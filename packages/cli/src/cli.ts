@@ -6,6 +6,9 @@ import { init } from './commands/init.js';
 import { status } from './commands/status.js';
 import { destroy } from './commands/destroy.js';
 import { verify } from './commands/verify.js';
+import { connect } from './commands/connect.js';
+import { restore } from './commands/restore.js';
+import { upgrade } from './commands/upgrade.js';
 import { handleCLIError } from './utils/errors.js';
 import { setupTabCompletion, printCompletionScript } from './utils/completion.js';
 
@@ -57,8 +60,11 @@ if (!command) {
   console.log('Usage: byo <command> [options]\n');
   console.log('Commands:');
   console.log(`  ${pc.cyan('init')}        Deploy new email infrastructure`);
+  console.log(`  ${pc.cyan('connect')}     Connect to existing AWS SES infrastructure`);
+  console.log(`  ${pc.cyan('upgrade')}     Add features to existing connection`);
   console.log(`  ${pc.cyan('status')}      Show current infrastructure status`);
   console.log(`  ${pc.cyan('verify')}      Verify domain DNS records and SES status`);
+  console.log(`  ${pc.cyan('restore')}     Restore original AWS configuration`);
   console.log(`  ${pc.cyan('destroy')}     Remove all deployed infrastructure`);
   console.log(`  ${pc.cyan('completion')}  Generate shell completion script\n`);
   console.log('Options:');
@@ -98,6 +104,28 @@ async function run() {
         }
         await verify({
           domain: flags.domain,
+        });
+        break;
+
+      case 'connect':
+        await connect({
+          provider: flags.provider,
+          region: flags.region,
+          yes: flags.yes,
+        });
+        break;
+
+      case 'upgrade':
+        await upgrade({
+          region: flags.region,
+          yes: flags.yes,
+        });
+        break;
+
+      case 'restore':
+        await restore({
+          region: flags.region,
+          yes: flags.yes,
         });
         break;
 
