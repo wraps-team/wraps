@@ -8,13 +8,21 @@ import {
   promptRegion,
   promptDomain,
   promptVercelConfig,
-  promptIntegrationLevel,
+  promptFeatureSelection,
   confirmDeploy,
 } from '../utils/prompts.js';
 import { DeploymentProgress, displaySuccess } from '../utils/output.js';
 import { deployEmailStack } from '../infrastructure/email-stack.js';
 import { ensurePulumiWorkDir, getPulumiWorkDir } from '../utils/fs.js';
 import { ensurePulumiInstalled } from '../utils/pulumi.js';
+import {
+  loadConnectionMetadata,
+  saveConnectionMetadata,
+  createConnectionMetadata,
+  updateFeatureMetadata,
+  ConnectionMetadata,
+  FeatureConfig,
+} from '../utils/metadata.js';
 
 /**
  * Init command - Deploy new email infrastructure
@@ -63,13 +71,103 @@ export async function init(options: InitOptions): Promise<void> {
     vercelConfig = await promptVercelConfig();
   }
 
-  // Get integration level
-  let integrationLevel: 'dashboard-only' | 'enhanced';
-  if (options.enhanced !== undefined) {
-    integrationLevel = options.enhanced ? 'enhanced' : 'dashboard-only';
-  } else {
-    integrationLevel = await promptIntegrationLevel();
+  // 4. Check if connection already exists
+  const existingConnection = await loadConnectionMetadata(identity.accountId, region);
+  if (existingConnection) {
+    clack.log.warn(
+      `Connection already exists for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
+    );
+    clack.log.info(`Created: ${existingConnection.timestamp}`);
+    clack.log.info(`Use ${pc.cyan('byo status')} to view current setup`);
+    clack.log.info(`Use ${pc.cyan('byo upgrade')} to add more features`);
+    process.exit(0);
   }
+
+  // 5. Feature selection
+  let selectedFeatures: string[];
+  if (options.enhanced !== undefined) {
+    // Use legacy enhanced flag if provided
+    selectedFeatures = options.enhanced
+      ? ['configSet', 'bounceHandling', 'complaintHandling', 'emailHistory', 'dashboardAccess']
+      : ['dashboardAccess'];
+  } else {
+    selectedFeatures = await promptFeatureSelection();
+  }
+
+  // 6. Create metadata to track deployment
+  const metadata = createConnectionMetadata(identity.accountId, region, provider);
+  if (vercelConfig) {
+    metadata.vercel = vercelConfig;
+  }
+
+  // Track selected features in metadata
+  const featureConfigs: Record<string, FeatureConfig> = {};
+
+  if (selectedFeatures.includes('configSet')) {
+    featureConfigs.configSet = {
+      enabled: true,
+      action: 'deploy-new',
+      originalValue: null,
+      currentValue: 'byo-tracking',
+    };
+    updateFeatureMetadata(metadata, 'configSet', featureConfigs.configSet);
+  }
+
+  if (selectedFeatures.includes('bounceHandling')) {
+    featureConfigs.bounceHandling = {
+      enabled: true,
+      action: 'deploy-new',
+      originalValue: null,
+      currentValue: 'byo-bounce-complaints',
+    };
+    updateFeatureMetadata(metadata, 'bounceHandling', featureConfigs.bounceHandling);
+  }
+
+  if (selectedFeatures.includes('complaintHandling')) {
+    featureConfigs.complaintHandling = {
+      enabled: true,
+      action: 'deploy-new',
+      originalValue: null,
+      currentValue: 'byo-bounce-complaints',
+    };
+    updateFeatureMetadata(metadata, 'complaintHandling', featureConfigs.complaintHandling);
+  }
+
+  if (selectedFeatures.includes('emailHistory')) {
+    featureConfigs.emailHistory = {
+      enabled: true,
+      action: 'deploy-new',
+      originalValue: null,
+      currentValue: 'byo-email-history',
+    };
+    updateFeatureMetadata(metadata, 'emailHistory', featureConfigs.emailHistory);
+  }
+
+  if (selectedFeatures.includes('eventProcessor')) {
+    featureConfigs.eventProcessor = {
+      enabled: true,
+      action: 'deploy-new',
+      originalValue: null,
+      currentValue: 'byo-event-processor',
+    };
+    updateFeatureMetadata(metadata, 'eventProcessor', featureConfigs.eventProcessor);
+  }
+
+  if (selectedFeatures.includes('dashboardAccess')) {
+    featureConfigs.dashboardAccess = {
+      enabled: true,
+      action: 'deploy-new',
+      originalValue: null,
+      currentValue: 'byo-email-role',
+    };
+    updateFeatureMetadata(metadata, 'dashboardAccess', featureConfigs.dashboardAccess);
+  }
+
+  // Determine integration level based on features
+  const integrationLevel =
+    selectedFeatures.includes('emailHistory') || selectedFeatures.includes('eventProcessor')
+      ? 'enhanced'
+      : 'dashboard-only';
 
   // Confirm deployment (skip if --yes flag)
   if (!options.yes) {
@@ -80,7 +178,7 @@ export async function init(options: InitOptions): Promise<void> {
     }
   }
 
-  // 4. Build stack configuration
+  // 7. Build stack configuration
   const stackConfig: EmailStackConfig = {
     provider,
     region,
@@ -89,7 +187,7 @@ export async function init(options: InitOptions): Promise<void> {
     integrationLevel,
   };
 
-  // 5. Deploy infrastructure using Pulumi
+  // 8. Deploy infrastructure using Pulumi
   let outputs;
   try {
     outputs = await progress.execute(
@@ -156,7 +254,13 @@ export async function init(options: InitOptions): Promise<void> {
     throw new Error(`Pulumi deployment failed: ${error.message}`);
   }
 
-  // 6. Check if Route53 hosted zone exists and create DNS records automatically
+  // 9. Save metadata for future upgrades and restore
+  metadata.pulumiStackName = `byo-${identity.accountId}-${region}`;
+  await saveConnectionMetadata(metadata);
+
+  progress.info('Connection metadata saved for upgrade and restore capability');
+
+  // 10. Check if Route53 hosted zone exists and create DNS records automatically
   let dnsAutoCreated = false;
   if (outputs.domain && outputs.dkimTokens && outputs.dkimTokens.length > 0) {
     const { findHostedZone, createDNSRecords } = await import('../utils/route53.js');
@@ -175,7 +279,7 @@ export async function init(options: InitOptions): Promise<void> {
     }
   }
 
-  // 7. Format DNS records if domain was provided and DNS wasn't auto-created
+  // 11. Format DNS records if domain was provided and DNS wasn't auto-created
   const dnsRecords = [];
   if (outputs.domain && outputs.dkimTokens && outputs.dkimTokens.length > 0 && !dnsAutoCreated) {
     // Add DKIM CNAME records
@@ -188,7 +292,7 @@ export async function init(options: InitOptions): Promise<void> {
     }
   }
 
-  // 8. Display success message
+  // 12. Display success message
   displaySuccess({
     roleArn: outputs.roleArn,
     configSetName: outputs.configSetName,
