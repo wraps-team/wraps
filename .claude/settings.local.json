@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm build:*)",
+      "Bash(pnpm --dir /Users/jarod/Projects/byo/packages/cli build)",
+      "Bash(/Users/jarod/Projects/byo/packages/cli/dist/cli.js init:*)",
+      "WebFetch(domain:bomb.sh)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebSearch",
+      "Bash(pnpm --dir /Users/jarod/Projects/byo/packages/cli install)",
+      "Bash(pnpm --dir /Users/jarod/Projects/byo/packages/cli add -D @types/args)",
+      "Bash(/Users/jarod/Projects/byo/packages/cli/dist/cli.js)",
+      "Bash(/Users/jarod/Projects/byo/packages/cli/dist/cli.js completion:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.pulumi.com)",
+      "Bash(AWS_PROFILE=kid-local ./dist/cli.js:*)",
+      "Bash(git init:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

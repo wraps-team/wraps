@@ -1,0 +1,55 @@
+{
+  "name": "@byo/cli",
+  "version": "0.1.0",
+  "description": "CLI for deploying BYO email infrastructure",
+  "type": "module",
+  "bin": {
+    "byo": "./dist/cli.js"
+  },
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "aws",
+    "ses",
+    "email",
+    "infrastructure",
+    "cli"
+  ],
+  "author": "BYO",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-cloudformation": "^3.490.0",
+    "@aws-sdk/client-dynamodb": "^3.490.0",
+    "@aws-sdk/client-route-53": "3.925.0",
+    "@aws-sdk/client-ses": "^3.490.0",
+    "@aws-sdk/client-sesv2": "3.925.0",
+    "@aws-sdk/client-sns": "^3.490.0",
+    "@aws-sdk/client-sts": "^3.490.0",
+    "@clack/prompts": "^0.11.0",
+    "@pulumi/aws": "^6.20.0",
+    "@pulumi/pulumi": "^3.100.0",
+    "args": "^5.0.3",
+    "cosmiconfig": "^9.0.0",
+    "esbuild": "^0.19.0",
+    "picocolors": "^1.1.1",
+    "tabtab": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/args": "5.0.4",
+    "@types/node": "^20.11.0",
+    "eslint": "^8.56.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

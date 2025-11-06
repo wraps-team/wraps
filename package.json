@@ -1,0 +1,27 @@
+{
+  "name": "byo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Bring Your Own Cloud - Deploy email infrastructure to your AWS account",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/byo-team/byo.git"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.2.3"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
