@@ -1,8 +1,0 @@
-{
-  "name": "byo-webhook-sender",
-  "version": "1.0.0",
-  "type": "module",
-  "devDependencies": {
-    "@types/aws-lambda": "^8.10.130"
-  }
-}
