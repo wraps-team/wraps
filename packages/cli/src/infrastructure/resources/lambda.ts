@@ -2,9 +2,10 @@ import * as pulumi from '@pulumi/pulumi';
 import * as aws from '@pulumi/aws';
 import { build } from 'esbuild';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { tmpdir } from 'os';
 import { randomBytes } from 'crypto';
+import { fileURLToPath } from 'url';
 
 /**
  * Lambda configuration
@@ -52,11 +53,44 @@ async function bundleLambda(functionPath: string): Promise<string> {
 }
 
 /**
+ * Get the project root directory (where lambda/ folder is)
+ */
+function getProjectRoot(): string {
+  // In development: __dirname is packages/cli/dist
+  // In production: __dirname is packages/cli/dist
+  // Lambda source is always at project_root/lambda
+
+  // Get the CLI package directory
+  const cliDir = process.cwd();
+
+  // Try multiple locations
+  const possibleRoots = [
+    // Running from project root
+    cliDir,
+    // Running from packages/cli
+    join(cliDir, '..', '..'),
+    // Running from packages/cli/dist
+    join(cliDir, '..', '..', '..'),
+  ];
+
+  for (const root of possibleRoots) {
+    const lambdaDir = join(root, 'lambda', 'event-processor', 'index.ts');
+    if (existsSync(lambdaDir)) {
+      return root;
+    }
+  }
+
+  // Default to current directory
+  return cliDir;
+}
+
+/**
  * Deploy Lambda functions for email event processing
  */
 export async function deployLambdaFunctions(config: LambdaConfig): Promise<LambdaFunctions> {
   // Get the Lambda source directory
-  const lambdaDir = join(process.cwd(), 'lambda');
+  const projectRoot = getProjectRoot();
+  const lambdaDir = join(projectRoot, 'lambda');
 
   // Bundle event-processor
   const eventProcessorPath = join(lambdaDir, 'event-processor', 'index.ts');
