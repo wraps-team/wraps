@@ -1,5 +1,5 @@
-import * as clack from '@clack/prompts';
-import pc from 'picocolors';
+import * as clack from "@clack/prompts";
+import pc from "picocolors";
 
 /**
  * Deployment progress tracker with spinners using clack
@@ -69,7 +69,7 @@ export class DeploymentProgress {
    */
   stop(message?: string) {
     if (this.currentSpinner) {
-      this.currentSpinner.stop(message || '');
+      this.currentSpinner.stop(message || "");
     }
   }
 }
@@ -77,16 +77,16 @@ export class DeploymentProgress {
 /**
  * DNS record type
  */
-export interface DNSRecord {
+export type DNSRecord = {
   name: string;
   type: string;
   value: string;
-}
+};
 
 /**
  * Success output configuration
  */
-export interface SuccessOutputs {
+export type SuccessOutputs = {
   roleArn: string;
   configSetName?: string;
   region: string;
@@ -94,38 +94,38 @@ export interface SuccessOutputs {
   tableName?: string;
   dnsAutoCreated?: boolean;
   domain?: string;
-}
+};
 
 /**
  * Display success message with infrastructure outputs
  */
 export function displaySuccess(outputs: SuccessOutputs) {
   const lines = [
-    '',
-    pc.bold('Role ARN:'),
+    "",
+    pc.bold("Role ARN:"),
     `  ${pc.cyan(outputs.roleArn)}`,
-    '',
-    `${pc.bold('Region:')} ${pc.cyan(outputs.region)}`,
+    "",
+    `${pc.bold("Region:")} ${pc.cyan(outputs.region)}`,
   ];
 
   if (outputs.configSetName) {
-    lines.push(`${pc.bold('Config Set:')} ${pc.cyan(outputs.configSetName)}`);
+    lines.push(`${pc.bold("Config Set:")} ${pc.cyan(outputs.configSetName)}`);
   }
 
   if (outputs.tableName) {
-    lines.push(`${pc.bold('DynamoDB Table:')} ${pc.cyan(outputs.tableName)}`);
+    lines.push(`${pc.bold("DynamoDB Table:")} ${pc.cyan(outputs.tableName)}`);
   }
 
   lines.push(
-    '',
-    pc.bold('Next steps:'),
-    `  1. Install SDK: ${pc.yellow('npm install @byo/email')}`,
-    `  2. View dashboard: ${pc.blue('https://dashboard.byo.dev')}`,
-    ''
+    "",
+    pc.bold("Next steps:"),
+    `  1. Install SDK: ${pc.yellow("npm install @byo/email")}`,
+    `  2. View dashboard: ${pc.blue("https://dashboard.byo.dev")}`,
+    ""
   );
 
-  clack.outro(pc.green('Email infrastructure deployed successfully!'));
-  console.log(lines.join('\n'));
+  clack.outro(pc.green("Email infrastructure deployed successfully!"));
+  console.log(lines.join("\n"));
 
   // Show DNS auto-creation message
   if (outputs.dnsAutoCreated && outputs.domain) {
@@ -133,37 +133,38 @@ export function displaySuccess(outputs: SuccessOutputs) {
       `DNS records (DKIM, SPF, DMARC) were automatically created in Route53 for ${pc.cyan(
         outputs.domain
       )}.\n\nVerification should complete within a few minutes.`,
-      pc.green('✓ DNS Auto-Configured')
+      pc.green("✓ DNS Auto-Configured")
     );
   }
 
   if (outputs.dnsRecords && outputs.dnsRecords.length > 0) {
     // Extract domain from first DKIM record
-    const domain = outputs.dnsRecords[0]?.name.split('._domainkey.')[1];
+    const domain = outputs.dnsRecords[0]?.name.split("._domainkey.")[1];
 
     const dnsLines = [
-      pc.bold('DKIM Records (CNAME):'),
+      pc.bold("DKIM Records (CNAME):"),
       ...outputs.dnsRecords.map(
-        (record) => `  ${pc.cyan(record.name)} ${pc.dim(record.type)} "${record.value}"`
+        (record) =>
+          `  ${pc.cyan(record.name)} ${pc.dim(record.type)} "${record.value}"`
       ),
     ];
 
     if (domain) {
       dnsLines.push(
-        '',
-        pc.bold('SPF Record (TXT):'),
-        `  ${pc.cyan(domain)} ${pc.dim('TXT')} "v=spf1 include:amazonses.com ~all"`,
-        '',
-        pc.bold('DMARC Record (TXT):'),
-        `  ${pc.cyan(`_dmarc.${domain}`)} ${pc.dim('TXT')} "v=DMARC1; p=quarantine; rua=mailto:postmaster@${domain}"`
+        "",
+        pc.bold("SPF Record (TXT):"),
+        `  ${pc.cyan(domain)} ${pc.dim("TXT")} "v=spf1 include:amazonses.com ~all"`,
+        "",
+        pc.bold("DMARC Record (TXT):"),
+        `  ${pc.cyan(`_dmarc.${domain}`)} ${pc.dim("TXT")} "v=DMARC1; p=quarantine; rua=mailto:postmaster@${domain}"`
       );
     }
 
-    clack.note(dnsLines.join('\n'), 'DNS Records to add:');
+    clack.note(dnsLines.join("\n"), "DNS Records to add:");
 
     console.log(
-      `\n${pc.dim('Run:')} ${pc.yellow(`byo verify --domain ${domain}`)} ${pc.dim(
-        '(after DNS propagates)'
+      `\n${pc.dim("Run:")} ${pc.yellow(`byo verify --domain ${domain}`)} ${pc.dim(
+        "(after DNS propagates)"
       )}\n`
     );
   }
@@ -172,12 +173,12 @@ export function displaySuccess(outputs: SuccessOutputs) {
 /**
  * Status output configuration
  */
-export interface StatusOutputs {
-  integrationLevel: 'dashboard-only' | 'enhanced';
+export type StatusOutputs = {
+  integrationLevel: "dashboard-only" | "enhanced";
   region: string;
   domains: Array<{
     domain: string;
-    status: 'verified' | 'pending' | 'failed';
+    status: "verified" | "pending" | "failed";
     dkimTokens?: string[];
   }>;
   resources: {
@@ -187,51 +188,60 @@ export interface StatusOutputs {
     lambdaFunctions?: number;
     snsTopics?: number;
   };
-}
+};
 
 /**
  * Display status information
  */
 export function displayStatus(status: StatusOutputs) {
-  clack.intro(pc.bold('BYO Email Infrastructure'));
+  clack.intro(pc.bold("BYO Email Infrastructure"));
 
   const infoLines = [
-    `${pc.bold('Integration:')} ${pc.cyan(status.integrationLevel)}`,
-    `${pc.bold('Region:')} ${pc.cyan(status.region)}`,
+    `${pc.bold("Integration:")} ${pc.cyan(status.integrationLevel)}`,
+    `${pc.bold("Region:")} ${pc.cyan(status.region)}`,
   ];
 
   if (status.domains.length > 0) {
     const domainStrings = status.domains.map((d) => {
-      const statusIcon = d.status === 'verified' ? '✓' : d.status === 'pending' ? '⏱' : '✗';
+      const statusIcon =
+        d.status === "verified" ? "✓" : d.status === "pending" ? "⏱" : "✗";
       const statusColor =
-        d.status === 'verified' ? pc.green : d.status === 'pending' ? pc.yellow : pc.red;
-      return `    ${d.domain} ${statusColor(statusIcon + ' ' + d.status)}`;
+        d.status === "verified"
+          ? pc.green
+          : d.status === "pending"
+            ? pc.yellow
+            : pc.red;
+      return `    ${d.domain} ${statusColor(`${statusIcon} ${d.status}`)}`;
     });
-    infoLines.push(`${pc.bold('Domains:')}\n${domainStrings.join('\n')}`);
+    infoLines.push(`${pc.bold("Domains:")}\n${domainStrings.join("\n")}`);
   }
 
-  clack.note(infoLines.join('\n'), 'Configuration');
+  clack.note(infoLines.join("\n"), "Configuration");
 
   // Resources
   const resourceLines = [];
 
   if (status.resources.roleArn) {
-    resourceLines.push(`  ${pc.green('✓')} IAM Role: ${pc.cyan(status.resources.roleArn)}`);
+    resourceLines.push(
+      `  ${pc.green("✓")} IAM Role: ${pc.cyan(status.resources.roleArn)}`
+    );
   }
 
   if (status.resources.configSetName) {
     resourceLines.push(
-      `  ${pc.green('✓')} Configuration Set: ${pc.cyan(status.resources.configSetName)}`
+      `  ${pc.green("✓")} Configuration Set: ${pc.cyan(status.resources.configSetName)}`
     );
   }
 
   if (status.resources.tableName) {
-    resourceLines.push(`  ${pc.green('✓')} DynamoDB Table: ${pc.cyan(status.resources.tableName)}`);
+    resourceLines.push(
+      `  ${pc.green("✓")} DynamoDB Table: ${pc.cyan(status.resources.tableName)}`
+    );
   }
 
   if (status.resources.lambdaFunctions) {
     resourceLines.push(
-      `  ${pc.green('✓')} Lambda Functions: ${pc.cyan(
+      `  ${pc.green("✓")} Lambda Functions: ${pc.cyan(
         `${status.resources.lambdaFunctions} deployed`
       )}`
     );
@@ -239,44 +249,48 @@ export function displayStatus(status: StatusOutputs) {
 
   if (status.resources.snsTopics) {
     resourceLines.push(
-      `  ${pc.green('✓')} SNS Topics: ${pc.cyan(`${status.resources.snsTopics} configured`)}`
+      `  ${pc.green("✓")} SNS Topics: ${pc.cyan(`${status.resources.snsTopics} configured`)}`
     );
   }
 
-  clack.note(resourceLines.join('\n'), 'Resources');
+  clack.note(resourceLines.join("\n"), "Resources");
 
   // Show DNS records for pending domains
-  const pendingDomains = status.domains.filter((d) => d.status === 'pending' && d.dkimTokens);
+  const pendingDomains = status.domains.filter(
+    (d) => d.status === "pending" && d.dkimTokens
+  );
   if (pendingDomains.length > 0) {
     for (const domain of pendingDomains) {
       if (domain.dkimTokens && domain.dkimTokens.length > 0) {
         const dnsLines = [
-          pc.bold('DKIM Records (CNAME):'),
+          pc.bold("DKIM Records (CNAME):"),
           ...domain.dkimTokens.map(
             (token) =>
-              `  ${pc.cyan(`${token}._domainkey.${domain.domain}`)} ${pc.dim('CNAME')} "${token}.dkim.amazonses.com"`
+              `  ${pc.cyan(`${token}._domainkey.${domain.domain}`)} ${pc.dim("CNAME")} "${token}.dkim.amazonses.com"`
           ),
-          '',
-          pc.bold('SPF Record (TXT):'),
-          `  ${pc.cyan(domain.domain)} ${pc.dim('TXT')} "v=spf1 include:amazonses.com ~all"`,
-          '',
-          pc.bold('DMARC Record (TXT):'),
-          `  ${pc.cyan(`_dmarc.${domain.domain}`)} ${pc.dim('TXT')} "v=DMARC1; p=quarantine; rua=mailto:postmaster@${domain.domain}"`,
+          "",
+          pc.bold("SPF Record (TXT):"),
+          `  ${pc.cyan(domain.domain)} ${pc.dim("TXT")} "v=spf1 include:amazonses.com ~all"`,
+          "",
+          pc.bold("DMARC Record (TXT):"),
+          `  ${pc.cyan(`_dmarc.${domain.domain}`)} ${pc.dim("TXT")} "v=DMARC1; p=quarantine; rua=mailto:postmaster@${domain.domain}"`,
         ];
 
-        clack.note(dnsLines.join('\n'), `DNS Records for ${domain.domain}`);
+        clack.note(dnsLines.join("\n"), `DNS Records for ${domain.domain}`);
       }
     }
 
     // Show verify command with first pending domain as example
     const exampleDomain = pendingDomains[0].domain;
     console.log(
-      `\n${pc.dim('Run:')} ${pc.yellow(`byo verify --domain ${exampleDomain}`)} ${pc.dim(
-        '(after DNS propagates)'
+      `\n${pc.dim("Run:")} ${pc.yellow(`byo verify --domain ${exampleDomain}`)} ${pc.dim(
+        "(after DNS propagates)"
       )}\n`
     );
   }
 
-  console.log(`\n${pc.bold('Dashboard:')} ${pc.blue('https://dashboard.byo.dev')}`);
-  console.log(`${pc.bold('Docs:')} ${pc.blue('https://docs.byo.dev')}\n`);
+  console.log(
+    `\n${pc.bold("Dashboard:")} ${pc.blue("https://dashboard.byo.dev")}`
+  );
+  console.log(`${pc.bold("Docs:")} ${pc.blue("https://docs.byo.dev")}\n`);
 }

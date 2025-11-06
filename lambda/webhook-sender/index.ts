@@ -1,18 +1,21 @@
-import { SNSEvent } from 'aws-lambda';
+import type { SNSEvent } from "aws-lambda";
 
-const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
+const WEBHOOK_URL = process.env.WEBHOOK_URL || "";
 
 /**
  * Lambda handler for forwarding email events to a webhook endpoint
  */
 export async function handler(event: SNSEvent) {
-  console.log('Received SNS event for webhook:', JSON.stringify(event, null, 2));
+  console.log(
+    "Received SNS event for webhook:",
+    JSON.stringify(event, null, 2)
+  );
 
   if (!WEBHOOK_URL) {
-    console.log('No webhook URL configured, skipping');
+    console.log("No webhook URL configured, skipping");
     return {
       statusCode: 200,
-      body: JSON.stringify({ message: 'No webhook URL configured' }),
+      body: JSON.stringify({ message: "No webhook URL configured" }),
     };
   }
 
@@ -23,15 +26,15 @@ export async function handler(event: SNSEvent) {
       const message = JSON.parse(record.Sns.Message);
       const messageType = message.notificationType || message.eventType;
 
-      console.log('Forwarding to webhook:', messageType);
+      console.log("Forwarding to webhook:", messageType);
 
       // Send to webhook
       const response = await fetch(WEBHOOK_URL, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'BYO-Email-Webhook/1.0',
-          'X-BYO-Event-Type': messageType,
+          "Content-Type": "application/json",
+          "User-Agent": "BYO-Email-Webhook/1.0",
+          "X-BYO-Event-Type": messageType,
         },
         body: JSON.stringify({
           eventType: messageType,
@@ -47,18 +50,22 @@ export async function handler(event: SNSEvent) {
         }),
       });
 
-      if (!response.ok) {
-        console.error('Webhook request failed:', response.status, response.statusText);
+      if (response.ok) {
+        console.log("Webhook request successful:", response.status);
+        results.push({ success: true });
+      } else {
+        console.error(
+          "Webhook request failed:",
+          response.status,
+          response.statusText
+        );
         results.push({
           success: false,
           error: `HTTP ${response.status}: ${response.statusText}`,
         });
-      } else {
-        console.log('Webhook request successful:', response.status);
-        results.push({ success: true });
       }
     } catch (error) {
-      console.error('Error forwarding to webhook:', error);
+      console.error("Error forwarding to webhook:", error);
       results.push({
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -72,7 +79,7 @@ export async function handler(event: SNSEvent) {
   return {
     statusCode: failedCount > 0 ? 207 : 200, // 207 Multi-Status if some failed
     body: JSON.stringify({
-      message: 'Webhook processing complete',
+      message: "Webhook processing complete",
       total: results.length,
       successful: results.length - failedCount,
       failed: failedCount,

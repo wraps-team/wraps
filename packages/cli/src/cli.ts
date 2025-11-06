@@ -1,16 +1,19 @@
 #!/usr/bin/env node
-import args from 'args';
-import * as clack from '@clack/prompts';
-import pc from 'picocolors';
-import { init } from './commands/init.js';
-import { status } from './commands/status.js';
-import { destroy } from './commands/destroy.js';
-import { verify } from './commands/verify.js';
-import { connect } from './commands/connect.js';
-import { restore } from './commands/restore.js';
-import { upgrade } from './commands/upgrade.js';
-import { handleCLIError } from './utils/errors.js';
-import { setupTabCompletion, printCompletionScript } from './utils/completion.js';
+import * as clack from "@clack/prompts";
+import args from "args";
+import pc from "picocolors";
+import { connect } from "./commands/connect.js";
+import { destroy } from "./commands/destroy.js";
+import { init } from "./commands/init.js";
+import { restore } from "./commands/restore.js";
+import { status } from "./commands/status.js";
+import { upgrade } from "./commands/upgrade.js";
+import { verify } from "./commands/verify.js";
+import {
+  printCompletionScript,
+  setupTabCompletion,
+} from "./utils/completion.js";
+import { handleCLIError } from "./utils/errors.js";
 
 // Setup tab completion
 setupTabCompletion();
@@ -18,33 +21,33 @@ setupTabCompletion();
 // Configure args
 args.options([
   {
-    name: 'provider',
-    description: 'Hosting provider (vercel, aws, railway, other)',
+    name: "provider",
+    description: "Hosting provider (vercel, aws, railway, other)",
     defaultValue: undefined,
   },
   {
-    name: 'region',
-    description: 'AWS region',
+    name: "region",
+    description: "AWS region",
     defaultValue: undefined,
   },
   {
-    name: 'domain',
-    description: 'Domain to verify',
+    name: "domain",
+    description: "Domain to verify",
     defaultValue: undefined,
   },
   {
-    name: 'account',
-    description: 'AWS account ID or alias',
+    name: "account",
+    description: "AWS account ID or alias",
     defaultValue: undefined,
   },
   {
-    name: 'enhanced',
-    description: 'Use enhanced integration (Lambda, DynamoDB, SNS)',
+    name: "enhanced",
+    description: "Use enhanced integration (Lambda, DynamoDB, SNS)",
     defaultValue: undefined,
   },
   {
-    name: 'yes',
-    description: 'Skip confirmation prompts',
+    name: "yes",
+    description: "Skip confirmation prompts",
     defaultValue: false,
   },
 ]);
@@ -55,24 +58,34 @@ const [command] = args.sub;
 
 // Show help if no command
 if (!command) {
-  clack.intro(pc.bold('BYO CLI'));
-  console.log('Deploy email infrastructure to your AWS account\n');
-  console.log('Usage: byo <command> [options]\n');
-  console.log('Commands:');
-  console.log(`  ${pc.cyan('init')}        Deploy new email infrastructure`);
-  console.log(`  ${pc.cyan('connect')}     Connect to existing AWS SES infrastructure`);
-  console.log(`  ${pc.cyan('upgrade')}     Add features to existing connection`);
-  console.log(`  ${pc.cyan('status')}      Show current infrastructure status`);
-  console.log(`  ${pc.cyan('verify')}      Verify domain DNS records and SES status`);
-  console.log(`  ${pc.cyan('restore')}     Restore original AWS configuration`);
-  console.log(`  ${pc.cyan('destroy')}     Remove all deployed infrastructure`);
-  console.log(`  ${pc.cyan('completion')}  Generate shell completion script\n`);
-  console.log('Options:');
-  console.log(`  ${pc.dim('--provider')}  Hosting provider (vercel, aws, railway, other)`);
-  console.log(`  ${pc.dim('--region')}    AWS region`);
-  console.log(`  ${pc.dim('--domain')}    Domain to verify`);
-  console.log(`  ${pc.dim('--account')}   AWS account ID or alias\n`);
-  console.log(`Run ${pc.cyan('byo <command> --help')} for more information on a command.\n`);
+  clack.intro(pc.bold("BYO CLI"));
+  console.log("Deploy email infrastructure to your AWS account\n");
+  console.log("Usage: byo <command> [options]\n");
+  console.log("Commands:");
+  console.log(`  ${pc.cyan("init")}        Deploy new email infrastructure`);
+  console.log(
+    `  ${pc.cyan("connect")}     Connect to existing AWS SES infrastructure`
+  );
+  console.log(
+    `  ${pc.cyan("upgrade")}     Add features to existing connection`
+  );
+  console.log(`  ${pc.cyan("status")}      Show current infrastructure status`);
+  console.log(
+    `  ${pc.cyan("verify")}      Verify domain DNS records and SES status`
+  );
+  console.log(`  ${pc.cyan("restore")}     Restore original AWS configuration`);
+  console.log(`  ${pc.cyan("destroy")}     Remove all deployed infrastructure`);
+  console.log(`  ${pc.cyan("completion")}  Generate shell completion script\n`);
+  console.log("Options:");
+  console.log(
+    `  ${pc.dim("--provider")}  Hosting provider (vercel, aws, railway, other)`
+  );
+  console.log(`  ${pc.dim("--region")}    AWS region`);
+  console.log(`  ${pc.dim("--domain")}    Domain to verify`);
+  console.log(`  ${pc.dim("--account")}   AWS account ID or alias\n`);
+  console.log(
+    `Run ${pc.cyan("byo <command> --help")} for more information on a command.\n`
+  );
   process.exit(0);
 }
 
@@ -80,7 +93,7 @@ if (!command) {
 async function run() {
   try {
     switch (command) {
-      case 'init':
+      case "init":
         await init({
           provider: flags.provider,
           region: flags.region,
@@ -90,16 +103,18 @@ async function run() {
         });
         break;
 
-      case 'status':
+      case "status":
         await status({
           account: flags.account,
         });
         break;
 
-      case 'verify':
+      case "verify":
         if (!flags.domain) {
-          clack.log.error('--domain flag is required');
-          console.log(`\nUsage: ${pc.cyan('byo verify --domain yourapp.com')}\n`);
+          clack.log.error("--domain flag is required");
+          console.log(
+            `\nUsage: ${pc.cyan("byo verify --domain yourapp.com")}\n`
+          );
           process.exit(1);
         }
         await verify({
@@ -107,7 +122,7 @@ async function run() {
         });
         break;
 
-      case 'connect':
+      case "connect":
         await connect({
           provider: flags.provider,
           region: flags.region,
@@ -115,33 +130,33 @@ async function run() {
         });
         break;
 
-      case 'upgrade':
+      case "upgrade":
         await upgrade({
           region: flags.region,
           yes: flags.yes,
         });
         break;
 
-      case 'restore':
+      case "restore":
         await restore({
           region: flags.region,
           yes: flags.yes,
         });
         break;
 
-      case 'destroy':
+      case "destroy":
         await destroy({
           yes: flags.yes,
         });
         break;
 
-      case 'completion':
+      case "completion":
         printCompletionScript();
         break;
 
       default:
         clack.log.error(`Unknown command: ${command}`);
-        console.log(`\nRun ${pc.cyan('byo --help')} for available commands.\n`);
+        console.log(`\nRun ${pc.cyan("byo --help")} for available commands.\n`);
         process.exit(1);
     }
   } catch (error) {

@@ -12,12 +12,16 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "test": "turbo run test",
-    "lint": "turbo run lint",
+    "lint": "npx ultracite@latest check",
     "typecheck": "turbo run typecheck",
+    "check": "npx ultracite@latest check",
+    "fix": "npx ultracite@latest fix",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "turbo": "^2.2.3"
+    "@biomejs/biome": "2.3.4",
+    "turbo": "^2.2.3",
+    "ultracite": "6.3.2"
   },
   "engines": {
     "node": ">=20",

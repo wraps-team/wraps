@@ -1,46 +1,38 @@
 import {
-  SESClient,
-  ListIdentitiesCommand,
-  GetIdentityVerificationAttributesCommand,
-  ListConfigurationSetsCommand,
-  DescribeConfigurationSetCommand,
-} from '@aws-sdk/client-ses';
-import {
-  SNSClient,
-  ListTopicsCommand,
-  GetTopicAttributesCommand,
-} from '@aws-sdk/client-sns';
-import {
+  DescribeTableCommand,
   DynamoDBClient,
   ListTablesCommand,
-  DescribeTableCommand,
-} from '@aws-sdk/client-dynamodb';
+} from "@aws-sdk/client-dynamodb";
+import { IAMClient, ListRolesCommand } from "@aws-sdk/client-iam";
+import { LambdaClient, ListFunctionsCommand } from "@aws-sdk/client-lambda";
 import {
-  LambdaClient,
-  ListFunctionsCommand,
-  GetFunctionCommand,
-} from '@aws-sdk/client-lambda';
+  DescribeConfigurationSetCommand,
+  GetIdentityVerificationAttributesCommand,
+  ListConfigurationSetsCommand,
+  ListIdentitiesCommand,
+  SESClient,
+} from "@aws-sdk/client-ses";
 import {
-  IAMClient,
-  ListRolesCommand,
-  GetRoleCommand,
-} from '@aws-sdk/client-iam';
+  GetTopicAttributesCommand,
+  ListTopicsCommand,
+  SNSClient,
+} from "@aws-sdk/client-sns";
 
 /**
  * SES Identity with configuration
  */
-export interface SESIdentity {
+export type SESIdentity = {
   name: string;
-  type: 'Domain' | 'EmailAddress';
+  type: "Domain" | "EmailAddress";
   verified: boolean;
   configurationSet?: string;
   dkimEnabled?: boolean;
-}
+};
 
 /**
  * SES Configuration Set
  */
-export interface SESConfigurationSet {
+export type SESConfigurationSet = {
   name: string;
   eventDestinations: Array<{
     name: string;
@@ -49,62 +41,64 @@ export interface SESConfigurationSet {
     snsDestination?: string;
     cloudWatchDestination?: any;
   }>;
-}
+};
 
 /**
  * SNS Topic
  */
-export interface SNSTopic {
+export type SNSTopic = {
   arn: string;
   name: string;
   subscriptions?: number;
-}
+};
 
 /**
  * DynamoDB Table
  */
-export interface DynamoTable {
+export type DynamoTable = {
   name: string;
   status: string;
   itemCount?: number;
   sizeBytes?: number;
-}
+};
 
 /**
  * Lambda Function
  */
-export interface LambdaFunction {
+export type LambdaFunction = {
   name: string;
   arn: string;
   runtime?: string;
   handler?: string;
-}
+};
 
 /**
  * IAM Role
  */
-export interface IAMRole {
+export type IAMRole = {
   name: string;
   arn: string;
   assumeRolePolicyDocument: string;
-}
+};
 
 /**
  * Complete scan of existing AWS resources
  */
-export interface AWSResourceScan {
+export type AWSResourceScan = {
   identities: SESIdentity[];
   configurationSets: SESConfigurationSet[];
   snsTopics: SNSTopic[];
   dynamoTables: DynamoTable[];
   lambdaFunctions: LambdaFunction[];
   iamRoles: IAMRole[];
-}
+};
 
 /**
  * Scan all existing SES identities (domains and email addresses)
  */
-export async function scanSESIdentities(region: string): Promise<SESIdentity[]> {
+export async function scanSESIdentities(
+  region: string
+): Promise<SESIdentity[]> {
   const ses = new SESClient({ region });
   const identities: SESIdentity[] = [];
 
@@ -131,15 +125,14 @@ export async function scanSESIdentities(region: string): Promise<SESIdentity[]> 
       const attr = attrs[name];
       identities.push({
         name,
-        type: name.includes('@') ? 'EmailAddress' : 'Domain',
-        verified: attr?.VerificationStatus === 'Success',
-        dkimEnabled: attr?.DkimEnabled,
+        type: name.includes("@") ? "EmailAddress" : "Domain",
+        verified: attr?.VerificationStatus === "Success",
       });
     }
 
     return identities;
   } catch (error: any) {
-    console.error('Error scanning SES identities:', error.message);
+    console.error("Error scanning SES identities:", error.message);
     return [];
   }
 }
@@ -156,7 +149,9 @@ export async function scanSESConfigurationSets(
   try {
     // List configuration sets
     const listResponse = await ses.send(new ListConfigurationSetsCommand({}));
-    const configSetNames = listResponse.ConfigurationSets?.map((cs) => cs.Name!).filter(Boolean) || [];
+    const configSetNames =
+      listResponse.ConfigurationSets?.map((cs) => cs.Name!).filter(Boolean) ||
+      [];
 
     // Get details for each config set
     for (const name of configSetNames) {
@@ -168,7 +163,7 @@ export async function scanSESConfigurationSets(
         const eventDestinations =
           describeResponse.EventDestinations?.map((ed) => ({
             name: ed.Name!,
-            enabled: ed.Enabled || false,
+            enabled: ed.Enabled ?? false,
             matchingEventTypes: ed.MatchingEventTypes || [],
             snsDestination: ed.SNSDestination?.TopicARN,
             cloudWatchDestination: ed.CloudWatchDestination,
@@ -185,7 +180,7 @@ export async function scanSESConfigurationSets(
 
     return configSets;
   } catch (error: any) {
-    console.error('Error scanning SES configuration sets:', error.message);
+    console.error("Error scanning SES configuration sets:", error.message);
     return [];
   }
 }
@@ -200,7 +195,8 @@ export async function scanSNSTopics(region: string): Promise<SNSTopic[]> {
   try {
     // List all topics
     const listResponse = await sns.send(new ListTopicsCommand({}));
-    const topicArns = listResponse.Topics?.map((t) => t.TopicArn!).filter(Boolean) || [];
+    const topicArns =
+      listResponse.Topics?.map((t) => t.TopicArn!).filter(Boolean) || [];
 
     // Get details for each topic
     for (const arn of topicArns) {
@@ -209,9 +205,9 @@ export async function scanSNSTopics(region: string): Promise<SNSTopic[]> {
           new GetTopicAttributesCommand({ TopicArn: arn })
         );
 
-        const name = arn.split(':').pop() || arn;
-        const subscriptions = parseInt(
-          attrsResponse.Attributes?.SubscriptionsConfirmed || '0',
+        const name = arn.split(":").pop() || arn;
+        const subscriptions = Number.parseInt(
+          attrsResponse.Attributes?.SubscriptionsConfirmed || "0",
           10
         );
 
@@ -221,13 +217,16 @@ export async function scanSNSTopics(region: string): Promise<SNSTopic[]> {
           subscriptions,
         });
       } catch (error: any) {
-        console.error(`Error getting topic attributes for ${arn}:`, error.message);
+        console.error(
+          `Error getting topic attributes for ${arn}:`,
+          error.message
+        );
       }
     }
 
     return topics;
   } catch (error: any) {
-    console.error('Error scanning SNS topics:', error.message);
+    console.error("Error scanning SNS topics:", error.message);
     return [];
   }
 }
@@ -255,7 +254,7 @@ export async function scanDynamoTables(region: string): Promise<DynamoTable[]> {
         if (table) {
           tables.push({
             name,
-            status: table.TableStatus || 'UNKNOWN',
+            status: table.TableStatus || "UNKNOWN",
             itemCount: table.ItemCount,
             sizeBytes: table.TableSizeBytes,
           });
@@ -267,7 +266,7 @@ export async function scanDynamoTables(region: string): Promise<DynamoTable[]> {
 
     return tables;
   } catch (error: any) {
-    console.error('Error scanning DynamoDB tables:', error.message);
+    console.error("Error scanning DynamoDB tables:", error.message);
     return [];
   }
 }
@@ -275,7 +274,9 @@ export async function scanDynamoTables(region: string): Promise<DynamoTable[]> {
 /**
  * Scan Lambda functions (filter for email-related ones)
  */
-export async function scanLambdaFunctions(region: string): Promise<LambdaFunction[]> {
+export async function scanLambdaFunctions(
+  region: string
+): Promise<LambdaFunction[]> {
   const lambda = new LambdaClient({ region });
   const functions: LambdaFunction[] = [];
 
@@ -297,7 +298,7 @@ export async function scanLambdaFunctions(region: string): Promise<LambdaFunctio
 
     return functions;
   } catch (error: any) {
-    console.error('Error scanning Lambda functions:', error.message);
+    console.error("Error scanning Lambda functions:", error.message);
     return [];
   }
 }
@@ -329,18 +330,18 @@ export async function scanIAMRoles(region: string): Promise<IAMRole[]> {
           roles.push({
             name: role.RoleName,
             arn: role.Arn,
-            assumeRolePolicyDocument: role.AssumeRolePolicyDocument || '',
+            assumeRolePolicyDocument: role.AssumeRolePolicyDocument || "",
           });
         }
       }
 
       marker = listResponse.Marker;
-      hasMore = listResponse.IsTruncated || false;
+      hasMore = listResponse.IsTruncated ?? false;
     }
 
     return roles;
   } catch (error: any) {
-    console.error('Error scanning IAM roles:', error.message);
+    console.error("Error scanning IAM roles:", error.message);
     return [];
   }
 }
@@ -348,7 +349,9 @@ export async function scanIAMRoles(region: string): Promise<IAMRole[]> {
 /**
  * Scan all relevant AWS resources for email infrastructure
  */
-export async function scanAWSResources(region: string): Promise<AWSResourceScan> {
+export async function scanAWSResources(
+  region: string
+): Promise<AWSResourceScan> {
   const [
     identities,
     configurationSets,
@@ -382,14 +385,14 @@ export function filterBYOResources(scan: AWSResourceScan): AWSResourceScan {
   return {
     identities: scan.identities, // All identities are relevant
     configurationSets: scan.configurationSets.filter((cs) =>
-      cs.name.startsWith('byo-')
+      cs.name.startsWith("byo-")
     ),
-    snsTopics: scan.snsTopics.filter((t) => t.name.startsWith('byo-')),
-    dynamoTables: scan.dynamoTables.filter((t) => t.name.startsWith('byo-')),
+    snsTopics: scan.snsTopics.filter((t) => t.name.startsWith("byo-")),
+    dynamoTables: scan.dynamoTables.filter((t) => t.name.startsWith("byo-")),
     lambdaFunctions: scan.lambdaFunctions.filter((f) =>
-      f.name.startsWith('byo-')
+      f.name.startsWith("byo-")
     ),
-    iamRoles: scan.iamRoles.filter((r) => r.name.startsWith('byo-')),
+    iamRoles: scan.iamRoles.filter((r) => r.name.startsWith("byo-")),
   };
 }
 

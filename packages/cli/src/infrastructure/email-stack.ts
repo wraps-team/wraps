@@ -1,16 +1,18 @@
-import * as pulumi from '@pulumi/pulumi';
-import * as aws from '@pulumi/aws';
-import { EmailStackConfig, StackOutputs } from '../types/index.js';
-import { createVercelOIDC } from './vercel-oidc.js';
-import { createIAMRole } from './resources/iam.js';
-import { createSESResources } from './resources/ses.js';
-import { createDynamoDBTables } from './resources/dynamodb.js';
-import { deployLambdaFunctions } from './resources/lambda.js';
+import * as aws from "@pulumi/aws";
+import * as pulumi from "@pulumi/pulumi";
+import type { EmailStackConfig, StackOutputs } from "../types/index.js";
+import { createDynamoDBTables } from "./resources/dynamodb.js";
+import { createIAMRole } from "./resources/iam.js";
+import { deployLambdaFunctions } from "./resources/lambda.js";
+import { createSESResources } from "./resources/ses.js";
+import { createVercelOIDC } from "./vercel-oidc.js";
 
 /**
  * Deploy email infrastructure stack using Pulumi
  */
-export async function deployEmailStack(config: EmailStackConfig): Promise<StackOutputs> {
+export async function deployEmailStack(
+  config: EmailStackConfig
+): Promise<StackOutputs> {
   // Get current AWS account
   const identity = await aws.getCallerIdentity();
   const accountId = identity.accountId;
@@ -18,7 +20,7 @@ export async function deployEmailStack(config: EmailStackConfig): Promise<StackO
   let oidcProvider: aws.iam.OpenIdConnectProvider | undefined;
 
   // 1. Create OIDC provider if Vercel
-  if (config.provider === 'vercel' && config.vercel) {
+  if (config.provider === "vercel" && config.vercel) {
     oidcProvider = await createVercelOIDC({
       teamSlug: config.vercel.teamSlug,
       accountId,
@@ -36,7 +38,7 @@ export async function deployEmailStack(config: EmailStackConfig): Promise<StackO
 
   // 3. SES resources (if enhanced)
   let sesResources;
-  if (config.integrationLevel === 'enhanced') {
+  if (config.integrationLevel === "enhanced") {
     sesResources = await createSESResources({
       domain: config.domain,
       region: config.region,
@@ -45,13 +47,13 @@ export async function deployEmailStack(config: EmailStackConfig): Promise<StackO
 
   // 4. DynamoDB tables (if enhanced)
   let dynamoTables;
-  if (config.integrationLevel === 'enhanced') {
+  if (config.integrationLevel === "enhanced") {
     dynamoTables = await createDynamoDBTables();
   }
 
   // 5. Lambda functions (if enhanced)
   let lambdaFunctions;
-  if (config.integrationLevel === 'enhanced' && sesResources && dynamoTables) {
+  if (config.integrationLevel === "enhanced" && sesResources && dynamoTables) {
     lambdaFunctions = await deployLambdaFunctions({
       roleArn: role.arn,
       tableName: dynamoTables.emailHistory.name,
@@ -63,7 +65,7 @@ export async function deployEmailStack(config: EmailStackConfig): Promise<StackO
   // Return outputs
   return {
     roleArn: role.arn as any as string,
-    configSetName: sesResources?.configSet.name as any as string | undefined,
+    configSetName: sesResources?.configSet.configurationSetName as any as string | undefined,
     tableName: dynamoTables?.emailHistory.name as any as string | undefined,
     region: config.region,
     lambdaFunctions: lambdaFunctions
@@ -88,19 +90,21 @@ export async function runPulumiProgram(
   const stack = await pulumi.automation.LocalWorkspace.createOrSelectStack(
     {
       stackName,
-      projectName: 'byo-email',
+      projectName: "byo-email",
       program,
     },
     {
-      workDir: process.env.HOME + '/.byo/pulumi',
+      workDir: `${process.env.HOME}/.byo/pulumi`,
     }
   );
 
   // Set AWS region
-  await stack.setConfig('aws:region', { value: 'us-east-1' });
+  await stack.setConfig("aws:region", { value: "us-east-1" });
 
   // Run the deployment
-  const upResult = await stack.up({ onOutput: (msg) => process.stdout.write(msg) });
+  const upResult = await stack.up({
+    onOutput: (msg) => process.stdout.write(msg),
+  });
 
   // Get outputs
   const outputs = upResult.outputs;

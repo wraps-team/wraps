@@ -1,33 +1,33 @@
-import { readFile, writeFile } from 'fs/promises';
-import { existsSync } from 'fs';
-import { join } from 'path';
-import { getBYODir, ensureBYODir } from './fs.js';
+import { existsSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { ensureBYODir, getBYODir } from "./fs.js";
 
 /**
  * Feature configuration for a connection
  */
-export interface FeatureConfig {
+export type FeatureConfig = {
   enabled: boolean;
-  action: 'deploy-new' | 'replace' | 'skip';
+  action: "deploy-new" | "replace" | "skip";
   originalValue?: string | null;
   currentValue?: string | null;
-}
+};
 
 /**
  * Identity configuration tracking
  */
-export interface IdentityConfig {
+export type IdentityConfig = {
   name: string;
-  type: 'Domain' | 'EmailAddress';
+  type: "Domain" | "EmailAddress";
   originalConfigSet?: string | null;
   currentConfigSet?: string | null;
-  action: 'no-change' | 'attached' | 'replaced';
-}
+  action: "no-change" | "attached" | "replaced";
+};
 
 /**
  * Connection metadata for restore
  */
-export interface ConnectionMetadata {
+export type ConnectionMetadata = {
   accountId: string;
   region: string;
   provider: string;
@@ -46,13 +46,13 @@ export interface ConnectionMetadata {
   };
   identities: IdentityConfig[];
   pulumiStackName?: string;
-}
+};
 
 /**
  * Get the connections directory
  */
 function getConnectionsDir(): string {
-  return join(getBYODir(), 'connections');
+  return join(getBYODir(), "connections");
 }
 
 /**
@@ -69,7 +69,7 @@ async function ensureConnectionsDir(): Promise<void> {
   await ensureBYODir();
   const connectionsDir = getConnectionsDir();
   if (!existsSync(connectionsDir)) {
-    const { mkdir } = await import('fs/promises');
+    const { mkdir } = await import("node:fs/promises");
     await mkdir(connectionsDir, { recursive: true });
   }
 }
@@ -88,10 +88,10 @@ export async function loadConnectionMetadata(
   }
 
   try {
-    const content = await readFile(metadataPath, 'utf-8');
+    const content = await readFile(metadataPath, "utf-8");
     return JSON.parse(content) as ConnectionMetadata;
   } catch (error: any) {
-    console.error('Error loading connection metadata:', error.message);
+    console.error("Error loading connection metadata:", error.message);
     return null;
   }
 }
@@ -107,9 +107,9 @@ export async function saveConnectionMetadata(
 
   try {
     const content = JSON.stringify(metadata, null, 2);
-    await writeFile(metadataPath, content, 'utf-8');
+    await writeFile(metadataPath, content, "utf-8");
   } catch (error: any) {
-    console.error('Error saving connection metadata:', error.message);
+    console.error("Error saving connection metadata:", error.message);
     throw error;
   }
 }
@@ -124,7 +124,7 @@ export async function deleteConnectionMetadata(
   const metadataPath = getMetadataPath(accountId, region);
 
   if (existsSync(metadataPath)) {
-    const { unlink } = await import('fs/promises');
+    const { unlink } = await import("node:fs/promises");
     await unlink(metadataPath);
   }
 }
@@ -140,13 +140,13 @@ export async function listConnections(): Promise<ConnectionMetadata[]> {
   }
 
   try {
-    const { readdir } = await import('fs/promises');
+    const { readdir } = await import("node:fs/promises");
     const files = await readdir(connectionsDir);
     const connections: ConnectionMetadata[] = [];
 
     for (const file of files) {
-      if (file.endsWith('.json')) {
-        const content = await readFile(join(connectionsDir, file), 'utf-8');
+      if (file.endsWith(".json")) {
+        const content = await readFile(join(connectionsDir, file), "utf-8");
         try {
           const metadata = JSON.parse(content) as ConnectionMetadata;
           connections.push(metadata);
@@ -158,7 +158,7 @@ export async function listConnections(): Promise<ConnectionMetadata[]> {
 
     return connections;
   } catch (error: any) {
-    console.error('Error listing connections:', error.message);
+    console.error("Error listing connections:", error.message);
     return [];
   }
 }
@@ -197,7 +197,7 @@ export function createConnectionMetadata(
  */
 export function updateFeatureMetadata(
   metadata: ConnectionMetadata,
-  featureName: keyof ConnectionMetadata['features'],
+  featureName: keyof ConnectionMetadata["features"],
   config: FeatureConfig
 ): void {
   metadata.features[featureName] = config;
@@ -211,7 +211,9 @@ export function updateIdentityMetadata(
   identity: IdentityConfig
 ): void {
   // Remove existing entry if present
-  metadata.identities = metadata.identities.filter((i) => i.name !== identity.name);
+  metadata.identities = metadata.identities.filter(
+    (i) => i.name !== identity.name
+  );
   // Add new entry
   metadata.identities.push(identity);
 }
@@ -225,7 +227,7 @@ export function getReplacedFeatures(
   const replaced: Array<{ name: string; config: FeatureConfig }> = [];
 
   for (const [name, config] of Object.entries(metadata.features)) {
-    if (config && config.action === 'replace' && config.originalValue) {
+    if (config && config.action === "replace" && config.originalValue) {
       replaced.push({ name, config });
     }
   }
@@ -240,6 +242,6 @@ export function getModifiedIdentities(
   metadata: ConnectionMetadata
 ): IdentityConfig[] {
   return metadata.identities.filter(
-    (i) => i.action === 'attached' || i.action === 'replaced'
+    (i) => i.action === "attached" || i.action === "replaced"
   );
 }

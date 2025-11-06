@@ -1,26 +1,28 @@
-import * as pulumi from '@pulumi/pulumi';
-import * as aws from '@pulumi/aws';
-import { Provider, IntegrationLevel } from '../../types/index.js';
+import * as aws from "@pulumi/aws";
+import * as pulumi from "@pulumi/pulumi";
+import type { IntegrationLevel, Provider } from "../../types/index.js";
 
 /**
  * IAM role configuration
  */
-export interface IAMRoleConfig {
+export type IAMRoleConfig = {
   provider: Provider;
   oidcProvider?: aws.iam.OpenIdConnectProvider;
   vercelTeamSlug?: string;
   vercelProjectName?: string;
   integrationLevel: IntegrationLevel;
-}
+};
 
 /**
  * Create IAM role for email infrastructure
  */
-export async function createIAMRole(config: IAMRoleConfig): Promise<aws.iam.Role> {
+export async function createIAMRole(
+  config: IAMRoleConfig
+): Promise<aws.iam.Role> {
   // Build assume role policy based on provider
   let assumeRolePolicy: pulumi.Output<string>;
 
-  if (config.provider === 'vercel' && config.oidcProvider) {
+  if (config.provider === "vercel" && config.oidcProvider) {
     assumeRolePolicy = pulumi.interpolate`{
       "Version": "2012-10-17",
       "Statement": [{
@@ -39,7 +41,7 @@ export async function createIAMRole(config: IAMRoleConfig): Promise<aws.iam.Role
         }
       }]
     }`;
-  } else if (config.provider === 'aws') {
+  } else if (config.provider === "aws") {
     // Native AWS - EC2, Lambda, ECS can assume
     assumeRolePolicy = pulumi.output(`{
       "Version": "2012-10-17",
@@ -53,68 +55,68 @@ export async function createIAMRole(config: IAMRoleConfig): Promise<aws.iam.Role
     }`);
   } else {
     // Other providers - will use access keys
-    throw new Error('Other providers not yet implemented');
+    throw new Error("Other providers not yet implemented");
   }
 
-  const role = new aws.iam.Role('byo-email-role', {
-    name: 'byo-email-role',
+  const role = new aws.iam.Role("byo-email-role", {
+    name: "byo-email-role",
     assumeRolePolicy,
     tags: {
-      ManagedBy: 'byo-cli',
+      ManagedBy: "byo-cli",
       Provider: config.provider,
     },
   });
 
   // Attach policies based on integration level
-  if (config.integrationLevel === 'dashboard-only') {
+  if (config.integrationLevel === "dashboard-only") {
     // Read-only access
-    new aws.iam.RolePolicy('byo-email-dashboard-read-policy', {
+    new aws.iam.RolePolicy("byo-email-dashboard-read-policy", {
       role: role.name,
       policy: JSON.stringify({
-        Version: '2012-10-17',
+        Version: "2012-10-17",
         Statement: [
           {
-            Effect: 'Allow',
+            Effect: "Allow",
             Action: [
-              'ses:GetSendStatistics',
-              'ses:ListIdentities',
-              'ses:GetIdentityVerificationAttributes',
-              'cloudwatch:GetMetricData',
-              'cloudwatch:GetMetricStatistics',
-              'logs:FilterLogEvents',
+              "ses:GetSendStatistics",
+              "ses:ListIdentities",
+              "ses:GetIdentityVerificationAttributes",
+              "cloudwatch:GetMetricData",
+              "cloudwatch:GetMetricStatistics",
+              "logs:FilterLogEvents",
             ],
-            Resource: '*',
+            Resource: "*",
           },
         ],
       }),
     });
   } else {
     // Enhanced - send + read access
-    new aws.iam.RolePolicy('byo-email-policy', {
+    new aws.iam.RolePolicy("byo-email-policy", {
       role: role.name,
       policy: JSON.stringify({
-        Version: '2012-10-17',
+        Version: "2012-10-17",
         Statement: [
           {
-            Effect: 'Allow',
+            Effect: "Allow",
             Action: [
-              'ses:SendEmail',
-              'ses:SendRawEmail',
-              'ses:SendTemplatedEmail',
-              'ses:GetSendStatistics',
-              'ses:ListIdentities',
+              "ses:SendEmail",
+              "ses:SendRawEmail",
+              "ses:SendTemplatedEmail",
+              "ses:GetSendStatistics",
+              "ses:ListIdentities",
             ],
-            Resource: '*',
+            Resource: "*",
           },
           {
-            Effect: 'Allow',
+            Effect: "Allow",
             Action: [
-              'dynamodb:PutItem',
-              'dynamodb:GetItem',
-              'dynamodb:Query',
-              'dynamodb:Scan',
+              "dynamodb:PutItem",
+              "dynamodb:GetItem",
+              "dynamodb:Query",
+              "dynamodb:Scan",
             ],
-            Resource: 'arn:aws:dynamodb:*:*:table/byo-email-*',
+            Resource: "arn:aws:dynamodb:*:*:table/byo-email-*",
           },
         ],
       }),

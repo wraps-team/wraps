@@ -1,20 +1,20 @@
-import { mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
+import { existsSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 /**
  * Get the BYO configuration directory
  */
 export function getBYODir(): string {
-  return join(homedir(), '.byo');
+  return join(homedir(), ".byo");
 }
 
 /**
  * Get the Pulumi workspace directory
  */
 export function getPulumiWorkDir(): string {
-  return join(getBYODir(), 'pulumi');
+  return join(getBYODir(), "pulumi");
 }
 
 /**
@@ -40,5 +40,5 @@ export async function ensurePulumiWorkDir(): Promise<void> {
   // Set Pulumi to use local backend (file-based state)
   // This avoids needing to login to Pulumi Cloud
   process.env.PULUMI_BACKEND_URL = `file://${pulumiDir}`;
-  process.env.PULUMI_CONFIG_PASSPHRASE = ''; // Empty passphrase for simplicity
+  process.env.PULUMI_CONFIG_PASSPHRASE = ""; // Empty passphrase for simplicity
 }

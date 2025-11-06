@@ -1,61 +1,54 @@
-import * as pulumi from '@pulumi/pulumi';
-import * as clack from '@clack/prompts';
-import pc from 'picocolors';
-import { ConnectOptions, EmailStackConfig, BYOFeature } from '../types/index.js';
-import { validateAWSCredentials, getAWSRegion } from '../utils/aws.js';
+import * as clack from "@clack/prompts";
+import * as pulumi from "@pulumi/pulumi";
+import pc from "picocolors";
+import { deployEmailStack } from "../infrastructure/email-stack.js";
+import type { ConnectOptions, EmailStackConfig } from "../types/index.js";
+import { getAWSRegion, validateAWSCredentials } from "../utils/aws.js";
+import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/fs.js";
 import {
-  promptProvider,
-  promptRegion,
-  promptFeatureSelection,
-  promptConflictResolution,
-  promptSelectIdentities,
-  promptVercelConfig,
-  confirmConnect,
-  ConflictAction,
-} from '../utils/prompts.js';
-import { DeploymentProgress, displaySuccess } from '../utils/output.js';
-import { deployEmailStack } from '../infrastructure/email-stack.js';
-import { ensurePulumiWorkDir, getPulumiWorkDir } from '../utils/fs.js';
-import { ensurePulumiInstalled } from '../utils/pulumi.js';
-import {
-  scanAWSResources,
-  checkBYOResourcesExist,
-  AWSResourceScan,
-} from '../utils/scanner.js';
-import {
+  createConnectionMetadata,
+  type FeatureConfig,
   loadConnectionMetadata,
   saveConnectionMetadata,
-  createConnectionMetadata,
   updateFeatureMetadata,
   updateIdentityMetadata,
-  ConnectionMetadata,
-  FeatureConfig,
-} from '../utils/metadata.js';
+} from "../utils/metadata.js";
+import { DeploymentProgress, displaySuccess } from "../utils/output.js";
+import {
+  confirmConnect,
+  promptConflictResolution,
+  promptFeatureSelection,
+  promptProvider,
+  promptRegion,
+  promptSelectIdentities,
+  promptVercelConfig,
+} from "../utils/prompts.js";
+import { ensurePulumiInstalled } from "../utils/pulumi.js";
+import { scanAWSResources } from "../utils/scanner.js";
 
 /**
  * Connect command - Connect to existing AWS SES infrastructure
  */
 export async function connect(options: ConnectOptions): Promise<void> {
-  clack.intro(pc.bold('BYO Connect - Link Existing Infrastructure'));
+  clack.intro(pc.bold("BYO Connect - Link Existing Infrastructure"));
 
   const progress = new DeploymentProgress();
 
   // 1. Check Pulumi CLI is installed
   const wasAutoInstalled = await progress.execute(
-    'Checking Pulumi CLI installation',
-    async () => {
-      return await ensurePulumiInstalled();
-    }
+    "Checking Pulumi CLI installation",
+    async () => await ensurePulumiInstalled()
   );
 
   if (wasAutoInstalled) {
-    progress.info('Pulumi CLI was automatically installed');
+    progress.info("Pulumi CLI was automatically installed");
   }
 
   // 2. Validate AWS credentials
-  const identity = await progress.execute('Validating AWS credentials', async () => {
-    return validateAWSCredentials();
-  });
+  const identity = await progress.execute(
+    "Validating AWS credentials",
+    async () => validateAWSCredentials()
+  );
 
   progress.info(`Connected to AWS account: ${pc.cyan(identity.accountId)}`);
 
@@ -67,21 +60,25 @@ export async function connect(options: ConnectOptions): Promise<void> {
   }
 
   // 4. Check if connection already exists
-  const existingConnection = await loadConnectionMetadata(identity.accountId, region);
+  const existingConnection = await loadConnectionMetadata(
+    identity.accountId,
+    region
+  );
   if (existingConnection) {
     clack.log.warn(
       `Connection already exists for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
     );
     clack.log.info(`Created: ${existingConnection.timestamp}`);
-    clack.log.info(`Use ${pc.cyan('byo status')} to view current setup`);
-    clack.log.info(`Use ${pc.cyan('byo upgrade')} to add more features`);
+    clack.log.info(`Use ${pc.cyan("byo status")} to view current setup`);
+    clack.log.info(`Use ${pc.cyan("byo upgrade")} to add more features`);
     process.exit(0);
   }
 
   // 5. Scan existing AWS resources
-  const scan = await progress.execute('Scanning existing AWS resources', async () => {
-    return scanAWSResources(region);
-  });
+  const scan = await progress.execute(
+    "Scanning existing AWS resources",
+    async () => scanAWSResources(region)
+  );
 
   // Display what we found
   progress.info(
@@ -90,9 +87,9 @@ export async function connect(options: ConnectOptions): Promise<void> {
 
   // Check if any identities exist
   if (scan.identities.length === 0) {
-    clack.log.warn('No SES identities found in this region.');
+    clack.log.warn("No SES identities found in this region.");
     clack.log.info(
-      `Use ${pc.cyan('byo init')} to create new email infrastructure instead.`
+      `Use ${pc.cyan("byo init")} to create new email infrastructure instead.`
     );
     process.exit(0);
   }
@@ -101,7 +98,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
   const verifiedIdentities = scan.identities.filter((id) => id.verified);
   if (verifiedIdentities.length > 0) {
     progress.info(
-      `Verified identities: ${verifiedIdentities.map((id) => pc.cyan(id.name)).join(', ')}`
+      `Verified identities: ${verifiedIdentities.map((id) => pc.cyan(id.name)).join(", ")}`
     );
   }
 
@@ -113,7 +110,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
 
   // Get Vercel config if needed
   let vercelConfig;
-  if (provider === 'vercel') {
+  if (provider === "vercel") {
     vercelConfig = await promptVercelConfig();
   }
 
@@ -126,7 +123,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
   );
 
   if (selectedIdentities.length === 0) {
-    clack.log.warn('No identities selected. Nothing to connect.');
+    clack.log.warn("No identities selected. Nothing to connect.");
     process.exit(0);
   }
 
@@ -134,129 +131,173 @@ export async function connect(options: ConnectOptions): Promise<void> {
   const selectedFeatures = await promptFeatureSelection();
 
   // 9. Conflict detection and resolution
-  const metadata = createConnectionMetadata(identity.accountId, region, provider);
+  const metadata = createConnectionMetadata(
+    identity.accountId,
+    region,
+    provider
+  );
   const featureConfigs: Record<string, FeatureConfig> = {};
 
   // Check for configuration set conflict
-  if (selectedFeatures.includes('configSet')) {
+  if (selectedFeatures.includes("configSet")) {
     const existingConfigSets = scan.configurationSets.filter(
-      (cs) => !cs.name.startsWith('byo-')
+      (cs) => !cs.name.startsWith("byo-")
     );
 
     if (existingConfigSets.length > 0) {
       // Found existing non-BYO config sets
       const action = await promptConflictResolution(
-        'configuration set',
+        "configuration set",
         existingConfigSets[0].name
       );
 
       featureConfigs.configSet = {
-        enabled: action !== 'skip',
-        action: action === 'replace' ? 'replace' : action === 'skip' ? 'skip' : 'deploy-new',
-        originalValue: action === 'replace' ? existingConfigSets[0].name : null,
-        currentValue: 'byo-tracking',
+        enabled: action !== "skip",
+        action:
+          action === "replace"
+            ? "replace"
+            : action === "skip"
+              ? "skip"
+              : "deploy-new",
+        originalValue: action === "replace" ? existingConfigSets[0].name : null,
+        currentValue: "byo-tracking",
       };
     } else {
       // No conflict, deploy new
       featureConfigs.configSet = {
         enabled: true,
-        action: 'deploy-new',
+        action: "deploy-new",
         originalValue: null,
-        currentValue: 'byo-tracking',
+        currentValue: "byo-tracking",
       };
     }
 
-    updateFeatureMetadata(metadata, 'configSet', featureConfigs.configSet);
+    updateFeatureMetadata(metadata, "configSet", featureConfigs.configSet);
   }
 
   // Check for SNS topic conflicts (bounce handling)
-  if (selectedFeatures.includes('bounceHandling')) {
+  if (selectedFeatures.includes("bounceHandling")) {
     const existingSNS = scan.snsTopics.filter(
-      (t) => !t.name.startsWith('byo-') && t.name.toLowerCase().includes('bounce')
+      (t) =>
+        !t.name.startsWith("byo-") && t.name.toLowerCase().includes("bounce")
     );
 
     if (existingSNS.length > 0) {
-      const action = await promptConflictResolution('SNS topic (bounces)', existingSNS[0].name);
+      const action = await promptConflictResolution(
+        "SNS topic (bounces)",
+        existingSNS[0].name
+      );
 
       featureConfigs.bounceHandling = {
-        enabled: action !== 'skip',
-        action: action === 'replace' ? 'replace' : action === 'skip' ? 'skip' : 'deploy-new',
-        originalValue: action === 'replace' ? existingSNS[0].arn : null,
-        currentValue: 'byo-bounce-complaints',
+        enabled: action !== "skip",
+        action:
+          action === "replace"
+            ? "replace"
+            : action === "skip"
+              ? "skip"
+              : "deploy-new",
+        originalValue: action === "replace" ? existingSNS[0].arn : null,
+        currentValue: "byo-bounce-complaints",
       };
     } else {
       featureConfigs.bounceHandling = {
         enabled: true,
-        action: 'deploy-new',
+        action: "deploy-new",
         originalValue: null,
-        currentValue: 'byo-bounce-complaints',
+        currentValue: "byo-bounce-complaints",
       };
     }
 
-    updateFeatureMetadata(metadata, 'bounceHandling', featureConfigs.bounceHandling);
+    updateFeatureMetadata(
+      metadata,
+      "bounceHandling",
+      featureConfigs.bounceHandling
+    );
   }
 
   // Complaint handling uses same SNS topic
-  if (selectedFeatures.includes('complaintHandling')) {
+  if (selectedFeatures.includes("complaintHandling")) {
     featureConfigs.complaintHandling = {
       enabled: true,
-      action: 'deploy-new',
+      action: "deploy-new",
       originalValue: null,
-      currentValue: 'byo-bounce-complaints',
+      currentValue: "byo-bounce-complaints",
     };
-    updateFeatureMetadata(metadata, 'complaintHandling', featureConfigs.complaintHandling);
+    updateFeatureMetadata(
+      metadata,
+      "complaintHandling",
+      featureConfigs.complaintHandling
+    );
   }
 
   // Email history
-  if (selectedFeatures.includes('emailHistory')) {
+  if (selectedFeatures.includes("emailHistory")) {
     const existingTables = scan.dynamoTables.filter(
-      (t) => !t.name.startsWith('byo-') && t.name.toLowerCase().includes('email')
+      (t) =>
+        !t.name.startsWith("byo-") && t.name.toLowerCase().includes("email")
     );
 
     if (existingTables.length > 0) {
       const action = await promptConflictResolution(
-        'DynamoDB table (email history)',
+        "DynamoDB table (email history)",
         existingTables[0].name
       );
 
       featureConfigs.emailHistory = {
-        enabled: action !== 'skip',
-        action: action === 'replace' ? 'replace' : action === 'skip' ? 'skip' : 'deploy-new',
-        originalValue: action === 'replace' ? existingTables[0].name : null,
-        currentValue: 'byo-email-history',
+        enabled: action !== "skip",
+        action:
+          action === "replace"
+            ? "replace"
+            : action === "skip"
+              ? "skip"
+              : "deploy-new",
+        originalValue: action === "replace" ? existingTables[0].name : null,
+        currentValue: "byo-email-history",
       };
     } else {
       featureConfigs.emailHistory = {
         enabled: true,
-        action: 'deploy-new',
+        action: "deploy-new",
         originalValue: null,
-        currentValue: 'byo-email-history',
+        currentValue: "byo-email-history",
       };
     }
 
-    updateFeatureMetadata(metadata, 'emailHistory', featureConfigs.emailHistory);
+    updateFeatureMetadata(
+      metadata,
+      "emailHistory",
+      featureConfigs.emailHistory
+    );
   }
 
   // Event processor
-  if (selectedFeatures.includes('eventProcessor')) {
+  if (selectedFeatures.includes("eventProcessor")) {
     featureConfigs.eventProcessor = {
       enabled: true,
-      action: 'deploy-new',
+      action: "deploy-new",
       originalValue: null,
-      currentValue: 'byo-event-processor',
+      currentValue: "byo-event-processor",
     };
-    updateFeatureMetadata(metadata, 'eventProcessor', featureConfigs.eventProcessor);
+    updateFeatureMetadata(
+      metadata,
+      "eventProcessor",
+      featureConfigs.eventProcessor
+    );
   }
 
   // Dashboard access (always deploy-new, no conflicts)
-  if (selectedFeatures.includes('dashboardAccess')) {
+  if (selectedFeatures.includes("dashboardAccess")) {
     featureConfigs.dashboardAccess = {
       enabled: true,
-      action: 'deploy-new',
+      action: "deploy-new",
       originalValue: null,
-      currentValue: 'byo-email-role',
+      currentValue: "byo-email-role",
     };
-    updateFeatureMetadata(metadata, 'dashboardAccess', featureConfigs.dashboardAccess);
+    updateFeatureMetadata(
+      metadata,
+      "dashboardAccess",
+      featureConfigs.dashboardAccess
+    );
   }
 
   // 10. Store identity configurations in metadata
@@ -267,8 +308,10 @@ export async function connect(options: ConnectOptions): Promise<void> {
         name: identity.name,
         type: identity.type,
         originalConfigSet: identity.configurationSet || null,
-        currentConfigSet: featureConfigs.configSet?.enabled ? 'byo-tracking' : null,
-        action: identity.configurationSet ? 'replaced' : 'attached',
+        currentConfigSet: featureConfigs.configSet?.enabled
+          ? "byo-tracking"
+          : null,
+        action: identity.configurationSet ? "replaced" : "attached",
       });
     }
   }
@@ -277,7 +320,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
   if (!options.yes) {
     const confirmed = await confirmConnect();
     if (!confirmed) {
-      clack.cancel('Connection cancelled.');
+      clack.cancel("Connection cancelled.");
       process.exit(0);
     }
   }
@@ -287,62 +330,70 @@ export async function connect(options: ConnectOptions): Promise<void> {
     provider,
     region,
     vercel: vercelConfig,
-    integrationLevel: selectedFeatures.includes('emailHistory') ||
-      selectedFeatures.includes('eventProcessor')
-      ? 'enhanced'
-      : 'dashboard-only',
+    integrationLevel:
+      selectedFeatures.includes("emailHistory") ||
+      selectedFeatures.includes("eventProcessor")
+        ? "enhanced"
+        : "dashboard-only",
   };
 
   // 13. Deploy infrastructure using Pulumi
   let outputs;
   try {
     outputs = await progress.execute(
-      'Deploying BYO infrastructure (this may take 2-3 minutes)',
+      "Deploying BYO infrastructure (this may take 2-3 minutes)",
       async () => {
         await ensurePulumiWorkDir();
 
-        const stack = await pulumi.automation.LocalWorkspace.createOrSelectStack(
-          {
-            stackName: `byo-${identity.accountId}-${region}`,
-            projectName: 'byo-email',
-            program: async () => {
-              const result = await deployEmailStack(stackConfig);
+        const stack =
+          await pulumi.automation.LocalWorkspace.createOrSelectStack(
+            {
+              stackName: `byo-${identity.accountId}-${region}`,
+              projectName: "byo-email",
+              program: async () => {
+                const result = await deployEmailStack(stackConfig);
 
-              return {
-                roleArn: result.roleArn,
-                configSetName: result.configSetName,
-                tableName: result.tableName,
-                region: result.region,
-                lambdaFunctions: result.lambdaFunctions,
-              };
+                return {
+                  roleArn: result.roleArn,
+                  configSetName: result.configSetName,
+                  tableName: result.tableName,
+                  region: result.region,
+                  lambdaFunctions: result.lambdaFunctions,
+                };
+              },
             },
-          },
-          {
-            workDir: getPulumiWorkDir(),
-            envVars: {
-              PULUMI_CONFIG_PASSPHRASE: '',
-            },
-            secretsProvider: 'passphrase',
-          }
+            {
+              workDir: getPulumiWorkDir(),
+              envVars: {
+                PULUMI_CONFIG_PASSPHRASE: "",
+              },
+              secretsProvider: "passphrase",
+            }
+          );
+
+        await stack.workspace.selectStack(
+          `byo-${identity.accountId}-${region}`
         );
-
-        await stack.workspace.selectStack(`byo-${identity.accountId}-${region}`);
-        await stack.setConfig('aws:region', { value: region });
+        await stack.setConfig("aws:region", { value: region });
 
         const upResult = await stack.up({ onOutput: () => {} });
         const pulumiOutputs = upResult.outputs;
 
         return {
           roleArn: pulumiOutputs.roleArn?.value as string,
-          configSetName: pulumiOutputs.configSetName?.value as string | undefined,
+          configSetName: pulumiOutputs.configSetName?.value as
+            | string
+            | undefined,
           tableName: pulumiOutputs.tableName?.value as string | undefined,
           region: pulumiOutputs.region?.value as string,
-          lambdaFunctions: pulumiOutputs.lambdaFunctions?.value as string[] | undefined,
+          lambdaFunctions: pulumiOutputs.lambdaFunctions?.value as
+            | string[]
+            | undefined,
         };
       }
     );
   } catch (error: any) {
-    clack.log.error('Infrastructure deployment failed');
+    clack.log.error("Infrastructure deployment failed");
     throw new Error(`Pulumi deployment failed: ${error.message}`);
   }
 
@@ -353,7 +404,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
   }
   await saveConnectionMetadata(metadata);
 
-  progress.info('Connection metadata saved for restore capability');
+  progress.info("Connection metadata saved for restore capability");
 
   // 15. Display success message
   displaySuccess({
@@ -365,34 +416,34 @@ export async function connect(options: ConnectOptions): Promise<void> {
 
   // Show next steps for replaced resources
   const replacedFeatures = Object.entries(featureConfigs).filter(
-    ([_, config]) => config.action === 'replace'
+    ([_, config]) => config.action === "replace"
   );
 
   if (replacedFeatures.length > 0) {
-    console.log(`\n${pc.yellow('⚠ Resources were replaced:')}\n`);
-    for (const [feature, config] of replacedFeatures) {
+    console.log(`\n${pc.yellow("⚠ Resources were replaced:")}\n`);
+    for (const [_feature, config] of replacedFeatures) {
       console.log(
         `  ${pc.cyan(config.originalValue!)} → ${pc.green(config.currentValue!)}`
       );
     }
     console.log(
-      `\n${pc.dim('To restore original resources: ')}${pc.cyan('byo restore')}\n`
+      `\n${pc.dim("To restore original resources: ")}${pc.cyan("byo restore")}\n`
     );
   }
 
   // Show identities that need manual configuration
   if (selectedIdentities.length > 0 && featureConfigs.configSet?.enabled) {
-    console.log(`\n${pc.bold('Next Steps:')}\n`);
+    console.log(`\n${pc.bold("Next Steps:")}\n`);
     console.log(
-      `Update your code to use configuration set: ${pc.cyan('byo-tracking')}`
+      `Update your code to use configuration set: ${pc.cyan("byo-tracking")}`
     );
-    console.log(`\n${pc.dim('Example:')}`);
+    console.log(`\n${pc.dim("Example:")}`);
     console.log(
       pc.gray(`  await ses.sendEmail({
     ConfigurationSetName: 'byo-tracking',
     // ... other parameters
   });`)
     );
-    console.log('');
+    console.log("");
   }
 }

@@ -1,43 +1,43 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BYOError, handleCLIError, errors } from '../errors.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { BYOError, errors, handleCLIError } from "../errors.js";
 
-describe('BYOError', () => {
-  it('should create error with all properties', () => {
+describe("BYOError", () => {
+  it("should create error with all properties", () => {
     const error = new BYOError(
-      'Test error message',
-      'TEST_ERROR',
-      'Try this suggestion',
-      'https://docs.byo.dev/test'
+      "Test error message",
+      "TEST_ERROR",
+      "Try this suggestion",
+      "https://docs.byo.dev/test"
     );
 
     expect(error).toBeInstanceOf(Error);
     expect(error).toBeInstanceOf(BYOError);
-    expect(error.message).toBe('Test error message');
-    expect(error.code).toBe('TEST_ERROR');
-    expect(error.suggestion).toBe('Try this suggestion');
-    expect(error.docsUrl).toBe('https://docs.byo.dev/test');
-    expect(error.name).toBe('BYOError');
+    expect(error.message).toBe("Test error message");
+    expect(error.code).toBe("TEST_ERROR");
+    expect(error.suggestion).toBe("Try this suggestion");
+    expect(error.docsUrl).toBe("https://docs.byo.dev/test");
+    expect(error.name).toBe("BYOError");
   });
 
-  it('should create error without optional properties', () => {
-    const error = new BYOError('Test error', 'TEST_ERROR');
+  it("should create error without optional properties", () => {
+    const error = new BYOError("Test error", "TEST_ERROR");
 
-    expect(error.message).toBe('Test error');
-    expect(error.code).toBe('TEST_ERROR');
+    expect(error.message).toBe("Test error");
+    expect(error.code).toBe("TEST_ERROR");
     expect(error.suggestion).toBeUndefined();
     expect(error.docsUrl).toBeUndefined();
   });
 });
 
-describe('handleCLIError', () => {
+describe("handleCLIError", () => {
   let exitSpy: any;
   let consoleErrorSpy: any;
   let consoleLogSpy: any;
 
   beforeEach(() => {
-    exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as any);
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -46,59 +46,59 @@ describe('handleCLIError', () => {
     consoleLogSpy.mockRestore();
   });
 
-  it('should handle BYOError with all properties', () => {
+  it("should handle BYOError with all properties", () => {
     const error = new BYOError(
-      'AWS credentials not found',
-      'NO_AWS_CREDENTIALS',
-      'Run: aws configure',
-      'https://docs.byo.dev/credentials'
+      "AWS credentials not found",
+      "NO_AWS_CREDENTIALS",
+      "Run: aws configure",
+      "https://docs.byo.dev/credentials"
     );
 
     handleCLIError(error);
 
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Suggestion:')
+      expect.stringContaining("Suggestion:")
     );
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Run: aws configure')
+      expect.stringContaining("Run: aws configure")
     );
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Documentation:')
+      expect.stringContaining("Documentation:")
     );
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining('https://docs.byo.dev/credentials')
+      expect.stringContaining("https://docs.byo.dev/credentials")
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
-  it('should handle BYOError without suggestion and docs', () => {
-    const error = new BYOError('Simple error', 'SIMPLE_ERROR');
+  it("should handle BYOError without suggestion and docs", () => {
+    const error = new BYOError("Simple error", "SIMPLE_ERROR");
 
     handleCLIError(error);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
-  it('should handle unknown errors', () => {
-    const error = new Error('Unknown error');
+  it("should handle unknown errors", () => {
+    const error = new Error("Unknown error");
 
     handleCLIError(error);
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(error);
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining('https://github.com/byo/byo/issues')
+      expect.stringContaining("https://github.com/byo/byo/issues")
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
-  it('should handle string errors', () => {
-    handleCLIError('String error message');
+  it("should handle string errors", () => {
+    handleCLIError("String error message");
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('String error message');
+    expect(consoleErrorSpy).toHaveBeenCalledWith("String error message");
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
-  it('should handle null/undefined errors', () => {
+  it("should handle null/undefined errors", () => {
     handleCLIError(null);
     expect(exitSpy).toHaveBeenCalledWith(1);
 
@@ -107,78 +107,80 @@ describe('handleCLIError', () => {
   });
 });
 
-describe('error factory functions', () => {
-  describe('noAWSCredentials', () => {
-    it('should create proper error', () => {
+describe("error factory functions", () => {
+  describe("noAWSCredentials", () => {
+    it("should create proper error", () => {
       const error = errors.noAWSCredentials();
 
       expect(error).toBeInstanceOf(BYOError);
-      expect(error.message).toBe('AWS credentials not found');
-      expect(error.code).toBe('NO_AWS_CREDENTIALS');
-      expect(error.suggestion).toContain('aws configure');
-      expect(error.docsUrl).toBe('https://docs.byo.dev/setup/aws-credentials');
+      expect(error.message).toBe("AWS credentials not found");
+      expect(error.code).toBe("NO_AWS_CREDENTIALS");
+      expect(error.suggestion).toContain("aws configure");
+      expect(error.docsUrl).toBe("https://docs.byo.dev/setup/aws-credentials");
     });
   });
 
-  describe('stackExists', () => {
-    it('should create proper error with stack name', () => {
-      const error = errors.stackExists('byo-123456789-us-east-1');
+  describe("stackExists", () => {
+    it("should create proper error with stack name", () => {
+      const error = errors.stackExists("byo-123456789-us-east-1");
 
       expect(error).toBeInstanceOf(BYOError);
-      expect(error.message).toContain('byo-123456789-us-east-1');
-      expect(error.code).toBe('STACK_EXISTS');
-      expect(error.suggestion).toContain('byo upgrade');
-      expect(error.suggestion).toContain('byo destroy --stack byo-123456789-us-east-1');
-      expect(error.docsUrl).toBe('https://docs.byo.dev/cli/upgrade');
+      expect(error.message).toContain("byo-123456789-us-east-1");
+      expect(error.code).toBe("STACK_EXISTS");
+      expect(error.suggestion).toContain("byo upgrade");
+      expect(error.suggestion).toContain(
+        "byo destroy --stack byo-123456789-us-east-1"
+      );
+      expect(error.docsUrl).toBe("https://docs.byo.dev/cli/upgrade");
     });
   });
 
-  describe('invalidRegion', () => {
-    it('should create proper error with region', () => {
-      const error = errors.invalidRegion('invalid-region-123');
+  describe("invalidRegion", () => {
+    it("should create proper error with region", () => {
+      const error = errors.invalidRegion("invalid-region-123");
 
       expect(error).toBeInstanceOf(BYOError);
-      expect(error.message).toContain('invalid-region-123');
-      expect(error.code).toBe('INVALID_REGION');
-      expect(error.suggestion).toContain('us-east-1');
-      expect(error.docsUrl).toContain('aws.amazon.com');
+      expect(error.message).toContain("invalid-region-123");
+      expect(error.code).toBe("INVALID_REGION");
+      expect(error.suggestion).toContain("us-east-1");
+      expect(error.docsUrl).toContain("aws.amazon.com");
     });
   });
 
-  describe('pulumiError', () => {
-    it('should create proper error with message', () => {
-      const error = errors.pulumiError('Failed to create IAM role');
+  describe("pulumiError", () => {
+    it("should create proper error with message", () => {
+      const error = errors.pulumiError("Failed to create IAM role");
 
       expect(error).toBeInstanceOf(BYOError);
-      expect(error.message).toContain('Failed to create IAM role');
-      expect(error.code).toBe('PULUMI_ERROR');
-      expect(error.suggestion).toContain('AWS permissions');
-      expect(error.docsUrl).toBe('https://docs.byo.dev/troubleshooting');
+      expect(error.message).toContain("Failed to create IAM role");
+      expect(error.code).toBe("PULUMI_ERROR");
+      expect(error.suggestion).toContain("AWS permissions");
+      expect(error.docsUrl).toBe("https://docs.byo.dev/troubleshooting");
     });
   });
 
-  describe('noStack', () => {
-    it('should create proper error', () => {
+  describe("noStack", () => {
+    it("should create proper error", () => {
       const error = errors.noStack();
 
       expect(error).toBeInstanceOf(BYOError);
-      expect(error.message).toContain('No BYO infrastructure found');
-      expect(error.code).toBe('NO_STACK');
-      expect(error.suggestion).toContain('byo init');
-      expect(error.docsUrl).toBe('https://docs.byo.dev/cli/init');
+      expect(error.message).toContain("No BYO infrastructure found");
+      expect(error.code).toBe("NO_STACK");
+      expect(error.suggestion).toContain("byo init");
+      expect(error.docsUrl).toBe("https://docs.byo.dev/cli/init");
     });
   });
 
-  describe('pulumiNotInstalled', () => {
-    it('should create proper error', () => {
+  describe("pulumiNotInstalled", () => {
+    it("should create proper error", () => {
       const error = errors.pulumiNotInstalled();
 
       expect(error).toBeInstanceOf(BYOError);
-      expect(error.message).toBe('Pulumi CLI is not installed');
-      expect(error.code).toBe('PULUMI_NOT_INSTALLED');
-      expect(error.suggestion).toContain('brew install pulumi');
-      expect(error.suggestion).toContain('curl -fsSL https://get.pulumi.com');
-      expect(error.docsUrl).toBe('https://www.pulumi.com/docs/install/');
+      expect(error.message).toBe("Pulumi CLI is not installed");
+      expect(error.code).toBe("PULUMI_NOT_INSTALLED");
+      expect(error.suggestion).toContain("brew install pulumi");
+      expect(error.suggestion).toContain("curl -fsSL https://get.pulumi.com");
+      expect(error.docsUrl).toBe("https://www.pulumi.com/docs/install/");
     });
   });
 });

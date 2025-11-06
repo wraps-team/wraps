@@ -1,9 +1,9 @@
 import {
-  Route53Client,
-  ListHostedZonesByNameCommand,
-  ChangeResourceRecordSetsCommand,
   type Change,
-} from '@aws-sdk/client-route-53';
+  ChangeResourceRecordSetsCommand,
+  ListHostedZonesByNameCommand,
+  Route53Client,
+} from "@aws-sdk/client-route-53";
 
 /**
  * Find Route53 hosted zone for a domain
@@ -23,15 +23,15 @@ export async function findHostedZone(
     );
 
     const zone = response.HostedZones?.[0];
-    if (zone && zone.Name === `${domain}.`) {
+    if (zone && zone.Name === `${domain}.` && zone.Id) {
       return {
-        id: zone.Id!.replace('/hostedzone/', ''),
+        id: zone.Id.replace("/hostedzone/", ""),
         name: zone.Name,
       };
     }
 
     return null;
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }
@@ -52,10 +52,10 @@ export async function createDNSRecords(
   // DKIM CNAME records
   for (const token of dkimTokens) {
     changes.push({
-      Action: 'UPSERT',
+      Action: "UPSERT",
       ResourceRecordSet: {
         Name: `${token}._domainkey.${domain}`,
-        Type: 'CNAME',
+        Type: "CNAME",
         TTL: 1800,
         ResourceRecords: [{ Value: `${token}.dkim.amazonses.com` }],
       },
@@ -64,10 +64,10 @@ export async function createDNSRecords(
 
   // SPF TXT record
   changes.push({
-    Action: 'UPSERT',
+    Action: "UPSERT",
     ResourceRecordSet: {
       Name: domain,
-      Type: 'TXT',
+      Type: "TXT",
       TTL: 1800,
       ResourceRecords: [{ Value: '"v=spf1 include:amazonses.com ~all"' }],
     },
@@ -75,10 +75,10 @@ export async function createDNSRecords(
 
   // DMARC TXT record
   changes.push({
-    Action: 'UPSERT',
+    Action: "UPSERT",
     ResourceRecordSet: {
       Name: `_dmarc.${domain}`,
-      Type: 'TXT',
+      Type: "TXT",
       TTL: 1800,
       ResourceRecords: [
         { Value: `"v=DMARC1; p=quarantine; rua=mailto:postmaster@${domain}"` },

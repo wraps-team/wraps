@@ -1,7 +1,7 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import * as automation from '@pulumi/pulumi/automation/index.js';
-import { errors } from './errors.js';
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+import * as automation from "@pulumi/pulumi/automation/index.js";
+import { errors } from "./errors.js";
 
 const execAsync = promisify(exec);
 
@@ -13,9 +13,9 @@ const installPulumiCli = (automation as any).installPulumiCli;
  */
 export async function checkPulumiInstalled(): Promise<boolean> {
   try {
-    await execAsync('pulumi version');
+    await execAsync("pulumi version");
     return true;
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }
@@ -32,7 +32,7 @@ export async function ensurePulumiInstalled(): Promise<boolean> {
       // Try to auto-install Pulumi CLI using Automation API
       await installPulumiCli();
       return true; // Was auto-installed
-    } catch (error) {
+    } catch (_error) {
       // If auto-install fails, throw helpful error
       throw errors.pulumiNotInstalled();
     }

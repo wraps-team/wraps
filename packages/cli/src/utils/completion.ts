@@ -13,19 +13,21 @@ export function setupTabCompletion() {
  * Print completion script for the current shell
  */
 export function printCompletionScript() {
-  const shell = process.env.SHELL?.split('/').pop() || 'bash';
-
-  console.log('# BYO CLI Tab Completion');
-  console.log('# ========================\n');
-  console.log('# Tab completion will be available in a future release.\n');
-  console.log('# For now, here are the available commands:\n');
-  console.log('# Commands:');
-  console.log('#   byo init [--provider vercel|aws|railway|other] [--region <region>] [--domain <domain>]');
-  console.log('#   byo status [--account <account-id>]');
-  console.log('#   byo completion\n');
-  console.log('# Flags:');
-  console.log('#   --provider  : vercel, aws, railway, other');
-  console.log('#   --region    : us-east-1, us-east-2, us-west-1, us-west-2, eu-west-1, eu-west-2, etc.');
-  console.log('#   --domain    : Your domain name (e.g., myapp.com)');
-  console.log('#   --account   : AWS account ID or alias\n');
+  console.log("# BYO CLI Tab Completion");
+  console.log("# ========================\n");
+  console.log("# Tab completion will be available in a future release.\n");
+  console.log("# For now, here are the available commands:\n");
+  console.log("# Commands:");
+  console.log(
+    "#   byo init [--provider vercel|aws|railway|other] [--region <region>] [--domain <domain>]"
+  );
+  console.log("#   byo status [--account <account-id>]");
+  console.log("#   byo completion\n");
+  console.log("# Flags:");
+  console.log("#   --provider  : vercel, aws, railway, other");
+  console.log(
+    "#   --region    : us-east-1, us-east-2, us-west-1, us-west-2, eu-west-1, eu-west-2, etc."
+  );
+  console.log("#   --domain    : Your domain name (e.g., myapp.com)");
+  console.log("#   --account   : AWS account ID or alias\n");
 }

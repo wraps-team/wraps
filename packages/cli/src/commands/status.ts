@@ -1,23 +1,26 @@
-import * as pulumi from '@pulumi/pulumi';
-import * as clack from '@clack/prompts';
-import pc from 'picocolors';
-import { StatusOptions } from '../types/index.js';
-import { validateAWSCredentials, listSESDomains, getAWSRegion } from '../utils/aws.js';
-import { displayStatus } from '../utils/output.js';
-import { errors } from '../utils/errors.js';
-import { DeploymentProgress } from '../utils/output.js';
-import { getPulumiWorkDir, ensurePulumiWorkDir } from '../utils/fs.js';
+import * as clack from "@clack/prompts";
+import * as pulumi from "@pulumi/pulumi";
+import pc from "picocolors";
+import type { StatusOptions } from "../types/index.js";
+import {
+  getAWSRegion,
+  listSESDomains,
+  validateAWSCredentials,
+} from "../utils/aws.js";
+import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/fs.js";
+import { DeploymentProgress, displayStatus } from "../utils/output.js";
 
 /**
  * Status command - Show current infrastructure setup
  */
-export async function status(options: StatusOptions): Promise<void> {
+export async function status(_options: StatusOptions): Promise<void> {
   const progress = new DeploymentProgress();
 
   // 1. Validate AWS credentials
-  const identity = await progress.execute('Loading infrastructure status', async () => {
-    return validateAWSCredentials();
-  });
+  const identity = await progress.execute(
+    "Loading infrastructure status",
+    async () => validateAWSCredentials()
+  );
 
   // 2. Get region
   const region = await getAWSRegion();
@@ -34,10 +37,10 @@ export async function status(options: StatusOptions): Promise<void> {
     });
 
     stackOutputs = await stack.outputs();
-  } catch (error: any) {
+  } catch (_error: any) {
     progress.stop();
-    clack.log.error('No BYO infrastructure found');
-    console.log(`\nRun ${pc.cyan('byo init')} to deploy infrastructure.\n`);
+    clack.log.error("No BYO infrastructure found");
+    console.log(`\nRun ${pc.cyan("byo init")} to deploy infrastructure.\n`);
     process.exit(1);
   }
 
@@ -45,7 +48,9 @@ export async function status(options: StatusOptions): Promise<void> {
   const domains = await listSESDomains(region);
 
   // 4a. Fetch DKIM tokens for each domain
-  const { SESv2Client, GetEmailIdentityCommand } = await import('@aws-sdk/client-sesv2');
+  const { SESv2Client, GetEmailIdentityCommand } = await import(
+    "@aws-sdk/client-sesv2"
+  );
   const sesv2Client = new SESv2Client({ region });
 
   const domainsWithTokens = await Promise.all(
@@ -56,13 +61,13 @@ export async function status(options: StatusOptions): Promise<void> {
         );
         return {
           domain: d.domain,
-          status: d.verified ? ('verified' as const) : ('pending' as const),
+          status: d.verified ? ("verified" as const) : ("pending" as const),
           dkimTokens: identity.DkimAttributes?.Tokens || [],
         };
-      } catch (error) {
+      } catch (_error) {
         return {
           domain: d.domain,
-          status: d.verified ? ('verified' as const) : ('pending' as const),
+          status: d.verified ? ("verified" as const) : ("pending" as const),
           dkimTokens: undefined,
         };
       }
@@ -70,12 +75,14 @@ export async function status(options: StatusOptions): Promise<void> {
   );
 
   // 5. Determine integration level
-  const integrationLevel = stackOutputs.configSetName ? 'enhanced' : 'dashboard-only';
+  const integrationLevel = stackOutputs.configSetName
+    ? "enhanced"
+    : "dashboard-only";
 
   // 6. Display status
   progress.stop();
   displayStatus({
-    integrationLevel: integrationLevel as 'dashboard-only' | 'enhanced',
+    integrationLevel: integrationLevel as "dashboard-only" | "enhanced",
     region,
     domains: domainsWithTokens,
     resources: {
@@ -83,7 +90,7 @@ export async function status(options: StatusOptions): Promise<void> {
       configSetName: stackOutputs.configSetName?.value,
       tableName: stackOutputs.tableName?.value,
       lambdaFunctions: stackOutputs.lambdaFunctions?.value?.length || 0,
-      snsTopics: integrationLevel === 'enhanced' ? 1 : 0,
+      snsTopics: integrationLevel === "enhanced" ? 1 : 0,
     },
   });
 }
