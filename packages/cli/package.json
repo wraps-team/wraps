@@ -9,8 +9,10 @@
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
-    "test": "vitest",
+    "test": "vitest run",
     "test:watch": "vitest --watch",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "prepublishOnly": "pnpm build"
@@ -46,10 +48,13 @@
   "devDependencies": {
     "@types/args": "5.0.4",
     "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "4.0.7",
+    "aws-sdk-client-mock": "4.1.0",
+    "aws-sdk-client-mock-vitest": "7.0.1",
     "eslint": "^8.56.0",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3",
-    "vitest": "^1.2.0"
+    "vitest": "^4.0.7"
   },
   "engines": {
     "node": ">=20.0.0"
