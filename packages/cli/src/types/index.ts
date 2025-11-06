@@ -50,12 +50,34 @@ export interface InitOptions {
 }
 
 /**
+ * Available features for BYO email infrastructure
+ */
+export type BYOFeature =
+  | 'configSet'
+  | 'bounceHandling'
+  | 'complaintHandling'
+  | 'emailHistory'
+  | 'eventProcessor'
+  | 'dashboardAccess';
+
+/**
+ * Feature metadata
+ */
+export interface BYOFeatureMetadata {
+  id: BYOFeature;
+  name: string;
+  description: string;
+  requires?: BYOFeature[];
+  resources: string[];
+}
+
+/**
  * Command options for connect
  */
 export interface ConnectOptions {
-  existing?: boolean;
-  dashboardOnly?: boolean;
-  enhanced?: boolean;
+  provider?: Provider;
+  region?: string;
+  yes?: boolean;
 }
 
 /**
@@ -76,7 +98,8 @@ export interface VerifyOptions {
  * Command options for upgrade
  */
 export interface UpgradeOptions {
-  enhanced?: boolean;
+  region?: string;
+  yes?: boolean;
 }
 
 /**

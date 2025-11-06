@@ -194,3 +194,160 @@ export async function confirmDeploy(): Promise<boolean> {
 
   return confirmed;
 }
+
+/**
+ * Feature definition for multi-select
+ */
+export interface FeatureOption {
+  value: string;
+  label: string;
+  hint: string;
+}
+
+/**
+ * Get available features
+ */
+export function getAvailableFeatures(): FeatureOption[] {
+  return [
+    {
+      value: 'configSet',
+      label: 'Configuration Set',
+      hint: 'Track opens, clicks, bounces, and complaints',
+    },
+    {
+      value: 'bounceHandling',
+      label: 'Bounce Handling',
+      hint: 'Automatically process bounce notifications',
+    },
+    {
+      value: 'complaintHandling',
+      label: 'Complaint Handling',
+      hint: 'Automatically process spam complaints',
+    },
+    {
+      value: 'emailHistory',
+      label: 'Email History',
+      hint: 'Store sent emails in DynamoDB (90-day retention)',
+    },
+    {
+      value: 'eventProcessor',
+      label: 'Event Processor',
+      hint: 'Advanced analytics and webhook forwarding',
+    },
+    {
+      value: 'dashboardAccess',
+      label: 'Dashboard Access',
+      hint: 'Read-only IAM role for web dashboard',
+    },
+  ];
+}
+
+/**
+ * Prompt for feature selection (multi-select)
+ */
+export async function promptFeatureSelection(
+  preselected?: string[]
+): Promise<string[]> {
+  const features = getAvailableFeatures();
+
+  const selected = await clack.multiselect({
+    message: 'Select features to deploy:',
+    options: features,
+    initialValues: preselected || [
+      'configSet',
+      'bounceHandling',
+      'complaintHandling',
+      'dashboardAccess',
+    ],
+    required: true,
+  });
+
+  if (clack.isCancel(selected)) {
+    clack.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  return selected as string[];
+}
+
+/**
+ * Conflict resolution action
+ */
+export type ConflictAction = 'deploy-alongside' | 'replace' | 'skip';
+
+/**
+ * Prompt for conflict resolution
+ */
+export async function promptConflictResolution(
+  resourceType: string,
+  existingResourceName: string
+): Promise<ConflictAction> {
+  const action = await clack.select({
+    message: `Found existing ${resourceType}: ${pc.cyan(existingResourceName)}. How should we handle this?`,
+    options: [
+      {
+        value: 'deploy-alongside',
+        label: 'Deploy alongside (no changes)',
+        hint: 'Create our resources without modifying yours',
+      },
+      {
+        value: 'replace',
+        label: 'Replace with BYO version',
+        hint: 'Save original for restore, use ours',
+      },
+      {
+        value: 'skip',
+        label: 'Skip this feature',
+        hint: 'Keep your setup, skip BYO deployment',
+      },
+    ],
+  });
+
+  if (clack.isCancel(action)) {
+    clack.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  return action as ConflictAction;
+}
+
+/**
+ * Prompt to select identities to track
+ */
+export async function promptSelectIdentities(
+  identities: Array<{ name: string; verified: boolean }>
+): Promise<string[]> {
+  const selected = await clack.multiselect({
+    message: 'Select identities to connect with BYO:',
+    options: identities.map((id) => ({
+      value: id.name,
+      label: id.name,
+      hint: id.verified ? 'Verified' : 'Pending verification',
+    })),
+    required: false,
+  });
+
+  if (clack.isCancel(selected)) {
+    clack.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  return selected as string[];
+}
+
+/**
+ * Confirm connection deployment
+ */
+export async function confirmConnect(): Promise<boolean> {
+  const confirmed = await clack.confirm({
+    message: 'Connect to existing AWS infrastructure?',
+    initialValue: true,
+  });
+
+  if (clack.isCancel(confirmed)) {
+    clack.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  return confirmed;
+}
