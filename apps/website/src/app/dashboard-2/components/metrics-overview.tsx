@@ -1,15 +1,22 @@
-"use client"
+"use client";
 
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
-  Users, 
-  ShoppingCart, 
-  BarChart3 
-} from "lucide-react"
-import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import {
+  BarChart3,
+  DollarSign,
+  ShoppingCart,
+  TrendingDown,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardAction,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 const metrics = [
   {
@@ -20,27 +27,27 @@ const metrics = [
     trend: "up",
     icon: DollarSign,
     footer: "Trending up this month",
-    subfooter: "Revenue for the last 6 months"
+    subfooter: "Revenue for the last 6 months",
   },
   {
     title: "Active Customers",
     value: "2,350",
     description: "Total active users",
-    change: "+5.2%", 
+    change: "+5.2%",
     trend: "up",
     icon: Users,
     footer: "Strong user retention",
-    subfooter: "Engagement exceeds targets"
+    subfooter: "Engagement exceeds targets",
   },
   {
     title: "Total Orders",
     value: "1,247",
     description: "Orders this month",
     change: "-2.1%",
-    trend: "down", 
+    trend: "down",
     icon: ShoppingCart,
     footer: "Down 2% this period",
-    subfooter: "Order volume needs attention"
+    subfooter: "Order volume needs attention",
   },
   {
     title: "Conversion Rate",
@@ -50,21 +57,21 @@ const metrics = [
     trend: "up",
     icon: BarChart3,
     footer: "Steady performance increase",
-    subfooter: "Meets conversion projections"
+    subfooter: "Meets conversion projections",
   },
-]
+];
 
 export function MetricsOverview() {
   return (
-    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs grid gap-4 sm:grid-cols-2 @5xl:grid-cols-4">
+    <div className="grid @5xl:grid-cols-4 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs sm:grid-cols-2 dark:*:data-[slot=card]:bg-card">
       {metrics.map((metric) => {
-        const TrendIcon = metric.trend === "up" ? TrendingUp : TrendingDown
-        
+        const TrendIcon = metric.trend === "up" ? TrendingUp : TrendingDown;
+
         return (
-          <Card key={metric.title} className=" cursor-pointer">
+          <Card className="cursor-pointer" key={metric.title}>
             <CardHeader>
               <CardDescription>{metric.title}</CardDescription>
-              <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              <CardTitle className="font-semibold @[250px]/card:text-3xl text-2xl tabular-nums">
                 {metric.value}
               </CardTitle>
               <CardAction>
@@ -78,13 +85,11 @@ export function MetricsOverview() {
               <div className="line-clamp-1 flex gap-2 font-medium">
                 {metric.footer} <TrendIcon className="size-4" />
               </div>
-              <div className="text-muted-foreground">
-                {metric.subfooter}
-              </div>
+              <div className="text-muted-foreground">{metric.subfooter}</div>
             </CardFooter>
           </Card>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

@@ -1,17 +1,17 @@
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from '@/components/ui/button'
-import { ArrowRight, Sparkles, Shield, Truck, Clock } from 'lucide-react'
+import { ArrowRight, Clock, Shield, Sparkles, Truck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface FeatureItem {
-  id: number
-  title: string
-  description: string
-  icon: string
+  id: number;
+  title: string;
+  description: string;
+  icon: string;
 }
 
 interface FeaturesGridProps {
-  features: FeatureItem[]
+  features: FeatureItem[];
 }
 
 const iconMap = {
@@ -19,36 +19,41 @@ const iconMap = {
   Shield,
   Truck,
   Clock,
-}
+};
 
 export function FeaturesGrid({ features }: FeaturesGridProps) {
   return (
-    <div className='grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4 mt-8'>
-      {features.map(feature => {
-        const IconComponent = iconMap[feature.icon as keyof typeof iconMap]
+    <div className="mt-8 grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
+      {features.map((feature) => {
+        const IconComponent = iconMap[feature.icon as keyof typeof iconMap];
         return (
-          <article key={feature.id} className='group'>
-            <Card className='relative h-full overflow-hidden transition-all hover:shadow-md'>
-              <CardContent className='px-6'>
-                <Badge variant='secondary' className='mb-4 inline-flex size-12 items-center justify-center'>
-                  <IconComponent className='!size-5' aria-hidden='true' />
+          <article className="group" key={feature.id}>
+            <Card className="relative h-full overflow-hidden transition-all hover:shadow-md">
+              <CardContent className="px-6">
+                <Badge
+                  className="mb-4 inline-flex size-12 items-center justify-center"
+                  variant="secondary"
+                >
+                  <IconComponent aria-hidden="true" className="size-5!" />
                 </Badge>
-                <h3 className='mb-2 text-lg font-semibold'>{feature.title}</h3>
-                <p className='text-muted-foreground mb-4 text-sm'>{feature.description}</p>
+                <h3 className="mb-2 font-semibold text-lg">{feature.title}</h3>
+                <p className="mb-4 text-muted-foreground text-sm">
+                  {feature.description}
+                </p>
 
                 <Button
-                  variant='link'
-                  size='sm'
-                  className='text-muted-foreground hover:text-foreground h-auto cursor-pointer !p-0 text-sm'
+                  className="h-auto cursor-pointer p-0! text-muted-foreground text-sm hover:text-foreground"
+                  size="sm"
+                  variant="link"
                 >
                   Learn more
-                  <ArrowRight className='ms-1.5 size-4' />
+                  <ArrowRight className="ms-1.5 size-4" />
                 </Button>
               </CardContent>
             </Card>
           </article>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

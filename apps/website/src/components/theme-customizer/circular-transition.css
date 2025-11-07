@@ -64,7 +64,7 @@
 }
 
 .mode-toggle-button::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 50%;
   left: 50%;
@@ -102,7 +102,7 @@
   .mode-toggle-button::before {
     transition: none;
   }
-}/* Dark mode specific styling for the overlay */
+} /* Dark mode specific styling for the overlay */
 .dark .theme-transition-overlay {
   background: var(--background);
 }

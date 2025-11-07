@@ -159,7 +159,7 @@ import { DotPatternLight, DotPatternDark } from "@/components/dot-pattern"
 
 ```tsx
 <div 
-  className="absolute inset-0 bg-[radial-gradient(#your-color_1px,transparent_1px)] [background-size:16px_16px]"
+  className="absolute inset-0 bg-[radial-gradient(#your-color_1px,transparent_1px)] bg-size-[16px_16px]"
 />
 ```
 

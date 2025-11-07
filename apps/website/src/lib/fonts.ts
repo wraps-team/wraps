@@ -6,7 +6,7 @@ export const interFontCSS = `
 `;
 
 // CSS variable name to match Next.js version
-export const interFontVariable = '--font-inter';
+export const interFontVariable = "--font-inter";
 
 // Inter font family for direct CSS usage
-export const interFontFamily = 'Inter, system-ui, sans-serif';
+export const interFontFamily = "Inter, system-ui, sans-serif";

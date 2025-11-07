@@ -1,11 +1,19 @@
-"use client"
+"use client";
 
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
-import { BaseLayout } from "@/components/layouts/base-layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Bell, Mail, MessageSquare } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { BaseLayout } from "@/components/layouts/base-layout";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -13,12 +21,23 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Bell, Mail, MessageSquare } from "lucide-react"
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const notificationsFormSchema = z.object({
   emailSecurity: z.boolean(),
@@ -47,9 +66,9 @@ const notificationsFormSchema = z.object({
   systemMaintenanceBrowser: z.boolean(),
   systemMaintenanceApp: z.boolean(),
   notificationTiming: z.string(),
-})
+});
 
-type NotificationsFormValues = z.infer<typeof notificationsFormSchema>
+type NotificationsFormValues = z.infer<typeof notificationsFormSchema>;
 
 export default function NotificationSettings() {
   const form = useForm<NotificationsFormValues>({
@@ -82,10 +101,10 @@ export default function NotificationSettings() {
       systemMaintenanceApp: false,
       notificationTiming: "online",
     },
-  })
+  });
 
   function onSubmit(data: NotificationsFormValues) {
-    console.log("Notifications settings submitted:", data)
+    console.log("Notifications settings submitted:", data);
     // Here you would typically save the settings
   }
 
@@ -93,15 +112,15 @@ export default function NotificationSettings() {
     <BaseLayout>
       <div className="space-y-6 px-4 lg:px-6">
         <div>
-          <h1 className="text-3xl font-bold">Notifications</h1>
+          <h1 className="font-bold text-3xl">Notifications</h1>
           <p className="text-muted-foreground">
             Configure how you receive notifications.
           </p>
         </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+          <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle>Email Notifications</CardTitle>
@@ -124,8 +143,9 @@ export default function NotificationSettings() {
                           </FormControl>
                           <div className="space-y-1">
                             <FormLabel>Security alerts</FormLabel>
-                            <p className="text-sm text-muted-foreground">
-                              Get notified when there are security events on your account.
+                            <p className="text-muted-foreground text-sm">
+                              Get notified when there are security events on
+                              your account.
                             </p>
                           </div>
                         </FormItem>
@@ -144,8 +164,9 @@ export default function NotificationSettings() {
                           </FormControl>
                           <div className="space-y-1">
                             <FormLabel>Product updates</FormLabel>
-                            <p className="text-sm text-muted-foreground">
-                              Receive updates about new features and improvements.
+                            <p className="text-muted-foreground text-sm">
+                              Receive updates about new features and
+                              improvements.
                             </p>
                           </div>
                         </FormItem>
@@ -164,8 +185,9 @@ export default function NotificationSettings() {
                           </FormControl>
                           <div className="space-y-1">
                             <FormLabel>Marketing emails</FormLabel>
-                            <p className="text-sm text-muted-foreground">
-                              Receive emails about our latest offers and promotions.
+                            <p className="text-muted-foreground text-sm">
+                              Receive emails about our latest offers and
+                              promotions.
                             </p>
                           </div>
                         </FormItem>
@@ -197,7 +219,7 @@ export default function NotificationSettings() {
                           </FormControl>
                           <div className="space-y-1">
                             <FormLabel>New messages</FormLabel>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-muted-foreground text-sm">
                               Get notified when you receive new messages.
                             </p>
                           </div>
@@ -217,7 +239,7 @@ export default function NotificationSettings() {
                           </FormControl>
                           <div className="space-y-1">
                             <FormLabel>Mentions</FormLabel>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-muted-foreground text-sm">
                               Get notified when someone mentions you.
                             </p>
                           </div>
@@ -237,7 +259,7 @@ export default function NotificationSettings() {
                           </FormControl>
                           <div className="space-y-1">
                             <FormLabel>Task updates</FormLabel>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-muted-foreground text-sm">
                               Get notified about task assignments and updates.
                             </p>
                           </div>
@@ -255,14 +277,17 @@ export default function NotificationSettings() {
                   Control how often you receive notifications.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="emailFrequency"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Email Frequency</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select
+                        defaultValue={field.value}
+                        onValueChange={field.onChange}
+                      >
                         <FormControl>
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select frequency" />
@@ -287,7 +312,10 @@ export default function NotificationSettings() {
                       control={form.control}
                       name="quietHoursStart"
                       render={({ field }) => (
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select
+                          defaultValue={field.value}
+                          onValueChange={field.onChange}
+                        >
                           <FormControl>
                             <SelectTrigger className="w-50">
                               <SelectValue placeholder="Start" />
@@ -306,7 +334,10 @@ export default function NotificationSettings() {
                       control={form.control}
                       name="quietHoursEnd"
                       render={({ field }) => (
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select
+                          defaultValue={field.value}
+                          onValueChange={field.onChange}
+                        >
                           <FormControl>
                             <SelectTrigger className="w-50">
                               <SelectValue placeholder="End" />
@@ -330,7 +361,7 @@ export default function NotificationSettings() {
                 <CardTitle>Notification Preferences</CardTitle>
                 <CardDescription>
                   We need permission from your browser to show notifications.{" "}
-                  <Button variant="link" className="p-0 h-auto text-primary">
+                  <Button className="h-auto p-0 text-primary" variant="link">
                     Request Permission
                   </Button>
                 </CardDescription>
@@ -348,7 +379,9 @@ export default function NotificationSettings() {
                     </TableHeader>
                     <TableBody>
                       <TableRow>
-                        <TableCell className="font-medium">Order updates</TableCell>
+                        <TableCell className="font-medium">
+                          Order updates
+                        </TableCell>
                         <TableCell className="text-center">
                           <FormField
                             control={form.control}
@@ -399,7 +432,9 @@ export default function NotificationSettings() {
                         </TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell className="font-medium">Invoice reminders</TableCell>
+                        <TableCell className="font-medium">
+                          Invoice reminders
+                        </TableCell>
                         <TableCell className="text-center">
                           <FormField
                             control={form.control}
@@ -450,7 +485,9 @@ export default function NotificationSettings() {
                         </TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell className="font-medium">Promotional offers</TableCell>
+                        <TableCell className="font-medium">
+                          Promotional offers
+                        </TableCell>
                         <TableCell className="text-center">
                           <FormField
                             control={form.control}
@@ -501,7 +538,9 @@ export default function NotificationSettings() {
                         </TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell className="font-medium">System maintenance</TableCell>
+                        <TableCell className="font-medium">
+                          System maintenance
+                        </TableCell>
                         <TableCell className="text-center">
                           <FormField
                             control={form.control}
@@ -560,15 +599,22 @@ export default function NotificationSettings() {
                       name="notificationTiming"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>When should we send you notifications?</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormLabel>
+                            When should we send you notifications?
+                          </FormLabel>
+                          <Select
+                            defaultValue={field.value}
+                            onValueChange={field.onChange}
+                          >
                             <FormControl>
                               <SelectTrigger className="w-full max-w-sm">
                                 <SelectValue placeholder="Select timing" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="online">Only When I'm online</SelectItem>
+                              <SelectItem value="online">
+                                Only When I'm online
+                              </SelectItem>
                               <SelectItem value="always">Always</SelectItem>
                               <SelectItem value="never">Never</SelectItem>
                             </SelectContent>
@@ -577,8 +623,6 @@ export default function NotificationSettings() {
                         </FormItem>
                       )}
                     />
-
-
                   </div>
                 </div>
               </CardContent>
@@ -588,7 +632,8 @@ export default function NotificationSettings() {
               <CardHeader>
                 <CardTitle>Notification Channels</CardTitle>
                 <CardDescription>
-                  Choose your preferred notification channels for different types of alerts.
+                  Choose your preferred notification channels for different
+                  types of alerts.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -601,8 +646,12 @@ export default function NotificationSettings() {
                         <div className="flex items-center space-x-3">
                           <Mail className="h-5 w-5 text-muted-foreground" />
                           <div>
-                            <FormLabel className="font-medium mb-1">Email</FormLabel>
-                            <div className="text-sm text-muted-foreground">Receive notifications via email</div>
+                            <FormLabel className="mb-1 font-medium">
+                              Email
+                            </FormLabel>
+                            <div className="text-muted-foreground text-sm">
+                              Receive notifications via email
+                            </div>
                           </div>
                         </div>
                         <FormControl>
@@ -623,8 +672,12 @@ export default function NotificationSettings() {
                         <div className="flex items-center space-x-3">
                           <Bell className="h-5 w-5 text-muted-foreground" />
                           <div>
-                            <FormLabel className="font-medium mb-1">Push Notifications</FormLabel>
-                            <div className="text-sm text-muted-foreground">Receive browser push notifications</div>
+                            <FormLabel className="mb-1 font-medium">
+                              Push Notifications
+                            </FormLabel>
+                            <div className="text-muted-foreground text-sm">
+                              Receive browser push notifications
+                            </div>
                           </div>
                         </div>
                         <FormControl>
@@ -645,8 +698,12 @@ export default function NotificationSettings() {
                         <div className="flex items-center space-x-3">
                           <MessageSquare className="h-5 w-5 text-muted-foreground" />
                           <div>
-                            <FormLabel className="font-medium mb-1">SMS</FormLabel>
-                            <div className="text-sm text-muted-foreground">Receive notifications via SMS</div>
+                            <FormLabel className="mb-1 font-medium">
+                              SMS
+                            </FormLabel>
+                            <div className="text-muted-foreground text-sm">
+                              Receive notifications via SMS
+                            </div>
                           </div>
                         </div>
                         <FormControl>
@@ -663,12 +720,16 @@ export default function NotificationSettings() {
             </Card>
 
             <div className="flex space-x-2">
-              <Button type="submit" className="cursor-pointer">Save Preferences</Button>
-              <Button variant="outline" type="reset" className="cursor-pointer">Cancel</Button>
+              <Button className="cursor-pointer" type="submit">
+                Save Preferences
+              </Button>
+              <Button className="cursor-pointer" type="reset" variant="outline">
+                Cancel
+              </Button>
             </div>
           </form>
         </Form>
       </div>
     </BaseLayout>
-  )
+  );
 }

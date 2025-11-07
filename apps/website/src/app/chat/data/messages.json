@@ -17,7 +17,7 @@
       "senderId": "current-user",
       "type": "text",
       "isEdited": false,
-      "reactions": [{"emoji": "👍", "users": ["1"], "count": 1}],
+      "reactions": [{ "emoji": "👍", "users": ["1"], "count": 1 }],
       "replyTo": null
     },
     {
@@ -37,7 +37,7 @@
       "senderId": "1",
       "type": "text",
       "isEdited": false,
-      "reactions": [{"emoji": "❤️", "users": ["current-user"], "count": 1}],
+      "reactions": [{ "emoji": "❤️", "users": ["current-user"], "count": 1 }],
       "replyTo": null
     }
   ],
@@ -69,7 +69,7 @@
       "senderId": "5",
       "type": "text",
       "isEdited": false,
-      "reactions": [{"emoji": "✅", "users": ["2", "3"], "count": 2}],
+      "reactions": [{ "emoji": "✅", "users": ["2", "3"], "count": 2 }],
       "replyTo": null
     },
     {
@@ -111,7 +111,7 @@
       "senderId": "3",
       "type": "text",
       "isEdited": false,
-      "reactions": [{"emoji": "👍", "users": ["current-user"], "count": 1}],
+      "reactions": [{ "emoji": "👍", "users": ["current-user"], "count": 1 }],
       "replyTo": null
     },
     {
@@ -153,7 +153,7 @@
       "senderId": "3",
       "type": "text",
       "isEdited": false,
-      "reactions": [{"emoji": "👍", "users": ["current-user"], "count": 1}],
+      "reactions": [{ "emoji": "👍", "users": ["current-user"], "count": 1 }],
       "replyTo": null
     }
   ],
@@ -217,7 +217,7 @@
       "senderId": "2",
       "type": "text",
       "isEdited": false,
-      "reactions": [{"emoji": "🎉", "users": ["current-user"], "count": 1}],
+      "reactions": [{ "emoji": "🎉", "users": ["current-user"], "count": 1 }],
       "replyTo": null
     }
   ]

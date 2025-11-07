@@ -1,146 +1,156 @@
-"use client"
+"use client";
 
-import { useEffect, useRef } from "react"
-import { format, isToday, isYesterday } from "date-fns"
-import { CheckCheck, MoreHorizontal, Reply, Copy, Trash2 } from "lucide-react"
-
-import { cn } from "@/lib/utils"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { assetUrl } from "@/lib/utils"
-import { 
+import { format, isToday, isYesterday } from "date-fns";
+import { CheckCheck, Copy, MoreHorizontal, Reply, Trash2 } from "lucide-react";
+import { useEffect, useRef } from "react";
+import type { Message, User } from "@/app/chat/use-chat";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu"
-import { type Message, type User } from "@/app/chat/use-chat"
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { assetUrl, cn } from "@/lib/utils";
 
 interface MessageListProps {
-  messages: Message[]
-  users: User[]
-  currentUserId?: string
+  messages: Message[];
+  users: User[];
+  currentUserId?: string;
 }
 
-export function MessageList({ messages, users, currentUserId = "current-user" }: MessageListProps) {
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const previousMessageCountRef = useRef(0)
-  const isInitialLoadRef = useRef(true)
-  const previousConversationRef = useRef<string | null>(null)
+export function MessageList({
+  messages,
+  users,
+  currentUserId = "current-user",
+}: MessageListProps) {
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const previousMessageCountRef = useRef(0);
+  const isInitialLoadRef = useRef(true);
+  const previousConversationRef = useRef<string | null>(null);
 
   // Reset scroll behavior when switching conversations
   useEffect(() => {
-    const currentConversationId = messages.length > 0 ? messages[0]?.id?.split('-')[0] : null
+    const currentConversationId =
+      messages.length > 0 ? messages[0]?.id?.split("-")[0] : null;
     if (currentConversationId !== previousConversationRef.current) {
-      isInitialLoadRef.current = true
-      previousConversationRef.current = currentConversationId
+      isInitialLoadRef.current = true;
+      previousConversationRef.current = currentConversationId;
     }
-  }, [messages])
+  }, [messages]);
 
   // Auto-scroll to bottom only when new messages are added (not on initial load)
   useEffect(() => {
     // Skip auto-scroll on initial load
     if (isInitialLoadRef.current) {
-      isInitialLoadRef.current = false
-      previousMessageCountRef.current = messages.length
-      return
+      isInitialLoadRef.current = false;
+      previousMessageCountRef.current = messages.length;
+      return;
     }
 
     // Only auto-scroll if new messages were added
-    if (messages.length > previousMessageCountRef.current && bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: "smooth" })
+    if (
+      messages.length > previousMessageCountRef.current &&
+      bottomRef.current
+    ) {
+      bottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
-    
-    previousMessageCountRef.current = messages.length
-  }, [messages])
+
+    previousMessageCountRef.current = messages.length;
+  }, [messages]);
 
   const getUserById = (userId: string) => {
     if (userId === currentUserId) {
-      return { 
-        id: currentUserId, 
-        name: "You", 
+      return {
+        id: currentUserId,
+        name: "You",
         avatar: assetUrl("avatars/current-user.png"),
         status: "online" as const,
         email: "you@example.com",
         lastSeen: new Date().toISOString(),
         role: "Developer",
-        department: "Engineering"
-      }
+        department: "Engineering",
+      };
     }
-    return users.find(user => user.id === userId)
-  }
+    return users.find((user) => user.id === userId);
+  };
 
   const formatMessageTime = (timestamp: string) => {
-    const date = new Date(timestamp)
+    const date = new Date(timestamp);
     if (isToday(date)) {
-      return format(date, "HH:mm")
-    } else if (isYesterday(date)) {
-      return `Yesterday ${format(date, "HH:mm")}`
-    } else {
-      return format(date, "MMM d, HH:mm")
+      return format(date, "HH:mm");
     }
-  }
+    if (isYesterday(date)) {
+      return `Yesterday ${format(date, "HH:mm")}`;
+    }
+    return format(date, "MMM d, HH:mm");
+  };
 
   const shouldShowAvatar = (message: Message, index: number) => {
-    if (message.senderId === currentUserId) return false
-    if (index === 0) return true
-    
-    const prevMessage = messages[index - 1]
-    return prevMessage.senderId !== message.senderId
-  }
+    if (message.senderId === currentUserId) return false;
+    if (index === 0) return true;
+
+    const prevMessage = messages[index - 1];
+    return prevMessage.senderId !== message.senderId;
+  };
 
   const shouldShowName = (message: Message, index: number) => {
-    if (message.senderId === currentUserId) return false
-    if (index === 0) return true
-    
-    const prevMessage = messages[index - 1]
-    return prevMessage.senderId !== message.senderId
-  }
+    if (message.senderId === currentUserId) return false;
+    if (index === 0) return true;
+
+    const prevMessage = messages[index - 1];
+    return prevMessage.senderId !== message.senderId;
+  };
 
   const isConsecutiveMessage = (message: Message, index: number) => {
-    if (index === 0) return false
-    
-    const prevMessage = messages[index - 1]
-    const timeDiff = new Date(message.timestamp).getTime() - new Date(prevMessage.timestamp).getTime()
-    
-    return prevMessage.senderId === message.senderId && timeDiff < 5 * 60 * 1000 // 5 minutes
-  }
+    if (index === 0) return false;
+
+    const prevMessage = messages[index - 1];
+    const timeDiff =
+      new Date(message.timestamp).getTime() -
+      new Date(prevMessage.timestamp).getTime();
+
+    return (
+      prevMessage.senderId === message.senderId && timeDiff < 5 * 60 * 1000
+    ); // 5 minutes
+  };
 
   const groupMessagesByDay = (messages: Message[]) => {
-    const groups: { date: string; messages: Message[] }[] = []
-    
+    const groups: { date: string; messages: Message[] }[] = [];
+
     messages.forEach((message) => {
-      const messageDate = format(new Date(message.timestamp), "yyyy-MM-dd")
-      const lastGroup = groups[groups.length - 1]
-      
+      const messageDate = format(new Date(message.timestamp), "yyyy-MM-dd");
+      const lastGroup = groups[groups.length - 1];
+
       if (lastGroup && lastGroup.date === messageDate) {
-        lastGroup.messages.push(message)
+        lastGroup.messages.push(message);
       } else {
         groups.push({
           date: messageDate,
-          messages: [message]
-        })
+          messages: [message],
+        });
       }
-    })
-    
-    return groups
-  }
+    });
+
+    return groups;
+  };
 
   const formatDateHeader = (dateString: string) => {
-    const date = new Date(dateString)
+    const date = new Date(dateString);
     if (isToday(date)) {
-      return "Today"
-    } else if (isYesterday(date)) {
-      return "Yesterday"
-    } else {
-      return format(date, "EEEE, MMMM d")
+      return "Today";
     }
-  }
+    if (isYesterday(date)) {
+      return "Yesterday";
+    }
+    return format(date, "EEEE, MMMM d");
+  };
 
-  const messageGroups = groupMessagesByDay(messages)
+  const messageGroups = groupMessagesByDay(messages);
 
   return (
     <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
@@ -149,7 +159,7 @@ export function MessageList({ messages, users, currentUserId = "current-user" }:
           <div key={group.date}>
             {/* Date separator */}
             <div className="flex items-center justify-center py-2">
-              <div className="text-xs text-muted-foreground bg-background px-3 py-1 rounded-full border">
+              <div className="rounded-full border bg-background px-3 py-1 text-muted-foreground text-xs">
                 {formatDateHeader(group.date)}
               </div>
             </div>
@@ -157,29 +167,36 @@ export function MessageList({ messages, users, currentUserId = "current-user" }:
             {/* Messages for this day */}
             <div className="space-y-1">
               {group.messages.map((message, messageIndex) => {
-                const user = getUserById(message.senderId)
-                const isOwnMessage = message.senderId === currentUserId
-                const showAvatar = shouldShowAvatar(message, messageIndex)
-                const showName = shouldShowName(message, messageIndex)
-                const isConsecutive = isConsecutiveMessage(message, messageIndex)
+                const user = getUserById(message.senderId);
+                const isOwnMessage = message.senderId === currentUserId;
+                const showAvatar = shouldShowAvatar(message, messageIndex);
+                const showName = shouldShowName(message, messageIndex);
+                const isConsecutive = isConsecutiveMessage(
+                  message,
+                  messageIndex
+                );
 
                 return (
                   <div
-                    key={message.id}
                     className={cn(
-                      "flex gap-3 group",
+                      "group flex gap-3",
                       isOwnMessage && "flex-row-reverse",
                       isConsecutive && !isOwnMessage && "ml-12"
                     )}
+                    key={message.id}
                   >
                     {/* Avatar */}
                     {!isOwnMessage && (
                       <div className="w-8">
                         {showAvatar && user && (
                           <Avatar className="h-8 w-8 cursor-pointer">
-                            <AvatarImage src={user.avatar} alt={user.name} />
+                            <AvatarImage alt={user.name} src={user.avatar} />
                             <AvatarFallback className="text-xs">
-                              {user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                              {user.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .slice(0, 2)}
                             </AvatarFallback>
                           </Avatar>
                         )}
@@ -187,19 +204,24 @@ export function MessageList({ messages, users, currentUserId = "current-user" }:
                     )}
 
                     {/* Message content */}
-                    <div className={cn("flex-1 max-w-[70%]", isOwnMessage && "flex flex-col items-end")}>
+                    <div
+                      className={cn(
+                        "max-w-[70%] flex-1",
+                        isOwnMessage && "flex flex-col items-end"
+                      )}
+                    >
                       {/* Sender name for group messages */}
                       {showName && user && !isOwnMessage && (
-                        <div className="text-sm font-medium text-foreground mb-1">
+                        <div className="mb-1 font-medium text-foreground text-sm">
                           {user.name}
                         </div>
                       )}
 
                       {/* Message bubble */}
-                      <div className="relative group/message">
+                      <div className="group/message relative">
                         <div
                           className={cn(
-                            "rounded-lg px-3 py-2 text-sm break-words",
+                            "wrap-break-word rounded-lg px-3 py-2 text-sm",
                             isOwnMessage
                               ? "bg-primary text-primary-foreground"
                               : "bg-muted",
@@ -207,32 +229,36 @@ export function MessageList({ messages, users, currentUserId = "current-user" }:
                           )}
                         >
                           <p>{message.content}</p>
-                          
+
                           {/* Message reactions */}
                           {message.reactions.length > 0 && (
-                            <div className="flex gap-1 mt-2">
+                            <div className="mt-2 flex gap-1">
                               {message.reactions.map((reaction, idx) => (
                                 <div
-                                  key={idx}
                                   className={cn(
-                                    "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border cursor-pointer",
-                                    "bg-background/90 backdrop-blur-sm shadow-sm"
+                                    "inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-1 text-xs",
+                                    "bg-background/90 shadow-sm backdrop-blur-sm"
                                   )}
+                                  key={idx}
                                 >
                                   <span>{reaction.emoji}</span>
-                                  <span className="text-muted-foreground">{reaction.count}</span>
+                                  <span className="text-muted-foreground">
+                                    {reaction.count}
+                                  </span>
                                 </div>
                               ))}
                             </div>
                           )}
-                          
+
                           {/* Timestamp and status */}
-                          <div className={cn(
-                            "flex items-center gap-1 mt-1 text-xs",
-                            isOwnMessage 
-                              ? "text-primary-foreground/70 justify-end" 
-                              : "text-muted-foreground"
-                          )}>
+                          <div
+                            className={cn(
+                              "mt-1 flex items-center gap-1 text-xs",
+                              isOwnMessage
+                                ? "justify-end text-primary-foreground/70"
+                                : "text-muted-foreground"
+                            )}
+                          >
                             <span>{formatMessageTime(message.timestamp)}</span>
                             {message.isEdited && (
                               <span className="italic">(edited)</span>
@@ -251,27 +277,27 @@ export function MessageList({ messages, users, currentUserId = "current-user" }:
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
-                                variant="ghost"
+                                className="h-6 w-6 cursor-pointer p-0"
                                 size="sm"
-                                className="h-6 w-6 p-0 cursor-pointer"
+                                variant="ghost"
                               >
                                 <MoreHorizontal className="h-3 w-3" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem className="cursor-pointer">
-                                <Reply className="h-4 w-4 mr-2" />
+                                <Reply className="mr-2 h-4 w-4" />
                                 Reply
                               </DropdownMenuItem>
                               <DropdownMenuItem className="cursor-pointer">
-                                <Copy className="h-4 w-4 mr-2" />
+                                <Copy className="mr-2 h-4 w-4" />
                                 Copy
                               </DropdownMenuItem>
                               {isOwnMessage && (
                                 <>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem className="cursor-pointer text-destructive">
-                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    <Trash2 className="mr-2 h-4 w-4" />
                                     Delete
                                   </DropdownMenuItem>
                                 </>
@@ -282,15 +308,15 @@ export function MessageList({ messages, users, currentUserId = "current-user" }:
                       </div>
                     </div>
                   </div>
-                )
+                );
               })}
             </div>
           </div>
         ))}
-        
+
         {/* Scroll anchor */}
         <div ref={bottomRef} />
       </div>
     </ScrollArea>
-  )
+  );
 }

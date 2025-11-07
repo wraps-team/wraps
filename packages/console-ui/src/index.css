@@ -1,0 +1,5 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./styles/globals.css";
+
+/* Console-specific overrides and customizations can go here */

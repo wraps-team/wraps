@@ -1,16 +1,13 @@
-import { BaseLayout } from "@/components/layouts/base-layout"
-import { Calendar } from "./components/calendar"
-import { events, eventDates } from "./data"
+import { BaseLayout } from "@/components/layouts/base-layout";
+import { Calendar } from "./components/calendar";
+import { eventDates, events } from "./data";
 
 export default function CalendarPage() {
   return (
-    <BaseLayout 
-      title="Calendar" 
-      description="Manage your schedule and events"
-    >
+    <BaseLayout description="Manage your schedule and events" title="Calendar">
       <div className="px-4 lg:px-6">
-        <Calendar events={events} eventDates={eventDates} />
+        <Calendar eventDates={eventDates} events={events} />
       </div>
     </BaseLayout>
-  )
+  );
 }

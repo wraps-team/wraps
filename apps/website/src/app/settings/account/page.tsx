@@ -1,11 +1,17 @@
-"use client"
+"use client";
 
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
-import { BaseLayout } from "@/components/layouts/base-layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { BaseLayout } from "@/components/layouts/base-layout";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -13,9 +19,9 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 const accountFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -25,9 +31,9 @@ const accountFormSchema = z.object({
   currentPassword: z.string().optional(),
   newPassword: z.string().optional(),
   confirmPassword: z.string().optional(),
-})
+});
 
-type AccountFormValues = z.infer<typeof accountFormSchema>
+type AccountFormValues = z.infer<typeof accountFormSchema>;
 
 export default function AccountSettings() {
   const form = useForm<AccountFormValues>({
@@ -41,10 +47,10 @@ export default function AccountSettings() {
       newPassword: "",
       confirmPassword: "",
     },
-  })
+  });
 
   function onSubmit(data: AccountFormValues) {
-    console.log("Form submitted:", data)
+    console.log("Form submitted:", data);
     // Here you would typically save the data
   }
 
@@ -52,19 +58,20 @@ export default function AccountSettings() {
     <BaseLayout>
       <div className="space-y-6 px-4 lg:px-6">
         <div>
-          <h1 className="text-3xl font-bold">Account Settings</h1>
+          <h1 className="font-bold text-3xl">Account Settings</h1>
           <p className="text-muted-foreground">
             Manage your account settings and preferences.
           </p>
         </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
             <Card>
               <CardHeader>
                 <CardTitle>Personal Information</CardTitle>
                 <CardDescription>
-                  Update your personal information that will be displayed on your profile.
+                  Update your personal information that will be displayed on
+                  your profile.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -76,7 +83,10 @@ export default function AccountSettings() {
                       <FormItem>
                         <FormLabel>First Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter your first name" {...field} />
+                          <Input
+                            placeholder="Enter your first name"
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -89,7 +99,10 @@ export default function AccountSettings() {
                       <FormItem>
                         <FormLabel>Last Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter your last name" {...field} />
+                          <Input
+                            placeholder="Enter your last name"
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -103,7 +116,11 @@ export default function AccountSettings() {
                     <FormItem>
                       <FormLabel>Email Address</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="Enter your email" {...field} />
+                        <Input
+                          placeholder="Enter your email"
+                          type="email"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -140,7 +157,11 @@ export default function AccountSettings() {
                     <FormItem>
                       <FormLabel>Current Password</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="Enter current password" {...field} />
+                        <Input
+                          placeholder="Enter current password"
+                          type="password"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -153,7 +174,11 @@ export default function AccountSettings() {
                     <FormItem>
                       <FormLabel>New Password</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="Enter new password" {...field} />
+                        <Input
+                          placeholder="Enter new password"
+                          type="password"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -166,7 +191,11 @@ export default function AccountSettings() {
                     <FormItem>
                       <FormLabel>Confirm New Password</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="Confirm new password" {...field} />
+                        <Input
+                          placeholder="Confirm new password"
+                          type="password"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -184,14 +213,18 @@ export default function AccountSettings() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <Separator />
-                <div className="flex flex-wrap gap-2 items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h4 className="font-semibold">Delete Account</h4>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                       Permanently delete your account and all associated data.
                     </p>
                   </div>
-                  <Button variant="destructive" type="button" className="cursor-pointer">
+                  <Button
+                    className="cursor-pointer"
+                    type="button"
+                    variant="destructive"
+                  >
                     Delete Account
                   </Button>
                 </div>
@@ -199,12 +232,16 @@ export default function AccountSettings() {
             </Card>
 
             <div className="flex space-x-2">
-              <Button type="submit" className="cursor-pointer">Save Changes</Button>
-              <Button variant="outline" type="reset" className="cursor-pointer">Cancel</Button>
+              <Button className="cursor-pointer" type="submit">
+                Save Changes
+              </Button>
+              <Button className="cursor-pointer" type="reset" variant="outline">
+                Cancel
+              </Button>
             </div>
           </form>
         </Form>
       </div>
     </BaseLayout>
-  )
+  );
 }

@@ -1,81 +1,95 @@
-"use client"
+"use client";
 
-import React from 'react'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
-import type { ImportedTheme } from '@/types/theme-customizer'
+import React from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import type { ImportedTheme } from "@/types/theme-customizer";
 
 interface ImportModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onImport: (theme: ImportedTheme) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onImport: (theme: ImportedTheme) => void;
 }
 
-export function ImportModal({ open, onOpenChange, onImport }: ImportModalProps) {
-  const [importText, setImportText] = React.useState("")
+export function ImportModal({
+  open,
+  onOpenChange,
+  onImport,
+}: ImportModalProps) {
+  const [importText, setImportText] = React.useState("");
 
   const processImport = () => {
     try {
       if (!importText.trim()) {
-        console.error("No CSS content provided")
-        return
+        console.error("No CSS content provided");
+        return;
       }
 
       // Parse CSS content into light and dark theme variables
-      const lightTheme: Record<string, string> = {}
-      const darkTheme: Record<string, string> = {}
-      
+      const lightTheme: Record<string, string> = {};
+      const darkTheme: Record<string, string> = {};
+
       // Split CSS into sections
-      const cssText = importText.replace(/\/\*[\s\S]*?\*\//g, '') // Remove comments
-      
+      const cssText = importText.replace(/\/\*[\s\S]*?\*\//g, ""); // Remove comments
+
       // Extract :root section (light theme)
-      const rootMatch = cssText.match(/:root\s*\{([^}]+)\}/)
+      const rootMatch = cssText.match(/:root\s*\{([^}]+)\}/);
       if (rootMatch) {
-        const rootContent = rootMatch[1]
-        const variableMatches = rootContent.matchAll(/--([^:]+):\s*([^;]+);/g)
+        const rootContent = rootMatch[1];
+        const variableMatches = rootContent.matchAll(/--([^:]+):\s*([^;]+);/g);
         for (const match of variableMatches) {
-          const [, variable, value] = match
-          lightTheme[variable.trim()] = value.trim()
+          const [, variable, value] = match;
+          lightTheme[variable.trim()] = value.trim();
         }
       }
-      
+
       // Extract .dark section (dark theme)
-      const darkMatch = cssText.match(/\.dark\s*\{([^}]+)\}/)
+      const darkMatch = cssText.match(/\.dark\s*\{([^}]+)\}/);
       if (darkMatch) {
-        const darkContent = darkMatch[1]
-        const variableMatches = darkContent.matchAll(/--([^:]+):\s*([^;]+);/g)
+        const darkContent = darkMatch[1];
+        const variableMatches = darkContent.matchAll(/--([^:]+):\s*([^;]+);/g);
         for (const match of variableMatches) {
-          const [, variable, value] = match
-          darkTheme[variable.trim()] = value.trim()
+          const [, variable, value] = match;
+          darkTheme[variable.trim()] = value.trim();
         }
       }
-      
+
       // Store the imported theme
-      const importedThemeData = { light: lightTheme, dark: darkTheme }
-      onImport(importedThemeData)
-      
-      onOpenChange(false)
-      setImportText("")
+      const importedThemeData = { light: lightTheme, dark: darkTheme };
+      onImport(importedThemeData);
+
+      onOpenChange(false);
+      setImportText("");
     } catch (error) {
-      console.error("Error importing theme:", error)
+      console.error("Error importing theme:", error);
     }
-  }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} modal={true}>
-      <DialogContent className="max-w-4xl w-[90vw]">
+    <Dialog modal={true} onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="w-[90vw] max-w-4xl">
         <DialogHeader>
           <DialogTitle>Import Custom CSS</DialogTitle>
           <DialogDescription>
-            Paste your CSS theme below. Include both <code>:root</code> (light mode) and <code>.dark</code> (dark mode) sections with CSS variables like <code>--primary</code>, <code>--background</code>, etc. The theme will automatically switch between light and dark modes.
+            Paste your CSS theme below. Include both <code>:root</code> (light
+            mode) and <code>.dark</code> (dark mode) sections with CSS variables
+            like <code>--primary</code>, <code>--background</code>, etc. The
+            theme will automatically switch between light and dark modes.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
             <Textarea
+              className="flex max-h-[400px] min-h-[300px] w-full resize-none overflow-y-auto rounded-md border border-input bg-transparent px-3 py-2 font-mono text-foreground text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
               id="theme-css"
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm max-h-[400px] min-h-[300px] font-mono text-sm text-foreground overflow-y-auto resize-none"
+              onChange={(e) => setImportText(e.target.value)}
               placeholder={`:root {
   --background: 0 0% 100%;
   --foreground: oklch(0.52 0.13 144.17);
@@ -89,19 +103,26 @@ export function ImportModal({ open, onOpenChange, onImport }: ImportModalProps) 
   /* And more */
 }`}
               value={importText}
-              onChange={(e) => setImportText(e.target.value)}
             />
           </div>
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)} className="cursor-pointer">
+          <div className="flex justify-end gap-2">
+            <Button
+              className="cursor-pointer"
+              onClick={() => onOpenChange(false)}
+              variant="outline"
+            >
               Cancel
             </Button>
-            <Button onClick={processImport} disabled={!importText.trim()} className="cursor-pointer">
+            <Button
+              className="cursor-pointer"
+              disabled={!importText.trim()}
+              onClick={processImport}
+            >
               Import Theme
             </Button>
           </div>
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

@@ -1,98 +1,105 @@
-"use client"
+"use client";
 
-import { format, isToday, isYesterday, isThisWeek, isThisYear } from "date-fns"
-import { 
-  Search, 
-  Pin, 
-  VolumeX, 
+import { format, isThisWeek, isThisYear, isToday, isYesterday } from "date-fns";
+import {
+  Hash,
   MoreHorizontal,
+  Pin,
+  Search,
   Users,
-  Hash
-} from "lucide-react"
-
-import { cn } from "@/lib/utils"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { 
+  VolumeX,
+} from "lucide-react";
+import { type Conversation, useChat } from "@/app/chat/use-chat";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu"
-import { useChat, type Conversation } from "@/app/chat/use-chat"
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface ConversationListProps {
-  conversations: Conversation[]
-  selectedConversation: string | null
-  onSelectConversation: (conversationId: string) => void
+  conversations: Conversation[];
+  selectedConversation: string | null;
+  onSelectConversation: (conversationId: string) => void;
 }
 
 // Enhanced time formatting function
 function formatMessageTime(timestamp: string): string {
-  const date = new Date(timestamp)
-  
+  const date = new Date(timestamp);
+
   if (isToday(date)) {
-    return format(date, 'h:mm a') // 3:30 PM
-  } else if (isYesterday(date)) {
-    return 'Yesterday'
-  } else if (isThisWeek(date)) {
-    return format(date, 'EEEE') // Day name
-  } else if (isThisYear(date)) {
-    return format(date, 'MMM d') // Jan 15
-  } else {
-    return format(date, 'dd/MM/yy') // 15/01/24
+    return format(date, "h:mm a"); // 3:30 PM
   }
+  if (isYesterday(date)) {
+    return "Yesterday";
+  }
+  if (isThisWeek(date)) {
+    return format(date, "EEEE"); // Day name
+  }
+  if (isThisYear(date)) {
+    return format(date, "MMM d"); // Jan 15
+  }
+  return format(date, "dd/MM/yy"); // 15/01/24
 }
 
-export function ConversationList({ 
-  conversations, 
-  selectedConversation, 
-  onSelectConversation 
+export function ConversationList({
+  conversations,
+  selectedConversation,
+  onSelectConversation,
 }: ConversationListProps) {
-  const { searchQuery, setSearchQuery, togglePin, toggleMute } = useChat()
+  const { searchQuery, setSearchQuery, togglePin, toggleMute } = useChat();
 
   const filteredConversations = conversations.filter((conversation) =>
     conversation.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  );
 
   const sortedConversations = filteredConversations.sort((a, b) => {
     // Pinned conversations first
-    if (a.isPinned && !b.isPinned) return -1
-    if (!a.isPinned && b.isPinned) return 1
-    
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+
     // Then by last message timestamp
-    return new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime()
-  })
+    return (
+      new Date(b.lastMessage.timestamp).getTime() -
+      new Date(a.lastMessage.timestamp).getTime()
+    );
+  });
 
   const getOnlineStatus = (conversation: Conversation) => {
-    if (conversation.type === "direct" && conversation.participants.length === 1) {
+    if (
+      conversation.type === "direct" &&
+      conversation.participants.length === 1
+    ) {
       // In a real app, you'd check user online status
-      return Math.random() > 0.5 // Mock online status
+      return Math.random() > 0.5; // Mock online status
     }
-    return false
-  }
+    return false;
+  };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
-        <h2 className="text-lg font-semibold">Messages</h2>
+      <div className="flex shrink-0 items-center justify-between border-b p-4">
+        <h2 className="font-semibold text-lg">Messages</h2>
       </div>
 
       {/* Search */}
-      <div className="p-4 border-b flex-shrink-0">
+      <div className="shrink-0 border-b p-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="-translate-y-1/2 absolute top-1/2 left-3 h-4 w-4 transform text-muted-foreground" />
           <Input
-            type="text"
-            placeholder="Search conversations..."
-            value={searchQuery}
+            className="cursor-text pl-9"
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 cursor-text"
+            placeholder="Search conversations..."
+            type="text"
+            value={searchQuery}
           />
         </div>
       </div>
@@ -102,107 +109,125 @@ export function ConversationList({
         <div className="p-2">
           {sortedConversations.map((conversation) => (
             <div
-              key={conversation.id}
               className={cn(
-                "flex items-center gap-3 p-3 rounded-lg cursor-pointer relative group overflow-hidden hover:bg-accent/50 transition-colors",
+                "group relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-lg p-3 transition-colors hover:bg-accent/50",
                 selectedConversation === conversation.id
                   ? "bg-accent text-accent-foreground"
                   : ""
               )}
+              key={conversation.id}
               onClick={() => onSelectConversation(conversation.id)}
             >
               {/* Avatar with online indicator */}
-              <div className="relative flex-shrink-0">
-                <Avatar className={cn(
-                  "h-12 w-12",
-                  selectedConversation === conversation.id && "ring-2 ring-background"
-                )}>
-                  <AvatarImage src={conversation.avatar} alt={conversation.name} />
+              <div className="relative shrink-0">
+                <Avatar
+                  className={cn(
+                    "h-12 w-12",
+                    selectedConversation === conversation.id &&
+                      "ring-2 ring-background"
+                  )}
+                >
+                  <AvatarImage
+                    alt={conversation.name}
+                    src={conversation.avatar}
+                  />
                   <AvatarFallback className="text-sm">
                     {conversation.type === "group" ? (
                       <Users className="h-5 w-5" />
                     ) : (
-                      conversation.name.split(' ').map(n => n[0]).join('').slice(0, 2)
+                      conversation.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .slice(0, 2)
                     )}
                   </AvatarFallback>
                 </Avatar>
-                
+
                 {/* Online indicator for direct messages */}
-                {conversation.type === "direct" && getOnlineStatus(conversation) && (
-                  <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-green-500 border-2 border-background rounded-full" />
-                )}
-                
+                {conversation.type === "direct" &&
+                  getOnlineStatus(conversation) && (
+                    <div className="-bottom-1 -right-1 absolute h-4 w-4 rounded-full border-2 border-background bg-green-500" />
+                  )}
+
                 {/* Group indicator */}
                 {conversation.type === "group" && (
-                  <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-blue-500 border-2 border-background rounded-full flex items-center justify-center">
+                  <div className="-bottom-1 -right-1 absolute flex h-4 w-4 items-center justify-center rounded-full border-2 border-background bg-blue-500">
                     <Hash className="h-2 w-2 text-white" />
                   </div>
                 )}
               </div>
 
               {/* Content */}
-              <div className="flex-1 min-w-0 overflow-hidden">
-                <div className="flex items-center justify-between mb-1 min-w-0">
-                  <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
-                    <h3 className="font-medium truncate min-w-0 max-w-[180px]">{conversation.name}</h3>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <div className="mb-1 flex min-w-0 items-center justify-between">
+                  <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+                    <h3 className="min-w-0 max-w-[180px] truncate font-medium">
+                      {conversation.name}
+                    </h3>
                     {conversation.isPinned && (
-                      <Pin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      <Pin className="h-3 w-3 shrink-0 text-muted-foreground" />
                     )}
                     {conversation.isMuted && (
-                      <VolumeX className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      <VolumeX className="h-3 w-3 shrink-0 text-muted-foreground" />
                     )}
                   </div>
-                  <span className="text-xs text-muted-foreground flex-shrink-0 ml-2 whitespace-nowrap">
+                  <span className="ml-2 shrink-0 whitespace-nowrap text-muted-foreground text-xs">
                     {formatMessageTime(conversation.lastMessage.timestamp)}
                   </span>
                 </div>
-                
-                <div className="flex items-center justify-between gap-2 min-w-0">
-                  <p className="text-sm text-muted-foreground truncate flex-1 min-w-0 max-w-[200px]">
+
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                  <p className="min-w-0 max-w-[200px] flex-1 truncate text-muted-foreground text-sm">
                     {conversation.lastMessage.content}
                   </p>
-                  
+
                   {/* Unread count */}
                   {conversation.unreadCount > 0 && (
-                    <Badge variant="default" className="ml-2 min-w-[20px] h-5 text-xs cursor-pointer flex-shrink-0">
-                      {conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}
+                    <Badge
+                      className="ml-2 h-5 min-w-[20px] shrink-0 cursor-pointer text-xs"
+                      variant="default"
+                    >
+                      {conversation.unreadCount > 99
+                        ? "99+"
+                        : conversation.unreadCount}
                     </Badge>
                   )}
                 </div>
               </div>
 
               {/* Actions menu */}
-              <div className="opacity-0 group-hover:opacity-100 ml-2 flex-shrink-0">
+              <div className="ml-2 shrink-0 opacity-0 group-hover:opacity-100">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 cursor-pointer"
+                      className="h-8 w-8 cursor-pointer p-0"
                       onClick={(e) => e.stopPropagation()}
+                      size="sm"
+                      variant="ghost"
                     >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem 
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        togglePin(conversation.id)
-                      }}
+                    <DropdownMenuItem
                       className="cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePin(conversation.id);
+                      }}
                     >
-                      <Pin className="h-4 w-4 mr-2" />
+                      <Pin className="mr-2 h-4 w-4" />
                       {conversation.isPinned ? "Unpin" : "Pin"}
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleMute(conversation.id)
-                      }}
+                    <DropdownMenuItem
                       className="cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleMute(conversation.id);
+                      }}
                     >
-                      <VolumeX className="h-4 w-4 mr-2" />
+                      <VolumeX className="mr-2 h-4 w-4" />
                       {conversation.isMuted ? "Unmute" : "Mute"}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -217,5 +242,5 @@ export function ConversationList({
         </div>
       </ScrollArea>
     </div>
-  )
+  );
 }

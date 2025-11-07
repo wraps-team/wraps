@@ -1,26 +1,42 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
+import { useState } from "react";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const salesData = [
-  { month: "Jan", sales: 12500, target: 15000 },
-  { month: "Feb", sales: 18200, target: 15000 },
-  { month: "Mar", sales: 16800, target: 15000 },
-  { month: "Apr", sales: 22400, target: 20000 },
-  { month: "May", sales: 24600, target: 20000 },
-  { month: "Jun", sales: 28200, target: 25000 },
-  { month: "Jul", sales: 31500, target: 25000 },
-  { month: "Aug", sales: 29800, target: 25000 },
-  { month: "Sep", sales: 33200, target: 30000 },
-  { month: "Oct", sales: 35100, target: 30000 },
-  { month: "Nov", sales: 38900, target: 35000 },
-  { month: "Dec", sales: 42300, target: 35000 },
-]
+  { month: "Jan", sales: 12_500, target: 15_000 },
+  { month: "Feb", sales: 18_200, target: 15_000 },
+  { month: "Mar", sales: 16_800, target: 15_000 },
+  { month: "Apr", sales: 22_400, target: 20_000 },
+  { month: "May", sales: 24_600, target: 20_000 },
+  { month: "Jun", sales: 28_200, target: 25_000 },
+  { month: "Jul", sales: 31_500, target: 25_000 },
+  { month: "Aug", sales: 29_800, target: 25_000 },
+  { month: "Sep", sales: 33_200, target: 30_000 },
+  { month: "Oct", sales: 35_100, target: 30_000 },
+  { month: "Nov", sales: 38_900, target: 35_000 },
+  { month: "Dec", sales: 42_300, target: 35_000 },
+];
 
 const chartConfig = {
   sales: {
@@ -31,10 +47,10 @@ const chartConfig = {
     label: "Target",
     color: "var(--primary)",
   },
-}
+};
 
 export function SalesChart() {
-  const [timeRange, setTimeRange] = useState("12m")
+  const [timeRange, setTimeRange] = useState("12m");
 
   return (
     <Card className="cursor-pointer">
@@ -44,72 +60,100 @@ export function SalesChart() {
           <CardDescription>Monthly sales vs targets</CardDescription>
         </div>
         <div className="flex items-center space-x-2">
-          <Select value={timeRange} onValueChange={setTimeRange}>
+          <Select onValueChange={setTimeRange} value={timeRange}>
             <SelectTrigger className="w-32 cursor-pointer">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="3m" className="cursor-pointer">Last 3 months</SelectItem>
-              <SelectItem value="6m" className="cursor-pointer">Last 6 months</SelectItem>
-              <SelectItem value="12m" className="cursor-pointer">Last 12 months</SelectItem>
+              <SelectItem className="cursor-pointer" value="3m">
+                Last 3 months
+              </SelectItem>
+              <SelectItem className="cursor-pointer" value="6m">
+                Last 6 months
+              </SelectItem>
+              <SelectItem className="cursor-pointer" value="12m">
+                Last 12 months
+              </SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" className="cursor-pointer">
+          <Button className="cursor-pointer" variant="outline">
             Export
           </Button>
         </div>
       </CardHeader>
       <CardContent className="p-0 pt-6">
         <div className="px-6 pb-6">
-          <ChartContainer config={chartConfig} className="h-[350px] w-full">
-            <AreaChart data={salesData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+          <ChartContainer className="h-[350px] w-full" config={chartConfig}>
+            <AreaChart
+              data={salesData}
+              margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+            >
               <defs>
-                <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-sales)" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="var(--color-sales)" stopOpacity={0.05} />
+                <linearGradient id="colorSales" x1="0" x2="0" y1="0" y2="1">
+                  <stop
+                    offset="5%"
+                    stopColor="var(--color-sales)"
+                    stopOpacity={0.4}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="var(--color-sales)"
+                    stopOpacity={0.05}
+                  />
                 </linearGradient>
-                <linearGradient id="colorTarget" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-target)" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="var(--color-target)" stopOpacity={0} />
+                <linearGradient id="colorTarget" x1="0" x2="0" y1="0" y2="1">
+                  <stop
+                    offset="5%"
+                    stopColor="var(--color-target)"
+                    stopOpacity={0.2}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="var(--color-target)"
+                    stopOpacity={0}
+                  />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
-              <XAxis 
-                dataKey="month" 
-                axisLine={false}
-                tickLine={false}
-                className="text-xs"
-                tick={{ fontSize: 12 }}
+              <CartesianGrid
+                className="stroke-muted/30"
+                strokeDasharray="3 3"
               />
-              <YAxis 
+              <XAxis
                 axisLine={false}
+                className="text-xs"
+                dataKey="month"
+                tick={{ fontSize: 12 }}
                 tickLine={false}
+              />
+              <YAxis
+                axisLine={false}
                 className="text-xs"
                 tick={{ fontSize: 12 }}
                 tickFormatter={(value) => `$${value.toLocaleString()}`}
+                tickLine={false}
               />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Area
-                type="monotone"
                 dataKey="target"
+                fill="url(#colorTarget)"
                 stackId="1"
                 stroke="var(--color-target)"
-                fill="url(#colorTarget)"
                 strokeDasharray="5 5"
                 strokeWidth={1}
+                type="monotone"
               />
               <Area
-                type="monotone"
                 dataKey="sales"
+                fill="url(#colorSales)"
                 stackId="2"
                 stroke="var(--color-sales)"
-                fill="url(#colorSales)"
                 strokeWidth={1}
+                type="monotone"
               />
             </AreaChart>
           </ChartContainer>
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

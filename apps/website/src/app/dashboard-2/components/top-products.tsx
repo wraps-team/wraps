@@ -1,10 +1,16 @@
-"use client"
+"use client";
 
-import { Eye, Star, TrendingUp } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
+import { Eye, Star, TrendingUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 const products = [
   {
@@ -57,7 +63,7 @@ const products = [
     stock: 999,
     category: "Subscription",
   },
-]
+];
 
 export function TopProducts() {
   return (
@@ -67,50 +73,61 @@ export function TopProducts() {
           <CardTitle>Top Products</CardTitle>
           <CardDescription>Best performing products this month</CardDescription>
         </div>
-        <Button variant="outline" size="sm" className="cursor-pointer">
-          <Eye className="h-4 w-4 mr-2" />
+        <Button className="cursor-pointer" size="sm" variant="outline">
+          <Eye className="mr-2 h-4 w-4" />
           View All
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         {products.map((product, index) => (
-          <div key={product.id} className="flex items-center p-3 rounded-lg border gap-2">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm">
-                #{index + 1}
-              </div>
-            <div className="flex gap-2 items-center justify-between space-x-3 flex-1 flex-wrap">
+          <div
+            className="flex items-center gap-2 rounded-lg border p-3"
+            key={product.id}
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary text-sm">
+              #{index + 1}
+            </div>
+            <div className="flex flex-1 flex-wrap items-center justify-between gap-2 space-x-3">
               <div className="">
                 <div className="flex items-center space-x-2">
-                  <p className="text-sm font-medium truncate">{product.name}</p>
-                  <Badge variant="outline" className="text-xs">
+                  <p className="truncate font-medium text-sm">{product.name}</p>
+                  <Badge className="text-xs" variant="outline">
                     {product.category}
                   </Badge>
                 </div>
-                <div className="flex items-center space-x-2 mt-1">
+                <div className="mt-1 flex items-center space-x-2">
                   <div className="flex items-center space-x-1">
                     <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                    <span className="text-xs text-muted-foreground">{product.rating}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {product.rating}
+                    </span>
                   </div>
-                  <span className="text-xs text-muted-foreground">•</span>
-                  <span className="text-xs text-muted-foreground">{product.sales} sales</span>
+                  <span className="text-muted-foreground text-xs">•</span>
+                  <span className="text-muted-foreground text-xs">
+                    {product.sales} sales
+                  </span>
                 </div>
               </div>
-              <div className="text-right space-y-1">
+              <div className="space-y-1 text-right">
                 <div className="flex items-center space-x-2">
-                  <p className="text-sm font-medium">{product.revenue}</p>
+                  <p className="font-medium text-sm">{product.revenue}</p>
                   <Badge
+                    className="cursor-pointer border-green-200 text-green-600"
                     variant="outline"
-                    className="text-green-600 border-green-200 cursor-pointer"
                   >
-                    <TrendingUp className="h-3 w-3 mr-1" />
+                    <TrendingUp className="mr-1 h-3 w-3" />
                     {product.growth}
                   </Badge>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs text-muted-foreground">Stock: {product.stock}</span>
+                  <span className="text-muted-foreground text-xs">
+                    Stock: {product.stock}
+                  </span>
                   <Progress
-                    value={product.stock > 100 ? 100 : (product.stock / 100) * 100}
-                    className="w-12 h-1"
+                    className="h-1 w-12"
+                    value={
+                      product.stock > 100 ? 100 : (product.stock / 100) * 100
+                    }
                   />
                 </div>
               </div>
@@ -119,5 +136,5 @@ export function TopProducts() {
         ))}
       </CardContent>
     </Card>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from "zod";
 
 export const schema = z.object({
   id: z.number(),
@@ -8,6 +8,6 @@ export const schema = z.object({
   target: z.string(),
   limit: z.string(),
   reviewer: z.string(),
-})
+});
 
-export type Task = z.infer<typeof schema>
+export type Task = z.infer<typeof schema>;

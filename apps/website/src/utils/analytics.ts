@@ -10,7 +10,7 @@ declare global {
   }
 }
 
-export const GTM_ID = import.meta.env.VITE_GTM_ID || '';
+export const GTM_ID = import.meta.env.VITE_GTM_ID || "";
 const IS_PRODUCTION = import.meta.env.PROD;
 
 /**
@@ -19,12 +19,14 @@ const IS_PRODUCTION = import.meta.env.PROD;
  */
 export const initGTM = (): void => {
   if (!GTM_ID) {
-    console.log('GTM not initialized - VITE_GTM_ID environment variable not set');
+    console.log(
+      "GTM not initialized - VITE_GTM_ID environment variable not set"
+    );
     return;
   }
 
   if (!IS_PRODUCTION) {
-    console.log('GTM not initialized - running in development mode');
+    console.log("GTM not initialized - running in development mode");
     return;
   }
 
@@ -32,7 +34,7 @@ export const initGTM = (): void => {
   window.dataLayer = window.dataLayer || [];
 
   // GTM script injection
-  const gtmScript = document.createElement('script');
+  const gtmScript = document.createElement("script");
   gtmScript.innerHTML = `
     (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -43,14 +45,14 @@ export const initGTM = (): void => {
   document.head.appendChild(gtmScript);
 
   // GTM noscript fallback
-  const noscript = document.createElement('noscript');
+  const noscript = document.createElement("noscript");
   noscript.innerHTML = `
     <iframe src="https://www.googletagmanager.com/ns.html?id=${GTM_ID}"
     height="0" width="0" style="display:none;visibility:hidden"></iframe>
   `;
   document.body.insertBefore(noscript, document.body.firstChild);
 
-  console.log('GTM initialized successfully');
+  console.log("GTM initialized successfully");
 };
 
 /**
@@ -58,8 +60,11 @@ export const initGTM = (): void => {
  * @param eventName - The event name
  * @param parameters - Event parameters
  */
-export const trackEvent = (eventName: string, parameters?: Record<string, unknown>): void => {
-  if (!GTM_ID || !IS_PRODUCTION || typeof window === 'undefined') return;
+export const trackEvent = (
+  eventName: string,
+  parameters?: Record<string, unknown>
+): void => {
+  if (!(GTM_ID && IS_PRODUCTION) || typeof window === "undefined") return;
 
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({
@@ -74,11 +79,11 @@ export const trackEvent = (eventName: string, parameters?: Record<string, unknow
  * @param title - Optional page title
  */
 export const trackPageView = (path: string, title?: string): void => {
-  if (!GTM_ID || !IS_PRODUCTION || typeof window === 'undefined') return;
+  if (!(GTM_ID && IS_PRODUCTION) || typeof window === "undefined") return;
 
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({
-    event: 'page_view',
+    event: "page_view",
     page_path: path,
     page_title: title || document.title,
   });
