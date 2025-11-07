@@ -1,23 +1,23 @@
-import { Button } from "@byo/ui/components/ui/button";
-import { Input } from "@byo/ui/components/ui/input";
-import { Separator } from "@byo/ui/components/ui/separator";
+import { Slot } from "@radix-ui/react-slot";
+import { Button } from "@wraps/ui/components/ui/button";
+import { Input } from "@wraps/ui/components/ui/input";
+import { Separator } from "@wraps/ui/components/ui/separator";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@byo/ui/components/ui/sheet";
-import { Skeleton } from "@byo/ui/components/ui/skeleton";
+} from "@wraps/ui/components/ui/sheet";
+import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@byo/ui/components/ui/tooltip";
-import { useIsMobile } from "@byo/ui/hooks/use-mobile";
-import { cn } from "@byo/ui/lib/utils";
-import { Slot } from "@radix-ui/react-slot";
+} from "@wraps/ui/components/ui/tooltip";
+import { useIsMobile } from "@wraps/ui/hooks/use-mobile";
+import { cn } from "@wraps/ui/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
 import * as React from "react";

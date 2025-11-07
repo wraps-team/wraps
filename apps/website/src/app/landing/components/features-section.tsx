@@ -75,7 +75,7 @@ export function FeaturesSection() {
         {/* Section Header */}
         <div className="mx-auto mb-16 max-w-2xl text-center">
           <Badge className="mb-4" variant="outline">
-            Why BYO?
+            Why Wraps?
           </Badge>
           <h2 className="mb-4 font-bold text-3xl tracking-tight sm:text-4xl">
             The Best of AWS and SaaS, None of the Downsides
@@ -103,9 +103,9 @@ export function FeaturesSection() {
                 Own your infrastructure, keep your data
               </h3>
               <p className="text-pretty text-base text-muted-foreground">
-                BYO deploys directly to your AWS account. You pay AWS directly,
-                you own the infrastructure, and your data never leaves your
-                control. Stop worrying about vendor lock-in.
+                Wraps deploys directly to your AWS account. You pay AWS
+                directly, you own the infrastructure, and your data never leaves
+                your control. Stop worrying about vendor lock-in.
               </p>
             </div>
 
@@ -142,7 +142,7 @@ export function FeaturesSection() {
               </Button>
               <Button className="cursor-pointer" size="lg" variant="outline">
                 <a
-                  href="https://github.com/yourusername/byo"
+                  href="https://github.com/wraps-team/wraps"
                   rel="noopener noreferrer"
                   target="_blank"
                 >

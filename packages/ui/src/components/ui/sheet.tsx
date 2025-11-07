@@ -1,7 +1,7 @@
 "use client";
 
-import { cn } from "@byo/ui/lib/utils";
 import * as SheetPrimitive from "@radix-ui/react-dialog";
+import { cn } from "@wraps/ui/lib/utils";
 import { XIcon } from "lucide-react";
 import type * as React from "react";
 

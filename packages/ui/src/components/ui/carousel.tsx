@@ -1,8 +1,8 @@
 "use client";
 
-import { Button } from "@byo/ui/components/ui/button";
-import { cn } from "@byo/ui/lib/utils";
 import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
+import { Button } from "@wraps/ui/components/ui/button";
+import { cn } from "@wraps/ui/lib/utils";
 import useEmblaCarousel, {
   type UseEmblaCarouselType,
 } from "embla-carousel-react";

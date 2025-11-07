@@ -17,7 +17,7 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@byo/ui/*": ["./src/*"]
+      "@wraps/ui/*": ["./src/*"]
     }
   },
   "include": ["src"],

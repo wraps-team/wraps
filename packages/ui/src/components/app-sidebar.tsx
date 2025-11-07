@@ -1,7 +1,7 @@
 "use client";
 
-import { NavUser } from "@byo/ui/components/nav-user";
-import { Label } from "@byo/ui/components/ui/label";
+import { NavUser } from "@wraps/ui/components/nav-user";
+import { Label } from "@wraps/ui/components/ui/label";
 import {
   Sidebar,
   SidebarContent,
@@ -14,8 +14,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@byo/ui/components/ui/sidebar";
-import { Switch } from "@byo/ui/components/ui/switch";
+} from "@wraps/ui/components/ui/sidebar";
+import { Switch } from "@wraps/ui/components/ui/switch";
 import { ArchiveX, Command, File, Inbox, Send, Trash2 } from "lucide-react";
 import * as React from "react";
 

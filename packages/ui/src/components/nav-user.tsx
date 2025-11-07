@@ -4,7 +4,7 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@byo/ui/components/ui/avatar";
+} from "@wraps/ui/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,13 +13,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@byo/ui/components/ui/dropdown-menu";
+} from "@wraps/ui/components/ui/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@byo/ui/components/ui/sidebar";
+} from "@wraps/ui/components/ui/sidebar";
 import {
   BadgeCheck,
   Bell,

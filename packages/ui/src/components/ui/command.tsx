@@ -6,8 +6,8 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@byo/ui/components/ui/dialog";
-import { cn } from "@byo/ui/lib/utils";
+} from "@wraps/ui/components/ui/dialog";
+import { cn } from "@wraps/ui/lib/utils";
 import { Command as CommandPrimitive } from "cmdk";
 import { SearchIcon } from "lucide-react";
 import type * as React from "react";

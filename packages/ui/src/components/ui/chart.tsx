@@ -1,4 +1,4 @@
-import { cn } from "@byo/ui/lib/utils";
+import { cn } from "@wraps/ui/lib/utils";
 import * as React from "react";
 import * as RechartsPrimitive from "recharts";
 

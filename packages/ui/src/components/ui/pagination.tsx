@@ -1,5 +1,5 @@
-import { type Button, buttonVariants } from "@byo/ui/components/ui/button";
-import { cn } from "@byo/ui/lib/utils";
+import { type Button, buttonVariants } from "@wraps/ui/components/ui/button";
+import { cn } from "@wraps/ui/lib/utils";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,

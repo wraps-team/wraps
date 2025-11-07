@@ -1,6 +1,6 @@
-import { cn } from "@byo/ui/lib/utils";
 import { ChevronRightIcon, DotsHorizontalIcon } from "@radix-ui/react-icons";
 import { Slot } from "@radix-ui/react-slot";
+import { cn } from "@wraps/ui/lib/utils";
 import type * as React from "react";
 
 function Breadcrumb({ ...props }: React.ComponentProps<"nav">) {

@@ -1,11 +1,11 @@
 {
-  "name": "byo",
+  "name": "wraps",
   "version": "0.0.0",
   "private": true,
-  "description": "Bring Your Own Cloud - Deploy email infrastructure to your AWS account",
+  "description": "Wraps - wrap your AWS account's SES, SNS, SQS, IoT, and more",
   "repository": {
     "type": "git",
-    "url": "https://github.com/byo-team/byo.git"
+    "url": "https://github.com/wraps-team/wraps.git"
   },
   "license": "MIT",
   "scripts": {

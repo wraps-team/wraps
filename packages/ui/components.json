@@ -10,11 +10,11 @@
     "cssVariables": true
   },
   "aliases": {
-    "components": "@byo/ui/components",
-    "utils": "@byo/ui/lib/utils",
-    "hooks": "@byo/ui/hooks",
-    "lib": "@byo/ui/lib",
-    "ui": "@byo/ui/components/ui"
+    "components": "@wraps/ui/components",
+    "utils": "@wraps/ui/lib/utils",
+    "hooks": "@wraps/ui/hooks",
+    "lib": "@wraps/ui/lib",
+    "ui": "@wraps/ui/components/ui"
   },
   "iconLibrary": "lucide"
 }

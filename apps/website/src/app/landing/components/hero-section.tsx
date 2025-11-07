@@ -58,7 +58,7 @@ export function HeroSection() {
               variant="outline"
             >
               <a
-                href="https://github.com/yourusername/byo"
+                href="https://github.com/wraps-team/wraps"
                 rel="noopener noreferrer"
                 target="_blank"
               >

@@ -1,5 +1,5 @@
-import { cn } from "@byo/ui/lib/utils";
 import * as SwitchPrimitive from "@radix-ui/react-switch";
+import { cn } from "@wraps/ui/lib/utils";
 import type * as React from "react";
 
 function Switch({

@@ -1,5 +1,5 @@
-import { cn } from "@byo/ui/lib/utils";
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
+import { cn } from "@wraps/ui/lib/utils";
 import { CheckIcon } from "lucide-react";
 import type * as React from "react";
 

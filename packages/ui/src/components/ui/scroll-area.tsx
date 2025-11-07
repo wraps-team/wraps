@@ -1,5 +1,5 @@
-import { cn } from "@byo/ui/lib/utils";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
+import { cn } from "@wraps/ui/lib/utils";
 import type * as React from "react";
 
 function ScrollArea({

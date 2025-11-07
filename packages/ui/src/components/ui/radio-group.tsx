@@ -1,5 +1,5 @@
-import { cn } from "@byo/ui/lib/utils";
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
+import { cn } from "@wraps/ui/lib/utils";
 import { CircleIcon } from "lucide-react";
 import type * as React from "react";
 

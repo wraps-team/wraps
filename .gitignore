@@ -42,8 +42,8 @@ Thumbs.db
 # Pulumi
 .pulumi/
 
-# Local BYO data
-.byo/
+# Local Wraps data
+.wraps/
 
 # Project notes (keep local)
 ai-notes/
