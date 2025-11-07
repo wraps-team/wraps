@@ -1,6 +1,6 @@
 # Wraps
 
-**AWS warppers with SaaS developer experience.**
+**AWS wrappers with SaaS developer experience.**
 
 Deploy production-ready email infrastructure to your AWS account in 30 seconds. No vendor lock-in, AWS pricing, Resend-like DX.
 

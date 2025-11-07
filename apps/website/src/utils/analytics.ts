@@ -4,10 +4,10 @@
  */
 
 declare global {
-  type Window = {
+  interface Window {
     dataLayer: unknown[];
     gtag: (...args: unknown[]) => void;
-  };
+  }
 }
 
 export const GTM_ID = import.meta.env.VITE_GTM_ID || "";
