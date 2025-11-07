@@ -3,13 +3,13 @@
 import {
   ArrowRight,
   Cloud,
-  DollarSign,
   Gauge,
-  Layers,
   Lock,
+  Mail,
+  MessageSquare,
   Shield,
   Terminal,
-  Zap,
+  Workflow,
 } from "lucide-react";
 import { Image3D } from "@/components/image-3d";
 import { Badge } from "@/components/ui/badge";
@@ -17,27 +17,32 @@ import { Button } from "@/components/ui/button";
 
 const mainFeatures = [
   {
+    icon: Mail,
+    title: "Email (SES)",
+    description:
+      "Shipping now. Resend-like DX for AWS SES. Templates, tracking, webhooks.",
+    status: "Available",
+  },
+  {
+    icon: MessageSquare,
+    title: "SMS (End User Messaging)",
+    description:
+      "Coming next. Text messaging with AWS End User Messaging, not SNS.",
+    status: "Next",
+  },
+  {
+    icon: Workflow,
+    title: "Workflows (SQS + Lambda)",
+    description:
+      "After SMS. Trigger-based workflows using SQS queues and Lambda functions.",
+    status: "Roadmap",
+  },
+  {
     icon: Lock,
     title: "Zero Vendor Lock-In",
     description:
       "Infrastructure stays in your AWS account. Stop paying us, keep using AWS.",
-  },
-  {
-    icon: DollarSign,
-    title: "AWS Pricing",
-    description:
-      "Pay AWS directly. 10-100x cheaper than SaaS alternatives at scale.",
-  },
-  {
-    icon: Zap,
-    title: "30-Second Setup",
-    description:
-      "Deploy production-ready infrastructure in one command. No 2-hour AWS tutorials.",
-  },
-  {
-    icon: Layers,
-    title: "Multi-Service Platform",
-    description: "Email, SMS, queues, and IoT. One dashboard to rule them all.",
+    status: "",
   },
 ];
 
@@ -75,15 +80,15 @@ export function FeaturesSection() {
         {/* Section Header */}
         <div className="mx-auto mb-16 max-w-2xl text-center">
           <Badge className="mb-4" variant="outline">
-            Why Wraps?
+            Product Roadmap
           </Badge>
           <h2 className="mb-4 font-bold text-3xl tracking-tight sm:text-4xl">
-            The Best of AWS and SaaS, None of the Downsides
+            One Platform, Multiple AWS Services
           </h2>
           <p className="text-lg text-muted-foreground">
-            Get Resend-like developer experience with AWS pricing. No vendor
-            lock-in, no stored credentials, no surprises. Your infrastructure,
-            your control, your data.
+            We're building infrastructure wrappers for the most common AWS
+            services. Each one gets SaaS-quality DX while staying in your AWS
+            account. Starting with email, expanding to SMS and workflows.
           </p>
         </div>
 
@@ -100,12 +105,13 @@ export function FeaturesSection() {
           <div className="space-y-6">
             <div className="space-y-4">
               <h3 className="text-balance font-semibold text-2xl tracking-tight sm:text-3xl">
-                Own your infrastructure, keep your data
+                Building One Wrapper at a Time
               </h3>
               <p className="text-pretty text-base text-muted-foreground">
-                Wraps deploys directly to your AWS account. You pay AWS
-                directly, you own the infrastructure, and your data never leaves
-                your control. Stop worrying about vendor lock-in.
+                We're taking the best AWS services and wrapping them in
+                beautiful developer experiences. Each wrapper deploys to your
+                AWS account, you pay AWS directly, and you keep full control. No
+                lock-in, no surprises.
               </p>
             </div>
 
@@ -122,9 +128,24 @@ export function FeaturesSection() {
                     />
                   </div>
                   <div>
-                    <h3 className="font-medium text-foreground">
-                      {feature.title}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-foreground">
+                        {feature.title}
+                      </h3>
+                      {feature.status && (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs ${
+                            feature.status === "Available"
+                              ? "bg-green-500/10 text-green-700 dark:text-green-400"
+                              : feature.status === "Next"
+                                ? "bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                                : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {feature.status}
+                        </span>
+                      )}
+                    </div>
                     <p className="mt-1 text-muted-foreground text-sm">
                       {feature.description}
                     </p>

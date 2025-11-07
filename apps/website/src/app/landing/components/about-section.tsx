@@ -1,6 +1,6 @@
 "use client";
 
-import { Code, Crown, Github, Layout, Palette } from "lucide-react";
+import { Cloud, Github, Lock, Package, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,28 +8,28 @@ import { CardDecorator } from "@/components/ui/card-decorator";
 
 const values = [
   {
-    icon: Code,
-    title: "Developer First",
+    icon: Package,
+    title: "Infrastructure Wrappers",
     description:
-      "Every component is built with the developer experience in mind, ensuring clean code and easy integration.",
+      "We wrap AWS services in beautiful developer experiences. Same power, 10x better DX.",
   },
   {
-    icon: Palette,
-    title: "Design Excellence",
+    icon: Lock,
+    title: "Zero Lock-In",
     description:
-      "We maintain the highest design standards, following shadcn/ui principles and modern UI patterns.",
+      "Infrastructure stays in your AWS account. Stop paying us, keep using AWS. Your choice, always.",
   },
   {
-    icon: Layout,
-    title: "Production Ready",
+    icon: Cloud,
+    title: "Your AWS Account",
     description:
-      "Battle-tested components used in real applications with proven performance and reliability across different environments.",
+      "Deploy to your account, pay AWS directly. You own the infrastructure and data. We just make it easy.",
   },
   {
-    icon: Crown,
-    title: "Premium Quality",
+    icon: Zap,
+    title: "SaaS-Quality DX",
     description:
-      "Hand-crafted with attention to detail and performance optimization, ensuring exceptional user experience and accessibility.",
+      "One-command deployments, beautiful dashboards, clean APIs. AWS power with Resend-like developer experience.",
   },
 ];
 
@@ -40,15 +40,16 @@ export function AboutSection() {
         {/* Section Header */}
         <div className="mx-auto mb-16 max-w-4xl text-center">
           <Badge className="mb-4" variant="outline">
-            About ShadcnStore
+            Our Mission
           </Badge>
           <h2 className="mb-6 font-bold text-3xl tracking-tight sm:text-4xl">
-            Built for developers, by developers
+            The Best of AWS and SaaS, None of the Downsides
           </h2>
           <p className="mb-8 text-lg text-muted-foreground">
-            We're passionate about creating the best marketplace for shadcn/ui
-            components and templates. Our mission is to accelerate development
-            and help developers build beautiful admin interfaces faster.
+            Wraps brings SaaS-quality developer experience to AWS
+            infrastructure. Deploy to your own AWS account, pay AWS directly,
+            and keep full control. We're building the infrastructure layer the
+            cloud deserves.
           </p>
         </div>
 
@@ -77,13 +78,13 @@ export function AboutSection() {
         <div className="mt-16 text-center">
           <div className="mb-6 flex items-center justify-center gap-2">
             <span className="text-muted-foreground">
-              ❤️ Made with love for the developer community
+              Open source. Forever free local console. Deploy in 30 seconds.
             </span>
           </div>
           <div className="flex flex-col justify-center gap-4 sm:flex-row">
             <Button asChild className="cursor-pointer" size="lg">
               <a
-                href="https://github.com/silicondeck/shadcn-dashboard-landing-template"
+                href="https://github.com/wraps-team/wraps"
                 rel="noopener noreferrer"
                 target="_blank"
               >
@@ -97,13 +98,7 @@ export function AboutSection() {
               size="lg"
               variant="outline"
             >
-              <a
-                href="https://discord.com/invite/XEQhPc9a6p"
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                Join Discord Community
-              </a>
+              <a href="#pricing">View Pricing</a>
             </Button>
           </div>
         </div>

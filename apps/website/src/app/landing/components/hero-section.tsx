@@ -28,19 +28,20 @@ export function HeroSection() {
 
           {/* Main Headline */}
           <h1 className="mb-6 font-bold text-4xl tracking-tight sm:text-6xl lg:text-7xl">
-            Deploy AWS Infrastructure
+            AWS Infrastructure Wrappers
             <span className="bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
               {" "}
-              To Your Account{" "}
+              with SaaS Provider DX{" "}
             </span>
-            with Zero Vendor Lock-In
+            on Your Own AWS Account
           </h1>
 
           {/* Subheading */}
           <p className="mx-auto mb-10 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-            Get Resend-like developer experience with AWS pricing. Deploy email,
-            SMS, queues, and IoT infrastructure to your own AWS account in 30
-            seconds. You own it, you control it, you pay AWS directly.
+            Deploy production-ready infrastructure to your AWS account in 30
+            seconds. Starting with SES for email, then AWS End User Messaging
+            for SMS, then SQS + Lambda for workflows. Zero vendor lock-in, AWS
+            pricing, SaaS-quality DX.
           </p>
 
           {/* CTA Buttons */}
