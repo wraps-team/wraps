@@ -16,7 +16,8 @@
     "typecheck": "turbo run typecheck",
     "check": "npx ultracite@latest check",
     "fix": "npx ultracite@latest fix",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "cli": "node packages/cli/dist/cli.js"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.4",
