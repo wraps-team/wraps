@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-export interface PricingPlan {
+export type PricingPlan = {
   id: string;
   name: string;
   description: string;
@@ -21,14 +21,14 @@ export interface PricingPlan {
   features: string[];
   popular?: boolean;
   current?: boolean;
-}
+};
 
-interface PricingPlansProps {
+type PricingPlansProps = {
   plans?: PricingPlan[];
   mode?: "pricing" | "billing";
   currentPlanId?: string;
   onPlanSelect?: (planId: string) => void;
-}
+};
 
 const defaultPlans: PricingPlan[] = [
   {

@@ -20,10 +20,10 @@ import { ImportModal } from "./import-modal";
 import { LayoutTab } from "./layout-tab";
 import { ThemeTab } from "./theme-tab";
 
-interface ThemeCustomizerProps {
+type ThemeCustomizerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
+};
 
 export function ThemeCustomizer({ open, onOpenChange }: ThemeCustomizerProps) {
   const {

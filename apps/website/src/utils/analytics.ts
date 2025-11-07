@@ -4,10 +4,10 @@
  */
 
 declare global {
-  interface Window {
+  type Window = {
     dataLayer: unknown[];
     gtag: (...args: unknown[]) => void;
-  }
+  };
 }
 
 export const GTM_ID = import.meta.env.VITE_GTM_ID || "";
@@ -64,7 +64,9 @@ export const trackEvent = (
   eventName: string,
   parameters?: Record<string, unknown>
 ): void => {
-  if (!(GTM_ID && IS_PRODUCTION) || typeof window === "undefined") return;
+  if (!(GTM_ID && IS_PRODUCTION) || typeof window === "undefined") {
+    return;
+  }
 
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({
@@ -79,7 +81,9 @@ export const trackEvent = (
  * @param title - Optional page title
  */
 export const trackPageView = (path: string, title?: string): void => {
-  if (!(GTM_ID && IS_PRODUCTION) || typeof window === "undefined") return;
+  if (!(GTM_ID && IS_PRODUCTION) || typeof window === "undefined") {
+    return;
+  }
 
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({

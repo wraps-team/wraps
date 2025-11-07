@@ -50,3 +50,6 @@ ai-notes/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Playwright
+.playwright*

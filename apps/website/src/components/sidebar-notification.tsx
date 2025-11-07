@@ -9,7 +9,9 @@ import { Logo } from "./logo";
 export function SidebarNotification() {
   const [isVisible, setIsVisible] = React.useState(true);
 
-  if (!isVisible) return null;
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <Card className="mb-3 border-neutral-200 bg-neutral-50 py-0 dark:border-neutral-700 dark:bg-neutral-800">

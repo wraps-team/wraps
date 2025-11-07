@@ -1,0 +1,10 @@
+{
+  "name": "byo-webhook-sender",
+  "version": "1.0.0",
+  "description": "Lambda function to send webhooks for SES events",
+  "type": "module",
+  "main": "index.ts",
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.130"
+  }
+}

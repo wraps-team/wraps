@@ -45,10 +45,10 @@ import { cn } from "@/lib/utils";
 import type { ImportedTheme } from "@/types/theme-customizer";
 import "@/components/theme-customizer/circular-transition.css";
 
-interface LandingThemeCustomizerProps {
+type LandingThemeCustomizerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
+};
 
 export function LandingThemeCustomizer({
   open,
@@ -130,12 +130,16 @@ export function LandingThemeCustomizer({
   };
 
   const handleLightMode = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (isDarkMode === false) return;
+    if (isDarkMode === false) {
+      return;
+    }
     toggleTheme(event);
   };
 
   const handleDarkMode = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (isDarkMode === true) return;
+    if (isDarkMode === true) {
+      return;
+    }
     toggleTheme(event);
   };
 

@@ -12,11 +12,11 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { UpgradeToProButton } from "@/components/upgrade-to-pro-button";
 import { useSidebarConfig } from "@/hooks/use-sidebar-config";
 
-interface BaseLayoutProps {
+type BaseLayoutProps = {
   children: React.ReactNode;
   title?: string;
   description?: string;
-}
+};
 
 export function BaseLayout({ children, title, description }: BaseLayoutProps) {
   const [themeCustomizerOpen, setThemeCustomizerOpen] = React.useState(false);

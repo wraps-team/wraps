@@ -4,11 +4,11 @@ import { lazy } from "react";
 const Landing = lazy(() => import("@/app/landing/page"));
 const NotFound = lazy(() => import("@/app/errors/not-found/page"));
 
-export interface RouteConfig {
+export type RouteConfig = {
   path: string;
   element: React.ReactNode;
   children?: RouteConfig[];
-}
+};
 
 export const routes: RouteConfig[] = [
   // Default route - Landing page

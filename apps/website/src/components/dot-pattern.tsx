@@ -2,12 +2,12 @@
 
 import { cn } from "@/lib/utils";
 
-interface DotPatternProps {
+type DotPatternProps = {
   className?: string;
   size?: "sm" | "md" | "lg";
   opacity?: "low" | "medium" | "high";
   fadeStyle?: "ellipse" | "circle" | "none";
-}
+};
 
 export function DotPattern({
   className,

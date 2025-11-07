@@ -3,14 +3,14 @@
 import { useCallback, useRef } from "react";
 import { useTheme } from "@/hooks/use-theme";
 
-interface CircularTransitionHook {
+type CircularTransitionHook = {
   startTransition: (
     coords: { x: number; y: number },
     callback: () => void
   ) => void;
   toggleTheme: (event: React.MouseEvent) => void;
   isTransitioning: () => boolean;
-}
+};
 
 export function useCircularTransition(): CircularTransitionHook {
   const { theme, setTheme } = useTheme();
@@ -18,7 +18,9 @@ export function useCircularTransition(): CircularTransitionHook {
 
   const startTransition = useCallback(
     (coords: { x: number; y: number }, callback: () => void) => {
-      if (isTransitioningRef.current) return;
+      if (isTransitioningRef.current) {
+        return;
+      }
 
       isTransitioningRef.current = true;
 

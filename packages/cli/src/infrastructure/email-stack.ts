@@ -92,11 +92,11 @@ export async function runPulumiProgram(
   const stack = await pulumi.automation.LocalWorkspace.createOrSelectStack(
     {
       stackName,
-      projectName: "wraps-email",
+      projectName: "byo-email",
       program,
     },
     {
-      workDir: `${process.env.HOME}/.wraps/pulumi`,
+      workDir: `${process.env.HOME}/.byo/pulumi`,
     }
   );
 

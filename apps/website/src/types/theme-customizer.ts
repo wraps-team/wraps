@@ -1,45 +1,45 @@
-export interface ThemePreset {
+export type ThemePreset = {
   label?: string;
   styles: {
     light: Record<string, string>;
     dark: Record<string, string>;
   };
-}
+};
 
-export interface ColorTheme {
+export type ColorTheme = {
   name: string;
   value: string;
   preset: ThemePreset;
-}
+};
 
-export interface SidebarVariant {
+export type SidebarVariant = {
   name: string;
   value: "sidebar" | "floating" | "inset";
   description: string;
-}
+};
 
-export interface SidebarCollapsibleOption {
+export type SidebarCollapsibleOption = {
   name: string;
   value: "offcanvas" | "icon" | "none";
   description: string;
-}
+};
 
-export interface SidebarSideOption {
+export type SidebarSideOption = {
   name: string;
   value: "left" | "right";
-}
+};
 
-export interface RadiusOption {
+export type RadiusOption = {
   name: string;
   value: string;
-}
+};
 
-export interface BrandColor {
+export type BrandColor = {
   name: string;
   cssVar: string;
-}
+};
 
-export interface ImportedTheme {
+export type ImportedTheme = {
   light: Record<string, string>;
   dark: Record<string, string>;
-}
+};

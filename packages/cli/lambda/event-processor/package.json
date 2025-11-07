@@ -1,0 +1,13 @@
+{
+  "name": "byo-event-processor",
+  "version": "1.0.0",
+  "description": "Lambda function to process SES events",
+  "type": "module",
+  "main": "index.ts",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.490.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.130"
+  }
+}
