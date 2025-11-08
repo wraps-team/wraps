@@ -108,3 +108,11 @@ export type UpgradeOptions = {
 export type DestroyOptions = {
   yes?: boolean;
 };
+
+/**
+ * Command options for console
+ */
+export type ConsoleOptions = {
+  port?: number;
+  noOpen?: boolean;
+};

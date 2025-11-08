@@ -3,6 +3,7 @@ import * as clack from "@clack/prompts";
 import args from "args";
 import pc from "picocolors";
 import { connect } from "./commands/connect.js";
+import { runConsole } from "./commands/console.js";
 import { destroy } from "./commands/destroy.js";
 import { init } from "./commands/init.js";
 import { restore } from "./commands/restore.js";
@@ -27,6 +28,9 @@ function showHelp() {
   console.log(`  ${pc.cyan("init")}        Deploy new email infrastructure`);
   console.log(
     `  ${pc.cyan("connect")}     Connect to existing AWS SES infrastructure`
+  );
+  console.log(
+    `  ${pc.cyan("console")}     Start local web dashboard for monitoring`
   );
   console.log(
     `  ${pc.cyan("upgrade")}     Add features to existing connection`
@@ -88,6 +92,16 @@ args.options([
     description: "Skip confirmation prompts",
     defaultValue: false,
   },
+  {
+    name: "port",
+    description: "Port for console server",
+    defaultValue: undefined,
+  },
+  {
+    name: "noOpen",
+    description: "Don't open browser automatically",
+    defaultValue: false,
+  },
 ]);
 
 // Get command and flags
@@ -137,6 +151,13 @@ async function run() {
           provider: flags.provider,
           region: flags.region,
           yes: flags.yes,
+        });
+        break;
+
+      case "console":
+        await runConsole({
+          port: flags.port,
+          noOpen: flags.noOpen,
         });
         break;
 

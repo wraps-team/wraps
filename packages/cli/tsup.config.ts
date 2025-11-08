@@ -4,7 +4,7 @@ export default defineConfig({
   entry: ["src/cli.ts"],
   format: ["esm"],
   dts: true,
-  clean: true,
+  clean: false, // Don't clean - console UI files are already built here
   shims: true,
   splitting: false,
   bundle: true,
