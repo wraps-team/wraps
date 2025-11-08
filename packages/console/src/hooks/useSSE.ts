@@ -32,7 +32,11 @@ export function useSSE<T = unknown>(url: string) {
     });
 
     if (!token) {
-      setError(new Error("Authentication token not found in URL. Please use the URL provided by 'wraps console' command."));
+      setError(
+        new Error(
+          "Authentication token not found in URL. Please use the URL provided by 'wraps console' command."
+        )
+      );
       return;
     }
 

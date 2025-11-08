@@ -218,6 +218,39 @@ export function displayStatus(status: StatusOutputs) {
 
   clack.note(infoLines.join("\n"), "Configuration");
 
+  // Features
+  const featureLines = [];
+  featureLines.push(`  ${pc.green("✓")} Email Sending ${pc.dim("(via SES)")}`);
+
+  if (status.resources.tableName) {
+    featureLines.push(
+      `  ${pc.green("✓")} Email Tracking ${pc.dim("(DynamoDB logs)")}`
+    );
+  } else {
+    featureLines.push(
+      `  ${pc.dim("○")} Email Tracking ${pc.dim("(run 'byo upgrade' to enable)")}`
+    );
+  }
+
+  if (
+    status.resources.lambdaFunctions &&
+    status.resources.lambdaFunctions > 0
+  ) {
+    featureLines.push(
+      `  ${pc.green("✓")} Bounce/Complaint Handling ${pc.dim("(automated)")}`
+    );
+  } else {
+    featureLines.push(
+      `  ${pc.dim("○")} Bounce/Complaint Handling ${pc.dim("(run 'byo upgrade' to enable)")}`
+    );
+  }
+
+  featureLines.push(
+    `  ${pc.green("✓")} Console Dashboard ${pc.dim("(run 'byo console')")}`
+  );
+
+  clack.note(featureLines.join("\n"), "Features");
+
   // Resources
   const resourceLines = [];
 

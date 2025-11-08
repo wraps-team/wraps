@@ -6,6 +6,7 @@ import { createHttpTerminator } from "http-terminator";
 import { authenticateToken } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
 import { createDomainsRouter } from "./routes/domains.js";
+import { createEmailsRouter } from "./routes/emails.js";
 import { createMetricsRouter } from "./routes/metrics.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,6 +16,7 @@ export interface ServerConfig {
   roleArn: string | undefined;
   region: string;
   tableName?: string;
+  accountId?: string;
   noOpen: boolean;
 }
 
@@ -58,6 +60,11 @@ export async function startConsoleServer(
     "/api/domains",
     authenticateToken(authToken),
     createDomainsRouter(config)
+  );
+  app.use(
+    "/api/emails",
+    authenticateToken(authToken),
+    createEmailsRouter(config)
   );
 
   // Serve static files from console-ui build

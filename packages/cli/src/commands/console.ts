@@ -67,6 +67,7 @@ export async function runConsole(options: ConsoleOptions): Promise<void> {
     roleArn: undefined, // Use current credentials instead of assuming role
     region,
     tableName,
+    accountId: identity.accountId,
     noOpen: options.noOpen,
   });
 
