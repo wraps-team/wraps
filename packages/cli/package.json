@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsup --watch",
     "build": "pnpm build:console && tsup",
-    "build:console": "pnpm --filter @wraps/console-ui build",
+    "build:console": "pnpm --filter @wraps/console build",
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
@@ -38,6 +38,7 @@
     "@aws-sdk/client-sesv2": "3.925.0",
     "@aws-sdk/client-sns": "^3.490.0",
     "@aws-sdk/client-sts": "^3.490.0",
+    "@aws-sdk/util-dynamodb": "3.927.0",
     "@clack/prompts": "^0.11.0",
     "@pulumi/aws": "^6.20.0",
     "@pulumi/pulumi": "^3.100.0",

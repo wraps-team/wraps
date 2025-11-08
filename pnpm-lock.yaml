@@ -237,6 +237,9 @@ importers:
       '@aws-sdk/client-sts':
         specifier: ^3.490.0
         version: 3.927.0
+      '@aws-sdk/util-dynamodb':
+        specifier: 3.927.0
+        version: 3.927.0(@aws-sdk/client-dynamodb@3.927.0)
       '@clack/prompts':
         specifier: ^0.11.0
         version: 0.11.0
@@ -464,6 +467,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^5.0.0
         version: 5.1.0(vite@6.4.1(@types/node@24.10.0)(jiti@2.6.1)(lightningcss@1.30.2))
+      react-router-dom:
+        specifier: ^7.7.1
+        version: 7.9.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       tailwindcss:
         specifier: ^4.1.17
         version: 4.1.17
@@ -835,6 +841,12 @@ packages:
   '@aws-sdk/util-arn-parser@3.893.0':
     resolution: {integrity: sha512-u8H4f2Zsi19DGnwj5FSZzDMhytYF/bCh37vAtBsn3cNDL3YG578X5oc+wSX54pM3tOxS+NY7tvOAo52SW7koUA==}
     engines: {node: '>=18.0.0'}
+
+  '@aws-sdk/util-dynamodb@3.927.0':
+    resolution: {integrity: sha512-KvNNocIkSloQx6XZBpp+uJY+8P3k/LsROHuqoB5OGBBeRvOvegtoiv8mBapaLj+ybXrj6/NXs+hPsQRb9Wrdgg==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@aws-sdk/client-dynamodb': ^3.927.0
 
   '@aws-sdk/util-endpoints@3.922.0':
     resolution: {integrity: sha512-4ZdQCSuNMY8HMlR1YN4MRDdXuKd+uQTeKIr5/pIM+g3TjInZoj8imvXudjcrFGA63UF3t92YVTkBq88mg58RXQ==}
@@ -6765,6 +6777,11 @@ snapshots:
 
   '@aws-sdk/util-arn-parser@3.893.0':
     dependencies:
+      tslib: 2.8.1
+
+  '@aws-sdk/util-dynamodb@3.927.0(@aws-sdk/client-dynamodb@3.927.0)':
+    dependencies:
+      '@aws-sdk/client-dynamodb': 3.927.0
       tslib: 2.8.1
 
   '@aws-sdk/util-endpoints@3.922.0':
