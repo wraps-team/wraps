@@ -12,6 +12,13 @@
       "**/*.jsonc"
     ]
   },
+  "linter": {
+    "rules": {
+      "performance": {
+        "noNamespaceImport": "warn"
+      }
+    }
+  },
   "overrides": [
     {
       "includes": [
