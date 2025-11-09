@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AggregateDashboard } from "@/components/AggregateDashboard";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Dashboard } from "@/components/Dashboard";
+import { EmailDetail } from "@/components/EmailDetail";
 import { EmailLogs } from "@/components/EmailLogs";
 import { EmailSettings } from "@/components/EmailSettings";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -42,6 +43,15 @@ function AppContent() {
   }, []);
 
   const getBreadcrumb = () => {
+    // Handle dynamic email detail route
+    if (
+      location.pathname.startsWith("/email/") &&
+      location.pathname !== "/email/metrics" &&
+      location.pathname !== "/email/settings"
+    ) {
+      return "Email Details";
+    }
+
     switch (location.pathname) {
       case "/":
         return "Dashboard";
@@ -78,6 +88,7 @@ function AppContent() {
           <Routes>
             <Route element={<AggregateDashboard />} path="/" />
             <Route element={<EmailLogs />} path="/email" />
+            <Route element={<EmailDetail />} path="/email/:id" />
             <Route element={<Dashboard />} path="/email/metrics" />
             <Route element={<EmailSettings />} path="/email/settings" />
           </Routes>

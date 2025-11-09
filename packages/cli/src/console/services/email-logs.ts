@@ -10,10 +10,51 @@ export type EmailLog = {
   to: string[]; // Array of recipients
   from: string;
   subject: string;
-  status: "delivered" | "bounced" | "complained" | "sent" | "failed";
+  status:
+    | "delivered"
+    | "bounced"
+    | "complained"
+    | "sent"
+    | "failed"
+    | "opened"
+    | "clicked";
   sentAt: number;
   accountId?: string;
   errorMessage?: string;
+};
+
+export type EmailEvent = {
+  type:
+    | "sent"
+    | "delivered"
+    | "bounced"
+    | "complained"
+    | "opened"
+    | "clicked"
+    | "failed";
+  timestamp: number;
+  metadata?: Record<string, any>;
+};
+
+export type EmailDetails = {
+  id: string;
+  messageId: string;
+  from: string;
+  to: string[];
+  replyTo?: string;
+  subject: string;
+  htmlBody?: string;
+  textBody?: string;
+  status:
+    | "delivered"
+    | "bounced"
+    | "complained"
+    | "sent"
+    | "failed"
+    | "opened"
+    | "clicked";
+  sentAt: number;
+  events: EmailEvent[];
 };
 
 type FetchEmailLogsOptions = {
@@ -122,20 +163,24 @@ export async function fetchEmailLogs(
 
 /**
  * Get priority for event type (higher = more important to display)
- * Priority: Complaint > Permanent Bounce > Delivery > Transient Bounce > Send
+ * Priority: Complaint > Permanent Bounce > Click > Open > Delivery > Transient Bounce > Send
  */
 function getEventPriority(item: any): number {
   const type = item.eventType?.toLowerCase();
 
   switch (type) {
     case "complaint":
-      return 5;
+      return 7;
     case "bounce": {
       // Permanent bounces (hard bounces) are more important than delivery
       // Transient bounces (OOTO, mailbox full) are less important than delivery
       const bounceType = item.bounceType?.toLowerCase();
-      return bounceType === "permanent" ? 4 : 2;
+      return bounceType === "permanent" ? 6 : 2;
     }
+    case "click":
+      return 5;
+    case "open":
+      return 4;
     case "delivery":
       return 3;
     case "send":
@@ -157,6 +202,10 @@ function normalizeEmailLog(data: any): EmailLog {
     status = "complained";
   } else if (eventType === "bounce") {
     status = "bounced";
+  } else if (eventType === "click") {
+    status = "clicked";
+  } else if (eventType === "open") {
+    status = "opened";
   } else if (eventType === "delivery") {
     status = "delivered";
   } else if (eventType === "send") {
@@ -202,4 +251,193 @@ function normalizeEmailLog(data: any): EmailLog {
     accountId: data.accountId,
     errorMessage: data.errorMessage,
   };
+}
+
+/**
+ * Fetch email details by message ID (with all events)
+ */
+export async function fetchEmailById(
+  messageId: string,
+  options: { region: string; tableName: string }
+): Promise<EmailDetails | null> {
+  const { region, tableName } = options;
+  const dynamodb = new DynamoDBClient({ region });
+
+  try {
+    // Query all events for this messageId
+    const response = await dynamodb.send(
+      new QueryCommand({
+        TableName: tableName,
+        KeyConditionExpression: "messageId = :messageId",
+        ExpressionAttributeValues: {
+          ":messageId": { S: messageId },
+        },
+      })
+    );
+
+    const items = response.Items || [];
+
+    if (items.length === 0) {
+      return null;
+    }
+
+    // Unmarshall all events
+    const events = items.map((item) => unmarshall(item));
+
+    // Get the send event (has the email content)
+    const sendEvent = events.find((e) => e.eventType?.toLowerCase() === "send");
+
+    if (!sendEvent) {
+      return null;
+    }
+
+    console.log("Send event fields:", {
+      from: sendEvent.from,
+      source: sendEvent.source,
+      subject: sendEvent.subject,
+      to: sendEvent.to,
+      destination: sendEvent.destination,
+      availableKeys: Object.keys(sendEvent),
+    });
+
+    // Try to extract email content from eventData
+    let htmlBody: string | undefined;
+    let textBody: string | undefined;
+
+    if (sendEvent.eventData) {
+      try {
+        const eventData = JSON.parse(sendEvent.eventData);
+        console.log("Send event data keys:", Object.keys(eventData));
+
+        // SES doesn't include email content in events by default
+        // Check if content was somehow included
+        if (eventData.content) {
+          htmlBody = eventData.content.html;
+          textBody = eventData.content.text;
+        }
+
+        // Check mail.content (unlikely but worth trying)
+        if (eventData.mail?.content) {
+          htmlBody = eventData.mail.content.html;
+          textBody = eventData.mail.content.text;
+        }
+      } catch (e) {
+        console.error("Failed to parse eventData:", e);
+      }
+    }
+
+    // Parse to addresses
+    let toAddresses: string[] = [];
+    const toField = sendEvent.to || sendEvent.destination;
+
+    if (toField) {
+      if (toField instanceof Set) {
+        toAddresses = Array.from(toField);
+      } else if (Array.isArray(toField)) {
+        toAddresses = toField;
+      } else if (typeof toField === "string") {
+        toAddresses = [toField];
+      }
+    }
+
+    // Determine final status (priority order: complaint > bounce > click > open > delivery > sent)
+    let status: EmailDetails["status"] = "sent";
+    const hasDelivery = events.some(
+      (e) => e.eventType?.toLowerCase() === "delivery"
+    );
+    const hasBounce = events.some(
+      (e) => e.eventType?.toLowerCase() === "bounce"
+    );
+    const hasComplaint = events.some(
+      (e) => e.eventType?.toLowerCase() === "complaint"
+    );
+    const hasOpen = events.some((e) => e.eventType?.toLowerCase() === "open");
+    const hasClick = events.some((e) => e.eventType?.toLowerCase() === "click");
+
+    if (hasComplaint) {
+      status = "complained";
+    } else if (hasBounce) {
+      status = "bounced";
+    } else if (hasClick) {
+      status = "clicked";
+    } else if (hasOpen) {
+      status = "opened";
+    } else if (hasDelivery) {
+      status = "delivered";
+    }
+
+    // Map events to simplified timeline
+    const timeline: EmailEvent[] = events
+      .map((event) => {
+        const eventType = event.eventType?.toLowerCase();
+        let type: EmailEvent["type"] = "sent";
+
+        switch (eventType) {
+          case "send":
+            type = "sent";
+            break;
+          case "delivery":
+            type = "delivered";
+            break;
+          case "bounce":
+            type = "bounced";
+            break;
+          case "complaint":
+            type = "complained";
+            break;
+          case "open":
+            type = "opened";
+            break;
+          case "click":
+            type = "clicked";
+            break;
+          default:
+            type = "sent";
+        }
+
+        const metadata: Record<string, any> = {};
+
+        // Add relevant metadata based on event type
+        if (eventType === "bounce" && event.bounceType) {
+          metadata.bounceType = event.bounceType;
+          metadata.bounceSubType = event.bounceSubType;
+        }
+
+        if (eventType === "complaint" && event.complaintFeedbackType) {
+          metadata.feedbackType = event.complaintFeedbackType;
+        }
+
+        if (eventType === "click" && event.link) {
+          metadata.link = event.link;
+        }
+
+        if (event.userAgent) {
+          metadata.userAgent = event.userAgent;
+        }
+
+        return {
+          type,
+          timestamp: Number(event.sentAt || event.timestamp),
+          metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+        };
+      })
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+    return {
+      id: messageId,
+      messageId,
+      from: sendEvent.from || "unknown",
+      to: toAddresses,
+      replyTo: sendEvent.replyTo,
+      subject: sendEvent.subject || "(no subject)",
+      htmlBody: htmlBody || sendEvent.htmlBody,
+      textBody: textBody || sendEvent.textBody,
+      status,
+      sentAt: Number(sendEvent.sentAt),
+      events: timeline,
+    };
+  } catch (error) {
+    console.error("Error fetching email by ID:", error);
+    throw error;
+  }
 }

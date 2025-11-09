@@ -1,5 +1,6 @@
 import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +33,14 @@ type EmailLog = {
   to: string[]; // Array of recipients
   from: string;
   subject: string;
-  status: "delivered" | "bounced" | "complained" | "sent" | "failed";
+  status:
+    | "delivered"
+    | "bounced"
+    | "complained"
+    | "sent"
+    | "failed"
+    | "opened"
+    | "clicked";
   timestamp: number;
   messageId: string;
 };
@@ -46,9 +54,12 @@ const STATUS_VARIANTS: Record<
   bounced: "destructive",
   complained: "destructive",
   failed: "destructive",
+  opened: "default",
+  clicked: "default",
 };
 
 export function EmailLogs() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [dateRange, setDateRange] = useState("15");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -226,6 +237,8 @@ export function EmailLogs() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="clicked">Clicked</SelectItem>
+                    <SelectItem value="opened">Opened</SelectItem>
                     <SelectItem value="delivered">Delivered</SelectItem>
                     <SelectItem value="sent">Sent</SelectItem>
                     <SelectItem value="bounced">Bounced</SelectItem>
@@ -272,7 +285,11 @@ export function EmailLogs() {
                       </TableRow>
                     ) : (
                       filteredLogs.map((log) => (
-                        <TableRow key={log.id}>
+                        <TableRow
+                          className="cursor-pointer hover:bg-muted/50"
+                          key={log.id}
+                          onClick={() => navigate(`/email/${log.id}`)}
+                        >
                           <TableCell className="font-mono text-sm">
                             {log.to.length > 0 ? (
                               <>
@@ -302,7 +319,14 @@ export function EmailLogs() {
                             {formatTimestamp(log.timestamp)}
                           </TableCell>
                           <TableCell>
-                            <Button size="icon" variant="ghost">
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Add menu actions here later
+                              }}
+                              size="icon"
+                              variant="ghost"
+                            >
                               <span className="sr-only">More options</span>⋯
                             </Button>
                           </TableCell>
