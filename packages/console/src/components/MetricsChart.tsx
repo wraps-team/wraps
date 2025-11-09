@@ -23,6 +23,8 @@ type MetricsChartProps = {
     bounces: Array<{ timestamp: number; value: number }>;
     complaints: Array<{ timestamp: number; value: number }>;
     deliveries: Array<{ timestamp: number; value: number }>;
+    opens: Array<{ timestamp: number; value: number }>;
+    clicks: Array<{ timestamp: number; value: number }>;
   };
 };
 
@@ -89,6 +91,20 @@ export function MetricsChart({ data }: MetricsChartProps) {
               type="monotone"
             />
             <Line
+              dataKey="opens"
+              name="Opens"
+              stroke="#8884d8"
+              strokeWidth={2}
+              type="monotone"
+            />
+            <Line
+              dataKey="clicks"
+              name="Clicks"
+              stroke="#ffc658"
+              strokeWidth={2}
+              type="monotone"
+            />
+            <Line
               dataKey="bounces"
               name="Bounces"
               stroke="#ff7300"
@@ -118,6 +134,8 @@ function mergeMetrics(data: MetricsChartProps["data"]) {
     ...data.bounces,
     ...data.complaints,
     ...data.deliveries,
+    ...data.opens,
+    ...data.clicks,
   ].forEach((point) => {
     if (!timestampMap.has(point.timestamp)) {
       timestampMap.set(point.timestamp, {
@@ -126,6 +144,8 @@ function mergeMetrics(data: MetricsChartProps["data"]) {
         bounces: 0,
         complaints: 0,
         deliveries: 0,
+        opens: 0,
+        clicks: 0,
       });
     }
   });
@@ -145,6 +165,14 @@ function mergeMetrics(data: MetricsChartProps["data"]) {
   }
   for (const point of data.deliveries) {
     (timestampMap.get(point.timestamp) as { deliveries: number }).deliveries =
+      point.value;
+  }
+  for (const point of data.opens) {
+    (timestampMap.get(point.timestamp) as { opens: number }).opens =
+      point.value;
+  }
+  for (const point of data.clicks) {
+    (timestampMap.get(point.timestamp) as { clicks: number }).clicks =
       point.value;
   }
 

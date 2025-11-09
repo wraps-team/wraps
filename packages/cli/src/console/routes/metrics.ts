@@ -19,16 +19,23 @@ export function createMetricsRouter(config: ServerConfig): Router {
     // Send initial connection event
     res.write('data: {"type":"connected"}\n\n');
 
+    // Get time range from query params, default to last 24 hours
+    const { startTime, endTime } = req.query;
+    const getTimeRange = () => ({
+      start: startTime
+        ? new Date(Number.parseInt(startTime as string, 10))
+        : new Date(Date.now() - 24 * 60 * 60 * 1000),
+      end: endTime
+        ? new Date(Number.parseInt(endTime as string, 10))
+        : new Date(),
+    });
+
     // Function to fetch and send metrics
     const sendMetrics = async () => {
       try {
         console.log("Fetching metrics from AWS...");
 
-        // Fetch last 24 hours of metrics
-        const timeRange = {
-          start: new Date(Date.now() - 24 * 60 * 60 * 1000),
-          end: new Date(),
-        };
+        const timeRange = getTimeRange();
 
         console.log("Time range:", timeRange);
         console.log("Config:", {
@@ -39,7 +46,12 @@ export function createMetricsRouter(config: ServerConfig): Router {
         });
 
         const [metrics, quota] = await Promise.all([
-          fetchSESMetrics(config.roleArn, config.region, timeRange),
+          fetchSESMetrics(
+            config.roleArn,
+            config.region,
+            timeRange,
+            config.tableName
+          ),
           fetchSendQuota(config.roleArn, config.region),
         ]);
 
@@ -86,7 +98,12 @@ export function createMetricsRouter(config: ServerConfig): Router {
       };
 
       const [metrics, quota] = await Promise.all([
-        fetchSESMetrics(config.roleArn, config.region, timeRange),
+        fetchSESMetrics(
+          config.roleArn,
+          config.region,
+          timeRange,
+          config.tableName
+        ),
         fetchSendQuota(config.roleArn, config.region),
       ]);
 
@@ -94,6 +111,46 @@ export function createMetricsRouter(config: ServerConfig): Router {
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  /**
+   * Get metrics for a specific time range
+   */
+  router.get("/", async (req: Request, res: Response) => {
+    try {
+      const { startTime, endTime } = req.query;
+
+      // Default to last 24 hours if no time range provided
+      const timeRange = {
+        start: startTime
+          ? new Date(Number.parseInt(startTime as string, 10))
+          : new Date(Date.now() - 24 * 60 * 60 * 1000),
+        end: endTime
+          ? new Date(Number.parseInt(endTime as string, 10))
+          : new Date(),
+      };
+
+      const [metrics, quota] = await Promise.all([
+        fetchSESMetrics(
+          config.roleArn,
+          config.region,
+          timeRange,
+          config.tableName
+        ),
+        fetchSendQuota(config.roleArn, config.region),
+      ]);
+
+      res.json({
+        metrics,
+        quota,
+        timestamp: Date.now(),
+      });
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      console.error("Error fetching metrics:", error);
       res.status(500).json({ error: errorMessage });
     }
   });

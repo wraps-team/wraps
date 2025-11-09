@@ -20,7 +20,8 @@ export type MetricsData = {
 export async function fetchSESMetrics(
   roleArn: string | undefined,
   region: string,
-  timeRange: { start: Date; end: Date }
+  timeRange: { start: Date; end: Date },
+  tableName?: string
 ): Promise<MetricsData> {
   // For console usage, use current credentials instead of assuming role
   const credentials = roleArn ? await assumeRole(roleArn, region) : undefined;
@@ -100,12 +101,32 @@ export async function fetchSESMetrics(
     }));
   };
 
+  // Fetch Opens and Clicks from DynamoDB if table name is provided
+  let opens: Array<{ timestamp: number; value: number }> = [];
+  let clicks: Array<{ timestamp: number; value: number }> = [];
+
+  if (tableName) {
+    try {
+      const { fetchDynamoDBMetrics } = await import("./dynamodb-metrics.js");
+      const dynamoMetrics = await fetchDynamoDBMetrics(
+        region,
+        tableName,
+        timeRange
+      );
+      opens = dynamoMetrics.opens;
+      clicks = dynamoMetrics.clicks;
+    } catch (error) {
+      console.error("Error fetching DynamoDB metrics:", error);
+      // Continue with empty arrays
+    }
+  }
+
   return {
     sends: parseMetric("sends"),
     bounces: parseMetric("bounces"),
     complaints: parseMetric("complaints"),
     deliveries: parseMetric("deliveries"),
-    opens: [], // Not available in CloudWatch by default
-    clicks: [], // Not available in CloudWatch by default
+    opens,
+    clicks,
   };
 }

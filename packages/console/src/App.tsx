@@ -2,9 +2,9 @@ import * as React from "react";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AggregateDashboard } from "@/components/AggregateDashboard";
 import { AppSidebar } from "@/components/app-sidebar";
-import { Dashboard } from "@/components/Dashboard";
 import { EmailDetail } from "@/components/EmailDetail";
 import { EmailLogs } from "@/components/EmailLogs";
+import { EmailMetrics } from "@/components/EmailMetrics";
 import { EmailSettings } from "@/components/EmailSettings";
 import { ThemeProvider } from "@/components/theme-provider";
 import {
@@ -89,7 +89,7 @@ function AppContent() {
             <Route element={<AggregateDashboard />} path="/" />
             <Route element={<EmailLogs />} path="/email" />
             <Route element={<EmailDetail />} path="/email/:id" />
-            <Route element={<Dashboard />} path="/email/metrics" />
+            <Route element={<EmailMetrics />} path="/email/metrics" />
             <Route element={<EmailSettings />} path="/email/settings" />
           </Routes>
         </div>
