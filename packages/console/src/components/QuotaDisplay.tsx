@@ -8,13 +8,13 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
-interface QuotaDisplayProps {
+type QuotaDisplayProps = {
   quota: {
     max24HourSend: number;
     maxSendRate: number;
     sentLast24Hours: number;
   };
-}
+};
 
 export function QuotaDisplay({ quota }: QuotaDisplayProps) {
   const usagePercent = (quota.sentLast24Hours / quota.max24HourSend) * 100;

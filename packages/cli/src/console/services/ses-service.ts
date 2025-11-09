@@ -2,18 +2,18 @@ import { GetSendQuotaCommand, SESClient } from "@aws-sdk/client-ses";
 import { GetEmailIdentityCommand, SESv2Client } from "@aws-sdk/client-sesv2";
 import { assumeRole } from "../../utils/assume-role.js";
 
-export interface SendQuota {
+export type SendQuota = {
   max24HourSend: number;
   maxSendRate: number;
   sentLast24Hours: number;
-}
+};
 
-export interface DomainInfo {
+export type DomainInfo = {
   domain: string;
   verified: boolean;
   dkimStatus: string;
   dkimTokens: string[];
-}
+};
 
 /**
  * Fetch SES send quota

@@ -11,7 +11,7 @@ import { useSSE } from "@/hooks/useSSE";
 import { MetricsChart } from "./MetricsChart";
 import { QuotaDisplay } from "./QuotaDisplay";
 
-interface MetricsData {
+type MetricsData = {
   type: "metrics";
   timestamp: number;
   metrics: {
@@ -25,7 +25,7 @@ interface MetricsData {
     maxSendRate: number;
     sentLast24Hours: number;
   };
-}
+};
 
 export function Dashboard() {
   const { data, error, isConnected } = useSSE<MetricsData>(

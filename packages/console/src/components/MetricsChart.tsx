@@ -17,14 +17,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-interface MetricsChartProps {
+type MetricsChartProps = {
   data: {
     sends: Array<{ timestamp: number; value: number }>;
     bounces: Array<{ timestamp: number; value: number }>;
     complaints: Array<{ timestamp: number; value: number }>;
     deliveries: Array<{ timestamp: number; value: number }>;
   };
-}
+};
 
 export function MetricsChart({ data }: MetricsChartProps) {
   // Merge all metrics by timestamp

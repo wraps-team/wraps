@@ -5,7 +5,7 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import { unmarshall } from "@aws-sdk/util-dynamodb";
 
-export interface EmailLog {
+export type EmailLog = {
   messageId: string;
   to: string[]; // Array of recipients
   from: string;
@@ -14,16 +14,16 @@ export interface EmailLog {
   sentAt: number;
   accountId?: string;
   errorMessage?: string;
-}
+};
 
-interface FetchEmailLogsOptions {
+type FetchEmailLogsOptions = {
   region: string;
   tableName: string;
   accountId?: string;
   limit?: number;
   startTime?: number;
   endTime?: number;
-}
+};
 
 /**
  * Fetch email logs from DynamoDB

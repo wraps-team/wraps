@@ -11,19 +11,19 @@ import { createMetricsRouter } from "./routes/metrics.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export interface ServerConfig {
+export type ServerConfig = {
   port: number;
   roleArn: string | undefined;
   region: string;
   tableName?: string;
   accountId?: string;
   noOpen: boolean;
-}
+};
 
-export interface ServerInfo {
+export type ServerInfo = {
   url: string;
   token: string;
-}
+};
 
 /**
  * Start console server
@@ -40,7 +40,7 @@ export async function startConsoleServer(
   app.use(express.json());
 
   // Security headers
-  app.use((req, res, next) => {
+  app.use((_req, res, next) => {
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader(
@@ -73,7 +73,7 @@ export async function startConsoleServer(
   app.use(express.static(staticDir));
 
   // SPA fallback
-  app.get("*", (req, res) => {
+  app.get("*", (_req, res) => {
     res.sendFile(path.join(staticDir, "index.html"));
   });
 

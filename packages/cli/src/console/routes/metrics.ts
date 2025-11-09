@@ -34,7 +34,7 @@ export function createMetricsRouter(config: ServerConfig): Router {
         console.log("Config:", {
           region: config.region,
           roleArn: config.roleArn
-            ? config.roleArn.substring(0, 30) + "..."
+            ? `${config.roleArn.substring(0, 30)}...`
             : "using current credentials",
         });
 
@@ -78,7 +78,7 @@ export function createMetricsRouter(config: ServerConfig): Router {
   /**
    * Get current metrics snapshot (REST endpoint)
    */
-  router.get("/snapshot", async (req: Request, res: Response) => {
+  router.get("/snapshot", async (_req: Request, res: Response) => {
     try {
       const timeRange = {
         start: new Date(Date.now() - 24 * 60 * 60 * 1000),

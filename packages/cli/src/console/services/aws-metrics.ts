@@ -5,14 +5,14 @@ import {
 } from "@aws-sdk/client-cloudwatch";
 import { assumeRole } from "../../utils/assume-role.js";
 
-export interface MetricsData {
+export type MetricsData = {
   sends: Array<{ timestamp: number; value: number }>;
   bounces: Array<{ timestamp: number; value: number }>;
   complaints: Array<{ timestamp: number; value: number }>;
   deliveries: Array<{ timestamp: number; value: number }>;
   opens: Array<{ timestamp: number; value: number }>;
   clicks: Array<{ timestamp: number; value: number }>;
-}
+};
 
 /**
  * Fetch SES metrics from CloudWatch
@@ -90,13 +90,13 @@ export async function fetchSESMetrics(
 
   const parseMetric = (id: string) => {
     const metric = results.find((r) => r.Id === id);
-    if (!(metric && metric.Timestamps && metric.Values)) {
+    if (!(metric?.Timestamps && metric.Values)) {
       return [];
     }
 
     return metric.Timestamps.map((timestamp, i) => ({
       timestamp: timestamp.getTime(),
-      value: metric.Values![i] || 0,
+      value: metric.Values?.[i] || 0,
     }));
   };
 

@@ -21,13 +21,13 @@ export function createEmailsRouter(config: ServerConfig): Router {
 
       // Parse query parameters
       const limit = req.query.limit
-        ? Number.parseInt(req.query.limit as string)
+        ? Number.parseInt(req.query.limit as string, 10)
         : 100;
       const startTime = req.query.startTime
-        ? Number.parseInt(req.query.startTime as string)
+        ? Number.parseInt(req.query.startTime as string, 10)
         : undefined;
       const endTime = req.query.endTime
-        ? Number.parseInt(req.query.endTime as string)
+        ? Number.parseInt(req.query.endTime as string, 10)
         : undefined;
 
       if (!config.tableName) {

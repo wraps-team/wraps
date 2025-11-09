@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-interface EmailLog {
+type EmailLog = {
   id: string;
   to: string[]; // Array of recipients
   from: string;
@@ -35,7 +35,7 @@ interface EmailLog {
   status: "delivered" | "bounced" | "complained" | "sent" | "failed";
   timestamp: number;
   messageId: string;
-}
+};
 
 const STATUS_VARIANTS: Record<
   string,
@@ -71,7 +71,7 @@ export function EmailLogs() {
         }
 
         // Calculate time range
-        const daysAgo = Number.parseInt(dateRange);
+        const daysAgo = Number.parseInt(dateRange, 10);
         const startTime = Date.now() - daysAgo * 24 * 60 * 60 * 1000;
         const endTime = Date.now();
 
@@ -84,7 +84,7 @@ export function EmailLogs() {
           try {
             const errorData = await response.json();
             errorMessage = errorData.error || errorMessage;
-          } catch (e) {
+          } catch (_e) {
             // Response wasn't JSON, use status text
             errorMessage = `${response.status}: ${response.statusText}`;
           }

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
-export interface SSEMessage<T = unknown> {
+export type SSEMessage<T = unknown> = {
   type: string;
   data: T;
-}
+};
 
 export function useSSE<T = unknown>(url: string) {
   const [data, setData] = useState<T | null>(null);
