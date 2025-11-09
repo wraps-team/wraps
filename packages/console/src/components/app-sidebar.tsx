@@ -1,7 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { Activity, BarChart3, FileText, Mail, Settings } from "lucide-react";
+import { Activity, BarChart3, Mail, Settings } from "lucide-react";
 import * as React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { NavUser } from "@/components/nav-user";
@@ -54,8 +54,7 @@ const data = {
       icon: Mail,
       isActive: false,
       subItems: [
-        { title: "Logs", icon: FileText, url: "/email/logs" },
-        { title: "Emails", icon: Mail, url: "/emails" },
+        { title: "Emails", icon: Mail, url: "/email" },
         { title: "Metrics", icon: BarChart3, url: "/email/metrics" },
         { title: "Settings", icon: Settings, url: "/email/settings" },
       ],

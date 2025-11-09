@@ -175,7 +175,7 @@ export function EmailLogs() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Email Logs</CardTitle>
+          <CardTitle>Emails</CardTitle>
           <CardDescription>
             View and manage your email sending history
           </CardDescription>

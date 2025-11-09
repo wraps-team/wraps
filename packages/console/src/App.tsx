@@ -45,12 +45,10 @@ function AppContent() {
     switch (location.pathname) {
       case "/":
         return "Dashboard";
-      case "/emails":
-        return "Email Logs";
+      case "/email":
+        return "Emails";
       case "/email/metrics":
         return "Email Metrics";
-      case "/email/logs":
-        return "Email Logs";
       case "/email/settings":
         return "Email Settings";
       default:
@@ -79,9 +77,8 @@ function AppContent() {
         <div className="flex flex-1 flex-col gap-6 p-6">
           <Routes>
             <Route element={<AggregateDashboard />} path="/" />
+            <Route element={<EmailLogs />} path="/email" />
             <Route element={<Dashboard />} path="/email/metrics" />
-            <Route element={<EmailLogs />} path="/emails" />
-            <Route element={<EmailLogs />} path="/email/logs" />
             <Route element={<EmailSettings />} path="/email/settings" />
           </Routes>
         </div>
