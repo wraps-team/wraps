@@ -64,10 +64,23 @@ export function EmailLogs() {
         setLoading(true);
         setError(null);
 
-        // Get token from sessionStorage
-        const token = sessionStorage.getItem("wraps-auth-token");
+        // Get token from sessionStorage or URL params
+        let token = sessionStorage.getItem("wraps-auth-token");
+
         if (!token) {
-          throw new Error("Authentication token not found");
+          const params = new URLSearchParams(window.location.search);
+          token = params.get("token");
+
+          // Store token for future use
+          if (token) {
+            sessionStorage.setItem("wraps-auth-token", token);
+          }
+        }
+
+        if (!token) {
+          throw new Error(
+            "Authentication token not found. Please use the URL provided by 'wraps console' command."
+          );
         }
 
         // Calculate time range
@@ -159,7 +172,7 @@ export function EmailLogs() {
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <>
       <Card>
         <CardHeader>
           <CardTitle>Email Logs</CardTitle>
@@ -318,6 +331,6 @@ export function EmailLogs() {
           </Tabs>
         </CardContent>
       </Card>
-    </div>
+    </>
   );
 }

@@ -3,3 +3,12 @@
 @import "./styles/globals.css";
 
 /* Console-specific overrides and customizations can go here */
+
+/* Force sidebar spacer to have correct width based on state */
+.peer[data-state="expanded"] > div:first-child {
+  width: var(--sidebar-width) !important;
+}
+
+.peer[data-state="collapsed"][data-collapsible="icon"] > div:first-child {
+  width: var(--sidebar-width-icon) !important;
+}

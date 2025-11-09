@@ -45,7 +45,7 @@
 :root {
   --font-inter: "Inter", system-ui, sans-serif;
   --radius: 0.625rem;
-  --sidebar-width: 16rem;
+  --sidebar-width: 10rem;
   --sidebar-width-icon: 3rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -114,6 +114,16 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* Utility classes for sidebar width */
+@layer utilities {
+  .w-sidebar {
+    width: var(--sidebar-width);
+  }
+  .w-sidebar-icon {
+    width: var(--sidebar-width-icon);
+  }
 }
 
 @layer base {

@@ -168,7 +168,7 @@ function Sidebar({
     return (
       <div
         className={cn(
-          "flex h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground",
+          "flex h-full w-[calc(var(--sidebar-width)-var(--sidebar-width-icon)+1px)]! flex-col bg-sidebar text-sidebar-foreground",
           className
         )}
         data-sidebar="sidebar"

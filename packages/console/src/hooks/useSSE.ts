@@ -25,12 +25,6 @@ export function useSSE<T = unknown>(url: string) {
       }
     }
 
-    console.log("Token check:", {
-      url: window.location.href,
-      search: window.location.search,
-      token: token ? "found" : "not found",
-    });
-
     if (!token) {
       setError(
         new Error(
