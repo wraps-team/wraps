@@ -8,7 +8,7 @@ import type {
   WrapsEmailConfig,
 } from "../types/index.js";
 import { getAWSRegion, validateAWSCredentials } from "../utils/aws.js";
-import { getCostSummary } from "../utils/costs.js";
+import { calculateCosts, formatCost } from "../utils/costs.js";
 import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/fs.js";
 import {
   loadConnectionMetadata,
@@ -106,9 +106,9 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   }
 
   // Calculate current cost
-  const currentCost = getCostSummary(config, 50_000); // Assume 50k emails/mo for estimate
+  const currentCostData = calculateCosts(config, 50_000); // Assume 50k emails/mo for estimate
   console.log(
-    `\n  Estimated Cost: ${pc.cyan(`~$${currentCost.monthly.toFixed(2)}/mo`)}`
+    `\n  Estimated Cost: ${pc.cyan(`~${formatCost(currentCostData.total.monthly)}/mo`)}`
   );
 
   console.log("");
@@ -365,16 +365,22 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   }
 
   // 8. Show cost comparison
-  const newCost = getCostSummary(updatedConfig, 50_000);
-  const costDiff = newCost.monthly - currentCost.monthly;
+  const newCostData = calculateCosts(updatedConfig, 50_000);
+  const costDiff = newCostData.total.monthly - currentCostData.total.monthly;
 
   console.log(`\n${pc.bold("Cost Impact:")}`);
-  console.log(`  Current: ${pc.cyan(`$${currentCost.monthly.toFixed(2)}/mo`)}`);
-  console.log(`  New:     ${pc.cyan(`$${newCost.monthly.toFixed(2)}/mo`)}`);
+  console.log(
+    `  Current: ${pc.cyan(`${formatCost(currentCostData.total.monthly)}/mo`)}`
+  );
+  console.log(
+    `  New:     ${pc.cyan(`${formatCost(newCostData.total.monthly)}/mo`)}`
+  );
   if (costDiff > 0) {
-    console.log(`  Change:  ${pc.yellow(`+$${costDiff.toFixed(2)}/mo`)}`);
+    console.log(`  Change:  ${pc.yellow(`+${formatCost(costDiff)}/mo`)}`);
   } else if (costDiff < 0) {
-    console.log(`  Change:  ${pc.green(`$${costDiff.toFixed(2)}/mo`)}`);
+    console.log(
+      `  Change:  ${pc.green(`${formatCost(Math.abs(costDiff))}/mo`)}`
+    );
   }
   console.log("");
 
@@ -467,8 +473,6 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
             | undefined,
           domain: pulumiOutputs.domain?.value as string | undefined,
           dkimTokens: pulumiOutputs.dkimTokens?.value as string[] | undefined,
-          trackingDomainDkimTokens: pulumiOutputs.trackingDomainDkimTokens
-            ?.value as string[] | undefined,
           customTrackingDomain: pulumiOutputs.customTrackingDomain?.value as
             | string
             | undefined,
@@ -498,19 +502,14 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
   // 14. Format tracking domain DNS records if custom tracking domain was added
   const trackingDomainDnsRecords = [];
-  if (
-    outputs.customTrackingDomain &&
-    outputs.trackingDomainDkimTokens &&
-    outputs.trackingDomainDkimTokens.length > 0
-  ) {
-    // Add DKIM CNAME records for tracking domain
-    for (const token of outputs.trackingDomainDkimTokens) {
-      trackingDomainDnsRecords.push({
-        name: `${token}._domainkey.${outputs.customTrackingDomain}`,
-        type: "CNAME",
-        value: `${token}.dkim.amazonses.com`,
-      });
-    }
+  if (outputs.customTrackingDomain) {
+    // Custom tracking domains need a CNAME pointing to the regional tracking endpoint
+    // This is different from DKIM verification - it's for redirect tracking
+    trackingDomainDnsRecords.push({
+      name: outputs.customTrackingDomain,
+      type: "CNAME",
+      value: `r.${outputs.region}.awstrack.me`,
+    });
   }
 
   // 15. Display success message
@@ -531,11 +530,11 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
   if (upgradeAction === "preset" && newPreset) {
     console.log(
-      `Upgraded to ${pc.cyan(newPreset)} preset (${pc.green(`$${newCost.monthly.toFixed(2)}/mo`)})\n`
+      `Upgraded to ${pc.cyan(newPreset)} preset (${pc.green(formatCost(newCostData.total.monthly) + "/mo")})\n`
     );
   } else {
     console.log(
-      `Updated configuration (${pc.green(`$${newCost.monthly.toFixed(2)}/mo`)})\n`
+      `Updated configuration (${pc.green(formatCost(newCostData.total.monthly) + "/mo")})\n`
     );
   }
 }

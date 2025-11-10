@@ -101,9 +101,6 @@ export async function deployEmailStack(
       : undefined,
     domain: emailConfig.domain,
     dkimTokens: sesResources?.dkimTokens as any as string[] | undefined,
-    trackingDomainDkimTokens: sesResources?.trackingDomainDkimTokens as any as
-      | string[]
-      | undefined,
     dnsAutoCreated: sesResources?.dnsAutoCreated,
     eventBusName: sesResources?.eventBus.name as any as string | undefined,
     queueUrl: sqsResources?.queue.url as any as string | undefined,

@@ -88,6 +88,7 @@ export async function createDNSRecords(
   });
 
   // Custom tracking domain CNAME (if provided)
+  // This allows SES to rewrite links for open/click tracking using your custom domain
   if (customTrackingDomain) {
     changes.push({
       Action: "UPSERT",
@@ -95,7 +96,7 @@ export async function createDNSRecords(
         Name: customTrackingDomain,
         Type: "CNAME",
         TTL: 1800,
-        ResourceRecords: [{ Value: `feedback-id.${region}.amazonses.com` }],
+        ResourceRecords: [{ Value: `r.${region}.awstrack.me` }],
       },
     });
   }

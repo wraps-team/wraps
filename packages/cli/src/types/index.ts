@@ -125,7 +125,6 @@ export type StackOutputs = {
   lambdaFunctions?: string[];
   domain?: string;
   dkimTokens?: string[];
-  trackingDomainDkimTokens?: string[];
   dnsAutoCreated?: boolean;
   eventBusName?: string;
   queueUrl?: string;

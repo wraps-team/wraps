@@ -171,45 +171,48 @@ export function displaySuccess(outputs: SuccessOutputs) {
     outputs.trackingDomainDnsRecords.length > 0
   ) {
     const trackingDnsLines = [
-      pc.bold("Custom Tracking Domain - DKIM Records (CNAME):"),
+      pc.bold("Custom Tracking Domain - Redirect CNAME:"),
       ...outputs.trackingDomainDnsRecords.map(
         (record) =>
           `  ${pc.cyan(record.name)} ${pc.dim(record.type)} "${record.value}"`
       ),
+      "",
+      pc.dim(
+        "Note: This CNAME allows SES to rewrite links in your emails to use"
+      ),
+      pc.dim("your custom domain for open and click tracking."),
     ];
-
-    if (outputs.customTrackingDomain) {
-      trackingDnsLines.push(
-        "",
-        pc.bold("SPF Record (TXT):"),
-        `  ${pc.cyan(outputs.customTrackingDomain)} ${pc.dim("TXT")} "v=spf1 include:amazonses.com ~all"`,
-        "",
-        pc.bold("DMARC Record (TXT):"),
-        `  ${pc.cyan(`_dmarc.${outputs.customTrackingDomain}`)} ${pc.dim("TXT")} "v=DMARC1; p=quarantine; rua=mailto:postmaster@${outputs.customTrackingDomain}"`
-      );
-    }
 
     clack.note(
       trackingDnsLines.join("\n"),
       "Custom Tracking Domain DNS Records:"
     );
 
-    console.log(
-      `\n${pc.dim("Run:")} ${pc.yellow(`wraps verify --domain ${domain}`)} ${pc.dim(
-        "(after DNS propagates)"
-      )}\n`
-    );
+    if (outputs.customTrackingDomain) {
+      console.log(
+        `\n${pc.dim("Run:")} ${pc.yellow(`wraps verify --domain ${outputs.customTrackingDomain}`)} ${pc.dim(
+          "(after DNS propagates)"
+        )}\n`
+      );
+    }
   }
 
   // Show tracking domain separately if we only have tracking domain (no other DNS records)
   if (
     outputs.customTrackingDomain &&
     !outputs.dnsAutoCreated &&
-    (!outputs.dnsRecords || outputs.dnsRecords.length === 0)
+    (!outputs.dnsRecords || outputs.dnsRecords.length === 0) &&
+    (!outputs.trackingDomainDnsRecords ||
+      outputs.trackingDomainDnsRecords.length === 0)
   ) {
     const trackingLines = [
       pc.bold("Tracking Domain (CNAME):"),
-      `  ${pc.cyan(outputs.customTrackingDomain)} ${pc.dim("CNAME")} "feedback-id.${outputs.region}.amazonses.com"`,
+      `  ${pc.cyan(outputs.customTrackingDomain)} ${pc.dim("CNAME")} "r.${outputs.region}.awstrack.me"`,
+      "",
+      pc.dim(
+        "Note: This CNAME allows SES to rewrite links in your emails to use"
+      ),
+      pc.dim("your custom domain for open and click tracking."),
     ];
 
     clack.note(trackingLines.join("\n"), "DNS Record to add:");

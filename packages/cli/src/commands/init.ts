@@ -224,8 +224,6 @@ export async function init(options: InitOptions): Promise<void> {
             | undefined,
           domain: pulumiOutputs.domain?.value as string | undefined,
           dkimTokens: pulumiOutputs.dkimTokens?.value as string[] | undefined,
-          trackingDomainDkimTokens: pulumiOutputs.trackingDomainDkimTokens
-            ?.value as string[] | undefined,
           customTrackingDomain: pulumiOutputs.customTrackingDomain?.value as
             | string
             | undefined,
