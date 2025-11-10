@@ -37,19 +37,22 @@ export async function handler(event: SQSEvent) {
       // Extract email details
       const mail = message.mail;
       const messageId = mail.messageId;
-      const timestamp = new Date(mail.timestamp).getTime();
+      const mailTimestamp = new Date(mail.timestamp).getTime();
       const from = mail.source;
       const to = mail.destination;
       const subject = mail.commonHeaders?.subject || "";
 
-      // Extract additional data based on event type
+      // Extract additional data and event-specific timestamp based on event type
       let additionalData: Record<string, unknown> = {};
+      let eventTimestamp = mailTimestamp; // Default to mail timestamp
 
       if (eventType === "Send" && message.send) {
+        // Send event uses mail timestamp
         additionalData = {
           tags: mail.tags || {},
         };
       } else if (eventType === "Delivery" && message.delivery) {
+        eventTimestamp = new Date(message.delivery.timestamp).getTime();
         additionalData = {
           timestamp: message.delivery.timestamp,
           processingTimeMillis: message.delivery.processingTimeMillis,
@@ -58,12 +61,14 @@ export async function handler(event: SQSEvent) {
           remoteMtaIp: message.delivery.remoteMtaIp,
         };
       } else if (eventType === "Open" && message.open) {
+        eventTimestamp = new Date(message.open.timestamp).getTime();
         additionalData = {
           timestamp: message.open.timestamp,
           userAgent: message.open.userAgent,
           ipAddress: message.open.ipAddress,
         };
       } else if (eventType === "Click" && message.click) {
+        eventTimestamp = new Date(message.click.timestamp).getTime();
         additionalData = {
           timestamp: message.click.timestamp,
           link: message.click.link,
@@ -72,6 +77,7 @@ export async function handler(event: SQSEvent) {
           ipAddress: message.click.ipAddress,
         };
       } else if (eventType === "Bounce" && message.bounce) {
+        eventTimestamp = new Date(message.bounce.timestamp).getTime();
         additionalData = {
           bounceType: message.bounce.bounceType,
           bounceSubType: message.bounce.bounceSubType,
@@ -80,6 +86,7 @@ export async function handler(event: SQSEvent) {
           feedbackId: message.bounce.feedbackId,
         };
       } else if (eventType === "Complaint" && message.complaint) {
+        eventTimestamp = new Date(message.complaint.timestamp).getTime();
         additionalData = {
           complainedRecipients: message.complaint.complainedRecipients,
           timestamp: message.complaint.timestamp,
@@ -88,15 +95,18 @@ export async function handler(event: SQSEvent) {
           userAgent: message.complaint.userAgent,
         };
       } else if (eventType === "Reject" && message.reject) {
+        // Reject doesn't have a specific timestamp, use mail timestamp
         additionalData = {
           reason: message.reject.reason,
         };
       } else if (eventType === "Rendering Failure" && message.failure) {
+        // Rendering failure doesn't have a specific timestamp, use mail timestamp
         additionalData = {
           errorMessage: message.failure.errorMessage,
           templateName: message.failure.templateName,
         };
       } else if (eventType === "DeliveryDelay" && message.deliveryDelay) {
+        eventTimestamp = new Date(message.deliveryDelay.timestamp).getTime();
         additionalData = {
           timestamp: message.deliveryDelay.timestamp,
           delayType: message.deliveryDelay.delayType,
@@ -104,6 +114,7 @@ export async function handler(event: SQSEvent) {
           delayedRecipients: message.deliveryDelay.delayedRecipients,
         };
       } else if (eventType === "Subscription" && message.subscription) {
+        eventTimestamp = new Date(message.subscription.timestamp).getTime();
         additionalData = {
           contactList: message.subscription.contactList,
           timestamp: message.subscription.timestamp,
@@ -114,12 +125,13 @@ export async function handler(event: SQSEvent) {
       }
 
       // Store event in DynamoDB
+      // Use eventTimestamp as sort key to ensure each event type creates a unique record
       await dynamodb.send(
         new PutItemCommand({
           TableName: tableName,
           Item: {
             messageId: { S: messageId },
-            sentAt: { N: timestamp.toString() },
+            sentAt: { N: eventTimestamp.toString() },
             accountId: { S: process.env.AWS_ACCOUNT_ID || "unknown" },
             from: { S: from },
             to: { SS: to },
