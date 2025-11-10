@@ -33,6 +33,7 @@ export type LambdaConfig = {
   roleArn: pulumi.Output<string>;
   tableName: pulumi.Output<string>;
   queueArn: pulumi.Output<string>;
+  accountId: string;
 };
 
 /**
@@ -168,6 +169,7 @@ export async function deployLambdaFunctions(
       environment: {
         variables: {
           TABLE_NAME: config.tableName,
+          AWS_ACCOUNT_ID: config.accountId,
         },
       },
       tags: {

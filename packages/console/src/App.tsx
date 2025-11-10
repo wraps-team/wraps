@@ -19,6 +19,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 
 function AppContent() {
   const location = useLocation();
@@ -103,6 +104,7 @@ export default function Page() {
     <ThemeProvider defaultTheme="system" storageKey="console-ui-theme">
       <BrowserRouter>
         <AppContent />
+        <Toaster />
       </BrowserRouter>
     </ThemeProvider>
   );

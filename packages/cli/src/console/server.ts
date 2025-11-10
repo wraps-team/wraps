@@ -8,6 +8,7 @@ import { errorHandler } from "./middleware/error.js";
 import { createDomainsRouter } from "./routes/domains.js";
 import { createEmailsRouter } from "./routes/emails.js";
 import { createMetricsRouter } from "./routes/metrics.js";
+import { createSettingsRouter } from "./routes/settings.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -45,7 +46,10 @@ export async function startConsoleServer(
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self' 'unsafe-inline' 'unsafe-eval'"
+      "default-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        "font-src 'self' https://fonts.gstatic.com; " +
+        "connect-src 'self'"
     );
     next();
   });
@@ -71,6 +75,11 @@ export async function startConsoleServer(
     "/api/emails",
     authenticateToken(authToken),
     createEmailsRouter(config)
+  );
+  app.use(
+    "/api/settings",
+    authenticateToken(authToken),
+    createSettingsRouter(config)
   );
 
   // Serve static files from console-ui build

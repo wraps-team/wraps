@@ -312,7 +312,7 @@ export function getCostSummary(
     `Estimated cost for ${emailsPerMonth.toLocaleString()} emails/month: ${formatCost(costs.total.monthly)}/mo`
   );
   lines.push(
-    `  (${formatCost(costs.total.perEmail * 1000)}/1k emails + infrastructure)`
+    `  (${formatCost((costs.total.perEmail ?? 0) * 1000)}/1k emails + infrastructure)`
   );
 
   if (costs.tracking) {

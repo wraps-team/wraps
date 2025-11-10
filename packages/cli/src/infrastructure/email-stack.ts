@@ -85,6 +85,7 @@ export async function deployEmailStack(
       roleArn: role.arn,
       tableName: dynamoTables.emailHistory.name,
       queueArn: sqsResources.queue.arn,
+      accountId,
     });
   }
 
