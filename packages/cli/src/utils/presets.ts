@@ -9,7 +9,7 @@ import { calculateCosts, formatCost } from "./costs.js";
  * Starter preset - minimal features for low-volume senders
  * Perfect for: Side projects, MVPs, development/staging
  * Volume: Up to 10k emails/month
- * Cost: ~$0.05/month (mostly free tier)
+ * Cost: ~$1-2/month
  */
 export const STARTER_PRESET: WrapsEmailConfig = {
   tracking: {
@@ -33,7 +33,7 @@ export const STARTER_PRESET: WrapsEmailConfig = {
  * Production preset - recommended for most production applications
  * Perfect for: SaaS apps, B2B products, moderate volume
  * Volume: 10k-500k emails/month
- * Cost: ~$2-5/month
+ * Cost: ~$10-50/month (scales with volume)
  */
 export const PRODUCTION_PRESET: WrapsEmailConfig = {
   tracking: {
@@ -70,7 +70,7 @@ export const PRODUCTION_PRESET: WrapsEmailConfig = {
  * Enterprise preset - full features for high-volume senders
  * Perfect for: Large platforms, high-volume transactional email
  * Volume: 500k+ emails/month
- * Cost: ~$50-100/month (includes dedicated IP)
+ * Cost: ~$100-200/month (includes $24.95 dedicated IP)
  */
 export const ENTERPRISE_PRESET: WrapsEmailConfig = {
   tracking: {

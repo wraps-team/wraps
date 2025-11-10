@@ -7,27 +7,28 @@ import type {
 
 /**
  * AWS pricing constants (as of 2025)
- * All costs in USD
+ * All costs in USD (US East N. Virginia region)
+ * Source: aws.amazon.com pricing pages verified January 2025
  */
 const AWS_PRICING = {
   // SES pricing
-  SES_PER_EMAIL: 0.0001, // $0.10 per 1,000 emails
+  SES_PER_EMAIL: 0.0001, // $0.10 per 1,000 emails (outbound)
   SES_ATTACHMENT_PER_GB: 0.12, // $0.12 per GB of attachments
 
-  // DynamoDB pricing (on-demand)
-  DYNAMODB_WRITE_PER_MILLION: 1.25, // $1.25 per million write request units
-  DYNAMODB_READ_PER_MILLION: 0.25, // $0.25 per million read request units
+  // DynamoDB pricing (on-demand, Standard table class)
+  DYNAMODB_WRITE_PER_MILLION: 1.25, // $1.25 per million write request units (US East Ohio)
+  DYNAMODB_READ_PER_MILLION: 0.25, // $0.25 per million read request units (US East Ohio)
   DYNAMODB_STORAGE_PER_GB: 0.25, // $0.25 per GB-month
 
-  // Lambda pricing
+  // Lambda pricing (x86)
   LAMBDA_REQUESTS_PER_MILLION: 0.2, // $0.20 per 1M requests
   LAMBDA_COMPUTE_PER_GB_SECOND: 0.000_016_666_7, // $0.0000166667 per GB-second
 
-  // SQS pricing
-  SQS_REQUESTS_PER_MILLION: 0.4, // $0.40 per million requests (beyond free tier)
+  // SQS pricing (Standard queues)
+  SQS_REQUESTS_PER_MILLION: 0.5, // $0.50 per million requests (after free tier)
 
   // EventBridge pricing
-  EVENTBRIDGE_EVENTS_PER_MILLION: 1.0, // $1.00 per million custom events
+  EVENTBRIDGE_EVENTS_PER_MILLION: 1.0, // $1.00 per million custom events published
 
   // Dedicated IP
   DEDICATED_IP_PER_MONTH: 24.95, // $24.95 per dedicated IP per month
@@ -38,25 +39,38 @@ const AWS_PRICING = {
 } as const;
 
 /**
- * Free tier limits (monthly)
+ * AWS Free tier limits (monthly, always-free or first 12 months)
+ * Note: Some limits are permanently free, others only for first 12 months
  */
 const FREE_TIER = {
-  SES_EMAILS: 62_000, // 62,000 emails per month from EC2 (3,000 from other services)
-  LAMBDA_REQUESTS: 1_000_000, // 1M requests per month
-  LAMBDA_COMPUTE_GB_SECONDS: 400_000, // 400,000 GB-seconds per month
-  DYNAMODB_WRITES: 1_000_000, // 1M write request units per month (on-demand)
-  DYNAMODB_READS: 1_000_000, // 1M read request units per month (on-demand)
-  DYNAMODB_STORAGE_GB: 25, // 25 GB storage per month
-  SQS_REQUESTS: 1_000_000, // 1M requests per month
-  CLOUDWATCH_LOGS_GB: 5, // 5 GB ingestion per month
+  // SES: 3,000 emails/month for first 12 months (new AWS accounts only)
+  // After 12 months or for existing accounts: NO free tier
+  SES_EMAILS: 0, // Conservative: assume no free tier (most users are past 12 months)
+
+  // Lambda: Permanently free tier
+  LAMBDA_REQUESTS: 1_000_000, // 1M requests per month (always free)
+  LAMBDA_COMPUTE_GB_SECONDS: 400_000, // 400,000 GB-seconds per month (always free)
+
+  // DynamoDB: Permanently free tier
+  DYNAMODB_WRITES: 0, // No free tier for writes in on-demand mode
+  DYNAMODB_READS: 0, // No free tier for reads in on-demand mode
+  DYNAMODB_STORAGE_GB: 25, // 25 GB storage per month (always free)
+
+  // SQS: Permanently free tier
+  SQS_REQUESTS: 1_000_000, // 1M requests per month (always free)
+
+  // CloudWatch: Permanently free tier
+  CLOUDWATCH_LOGS_GB: 5, // 5 GB ingestion per month (always free)
 } as const;
 
 /**
  * Estimate storage size in GB based on retention period and email volume
+ * Note: Each email generates multiple events (SEND, DELIVERY, OPEN, CLICK, etc.)
  */
 function estimateStorageSize(
   emailsPerMonth: number,
-  retention: ArchiveRetention
+  retention: ArchiveRetention,
+  numEventTypes = 8
 ): number {
   // Average email event record size: ~2 KB (including metadata)
   const avgRecordSizeKB = 2;
@@ -70,13 +84,15 @@ function estimateStorageSize(
     indefinite: 24, // Assume 2 years for cost estimation
   }[retention];
 
-  // Total storage = emails/month * months * record size
-  const totalKB = emailsPerMonth * retentionMonths * avgRecordSizeKB;
+  // Total storage = emails/month * event types * months * record size
+  const totalKB =
+    emailsPerMonth * numEventTypes * retentionMonths * avgRecordSizeKB;
   return totalKB / 1024 / 1024; // Convert to GB
 }
 
 /**
  * Calculate cost for event tracking feature
+ * Architecture: SES → EventBridge → SQS → Lambda → DynamoDB
  */
 function calculateEventTrackingCost(
   config: WrapsEmailConfig,
@@ -89,41 +105,47 @@ function calculateEventTrackingCost(
   let monthlyCost = 0;
   const components: string[] = [];
 
-  // EventBridge custom events
+  // Calculate number of events based on event types tracked
+  const numEventTypes = config.eventTracking.events?.length || 8; // Default to 8 common events
+  const totalEvents = emailsPerMonth * numEventTypes; // Each email can trigger multiple events
+
+  // EventBridge custom events (SES → EventBridge)
   if (config.eventTracking.eventBridge) {
-    const eventCount =
-      emailsPerMonth * (config.eventTracking.events?.length || 10);
     const eventCost =
-      Math.max(0, eventCount - FREE_TIER.SQS_REQUESTS) *
-      (AWS_PRICING.EVENTBRIDGE_EVENTS_PER_MILLION / 1_000_000);
+      (totalEvents / 1_000_000) * AWS_PRICING.EVENTBRIDGE_EVENTS_PER_MILLION;
     monthlyCost += eventCost;
     components.push("EventBridge");
   }
 
-  // SQS queue costs
-  const sqsRequests = emailsPerMonth * 2; // 1 send + 1 receive
+  // SQS queue costs (EventBridge → SQS)
+  // Each event: 1 send to SQS + 1 receive by Lambda + 1 delete = 3 requests
+  const sqsRequests = totalEvents * 3;
   const sqsCost =
-    Math.max(0, sqsRequests - FREE_TIER.SQS_REQUESTS) *
-    (AWS_PRICING.SQS_REQUESTS_PER_MILLION / 1_000_000);
+    (Math.max(0, sqsRequests - FREE_TIER.SQS_REQUESTS) / 1_000_000) *
+    AWS_PRICING.SQS_REQUESTS_PER_MILLION;
   monthlyCost += sqsCost;
   components.push("SQS");
 
-  // Lambda processing costs
-  const lambdaInvocations = emailsPerMonth;
-  const lambdaCost =
-    Math.max(0, lambdaInvocations - FREE_TIER.LAMBDA_REQUESTS) *
-    (AWS_PRICING.LAMBDA_REQUESTS_PER_MILLION / 1_000_000);
-  // Assume 512MB memory, 100ms average execution
-  const computeGBSeconds = lambdaInvocations * 0.5 * 0.1;
-  const computeCost =
+  // Lambda processing costs (SQS → Lambda → DynamoDB)
+  const lambdaInvocations = totalEvents; // One invocation per event
+  const lambdaRequestCost =
+    (Math.max(0, lambdaInvocations - FREE_TIER.LAMBDA_REQUESTS) / 1_000_000) *
+    AWS_PRICING.LAMBDA_REQUESTS_PER_MILLION;
+
+  // Compute cost: 512MB memory, 100ms average execution
+  const memoryGB = 0.5; // 512MB = 0.5GB
+  const avgDurationSeconds = 0.1; // 100ms
+  const computeGBSeconds = lambdaInvocations * memoryGB * avgDurationSeconds;
+  const lambdaComputeCost =
     Math.max(0, computeGBSeconds - FREE_TIER.LAMBDA_COMPUTE_GB_SECONDS) *
     AWS_PRICING.LAMBDA_COMPUTE_PER_GB_SECOND;
-  monthlyCost += lambdaCost + computeCost;
+
+  monthlyCost += lambdaRequestCost + lambdaComputeCost;
   components.push("Lambda");
 
   return {
     monthly: monthlyCost,
-    description: `Event processing pipeline (${components.join(" + ")})`,
+    description: `Event processing (${numEventTypes} event types: ${components.join(" → ")})`,
   };
 }
 
@@ -139,22 +161,27 @@ function calculateDynamoDBCost(
   }
 
   const retention = config.eventTracking.archiveRetention || "90days";
+  const numEventTypes = config.eventTracking.events?.length || 8;
 
-  // Write costs (one write per email event)
-  const writes = emailsPerMonth;
+  // Write costs: one write per event (each email generates multiple events)
+  const totalEvents = emailsPerMonth * numEventTypes;
   const writeCost =
-    Math.max(0, writes - FREE_TIER.DYNAMODB_WRITES) *
-    (AWS_PRICING.DYNAMODB_WRITE_PER_MILLION / 1_000_000);
+    (Math.max(0, totalEvents - FREE_TIER.DYNAMODB_WRITES) / 1_000_000) *
+    AWS_PRICING.DYNAMODB_WRITE_PER_MILLION;
 
   // Storage costs
-  const storageGB = estimateStorageSize(emailsPerMonth, retention);
+  const storageGB = estimateStorageSize(
+    emailsPerMonth,
+    retention,
+    numEventTypes
+  );
   const storageCost =
     Math.max(0, storageGB - FREE_TIER.DYNAMODB_STORAGE_GB) *
     AWS_PRICING.DYNAMODB_STORAGE_PER_GB;
 
   return {
     monthly: writeCost + storageCost,
-    description: `Email history storage (${retention}, ~${storageGB.toFixed(1)} GB)`,
+    description: `Email history (${retention}, ~${storageGB.toFixed(1)} GB, ${numEventTypes} event types)`,
   };
 }
 
@@ -281,19 +308,12 @@ export function getCostSummary(
   const costs = calculateCosts(config, emailsPerMonth);
   const lines: string[] = [];
 
-  // Add free tier context if under limits
-  if (emailsPerMonth < FREE_TIER.SES_EMAILS) {
-    lines.push(
-      `Estimated cost for ${emailsPerMonth.toLocaleString()} emails/month: ${formatCost(costs.total.monthly)}/mo`
-    );
-    lines.push(
-      "  (AWS free tier: 62k emails/month permanently free from EC2/Lambda)"
-    );
-  } else {
-    lines.push(
-      `Estimated cost for ${emailsPerMonth.toLocaleString()} emails/month: ${formatCost(costs.total.monthly)}/mo`
-    );
-  }
+  lines.push(
+    `Estimated cost for ${emailsPerMonth.toLocaleString()} emails/month: ${formatCost(costs.total.monthly)}/mo`
+  );
+  lines.push(
+    `  (${formatCost(costs.total.perEmail * 1000)}/1k emails + infrastructure)`
+  );
 
   if (costs.tracking) {
     lines.push(
