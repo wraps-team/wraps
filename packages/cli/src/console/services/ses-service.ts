@@ -55,7 +55,7 @@ export async function fetchDomainInfo(
 
   return {
     domain,
-    verified: response.VerifiedForSendingStatus,
+    verified: response.VerifiedForSendingStatus ?? false,
     dkimStatus: response.DkimAttributes?.Status || "PENDING",
     dkimTokens: response.DkimAttributes?.Tokens || [],
   };

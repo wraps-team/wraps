@@ -2,9 +2,11 @@ import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
 import type { EmailStackConfig, StackOutputs } from "../types/index.js";
 import { createDynamoDBTables } from "./resources/dynamodb.js";
+import { createEventBridgeResources } from "./resources/eventbridge.js";
 import { createIAMRole } from "./resources/iam.js";
 import { deployLambdaFunctions } from "./resources/lambda.js";
 import { createSESResources } from "./resources/ses.js";
+import { createSQSResources } from "./resources/sqs.js";
 import { createVercelOIDC } from "./vercel-oidc.js";
 
 /**
@@ -27,38 +29,62 @@ export async function deployEmailStack(
     });
   }
 
+  const emailConfig = config.emailConfig;
+
   // 2. Create IAM role
   const role = await createIAMRole({
     provider: config.provider,
     oidcProvider,
     vercelTeamSlug: config.vercel?.teamSlug,
     vercelProjectName: config.vercel?.projectName,
-    integrationLevel: config.integrationLevel,
+    emailConfig,
   });
 
-  // 3. SES resources (if enhanced)
+  // 3. SES resources (if tracking or event tracking enabled)
   let sesResources;
-  if (config.integrationLevel === "enhanced") {
+  if (emailConfig.tracking?.enabled || emailConfig.eventTracking?.enabled) {
     sesResources = await createSESResources({
-      domain: config.domain,
+      domain: emailConfig.domain,
       region: config.region,
+      trackingConfig: emailConfig.tracking,
+      eventTypes: emailConfig.eventTracking?.events,
     });
   }
 
-  // 4. DynamoDB tables (if enhanced)
+  // 4. DynamoDB tables (if history storage enabled)
   let dynamoTables;
-  if (config.integrationLevel === "enhanced") {
-    dynamoTables = await createDynamoDBTables();
+  if (emailConfig.eventTracking?.dynamoDBHistory) {
+    dynamoTables = await createDynamoDBTables({
+      retention: emailConfig.eventTracking.archiveRetention,
+    });
   }
 
-  // 5. Lambda functions (if enhanced)
+  // 5. SQS queues (if event tracking enabled)
+  let sqsResources;
+  if (emailConfig.eventTracking?.enabled) {
+    sqsResources = await createSQSResources();
+  }
+
+  // 6. EventBridge rule to route SES events to SQS (if event tracking enabled)
+  if (emailConfig.eventTracking?.enabled && sesResources && sqsResources) {
+    await createEventBridgeResources({
+      eventBusArn: sesResources.eventBus.arn,
+      queueArn: sqsResources.queue.arn,
+      queueUrl: sqsResources.queue.url,
+    });
+  }
+
+  // 7. Lambda functions (if event tracking and DynamoDB enabled)
   let lambdaFunctions;
-  if (config.integrationLevel === "enhanced" && sesResources && dynamoTables) {
+  if (
+    emailConfig.eventTracking?.dynamoDBHistory &&
+    dynamoTables &&
+    sqsResources
+  ) {
     lambdaFunctions = await deployLambdaFunctions({
       roleArn: role.arn,
       tableName: dynamoTables.emailHistory.name,
-      bounceComplaintTopicArn: sesResources.bounceComplaintTopic.arn,
-      webhookUrl: config.webhookUrl,
+      queueArn: sqsResources.queue.arn,
     });
   }
 
@@ -71,14 +97,14 @@ export async function deployEmailStack(
     tableName: dynamoTables?.emailHistory.name as any as string | undefined,
     region: config.region,
     lambdaFunctions: lambdaFunctions
-      ? [
-          lambdaFunctions.eventProcessor.arn as any as string,
-          lambdaFunctions.webhookSender.arn as any as string,
-        ]
+      ? [lambdaFunctions.eventProcessor.arn as any as string]
       : undefined,
-    domain: config.domain,
+    domain: emailConfig.domain,
     dkimTokens: sesResources?.dkimTokens as any as string[] | undefined,
     dnsAutoCreated: sesResources?.dnsAutoCreated,
+    eventBusName: sesResources?.eventBus.name as any as string | undefined,
+    queueUrl: sqsResources?.queue.url as any as string | undefined,
+    dlqUrl: sqsResources?.dlq.url as any as string | undefined,
   };
 }
 
@@ -92,11 +118,11 @@ export async function runPulumiProgram(
   const stack = await pulumi.automation.LocalWorkspace.createOrSelectStack(
     {
       stackName,
-      projectName: "byo-email",
+      projectName: "wraps-email",
       program,
     },
     {
-      workDir: `${process.env.HOME}/.byo/pulumi`,
+      workDir: `${process.env.HOME}/.wraps/pulumi`,
     }
   );
 

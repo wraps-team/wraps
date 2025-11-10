@@ -1,6 +1,6 @@
 import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
-import type { IntegrationLevel, Provider } from "../../types/index.js";
+import type { Provider, WrapsEmailConfig } from "../../types/index.js";
 
 /**
  * IAM role configuration
@@ -10,7 +10,7 @@ export type IAMRoleConfig = {
   oidcProvider?: aws.iam.OpenIdConnectProvider;
   vercelTeamSlug?: string;
   vercelProjectName?: string;
-  integrationLevel: IntegrationLevel;
+  emailConfig: WrapsEmailConfig;
 };
 
 /**
@@ -58,70 +58,91 @@ export async function createIAMRole(
     throw new Error("Other providers not yet implemented");
   }
 
-  const role = new aws.iam.Role("byo-email-role", {
-    name: "byo-email-role",
+  const role = new aws.iam.Role("wraps-email-role", {
+    name: "wraps-email-role",
     assumeRolePolicy,
     tags: {
-      ManagedBy: "byo-cli",
+      ManagedBy: "wraps-cli",
       Provider: config.provider,
     },
   });
 
-  // Attach policies based on integration level
-  if (config.integrationLevel === "dashboard-only") {
-    // Read-only access
-    new aws.iam.RolePolicy("byo-email-dashboard-read-policy", {
-      role: role.name,
-      policy: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [
-          {
-            Effect: "Allow",
-            Action: [
-              "ses:GetSendStatistics",
-              "ses:ListIdentities",
-              "ses:GetIdentityVerificationAttributes",
-              "cloudwatch:GetMetricData",
-              "cloudwatch:GetMetricStatistics",
-              "logs:FilterLogEvents",
-            ],
-            Resource: "*",
-          },
-        ],
-      }),
-    });
-  } else {
-    // Enhanced - send + read access
-    new aws.iam.RolePolicy("byo-email-policy", {
-      role: role.name,
-      policy: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [
-          {
-            Effect: "Allow",
-            Action: [
-              "ses:SendEmail",
-              "ses:SendRawEmail",
-              "ses:SendTemplatedEmail",
-              "ses:GetSendStatistics",
-              "ses:ListIdentities",
-            ],
-            Resource: "*",
-          },
-          {
-            Effect: "Allow",
-            Action: [
-              "dynamodb:PutItem",
-              "dynamodb:GetItem",
-              "dynamodb:Query",
-              "dynamodb:Scan",
-            ],
-            Resource: "arn:aws:dynamodb:*:*:table/byo-email-*",
-          },
-        ],
-      }),
+  // Build policy statements based on enabled features
+  const statements: any[] = [];
+
+  // Always allow reading SES metrics for dashboard
+  statements.push({
+    Effect: "Allow",
+    Action: [
+      "ses:GetSendStatistics",
+      "ses:ListIdentities",
+      "ses:GetIdentityVerificationAttributes",
+      "cloudwatch:GetMetricData",
+      "cloudwatch:GetMetricStatistics",
+    ],
+    Resource: "*",
+  });
+
+  // Allow sending if enabled
+  if (config.emailConfig.sendingEnabled !== false) {
+    statements.push({
+      Effect: "Allow",
+      Action: [
+        "ses:SendEmail",
+        "ses:SendRawEmail",
+        "ses:SendTemplatedEmail",
+        "ses:SendBulkTemplatedEmail",
+      ],
+      Resource: "*",
     });
   }
+
+  // Allow DynamoDB access if history storage enabled
+  if (config.emailConfig.eventTracking?.dynamoDBHistory) {
+    statements.push({
+      Effect: "Allow",
+      Action: [
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:BatchGetItem",
+      ],
+      Resource: "arn:aws:dynamodb:*:*:table/wraps-email-*",
+    });
+  }
+
+  // Allow EventBridge access if event tracking enabled
+  if (config.emailConfig.eventTracking?.enabled) {
+    statements.push({
+      Effect: "Allow",
+      Action: ["events:PutEvents", "events:DescribeEventBus"],
+      Resource: "arn:aws:events:*:*:event-bus/wraps-email-*",
+    });
+  }
+
+  // Allow SQS access if event tracking enabled
+  if (config.emailConfig.eventTracking?.enabled) {
+    statements.push({
+      Effect: "Allow",
+      Action: [
+        "sqs:SendMessage",
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:GetQueueAttributes",
+      ],
+      Resource: "arn:aws:sqs:*:*:wraps-email-*",
+    });
+  }
+
+  // Attach policy to role
+  new aws.iam.RolePolicy("wraps-email-policy", {
+    role: role.name,
+    policy: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: statements,
+    }),
+  });
 
   return role;
 }

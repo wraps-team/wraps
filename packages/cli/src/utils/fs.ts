@@ -4,26 +4,26 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 /**
- * Get the BYO configuration directory
+ * Get the Wraps configuration directory
  */
-export function getBYODir(): string {
-  return join(homedir(), ".byo");
+export function getWrapsDir(): string {
+  return join(homedir(), ".wraps");
 }
 
 /**
  * Get the Pulumi workspace directory
  */
 export function getPulumiWorkDir(): string {
-  return join(getBYODir(), "pulumi");
+  return join(getWrapsDir(), "pulumi");
 }
 
 /**
- * Ensure the BYO configuration directory exists
+ * Ensure the Wraps configuration directory exists
  */
-export async function ensureBYODir(): Promise<void> {
-  const byoDir = getBYODir();
-  if (!existsSync(byoDir)) {
-    await mkdir(byoDir, { recursive: true });
+export async function ensureWrapsDir(): Promise<void> {
+  const wrapsDir = getWrapsDir();
+  if (!existsSync(wrapsDir)) {
+    await mkdir(wrapsDir, { recursive: true });
   }
 }
 
@@ -31,7 +31,7 @@ export async function ensureBYODir(): Promise<void> {
  * Ensure the Pulumi workspace directory exists and configure local backend
  */
 export async function ensurePulumiWorkDir(): Promise<void> {
-  await ensureBYODir();
+  await ensureWrapsDir();
   const pulumiDir = getPulumiWorkDir();
   if (!existsSync(pulumiDir)) {
     await mkdir(pulumiDir, { recursive: true });

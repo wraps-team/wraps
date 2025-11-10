@@ -1,4 +1,4 @@
-# BYO CLI Testing Documentation
+# Wraps CLI Testing Documentation
 
 ## Test Coverage Summary
 
@@ -58,7 +58,7 @@ packages/cli/src/
 - ✅ Error handling
 
 #### Error Handling (`errors.test.ts`)
-- ✅ Custom BYOError class
+- ✅ Custom WrapsError class
 - ✅ CLI error handler
 - ✅ All error factory functions
 - ✅ Error message formatting

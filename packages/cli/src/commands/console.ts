@@ -33,7 +33,7 @@ export async function runConsole(options: ConsoleOptions): Promise<void> {
     await ensurePulumiWorkDir();
 
     const stack = await pulumi.automation.LocalWorkspace.selectStack({
-      stackName: `byo-${identity.accountId}-${region}`,
+      stackName: `wraps-${identity.accountId}-${region}`,
       workDir: getPulumiWorkDir(),
     });
 
@@ -47,8 +47,7 @@ export async function runConsole(options: ConsoleOptions): Promise<void> {
     process.exit(1);
   }
 
-  // Extract roleArn from stack outputs (optional - console uses current AWS credentials)
-  const roleArn = stackOutputs.roleArn?.value;
+  // Extract outputs from stack (optional - console uses current AWS credentials)
   const tableName = stackOutputs.tableName?.value;
 
   // 4. Find available port
@@ -68,7 +67,7 @@ export async function runConsole(options: ConsoleOptions): Promise<void> {
     region,
     tableName,
     accountId: identity.accountId,
-    noOpen: options.noOpen,
+    noOpen: options.noOpen ?? false,
   });
 
   console.log(`\\n${pc.bold("Console:")} ${pc.cyan(url)}`);

@@ -2,21 +2,27 @@ import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import pc from "picocolors";
 import { deployEmailStack } from "../infrastructure/email-stack.js";
-import type { EmailStackConfig, InitOptions } from "../types/index.js";
+import type {
+  EmailStackConfig,
+  InitOptions,
+  WrapsEmailConfig,
+} from "../types/index.js";
 import { getAWSRegion, validateAWSCredentials } from "../utils/aws.js";
+import { getCostSummary } from "../utils/costs.js";
 import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/fs.js";
 import {
   createConnectionMetadata,
-  type FeatureConfig,
   loadConnectionMetadata,
   saveConnectionMetadata,
-  updateFeatureMetadata,
 } from "../utils/metadata.js";
 import { DeploymentProgress, displaySuccess } from "../utils/output.js";
+import { getPreset, validateConfig } from "../utils/presets.js";
 import {
   confirmDeploy,
+  promptConfigPreset,
+  promptCustomConfig,
   promptDomain,
-  promptFeatureSelection,
+  promptEstimatedVolume,
   promptProvider,
   promptRegion,
   promptVercelConfig,
@@ -27,7 +33,7 @@ import { ensurePulumiInstalled } from "../utils/pulumi.js";
  * Init command - Deploy new email infrastructure
  */
 export async function init(options: InitOptions): Promise<void> {
-  clack.intro(pc.bold("BYO Email Infrastructure Setup"));
+  clack.intro(pc.bold("Wraps Email Infrastructure Setup"));
 
   const progress = new DeploymentProgress();
 
@@ -82,26 +88,44 @@ export async function init(options: InitOptions): Promise<void> {
       `Connection already exists for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
     );
     clack.log.info(`Created: ${existingConnection.timestamp}`);
-    clack.log.info(`Use ${pc.cyan("byo status")} to view current setup`);
-    clack.log.info(`Use ${pc.cyan("byo upgrade")} to add more features`);
+    clack.log.info(`Use ${pc.cyan("wraps status")} to view current setup`);
+    clack.log.info(`Use ${pc.cyan("wraps upgrade")} to add more features`);
     process.exit(0);
   }
 
-  // 5. Feature selection
-  let selectedFeatures: string[];
-  if (options.enhanced !== undefined) {
-    // Use legacy enhanced flag if provided
-    selectedFeatures = options.enhanced
-      ? [
-          "configSet",
-          "bounceHandling",
-          "complaintHandling",
-          "emailHistory",
-          "dashboardAccess",
-        ]
-      : ["dashboardAccess"];
+  // 5. Configuration selection
+  let preset = options.preset;
+  if (!preset) {
+    preset = await promptConfigPreset();
+  }
+
+  let emailConfig: WrapsEmailConfig;
+  if (preset === "custom") {
+    emailConfig = await promptCustomConfig();
   } else {
-    selectedFeatures = await promptFeatureSelection();
+    emailConfig = getPreset(preset)!;
+  }
+
+  // Set domain if provided
+  if (domain) {
+    emailConfig.domain = domain;
+  }
+
+  // Get estimated volume for cost calculation
+  const estimatedVolume = await promptEstimatedVolume();
+
+  // Display cost summary
+  progress.info("\n" + pc.bold("Cost Estimate:"));
+  const costSummary = getCostSummary(emailConfig, estimatedVolume);
+  clack.log.info(costSummary);
+
+  // Validate configuration and show warnings
+  const warnings = validateConfig(emailConfig);
+  if (warnings.length > 0) {
+    progress.info("\n" + pc.yellow(pc.bold("Configuration Warnings:")));
+    for (const warning of warnings) {
+      clack.log.warn(warning);
+    }
   }
 
   // 6. Create metadata to track deployment
@@ -113,96 +137,6 @@ export async function init(options: InitOptions): Promise<void> {
   if (vercelConfig) {
     metadata.vercel = vercelConfig;
   }
-
-  // Track selected features in metadata
-  const featureConfigs: Record<string, FeatureConfig> = {};
-
-  if (selectedFeatures.includes("configSet")) {
-    featureConfigs.configSet = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "byo-tracking",
-    };
-    updateFeatureMetadata(metadata, "configSet", featureConfigs.configSet);
-  }
-
-  if (selectedFeatures.includes("bounceHandling")) {
-    featureConfigs.bounceHandling = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "byo-bounce-complaints",
-    };
-    updateFeatureMetadata(
-      metadata,
-      "bounceHandling",
-      featureConfigs.bounceHandling
-    );
-  }
-
-  if (selectedFeatures.includes("complaintHandling")) {
-    featureConfigs.complaintHandling = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "byo-bounce-complaints",
-    };
-    updateFeatureMetadata(
-      metadata,
-      "complaintHandling",
-      featureConfigs.complaintHandling
-    );
-  }
-
-  if (selectedFeatures.includes("emailHistory")) {
-    featureConfigs.emailHistory = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "byo-email-history",
-    };
-    updateFeatureMetadata(
-      metadata,
-      "emailHistory",
-      featureConfigs.emailHistory
-    );
-  }
-
-  if (selectedFeatures.includes("eventProcessor")) {
-    featureConfigs.eventProcessor = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "byo-event-processor",
-    };
-    updateFeatureMetadata(
-      metadata,
-      "eventProcessor",
-      featureConfigs.eventProcessor
-    );
-  }
-
-  if (selectedFeatures.includes("dashboardAccess")) {
-    featureConfigs.dashboardAccess = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "byo-email-role",
-    };
-    updateFeatureMetadata(
-      metadata,
-      "dashboardAccess",
-      featureConfigs.dashboardAccess
-    );
-  }
-
-  // Determine integration level based on features
-  const integrationLevel =
-    selectedFeatures.includes("emailHistory") ||
-    selectedFeatures.includes("eventProcessor")
-      ? "enhanced"
-      : "dashboard-only";
 
   // Confirm deployment (skip if --yes flag)
   if (!options.yes) {
@@ -217,9 +151,8 @@ export async function init(options: InitOptions): Promise<void> {
   const stackConfig: EmailStackConfig = {
     provider,
     region,
-    domain: domain || undefined,
     vercel: vercelConfig,
-    integrationLevel,
+    emailConfig,
   };
 
   // 8. Deploy infrastructure using Pulumi
@@ -235,8 +168,8 @@ export async function init(options: InitOptions): Promise<void> {
         const stack =
           await pulumi.automation.LocalWorkspace.createOrSelectStack(
             {
-              stackName: `byo-${identity.accountId}-${region}`,
-              projectName: "byo-email",
+              stackName: `wraps-${identity.accountId}-${region}`,
+              projectName: "wraps-email",
               program: async () => {
                 const result = await deployEmailStack(stackConfig);
 
@@ -264,7 +197,7 @@ export async function init(options: InitOptions): Promise<void> {
 
         // Set backend to local file system
         await stack.workspace.selectStack(
-          `byo-${identity.accountId}-${region}`
+          `wraps-${identity.accountId}-${region}`
         );
 
         // Set AWS region
@@ -297,7 +230,7 @@ export async function init(options: InitOptions): Promise<void> {
   }
 
   // 9. Save metadata for future upgrades and restore
-  metadata.pulumiStackName = `byo-${identity.accountId}-${region}`;
+  metadata.pulumiStackName = `wraps-${identity.accountId}-${region}`;
   await saveConnectionMetadata(metadata);
 
   progress.info("Connection metadata saved for upgrade and restore capability");

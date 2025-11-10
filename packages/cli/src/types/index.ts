@@ -4,23 +4,114 @@
 export type Provider = "vercel" | "aws" | "railway" | "other";
 
 /**
- * Integration level type
+ * SES event types that can be tracked
  */
-export type IntegrationLevel = "dashboard-only" | "enhanced";
+export type SESEventType =
+  | "SEND"
+  | "DELIVERY"
+  | "OPEN"
+  | "CLICK"
+  | "BOUNCE"
+  | "COMPLAINT"
+  | "REJECT"
+  | "RENDERING_FAILURE"
+  | "DELIVERY_DELAY"
+  | "SUBSCRIPTION";
 
 /**
- * Email stack configuration
+ * Archive retention periods for email data
+ */
+export type ArchiveRetention =
+  | "7days"
+  | "30days"
+  | "90days"
+  | "1year"
+  | "indefinite";
+
+/**
+ * Suppression list reasons
+ */
+export type SuppressionReason = "BOUNCE" | "COMPLAINT";
+
+/**
+ * Feature-based email configuration
+ */
+export type WrapsEmailConfig = {
+  // Domain configuration
+  domain?: string;
+  mailFromDomain?: string;
+
+  // Tracking configuration
+  tracking?: {
+    enabled: boolean;
+    opens?: boolean;
+    clicks?: boolean;
+    customRedirectDomain?: string;
+  };
+
+  // Security
+  tlsRequired?: boolean;
+
+  // Reputation and deliverability
+  reputationMetrics?: boolean;
+  suppressionList?: {
+    enabled: boolean;
+    reasons: SuppressionReason[];
+  };
+
+  // Event tracking and storage
+  eventTracking?: {
+    enabled: boolean;
+    eventBridge?: boolean;
+    events?: SESEventType[];
+    dynamoDBHistory?: boolean;
+    archiveRetention?: ArchiveRetention;
+  };
+
+  // Advanced options
+  ipPool?: string;
+  dedicatedIp?: boolean;
+  sendingEnabled?: boolean;
+};
+
+/**
+ * Configuration preset types
+ */
+export type ConfigPreset = "starter" | "production" | "enterprise" | "custom";
+
+/**
+ * Cost information for a feature
+ */
+export type FeatureCost = {
+  monthly: number; // Base monthly cost in USD
+  perEmail?: number; // Additional cost per email
+  perEvent?: number; // Additional cost per event
+  description: string;
+};
+
+/**
+ * Feature cost breakdown
+ */
+export type FeatureCostBreakdown = {
+  tracking?: FeatureCost;
+  reputationMetrics?: FeatureCost;
+  eventTracking?: FeatureCost;
+  dynamoDBHistory?: FeatureCost;
+  dedicatedIp?: FeatureCost;
+  total: FeatureCost;
+};
+
+/**
+ * Email stack configuration (used by Pulumi)
  */
 export type EmailStackConfig = {
   provider: Provider;
   region: string;
-  domain?: string;
   vercel?: {
     teamSlug: string;
     projectName: string;
   };
-  integrationLevel: IntegrationLevel;
-  webhookUrl?: string;
+  emailConfig: WrapsEmailConfig;
 };
 
 /**
@@ -32,10 +123,12 @@ export type StackOutputs = {
   tableName?: string;
   region: string;
   lambdaFunctions?: string[];
-  snsTopics?: string[];
   domain?: string;
   dkimTokens?: string[];
   dnsAutoCreated?: boolean;
+  eventBusName?: string;
+  queueUrl?: string;
+  dlqUrl?: string;
 };
 
 /**
@@ -45,14 +138,14 @@ export type InitOptions = {
   provider?: Provider;
   region?: string;
   domain?: string;
-  enhanced?: boolean;
+  preset?: ConfigPreset;
   yes?: boolean;
 };
 
 /**
- * Available features for BYO email infrastructure
+ * Available features for Wraps email infrastructure
  */
-export type BYOFeature =
+export type WrapsFeature =
   | "configSet"
   | "bounceHandling"
   | "complaintHandling"
@@ -63,11 +156,11 @@ export type BYOFeature =
 /**
  * Feature metadata
  */
-export type BYOFeatureMetadata = {
-  id: BYOFeature;
+export type WrapsFeatureMetadata = {
+  id: WrapsFeature;
   name: string;
   description: string;
-  requires?: BYOFeature[];
+  requires?: WrapsFeature[];
   resources: string[];
 };
 

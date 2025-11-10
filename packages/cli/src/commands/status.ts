@@ -32,15 +32,15 @@ export async function status(_options: StatusOptions): Promise<void> {
     await ensurePulumiWorkDir();
 
     const stack = await pulumi.automation.LocalWorkspace.selectStack({
-      stackName: `byo-${identity.accountId}-${region}`,
+      stackName: `wraps-${identity.accountId}-${region}`,
       workDir: getPulumiWorkDir(),
     });
 
     stackOutputs = await stack.outputs();
   } catch (_error: any) {
     progress.stop();
-    clack.log.error("No BYO infrastructure found");
-    console.log(`\nRun ${pc.cyan("byo init")} to deploy infrastructure.\n`);
+    clack.log.error("No Wraps infrastructure found");
+    console.log(`\nRun ${pc.cyan("wraps init")} to deploy infrastructure.\n`);
     process.exit(1);
   }
 

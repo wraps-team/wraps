@@ -119,8 +119,8 @@ export function displaySuccess(outputs: SuccessOutputs) {
   lines.push(
     "",
     pc.bold("Next steps:"),
-    `  1. Install SDK: ${pc.yellow("npm install @byo/email")}`,
-    `  2. View dashboard: ${pc.blue("https://dashboard.byo.dev")}`,
+    `  1. Install SDK: ${pc.yellow("npm install @wraps/sdk")}`,
+    `  2. View dashboard: ${pc.blue("https://dashboard.wraps.dev")}`,
     ""
   );
 
@@ -163,7 +163,7 @@ export function displaySuccess(outputs: SuccessOutputs) {
     clack.note(dnsLines.join("\n"), "DNS Records to add:");
 
     console.log(
-      `\n${pc.dim("Run:")} ${pc.yellow(`byo verify --domain ${domain}`)} ${pc.dim(
+      `\n${pc.dim("Run:")} ${pc.yellow(`wraps verify --domain ${domain}`)} ${pc.dim(
         "(after DNS propagates)"
       )}\n`
     );
@@ -194,7 +194,7 @@ export type StatusOutputs = {
  * Display status information
  */
 export function displayStatus(status: StatusOutputs) {
-  clack.intro(pc.bold("BYO Email Infrastructure"));
+  clack.intro(pc.bold("Wraps Email Infrastructure"));
 
   const infoLines = [
     `${pc.bold("Integration:")} ${pc.cyan(status.integrationLevel)}`,
@@ -228,7 +228,7 @@ export function displayStatus(status: StatusOutputs) {
     );
   } else {
     featureLines.push(
-      `  ${pc.dim("○")} Email Tracking ${pc.dim("(run 'byo upgrade' to enable)")}`
+      `  ${pc.dim("○")} Email Tracking ${pc.dim("(run 'wraps upgrade' to enable)")}`
     );
   }
 
@@ -241,12 +241,12 @@ export function displayStatus(status: StatusOutputs) {
     );
   } else {
     featureLines.push(
-      `  ${pc.dim("○")} Bounce/Complaint Handling ${pc.dim("(run 'byo upgrade' to enable)")}`
+      `  ${pc.dim("○")} Bounce/Complaint Handling ${pc.dim("(run 'wraps upgrade' to enable)")}`
     );
   }
 
   featureLines.push(
-    `  ${pc.green("✓")} Console Dashboard ${pc.dim("(run 'byo console')")}`
+    `  ${pc.green("✓")} Console Dashboard ${pc.dim("(run 'wraps console')")}`
   );
 
   clack.note(featureLines.join("\n"), "Features");
@@ -316,14 +316,14 @@ export function displayStatus(status: StatusOutputs) {
     // Show verify command with first pending domain as example
     const exampleDomain = pendingDomains[0].domain;
     console.log(
-      `\n${pc.dim("Run:")} ${pc.yellow(`byo verify --domain ${exampleDomain}`)} ${pc.dim(
+      `\n${pc.dim("Run:")} ${pc.yellow(`wraps verify --domain ${exampleDomain}`)} ${pc.dim(
         "(after DNS propagates)"
       )}\n`
     );
   }
 
   console.log(
-    `\n${pc.bold("Dashboard:")} ${pc.blue("https://dashboard.byo.dev")}`
+    `\n${pc.bold("Dashboard:")} ${pc.blue("https://dashboard.wraps.dev")}`
   );
-  console.log(`${pc.bold("Docs:")} ${pc.blue("https://docs.byo.dev")}\n`);
+  console.log(`${pc.bold("Docs:")} ${pc.blue("https://docs.wraps.dev")}\n`);
 }

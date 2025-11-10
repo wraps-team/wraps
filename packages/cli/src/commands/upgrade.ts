@@ -21,10 +21,10 @@ import { ensurePulumiInstalled } from "../utils/pulumi.js";
 import { scanAWSResources } from "../utils/scanner.js";
 
 /**
- * Upgrade command - Add features to existing BYO connection
+ * Upgrade command - Add features to existing Wraps connection
  */
 export async function upgrade(options: UpgradeOptions): Promise<void> {
-  clack.intro(pc.bold("BYO Upgrade - Add Features to Existing Connection"));
+  clack.intro(pc.bold("Wraps Upgrade - Add Features to Existing Connection"));
 
   const progress = new DeploymentProgress();
 
@@ -58,10 +58,10 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
   if (!metadata) {
     clack.log.error(
-      `No BYO connection found for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
+      `No Wraps connection found for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
     );
     clack.log.info(
-      `Use ${pc.cyan("byo init")} to create new infrastructure or ${pc.cyan("byo connect")} to connect existing.`
+      `Use ${pc.cyan("wraps init")} to create new infrastructure or ${pc.cyan("wraps connect")} to connect existing.`
     );
     process.exit(1);
   }
@@ -152,7 +152,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   // Check for configuration set conflict
   if (selectedFeatures.includes("configSet")) {
     const existingConfigSets = scan.configurationSets.filter(
-      (cs) => !cs.name.startsWith("byo-")
+      (cs) => !cs.name.startsWith("wraps-")
     );
 
     if (existingConfigSets.length > 0) {
@@ -170,14 +170,14 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
               ? "skip"
               : "deploy-new",
         originalValue: action === "replace" ? existingConfigSets[0].name : null,
-        currentValue: "byo-tracking",
+        currentValue: "wraps-tracking",
       };
     } else {
       featureConfigs.configSet = {
         enabled: true,
         action: "deploy-new",
         originalValue: null,
-        currentValue: "byo-tracking",
+        currentValue: "wraps-tracking",
       };
     }
 
@@ -188,7 +188,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   if (selectedFeatures.includes("bounceHandling")) {
     const existingSNS = scan.snsTopics.filter(
       (t) =>
-        !t.name.startsWith("byo-") && t.name.toLowerCase().includes("bounce")
+        !t.name.startsWith("wraps-") && t.name.toLowerCase().includes("bounce")
     );
 
     if (existingSNS.length > 0) {
@@ -206,14 +206,14 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
               ? "skip"
               : "deploy-new",
         originalValue: action === "replace" ? existingSNS[0].arn : null,
-        currentValue: "byo-bounce-complaints",
+        currentValue: "wraps-bounce-complaints",
       };
     } else {
       featureConfigs.bounceHandling = {
         enabled: true,
         action: "deploy-new",
         originalValue: null,
-        currentValue: "byo-bounce-complaints",
+        currentValue: "wraps-bounce-complaints",
       };
     }
 
@@ -230,7 +230,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       enabled: true,
       action: "deploy-new",
       originalValue: null,
-      currentValue: "byo-bounce-complaints",
+      currentValue: "wraps-bounce-complaints",
     };
     updateFeatureMetadata(
       metadata,
@@ -243,7 +243,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   if (selectedFeatures.includes("emailHistory")) {
     const existingTables = scan.dynamoTables.filter(
       (t) =>
-        !t.name.startsWith("byo-") && t.name.toLowerCase().includes("email")
+        !t.name.startsWith("wraps-") && t.name.toLowerCase().includes("email")
     );
 
     if (existingTables.length > 0) {
@@ -261,14 +261,14 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
               ? "skip"
               : "deploy-new",
         originalValue: action === "replace" ? existingTables[0].name : null,
-        currentValue: "byo-email-history",
+        currentValue: "wraps-email-history",
       };
     } else {
       featureConfigs.emailHistory = {
         enabled: true,
         action: "deploy-new",
         originalValue: null,
-        currentValue: "byo-email-history",
+        currentValue: "wraps-email-history",
       };
     }
 
@@ -285,7 +285,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       enabled: true,
       action: "deploy-new",
       originalValue: null,
-      currentValue: "byo-event-processor",
+      currentValue: "wraps-event-processor",
     };
     updateFeatureMetadata(
       metadata,
@@ -300,7 +300,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       enabled: true,
       action: "deploy-new",
       originalValue: null,
-      currentValue: "byo-email-role",
+      currentValue: "wraps-email-role",
     };
     updateFeatureMetadata(
       metadata,
@@ -330,27 +330,56 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     vercelConfig = metadata.vercel;
   }
 
-  // 12. Determine integration level based on enabled features
+  // 12. Build email configuration from all enabled features
   const allEnabledFeatures = [...enabledFeatures, ...selectedFeatures];
-  const integrationLevel =
-    allEnabledFeatures.includes("emailHistory") ||
-    allEnabledFeatures.includes("eventProcessor")
-      ? "enhanced"
-      : "dashboard-only";
+  const emailConfig = {
+    tracking: {
+      enabled: allEnabledFeatures.includes("configSet"),
+      opens: true,
+      clicks: true,
+    },
+    tlsRequired: true,
+    reputationMetrics: allEnabledFeatures.includes("configSet"),
+    suppressionList: {
+      enabled:
+        allEnabledFeatures.includes("bounceHandling") ||
+        allEnabledFeatures.includes("complaintHandling"),
+      reasons: ["BOUNCE" as const, "COMPLAINT" as const],
+    },
+    eventTracking: {
+      enabled:
+        allEnabledFeatures.includes("emailHistory") ||
+        allEnabledFeatures.includes("eventProcessor"),
+      eventBridge: allEnabledFeatures.includes("eventProcessor"),
+      events: [
+        "SEND" as const,
+        "DELIVERY" as const,
+        "OPEN" as const,
+        "CLICK" as const,
+        "BOUNCE" as const,
+        "COMPLAINT" as const,
+        "REJECT" as const,
+        "RENDERING_FAILURE" as const,
+      ],
+      dynamoDBHistory: allEnabledFeatures.includes("emailHistory"),
+      archiveRetention: "90days" as const,
+    },
+    sendingEnabled: true,
+  };
 
   // 13. Build stack configuration
   const stackConfig: EmailStackConfig = {
     provider: metadata.provider as any,
     region,
     vercel: vercelConfig,
-    integrationLevel,
+    emailConfig,
   };
 
   // 14. Update Pulumi stack (incremental update)
   let outputs;
   try {
     outputs = await progress.execute(
-      "Updating BYO infrastructure (this may take 2-3 minutes)",
+      "Updating Wraps infrastructure (this may take 2-3 minutes)",
       async () => {
         await ensurePulumiWorkDir();
 
@@ -359,8 +388,8 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
             {
               stackName:
                 metadata.pulumiStackName ||
-                `byo-${identity.accountId}-${region}`,
-              projectName: "byo-email",
+                `wraps-${identity.accountId}-${region}`,
+              projectName: "wraps-email",
               program: async () => {
                 const result = await deployEmailStack(stackConfig);
 
@@ -383,7 +412,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           );
 
         await stack.workspace.selectStack(
-          metadata.pulumiStackName || `byo-${identity.accountId}-${region}`
+          metadata.pulumiStackName || `wraps-${identity.accountId}-${region}`
         );
         await stack.setConfig("aws:region", { value: region });
 
@@ -447,6 +476,6 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         `  ${pc.cyan(config.originalValue!)} → ${pc.green(config.currentValue!)}`
       );
     }
-    console.log(`\n${pc.dim("To restore: ")}${pc.cyan("byo restore")}\n`);
+    console.log(`\n${pc.dim("To restore: ")}${pc.cyan("wraps restore")}\n`);
   }
 }

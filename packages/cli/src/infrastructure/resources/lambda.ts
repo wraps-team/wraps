@@ -12,8 +12,7 @@ import { build } from "esbuild";
 export type LambdaConfig = {
   roleArn: pulumi.Output<string>;
   tableName: pulumi.Output<string>;
-  bounceComplaintTopicArn: pulumi.Output<string>;
-  webhookUrl?: string;
+  queueArn: pulumi.Output<string>;
 };
 
 /**
@@ -21,7 +20,7 @@ export type LambdaConfig = {
  */
 export type LambdaFunctions = {
   eventProcessor: aws.lambda.Function;
-  webhookSender: aws.lambda.Function;
+  eventSourceMapping: aws.lambda.EventSourceMapping;
 };
 
 /**
@@ -29,7 +28,7 @@ export type LambdaFunctions = {
  */
 async function bundleLambda(functionPath: string): Promise<string> {
   const buildId = randomBytes(8).toString("hex");
-  const outdir = join(tmpdir(), `byo-lambda-${buildId}`);
+  const outdir = join(tmpdir(), `wraps-lambda-${buildId}`);
 
   if (!existsSync(outdir)) {
     mkdirSync(outdir, { recursive: true });
@@ -52,101 +51,81 @@ async function bundleLambda(functionPath: string): Promise<string> {
 }
 
 /**
- * Get the project root directory (where lambda/ folder is)
- */
-function getProjectRoot(): string {
-  // In development: __dirname is packages/cli/dist
-  // In production: __dirname is packages/cli/dist
-  // Lambda source is always at project_root/lambda
-
-  // Get the CLI package directory
-  const cliDir = process.cwd();
-
-  // Try multiple locations
-  const possibleRoots = [
-    // Running from project root
-    cliDir,
-    // Running from packages/cli
-    join(cliDir, "..", ".."),
-    // Running from packages/cli/dist
-    join(cliDir, "..", "..", ".."),
-  ];
-
-  for (const root of possibleRoots) {
-    const lambdaDir = join(root, "lambda", "event-processor", "index.ts");
-    if (existsSync(lambdaDir)) {
-      return root;
-    }
-  }
-
-  // Default to current directory
-  return cliDir;
-}
-
-/**
  * Deploy Lambda functions for email event processing
+ *
+ * Architecture:
+ * SQS Queue -> Lambda (event-processor) -> DynamoDB
+ *
+ * The Lambda function is triggered by SQS via Event Source Mapping.
+ * Failed messages are automatically sent to the DLQ after 3 retries.
  */
 export async function deployLambdaFunctions(
   config: LambdaConfig
 ): Promise<LambdaFunctions> {
-  // Get the Lambda source directory
-  const projectRoot = getProjectRoot();
-  const lambdaDir = join(projectRoot, "lambda");
+  // Get Lambda source directory
+  const lambdaDir = join(process.cwd(), "lambda");
 
   // Bundle event-processor
   const eventProcessorPath = join(lambdaDir, "event-processor", "index.ts");
   const eventProcessorBundle = await bundleLambda(eventProcessorPath);
 
-  // Create Lambda execution role policy
-  const lambdaAssumeRole = {
-    Version: "2012-10-17",
-    Statement: [
-      {
-        Action: "sts:AssumeRole",
-        Principal: {
-          Service: "lambda.amazonaws.com",
+  // IAM role for Lambda execution
+  const lambdaRole = new aws.iam.Role("wraps-email-lambda-role", {
+    assumeRolePolicy: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { Service: "lambda.amazonaws.com" },
+          Action: "sts:AssumeRole",
         },
-        Effect: "Allow",
-      },
-    ],
-  };
-
-  const lambdaRole = new aws.iam.Role("byo-email-lambda-role", {
-    assumeRolePolicy: JSON.stringify(lambdaAssumeRole),
+      ],
+    }),
     tags: {
-      ManagedBy: "byo-cli",
+      ManagedBy: "wraps-cli",
     },
   });
 
   // Attach basic Lambda execution policy
-  new aws.iam.RolePolicyAttachment("byo-email-lambda-basic-execution", {
+  new aws.iam.RolePolicyAttachment("wraps-email-lambda-basic-execution", {
     role: lambdaRole.name,
     policyArn:
       "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
   });
 
-  // Attach DynamoDB and SNS permissions
-  new aws.iam.RolePolicy("byo-email-lambda-policy", {
+  // Lambda policy for DynamoDB and SQS
+  new aws.iam.RolePolicy("wraps-email-lambda-policy", {
     role: lambdaRole.name,
     policy: pulumi
-      .all([config.tableName, config.bounceComplaintTopicArn])
-      .apply(([tableName, topicArn]) =>
+      .all([config.tableName, config.queueArn])
+      .apply(([tableName, queueArn]) =>
         JSON.stringify({
           Version: "2012-10-17",
           Statement: [
             {
+              // DynamoDB access
               Effect: "Allow",
               Action: [
                 "dynamodb:PutItem",
                 "dynamodb:GetItem",
                 "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:UpdateItem",
               ],
-              Resource: `arn:aws:dynamodb:*:*:table/${tableName}`,
+              Resource: [
+                `arn:aws:dynamodb:*:*:table/${tableName}`,
+                `arn:aws:dynamodb:*:*:table/${tableName}/index/*`,
+              ],
             },
             {
+              // SQS access for event source mapping
               Effect: "Allow",
-              Action: ["sns:Publish"],
-              Resource: topicArn,
+              Action: [
+                "sqs:ReceiveMessage",
+                "sqs:DeleteMessage",
+                "sqs:GetQueueAttributes",
+              ],
+              Resource: queueArn,
             },
           ],
         })
@@ -154,79 +133,43 @@ export async function deployLambdaFunctions(
   });
 
   // Create event-processor Lambda
-  const eventProcessor = new aws.lambda.Function("byo-email-event-processor", {
-    name: "byo-email-event-processor",
-    runtime: aws.lambda.Runtime.NodeJS20dX,
-    handler: "index.handler",
-    role: lambdaRole.arn,
-    code: new pulumi.asset.FileArchive(eventProcessorBundle),
-    timeout: 30,
-    memorySize: 256,
-    environment: {
-      variables: {
-        TABLE_NAME: config.tableName,
+  const eventProcessor = new aws.lambda.Function(
+    "wraps-email-event-processor",
+    {
+      name: "wraps-email-event-processor",
+      runtime: aws.lambda.Runtime.NodeJS20dX,
+      handler: "index.handler",
+      role: lambdaRole.arn,
+      code: new pulumi.asset.FileArchive(eventProcessorBundle),
+      timeout: 300, // 5 minutes (matches SQS visibility timeout)
+      memorySize: 512,
+      environment: {
+        variables: {
+          TABLE_NAME: config.tableName,
+        },
       },
-    },
-    tags: {
-      ManagedBy: "byo-cli",
-    },
-  });
-
-  // Allow SNS to invoke event-processor
-  new aws.lambda.Permission("byo-email-event-processor-sns-permission", {
-    action: "lambda:InvokeFunction",
-    function: eventProcessor.name,
-    principal: "sns.amazonaws.com",
-    sourceArn: config.bounceComplaintTopicArn,
-  });
-
-  // Subscribe event-processor to SNS topic
-  new aws.sns.TopicSubscription("byo-email-event-processor-subscription", {
-    topic: config.bounceComplaintTopicArn,
-    protocol: "lambda",
-    endpoint: eventProcessor.arn,
-  });
-
-  // Bundle webhook-sender
-  const webhookSenderPath = join(lambdaDir, "webhook-sender", "index.ts");
-  const webhookSenderBundle = await bundleLambda(webhookSenderPath);
-
-  // Create webhook-sender Lambda
-  const webhookSender = new aws.lambda.Function("byo-email-webhook-sender", {
-    name: "byo-email-webhook-sender",
-    runtime: aws.lambda.Runtime.NodeJS20dX,
-    handler: "index.handler",
-    role: lambdaRole.arn,
-    code: new pulumi.asset.FileArchive(webhookSenderBundle),
-    timeout: 30,
-    memorySize: 256,
-    environment: {
-      variables: {
-        WEBHOOK_URL: config.webhookUrl || "",
+      tags: {
+        ManagedBy: "wraps-cli",
+        Description: "Process SES email events from SQS and store in DynamoDB",
       },
-    },
-    tags: {
-      ManagedBy: "byo-cli",
-    },
-  });
+    }
+  );
 
-  // Allow SNS to invoke webhook-sender
-  new aws.lambda.Permission("byo-email-webhook-sender-sns-permission", {
-    action: "lambda:InvokeFunction",
-    function: webhookSender.name,
-    principal: "sns.amazonaws.com",
-    sourceArn: config.bounceComplaintTopicArn,
-  });
-
-  // Subscribe webhook-sender to SNS topic
-  new aws.sns.TopicSubscription("byo-email-webhook-sender-subscription", {
-    topic: config.bounceComplaintTopicArn,
-    protocol: "lambda",
-    endpoint: webhookSender.arn,
-  });
+  // Create SQS event source mapping for Lambda
+  // This automatically polls SQS and invokes the Lambda function
+  const eventSourceMapping = new aws.lambda.EventSourceMapping(
+    "wraps-email-event-source-mapping",
+    {
+      eventSourceArn: config.queueArn,
+      functionName: eventProcessor.name,
+      batchSize: 10, // Process up to 10 messages per invocation
+      maximumBatchingWindowInSeconds: 5, // Wait up to 5 seconds to batch messages
+      functionResponseTypes: ["ReportBatchItemFailures"], // Enable partial batch responses
+    }
+  );
 
   return {
     eventProcessor,
-    webhookSender,
+    eventSourceMapping,
   };
 }

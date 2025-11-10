@@ -104,7 +104,7 @@ describe("status command", () => {
     const { LocalWorkspace } = await import("@pulumi/pulumi/automation");
     vi.mocked(LocalWorkspace.selectStack).mockResolvedValue({
       outputs: vi.fn().mockResolvedValue({
-        roleArn: { value: "arn:aws:iam::123456789012:role/byo-email-role" },
+        roleArn: { value: "arn:aws:iam::123456789012:role/wraps-email-role" },
         region: { value: "us-east-1" },
       }),
     } as any);
@@ -148,9 +148,9 @@ describe("status command", () => {
     const { LocalWorkspace } = await import("@pulumi/pulumi/automation");
     vi.mocked(LocalWorkspace.selectStack).mockResolvedValue({
       outputs: vi.fn().mockResolvedValue({
-        roleArn: { value: "arn:aws:iam::123456789012:role/byo-email-role" },
-        configSetName: { value: "byo-tracking" },
-        tableName: { value: "byo-email-history" },
+        roleArn: { value: "arn:aws:iam::123456789012:role/wraps-email-role" },
+        configSetName: { value: "wraps-tracking" },
+        tableName: { value: "wraps-email-history" },
         lambdaFunctions: { value: ["fn1", "fn2"] },
         region: { value: "us-east-1" },
       }),
@@ -177,8 +177,8 @@ describe("status command", () => {
       expect.objectContaining({
         integrationLevel: "enhanced",
         resources: expect.objectContaining({
-          configSetName: "byo-tracking",
-          tableName: "byo-email-history",
+          configSetName: "wraps-tracking",
+          tableName: "wraps-email-history",
         }),
       })
     );
@@ -194,7 +194,7 @@ describe("status command", () => {
     const { LocalWorkspace } = await import("@pulumi/pulumi/automation");
     vi.mocked(LocalWorkspace.selectStack).mockResolvedValue({
       outputs: vi.fn().mockResolvedValue({
-        roleArn: { value: "arn:aws:iam::123456789012:role/byo-email-role" },
+        roleArn: { value: "arn:aws:iam::123456789012:role/wraps-email-role" },
         region: { value: "us-east-1" },
       }),
     } as any);

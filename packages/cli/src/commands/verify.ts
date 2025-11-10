@@ -36,7 +36,7 @@ export async function verify(options: VerifyOptions): Promise<void> {
     progress.stop();
     clack.log.error(`Domain ${options.domain} not found in SES`);
     console.log(
-      `\nRun ${pc.cyan(`byo init --domain ${options.domain}`)} to add this domain.\n`
+      `\nRun ${pc.cyan(`wraps init --domain ${options.domain}`)} to add this domain.\n`
     );
     process.exit(1);
   }
@@ -171,7 +171,7 @@ export async function verify(options: VerifyOptions): Promise<void> {
       pc.red("✗ Some DNS records are incorrect. Please update them.")
     );
     console.log(
-      `\nRun ${pc.cyan("byo status")} to see the correct DNS records.\n`
+      `\nRun ${pc.cyan("wraps status")} to see the correct DNS records.\n`
     );
   } else {
     clack.outro(

@@ -14,7 +14,7 @@ export type VercelOIDCConfig = {
 export async function createVercelOIDC(
   config: VercelOIDCConfig
 ): Promise<aws.iam.OpenIdConnectProvider> {
-  return new aws.iam.OpenIdConnectProvider("byo-vercel-oidc", {
+  return new aws.iam.OpenIdConnectProvider("wraps-vercel-oidc", {
     url: `https://oidc.vercel.com/${config.teamSlug}`,
     clientIdLists: [`https://vercel.com/${config.teamSlug}`],
     thumbprintLists: [
@@ -23,7 +23,7 @@ export async function createVercelOIDC(
       "696db3af0dffc17e65c6a20d925c5a7bd24dec7e",
     ],
     tags: {
-      ManagedBy: "byo-cli",
+      ManagedBy: "wraps-cli",
       Provider: "vercel",
     },
   });

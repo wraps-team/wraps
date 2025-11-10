@@ -1,26 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BYOError, errors, handleCLIError } from "../errors.js";
+import { errors, handleCLIError, WrapsError } from "../errors.js";
 
-describe("BYOError", () => {
+describe("WrapsError", () => {
   it("should create error with all properties", () => {
-    const error = new BYOError(
+    const error = new WrapsError(
       "Test error message",
       "TEST_ERROR",
       "Try this suggestion",
-      "https://docs.byo.dev/test"
+      "https://docs.wraps.dev/test"
     );
 
     expect(error).toBeInstanceOf(Error);
-    expect(error).toBeInstanceOf(BYOError);
+    expect(error).toBeInstanceOf(WrapsError);
     expect(error.message).toBe("Test error message");
     expect(error.code).toBe("TEST_ERROR");
     expect(error.suggestion).toBe("Try this suggestion");
-    expect(error.docsUrl).toBe("https://docs.byo.dev/test");
-    expect(error.name).toBe("BYOError");
+    expect(error.docsUrl).toBe("https://docs.wraps.dev/test");
+    expect(error.name).toBe("WrapsError");
   });
 
   it("should create error without optional properties", () => {
-    const error = new BYOError("Test error", "TEST_ERROR");
+    const error = new WrapsError("Test error", "TEST_ERROR");
 
     expect(error.message).toBe("Test error");
     expect(error.code).toBe("TEST_ERROR");
@@ -46,12 +46,12 @@ describe("handleCLIError", () => {
     consoleLogSpy.mockRestore();
   });
 
-  it("should handle BYOError with all properties", () => {
-    const error = new BYOError(
+  it("should handle WrapsError with all properties", () => {
+    const error = new WrapsError(
       "AWS credentials not found",
       "NO_AWS_CREDENTIALS",
       "Run: aws configure",
-      "https://docs.byo.dev/credentials"
+      "https://docs.wraps.dev/credentials"
     );
 
     handleCLIError(error);
@@ -66,13 +66,13 @@ describe("handleCLIError", () => {
       expect.stringContaining("Documentation:")
     );
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining("https://docs.byo.dev/credentials")
+      expect.stringContaining("https://docs.wraps.dev/credentials")
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
-  it("should handle BYOError without suggestion and docs", () => {
-    const error = new BYOError("Simple error", "SIMPLE_ERROR");
+  it("should handle WrapsError without suggestion and docs", () => {
+    const error = new WrapsError("Simple error", "SIMPLE_ERROR");
 
     handleCLIError(error);
 
@@ -86,7 +86,7 @@ describe("handleCLIError", () => {
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(error);
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining("https://github.com/byo/byo/issues")
+      expect.stringContaining("https://github.com/wraps-team/wraps/issues")
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
@@ -112,26 +112,28 @@ describe("error factory functions", () => {
     it("should create proper error", () => {
       const error = errors.noAWSCredentials();
 
-      expect(error).toBeInstanceOf(BYOError);
+      expect(error).toBeInstanceOf(WrapsError);
       expect(error.message).toBe("AWS credentials not found");
       expect(error.code).toBe("NO_AWS_CREDENTIALS");
       expect(error.suggestion).toContain("aws configure");
-      expect(error.docsUrl).toBe("https://docs.byo.dev/setup/aws-credentials");
+      expect(error.docsUrl).toBe(
+        "https://docs.wraps.dev/setup/aws-credentials"
+      );
     });
   });
 
   describe("stackExists", () => {
     it("should create proper error with stack name", () => {
-      const error = errors.stackExists("byo-123456789-us-east-1");
+      const error = errors.stackExists("wraps-123456789-us-east-1");
 
-      expect(error).toBeInstanceOf(BYOError);
-      expect(error.message).toContain("byo-123456789-us-east-1");
+      expect(error).toBeInstanceOf(WrapsError);
+      expect(error.message).toContain("wraps-123456789-us-east-1");
       expect(error.code).toBe("STACK_EXISTS");
-      expect(error.suggestion).toContain("byo upgrade");
+      expect(error.suggestion).toContain("wraps upgrade");
       expect(error.suggestion).toContain(
-        "byo destroy --stack byo-123456789-us-east-1"
+        "wraps destroy --stack wraps-123456789-us-east-1"
       );
-      expect(error.docsUrl).toBe("https://docs.byo.dev/cli/upgrade");
+      expect(error.docsUrl).toBe("https://docs.wraps.dev/cli/upgrade");
     });
   });
 
@@ -139,7 +141,7 @@ describe("error factory functions", () => {
     it("should create proper error with region", () => {
       const error = errors.invalidRegion("invalid-region-123");
 
-      expect(error).toBeInstanceOf(BYOError);
+      expect(error).toBeInstanceOf(WrapsError);
       expect(error.message).toContain("invalid-region-123");
       expect(error.code).toBe("INVALID_REGION");
       expect(error.suggestion).toContain("us-east-1");
@@ -151,11 +153,11 @@ describe("error factory functions", () => {
     it("should create proper error with message", () => {
       const error = errors.pulumiError("Failed to create IAM role");
 
-      expect(error).toBeInstanceOf(BYOError);
+      expect(error).toBeInstanceOf(WrapsError);
       expect(error.message).toContain("Failed to create IAM role");
       expect(error.code).toBe("PULUMI_ERROR");
       expect(error.suggestion).toContain("AWS permissions");
-      expect(error.docsUrl).toBe("https://docs.byo.dev/troubleshooting");
+      expect(error.docsUrl).toBe("https://docs.wraps.dev/troubleshooting");
     });
   });
 
@@ -163,11 +165,11 @@ describe("error factory functions", () => {
     it("should create proper error", () => {
       const error = errors.noStack();
 
-      expect(error).toBeInstanceOf(BYOError);
-      expect(error.message).toContain("No BYO infrastructure found");
+      expect(error).toBeInstanceOf(WrapsError);
+      expect(error.message).toContain("No Wraps infrastructure found");
       expect(error.code).toBe("NO_STACK");
-      expect(error.suggestion).toContain("byo init");
-      expect(error.docsUrl).toBe("https://docs.byo.dev/cli/init");
+      expect(error.suggestion).toContain("wraps init");
+      expect(error.docsUrl).toBe("https://docs.wraps.dev/cli/init");
     });
   });
 
@@ -175,7 +177,7 @@ describe("error factory functions", () => {
     it("should create proper error", () => {
       const error = errors.pulumiNotInstalled();
 
-      expect(error).toBeInstanceOf(BYOError);
+      expect(error).toBeInstanceOf(WrapsError);
       expect(error.message).toBe("Pulumi CLI is not installed");
       expect(error.code).toBe("PULUMI_NOT_INSTALLED");
       expect(error.suggestion).toContain("brew install pulumi");

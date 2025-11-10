@@ -304,7 +304,7 @@ export async function scanLambdaFunctions(
 }
 
 /**
- * Scan IAM roles (filter for BYO or email-related ones)
+ * Scan IAM roles (filter for Wraps or email-related ones)
  */
 export async function scanIAMRoles(region: string): Promise<IAMRole[]> {
   const iam = new IAMClient({ region });
@@ -379,34 +379,34 @@ export async function scanAWSResources(
 }
 
 /**
- * Filter resources to only BYO-managed ones (byo-* prefix)
+ * Filter resources to only Wraps-managed ones (wraps-* prefix)
  */
-export function filterBYOResources(scan: AWSResourceScan): AWSResourceScan {
+export function filterWrapsResources(scan: AWSResourceScan): AWSResourceScan {
   return {
     identities: scan.identities, // All identities are relevant
     configurationSets: scan.configurationSets.filter((cs) =>
-      cs.name.startsWith("byo-")
+      cs.name.startsWith("wraps-")
     ),
-    snsTopics: scan.snsTopics.filter((t) => t.name.startsWith("byo-")),
-    dynamoTables: scan.dynamoTables.filter((t) => t.name.startsWith("byo-")),
+    snsTopics: scan.snsTopics.filter((t) => t.name.startsWith("wraps-")),
+    dynamoTables: scan.dynamoTables.filter((t) => t.name.startsWith("wraps-")),
     lambdaFunctions: scan.lambdaFunctions.filter((f) =>
-      f.name.startsWith("byo-")
+      f.name.startsWith("wraps-")
     ),
-    iamRoles: scan.iamRoles.filter((r) => r.name.startsWith("byo-")),
+    iamRoles: scan.iamRoles.filter((r) => r.name.startsWith("wraps-")),
   };
 }
 
 /**
- * Check if specific BYO resources exist
+ * Check if specific Wraps resources exist
  */
-export function checkBYOResourcesExist(scan: AWSResourceScan): {
+export function checkWrapsResourcesExist(scan: AWSResourceScan): {
   hasConfigSet: boolean;
   hasSNSTopics: boolean;
   hasDynamoTable: boolean;
   hasLambdaFunctions: boolean;
   hasIAMRole: boolean;
 } {
-  const filtered = filterBYOResources(scan);
+  const filtered = filterWrapsResources(scan);
 
   return {
     hasConfigSet: filtered.configurationSets.length > 0,

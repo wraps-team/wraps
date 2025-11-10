@@ -1,5 +1,5 @@
 /**
- * Setup tab completion for the BYO CLI
+ * Setup tab completion for the Wraps CLI
  *
  * This is a placeholder for future tab completion support.
  * Will integrate with tabtab or similar completion library.
@@ -13,16 +13,16 @@ export function setupTabCompletion() {
  * Print completion script for the current shell
  */
 export function printCompletionScript() {
-  console.log("# BYO CLI Tab Completion");
+  console.log("# Wraps CLI Tab Completion");
   console.log("# ========================\n");
   console.log("# Tab completion will be available in a future release.\n");
   console.log("# For now, here are the available commands:\n");
   console.log("# Commands:");
   console.log(
-    "#   byo init [--provider vercel|aws|railway|other] [--region <region>] [--domain <domain>]"
+    "#   wraps init [--provider vercel|aws|railway|other] [--region <region>] [--domain <domain>]"
   );
-  console.log("#   byo status [--account <account-id>]");
-  console.log("#   byo completion\n");
+  console.log("#   wraps status [--account <account-id>]");
+  console.log("#   wraps completion\n");
   console.log("# Flags:");
   console.log("#   --provider  : vercel, aws, railway, other");
   console.log(

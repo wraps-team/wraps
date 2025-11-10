@@ -13,7 +13,7 @@ import {
   listSESDomains,
   validateAWSCredentials,
 } from "../aws.js";
-import { BYOError } from "../errors.js";
+import { WrapsError } from "../errors.js";
 
 const stsMock = mockClient(STSClient);
 const sesMock = mockClient(SESClient);
@@ -39,21 +39,21 @@ describe("validateAWSCredentials", () => {
     });
   });
 
-  it("should throw BYOError when credentials are invalid", async () => {
+  it("should throw WrapsError when credentials are invalid", async () => {
     stsMock
       .on(GetCallerIdentityCommand)
       .rejects(new Error("Invalid credentials"));
 
-    await expect(validateAWSCredentials()).rejects.toThrow(BYOError);
+    await expect(validateAWSCredentials()).rejects.toThrow(WrapsError);
     await expect(validateAWSCredentials()).rejects.toThrow(
       "AWS credentials not found"
     );
   });
 
-  it("should throw BYOError when STS call fails", async () => {
+  it("should throw WrapsError when STS call fails", async () => {
     stsMock.on(GetCallerIdentityCommand).rejects(new Error("Network error"));
 
-    await expect(validateAWSCredentials()).rejects.toThrow(BYOError);
+    await expect(validateAWSCredentials()).rejects.toThrow(WrapsError);
   });
 });
 

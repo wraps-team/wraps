@@ -102,7 +102,7 @@ describe("displaySuccess", () => {
   it("should display success with minimal outputs", () => {
     expect(() =>
       displaySuccess({
-        roleArn: "arn:aws:iam::123456789012:role/byo-email-role",
+        roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
         region: "us-east-1",
       })
     ).not.toThrow();
@@ -111,8 +111,8 @@ describe("displaySuccess", () => {
   it("should display success with config set", () => {
     expect(() =>
       displaySuccess({
-        roleArn: "arn:aws:iam::123456789012:role/byo-email-role",
-        configSetName: "byo-tracking",
+        roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
+        configSetName: "wraps-tracking",
         region: "us-east-1",
       })
     ).not.toThrow();
@@ -121,8 +121,8 @@ describe("displaySuccess", () => {
   it("should display success with table name", () => {
     expect(() =>
       displaySuccess({
-        roleArn: "arn:aws:iam::123456789012:role/byo-email-role",
-        tableName: "byo-email-history",
+        roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
+        tableName: "wraps-email-history",
         region: "us-east-1",
       })
     ).not.toThrow();
@@ -131,7 +131,7 @@ describe("displaySuccess", () => {
   it("should display success with DNS records", () => {
     expect(() =>
       displaySuccess({
-        roleArn: "arn:aws:iam::123456789012:role/byo-email-role",
+        roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
         region: "us-east-1",
         domain: "example.com",
         dnsRecords: [
@@ -153,7 +153,7 @@ describe("displaySuccess", () => {
   it("should display success with auto-created DNS", () => {
     expect(() =>
       displaySuccess({
-        roleArn: "arn:aws:iam::123456789012:role/byo-email-role",
+        roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
         region: "us-east-1",
         domain: "example.com",
         dnsAutoCreated: true,
@@ -164,9 +164,9 @@ describe("displaySuccess", () => {
   it("should handle all outputs together", () => {
     expect(() =>
       displaySuccess({
-        roleArn: "arn:aws:iam::123456789012:role/byo-email-role",
-        configSetName: "byo-tracking",
-        tableName: "byo-email-history",
+        roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
+        configSetName: "wraps-tracking",
+        tableName: "wraps-email-history",
         region: "us-east-1",
         domain: "example.com",
         dnsAutoCreated: true,
@@ -203,7 +203,7 @@ describe("displayStatus", () => {
           },
         ],
         resources: {
-          roleArn: "arn:aws:iam::123456789012:role/byo-email-role",
+          roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
         },
       })
     ).not.toThrow();
@@ -222,8 +222,8 @@ describe("displayStatus", () => {
           },
         ],
         resources: {
-          roleArn: "arn:aws:iam::123456789012:role/byo-email-role",
-          configSetName: "byo-tracking",
+          roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
+          configSetName: "wraps-tracking",
         },
       })
     ).not.toThrow();
@@ -240,9 +240,9 @@ describe("displayStatus", () => {
           { domain: "failed.com", status: "failed" },
         ],
         resources: {
-          roleArn: "arn:aws:iam::123456789012:role/byo-email-role",
-          configSetName: "byo-tracking",
-          tableName: "byo-email-history",
+          roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
+          configSetName: "wraps-tracking",
+          tableName: "wraps-email-history",
           lambdaFunctions: 2,
           snsTopics: 1,
         },
@@ -257,9 +257,9 @@ describe("displayStatus", () => {
         region: "us-east-1",
         domains: [],
         resources: {
-          roleArn: "arn:aws:iam::123456789012:role/byo-email-role",
-          configSetName: "byo-tracking",
-          tableName: "byo-email-history",
+          roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
+          configSetName: "wraps-tracking",
+          tableName: "wraps-email-history",
           lambdaFunctions: 3,
           snsTopics: 2,
         },

@@ -1,4 +1,4 @@
-# BYO CLI
+# Wraps CLI
 
 > Deploy production-ready email infrastructure to your AWS account in 30 seconds.
 
@@ -35,9 +35,9 @@ choco install pulumi
 ## Installation
 
 ```bash
-npm install -g @byo/cli
+npm install -g @wraps/cli
 # or
-pnpm add -g @byo/cli
+pnpm add -g @wraps/cli
 ```
 
 ## Quick Start
@@ -45,7 +45,7 @@ pnpm add -g @byo/cli
 ### 1. Deploy New Infrastructure
 
 ```bash
-byo init
+wraps init
 ```
 
 This will:
@@ -57,7 +57,7 @@ This will:
 ### 2. Check Status
 
 ```bash
-byo status
+wraps status
 ```
 
 Shows:
@@ -68,7 +68,7 @@ Shows:
 
 ## Commands
 
-### `byo init`
+### `wraps init`
 
 Deploy new email infrastructure to your AWS account.
 
@@ -81,13 +81,13 @@ Deploy new email infrastructure to your AWS account.
 
 ```bash
 # Interactive mode (recommended)
-byo init
+wraps init
 
 # With flags
-byo init --provider vercel --region us-east-1 --domain myapp.com
+wraps init --provider vercel --region us-east-1 --domain myapp.com
 ```
 
-### `byo status`
+### `wraps status`
 
 Show current infrastructure status.
 
@@ -97,17 +97,17 @@ Show current infrastructure status.
 **Example:**
 
 ```bash
-byo status
+wraps status
 ```
 
-### `byo completion`
+### `wraps completion`
 
 Generate shell completion script.
 
 **Example:**
 
 ```bash
-byo completion
+wraps completion
 ```
 
 This will display tab completion information for your shell.
@@ -116,10 +116,10 @@ This will display tab completion information for your shell.
 
 ### Vercel Integration (Recommended)
 
-For Vercel projects, BYO uses OIDC federation so you never need to store AWS credentials:
+For Vercel projects, Wraps uses OIDC federation so you never need to store AWS credentials:
 
 ```bash
-byo init --provider vercel
+wraps init --provider vercel
 ```
 
 You'll be prompted for:
@@ -131,7 +131,7 @@ You'll be prompted for:
 For Lambda, ECS, or EC2 deployments:
 
 ```bash
-byo init --provider aws
+wraps init --provider aws
 ```
 
 Uses IAM roles automatically.
@@ -141,7 +141,7 @@ Uses IAM roles automatically.
 For Railway, Render, or other platforms:
 
 ```bash
-byo init --provider other
+wraps init --provider other
 ```
 
 Note: Will require AWS access keys.
@@ -252,7 +252,7 @@ If you've already deployed infrastructure:
 
 ```bash
 # Check status
-byo status
+wraps status
 
 # To redeploy, destroy the existing stack first
 # (coming in Phase 3)
@@ -274,13 +274,13 @@ byo status
 - [ ] CloudWatch alarms
 
 ### Phase 3: Existing SES Support
-- [ ] `byo connect` command
+- [ ] `wraps connect` command
 - [ ] Resource detection
 - [ ] Non-destructive deployment
 
 ### Phase 4: Polish
-- [ ] `byo verify` command (DNS verification)
-- [ ] `byo upgrade` command
+- [ ] `wraps verify` command (DNS verification)
+- [ ] `wraps upgrade` command
 - [ ] Comprehensive tests
 - [ ] Publishing to npm
 
@@ -290,6 +290,6 @@ MIT
 
 ## Support
 
-- Documentation: https://docs.byo.dev
-- Issues: https://github.com/byo/byo/issues
-- Dashboard: https://dashboard.byo.dev
+- Documentation: https://docs.wraps.dev
+- Issues: https://github.com/wraps-team/wraps/issues
+- Dashboard: https://dashboard.wraps.dev

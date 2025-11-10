@@ -10,7 +10,7 @@ import { DeploymentProgress } from "../utils/output.js";
  * Destroy command - Remove all deployed infrastructure
  */
 export async function destroy(options: DestroyOptions): Promise<void> {
-  clack.intro(pc.bold("BYO Email Infrastructure Teardown"));
+  clack.intro(pc.bold("Wraps Email Infrastructure Teardown"));
 
   const progress = new DeploymentProgress();
 
@@ -27,7 +27,7 @@ export async function destroy(options: DestroyOptions): Promise<void> {
   if (!options.yes) {
     const confirmed = await clack.confirm({
       message: pc.red(
-        "Are you sure you want to destroy all BYO infrastructure?"
+        "Are you sure you want to destroy all Wraps infrastructure?"
       ),
       initialValue: false,
     });
@@ -46,7 +46,7 @@ export async function destroy(options: DestroyOptions): Promise<void> {
         // Ensure Pulumi workspace directory exists
         await ensurePulumiWorkDir();
 
-        const stackName = `byo-${identity.accountId}-${region}`;
+        const stackName = `wraps-${identity.accountId}-${region}`;
 
         // Try to select the stack
         let stack;
@@ -56,7 +56,7 @@ export async function destroy(options: DestroyOptions): Promise<void> {
             workDir: getPulumiWorkDir(),
           });
         } catch (_error) {
-          throw new Error("No BYO infrastructure found to destroy");
+          throw new Error("No Wraps infrastructure found to destroy");
         }
 
         // Run destroy
@@ -68,8 +68,8 @@ export async function destroy(options: DestroyOptions): Promise<void> {
     );
   } catch (error: any) {
     progress.stop();
-    if (error.message.includes("No BYO infrastructure found")) {
-      clack.log.warn("No BYO infrastructure found");
+    if (error.message.includes("No Wraps infrastructure found")) {
+      clack.log.warn("No Wraps infrastructure found");
       process.exit(0);
     }
     clack.log.error("Infrastructure destruction failed");
@@ -78,6 +78,8 @@ export async function destroy(options: DestroyOptions): Promise<void> {
 
   // 5. Display success message
   progress.stop();
-  clack.outro(pc.green("All BYO infrastructure has been removed"));
-  console.log(`\nRun ${pc.cyan("byo init")} to deploy infrastructure again.\n`);
+  clack.outro(pc.green("All Wraps infrastructure has been removed"));
+  console.log(
+    `\nRun ${pc.cyan("wraps init")} to deploy infrastructure again.\n`
+  );
 }

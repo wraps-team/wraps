@@ -38,8 +38,8 @@ vi.mock("fs/promises", async () => {
 });
 
 vi.mock("../fs.js", () => ({
-  getBYODir: () => "/mock/byo/dir",
-  ensureBYODir: vi.fn().mockResolvedValue(undefined),
+  getWrapsDir: () => "/mock/wraps/dir",
+  ensureWrapsDir: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe("createConnectionMetadata", () => {
@@ -86,7 +86,7 @@ describe("updateFeatureMetadata", () => {
       enabled: true,
       action: "deploy-new",
       originalValue: null,
-      currentValue: "byo-tracking",
+      currentValue: "wraps-tracking",
     };
 
     updateFeatureMetadata(metadata, "configSet", featureConfig);
@@ -130,20 +130,20 @@ describe("updateFeatureMetadata", () => {
       enabled: true,
       action: "deploy-new",
       originalValue: null,
-      currentValue: "byo-tracking",
+      currentValue: "wraps-tracking",
     });
 
     updateFeatureMetadata(metadata, "emailHistory", {
       enabled: true,
       action: "deploy-new",
       originalValue: null,
-      currentValue: "byo-email-history",
+      currentValue: "wraps-email-history",
     });
 
     expect(Object.keys(metadata.features)).toHaveLength(2);
-    expect(metadata.features.configSet?.currentValue).toBe("byo-tracking");
+    expect(metadata.features.configSet?.currentValue).toBe("wraps-tracking");
     expect(metadata.features.emailHistory?.currentValue).toBe(
-      "byo-email-history"
+      "wraps-email-history"
     );
   });
 });
@@ -159,7 +159,7 @@ describe("updateIdentityMetadata", () => {
       name: "example.com",
       type: "Domain",
       originalConfigSet: null,
-      currentConfigSet: "byo-tracking",
+      currentConfigSet: "wraps-tracking",
       action: "attached",
     };
 
@@ -232,7 +232,7 @@ describe("getReplacedFeatures", () => {
       enabled: true,
       action: "deploy-new",
       originalValue: null,
-      currentValue: "byo-tracking",
+      currentValue: "wraps-tracking",
     });
 
     const replaced = getReplacedFeatures(metadata);
@@ -250,7 +250,7 @@ describe("getReplacedFeatures", () => {
       enabled: true,
       action: "replace",
       originalValue: "old-tracking",
-      currentValue: "byo-tracking",
+      currentValue: "wraps-tracking",
     });
 
     const replaced = getReplacedFeatures(metadata);
@@ -278,7 +278,7 @@ describe("getReplacedFeatures", () => {
       enabled: true,
       action: "deploy-new",
       originalValue: null,
-      currentValue: "byo-bounce",
+      currentValue: "wraps-bounce",
     });
 
     updateFeatureMetadata(metadata, "emailHistory", {
@@ -345,7 +345,7 @@ describe("getModifiedIdentities", () => {
       type: "Domain",
       action: "replaced",
       originalConfigSet: "old-config",
-      currentConfigSet: "byo-tracking",
+      currentConfigSet: "wraps-tracking",
     });
 
     const modified = getModifiedIdentities(metadata);
@@ -405,7 +405,7 @@ describe("saveConnectionMetadata", () => {
     await saveConnectionMetadata(metadata);
 
     expect(writeFile).toHaveBeenCalledWith(
-      "/mock/byo/dir/connections/123456789012-us-east-1.json",
+      "/mock/wraps/dir/connections/123456789012-us-east-1.json",
       expect.any(String),
       "utf-8"
     );
@@ -454,7 +454,7 @@ describe("loadConnectionMetadata", () => {
 
     expect(result).toEqual(metadata);
     expect(readFile).toHaveBeenCalledWith(
-      "/mock/byo/dir/connections/123456789012-us-east-1.json",
+      "/mock/wraps/dir/connections/123456789012-us-east-1.json",
       "utf-8"
     );
   });
@@ -483,7 +483,7 @@ describe("deleteConnectionMetadata", () => {
     await deleteConnectionMetadata("123456789012", "us-east-1");
 
     expect(unlink).toHaveBeenCalledWith(
-      "/mock/byo/dir/connections/123456789012-us-east-1.json"
+      "/mock/wraps/dir/connections/123456789012-us-east-1.json"
     );
   });
 
@@ -589,7 +589,7 @@ describe("connectionExists", () => {
 
     expect(exists).toBe(true);
     expect(existsSync).toHaveBeenCalledWith(
-      "/mock/byo/dir/connections/123456789012-us-east-1.json"
+      "/mock/wraps/dir/connections/123456789012-us-east-1.json"
     );
   });
 

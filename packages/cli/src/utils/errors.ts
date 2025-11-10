@@ -2,9 +2,9 @@ import * as clack from "@clack/prompts";
 import pc from "picocolors";
 
 /**
- * Custom error class for BYO CLI errors
+ * Custom error class for Wraps CLI errors
  */
-export class BYOError extends Error {
+export class WrapsError extends Error {
   constructor(
     message: string,
     public code: string,
@@ -12,7 +12,7 @@ export class BYOError extends Error {
     public docsUrl?: string
   ) {
     super(message);
-    this.name = "BYOError";
+    this.name = "WrapsError";
   }
 }
 
@@ -23,7 +23,7 @@ export class BYOError extends Error {
 export function handleCLIError(error: unknown): never {
   console.error(""); // Blank line
 
-  if (error instanceof BYOError) {
+  if (error instanceof WrapsError) {
     clack.log.error(error.message);
 
     if (error.suggestion) {
@@ -43,7 +43,7 @@ export function handleCLIError(error: unknown): never {
   clack.log.error("An unexpected error occurred");
   console.error(error);
   console.log(`\n${pc.dim("If this persists, please report at:")}`);
-  console.log(`  ${pc.blue("https://github.com/byo/byo/issues")}\n`);
+  console.log(`  ${pc.blue("https://github.com/wraps-team/wraps/issues")}\n`);
   process.exit(1);
 }
 
@@ -52,23 +52,23 @@ export function handleCLIError(error: unknown): never {
  */
 export const errors = {
   noAWSCredentials: () =>
-    new BYOError(
+    new WrapsError(
       "AWS credentials not found",
       "NO_AWS_CREDENTIALS",
       "Run: aws configure\nOr set AWS_PROFILE environment variable",
-      "https://docs.byo.dev/setup/aws-credentials"
+      "https://docs.wraps.dev/setup/aws-credentials"
     ),
 
   stackExists: (stackName: string) =>
-    new BYOError(
+    new WrapsError(
       `Stack "${stackName}" already exists`,
       "STACK_EXISTS",
-      `To update: byo upgrade\nTo remove: byo destroy --stack ${stackName}`,
-      "https://docs.byo.dev/cli/upgrade"
+      `To update: wraps upgrade\nTo remove: wraps destroy --stack ${stackName}`,
+      "https://docs.wraps.dev/cli/upgrade"
     ),
 
   invalidRegion: (region: string) =>
-    new BYOError(
+    new WrapsError(
       `Invalid AWS region: ${region}`,
       "INVALID_REGION",
       "Use a valid AWS region like: us-east-1, eu-west-1, ap-southeast-1",
@@ -76,23 +76,23 @@ export const errors = {
     ),
 
   pulumiError: (message: string) =>
-    new BYOError(
+    new WrapsError(
       `Infrastructure deployment failed: ${message}`,
       "PULUMI_ERROR",
       "Check your AWS permissions and try again",
-      "https://docs.byo.dev/troubleshooting"
+      "https://docs.wraps.dev/troubleshooting"
     ),
 
   noStack: () =>
-    new BYOError(
-      "No BYO infrastructure found in this AWS account",
+    new WrapsError(
+      "No Wraps infrastructure found in this AWS account",
       "NO_STACK",
-      "Run: byo init\nTo deploy new infrastructure",
-      "https://docs.byo.dev/cli/init"
+      "Run: wraps init\nTo deploy new infrastructure",
+      "https://docs.wraps.dev/cli/init"
     ),
 
   pulumiNotInstalled: () =>
-    new BYOError(
+    new WrapsError(
       "Pulumi CLI is not installed",
       "PULUMI_NOT_INSTALLED",
       "Install Pulumi:\n  macOS: brew install pulumi/tap/pulumi\n  Linux: curl -fsSL https://get.pulumi.com | sh\n  Windows: choco install pulumi\n\nOr download from: https://www.pulumi.com/docs/install/",

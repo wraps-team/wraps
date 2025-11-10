@@ -84,10 +84,14 @@ wraps/                            # Monorepo root
 │   │   │   │       ├── iam.ts        # IAM role definitions
 │   │   │   │       ├── ses.ts        # SES configuration
 │   │   │   │       ├── dynamodb.ts   # DynamoDB tables
-│   │   │   │       └── lambda.ts     # Lambda functions
+│   │   │   │       ├── lambda.ts     # Lambda functions
+│   │   │   │       ├── sqs.ts        # SQS queues + DLQ
+│   │   │   │       └── eventbridge.ts # EventBridge rules
 │   │   │   ├── utils/           # Shared utilities
 │   │   │   │   ├── aws.ts       # AWS SDK helpers
 │   │   │   │   ├── prompts.ts   # Prompt utilities (@clack/prompts)
+│   │   │   │   ├── costs.ts     # Cost calculation utilities
+│   │   │   │   ├── presets.ts   # Configuration presets
 │   │   │   │   ├── errors.ts    # Error handling
 │   │   │   │   ├── output.ts    # Console output (picocolors)
 │   │   │   │   ├── route53.ts   # Route53 DNS helpers
@@ -96,8 +100,7 @@ wraps/                            # Monorepo root
 │   │   │   └── types/
 │   │   │       └── index.ts     # TypeScript types
 │   │   └── lambda/              # Lambda function source
-│   │       ├── event-processor/
-│   │       └── webhook-sender/
+│   │       └── event-processor/ # SQS -> DynamoDB processor
 │   ├── console-ui/              # Dashboard application (Vite + React)
 │   │   └── src/
 │   │       ├── components/      # UI components
@@ -116,24 +119,61 @@ wraps/                            # Monorepo root
 └── turbo.json                   # Turborepo configuration
 ```
 
+## Configuration System
+
+### Feature-Based Configuration
+Wraps uses a feature-based configuration system with transparent cost calculations:
+
+**Configuration Presets:**
+- **Starter** (~$0.05/mo): Minimal tracking for low-volume senders
+  - Open & click tracking
+  - Bounce/complaint suppression
+  - Perfect for MVPs and side projects
+
+- **Production** (~$2-5/mo): Recommended for most applications
+  - Everything in Starter
+  - Real-time event tracking (EventBridge)
+  - 90-day email history storage
+  - Reputation metrics dashboard
+
+- **Enterprise** (~$50-100/mo): High-volume senders
+  - Everything in Production
+  - Dedicated IP address
+  - 1-year email history retention
+  - All 10 SES event types tracked
+
+- **Custom**: Configure each feature individually
+
+**Event Processing Architecture:**
+```
+SES → EventBridge → SQS + DLQ → Lambda → DynamoDB
+```
+
+**Supported SES Event Types:**
+- SEND, DELIVERY, OPEN, CLICK
+- BOUNCE, COMPLAINT, REJECT
+- RENDERING_FAILURE, DELIVERY_DELAY, SUBSCRIPTION
+
 ## Commands
 
 ### 1. `wraps init` - Deploy New Infrastructure
 - Validates AWS credentials
-- Prompts for configuration (provider, region, domain)
+- Prompts for configuration preset (or custom config)
+- Shows estimated monthly costs based on volume
+- Validates configuration (warns about potential issues)
 - Deploys infrastructure using Pulumi
 - Sets up OIDC provider (if Vercel)
-- Creates IAM roles, SES config, DynamoDB, Lambda, SNS
+- Creates IAM roles, SES config, DynamoDB, Lambda, EventBridge, SQS
 - Displays success message with next steps
 
 ### 2. `wraps connect` - Connect Existing SES
-- Scans existing AWS resources (SES domains, config sets, SNS topics)
-- Prompts for integration level (dashboard-only or enhanced)
+- Scans existing AWS resources (SES domains, config sets)
+- Prompts for feature selection
 - Deploys **non-destructively** (always create new resources with `wraps-` prefix)
 - Never modifies existing resources
 
 ### 3. `wraps status` - Show Current Setup
-- Displays integration type, region, domains
+- Displays active features, region, domains
 - Shows all deployed resources
 - Links to dashboard and docs
 
@@ -142,10 +182,11 @@ wraps/                            # Monorepo root
 - Checks DKIM, SPF, DMARC records
 - Provides guidance if records missing/incorrect
 
-### 5. `wraps upgrade` - Upgrade Integration
-- Detects current integration level
-- Deploys additional resources
-- Updates configuration
+### 5. `wraps upgrade` - Add Features
+- Shows currently enabled features
+- Prompts for additional features to enable
+- Deploys new resources incrementally
+- Updates IAM policies as needed
 
 ## Critical Design Principles
 
@@ -168,10 +209,14 @@ wraps/                            # Monorepo root
 - Generate unique external ID for IAM role (security)
 
 #### IAM Roles
+Policies are feature-based and grant minimum required permissions:
+
 - **Vercel**: OIDC provider with AssumeRoleWithWebIdentity
-- **AWS Native**: Lambda, EC2, ECS can assume
-- **Dashboard-only**: Read-only CloudWatch access
-- **Enhanced**: Send + read access (SES, DynamoDB)
+- **AWS Native**: Lambda, EC2, ECS can assume via IAM roles
+- **Base permissions**: Always include SES metrics + CloudWatch read access
+- **Sending enabled**: Adds SES send permissions (SendEmail, SendRawEmail, etc.)
+- **Event tracking**: Adds EventBridge + SQS permissions
+- **History storage**: Adds DynamoDB read/write permissions
 
 #### Resource Naming
 - All resources: `wraps-{resource-type}-`

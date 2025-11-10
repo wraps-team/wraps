@@ -1,5 +1,14 @@
 import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
-import type { AwsCredentialIdentity } from "@aws-sdk/types";
+
+/**
+ * AWS credential identity type
+ */
+export type AwsCredentialIdentity = {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+  expiration?: Date;
+};
 
 /**
  * Assume IAM role and return temporary credentials

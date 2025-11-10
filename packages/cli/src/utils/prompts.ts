@@ -352,13 +352,13 @@ export async function promptConflictResolution(
       },
       {
         value: "replace",
-        label: "Replace with BYO version",
+        label: "Replace with Wraps version",
         hint: "Save original for restore, use ours",
       },
       {
         value: "skip",
         label: "Skip this feature",
-        hint: "Keep your setup, skip BYO deployment",
+        hint: "Keep your setup, skip Wraps deployment",
       },
     ],
   });
@@ -378,7 +378,7 @@ export async function promptSelectIdentities(
   identities: Array<{ name: string; verified: boolean }>
 ): Promise<string[]> {
   const selected = await clack.multiselect({
-    message: "Select identities to connect with BYO:",
+    message: "Select identities to connect with Wraps:",
     options: identities.map((id) => ({
       value: id.name,
       label: id.name,
@@ -410,4 +410,229 @@ export async function confirmConnect(): Promise<boolean> {
   }
 
   return confirmed;
+}
+
+/**
+ * Prompt for configuration preset
+ */
+export async function promptConfigPreset(): Promise<
+  "starter" | "production" | "enterprise" | "custom"
+> {
+  const { getAllPresetInfo } = await import("./presets.js");
+  const presets = getAllPresetInfo();
+
+  const preset = await clack.select({
+    message: "Choose a configuration preset:",
+    options: presets.map((p) => ({
+      value: p.name.toLowerCase() as
+        | "starter"
+        | "production"
+        | "enterprise"
+        | "custom",
+      label: `${p.name} - ${p.description}`,
+      hint: `${p.volume} | Est. ${p.estimatedCost}/mo`,
+    })),
+  });
+
+  if (clack.isCancel(preset)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  return preset as "starter" | "production" | "enterprise" | "custom";
+}
+
+/**
+ * Prompt for estimated monthly email volume
+ */
+export async function promptEstimatedVolume(): Promise<number> {
+  const volume = await clack.select({
+    message: "Estimated monthly email volume:",
+    options: [
+      { value: 1000, label: "< 1k emails/month", hint: "Hobby/Development" },
+      { value: 10_000, label: "1k-10k emails/month", hint: "Side Project" },
+      {
+        value: 50_000,
+        label: "10k-100k emails/month",
+        hint: "Growing Startup",
+      },
+      {
+        value: 250_000,
+        label: "100k-500k emails/month",
+        hint: "Production SaaS",
+      },
+      { value: 1_000_000, label: "500k+ emails/month", hint: "High Volume" },
+    ],
+  });
+
+  if (clack.isCancel(volume)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  return volume as number;
+}
+
+/**
+ * Prompt for custom configuration
+ */
+export async function promptCustomConfig(): Promise<any> {
+  clack.log.info("Custom configuration builder");
+  clack.log.info("Configure each feature individually");
+
+  // Tracking
+  const trackingEnabled = await clack.confirm({
+    message: "Enable open & click tracking?",
+    initialValue: true,
+  });
+
+  if (clack.isCancel(trackingEnabled)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  let customTrackingDomain: string | symbol | undefined;
+  if (trackingEnabled) {
+    customTrackingDomain = await clack.text({
+      message:
+        "Custom tracking redirect domain? (optional, press Enter to skip)",
+      placeholder: "track.yourdomain.com",
+      validate: (value) => {
+        if (value && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(value)) {
+          return "Please enter a valid domain";
+        }
+      },
+    });
+
+    if (clack.isCancel(customTrackingDomain)) {
+      clack.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+  }
+
+  // Event tracking
+  const eventTrackingEnabled = await clack.confirm({
+    message: "Enable real-time event tracking (EventBridge)?",
+    initialValue: true,
+  });
+
+  if (clack.isCancel(eventTrackingEnabled)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  let dynamoDBHistory: boolean | symbol = false;
+  let archiveRetention: string | symbol = "90days";
+
+  if (eventTrackingEnabled) {
+    dynamoDBHistory = await clack.confirm({
+      message: "Store email history in DynamoDB?",
+      initialValue: true,
+    });
+
+    if (clack.isCancel(dynamoDBHistory)) {
+      clack.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    if (dynamoDBHistory) {
+      archiveRetention = await clack.select({
+        message: "Email history retention period:",
+        options: [
+          { value: "7days", label: "7 days", hint: "Minimal storage cost" },
+          { value: "30days", label: "30 days", hint: "Development/testing" },
+          {
+            value: "90days",
+            label: "90 days (recommended)",
+            hint: "Standard retention",
+          },
+          { value: "1year", label: "1 year", hint: "Compliance requirements" },
+          {
+            value: "indefinite",
+            label: "Indefinite",
+            hint: "Higher storage cost",
+          },
+        ],
+      });
+
+      if (clack.isCancel(archiveRetention)) {
+        clack.cancel("Operation cancelled.");
+        process.exit(0);
+      }
+    }
+  }
+
+  // Security
+  const tlsRequired = await clack.confirm({
+    message: "Require TLS encryption for all emails?",
+    initialValue: true,
+  });
+
+  if (clack.isCancel(tlsRequired)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  // Reputation metrics
+  const reputationMetrics = await clack.confirm({
+    message: "Enable reputation metrics dashboard?",
+    initialValue: true,
+  });
+
+  if (clack.isCancel(reputationMetrics)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  // Dedicated IP
+  const dedicatedIp = await clack.confirm({
+    message: "Request dedicated IP address? (requires 100k+ emails/day)",
+    initialValue: false,
+  });
+
+  if (clack.isCancel(dedicatedIp)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  return {
+    tracking: trackingEnabled
+      ? {
+          enabled: true,
+          opens: true,
+          clicks: true,
+          customRedirectDomain:
+            typeof customTrackingDomain === "string" && customTrackingDomain
+              ? customTrackingDomain
+              : undefined,
+        }
+      : { enabled: false },
+    tlsRequired,
+    reputationMetrics,
+    suppressionList: {
+      enabled: true,
+      reasons: ["BOUNCE", "COMPLAINT"],
+    },
+    eventTracking: eventTrackingEnabled
+      ? {
+          enabled: true,
+          eventBridge: true,
+          events: [
+            "SEND",
+            "DELIVERY",
+            "OPEN",
+            "CLICK",
+            "BOUNCE",
+            "COMPLAINT",
+            "REJECT",
+            "RENDERING_FAILURE",
+          ],
+          dynamoDBHistory: Boolean(dynamoDBHistory),
+          archiveRetention:
+            typeof archiveRetention === "string" ? archiveRetention : "90days",
+        }
+      : { enabled: false },
+    dedicatedIp,
+    sendingEnabled: true,
+  };
 }

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ensureBYODir, getBYODir } from "./fs.js";
+import { ensureWrapsDir, getWrapsDir } from "./fs.js";
 
 /**
  * Feature configuration for a connection
@@ -52,7 +52,7 @@ export type ConnectionMetadata = {
  * Get the connections directory
  */
 function getConnectionsDir(): string {
-  return join(getBYODir(), "connections");
+  return join(getWrapsDir(), "connections");
 }
 
 /**
@@ -66,7 +66,7 @@ function getMetadataPath(accountId: string, region: string): string {
  * Ensure the connections directory exists
  */
 async function ensureConnectionsDir(): Promise<void> {
-  await ensureBYODir();
+  await ensureWrapsDir();
   const connectionsDir = getConnectionsDir();
   if (!existsSync(connectionsDir)) {
     const { mkdir } = await import("node:fs/promises");

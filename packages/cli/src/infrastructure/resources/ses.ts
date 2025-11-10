@@ -1,4 +1,5 @@
 import * as aws from "@pulumi/aws";
+import type { SESEventType } from "../../types/index.js";
 
 /**
  * SES resources configuration
@@ -6,6 +7,13 @@ import * as aws from "@pulumi/aws";
 export type SESResourcesConfig = {
   domain?: string;
   region: string;
+  trackingConfig?: {
+    enabled: boolean;
+    opens?: boolean;
+    clicks?: boolean;
+    customRedirectDomain?: string;
+  };
+  eventTypes?: SESEventType[];
 };
 
 /**
@@ -13,57 +21,57 @@ export type SESResourcesConfig = {
  */
 export type SESResources = {
   configSet: aws.sesv2.ConfigurationSet;
-  bounceComplaintTopic: aws.sns.Topic;
+  eventBus: aws.cloudwatch.EventBus;
   domainIdentity?: aws.sesv2.EmailIdentity;
   dkimTokens?: string[];
   dnsAutoCreated?: boolean;
 };
 
 /**
- * Create SES resources (configuration set, SNS topics, domain identity)
+ * Create SES resources (configuration set, EventBridge event bus, domain identity)
  */
 export async function createSESResources(
   config: SESResourcesConfig
 ): Promise<SESResources> {
   // Configuration set for tracking (using SESv2 which supports tags)
-  const configSet = new aws.sesv2.ConfigurationSet("byo-email-tracking", {
-    configurationSetName: "byo-email-tracking",
+  const configSet = new aws.sesv2.ConfigurationSet("wraps-email-tracking", {
+    configurationSetName: "wraps-email-tracking",
     tags: {
-      ManagedBy: "byo-cli",
-      Description: "BYO email tracking configuration set",
+      ManagedBy: "wraps-cli",
+      Description: "Wraps email tracking configuration set",
     },
   });
 
-  // SNS topic for bounce/complaint notifications
-  const bounceComplaintTopic = new aws.sns.Topic(
-    "byo-email-bounce-complaints",
-    {
-      name: "byo-email-bounce-complaints",
-      tags: {
-        ManagedBy: "byo-cli",
+  // Create custom EventBridge event bus for SES events
+  const eventBus = new aws.cloudwatch.EventBus("wraps-email-events", {
+    name: "wraps-email-events",
+    tags: {
+      ManagedBy: "wraps-cli",
+      Description: "EventBridge bus for SES email events",
+    },
+  });
+
+  // Event destination for all SES events -> EventBridge
+  new aws.sesv2.ConfigurationSetEventDestination("wraps-email-all-events", {
+    configurationSetName: configSet.configurationSetName,
+    eventDestinationName: "wraps-email-eventbridge",
+    eventDestination: {
+      enabled: true,
+      matchingEventTypes: [
+        "SEND",
+        "DELIVERY",
+        "OPEN",
+        "CLICK",
+        "BOUNCE",
+        "COMPLAINT",
+        "REJECT",
+        "RENDERING_FAILURE",
+        "DELIVERY_DELAY",
+        "SUBSCRIPTION",
+      ],
+      eventBridgeDestination: {
+        eventBusArn: eventBus.arn,
       },
-    }
-  );
-
-  // Event destination for bounces/complaints
-  new aws.ses.EventDestination("byo-email-bounce-complaint-events", {
-    name: "byo-email-bounce-complaints",
-    configurationSetName: configSet.configurationSetName,
-    enabled: true,
-    matchingTypes: ["bounce", "complaint"],
-    snsDestination: {
-      topicArn: bounceComplaintTopic.arn,
-    },
-  });
-
-  // Event destination for engagement (opens, clicks, deliveries)
-  new aws.ses.EventDestination("byo-email-engagement-events", {
-    name: "byo-email-engagement",
-    configurationSetName: configSet.configurationSetName,
-    enabled: true,
-    matchingTypes: ["send", "delivery", "open", "click"],
-    snsDestination: {
-      topicArn: bounceComplaintTopic.arn,
     },
   });
 
@@ -73,14 +81,14 @@ export async function createSESResources(
 
   if (config.domain) {
     // Use SES v2 API to create email identity with configuration set
-    domainIdentity = new aws.sesv2.EmailIdentity("byo-email-domain", {
+    domainIdentity = new aws.sesv2.EmailIdentity("wraps-email-domain", {
       emailIdentity: config.domain,
       configurationSetName: configSet.configurationSetName, // Link configuration set to domain
       dkimSigningAttributes: {
         nextSigningKeyLength: "RSA_2048_BIT",
       },
       tags: {
-        ManagedBy: "byo-cli",
+        ManagedBy: "wraps-cli",
       },
     });
 
@@ -92,7 +100,7 @@ export async function createSESResources(
 
   return {
     configSet,
-    bounceComplaintTopic,
+    eventBus,
     domainIdentity,
     dkimTokens,
     dnsAutoCreated: false, // Will be set after deployment

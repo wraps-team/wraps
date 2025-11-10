@@ -30,7 +30,7 @@ import { scanAWSResources } from "../utils/scanner.js";
  * Connect command - Connect to existing AWS SES infrastructure
  */
 export async function connect(options: ConnectOptions): Promise<void> {
-  clack.intro(pc.bold("BYO Connect - Link Existing Infrastructure"));
+  clack.intro(pc.bold("Wraps Connect - Link Existing Infrastructure"));
 
   const progress = new DeploymentProgress();
 
@@ -69,8 +69,8 @@ export async function connect(options: ConnectOptions): Promise<void> {
       `Connection already exists for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
     );
     clack.log.info(`Created: ${existingConnection.timestamp}`);
-    clack.log.info(`Use ${pc.cyan("byo status")} to view current setup`);
-    clack.log.info(`Use ${pc.cyan("byo upgrade")} to add more features`);
+    clack.log.info(`Use ${pc.cyan("wraps status")} to view current setup`);
+    clack.log.info(`Use ${pc.cyan("wraps upgrade")} to add more features`);
     process.exit(0);
   }
 
@@ -89,7 +89,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
   if (scan.identities.length === 0) {
     clack.log.warn("No SES identities found in this region.");
     clack.log.info(
-      `Use ${pc.cyan("byo init")} to create new email infrastructure instead.`
+      `Use ${pc.cyan("wraps init")} to create new email infrastructure instead.`
     );
     process.exit(0);
   }
@@ -141,11 +141,11 @@ export async function connect(options: ConnectOptions): Promise<void> {
   // Check for configuration set conflict
   if (selectedFeatures.includes("configSet")) {
     const existingConfigSets = scan.configurationSets.filter(
-      (cs) => !cs.name.startsWith("byo-")
+      (cs) => !cs.name.startsWith("wraps-")
     );
 
     if (existingConfigSets.length > 0) {
-      // Found existing non-BYO config sets
+      // Found existing non-Wraps config sets
       const action = await promptConflictResolution(
         "configuration set",
         existingConfigSets[0].name
@@ -160,7 +160,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
               ? "skip"
               : "deploy-new",
         originalValue: action === "replace" ? existingConfigSets[0].name : null,
-        currentValue: "byo-tracking",
+        currentValue: "wraps-tracking",
       };
     } else {
       // No conflict, deploy new
@@ -168,7 +168,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
         enabled: true,
         action: "deploy-new",
         originalValue: null,
-        currentValue: "byo-tracking",
+        currentValue: "wraps-tracking",
       };
     }
 
@@ -179,7 +179,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
   if (selectedFeatures.includes("bounceHandling")) {
     const existingSNS = scan.snsTopics.filter(
       (t) =>
-        !t.name.startsWith("byo-") && t.name.toLowerCase().includes("bounce")
+        !t.name.startsWith("wraps-") && t.name.toLowerCase().includes("bounce")
     );
 
     if (existingSNS.length > 0) {
@@ -197,14 +197,14 @@ export async function connect(options: ConnectOptions): Promise<void> {
               ? "skip"
               : "deploy-new",
         originalValue: action === "replace" ? existingSNS[0].arn : null,
-        currentValue: "byo-bounce-complaints",
+        currentValue: "wraps-bounce-complaints",
       };
     } else {
       featureConfigs.bounceHandling = {
         enabled: true,
         action: "deploy-new",
         originalValue: null,
-        currentValue: "byo-bounce-complaints",
+        currentValue: "wraps-bounce-complaints",
       };
     }
 
@@ -221,7 +221,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
       enabled: true,
       action: "deploy-new",
       originalValue: null,
-      currentValue: "byo-bounce-complaints",
+      currentValue: "wraps-bounce-complaints",
     };
     updateFeatureMetadata(
       metadata,
@@ -234,7 +234,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
   if (selectedFeatures.includes("emailHistory")) {
     const existingTables = scan.dynamoTables.filter(
       (t) =>
-        !t.name.startsWith("byo-") && t.name.toLowerCase().includes("email")
+        !t.name.startsWith("wraps-") && t.name.toLowerCase().includes("email")
     );
 
     if (existingTables.length > 0) {
@@ -252,14 +252,14 @@ export async function connect(options: ConnectOptions): Promise<void> {
               ? "skip"
               : "deploy-new",
         originalValue: action === "replace" ? existingTables[0].name : null,
-        currentValue: "byo-email-history",
+        currentValue: "wraps-email-history",
       };
     } else {
       featureConfigs.emailHistory = {
         enabled: true,
         action: "deploy-new",
         originalValue: null,
-        currentValue: "byo-email-history",
+        currentValue: "wraps-email-history",
       };
     }
 
@@ -276,7 +276,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
       enabled: true,
       action: "deploy-new",
       originalValue: null,
-      currentValue: "byo-event-processor",
+      currentValue: "wraps-event-processor",
     };
     updateFeatureMetadata(
       metadata,
@@ -291,7 +291,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
       enabled: true,
       action: "deploy-new",
       originalValue: null,
-      currentValue: "byo-email-role",
+      currentValue: "wraps-email-role",
     };
     updateFeatureMetadata(
       metadata,
@@ -309,7 +309,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
         type: identity.type,
         originalConfigSet: identity.configurationSet || null,
         currentConfigSet: featureConfigs.configSet?.enabled
-          ? "byo-tracking"
+          ? "wraps-tracking"
           : null,
         action: identity.configurationSet ? "replaced" : "attached",
       });
@@ -325,31 +325,62 @@ export async function connect(options: ConnectOptions): Promise<void> {
     }
   }
 
-  // 12. Build stack configuration
+  // 12. Build email configuration from selected features
+  const emailConfig = {
+    tracking: {
+      enabled: selectedFeatures.includes("configSet"),
+      opens: true,
+      clicks: true,
+    },
+    tlsRequired: true,
+    reputationMetrics: selectedFeatures.includes("configSet"),
+    suppressionList: {
+      enabled:
+        selectedFeatures.includes("bounceHandling") ||
+        selectedFeatures.includes("complaintHandling"),
+      reasons: ["BOUNCE" as const, "COMPLAINT" as const],
+    },
+    eventTracking: {
+      enabled:
+        selectedFeatures.includes("emailHistory") ||
+        selectedFeatures.includes("eventProcessor"),
+      eventBridge: selectedFeatures.includes("eventProcessor"),
+      events: [
+        "SEND" as const,
+        "DELIVERY" as const,
+        "OPEN" as const,
+        "CLICK" as const,
+        "BOUNCE" as const,
+        "COMPLAINT" as const,
+        "REJECT" as const,
+        "RENDERING_FAILURE" as const,
+      ],
+      dynamoDBHistory: selectedFeatures.includes("emailHistory"),
+      archiveRetention: "90days" as const,
+    },
+    sendingEnabled: true,
+  };
+
   const stackConfig: EmailStackConfig = {
     provider,
     region,
     vercel: vercelConfig,
-    integrationLevel:
-      selectedFeatures.includes("emailHistory") ||
-      selectedFeatures.includes("eventProcessor")
-        ? "enhanced"
-        : "dashboard-only",
+    emailConfig,
   };
 
   // 13. Deploy infrastructure using Pulumi
   let outputs;
   try {
     outputs = await progress.execute(
-      "Deploying BYO infrastructure (this may take 2-3 minutes)",
+      "Deploying Wraps infrastructure (this may take 2-3 minutes)",
       async () => {
         await ensurePulumiWorkDir();
 
         const stack =
           await pulumi.automation.LocalWorkspace.createOrSelectStack(
             {
-              stackName: `byo-${identity.accountId}-${region}`,
-              projectName: "byo-email",
+              stackName: `wraps-${identity.accountId}-${region}`,
+              projectName: "wraps-email",
               program: async () => {
                 const result = await deployEmailStack(stackConfig);
 
@@ -372,7 +403,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
           );
 
         await stack.workspace.selectStack(
-          `byo-${identity.accountId}-${region}`
+          `wraps-${identity.accountId}-${region}`
         );
         await stack.setConfig("aws:region", { value: region });
 
@@ -398,7 +429,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
   }
 
   // 14. Save metadata for restore capability
-  metadata.pulumiStackName = `byo-${identity.accountId}-${region}`;
+  metadata.pulumiStackName = `wraps-${identity.accountId}-${region}`;
   if (vercelConfig) {
     metadata.vercel = vercelConfig;
   }
@@ -427,7 +458,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
       );
     }
     console.log(
-      `\n${pc.dim("To restore original resources: ")}${pc.cyan("byo restore")}\n`
+      `\n${pc.dim("To restore original resources: ")}${pc.cyan("wraps restore")}\n`
     );
   }
 
@@ -435,12 +466,12 @@ export async function connect(options: ConnectOptions): Promise<void> {
   if (selectedIdentities.length > 0 && featureConfigs.configSet?.enabled) {
     console.log(`\n${pc.bold("Next Steps:")}\n`);
     console.log(
-      `Update your code to use configuration set: ${pc.cyan("byo-tracking")}`
+      `Update your code to use configuration set: ${pc.cyan("wraps-tracking")}`
     );
     console.log(`\n${pc.dim("Example:")}`);
     console.log(
       pc.gray(`  await ses.sendEmail({
-    ConfigurationSetName: 'byo-tracking',
+    ConfigurationSetName: 'wraps-tracking',
     // ... other parameters
   });`)
     );

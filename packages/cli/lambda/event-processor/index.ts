@@ -1,14 +1,24 @@
 import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
-import type { SNSEvent } from "aws-lambda";
+import type { SQSEvent } from "aws-lambda";
 
 const dynamodb = new DynamoDBClient({});
 
 /**
- * Lambda handler for processing SES events from SNS
- * Stores all SES events (send, delivery, bounce, complaint, open, click) in DynamoDB
+ * Lambda handler for processing SES events from SQS (via EventBridge)
+ * Stores all SES events in DynamoDB:
+ * - Send: Email sent from SES
+ * - Delivery: Email delivered to recipient
+ * - Open: Email opened by recipient
+ * - Click: Link clicked in email
+ * - Bounce: Email bounced (permanent or transient)
+ * - Complaint: Recipient marked email as spam
+ * - Reject: Email rejected before sending
+ * - Rendering Failure: Template rendering failed
+ * - DeliveryDelay: Temporary delivery delay
+ * - Subscription: Recipient unsubscribed/changed preferences
  */
-export async function handler(event: SNSEvent) {
-  console.log("Processing SES event:", JSON.stringify(event, null, 2));
+export async function handler(event: SQSEvent) {
+  console.log("Processing SES event from SQS:", JSON.stringify(event, null, 2));
 
   const tableName = process.env.TABLE_NAME;
   if (!tableName) {
@@ -17,7 +27,11 @@ export async function handler(event: SNSEvent) {
 
   for (const record of event.Records) {
     try {
-      const message = JSON.parse(record.Sns.Message);
+      // Parse the SQS message body (which contains the EventBridge event)
+      const eventBridgeEvent = JSON.parse(record.body);
+
+      // The actual SES event is in the 'detail' field of the EventBridge event
+      const message = eventBridgeEvent.detail;
       const eventType = message.eventType || message.notificationType;
 
       // Extract email details
@@ -29,16 +43,31 @@ export async function handler(event: SNSEvent) {
       const subject = mail.commonHeaders?.subject || "";
 
       // Extract additional data based on event type
-      let additionalData: Record<string, any> = {};
+      let additionalData: Record<string, unknown> = {};
 
-      if (eventType === "Open" && message.open) {
+      if (eventType === "Send" && message.send) {
         additionalData = {
+          tags: mail.tags || {},
+        };
+      } else if (eventType === "Delivery" && message.delivery) {
+        additionalData = {
+          timestamp: message.delivery.timestamp,
+          processingTimeMillis: message.delivery.processingTimeMillis,
+          recipients: message.delivery.recipients,
+          smtpResponse: message.delivery.smtpResponse,
+          remoteMtaIp: message.delivery.remoteMtaIp,
+        };
+      } else if (eventType === "Open" && message.open) {
+        additionalData = {
+          timestamp: message.open.timestamp,
           userAgent: message.open.userAgent,
           ipAddress: message.open.ipAddress,
         };
       } else if (eventType === "Click" && message.click) {
         additionalData = {
+          timestamp: message.click.timestamp,
           link: message.click.link,
+          linkTags: message.click.linkTags || {},
           userAgent: message.click.userAgent,
           ipAddress: message.click.ipAddress,
         };
@@ -46,10 +75,41 @@ export async function handler(event: SNSEvent) {
         additionalData = {
           bounceType: message.bounce.bounceType,
           bounceSubType: message.bounce.bounceSubType,
+          bouncedRecipients: message.bounce.bouncedRecipients,
+          timestamp: message.bounce.timestamp,
+          feedbackId: message.bounce.feedbackId,
         };
       } else if (eventType === "Complaint" && message.complaint) {
         additionalData = {
+          complainedRecipients: message.complaint.complainedRecipients,
+          timestamp: message.complaint.timestamp,
+          feedbackId: message.complaint.feedbackId,
           complaintFeedbackType: message.complaint.complaintFeedbackType,
+          userAgent: message.complaint.userAgent,
+        };
+      } else if (eventType === "Reject" && message.reject) {
+        additionalData = {
+          reason: message.reject.reason,
+        };
+      } else if (eventType === "Rendering Failure" && message.failure) {
+        additionalData = {
+          errorMessage: message.failure.errorMessage,
+          templateName: message.failure.templateName,
+        };
+      } else if (eventType === "DeliveryDelay" && message.deliveryDelay) {
+        additionalData = {
+          timestamp: message.deliveryDelay.timestamp,
+          delayType: message.deliveryDelay.delayType,
+          expirationTime: message.deliveryDelay.expirationTime,
+          delayedRecipients: message.deliveryDelay.delayedRecipients,
+        };
+      } else if (eventType === "Subscription" && message.subscription) {
+        additionalData = {
+          contactList: message.subscription.contactList,
+          timestamp: message.subscription.timestamp,
+          source: message.subscription.source,
+          newTopicPreferences: message.subscription.newTopicPreferences,
+          oldTopicPreferences: message.subscription.oldTopicPreferences,
         };
       }
 
@@ -80,7 +140,7 @@ export async function handler(event: SNSEvent) {
         additionalData
       );
     } catch (error) {
-      console.error("Error processing SNS record:", error);
+      console.error("Error processing record:", error);
       console.error("Record:", JSON.stringify(record, null, 2));
       // Don't throw - continue processing other records
     }

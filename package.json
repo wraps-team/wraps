@@ -21,6 +21,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.4",
+    "@types/aws-lambda": "8.10.157",
+    "@types/node": "24.10.0",
     "turbo": "^2.2.3",
     "ultracite": "6.3.2"
   },

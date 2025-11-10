@@ -1,10 +1,10 @@
 {
-  "name": "@byo/cli",
+  "name": "@wraps/cli",
   "version": "0.1.0",
-  "description": "CLI for deploying BYO email infrastructure",
+  "description": "CLI for deploying Wraps email infrastructure to your AWS account",
   "type": "module",
   "bin": {
-    "byo": "./dist/cli.js"
+    "wraps": "./dist/cli.js"
   },
   "scripts": {
     "dev": "tsup --watch",
@@ -25,7 +25,7 @@
     "infrastructure",
     "cli"
   ],
-  "author": "BYO",
+  "author": "Wraps",
   "license": "MIT",
   "dependencies": {
     "@aws-sdk/client-cloudformation": "^3.490.0",

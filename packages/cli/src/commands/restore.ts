@@ -23,7 +23,7 @@ export type RestoreOptions = {
  * Restore command - Revert changes and restore original resources
  */
 export async function restore(options: RestoreOptions): Promise<void> {
-  clack.intro(pc.bold("BYO Restore - Revert to Original Configuration"));
+  clack.intro(pc.bold("Wraps Restore - Revert to Original Configuration"));
 
   const progress = new DeploymentProgress();
 
@@ -47,10 +47,10 @@ export async function restore(options: RestoreOptions): Promise<void> {
 
   if (!metadata) {
     clack.log.error(
-      `No BYO connection found for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
+      `No Wraps connection found for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
     );
     clack.log.info(
-      `Use ${pc.cyan("byo connect")} to create a connection first.`
+      `Use ${pc.cyan("wraps connect")} to create a connection first.`
     );
     process.exit(1);
   }
@@ -87,7 +87,7 @@ export async function restore(options: RestoreOptions): Promise<void> {
           `  ${pc.cyan(identity.name)}: restore ${pc.green(identity.originalConfigSet)}`
         );
       } else if (identity.action === "attached") {
-        console.log(`  ${pc.cyan(identity.name)}: remove BYO config set`);
+        console.log(`  ${pc.cyan(identity.name)}: remove Wraps config set`);
       }
     }
     console.log("");
@@ -96,7 +96,8 @@ export async function restore(options: RestoreOptions): Promise<void> {
   // 6. Confirm restoration
   if (!options.yes) {
     const confirmed = await clack.confirm({
-      message: "Proceed with restoration? This will remove BYO infrastructure.",
+      message:
+        "Proceed with restoration? This will remove Wraps infrastructure.",
       initialValue: false,
     });
 
@@ -122,12 +123,12 @@ export async function restore(options: RestoreOptions): Promise<void> {
 
   // 8. Destroy Pulumi stack
   if (metadata.pulumiStackName) {
-    await progress.execute("Removing BYO infrastructure", async () => {
+    await progress.execute("Removing Wraps infrastructure", async () => {
       try {
         const stack = await pulumi.automation.LocalWorkspace.selectStack(
           {
             stackName: metadata.pulumiStackName!,
-            projectName: "byo-email",
+            projectName: "wraps-email",
             program: async () => {}, // Empty program
           },
           {
@@ -157,7 +158,7 @@ export async function restore(options: RestoreOptions): Promise<void> {
 
   // 10. Success message
   console.log(`\n${pc.green("✓")} ${pc.bold("Restoration complete!")}\n`);
-  console.log(`${pc.dim("BYO infrastructure has been removed.")}`);
+  console.log(`${pc.dim("Wraps infrastructure has been removed.")}`);
   console.log(
     `${pc.dim("Your original AWS resources have been preserved.")}\n`
   );

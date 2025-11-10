@@ -1,5 +1,5 @@
 {
-  "name": "byo-event-processor",
+  "name": "wraps-email-event-processor",
   "version": "1.0.0",
   "description": "Lambda function to process SES events",
   "type": "module",

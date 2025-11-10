@@ -83,8 +83,9 @@ args.options([
     defaultValue: undefined,
   },
   {
-    name: "enhanced",
-    description: "Use enhanced integration (Lambda, DynamoDB, SNS)",
+    name: "preset",
+    description:
+      "Configuration preset (starter, production, enterprise, custom)",
     defaultValue: undefined,
   },
   {
@@ -122,7 +123,7 @@ async function run() {
           provider: flags.provider,
           region: flags.region,
           domain: flags.domain,
-          enhanced: flags.enhanced,
+          preset: flags.preset,
           yes: flags.yes,
         });
         break;
