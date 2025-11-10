@@ -79,6 +79,11 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
   const config = metadata.emailConfig;
 
+  // Show sending domain if configured
+  if (config.domain) {
+    console.log(`  Sending Domain: ${pc.cyan(config.domain)}`);
+  }
+
   if (config.tracking?.enabled) {
     console.log(`  ${pc.green("✓")} Open & Click Tracking`);
     if (config.tracking.customRedirectDomain) {
