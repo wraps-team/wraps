@@ -1,10 +1,14 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
 import { build } from "esbuild";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * Lambda configuration
@@ -62,8 +66,10 @@ async function bundleLambda(functionPath: string): Promise<string> {
 export async function deployLambdaFunctions(
   config: LambdaConfig
 ): Promise<LambdaFunctions> {
-  // Get Lambda source directory
-  const lambdaDir = join(process.cwd(), "lambda");
+  // Get Lambda source directory (relative to this file's location)
+  // This file is in packages/cli/src/infrastructure/resources/lambda.ts
+  // Lambda sources are in packages/cli/lambda/
+  const lambdaDir = join(__dirname, "..", "..", "..", "lambda");
 
   // Bundle event-processor
   const eventProcessorPath = join(lambdaDir, "event-processor", "index.ts");

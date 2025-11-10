@@ -42,16 +42,14 @@ export async function createSESResources(
     },
   });
 
-  // Create custom EventBridge event bus for SES events
-  const eventBus = new aws.cloudwatch.EventBus("wraps-email-events", {
-    name: "wraps-email-events",
-    tags: {
-      ManagedBy: "wraps-cli",
-      Description: "EventBridge bus for SES email events",
-    },
+  // SES can only send to the default EventBridge bus
+  // We'll use EventBridge rules to route from default bus to SQS
+  // Get the default event bus (it always exists)
+  const defaultEventBus = aws.cloudwatch.getEventBusOutput({
+    name: "default",
   });
 
-  // Event destination for all SES events -> EventBridge
+  // Event destination for all SES events -> EventBridge (default bus)
   new aws.sesv2.ConfigurationSetEventDestination("wraps-email-all-events", {
     configurationSetName: configSet.configurationSetName,
     eventDestinationName: "wraps-email-eventbridge",
@@ -70,7 +68,8 @@ export async function createSESResources(
         "SUBSCRIPTION",
       ],
       eventBridgeDestination: {
-        eventBusArn: eventBus.arn,
+        // SES requires default bus - cannot use custom bus
+        eventBusArn: defaultEventBus.arn,
       },
     },
   });
@@ -100,7 +99,7 @@ export async function createSESResources(
 
   return {
     configSet,
-    eventBus,
+    eventBus: defaultEventBus as any, // Return default bus reference
     domainIdentity,
     dkimTokens,
     dnsAutoCreated: false, // Will be set after deployment

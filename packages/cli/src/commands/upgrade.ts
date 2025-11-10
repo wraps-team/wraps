@@ -435,6 +435,15 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     );
   } catch (error: any) {
     clack.log.error("Infrastructure upgrade failed");
+
+    // Check if it's a lock file error
+    if (error.message?.includes("stack is currently locked")) {
+      clack.log.warn("\nThe Pulumi stack is locked from a previous run.");
+      clack.log.info("To fix this, run:");
+      clack.log.info(`  ${pc.cyan("rm -rf ~/.wraps/pulumi/.pulumi/locks")}`);
+      clack.log.info("\nThen try running wraps upgrade again.");
+    }
+
     throw new Error(`Pulumi upgrade failed: ${error.message}`);
   }
 

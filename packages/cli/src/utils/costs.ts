@@ -281,9 +281,19 @@ export function getCostSummary(
   const costs = calculateCosts(config, emailsPerMonth);
   const lines: string[] = [];
 
-  lines.push(
-    `Estimated cost for ${emailsPerMonth.toLocaleString()} emails/month: ${formatCost(costs.total.monthly)}/mo`
-  );
+  // Add free tier context if under limits
+  if (emailsPerMonth < FREE_TIER.SES_EMAILS) {
+    lines.push(
+      `Estimated cost for ${emailsPerMonth.toLocaleString()} emails/month: ${formatCost(costs.total.monthly)}/mo`
+    );
+    lines.push(
+      "  (AWS free tier: 62k emails/month permanently free from EC2/Lambda)"
+    );
+  } else {
+    lines.push(
+      `Estimated cost for ${emailsPerMonth.toLocaleString()} emails/month: ${formatCost(costs.total.monthly)}/mo`
+    );
+  }
 
   if (costs.tracking) {
     lines.push(

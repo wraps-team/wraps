@@ -21,25 +21,26 @@ export type EventBridgeResources = {
 /**
  * Create EventBridge rule to route SES events to SQS queue
  *
- * This rule captures all SES events from the custom event bus
+ * This rule captures all SES events from the default event bus
  * and routes them to the SQS queue for processing.
+ *
+ * Note: SES can only send to the default EventBridge bus, not custom buses.
  */
 export async function createEventBridgeResources(
   config: EventBridgeConfig
 ): Promise<EventBridgeResources> {
-  // Extract event bus name from ARN
+  // Extract event bus name from ARN (will be "default" for SES)
   const eventBusName = config.eventBusArn.apply((arn) => arn.split("/").pop()!);
 
-  // EventBridge rule to capture all SES events
+  // EventBridge rule to capture all SES events on default bus
   const rule = new aws.cloudwatch.EventRule("wraps-email-events-rule", {
     name: "wraps-email-events-to-sqs",
     description: "Route all SES email events to SQS for processing",
     eventBusName,
     eventPattern: JSON.stringify({
       source: ["aws.ses"],
-      "detail-type": [
-        "SES Email Event", // EventBridge format from SES
-      ],
+      // SES sends events with various detail-types based on event type
+      // We capture all by not filtering on detail-type
     }),
     tags: {
       ManagedBy: "wraps-cli",
