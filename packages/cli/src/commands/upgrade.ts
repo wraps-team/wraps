@@ -194,7 +194,12 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         process.exit(0);
       }
 
-      updatedConfig = getPreset(selectedPreset as any)!;
+      // Get preset config but preserve domain from existing config
+      const presetConfig = getPreset(selectedPreset as any)!;
+      updatedConfig = {
+        ...presetConfig,
+        domain: config.domain, // Preserve original domain
+      };
       newPreset = selectedPreset as string;
       break;
     }
@@ -358,7 +363,12 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     case "custom": {
       // Full custom configuration
       const { promptCustomConfig } = await import("../utils/prompts.js");
-      updatedConfig = await promptCustomConfig();
+      const customConfig = await promptCustomConfig();
+      // Preserve domain from existing config
+      updatedConfig = {
+        ...customConfig,
+        domain: config.domain,
+      };
       newPreset = undefined;
       break;
     }
