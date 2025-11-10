@@ -105,6 +105,7 @@ export async function deployEmailStack(
     eventBusName: sesResources?.eventBus.name as any as string | undefined,
     queueUrl: sqsResources?.queue.url as any as string | undefined,
     dlqUrl: sqsResources?.dlq.url as any as string | undefined,
+    customTrackingDomain: sesResources?.customTrackingDomain,
   };
 }
 

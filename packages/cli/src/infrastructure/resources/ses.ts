@@ -25,6 +25,7 @@ export type SESResources = {
   domainIdentity?: aws.sesv2.EmailIdentity;
   dkimTokens?: string[];
   dnsAutoCreated?: boolean;
+  customTrackingDomain?: string;
 };
 
 /**
@@ -34,13 +35,26 @@ export async function createSESResources(
   config: SESResourcesConfig
 ): Promise<SESResources> {
   // Configuration set for tracking (using SESv2 which supports tags)
-  const configSet = new aws.sesv2.ConfigurationSet("wraps-email-tracking", {
+  const configSetOptions: aws.sesv2.ConfigurationSetArgs = {
     configurationSetName: "wraps-email-tracking",
     tags: {
       ManagedBy: "wraps-cli",
       Description: "Wraps email tracking configuration set",
     },
-  });
+  };
+
+  // Add custom tracking domain if provided
+  if (config.trackingConfig?.customRedirectDomain) {
+    configSetOptions.trackingOptions = {
+      customRedirectDomain: config.trackingConfig.customRedirectDomain,
+      httpsPolicy: "REQUIRE", // Always require HTTPS for security
+    };
+  }
+
+  const configSet = new aws.sesv2.ConfigurationSet(
+    "wraps-email-tracking",
+    configSetOptions
+  );
 
   // SES can only send to the default EventBridge bus
   // We'll use EventBridge rules to route from default bus to SQS
@@ -103,5 +117,6 @@ export async function createSESResources(
     domainIdentity,
     dkimTokens,
     dnsAutoCreated: false, // Will be set after deployment
+    customTrackingDomain: config.trackingConfig?.customRedirectDomain,
   };
 }

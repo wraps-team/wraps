@@ -94,6 +94,7 @@ export type SuccessOutputs = {
   tableName?: string;
   dnsAutoCreated?: boolean;
   domain?: string;
+  customTrackingDomain?: string;
 };
 
 /**
@@ -160,6 +161,15 @@ export function displaySuccess(outputs: SuccessOutputs) {
       );
     }
 
+    // Add custom tracking domain CNAME if provided and not auto-created
+    if (outputs.customTrackingDomain && !outputs.dnsAutoCreated) {
+      dnsLines.push(
+        "",
+        pc.bold("Tracking Domain (CNAME):"),
+        `  ${pc.cyan(outputs.customTrackingDomain)} ${pc.dim("CNAME")} "feedback-id.${outputs.region}.amazonses.com"`
+      );
+    }
+
     clack.note(dnsLines.join("\n"), "DNS Records to add:");
 
     console.log(
@@ -167,6 +177,20 @@ export function displaySuccess(outputs: SuccessOutputs) {
         "(after DNS propagates)"
       )}\n`
     );
+  }
+
+  // Show tracking domain separately if we only have tracking domain (no other DNS records)
+  if (
+    outputs.customTrackingDomain &&
+    !outputs.dnsAutoCreated &&
+    (!outputs.dnsRecords || outputs.dnsRecords.length === 0)
+  ) {
+    const trackingLines = [
+      pc.bold("Tracking Domain (CNAME):"),
+      `  ${pc.cyan(outputs.customTrackingDomain)} ${pc.dim("CNAME")} "feedback-id.${outputs.region}.amazonses.com"`,
+    ];
+
+    clack.note(trackingLines.join("\n"), "DNS Record to add:");
   }
 }
 

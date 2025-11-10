@@ -129,6 +129,7 @@ export type StackOutputs = {
   eventBusName?: string;
   queueUrl?: string;
   dlqUrl?: string;
+  customTrackingDomain?: string;
 };
 
 /**

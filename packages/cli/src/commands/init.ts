@@ -132,7 +132,9 @@ export async function init(options: InitOptions): Promise<void> {
   const metadata = createConnectionMetadata(
     identity.accountId,
     region,
-    provider
+    provider,
+    emailConfig,
+    preset === "custom" ? undefined : preset
   );
   if (vercelConfig) {
     metadata.vercel = vercelConfig;
@@ -182,6 +184,7 @@ export async function init(options: InitOptions): Promise<void> {
                   lambdaFunctions: result.lambdaFunctions,
                   domain: result.domain,
                   dkimTokens: result.dkimTokens,
+                  customTrackingDomain: result.customTrackingDomain,
                 };
               },
             },
@@ -221,6 +224,9 @@ export async function init(options: InitOptions): Promise<void> {
             | undefined,
           domain: pulumiOutputs.domain?.value as string | undefined,
           dkimTokens: pulumiOutputs.dkimTokens?.value as string[] | undefined,
+          customTrackingDomain: pulumiOutputs.customTrackingDomain?.value as
+            | string
+            | undefined,
         };
       }
     );
@@ -259,7 +265,8 @@ export async function init(options: InitOptions): Promise<void> {
           hostedZone.id,
           outputs.domain,
           outputs.dkimTokens,
-          region
+          region,
+          outputs.customTrackingDomain
         );
         progress.succeed("DNS records created in Route53");
         dnsAutoCreated = true;
@@ -297,5 +304,6 @@ export async function init(options: InitOptions): Promise<void> {
     dnsRecords: dnsRecords.length > 0 ? dnsRecords : undefined,
     dnsAutoCreated,
     domain: outputs.domain,
+    customTrackingDomain: outputs.customTrackingDomain,
   });
 }

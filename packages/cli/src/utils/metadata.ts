@@ -1,50 +1,27 @@
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import type {
+  ConfigPreset,
+  Provider,
+  WrapsEmailConfig,
+} from "../types/index.js";
 import { ensureWrapsDir, getWrapsDir } from "./fs.js";
 
 /**
- * Feature configuration for a connection
- */
-export type FeatureConfig = {
-  enabled: boolean;
-  action: "deploy-new" | "replace" | "skip";
-  originalValue?: string | null;
-  currentValue?: string | null;
-};
-
-/**
- * Identity configuration tracking
- */
-export type IdentityConfig = {
-  name: string;
-  type: "Domain" | "EmailAddress";
-  originalConfigSet?: string | null;
-  currentConfigSet?: string | null;
-  action: "no-change" | "attached" | "replaced";
-};
-
-/**
- * Connection metadata for restore
+ * Connection metadata
  */
 export type ConnectionMetadata = {
   accountId: string;
   region: string;
-  provider: string;
+  provider: Provider;
   timestamp: string;
+  preset?: ConfigPreset; // Which preset was used (if any)
+  emailConfig: WrapsEmailConfig; // The actual email configuration
   vercel?: {
     teamSlug: string;
     projectName: string;
   };
-  features: {
-    configSet?: FeatureConfig;
-    bounceHandling?: FeatureConfig;
-    complaintHandling?: FeatureConfig;
-    emailHistory?: FeatureConfig;
-    eventProcessor?: FeatureConfig;
-    dashboardAccess?: FeatureConfig;
-  };
-  identities: IdentityConfig[];
   pulumiStackName?: string;
 };
 
@@ -180,68 +157,30 @@ export async function connectionExists(
 export function createConnectionMetadata(
   accountId: string,
   region: string,
-  provider: string
+  provider: Provider,
+  emailConfig: WrapsEmailConfig,
+  preset?: ConfigPreset
 ): ConnectionMetadata {
   return {
     accountId,
     region,
     provider,
     timestamp: new Date().toISOString(),
-    features: {},
-    identities: [],
+    emailConfig,
+    preset,
   };
 }
 
 /**
- * Update feature in metadata
+ * Update email configuration in metadata
  */
-export function updateFeatureMetadata(
+export function updateEmailConfig(
   metadata: ConnectionMetadata,
-  featureName: keyof ConnectionMetadata["features"],
-  config: FeatureConfig
+  emailConfig: Partial<WrapsEmailConfig>
 ): void {
-  metadata.features[featureName] = config;
-}
-
-/**
- * Update identity in metadata
- */
-export function updateIdentityMetadata(
-  metadata: ConnectionMetadata,
-  identity: IdentityConfig
-): void {
-  // Remove existing entry if present
-  metadata.identities = metadata.identities.filter(
-    (i) => i.name !== identity.name
-  );
-  // Add new entry
-  metadata.identities.push(identity);
-}
-
-/**
- * Get features that were replaced (for restore)
- */
-export function getReplacedFeatures(
-  metadata: ConnectionMetadata
-): Array<{ name: string; config: FeatureConfig }> {
-  const replaced: Array<{ name: string; config: FeatureConfig }> = [];
-
-  for (const [name, config] of Object.entries(metadata.features)) {
-    if (config && config.action === "replace" && config.originalValue) {
-      replaced.push({ name, config });
-    }
-  }
-
-  return replaced;
-}
-
-/**
- * Get identities that were modified (for restore)
- */
-export function getModifiedIdentities(
-  metadata: ConnectionMetadata
-): IdentityConfig[] {
-  return metadata.identities.filter(
-    (i) => i.action === "attached" || i.action === "replaced"
-  );
+  metadata.emailConfig = {
+    ...metadata.emailConfig,
+    ...emailConfig,
+  };
+  metadata.timestamp = new Date().toISOString();
 }

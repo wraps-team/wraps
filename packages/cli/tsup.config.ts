@@ -1,3 +1,4 @@
+import { cp } from "node:fs/promises";
 import { defineConfig } from "tsup";
 
 export default defineConfig({
@@ -12,5 +13,13 @@ export default defineConfig({
   sourcemap: true,
   target: "node20",
   outDir: "dist",
-  onSuccess: "chmod +x dist/cli.js",
+  onSuccess: async () => {
+    // Make CLI executable
+    await import("node:fs/promises").then((fs) =>
+      fs.chmod("dist/cli.js", 0o755)
+    );
+    // Copy Lambda source files to dist
+    await cp("lambda", "dist/lambda", { recursive: true });
+    console.log("✓ Copied Lambda sources to dist/");
+  },
 });

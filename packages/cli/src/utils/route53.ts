@@ -43,7 +43,8 @@ export async function createDNSRecords(
   hostedZoneId: string,
   domain: string,
   dkimTokens: string[],
-  region: string
+  region: string,
+  customTrackingDomain?: string
 ): Promise<void> {
   const client = new Route53Client({ region });
 
@@ -85,6 +86,19 @@ export async function createDNSRecords(
       ],
     },
   });
+
+  // Custom tracking domain CNAME (if provided)
+  if (customTrackingDomain) {
+    changes.push({
+      Action: "UPSERT",
+      ResourceRecordSet: {
+        Name: customTrackingDomain,
+        Type: "CNAME",
+        TTL: 1800,
+        ResourceRecords: [{ Value: `feedback-id.${region}.amazonses.com` }],
+      },
+    });
+  }
 
   await client.send(
     new ChangeResourceRecordSetsCommand({

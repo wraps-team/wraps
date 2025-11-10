@@ -5,16 +5,12 @@ import {
   connectionExists,
   createConnectionMetadata,
   deleteConnectionMetadata,
-  type FeatureConfig,
-  getModifiedIdentities,
-  getReplacedFeatures,
-  type IdentityConfig,
   listConnections,
   loadConnectionMetadata,
   saveConnectionMetadata,
-  updateFeatureMetadata,
-  updateIdentityMetadata,
+  updateEmailConfig,
 } from "../metadata.js";
+import { getPreset } from "../presets.js";
 
 // Mock fs module
 vi.mock("fs", async () => {
@@ -44,26 +40,48 @@ vi.mock("../fs.js", () => ({
 
 describe("createConnectionMetadata", () => {
   it("should create metadata with required fields", () => {
+    const emailConfig = getPreset("starter")!;
     const metadata = createConnectionMetadata(
       "123456789012",
       "us-east-1",
-      "vercel"
+      "vercel",
+      emailConfig,
+      "starter"
     );
 
     expect(metadata.accountId).toBe("123456789012");
     expect(metadata.region).toBe("us-east-1");
     expect(metadata.provider).toBe("vercel");
+    expect(metadata.preset).toBe("starter");
+    expect(metadata.emailConfig).toEqual(emailConfig);
     expect(metadata.timestamp).toBeDefined();
-    expect(metadata.features).toEqual({});
-    expect(metadata.identities).toEqual([]);
+  });
+
+  it("should create metadata without preset for custom config", () => {
+    const emailConfig = {
+      tracking: { enabled: true, opens: true, clicks: true },
+      sendingEnabled: true,
+    };
+    const metadata = createConnectionMetadata(
+      "123456789012",
+      "us-east-1",
+      "aws",
+      emailConfig
+    );
+
+    expect(metadata.preset).toBeUndefined();
+    expect(metadata.emailConfig).toEqual(emailConfig);
   });
 
   it("should generate ISO timestamp", () => {
     const before = new Date().toISOString();
+    const emailConfig = getPreset("production")!;
     const metadata = createConnectionMetadata(
       "123456789012",
       "us-east-1",
-      "aws"
+      "aws",
+      emailConfig,
+      "production"
     );
     const after = new Date().toISOString();
 
@@ -75,331 +93,107 @@ describe("createConnectionMetadata", () => {
   });
 });
 
-describe("updateFeatureMetadata", () => {
-  it("should add feature to metadata", () => {
+describe("updateEmailConfig", () => {
+  it("should update email configuration", () => {
+    const emailConfig = getPreset("starter")!;
     const metadata = createConnectionMetadata(
       "123456789012",
       "us-east-1",
-      "vercel"
+      "vercel",
+      emailConfig,
+      "starter"
     );
-    const featureConfig: FeatureConfig = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "wraps-tracking",
+
+    const oldTimestamp = metadata.timestamp;
+
+    const updates = {
+      tracking: {
+        ...emailConfig.tracking,
+        customRedirectDomain: "track.example.com",
+      },
     };
 
-    updateFeatureMetadata(metadata, "configSet", featureConfig);
+    // Use fake timers to ensure timestamp changes
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(100);
 
-    expect(metadata.features.configSet).toEqual(featureConfig);
+    updateEmailConfig(metadata, updates);
+
+    vi.useRealTimers();
+
+    expect(metadata.emailConfig.tracking?.customRedirectDomain).toBe(
+      "track.example.com"
+    );
+    expect(metadata.timestamp).not.toBe(oldTimestamp);
   });
 
-  it("should update existing feature", () => {
+  it("should merge partial updates", () => {
+    const emailConfig = getPreset("production")!;
     const metadata = createConnectionMetadata(
       "123456789012",
       "us-east-1",
-      "vercel"
+      "aws",
+      emailConfig,
+      "production"
     );
-    metadata.features.configSet = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "old-value",
-    };
 
-    const newConfig: FeatureConfig = {
-      enabled: true,
-      action: "replace",
-      originalValue: "old-value",
-      currentValue: "new-value",
-    };
+    const originalRetention =
+      metadata.emailConfig.eventTracking?.archiveRetention;
 
-    updateFeatureMetadata(metadata, "configSet", newConfig);
+    updateEmailConfig(metadata, {
+      eventTracking: {
+        ...metadata.emailConfig.eventTracking,
+        archiveRetention: "1year",
+      },
+    });
 
-    expect(metadata.features.configSet).toEqual(newConfig);
+    expect(metadata.emailConfig.eventTracking?.archiveRetention).toBe("1year");
+    expect(metadata.emailConfig.eventTracking?.enabled).toBe(true); // Original value preserved
+    expect(originalRetention).not.toBe("1year"); // Verify it actually changed
   });
 
-  it("should handle multiple features", () => {
+  it("should update timestamp on config update", () => {
+    const emailConfig = getPreset("starter")!;
     const metadata = createConnectionMetadata(
       "123456789012",
       "us-east-1",
-      "vercel"
+      "vercel",
+      emailConfig,
+      "starter"
     );
 
-    updateFeatureMetadata(metadata, "configSet", {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "wraps-tracking",
+    const oldTimestamp = metadata.timestamp;
+
+    // Wait a tiny bit to ensure timestamp changes
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(100);
+
+    updateEmailConfig(metadata, {
+      dedicatedIp: true,
     });
 
-    updateFeatureMetadata(metadata, "emailHistory", {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "wraps-email-history",
-    });
+    vi.useRealTimers();
 
-    expect(Object.keys(metadata.features)).toHaveLength(2);
-    expect(metadata.features.configSet?.currentValue).toBe("wraps-tracking");
-    expect(metadata.features.emailHistory?.currentValue).toBe(
-      "wraps-email-history"
-    );
-  });
-});
-
-describe("updateIdentityMetadata", () => {
-  it("should add identity to metadata", () => {
-    const metadata = createConnectionMetadata(
-      "123456789012",
-      "us-east-1",
-      "vercel"
-    );
-    const identity: IdentityConfig = {
-      name: "example.com",
-      type: "Domain",
-      originalConfigSet: null,
-      currentConfigSet: "wraps-tracking",
-      action: "attached",
-    };
-
-    updateIdentityMetadata(metadata, identity);
-
-    expect(metadata.identities).toHaveLength(1);
-    expect(metadata.identities[0]).toEqual(identity);
-  });
-
-  it("should replace existing identity with same name", () => {
-    const metadata = createConnectionMetadata(
-      "123456789012",
-      "us-east-1",
-      "vercel"
-    );
-
-    updateIdentityMetadata(metadata, {
-      name: "example.com",
-      type: "Domain",
-      originalConfigSet: null,
-      currentConfigSet: "old-config",
-      action: "attached",
-    });
-
-    updateIdentityMetadata(metadata, {
-      name: "example.com",
-      type: "Domain",
-      originalConfigSet: "old-config",
-      currentConfigSet: "new-config",
-      action: "replaced",
-    });
-
-    expect(metadata.identities).toHaveLength(1);
-    expect(metadata.identities[0].currentConfigSet).toBe("new-config");
-    expect(metadata.identities[0].action).toBe("replaced");
-  });
-
-  it("should handle multiple different identities", () => {
-    const metadata = createConnectionMetadata(
-      "123456789012",
-      "us-east-1",
-      "vercel"
-    );
-
-    updateIdentityMetadata(metadata, {
-      name: "example.com",
-      type: "Domain",
-      action: "attached",
-    });
-
-    updateIdentityMetadata(metadata, {
-      name: "test@example.com",
-      type: "EmailAddress",
-      action: "attached",
-    });
-
-    expect(metadata.identities).toHaveLength(2);
-  });
-});
-
-describe("getReplacedFeatures", () => {
-  it("should return empty array when no features are replaced", () => {
-    const metadata = createConnectionMetadata(
-      "123456789012",
-      "us-east-1",
-      "vercel"
-    );
-
-    updateFeatureMetadata(metadata, "configSet", {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "wraps-tracking",
-    });
-
-    const replaced = getReplacedFeatures(metadata);
-    expect(replaced).toEqual([]);
-  });
-
-  it("should return replaced features", () => {
-    const metadata = createConnectionMetadata(
-      "123456789012",
-      "us-east-1",
-      "vercel"
-    );
-
-    updateFeatureMetadata(metadata, "configSet", {
-      enabled: true,
-      action: "replace",
-      originalValue: "old-tracking",
-      currentValue: "wraps-tracking",
-    });
-
-    const replaced = getReplacedFeatures(metadata);
-
-    expect(replaced).toHaveLength(1);
-    expect(replaced[0].name).toBe("configSet");
-    expect(replaced[0].config.originalValue).toBe("old-tracking");
-  });
-
-  it("should only return features with replace action and original value", () => {
-    const metadata = createConnectionMetadata(
-      "123456789012",
-      "us-east-1",
-      "vercel"
-    );
-
-    updateFeatureMetadata(metadata, "configSet", {
-      enabled: true,
-      action: "replace",
-      originalValue: "old-value",
-      currentValue: "new-value",
-    });
-
-    updateFeatureMetadata(metadata, "bounceHandling", {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "wraps-bounce",
-    });
-
-    updateFeatureMetadata(metadata, "emailHistory", {
-      enabled: true,
-      action: "skip",
-      originalValue: "existing",
-      currentValue: "existing",
-    });
-
-    const replaced = getReplacedFeatures(metadata);
-
-    expect(replaced).toHaveLength(1);
-    expect(replaced[0].name).toBe("configSet");
-  });
-});
-
-describe("getModifiedIdentities", () => {
-  it("should return empty array when no identities are modified", () => {
-    const metadata = createConnectionMetadata(
-      "123456789012",
-      "us-east-1",
-      "vercel"
-    );
-
-    updateIdentityMetadata(metadata, {
-      name: "example.com",
-      type: "Domain",
-      action: "no-change",
-    });
-
-    const modified = getModifiedIdentities(metadata);
-    expect(modified).toEqual([]);
-  });
-
-  it("should return attached identities", () => {
-    const metadata = createConnectionMetadata(
-      "123456789012",
-      "us-east-1",
-      "vercel"
-    );
-
-    updateIdentityMetadata(metadata, {
-      name: "example.com",
-      type: "Domain",
-      action: "attached",
-    });
-
-    const modified = getModifiedIdentities(metadata);
-
-    expect(modified).toHaveLength(1);
-    expect(modified[0].name).toBe("example.com");
-    expect(modified[0].action).toBe("attached");
-  });
-
-  it("should return replaced identities", () => {
-    const metadata = createConnectionMetadata(
-      "123456789012",
-      "us-east-1",
-      "vercel"
-    );
-
-    updateIdentityMetadata(metadata, {
-      name: "example.com",
-      type: "Domain",
-      action: "replaced",
-      originalConfigSet: "old-config",
-      currentConfigSet: "wraps-tracking",
-    });
-
-    const modified = getModifiedIdentities(metadata);
-
-    expect(modified).toHaveLength(1);
-    expect(modified[0].action).toBe("replaced");
-  });
-
-  it("should return both attached and replaced identities", () => {
-    const metadata = createConnectionMetadata(
-      "123456789012",
-      "us-east-1",
-      "vercel"
-    );
-
-    updateIdentityMetadata(metadata, {
-      name: "attached.com",
-      type: "Domain",
-      action: "attached",
-    });
-
-    updateIdentityMetadata(metadata, {
-      name: "replaced.com",
-      type: "Domain",
-      action: "replaced",
-    });
-
-    updateIdentityMetadata(metadata, {
-      name: "unchanged.com",
-      type: "Domain",
-      action: "no-change",
-    });
-
-    const modified = getModifiedIdentities(metadata);
-
-    expect(modified).toHaveLength(2);
-    expect(modified.map((i) => i.name).sort()).toEqual([
-      "attached.com",
-      "replaced.com",
-    ]);
+    expect(metadata.timestamp).not.toBe(oldTimestamp);
+    expect(metadata.emailConfig.dedicatedIp).toBe(true);
   });
 });
 
 describe("saveConnectionMetadata", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(writeFile).mockResolvedValue(undefined);
   });
 
   it("should save metadata to correct file path", async () => {
+    const emailConfig = getPreset("starter")!;
     const metadata = createConnectionMetadata(
       "123456789012",
       "us-east-1",
-      "vercel"
+      "vercel",
+      emailConfig,
+      "starter"
     );
 
     await saveConnectionMetadata(metadata);
@@ -412,10 +206,13 @@ describe("saveConnectionMetadata", () => {
   });
 
   it("should serialize metadata as formatted JSON", async () => {
+    const emailConfig = getPreset("production")!;
     const metadata = createConnectionMetadata(
       "123456789012",
       "us-east-1",
-      "vercel"
+      "vercel",
+      emailConfig,
+      "production"
     );
     metadata.vercel = { teamSlug: "my-team", projectName: "my-project" };
 
@@ -426,6 +223,8 @@ describe("saveConnectionMetadata", () => {
 
     expect(parsed.accountId).toBe("123456789012");
     expect(parsed.provider).toBe("vercel");
+    expect(parsed.preset).toBe("production");
+    expect(parsed.emailConfig).toEqual(emailConfig);
     expect(savedContent).toContain("\n"); // Check it's formatted
   });
 });
@@ -440,10 +239,13 @@ describe("loadConnectionMetadata", () => {
   });
 
   it("should load and parse metadata from file", async () => {
+    const emailConfig = getPreset("starter")!;
     const metadata = createConnectionMetadata(
       "123456789012",
       "us-east-1",
-      "vercel"
+      "vercel",
+      emailConfig,
+      "starter"
     );
     const content = JSON.stringify(metadata);
 
@@ -493,7 +295,6 @@ describe("deleteConnectionMetadata", () => {
     await expect(
       deleteConnectionMetadata("123456789012", "us-east-1")
     ).resolves.toBeUndefined();
-    // Note: Implementation may still call unlink which handles non-existent files gracefully
   });
 });
 
@@ -513,15 +314,21 @@ describe("listConnections", () => {
       "999888777666-eu-west-1.json",
     ] as any);
 
+    const emailConfig1 = getPreset("starter")!;
+    const emailConfig2 = getPreset("production")!;
     const metadata1 = createConnectionMetadata(
       "123456789012",
       "us-east-1",
-      "vercel"
+      "vercel",
+      emailConfig1,
+      "starter"
     );
     const metadata2 = createConnectionMetadata(
       "999888777666",
       "eu-west-1",
-      "aws"
+      "aws",
+      emailConfig2,
+      "production"
     );
 
     vi.mocked(readFile)
@@ -533,6 +340,8 @@ describe("listConnections", () => {
     expect(connections).toHaveLength(2);
     expect(connections[0].accountId).toBe("123456789012");
     expect(connections[1].accountId).toBe("999888777666");
+    expect(connections[0].preset).toBe("starter");
+    expect(connections[1].preset).toBe("production");
   });
 
   it("should skip non-json files", async () => {
@@ -543,27 +352,32 @@ describe("listConnections", () => {
       "config.yaml",
     ] as any);
 
+    const emailConfig = getPreset("starter")!;
     const metadata = createConnectionMetadata(
       "123456789012",
       "us-east-1",
-      "vercel"
+      "vercel",
+      emailConfig,
+      "starter"
     );
     vi.mocked(readFile).mockResolvedValue(JSON.stringify(metadata));
 
     const connections = await listConnections();
 
     expect(connections).toHaveLength(1);
-    // readFile might be called more times due to mocking behavior, just check we got right number of connections
   });
 
   it("should handle parse errors gracefully", async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdir).mockResolvedValue(["valid.json", "invalid.json"] as any);
 
+    const emailConfig = getPreset("starter")!;
     const validMetadata = createConnectionMetadata(
       "123456789012",
       "us-east-1",
-      "vercel"
+      "vercel",
+      emailConfig,
+      "starter"
     );
     vi.mocked(readFile)
       .mockResolvedValueOnce(JSON.stringify(validMetadata))

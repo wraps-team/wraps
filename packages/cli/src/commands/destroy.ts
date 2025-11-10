@@ -4,6 +4,7 @@ import pc from "picocolors";
 import type { DestroyOptions } from "../types/index.js";
 import { getAWSRegion, validateAWSCredentials } from "../utils/aws.js";
 import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/fs.js";
+import { deleteConnectionMetadata } from "../utils/metadata.js";
 import { DeploymentProgress } from "../utils/output.js";
 
 /**
@@ -70,13 +71,18 @@ export async function destroy(options: DestroyOptions): Promise<void> {
     progress.stop();
     if (error.message.includes("No Wraps infrastructure found")) {
       clack.log.warn("No Wraps infrastructure found");
+      // Still delete metadata if it exists
+      await deleteConnectionMetadata(identity.accountId, region);
       process.exit(0);
     }
     clack.log.error("Infrastructure destruction failed");
     throw error;
   }
 
-  // 5. Display success message
+  // 5. Delete connection metadata
+  await deleteConnectionMetadata(identity.accountId, region);
+
+  // 6. Display success message
   progress.stop();
   clack.outro(pc.green("All Wraps infrastructure has been removed"));
   console.log(

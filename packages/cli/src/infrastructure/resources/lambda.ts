@@ -7,8 +7,24 @@ import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
 import { build } from "esbuild";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+/**
+ * Get the package root directory (where package.json lives)
+ * Works both in development (src/) and production (dist/)
+ */
+function getPackageRoot(): string {
+  const currentFile = fileURLToPath(import.meta.url);
+  let dir = dirname(currentFile);
+
+  // Walk up the directory tree until we find package.json
+  while (dir !== dirname(dir)) {
+    if (existsSync(join(dir, "package.json"))) {
+      return dir;
+    }
+    dir = dirname(dir);
+  }
+
+  throw new Error("Could not find package.json");
+}
 
 /**
  * Lambda configuration
@@ -66,10 +82,10 @@ async function bundleLambda(functionPath: string): Promise<string> {
 export async function deployLambdaFunctions(
   config: LambdaConfig
 ): Promise<LambdaFunctions> {
-  // Get Lambda source directory (relative to this file's location)
-  // This file is in packages/cli/src/infrastructure/resources/lambda.ts
-  // Lambda sources are in packages/cli/lambda/
-  const lambdaDir = join(__dirname, "..", "..", "..", "lambda");
+  // Get Lambda source directory relative to package root
+  // This works both in dev (packages/cli/src/) and production (packages/cli/dist/)
+  const packageRoot = getPackageRoot();
+  const lambdaDir = join(packageRoot, "lambda");
 
   // Bundle event-processor
   const eventProcessorPath = join(lambdaDir, "event-processor", "index.ts");

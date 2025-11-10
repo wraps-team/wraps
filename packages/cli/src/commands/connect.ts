@@ -7,17 +7,14 @@ import { getAWSRegion, validateAWSCredentials } from "../utils/aws.js";
 import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/fs.js";
 import {
   createConnectionMetadata,
-  type FeatureConfig,
   loadConnectionMetadata,
   saveConnectionMetadata,
-  updateFeatureMetadata,
-  updateIdentityMetadata,
 } from "../utils/metadata.js";
 import { DeploymentProgress, displaySuccess } from "../utils/output.js";
+import { getPreset } from "../utils/presets.js";
 import {
   confirmConnect,
-  promptConflictResolution,
-  promptFeatureSelection,
+  promptConfigPreset,
   promptProvider,
   promptRegion,
   promptSelectIdentities,
@@ -82,7 +79,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
 
   // Display what we found
   progress.info(
-    `Found: ${scan.identities.length} identities, ${scan.configurationSets.length} config sets, ${scan.snsTopics.length} SNS topics`
+    `Found: ${scan.identities.length} identities, ${scan.configurationSets.length} config sets`
   );
 
   // Check if any identities exist
@@ -127,196 +124,14 @@ export async function connect(options: ConnectOptions): Promise<void> {
     process.exit(0);
   }
 
-  // 8. Feature selection
-  const selectedFeatures = await promptFeatureSelection();
+  // 8. Select configuration preset
+  const preset = await promptConfigPreset();
+  const emailConfig =
+    preset === "custom"
+      ? await import("../utils/prompts.js").then((m) => m.promptCustomConfig())
+      : getPreset(preset)!;
 
-  // 9. Conflict detection and resolution
-  const metadata = createConnectionMetadata(
-    identity.accountId,
-    region,
-    provider
-  );
-  const featureConfigs: Record<string, FeatureConfig> = {};
-
-  // Check for configuration set conflict
-  if (selectedFeatures.includes("configSet")) {
-    const existingConfigSets = scan.configurationSets.filter(
-      (cs) => !cs.name.startsWith("wraps-")
-    );
-
-    if (existingConfigSets.length > 0) {
-      // Found existing non-Wraps config sets
-      const action = await promptConflictResolution(
-        "configuration set",
-        existingConfigSets[0].name
-      );
-
-      featureConfigs.configSet = {
-        enabled: action !== "skip",
-        action:
-          action === "replace"
-            ? "replace"
-            : action === "skip"
-              ? "skip"
-              : "deploy-new",
-        originalValue: action === "replace" ? existingConfigSets[0].name : null,
-        currentValue: "wraps-tracking",
-      };
-    } else {
-      // No conflict, deploy new
-      featureConfigs.configSet = {
-        enabled: true,
-        action: "deploy-new",
-        originalValue: null,
-        currentValue: "wraps-tracking",
-      };
-    }
-
-    updateFeatureMetadata(metadata, "configSet", featureConfigs.configSet);
-  }
-
-  // Check for SNS topic conflicts (bounce handling)
-  if (selectedFeatures.includes("bounceHandling")) {
-    const existingSNS = scan.snsTopics.filter(
-      (t) =>
-        !t.name.startsWith("wraps-") && t.name.toLowerCase().includes("bounce")
-    );
-
-    if (existingSNS.length > 0) {
-      const action = await promptConflictResolution(
-        "SNS topic (bounces)",
-        existingSNS[0].name
-      );
-
-      featureConfigs.bounceHandling = {
-        enabled: action !== "skip",
-        action:
-          action === "replace"
-            ? "replace"
-            : action === "skip"
-              ? "skip"
-              : "deploy-new",
-        originalValue: action === "replace" ? existingSNS[0].arn : null,
-        currentValue: "wraps-bounce-complaints",
-      };
-    } else {
-      featureConfigs.bounceHandling = {
-        enabled: true,
-        action: "deploy-new",
-        originalValue: null,
-        currentValue: "wraps-bounce-complaints",
-      };
-    }
-
-    updateFeatureMetadata(
-      metadata,
-      "bounceHandling",
-      featureConfigs.bounceHandling
-    );
-  }
-
-  // Complaint handling uses same SNS topic
-  if (selectedFeatures.includes("complaintHandling")) {
-    featureConfigs.complaintHandling = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "wraps-bounce-complaints",
-    };
-    updateFeatureMetadata(
-      metadata,
-      "complaintHandling",
-      featureConfigs.complaintHandling
-    );
-  }
-
-  // Email history
-  if (selectedFeatures.includes("emailHistory")) {
-    const existingTables = scan.dynamoTables.filter(
-      (t) =>
-        !t.name.startsWith("wraps-") && t.name.toLowerCase().includes("email")
-    );
-
-    if (existingTables.length > 0) {
-      const action = await promptConflictResolution(
-        "DynamoDB table (email history)",
-        existingTables[0].name
-      );
-
-      featureConfigs.emailHistory = {
-        enabled: action !== "skip",
-        action:
-          action === "replace"
-            ? "replace"
-            : action === "skip"
-              ? "skip"
-              : "deploy-new",
-        originalValue: action === "replace" ? existingTables[0].name : null,
-        currentValue: "wraps-email-history",
-      };
-    } else {
-      featureConfigs.emailHistory = {
-        enabled: true,
-        action: "deploy-new",
-        originalValue: null,
-        currentValue: "wraps-email-history",
-      };
-    }
-
-    updateFeatureMetadata(
-      metadata,
-      "emailHistory",
-      featureConfigs.emailHistory
-    );
-  }
-
-  // Event processor
-  if (selectedFeatures.includes("eventProcessor")) {
-    featureConfigs.eventProcessor = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "wraps-event-processor",
-    };
-    updateFeatureMetadata(
-      metadata,
-      "eventProcessor",
-      featureConfigs.eventProcessor
-    );
-  }
-
-  // Dashboard access (always deploy-new, no conflicts)
-  if (selectedFeatures.includes("dashboardAccess")) {
-    featureConfigs.dashboardAccess = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "wraps-email-role",
-    };
-    updateFeatureMetadata(
-      metadata,
-      "dashboardAccess",
-      featureConfigs.dashboardAccess
-    );
-  }
-
-  // 10. Store identity configurations in metadata
-  for (const identityName of selectedIdentities) {
-    const identity = scan.identities.find((id) => id.name === identityName);
-    if (identity) {
-      updateIdentityMetadata(metadata, {
-        name: identity.name,
-        type: identity.type,
-        originalConfigSet: identity.configurationSet || null,
-        currentConfigSet: featureConfigs.configSet?.enabled
-          ? "wraps-tracking"
-          : null,
-        action: identity.configurationSet ? "replaced" : "attached",
-      });
-    }
-  }
-
-  // 11. Confirm deployment
+  // 9. Confirm deployment
   if (!options.yes) {
     const confirmed = await confirmConnect();
     if (!confirmed) {
@@ -325,42 +140,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
     }
   }
 
-  // 12. Build email configuration from selected features
-  const emailConfig = {
-    tracking: {
-      enabled: selectedFeatures.includes("configSet"),
-      opens: true,
-      clicks: true,
-    },
-    tlsRequired: true,
-    reputationMetrics: selectedFeatures.includes("configSet"),
-    suppressionList: {
-      enabled:
-        selectedFeatures.includes("bounceHandling") ||
-        selectedFeatures.includes("complaintHandling"),
-      reasons: ["BOUNCE" as const, "COMPLAINT" as const],
-    },
-    eventTracking: {
-      enabled:
-        selectedFeatures.includes("emailHistory") ||
-        selectedFeatures.includes("eventProcessor"),
-      eventBridge: selectedFeatures.includes("eventProcessor"),
-      events: [
-        "SEND" as const,
-        "DELIVERY" as const,
-        "OPEN" as const,
-        "CLICK" as const,
-        "BOUNCE" as const,
-        "COMPLAINT" as const,
-        "REJECT" as const,
-        "RENDERING_FAILURE" as const,
-      ],
-      dynamoDBHistory: selectedFeatures.includes("emailHistory"),
-      archiveRetention: "90days" as const,
-    },
-    sendingEnabled: true,
-  };
-
+  // 10. Build stack configuration
   const stackConfig: EmailStackConfig = {
     provider,
     region,
@@ -368,7 +148,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
     emailConfig,
   };
 
-  // 13. Deploy infrastructure using Pulumi
+  // 11. Deploy infrastructure using Pulumi
   let outputs;
   try {
     outputs = await progress.execute(
@@ -390,6 +170,9 @@ export async function connect(options: ConnectOptions): Promise<void> {
                   tableName: result.tableName,
                   region: result.region,
                   lambdaFunctions: result.lambdaFunctions,
+                  domain: result.domain,
+                  dkimTokens: result.dkimTokens,
+                  customTrackingDomain: result.customTrackingDomain,
                 };
               },
             },
@@ -420,6 +203,11 @@ export async function connect(options: ConnectOptions): Promise<void> {
           lambdaFunctions: pulumiOutputs.lambdaFunctions?.value as
             | string[]
             | undefined,
+          domain: pulumiOutputs.domain?.value as string | undefined,
+          dkimTokens: pulumiOutputs.dkimTokens?.value as string[] | undefined,
+          customTrackingDomain: pulumiOutputs.customTrackingDomain?.value as
+            | string
+            | undefined,
         };
       }
     );
@@ -437,50 +225,41 @@ export async function connect(options: ConnectOptions): Promise<void> {
     throw new Error(`Pulumi deployment failed: ${error.message}`);
   }
 
-  // 14. Save metadata for restore capability
+  // 12. Save metadata
+  const metadata = createConnectionMetadata(
+    identity.accountId,
+    region,
+    provider,
+    emailConfig,
+    preset === "custom" ? undefined : preset
+  );
   metadata.pulumiStackName = `wraps-${identity.accountId}-${region}`;
   if (vercelConfig) {
     metadata.vercel = vercelConfig;
   }
   await saveConnectionMetadata(metadata);
 
-  progress.info("Connection metadata saved for restore capability");
+  progress.info("Connection metadata saved");
 
-  // 15. Display success message
+  // 13. Display success message
   displaySuccess({
     roleArn: outputs.roleArn,
     configSetName: outputs.configSetName,
     region: outputs.region!,
     tableName: outputs.tableName,
+    customTrackingDomain: outputs.customTrackingDomain,
   });
 
-  // Show next steps for replaced resources
-  const replacedFeatures = Object.entries(featureConfigs).filter(
-    ([_, config]) => config.action === "replace"
-  );
-
-  if (replacedFeatures.length > 0) {
-    console.log(`\n${pc.yellow("⚠ Resources were replaced:")}\n`);
-    for (const [_feature, config] of replacedFeatures) {
-      console.log(
-        `  ${pc.cyan(config.originalValue!)} → ${pc.green(config.currentValue!)}`
-      );
-    }
-    console.log(
-      `\n${pc.dim("To restore original resources: ")}${pc.cyan("wraps restore")}\n`
-    );
-  }
-
-  // Show identities that need manual configuration
-  if (selectedIdentities.length > 0 && featureConfigs.configSet?.enabled) {
+  // Show next steps
+  if (selectedIdentities.length > 0 && emailConfig.tracking?.enabled) {
     console.log(`\n${pc.bold("Next Steps:")}\n`);
     console.log(
-      `Update your code to use configuration set: ${pc.cyan("wraps-tracking")}`
+      `Update your code to use configuration set: ${pc.cyan("wraps-email-tracking")}`
     );
     console.log(`\n${pc.dim("Example:")}`);
     console.log(
       pc.gray(`  await ses.sendEmail({
-    ConfigurationSetName: 'wraps-tracking',
+    ConfigurationSetName: 'wraps-email-tracking',
     // ... other parameters
   });`)
     );

@@ -2,29 +2,29 @@ import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import pc from "picocolors";
 import { deployEmailStack } from "../infrastructure/email-stack.js";
-import type { EmailStackConfig, UpgradeOptions } from "../types/index.js";
+import type {
+  EmailStackConfig,
+  UpgradeOptions,
+  WrapsEmailConfig,
+} from "../types/index.js";
 import { getAWSRegion, validateAWSCredentials } from "../utils/aws.js";
+import { getCostSummary } from "../utils/costs.js";
 import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/fs.js";
 import {
-  type FeatureConfig,
   loadConnectionMetadata,
   saveConnectionMetadata,
-  updateFeatureMetadata,
+  updateEmailConfig,
 } from "../utils/metadata.js";
 import { DeploymentProgress, displaySuccess } from "../utils/output.js";
-import {
-  getAvailableFeatures,
-  promptConflictResolution,
-  promptVercelConfig,
-} from "../utils/prompts.js";
+import { getAllPresetInfo, getPreset } from "../utils/presets.js";
+import { promptVercelConfig } from "../utils/prompts.js";
 import { ensurePulumiInstalled } from "../utils/pulumi.js";
-import { scanAWSResources } from "../utils/scanner.js";
 
 /**
- * Upgrade command - Add features to existing Wraps connection
+ * Upgrade command - Enhance existing Wraps infrastructure
  */
 export async function upgrade(options: UpgradeOptions): Promise<void> {
-  clack.intro(pc.bold("Wraps Upgrade - Add Features to Existing Connection"));
+  clack.intro(pc.bold("Wraps Upgrade - Enhance Your Email Infrastructure"));
 
   const progress = new DeploymentProgress();
 
@@ -68,248 +68,317 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
   progress.info(`Found existing connection created: ${metadata.timestamp}`);
 
-  // 5. Determine currently enabled features
-  const enabledFeatures: string[] = [];
-  const featureMap = metadata.features;
+  // 5. Display current configuration
+  console.log(`\n${pc.bold("Current Configuration:")}\n`);
 
-  if (featureMap.configSet?.enabled) {
-    enabledFeatures.push("configSet");
-  }
-  if (featureMap.bounceHandling?.enabled) {
-    enabledFeatures.push("bounceHandling");
-  }
-  if (featureMap.complaintHandling?.enabled) {
-    enabledFeatures.push("complaintHandling");
-  }
-  if (featureMap.emailHistory?.enabled) {
-    enabledFeatures.push("emailHistory");
-  }
-  if (featureMap.eventProcessor?.enabled) {
-    enabledFeatures.push("eventProcessor");
-  }
-  if (featureMap.dashboardAccess?.enabled) {
-    enabledFeatures.push("dashboardAccess");
+  if (metadata.preset) {
+    console.log(`  Preset: ${pc.cyan(metadata.preset)}`);
+  } else {
+    console.log(`  Preset: ${pc.cyan("custom")}`);
   }
 
-  if (enabledFeatures.length > 0) {
-    console.log(`\n${pc.bold("Currently enabled features:")}`);
-    const allFeatures = getAvailableFeatures();
-    for (const feature of enabledFeatures) {
-      const featureDef = allFeatures.find((f) => f.value === feature);
-      if (featureDef) {
-        console.log(`  ${pc.green("✓")} ${featureDef.label}`);
-      }
+  const config = metadata.emailConfig;
+
+  if (config.tracking?.enabled) {
+    console.log(`  ${pc.green("✓")} Open & Click Tracking`);
+    if (config.tracking.customRedirectDomain) {
+      console.log(
+        `    ${pc.dim("└─")} Custom domain: ${pc.cyan(config.tracking.customRedirectDomain)}`
+      );
     }
-    console.log("");
   }
 
-  // 6. Get available features to add
-  const availableFeatures = getAvailableFeatures().filter(
-    (f) => !enabledFeatures.includes(f.value)
+  if (config.suppressionList?.enabled) {
+    console.log(`  ${pc.green("✓")} Bounce/Complaint Suppression`);
+  }
+
+  if (config.eventTracking?.enabled) {
+    console.log(`  ${pc.green("✓")} Event Tracking (EventBridge)`);
+    if (config.eventTracking.dynamoDBHistory) {
+      console.log(
+        `    ${pc.dim("└─")} Email History: ${pc.cyan(config.eventTracking.archiveRetention || "90days")}`
+      );
+    }
+  }
+
+  if (config.dedicatedIp) {
+    console.log(`  ${pc.green("✓")} Dedicated IP Address`);
+  }
+
+  // Calculate current cost
+  const currentCost = getCostSummary(config, 50_000); // Assume 50k emails/mo for estimate
+  console.log(
+    `\n  Estimated Cost: ${pc.cyan(`~$${currentCost.monthly.toFixed(2)}/mo`)}`
   );
 
-  if (availableFeatures.length === 0) {
-    clack.log.info("All features are already enabled. Nothing to upgrade.");
-    process.exit(0);
-  }
-
-  console.log(`${pc.bold("Available features to add:")}`);
-  for (const feature of availableFeatures) {
-    console.log(`  ${pc.dim("○")} ${feature.label} - ${pc.dim(feature.hint)}`);
-  }
   console.log("");
 
-  // 7. Prompt for additional features
-  const additionalFeatures = await clack.multiselect({
-    message: "Select features to add:",
-    options: availableFeatures,
-    required: true,
+  // 6. Prompt for upgrade action
+  const upgradeAction = await clack.select({
+    message: "What would you like to do?",
+    options: [
+      {
+        value: "preset",
+        label: "Upgrade to a different preset",
+        hint: "Starter → Production → Enterprise",
+      },
+      {
+        value: "tracking-domain",
+        label: "Add/change custom tracking domain",
+        hint: "Use your own domain for email links",
+      },
+      {
+        value: "retention",
+        label: "Change email history retention",
+        hint: "7 days, 30 days, 90 days, 1 year, indefinite",
+      },
+      {
+        value: "events",
+        label: "Customize tracked event types",
+        hint: "Choose which SES events to track",
+      },
+      {
+        value: "dedicated-ip",
+        label: "Enable dedicated IP address",
+        hint: "Requires 100k+ emails/day ($50-100/mo)",
+      },
+      {
+        value: "custom",
+        label: "Custom configuration",
+        hint: "Modify multiple settings at once",
+      },
+    ],
   });
 
-  if (clack.isCancel(additionalFeatures)) {
+  if (clack.isCancel(upgradeAction)) {
     clack.cancel("Upgrade cancelled.");
     process.exit(0);
   }
 
-  const selectedFeatures = additionalFeatures as string[];
+  let updatedConfig: WrapsEmailConfig = { ...config };
+  let newPreset: string | undefined = metadata.preset;
 
-  if (selectedFeatures.length === 0) {
-    clack.log.info("No features selected. Nothing to upgrade.");
-    process.exit(0);
-  }
-
-  // 8. Scan existing AWS resources for conflict detection
-  const scan = await progress.execute(
-    "Scanning existing AWS resources",
-    async () => scanAWSResources(region)
-  );
-
-  // 9. Conflict detection for new features
-  const featureConfigs: Record<string, FeatureConfig> = {
-    ...metadata.features,
-  };
-
-  // Check for configuration set conflict
-  if (selectedFeatures.includes("configSet")) {
-    const existingConfigSets = scan.configurationSets.filter(
-      (cs) => !cs.name.startsWith("wraps-")
-    );
-
-    if (existingConfigSets.length > 0) {
-      const action = await promptConflictResolution(
-        "configuration set",
-        existingConfigSets[0].name
+  // 7. Handle upgrade action
+  switch (upgradeAction) {
+    case "preset": {
+      // Show available presets
+      const presets = getAllPresetInfo();
+      const currentPresetIdx = presets.findIndex(
+        (p) => p.name.toLowerCase() === metadata.preset
       );
 
-      featureConfigs.configSet = {
-        enabled: action !== "skip",
-        action:
-          action === "replace"
-            ? "replace"
-            : action === "skip"
-              ? "skip"
-              : "deploy-new",
-        originalValue: action === "replace" ? existingConfigSets[0].name : null,
-        currentValue: "wraps-tracking",
-      };
-    } else {
-      featureConfigs.configSet = {
-        enabled: true,
-        action: "deploy-new",
-        originalValue: null,
-        currentValue: "wraps-tracking",
-      };
+      const availablePresets = presets
+        .map((p, idx) => ({
+          value: p.name.toLowerCase(),
+          label: `${p.name} - ${p.description}`,
+          hint: `${p.volume} | Est. ${p.estimatedCost}/mo`,
+          disabled:
+            currentPresetIdx >= 0 && idx <= currentPresetIdx
+              ? "Current or lower tier"
+              : undefined,
+        }))
+        .filter((p) => !p.disabled);
+
+      if (availablePresets.length === 0) {
+        clack.log.warn("Already on highest preset (Enterprise)");
+        process.exit(0);
+      }
+
+      const selectedPreset = await clack.select({
+        message: "Select new preset:",
+        options: availablePresets,
+      });
+
+      if (clack.isCancel(selectedPreset)) {
+        clack.cancel("Upgrade cancelled.");
+        process.exit(0);
+      }
+
+      updatedConfig = getPreset(selectedPreset as any)!;
+      newPreset = selectedPreset as string;
+      break;
     }
 
-    updateFeatureMetadata(metadata, "configSet", featureConfigs.configSet);
-  }
+    case "tracking-domain": {
+      const trackingDomain = await clack.text({
+        message: "Custom tracking redirect domain:",
+        placeholder: "track.yourdomain.com",
+        initialValue: config.tracking?.customRedirectDomain || "",
+        validate: (value) => {
+          if (value && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(value)) {
+            return "Please enter a valid domain";
+          }
+        },
+      });
 
-  // Check for SNS topic conflicts (bounce handling)
-  if (selectedFeatures.includes("bounceHandling")) {
-    const existingSNS = scan.snsTopics.filter(
-      (t) =>
-        !t.name.startsWith("wraps-") && t.name.toLowerCase().includes("bounce")
-    );
+      if (clack.isCancel(trackingDomain)) {
+        clack.cancel("Upgrade cancelled.");
+        process.exit(0);
+      }
 
-    if (existingSNS.length > 0) {
-      const action = await promptConflictResolution(
-        "SNS topic (bounces)",
-        existingSNS[0].name
-      );
-
-      featureConfigs.bounceHandling = {
-        enabled: action !== "skip",
-        action:
-          action === "replace"
-            ? "replace"
-            : action === "skip"
-              ? "skip"
-              : "deploy-new",
-        originalValue: action === "replace" ? existingSNS[0].arn : null,
-        currentValue: "wraps-bounce-complaints",
+      updatedConfig = {
+        ...config,
+        tracking: {
+          ...config.tracking,
+          enabled: true,
+          customRedirectDomain: trackingDomain || undefined,
+        },
       };
-    } else {
-      featureConfigs.bounceHandling = {
-        enabled: true,
-        action: "deploy-new",
-        originalValue: null,
-        currentValue: "wraps-bounce-complaints",
-      };
+      newPreset = undefined; // Custom config
+      break;
     }
 
-    updateFeatureMetadata(
-      metadata,
-      "bounceHandling",
-      featureConfigs.bounceHandling
-    );
-  }
+    case "retention": {
+      const retention = await clack.select({
+        message: "Email history retention period:",
+        options: [
+          { value: "7days", label: "7 days", hint: "Minimal storage cost" },
+          { value: "30days", label: "30 days", hint: "Development/testing" },
+          {
+            value: "90days",
+            label: "90 days (recommended)",
+            hint: "Standard retention",
+          },
+          { value: "1year", label: "1 year", hint: "Compliance requirements" },
+          {
+            value: "indefinite",
+            label: "Indefinite",
+            hint: "Higher storage cost",
+          },
+        ],
+        initialValue: config.eventTracking?.archiveRetention || "90days",
+      });
 
-  // Complaint handling
-  if (selectedFeatures.includes("complaintHandling")) {
-    featureConfigs.complaintHandling = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "wraps-bounce-complaints",
-    };
-    updateFeatureMetadata(
-      metadata,
-      "complaintHandling",
-      featureConfigs.complaintHandling
-    );
-  }
+      if (clack.isCancel(retention)) {
+        clack.cancel("Upgrade cancelled.");
+        process.exit(0);
+      }
 
-  // Email history
-  if (selectedFeatures.includes("emailHistory")) {
-    const existingTables = scan.dynamoTables.filter(
-      (t) =>
-        !t.name.startsWith("wraps-") && t.name.toLowerCase().includes("email")
-    );
-
-    if (existingTables.length > 0) {
-      const action = await promptConflictResolution(
-        "DynamoDB table (email history)",
-        existingTables[0].name
-      );
-
-      featureConfigs.emailHistory = {
-        enabled: action !== "skip",
-        action:
-          action === "replace"
-            ? "replace"
-            : action === "skip"
-              ? "skip"
-              : "deploy-new",
-        originalValue: action === "replace" ? existingTables[0].name : null,
-        currentValue: "wraps-email-history",
+      updatedConfig = {
+        ...config,
+        eventTracking: {
+          ...config.eventTracking,
+          enabled: true,
+          dynamoDBHistory: true,
+          archiveRetention: retention as any,
+        },
       };
-    } else {
-      featureConfigs.emailHistory = {
-        enabled: true,
-        action: "deploy-new",
-        originalValue: null,
-        currentValue: "wraps-email-history",
-      };
+      newPreset = undefined; // Custom config
+      break;
     }
 
-    updateFeatureMetadata(
-      metadata,
-      "emailHistory",
-      featureConfigs.emailHistory
-    );
+    case "events": {
+      const selectedEvents = await clack.multiselect({
+        message: "Select SES event types to track:",
+        options: [
+          { value: "SEND", label: "Send", hint: "Email sent to SES" },
+          {
+            value: "DELIVERY",
+            label: "Delivery",
+            hint: "Email delivered successfully",
+          },
+          { value: "OPEN", label: "Open", hint: "Recipient opened email" },
+          { value: "CLICK", label: "Click", hint: "Recipient clicked link" },
+          { value: "BOUNCE", label: "Bounce", hint: "Email bounced" },
+          {
+            value: "COMPLAINT",
+            label: "Complaint",
+            hint: "Spam complaint received",
+          },
+          { value: "REJECT", label: "Reject", hint: "Email rejected by SES" },
+          {
+            value: "RENDERING_FAILURE",
+            label: "Rendering Failure",
+            hint: "Template rendering failed",
+          },
+          {
+            value: "DELIVERY_DELAY",
+            label: "Delivery Delay",
+            hint: "Temporary delivery delay",
+          },
+          {
+            value: "SUBSCRIPTION",
+            label: "Subscription",
+            hint: "List subscription event",
+          },
+        ],
+        initialValues: config.eventTracking?.events || [
+          "SEND",
+          "DELIVERY",
+          "OPEN",
+          "CLICK",
+          "BOUNCE",
+          "COMPLAINT",
+        ],
+        required: true,
+      });
+
+      if (clack.isCancel(selectedEvents)) {
+        clack.cancel("Upgrade cancelled.");
+        process.exit(0);
+      }
+
+      updatedConfig = {
+        ...config,
+        eventTracking: {
+          ...config.eventTracking,
+          enabled: true,
+          events: selectedEvents as any,
+        },
+      };
+      newPreset = undefined; // Custom config
+      break;
+    }
+
+    case "dedicated-ip": {
+      const confirmed = await clack.confirm({
+        message:
+          "Enable dedicated IP? (Requires 100k+ emails/day, adds ~$50-100/mo)",
+        initialValue: false,
+      });
+
+      if (clack.isCancel(confirmed)) {
+        clack.cancel("Upgrade cancelled.");
+        process.exit(0);
+      }
+
+      if (!confirmed) {
+        clack.log.info("Dedicated IP not enabled.");
+        process.exit(0);
+      }
+
+      updatedConfig = {
+        ...config,
+        dedicatedIp: true,
+      };
+      newPreset = undefined; // Custom config
+      break;
+    }
+
+    case "custom": {
+      // Full custom configuration
+      const { promptCustomConfig } = await import("../utils/prompts.js");
+      updatedConfig = await promptCustomConfig();
+      newPreset = undefined;
+      break;
+    }
   }
 
-  // Event processor
-  if (selectedFeatures.includes("eventProcessor")) {
-    featureConfigs.eventProcessor = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "wraps-event-processor",
-    };
-    updateFeatureMetadata(
-      metadata,
-      "eventProcessor",
-      featureConfigs.eventProcessor
-    );
-  }
+  // 8. Show cost comparison
+  const newCost = getCostSummary(updatedConfig, 50_000);
+  const costDiff = newCost.monthly - currentCost.monthly;
 
-  // Dashboard access
-  if (selectedFeatures.includes("dashboardAccess")) {
-    featureConfigs.dashboardAccess = {
-      enabled: true,
-      action: "deploy-new",
-      originalValue: null,
-      currentValue: "wraps-email-role",
-    };
-    updateFeatureMetadata(
-      metadata,
-      "dashboardAccess",
-      featureConfigs.dashboardAccess
-    );
+  console.log(`\n${pc.bold("Cost Impact:")}`);
+  console.log(`  Current: ${pc.cyan(`$${currentCost.monthly.toFixed(2)}/mo`)}`);
+  console.log(`  New:     ${pc.cyan(`$${newCost.monthly.toFixed(2)}/mo`)}`);
+  if (costDiff > 0) {
+    console.log(`  Change:  ${pc.yellow(`+$${costDiff.toFixed(2)}/mo`)}`);
+  } else if (costDiff < 0) {
+    console.log(`  Change:  ${pc.green(`$${costDiff.toFixed(2)}/mo`)}`);
   }
+  console.log("");
 
-  // 10. Confirm upgrade
+  // 9. Confirm upgrade
   if (!options.yes) {
     const confirmed = await clack.confirm({
       message: "Proceed with upgrade?",
@@ -322,7 +391,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     }
   }
 
-  // 11. Get Vercel config if needed and not already stored
+  // 10. Get Vercel config if needed and not already stored
   let vercelConfig;
   if (metadata.provider === "vercel" && !metadata.vercel) {
     vercelConfig = await promptVercelConfig();
@@ -330,52 +399,15 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     vercelConfig = metadata.vercel;
   }
 
-  // 12. Build email configuration from all enabled features
-  const allEnabledFeatures = [...enabledFeatures, ...selectedFeatures];
-  const emailConfig = {
-    tracking: {
-      enabled: allEnabledFeatures.includes("configSet"),
-      opens: true,
-      clicks: true,
-    },
-    tlsRequired: true,
-    reputationMetrics: allEnabledFeatures.includes("configSet"),
-    suppressionList: {
-      enabled:
-        allEnabledFeatures.includes("bounceHandling") ||
-        allEnabledFeatures.includes("complaintHandling"),
-      reasons: ["BOUNCE" as const, "COMPLAINT" as const],
-    },
-    eventTracking: {
-      enabled:
-        allEnabledFeatures.includes("emailHistory") ||
-        allEnabledFeatures.includes("eventProcessor"),
-      eventBridge: allEnabledFeatures.includes("eventProcessor"),
-      events: [
-        "SEND" as const,
-        "DELIVERY" as const,
-        "OPEN" as const,
-        "CLICK" as const,
-        "BOUNCE" as const,
-        "COMPLAINT" as const,
-        "REJECT" as const,
-        "RENDERING_FAILURE" as const,
-      ],
-      dynamoDBHistory: allEnabledFeatures.includes("emailHistory"),
-      archiveRetention: "90days" as const,
-    },
-    sendingEnabled: true,
-  };
-
-  // 13. Build stack configuration
+  // 11. Build stack configuration
   const stackConfig: EmailStackConfig = {
-    provider: metadata.provider as any,
+    provider: metadata.provider,
     region,
     vercel: vercelConfig,
-    emailConfig,
+    emailConfig: updatedConfig,
   };
 
-  // 14. Update Pulumi stack (incremental update)
+  // 12. Update Pulumi stack (incremental update)
   let outputs;
   try {
     outputs = await progress.execute(
@@ -399,6 +431,9 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
                   tableName: result.tableName,
                   region: result.region,
                   lambdaFunctions: result.lambdaFunctions,
+                  domain: result.domain,
+                  dkimTokens: result.dkimTokens,
+                  customTrackingDomain: result.customTrackingDomain,
                 };
               },
             },
@@ -430,6 +465,11 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           lambdaFunctions: pulumiOutputs.lambdaFunctions?.value as
             | string[]
             | undefined,
+          domain: pulumiOutputs.domain?.value as string | undefined,
+          dkimTokens: pulumiOutputs.dkimTokens?.value as string[] | undefined,
+          customTrackingDomain: pulumiOutputs.customTrackingDomain?.value as
+            | string
+            | undefined,
         };
       }
     );
@@ -447,44 +487,32 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     throw new Error(`Pulumi upgrade failed: ${error.message}`);
   }
 
-  // 15. Update metadata with timestamp
-  metadata.timestamp = new Date().toISOString();
+  // 13. Update metadata
+  updateEmailConfig(metadata, updatedConfig);
+  metadata.preset = newPreset as any;
   await saveConnectionMetadata(metadata);
 
   progress.info("Connection metadata updated");
 
-  // 16. Display success message
+  // 14. Display success message
   displaySuccess({
     roleArn: outputs.roleArn,
     configSetName: outputs.configSetName,
     region: outputs.region!,
     tableName: outputs.tableName,
+    customTrackingDomain: outputs.customTrackingDomain,
   });
 
-  // Show what was added
+  // Show what was upgraded
   console.log(`\n${pc.green("✓")} ${pc.bold("Upgrade complete!")}\n`);
-  console.log(`${pc.bold("Added features:")}`);
-  const allFeatures = getAvailableFeatures();
-  for (const feature of selectedFeatures) {
-    const featureDef = allFeatures.find((f) => f.value === feature);
-    if (featureDef) {
-      console.log(`  ${pc.green("✓")} ${featureDef.label}`);
-    }
-  }
-  console.log("");
 
-  // Show next steps for replaced resources
-  const replacedFeatures = Object.entries(featureConfigs).filter(
-    ([_, config]) => config.action === "replace"
-  );
-
-  if (replacedFeatures.length > 0) {
-    console.log(`${pc.yellow("⚠ Resources were replaced:")}\n`);
-    for (const [_feature, config] of replacedFeatures) {
-      console.log(
-        `  ${pc.cyan(config.originalValue!)} → ${pc.green(config.currentValue!)}`
-      );
-    }
-    console.log(`\n${pc.dim("To restore: ")}${pc.cyan("wraps restore")}\n`);
+  if (upgradeAction === "preset" && newPreset) {
+    console.log(
+      `Upgraded to ${pc.cyan(newPreset)} preset (${pc.green(`$${newCost.monthly.toFixed(2)}/mo`)})\n`
+    );
+  } else {
+    console.log(
+      `Updated configuration (${pc.green(`$${newCost.monthly.toFixed(2)}/mo`)})\n`
+    );
   }
 }

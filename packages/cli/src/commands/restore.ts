@@ -5,8 +5,6 @@ import { getAWSRegion, validateAWSCredentials } from "../utils/aws.js";
 import { getPulumiWorkDir } from "../utils/fs.js";
 import {
   deleteConnectionMetadata,
-  getModifiedIdentities,
-  getReplacedFeatures,
   loadConnectionMetadata,
 } from "../utils/metadata.js";
 import { DeploymentProgress } from "../utils/output.js";
@@ -20,10 +18,21 @@ export type RestoreOptions = {
 };
 
 /**
- * Restore command - Revert changes and restore original resources
+ * Restore command - Remove Wraps infrastructure (alias for destroy)
+ *
+ * Note: This command removes all Wraps-managed resources.
+ * Since Wraps always creates NEW resources (wraps- prefix) and never modifies
+ * existing infrastructure, there's nothing to "restore" - only to remove.
  */
 export async function restore(options: RestoreOptions): Promise<void> {
-  clack.intro(pc.bold("Wraps Restore - Revert to Original Configuration"));
+  clack.intro(pc.bold("Wraps Restore - Remove Wraps Infrastructure"));
+
+  clack.log.info(
+    `${pc.yellow("Note:")} This will remove all Wraps-managed infrastructure.`
+  );
+  clack.log.info(
+    "Your original AWS resources remain untouched (Wraps never modifies them).\n"
+  );
 
   const progress = new DeploymentProgress();
 
@@ -50,78 +59,46 @@ export async function restore(options: RestoreOptions): Promise<void> {
       `No Wraps connection found for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
     );
     clack.log.info(
-      `Use ${pc.cyan("wraps connect")} to create a connection first.`
+      `Use ${pc.cyan("wraps init")} or ${pc.cyan("wraps connect")} to create a connection first.`
     );
     process.exit(1);
   }
 
   progress.info(`Found connection created: ${metadata.timestamp}`);
 
-  // 4. Check what needs to be restored
-  const replacedFeatures = getReplacedFeatures(metadata);
-  const modifiedIdentities = getModifiedIdentities(metadata);
+  // 4. Display what will be removed
+  console.log(
+    `\n${pc.bold("The following Wraps resources will be removed:")}\n`
+  );
 
-  if (replacedFeatures.length === 0 && modifiedIdentities.length === 0) {
-    clack.log.info("Nothing to restore - no resources were replaced.");
-    process.exit(0);
+  if (metadata.emailConfig.tracking?.enabled) {
+    console.log(`  ${pc.cyan("✓")} Configuration Set (wraps-email-tracking)`);
   }
-
-  // 5. Display what will be restored
-  console.log(`\n${pc.bold("The following will be restored:")}\n`);
-
-  if (replacedFeatures.length > 0) {
-    console.log(pc.yellow("Features:"));
-    for (const { config } of replacedFeatures) {
-      console.log(
-        `  ${pc.cyan(config.currentValue!)} → ${pc.green(config.originalValue!)}`
-      );
-    }
-    console.log("");
+  if (metadata.emailConfig.eventTracking?.dynamoDBHistory) {
+    console.log(`  ${pc.cyan("✓")} DynamoDB Table (wraps-email-history)`);
   }
-
-  if (modifiedIdentities.length > 0) {
-    console.log(pc.yellow("Identities:"));
-    for (const identity of modifiedIdentities) {
-      if (identity.action === "replaced" && identity.originalConfigSet) {
-        console.log(
-          `  ${pc.cyan(identity.name)}: restore ${pc.green(identity.originalConfigSet)}`
-        );
-      } else if (identity.action === "attached") {
-        console.log(`  ${pc.cyan(identity.name)}: remove Wraps config set`);
-      }
-    }
-    console.log("");
+  if (metadata.emailConfig.eventTracking?.enabled) {
+    console.log(`  ${pc.cyan("✓")} EventBridge Rules`);
+    console.log(`  ${pc.cyan("✓")} SQS Queues`);
+    console.log(`  ${pc.cyan("✓")} Lambda Functions`);
   }
+  console.log(`  ${pc.cyan("✓")} IAM Role (wraps-email-role)`);
+  console.log("");
 
-  // 6. Confirm restoration
+  // 5. Confirm removal
   if (!options.yes) {
     const confirmed = await clack.confirm({
-      message:
-        "Proceed with restoration? This will remove Wraps infrastructure.",
+      message: "Proceed with removal? This cannot be undone.",
       initialValue: false,
     });
 
     if (clack.isCancel(confirmed) || !confirmed) {
-      clack.cancel("Restoration cancelled.");
+      clack.cancel("Removal cancelled.");
       process.exit(0);
     }
   }
 
-  // 7. Restore identities (remove/restore config sets)
-  if (modifiedIdentities.length > 0) {
-    await progress.execute("Restoring identity configurations", async () => {
-      for (const identity of modifiedIdentities) {
-        // Note: AWS SES v2 API doesn't directly support setting config sets on identities
-        // Config sets are specified at send time, so we just log what should be done
-        // In a real implementation, you'd want to track this differently
-        progress.info(
-          `Identity ${pc.cyan(identity.name)}: Use config set ${pc.green(identity.originalConfigSet || "none")} in your code`
-        );
-      }
-    });
-  }
-
-  // 8. Destroy Pulumi stack
+  // 6. Destroy Pulumi stack
   if (metadata.pulumiStackName) {
     await progress.execute("Removing Wraps infrastructure", async () => {
       try {
@@ -151,31 +128,17 @@ export async function restore(options: RestoreOptions): Promise<void> {
     });
   }
 
-  // 9. Delete connection metadata
+  // 7. Delete connection metadata
   await deleteConnectionMetadata(identity.accountId, region);
 
   progress.info("Connection metadata deleted");
 
-  // 10. Success message
-  console.log(`\n${pc.green("✓")} ${pc.bold("Restoration complete!")}\n`);
-  console.log(`${pc.dim("Wraps infrastructure has been removed.")}`);
+  // 8. Success message
   console.log(
-    `${pc.dim("Your original AWS resources have been preserved.")}\n`
+    `\n${pc.green("✓")} ${pc.bold("Infrastructure removed successfully!")}\n`
   );
-
-  // Show next steps
-  if (modifiedIdentities.length > 0) {
-    console.log(`${pc.bold("Next Steps:")}\n`);
-    console.log(
-      "Update your code to use the original configuration sets (if any):"
-    );
-    for (const identity of modifiedIdentities) {
-      if (identity.originalConfigSet) {
-        console.log(
-          `  ${pc.cyan(identity.name)}: ${pc.green(identity.originalConfigSet)}`
-        );
-      }
-    }
-    console.log("");
-  }
+  console.log(
+    `${pc.dim("All Wraps resources have been deleted from your AWS account.")}`
+  );
+  console.log(`${pc.dim("Your original AWS resources remain unchanged.")}\n`);
 }
