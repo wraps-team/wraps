@@ -23,7 +23,9 @@ export type SESResources = {
   configSet: aws.sesv2.ConfigurationSet;
   eventBus: aws.cloudwatch.EventBus;
   domainIdentity?: aws.sesv2.EmailIdentity;
+  trackingDomainIdentity?: aws.sesv2.EmailIdentity;
   dkimTokens?: string[];
+  trackingDomainDkimTokens?: string[];
   dnsAutoCreated?: boolean;
   customTrackingDomain?: string;
 };
@@ -34,6 +36,33 @@ export type SESResources = {
 export async function createSESResources(
   config: SESResourcesConfig
 ): Promise<SESResources> {
+  // If custom tracking domain is provided, create EmailIdentity for it first
+  // AWS requires the tracking domain to be verified before it can be used
+  let trackingDomainIdentity: aws.sesv2.EmailIdentity | undefined;
+  let trackingDomainDkimTokens: string[] | undefined;
+
+  if (config.trackingConfig?.customRedirectDomain) {
+    trackingDomainIdentity = new aws.sesv2.EmailIdentity(
+      "wraps-email-tracking-domain",
+      {
+        emailIdentity: config.trackingConfig.customRedirectDomain,
+        dkimSigningAttributes: {
+          nextSigningKeyLength: "RSA_2048_BIT",
+        },
+        tags: {
+          ManagedBy: "wraps-cli",
+          Description: "Custom tracking redirect domain",
+        },
+      }
+    );
+
+    // Extract DKIM tokens for DNS configuration
+    trackingDomainDkimTokens =
+      trackingDomainIdentity.dkimSigningAttributes.apply(
+        (attrs) => attrs?.tokens || []
+      ) as any;
+  }
+
   // Configuration set for tracking (using SESv2 which supports tags)
   const configSetOptions: aws.sesv2.ConfigurationSetArgs = {
     configurationSetName: "wraps-email-tracking",
@@ -43,12 +72,14 @@ export async function createSESResources(
     },
   };
 
-  // Add custom tracking domain if provided
-  if (config.trackingConfig?.customRedirectDomain) {
+  // Add custom tracking domain if provided (depends on identity being created)
+  if (config.trackingConfig?.customRedirectDomain && trackingDomainIdentity) {
     configSetOptions.trackingOptions = {
       customRedirectDomain: config.trackingConfig.customRedirectDomain,
       httpsPolicy: "REQUIRE", // Always require HTTPS for security
     };
+    // Make sure the identity is created before the config set
+    configSetOptions.dependsOn = [trackingDomainIdentity];
   }
 
   const configSet = new aws.sesv2.ConfigurationSet(
@@ -115,7 +146,9 @@ export async function createSESResources(
     configSet,
     eventBus: defaultEventBus as any, // Return default bus reference
     domainIdentity,
+    trackingDomainIdentity,
     dkimTokens,
+    trackingDomainDkimTokens,
     dnsAutoCreated: false, // Will be set after deployment
     customTrackingDomain: config.trackingConfig?.customRedirectDomain,
   };

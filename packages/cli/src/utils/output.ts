@@ -91,6 +91,7 @@ export type SuccessOutputs = {
   configSetName?: string;
   region: string;
   dnsRecords?: DNSRecord[];
+  trackingDomainDnsRecords?: DNSRecord[];
   tableName?: string;
   dnsAutoCreated?: boolean;
   domain?: string;
@@ -161,16 +162,37 @@ export function displaySuccess(outputs: SuccessOutputs) {
       );
     }
 
-    // Add custom tracking domain CNAME if provided and not auto-created
-    if (outputs.customTrackingDomain && !outputs.dnsAutoCreated) {
-      dnsLines.push(
+    clack.note(dnsLines.join("\n"), "DNS Records to add:");
+  }
+
+  // Show tracking domain DNS records if custom tracking domain is configured
+  if (
+    outputs.trackingDomainDnsRecords &&
+    outputs.trackingDomainDnsRecords.length > 0
+  ) {
+    const trackingDnsLines = [
+      pc.bold("Custom Tracking Domain - DKIM Records (CNAME):"),
+      ...outputs.trackingDomainDnsRecords.map(
+        (record) =>
+          `  ${pc.cyan(record.name)} ${pc.dim(record.type)} "${record.value}"`
+      ),
+    ];
+
+    if (outputs.customTrackingDomain) {
+      trackingDnsLines.push(
         "",
-        pc.bold("Tracking Domain (CNAME):"),
-        `  ${pc.cyan(outputs.customTrackingDomain)} ${pc.dim("CNAME")} "feedback-id.${outputs.region}.amazonses.com"`
+        pc.bold("SPF Record (TXT):"),
+        `  ${pc.cyan(outputs.customTrackingDomain)} ${pc.dim("TXT")} "v=spf1 include:amazonses.com ~all"`,
+        "",
+        pc.bold("DMARC Record (TXT):"),
+        `  ${pc.cyan(`_dmarc.${outputs.customTrackingDomain}`)} ${pc.dim("TXT")} "v=DMARC1; p=quarantine; rua=mailto:postmaster@${outputs.customTrackingDomain}"`
       );
     }
 
-    clack.note(dnsLines.join("\n"), "DNS Records to add:");
+    clack.note(
+      trackingDnsLines.join("\n"),
+      "Custom Tracking Domain DNS Records:"
+    );
 
     console.log(
       `\n${pc.dim("Run:")} ${pc.yellow(`wraps verify --domain ${domain}`)} ${pc.dim(

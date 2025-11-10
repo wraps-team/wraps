@@ -467,6 +467,8 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
             | undefined,
           domain: pulumiOutputs.domain?.value as string | undefined,
           dkimTokens: pulumiOutputs.dkimTokens?.value as string[] | undefined,
+          trackingDomainDkimTokens: pulumiOutputs.trackingDomainDkimTokens
+            ?.value as string[] | undefined,
           customTrackingDomain: pulumiOutputs.customTrackingDomain?.value as
             | string
             | undefined,
@@ -494,12 +496,33 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
   progress.info("Connection metadata updated");
 
-  // 14. Display success message
+  // 14. Format tracking domain DNS records if custom tracking domain was added
+  const trackingDomainDnsRecords = [];
+  if (
+    outputs.customTrackingDomain &&
+    outputs.trackingDomainDkimTokens &&
+    outputs.trackingDomainDkimTokens.length > 0
+  ) {
+    // Add DKIM CNAME records for tracking domain
+    for (const token of outputs.trackingDomainDkimTokens) {
+      trackingDomainDnsRecords.push({
+        name: `${token}._domainkey.${outputs.customTrackingDomain}`,
+        type: "CNAME",
+        value: `${token}.dkim.amazonses.com`,
+      });
+    }
+  }
+
+  // 15. Display success message
   displaySuccess({
     roleArn: outputs.roleArn,
     configSetName: outputs.configSetName,
     region: outputs.region!,
     tableName: outputs.tableName,
+    trackingDomainDnsRecords:
+      trackingDomainDnsRecords.length > 0
+        ? trackingDomainDnsRecords
+        : undefined,
     customTrackingDomain: outputs.customTrackingDomain,
   });
 

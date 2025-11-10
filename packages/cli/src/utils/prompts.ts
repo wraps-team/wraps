@@ -491,25 +491,6 @@ export async function promptCustomConfig(): Promise<any> {
     process.exit(0);
   }
 
-  let customTrackingDomain: string | symbol | undefined;
-  if (trackingEnabled) {
-    customTrackingDomain = await clack.text({
-      message:
-        "Custom tracking redirect domain? (optional, press Enter to skip)",
-      placeholder: "track.yourdomain.com",
-      validate: (value) => {
-        if (value && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(value)) {
-          return "Please enter a valid domain";
-        }
-      },
-    });
-
-    if (clack.isCancel(customTrackingDomain)) {
-      clack.cancel("Operation cancelled.");
-      process.exit(0);
-    }
-  }
-
   // Event tracking
   const eventTrackingEnabled = await clack.confirm({
     message: "Enable real-time event tracking (EventBridge)?",
@@ -601,10 +582,6 @@ export async function promptCustomConfig(): Promise<any> {
           enabled: true,
           opens: true,
           clicks: true,
-          customRedirectDomain:
-            typeof customTrackingDomain === "string" && customTrackingDomain
-              ? customTrackingDomain
-              : undefined,
         }
       : { enabled: false },
     tlsRequired,
