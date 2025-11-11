@@ -2,9 +2,11 @@
 
 ## Project Overview
 
-**Wraps** is a CLI tool that deploys email infrastructure (AWS SES) to users' AWS accounts with zero stored credentials, Resend-like developer experience, and AWS pricing.
+**Wraps** is a CLI tool and TypeScript SDK that deploys email infrastructure (AWS SES) to users' AWS accounts with zero stored credentials, Resend-like developer experience, and AWS pricing.
 
 **Core Value Proposition**: One command deploys production-ready email infrastructure to the user's AWS account with zero credentials stored, Resend-like DX, AWS pricing.
+
+**TypeScript SDK**: [`@wraps-js/email`](https://github.com/wraps-team/wraps-js) provides a simple, type-safe interface for sending emails through the deployed infrastructure. Available on [npm](https://www.npmjs.com/package/@wraps-js/email).
 
 ## Key Concepts
 
@@ -153,6 +155,38 @@ SES → EventBridge → SQS + DLQ → Lambda → DynamoDB
 - SEND, DELIVERY, OPEN, CLICK
 - BOUNCE, COMPLAINT, REJECT
 - RENDERING_FAILURE, DELIVERY_DELAY, SUBSCRIPTION
+
+## TypeScript SDK
+
+After deploying infrastructure with the CLI, developers use the [`@wraps-js/email`](https://github.com/wraps-team/wraps-js) SDK to send emails:
+
+```typescript
+import { Wraps } from '@wraps-js/email';
+
+const wraps = new Wraps();
+
+const result = await wraps.emails.send({
+  from: 'hello@yourapp.com',
+  to: 'user@example.com',
+  subject: 'Welcome!',
+  html: '<h1>Hello from Wraps!</h1>',
+});
+
+if (result.success) {
+  console.log('Email sent:', result.data.messageId);
+}
+```
+
+**Key Features:**
+- TypeScript-first with full type safety
+- Automatic AWS credential handling (OIDC, IAM roles, or environment variables)
+- Simple, intuitive API similar to Resend
+- Built on top of AWS SES for reliability and cost-effectiveness
+
+**Package Details:**
+- npm: `@wraps-js/email`
+- GitHub: https://github.com/wraps-team/wraps-js
+- Namespace: All future SDKs will use `@wraps-js` (e.g., `@wraps-js/sms`, `@wraps-js/queue`)
 
 ## Commands
 

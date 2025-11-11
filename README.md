@@ -107,11 +107,48 @@ All resources use the `wraps-email-*` namespace prefix.
 
 ### Roadmap
 
-- 🚧 **Email** - `@wraps/email` AWS SES wrapper
+- ✅ **Email SDK** - [`@wraps-js/email`](https://github.com/wraps-team/wraps-js) TypeScript SDK for AWS SES
 - 🚧 **Hosted Dashboard** - Analytics, logs, team management
-- 📋 **SMS** - AWS SNS wrapper (`@wraps/sms`)
-- 📋 **MQTT** - AWS IoT Core wrapper (`@wraps/iot`)
-- 📋 **Workflows** - SQS + Lambda orchestration (`@wraps/queue`)
+- 📋 **SMS** - AWS SNS wrapper (`@wraps-js/sms`)
+- 📋 **MQTT** - AWS IoT Core wrapper (`@wraps-js/iot`)
+- 📋 **Workflows** - SQS + Lambda orchestration (`@wraps-js/queue`)
+
+---
+
+## Using the SDK
+
+After deploying infrastructure with the CLI, install the TypeScript SDK to send emails:
+
+```bash
+npm install @wraps-js/email
+# or
+pnpm add @wraps-js/email
+```
+
+**Send your first email:**
+
+```typescript
+import { Wraps } from '@wraps-js/email';
+
+const wraps = new Wraps();
+
+const result = await wraps.emails.send({
+  from: 'hello@yourapp.com',
+  to: 'user@example.com',
+  subject: 'Welcome!',
+  html: '<h1>Hello from Wraps!</h1>',
+});
+
+if (result.success) {
+  console.log('Email sent:', result.data.messageId);
+}
+```
+
+The SDK automatically uses your AWS credentials (IAM roles, OIDC, or environment variables) configured during CLI deployment.
+
+**Learn more:**
+- [SDK Documentation](https://github.com/wraps-team/wraps-js)
+- [npm Package](https://www.npmjs.com/package/@wraps-js/email)
 
 ---
 

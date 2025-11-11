@@ -54,7 +54,34 @@ This will:
 - ✅ Deploy IAM roles, SES config, DynamoDB, Lambda, SNS
 - ✅ Display next steps with role ARN and DNS records
 
-### 2. Check Status
+### 2. Install the SDK
+
+After deploying, install the TypeScript SDK to send emails:
+
+```bash
+npm install @wraps-js/email
+# or
+pnpm add @wraps-js/email
+```
+
+**Send your first email:**
+
+```typescript
+import { Wraps } from '@wraps-js/email';
+
+const wraps = new Wraps();
+
+await wraps.emails.send({
+  from: 'hello@yourapp.com',
+  to: 'user@example.com',
+  subject: 'Welcome!',
+  html: '<h1>Hello from Wraps!</h1>',
+});
+```
+
+Learn more: [SDK Documentation](https://github.com/wraps-team/wraps-js) | [npm](https://www.npmjs.com/package/@wraps-js/email)
+
+### 3. Check Status
 
 ```bash
 wraps status

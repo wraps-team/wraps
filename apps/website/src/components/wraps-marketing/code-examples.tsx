@@ -46,50 +46,68 @@ export function CodeExamples() {
                   <>
                     <span className="text-muted-foreground">1</span>{" "}
                     <span className="text-purple-400">import</span>{" "}
-                    <span className="text-foreground">{"{ wraps }"}</span>{" "}
+                    <span className="text-foreground">{"{ Wraps }"}</span>{" "}
                     <span className="text-purple-400">from</span>{" "}
-                    <span className="text-green-400">&quot;wraps&quot;</span>;
-                    {"\n"}
+                    <span className="text-green-400">
+                      &quot;@wraps-js/email&quot;
+                    </span>
+                    ;{"\n"}
                     <span className="text-muted-foreground">2</span>
                     {"\n"}
                     <span className="text-muted-foreground">3</span>{" "}
+                    <span className="text-purple-400">const</span>{" "}
+                    <span className="text-blue-400">wraps</span>{" "}
+                    <span className="text-foreground">=</span>{" "}
+                    <span className="text-purple-400">new</span>{" "}
+                    <span className="text-yellow-400">Wraps</span>
+                    <span className="text-foreground">{"();"}</span>
+                    {"\n"}
+                    <span className="text-muted-foreground">4</span>
+                    {"\n"}
+                    <span className="text-muted-foreground">5</span>{" "}
                     <span className="text-purple-400">const</span>{" "}
                     <span className="text-blue-400">result</span>{" "}
                     <span className="text-foreground">=</span>{" "}
                     <span className="text-purple-400">await</span>{" "}
                     <span className="text-blue-400">wraps</span>.
-                    <span className="text-yellow-400">email</span>.
+                    <span className="text-yellow-400">emails</span>.
                     <span className="text-yellow-400">send</span>
                     <span className="text-foreground">{"({"}</span>
                     {"\n"}
-                    <span className="text-muted-foreground">4</span>{" "}
+                    <span className="text-muted-foreground">6</span>{" "}
+                    <span className="text-foreground"> from:</span>{" "}
+                    <span className="text-green-400">
+                      &quot;hello@yourapp.com&quot;
+                    </span>
+                    ,{"\n"}
+                    <span className="text-muted-foreground">7</span>{" "}
                     <span className="text-foreground"> to:</span>{" "}
                     <span className="text-green-400">
                       &quot;user@example.com&quot;
                     </span>
                     ,{"\n"}
-                    <span className="text-muted-foreground">5</span>{" "}
+                    <span className="text-muted-foreground">8</span>{" "}
                     <span className="text-foreground"> subject:</span>{" "}
                     <span className="text-green-400">&quot;Welcome!&quot;</span>
                     ,{"\n"}
-                    <span className="text-muted-foreground">6</span>{" "}
+                    <span className="text-muted-foreground">9</span>{" "}
                     <span className="text-foreground"> html:</span>{" "}
                     <span className="text-green-400">
                       &quot;&lt;h1&gt;Hello&lt;/h1&gt;&quot;
                     </span>
                     ,{"\n"}
-                    <span className="text-muted-foreground">7</span>{" "}
+                    <span className="text-muted-foreground">10</span>{" "}
                     <span className="text-foreground">{"});"}</span>
                     {"\n"}
-                    <span className="text-muted-foreground">8</span>
+                    <span className="text-muted-foreground">11</span>
                     {"\n"}
-                    <span className="text-muted-foreground">9</span>{" "}
+                    <span className="text-muted-foreground">12</span>{" "}
                     <span className="text-purple-400">if</span>{" "}
                     <span className="text-foreground">
                       (result.success) {"{"}
                     </span>
                     {"\n"}
-                    <span className="text-muted-foreground">10</span>{" "}
+                    <span className="text-muted-foreground">13</span>{" "}
                     <span className="text-foreground">
                       {"  "}console.
                       <span className="text-yellow-400">log</span>(
@@ -97,7 +115,7 @@ export function CodeExamples() {
                       );
                     </span>
                     {"\n"}
-                    <span className="text-muted-foreground">11</span>{" "}
+                    <span className="text-muted-foreground">14</span>{" "}
                     <span className="text-foreground">{"}"}</span>
                   </>
                 ) : (
