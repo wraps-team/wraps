@@ -264,8 +264,4 @@ We'd love your help! Wraps is open source and community-driven.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-**Built with [Claude Code](https://claude.com/claude-code)**
+Copyright (c) 2025 [Jarod Stewart](https://github.com/stewartjarod). This repo is associated with a commercial open-source company, which means some parts of this open-source repository require a commercial license. The concept is called "Open Core" where the core technology (99%) is fully open source, licensed under [AGPLv3](https://opensource.org/license/agpl-v3) and the last 1% is covered under a commercial license (["/ee" Enterprise Edition](<https://github.com/wraps-team/wraps/tree/main/apps/web/app/(ee)>)) which we believe is entirely relevant for larger organisations that require enterprise features. Enterprise features are built by Jarod Stewart.
