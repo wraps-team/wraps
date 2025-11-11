@@ -275,5 +275,74 @@ export function createSettingsRouter(config: ServerConfig): Router {
     }
   });
 
+  /**
+   * Update tracking domain
+   */
+  router.put(
+    "/config-set/tracking-domain",
+    async (req: Request, res: Response) => {
+      try {
+        const { domain } = req.body;
+
+        if (!domain || typeof domain !== "string") {
+          return res.status(400).json({ error: "domain must be a string" });
+        }
+
+        // Validate domain format (basic check)
+        const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-_.]+[a-zA-Z0-9]$/;
+        if (!domainRegex.test(domain)) {
+          return res.status(400).json({ error: "Invalid domain format" });
+        }
+
+        // Load metadata to get configuration set name
+        const metadata = await loadConnectionMetadata(
+          config.accountId || "",
+          config.region
+        );
+
+        if (!metadata) {
+          return res.status(404).json({
+            error: "No Wraps infrastructure found for this account and region",
+          });
+        }
+
+        const configSetName = "wraps-email-tracking";
+
+        console.log(
+          `[Settings] Updating tracking domain for ${configSetName}: ${domain}`
+        );
+
+        // Update tracking options via AWS SDK
+        const { SESv2Client, PutConfigurationSetTrackingOptionsCommand } =
+          await import("@aws-sdk/client-sesv2");
+        const { assumeRole } = await import("../../utils/assume-role.js");
+
+        const credentials = config.roleArn
+          ? await assumeRole(config.roleArn, config.region)
+          : undefined;
+        const sesClient = new SESv2Client({
+          region: config.region,
+          credentials,
+        });
+
+        await sesClient.send(
+          new PutConfigurationSetTrackingOptionsCommand({
+            ConfigurationSetName: configSetName,
+            CustomRedirectDomain: domain,
+          })
+        );
+
+        console.log("[Settings] Successfully updated tracking domain");
+
+        res.json({ success: true });
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        console.error("[Settings] Error updating tracking domain:", error);
+        res.status(500).json({ error: errorMessage });
+      }
+    }
+  );
+
   return router;
 }

@@ -5,6 +5,7 @@ import {
   ChevronUp,
   Clock,
   Copy,
+  Edit2,
   RefreshCw,
   XCircle,
 } from "lucide-react";
@@ -35,6 +36,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
@@ -457,14 +468,19 @@ function DmarcSection({ identity }: { identity?: EmailIdentityDetails }) {
 function TrackingDomainSection({
   configSet,
   region,
+  onRefresh,
 }: {
   configSet?: ConfigurationSetDetails;
   region?: string;
+  onRefresh?: () => Promise<void>;
 }) {
   const tracking = configSet?.trackingOptions;
   const [verificationStatus, setVerificationStatus] =
     React.useState<DNSVerificationStatus | null>(null);
   const [isVerifying, setIsVerifying] = React.useState(false);
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [newDomain, setNewDomain] = React.useState("");
+  const [isUpdating, setIsUpdating] = React.useState(false);
 
   // Default collapsed if verified, expanded otherwise
   const [isOpen, setIsOpen] = React.useState(!verificationStatus?.verified);
@@ -518,6 +534,60 @@ function TrackingDomainSection({
     }
   };
 
+  const handleEditClick = () => {
+    setNewDomain(tracking?.customRedirectDomain || "");
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateDomain = async () => {
+    if (!newDomain.trim()) {
+      toast.error("Invalid domain", {
+        description: "Please enter a valid domain name",
+      });
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const token = sessionStorage.getItem("wraps-auth-token");
+
+      const response = await fetch(
+        `/api/settings/config-set/tracking-domain?token=${token}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ domain: newDomain }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || `Failed to update: ${response.statusText}`
+        );
+      }
+
+      setEditDialogOpen(false);
+      toast.success("Tracking domain updated", {
+        description: "Don't forget to configure the DNS records",
+      });
+
+      // Refresh settings
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      console.error("Failed to update tracking domain:", error);
+      toast.error("Failed to update tracking domain", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -562,6 +632,14 @@ function TrackingDomainSection({
                     className={`h-4 w-4 ${isVerifying ? "animate-spin" : ""}`}
                   />
                 </Button>
+                <Button
+                  className="h-8 w-8 p-0"
+                  onClick={handleEditClick}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Button>
               </div>
             </div>
 
@@ -603,12 +681,58 @@ function TrackingDomainSection({
             </Collapsible>
           </>
         ) : (
-          <p className="text-muted-foreground text-sm">
-            No custom tracking domain configured. Using default awstrack.me
-            domain.
-          </p>
+          <div className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              No custom tracking domain configured. Using default awstrack.me
+              domain.
+            </p>
+            <Button onClick={handleEditClick} size="sm" variant="outline">
+              <Edit2 className="mr-2 h-4 w-4" />
+              Configure Tracking Domain
+            </Button>
+          </div>
         )}
       </CardContent>
+
+      {/* Edit Dialog */}
+      <Dialog onOpenChange={setEditDialogOpen} open={editDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Tracking Domain</DialogTitle>
+            <DialogDescription>
+              Enter the custom domain you want to use for email tracking links.
+              You'll need to configure DNS records after saving.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="domain">Tracking Domain</Label>
+              <Input
+                disabled={isUpdating}
+                id="domain"
+                onChange={(e) => setNewDomain(e.target.value)}
+                placeholder="track.example.com"
+                value={newDomain}
+              />
+              <p className="text-muted-foreground text-xs">
+                Example: track.yourdomain.com or email.yourdomain.com
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              disabled={isUpdating}
+              onClick={() => setEditDialogOpen(false)}
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button disabled={isUpdating} onClick={handleUpdateDomain}>
+              {isUpdating ? "Updating..." : "Update Domain"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
@@ -1105,6 +1229,7 @@ export function EmailSettings() {
         {/* Tracking Domain */}
         <TrackingDomainSection
           configSet={settings?.configurationSet}
+          onRefresh={fetchSettings}
           region={settings?.region}
         />
       </div>
