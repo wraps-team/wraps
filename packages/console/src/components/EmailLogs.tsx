@@ -27,6 +27,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type EmailLog = {
   id: string;
@@ -45,17 +50,51 @@ type EmailLog = {
   messageId: string;
 };
 
-const STATUS_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  delivered: "default",
-  sent: "secondary",
-  bounced: "destructive",
-  complained: "destructive",
-  failed: "destructive",
-  opened: "default",
-  clicked: "default",
+type StatusConfig = {
+  variant: "default" | "secondary" | "destructive" | "outline";
+  description: string;
+  className?: string;
+};
+
+const STATUS_CONFIG: Record<string, StatusConfig> = {
+  clicked: {
+    variant: "default",
+    description: "Recipient clicked a link in the email",
+    className:
+      "bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-200",
+  },
+  opened: {
+    variant: "default",
+    description: "Recipient opened the email",
+    className: "bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200",
+  },
+  delivered: {
+    variant: "default",
+    description: "Email was successfully delivered to recipient's mailbox",
+    className:
+      "bg-green-100 text-green-800 hover:bg-green-200 border-green-200",
+  },
+  sent: {
+    variant: "secondary",
+    description: "Email was sent but delivery not yet confirmed",
+    className: "bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200",
+  },
+  bounced: {
+    variant: "destructive",
+    description: "Email bounced - recipient's mailbox may not exist or be full",
+    className:
+      "bg-orange-100 text-orange-800 hover:bg-orange-200 border-orange-200",
+  },
+  complained: {
+    variant: "destructive",
+    description: "Recipient marked this email as spam",
+    className: "bg-red-100 text-red-800 hover:bg-red-200 border-red-200",
+  },
+  failed: {
+    variant: "destructive",
+    description: "Email failed to send due to an error",
+    className: "bg-red-100 text-red-800 hover:bg-red-200 border-red-200",
+  },
 };
 
 export function EmailLogs() {
@@ -307,10 +346,28 @@ export function EmailLogs() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={STATUS_VARIANTS[log.status]}>
-                              {log.status.charAt(0).toUpperCase() +
-                                log.status.slice(1)}
-                            </Badge>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  className={
+                                    STATUS_CONFIG[log.status]?.className
+                                  }
+                                  variant={
+                                    STATUS_CONFIG[log.status]?.variant ??
+                                    "default"
+                                  }
+                                >
+                                  {log.status.charAt(0).toUpperCase() +
+                                    log.status.slice(1)}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>
+                                  {STATUS_CONFIG[log.status]?.description ??
+                                    "Unknown status"}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
                           </TableCell>
                           <TableCell className="max-w-[400px] truncate">
                             {log.subject}
