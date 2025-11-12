@@ -5,7 +5,9 @@ import {
   Bell,
   ChevronsUpDown,
   CreditCard,
+  Moon,
   Sparkles,
+  Sun,
   X,
 } from "lucide-react";
 import * as React from "react";
@@ -25,6 +27,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useTheme } from "@/hooks/use-theme";
 
 type UserInfo = {
   accountId: string;
@@ -45,6 +48,7 @@ export function NavUser({
   };
 }) {
   const { isMobile } = useSidebar();
+  const { theme, setTheme } = useTheme();
   const [userInfo, setUserInfo] = React.useState<UserInfo | null>(null);
   const [retryCount, setRetryCount] = React.useState(0);
 
@@ -190,6 +194,13 @@ export function NavUser({
                 Product Updates
               </DropdownMenuItem>
             </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              {theme === "dark" ? <Sun /> : <Moon />}
+              {theme === "dark" ? "Light Mode" : "Dark Mode"}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleCloseConsole}>
               <X />

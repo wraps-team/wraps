@@ -61,39 +61,43 @@ const STATUS_CONFIG: Record<string, StatusConfig> = {
     variant: "default",
     description: "Recipient clicked a link in the email",
     className:
-      "bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-200",
+      "bg-purple-500/10 text-purple-700 dark:text-purple-400 hover:bg-purple-500/20 border-purple-500/20",
   },
   opened: {
     variant: "default",
     description: "Recipient opened the email",
-    className: "bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200",
+    className:
+      "bg-blue-500/10 text-blue-700 dark:text-blue-400 hover:bg-blue-500/20 border-blue-500/20",
   },
   delivered: {
     variant: "default",
     description: "Email was successfully delivered to recipient's mailbox",
     className:
-      "bg-green-100 text-green-800 hover:bg-green-200 border-green-200",
+      "bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-500/20 border-green-500/20",
   },
   sent: {
     variant: "secondary",
     description: "Email was sent but delivery not yet confirmed",
-    className: "bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200",
+    className:
+      "bg-gray-500/10 text-gray-700 dark:text-gray-400 hover:bg-gray-500/20 border-gray-500/20",
   },
   bounced: {
-    variant: "destructive",
+    variant: "default",
     description: "Email bounced - recipient's mailbox may not exist or be full",
     className:
-      "bg-orange-100 text-orange-800 hover:bg-orange-200 border-orange-200",
+      "bg-orange-500/10 text-orange-700 dark:text-orange-400 hover:bg-orange-500/20 border-orange-500/20",
   },
   complained: {
-    variant: "destructive",
+    variant: "default",
     description: "Recipient marked this email as spam",
-    className: "bg-red-100 text-red-800 hover:bg-red-200 border-red-200",
+    className:
+      "bg-red-500/10 text-red-700 dark:text-red-400 hover:bg-red-500/20 border-red-500/20",
   },
   failed: {
-    variant: "destructive",
+    variant: "default",
     description: "Email failed to send due to an error",
-    className: "bg-red-100 text-red-800 hover:bg-red-200 border-red-200",
+    className:
+      "bg-red-500/10 text-red-700 dark:text-red-400 hover:bg-red-500/20 border-red-500/20",
   },
 };
 
