@@ -21,7 +21,7 @@ const quickLinks = [
   {
     icon: Code,
     title: "SDK Reference",
-    description: "Learn how to use @wraps-js/email in your application",
+    description: "Learn how to use @wraps.dev/email in your application",
     href: "/docs/sdk-reference",
   },
   {
@@ -81,10 +81,10 @@ export default function DocsPage() {
 npx wraps init
 
 # Install SDK
-npm install @wraps-js/email
+npm install @wraps.dev/email
 
 # Send your first email
-import { Wraps } from '@wraps-js/email'
+import { Wraps } from '@wraps.dev/email'
 const wraps = new Wraps()
 await wraps.emails.send({ ... })`}
                 </code>
@@ -174,13 +174,13 @@ await wraps.emails.send({ ... })`}
                 <CardHeader>
                   <CardTitle>TypeScript SDK</CardTitle>
                   <CardDescription>
-                    View @wraps-js/email package on npm
+                    View @wraps.dev/email package on npm
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Button asChild variant="outline">
                     <a
-                      href="https://www.npmjs.com/package/@wraps-js/email"
+                      href="https://www.npmjs.com/package/@wraps.dev/email"
                       rel="noopener noreferrer"
                       target="_blank"
                     >

@@ -22,7 +22,7 @@ const footerLinks = {
     },
     {
       name: "npm Package",
-      href: "https://www.npmjs.com/package/@wraps-js/email",
+      href: "https://www.npmjs.com/package/@wraps.dev/email",
       external: true,
     },
     {

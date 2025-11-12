@@ -26,7 +26,7 @@ const mainFeatures = [
     icon: Mail,
     title: "Resend-like SDK",
     description:
-      "TypeScript-first SDK (@wraps-js/email) with the same clean API you love from Resend.",
+      "TypeScript-first SDK (@wraps.dev/email) with the same clean API you love from Resend.",
     status: "Available",
   },
   {

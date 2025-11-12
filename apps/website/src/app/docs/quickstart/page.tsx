@@ -120,7 +120,7 @@ export default function QuickstartPage() {
             <p className="mb-4 text-muted-foreground">
               Install the{" "}
               <code className="rounded bg-muted px-1.5 py-0.5">
-                @wraps-js/email
+                @wraps.dev/email
               </code>{" "}
               package:
             </p>
@@ -131,7 +131,7 @@ export default function QuickstartPage() {
                   npm
                 </div>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npm install @wraps-js/email</code>
+                  <code className="text-sm">npm install @wraps.dev/email</code>
                 </pre>
               </CardContent>
             </Card>
@@ -155,7 +155,7 @@ export default function QuickstartPage() {
                   TypeScript / JavaScript
                 </div>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">{`import { Wraps } from '@wraps-js/email';
+                  <code className="text-sm">{`import { Wraps } from '@wraps.dev/email';
 
 // Initialize the client
 const wraps = new Wraps();

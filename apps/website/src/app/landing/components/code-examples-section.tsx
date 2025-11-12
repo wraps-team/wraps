@@ -14,7 +14,7 @@ const codeExamples = {
     code: `// app/actions/email.ts
 'use server';
 
-import { Wraps } from '@wraps-js/email';
+import { Wraps } from '@wraps.dev/email';
 
 const wraps = new Wraps();
 
@@ -52,7 +52,7 @@ export default function SignupPage() {
     description: "REST API with async/await",
     language: "typescript",
     code: `import express from 'express';
-import { Wraps } from '@wraps-js/email';
+import { Wraps } from '@wraps.dev/email';
 
 const app = express();
 const wraps = new Wraps();
@@ -97,7 +97,7 @@ app.listen(3000);`,
     language: "typescript",
     code: `// pages/api/send-email.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Wraps } from '@wraps-js/email';
+import { Wraps } from '@wraps.dev/email';
 
 const wraps = new Wraps();
 
@@ -130,7 +130,7 @@ export default async function handler(
     description: "Edge Functions with OIDC auth",
     language: "typescript",
     code: `// api/send-email.ts
-import { Wraps } from '@wraps-js/email';
+import { Wraps } from '@wraps.dev/email';
 
 // Automatically uses Vercel OIDC token
 const wraps = new Wraps();
@@ -160,7 +160,7 @@ export const config = {
     title: "AWS Lambda",
     description: "Direct integration with IAM roles",
     language: "typescript",
-    code: `import { Wraps } from '@wraps-js/email';
+    code: `import { Wraps } from '@wraps.dev/email';
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 // Automatically uses Lambda IAM role
@@ -191,7 +191,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     language: "typescript",
     code: `// app/routes/signup.tsx
 import { json, type ActionFunctionArgs } from '@remix-run/node';
-import { Wraps } from '@wraps-js/email';
+import { Wraps } from '@wraps.dev/email';
 
 const wraps = new Wraps();
 
@@ -291,7 +291,7 @@ export function CodeExamplesSection() {
               Works with Your Favorite Framework
             </h2>
             <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-              The @wraps-js/email SDK integrates seamlessly with any JavaScript
+              The @wraps.dev/email SDK integrates seamlessly with any JavaScript
               or TypeScript framework. Choose your stack and start sending
               emails in minutes.
             </p>

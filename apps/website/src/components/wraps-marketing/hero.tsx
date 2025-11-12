@@ -29,7 +29,7 @@ export function Hero() {
           size="lg"
           variant="outline"
         >
-          npm i @wraps-js/email
+          npm i @wraps.dev/email
           <Copy className="h-4 w-4" />
         </Button>
       </div>

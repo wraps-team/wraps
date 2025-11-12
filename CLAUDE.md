@@ -6,7 +6,7 @@
 
 **Core Value Proposition**: One command deploys production-ready email infrastructure to the user's AWS account with zero credentials stored, Resend-like DX, AWS pricing.
 
-**TypeScript SDK**: [`@wraps-js/email`](https://github.com/wraps-team/wraps-js) provides a simple, type-safe interface for sending emails through the deployed infrastructure. Available on [npm](https://www.npmjs.com/package/@wraps-js/email).
+**TypeScript SDK**: [`@wraps.dev/email`](https://github.com/wraps-team/wraps-js) provides a simple, type-safe interface for sending emails through the deployed infrastructure. Available on [npm](https://www.npmjs.com/package/@wraps.dev/email).
 
 ## Key Concepts
 
@@ -158,10 +158,10 @@ SES → EventBridge → SQS + DLQ → Lambda → DynamoDB
 
 ## TypeScript SDK
 
-After deploying infrastructure with the CLI, developers use the [`@wraps-js/email`](https://github.com/wraps-team/wraps-js) SDK to send emails:
+After deploying infrastructure with the CLI, developers use the [`@wraps.dev/email`](https://github.com/wraps-team/wraps-js) SDK to send emails:
 
 ```typescript
-import { Wraps } from '@wraps-js/email';
+import { Wraps } from '@wraps.dev/email';
 
 const wraps = new Wraps();
 
@@ -184,9 +184,9 @@ if (result.success) {
 - Built on top of AWS SES for reliability and cost-effectiveness
 
 **Package Details:**
-- npm: `@wraps-js/email`
+- npm: `@wraps.dev/email`
 - GitHub: https://github.com/wraps-team/wraps-js
-- Namespace: All future SDKs will use `@wraps-js` (e.g., `@wraps-js/sms`, `@wraps-js/queue`)
+- Namespace: All future SDKs will use `@wraps.dev` (e.g., `@wraps.dev/sms`, `@wraps.dev/queue`)
 
 ## Commands
 

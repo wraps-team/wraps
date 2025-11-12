@@ -49,7 +49,7 @@ export function CodeExamples() {
                     <span className="text-foreground">{"{ Wraps }"}</span>{" "}
                     <span className="text-purple-400">from</span>{" "}
                     <span className="text-green-400">
-                      &quot;@wraps-js/email&quot;
+                      &quot;@wraps.dev/email&quot;
                     </span>
                     ;{"\n"}
                     <span className="text-muted-foreground">2</span>

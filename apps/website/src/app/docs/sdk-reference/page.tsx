@@ -36,7 +36,7 @@ export default function SDKReferencePage() {
               SDK Reference
             </Badge>
             <h1 className="mb-4 font-bold text-4xl tracking-tight">
-              @wraps-js/email SDK
+              @wraps.dev/email SDK
             </h1>
             <p className="text-lg text-muted-foreground">
               A TypeScript-first SDK for sending emails through your
@@ -59,7 +59,7 @@ export default function SDKReferencePage() {
                   <CardContent className="p-6">
                     <pre className="overflow-x-auto rounded bg-muted p-4">
                       <code className="text-sm">
-                        npm install @wraps-js/email
+                        npm install @wraps.dev/email
                       </code>
                     </pre>
                   </CardContent>
@@ -69,7 +69,7 @@ export default function SDKReferencePage() {
                 <Card>
                   <CardContent className="p-6">
                     <pre className="overflow-x-auto rounded bg-muted p-4">
-                      <code className="text-sm">yarn add @wraps-js/email</code>
+                      <code className="text-sm">yarn add @wraps.dev/email</code>
                     </pre>
                   </CardContent>
                 </Card>
@@ -78,7 +78,7 @@ export default function SDKReferencePage() {
                 <Card>
                   <CardContent className="p-6">
                     <pre className="overflow-x-auto rounded bg-muted p-4">
-                      <code className="text-sm">pnpm add @wraps-js/email</code>
+                      <code className="text-sm">pnpm add @wraps.dev/email</code>
                     </pre>
                   </CardContent>
                 </Card>
@@ -92,7 +92,7 @@ export default function SDKReferencePage() {
             <Card>
               <CardContent className="p-6">
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">{`import { Wraps } from '@wraps-js/email';
+                  <code className="text-sm">{`import { Wraps } from '@wraps.dev/email';
 
 const wraps = new Wraps();
 
@@ -425,7 +425,7 @@ console.log('Email sent successfully:', result.data.messageId);`}</code>
             <Card>
               <CardContent className="p-6">
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">{`import { Wraps, SendEmailParams, SendEmailResult } from '@wraps-js/email';
+                  <code className="text-sm">{`import { Wraps, SendEmailParams, SendEmailResult } from '@wraps.dev/email';
 
 const wraps = new Wraps();
 
@@ -458,7 +458,7 @@ const result: SendEmailResult = await wraps.emails.send(params);`}</code>
                   </p>
                   <Button asChild variant="outline">
                     <a
-                      href="https://www.npmjs.com/package/@wraps-js/email"
+                      href="https://www.npmjs.com/package/@wraps.dev/email"
                       rel="noopener noreferrer"
                       target="_blank"
                     >

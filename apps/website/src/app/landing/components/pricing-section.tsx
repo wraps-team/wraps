@@ -11,7 +11,7 @@ const currentPlan = {
     "Deploy production-ready email infrastructure to your AWS account",
   features: [
     "One-command infrastructure deployment",
-    "TypeScript SDK (@wraps-js/email)",
+    "TypeScript SDK (@wraps.dev/email)",
     "Local console dashboard",
     "All AWS SES features (sending, tracking, analytics)",
     "Event tracking via EventBridge & DynamoDB",

@@ -18,7 +18,7 @@ Use this checklist when deploying the Wraps website to production.
 - [ ] Documentation is accurate and up-to-date
 - [ ] Pricing information is correct
 - [ ] GitHub repository links point to correct repos
-- [ ] npm package links are correct (@wraps-js/email)
+- [ ] npm package links are correct (@wraps.dev/email)
 
 ### SEO & Metadata
 - [ ] Page titles are set correctly

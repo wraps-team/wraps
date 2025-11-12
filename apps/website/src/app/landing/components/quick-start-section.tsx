@@ -13,10 +13,10 @@ import {
 } from "@/components/ui/shadcn-io/snippet";
 
 const installCommands = {
-  npm: "npm install @wraps-js/email",
-  pnpm: "pnpm add @wraps-js/email",
-  yarn: "yarn add @wraps-js/email",
-  bun: "bun add @wraps-js/email",
+  npm: "npm install @wraps.dev/email",
+  pnpm: "pnpm add @wraps.dev/email",
+  yarn: "yarn add @wraps.dev/email",
+  bun: "bun add @wraps.dev/email",
 };
 
 const cliExample = `# Deploy infrastructure to AWS
@@ -28,7 +28,7 @@ npx wraps verify yourdomain.com
 # View deployment status
 npx wraps status`;
 
-const sdkExample = `import { Wraps } from '@wraps-js/email';
+const sdkExample = `import { Wraps } from '@wraps.dev/email';
 
 const wraps = new Wraps();
 
