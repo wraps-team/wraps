@@ -191,16 +191,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarContent>
                 <SidebarGroup className="px-0">
                   <SidebarGroupContent>
-                    {activeProduct.subItems.map((subItem) => (
-                      <Link
-                        className="flex items-center gap-3 border-b p-4 text-sm leading-tight transition-colors last:border-b-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        key={subItem.title}
-                        to={subItem.url}
-                      >
-                        <subItem.icon className="size-4 shrink-0" />
-                        <span className="font-medium">{subItem.title}</span>
-                      </Link>
-                    ))}
+                    {activeProduct.subItems.map((subItem) => {
+                      // Check for exact match or if we're on a detail page under this section
+                      const isActive =
+                        location.pathname === subItem.url ||
+                        (subItem.url === "/email" &&
+                          location.pathname.startsWith("/email/") &&
+                          location.pathname !== "/email/metrics" &&
+                          location.pathname !== "/email/settings");
+                      return (
+                        <Link
+                          className={`flex items-center gap-3 border-b p-4 text-sm leading-tight transition-colors last:border-b-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
+                            isActive
+                              ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+                              : ""
+                          }`}
+                          key={subItem.title}
+                          to={subItem.url}
+                        >
+                          <subItem.icon className="size-4 shrink-0" />
+                          <span className="font-medium">{subItem.title}</span>
+                        </Link>
+                      );
+                    })}
                   </SidebarGroupContent>
                 </SidebarGroup>
               </SidebarContent>

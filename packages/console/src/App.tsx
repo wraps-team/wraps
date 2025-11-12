@@ -1,5 +1,11 @@
 import * as React from "react";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 import { AppSidebar } from "@/components/app-sidebar";
 import { EmailDetail } from "@/components/EmailDetail";
 import { EmailLogs } from "@/components/EmailLogs";
@@ -22,6 +28,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 function AppContent() {
   const location = useLocation();
+  const [tokenExtracted, setTokenExtracted] = React.useState(false);
 
   // Extract and store auth token from URL params on mount
   React.useEffect(() => {
@@ -35,6 +42,7 @@ function AppContent() {
         sessionStorage.setItem("wraps-auth-token", token);
       }
     }
+    setTokenExtracted(true);
   }, []);
 
   // Clear sidebar cookie on mount to ensure it starts expanded
@@ -84,13 +92,19 @@ function AppContent() {
           </Breadcrumb>
         </header>
         <div className="flex flex-1 flex-col gap-6 p-6">
-          <Routes>
-            <Route element={<Navigate replace to="/email" />} path="/" />
-            <Route element={<EmailLogs />} path="/email" />
-            <Route element={<EmailDetail />} path="/email/:id" />
-            <Route element={<EmailMetrics />} path="/email/metrics" />
-            <Route element={<EmailSettings />} path="/email/settings" />
-          </Routes>
+          {tokenExtracted ? (
+            <Routes>
+              <Route element={<Navigate replace to="/email" />} path="/" />
+              <Route element={<EmailLogs />} path="/email" />
+              <Route element={<EmailDetail />} path="/email/:id" />
+              <Route element={<EmailMetrics />} path="/email/metrics" />
+              <Route element={<EmailSettings />} path="/email/settings" />
+            </Routes>
+          ) : (
+            <div className="flex items-center justify-center p-8">
+              <div className="text-muted-foreground">Loading...</div>
+            </div>
+          )}
         </div>
       </SidebarInset>
     </SidebarProvider>
