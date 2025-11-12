@@ -1,10 +1,28 @@
 {
-  "name": "@wraps/cli",
+  "name": "@wraps.dev/cli",
   "version": "0.1.0",
   "description": "CLI for deploying Wraps email infrastructure to your AWS account",
   "type": "module",
+  "main": "./dist/cli.js",
   "bin": {
     "wraps": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wraps-team/wraps.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://wraps.dev",
+  "bugs": {
+    "url": "https://github.com/wraps-team/wraps/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "dev": "tsup --watch",

@@ -35,9 +35,11 @@ choco install pulumi
 ## Installation
 
 ```bash
-npm install -g @wraps/cli
+npm install -g @wraps.dev/cli
 # or
-pnpm add -g @wraps/cli
+pnpm add -g @wraps.dev/cli
+# or use npx (no installation required)
+npx @wraps.dev/cli init
 ```
 
 ## Quick Start
@@ -50,8 +52,9 @@ wraps init
 
 This will:
 - ✅ Validate your AWS credentials
-- ✅ Prompt for configuration (provider, region, domain)
-- ✅ Deploy IAM roles, SES config, DynamoDB, Lambda, SNS
+- ✅ Prompt for configuration preset (Starter, Production, Enterprise, or Custom)
+- ✅ Show estimated monthly costs based on your volume
+- ✅ Deploy infrastructure (IAM roles, SES, DynamoDB, Lambda, EventBridge, SQS)
 - ✅ Display next steps with role ARN and DNS records
 
 ### 2. Install the SDK
@@ -88,10 +91,11 @@ wraps status
 ```
 
 Shows:
-- Integration level (dashboard-only or enhanced)
+- Active features and configuration
 - AWS region
 - Verified domains
 - Deployed resources
+- Links to console dashboard
 
 ## Commands
 
@@ -127,6 +131,64 @@ Show current infrastructure status.
 wraps status
 ```
 
+### `wraps connect`
+
+Connect to existing AWS SES infrastructure and add Wraps features.
+
+**Options:**
+- `--account <account>` - AWS account ID or alias (optional)
+
+**Example:**
+
+```bash
+wraps connect
+```
+
+### `wraps console`
+
+Start local web dashboard for monitoring email activity.
+
+**Example:**
+
+```bash
+wraps console
+```
+
+Opens a local dashboard at `http://localhost:3000` with real-time email tracking.
+
+### `wraps verify`
+
+Verify domain DNS records and SES status.
+
+**Options:**
+- `-d, --domain <domain>` - Domain to verify
+
+**Example:**
+
+```bash
+wraps verify --domain myapp.com
+```
+
+### `wraps upgrade`
+
+Add features to existing infrastructure.
+
+**Example:**
+
+```bash
+wraps upgrade
+```
+
+### `wraps destroy`
+
+Remove all deployed Wraps infrastructure.
+
+**Example:**
+
+```bash
+wraps destroy
+```
+
 ### `wraps completion`
 
 Generate shell completion script.
@@ -137,13 +199,38 @@ Generate shell completion script.
 wraps completion
 ```
 
-This will display tab completion information for your shell.
+## Configuration Presets
 
-## Configuration
+Wraps offers feature-based configuration presets with transparent cost estimates:
 
-### Vercel Integration (Recommended)
+### Starter (~$0.05/mo)
+Perfect for MVPs and side projects:
+- Open & click tracking
+- Bounce/complaint suppression
+- Minimal infrastructure
 
-For Vercel projects, Wraps uses OIDC federation so you never need to store AWS credentials:
+### Production (~$2-5/mo) - Recommended
+For most applications:
+- Everything in Starter
+- Real-time event tracking (EventBridge)
+- 90-day email history storage
+- Reputation metrics dashboard
+
+### Enterprise (~$50-100/mo)
+For high-volume senders:
+- Everything in Production
+- Dedicated IP address
+- 1-year email history retention
+- All 10 SES event types tracked
+
+### Custom
+Configure each feature individually with granular control.
+
+## Hosting Provider Integration
+
+### Vercel (Recommended)
+
+Wraps uses OIDC federation so you never need to store AWS credentials:
 
 ```bash
 wraps init --provider vercel
@@ -155,13 +242,11 @@ You'll be prompted for:
 
 ### AWS Native
 
-For Lambda, ECS, or EC2 deployments:
+For Lambda, ECS, or EC2 deployments - uses IAM roles automatically:
 
 ```bash
 wraps init --provider aws
 ```
-
-Uses IAM roles automatically.
 
 ### Other Providers
 
@@ -171,25 +256,7 @@ For Railway, Render, or other platforms:
 wraps init --provider other
 ```
 
-Note: Will require AWS access keys.
-
-## Integration Levels
-
-### Enhanced (Recommended)
-
-Creates full email tracking infrastructure:
-- ✅ IAM role with send permissions
-- ✅ SES configuration set
-- ✅ DynamoDB table for email history
-- ✅ Lambda functions for event processing
-- ✅ SNS topics for bounce/complaint handling
-
-### Dashboard-Only
-
-Read-only access for dashboard integration:
-- ✅ IAM role with read-only permissions
-- ❌ No sending capabilities
-- ❌ No email history tracking
+Note: Will require AWS access keys as environment variables.
 
 ## Development
 
@@ -236,22 +303,38 @@ packages/cli/
 │   ├── cli.ts                    # Entry point
 │   ├── commands/                 # CLI commands
 │   │   ├── init.ts              # Deploy new infrastructure
-│   │   └── status.ts            # Show current setup
+│   │   ├── connect.ts           # Connect existing SES
+│   │   ├── console.ts           # Web dashboard
+│   │   ├── status.ts            # Show current setup
+│   │   ├── verify.ts            # DNS verification
+│   │   ├── upgrade.ts           # Add features
+│   │   └── destroy.ts           # Clean removal
 │   ├── infrastructure/           # Pulumi stacks
 │   │   ├── email-stack.ts       # Main stack
 │   │   ├── vercel-oidc.ts       # Vercel OIDC setup
 │   │   └── resources/           # Resource definitions
-│   │       ├── iam.ts
-│   │       ├── ses.ts
-│   │       └── dynamodb.ts
+│   │       ├── iam.ts           # IAM roles and policies
+│   │       ├── ses.ts           # SES configuration
+│   │       ├── dynamodb.ts      # Email history storage
+│   │       ├── lambda.ts        # Event processing
+│   │       ├── sqs.ts           # Event queues + DLQ
+│   │       └── eventbridge.ts   # SES event routing
+│   ├── console/                  # Web dashboard (React)
+│   ├── lambda/                   # Lambda function source
+│   │   └── event-processor/     # SQS → DynamoDB processor
 │   ├── utils/                    # Utilities
-│   │   ├── aws.ts
-│   │   ├── prompts.ts
-│   │   ├── errors.ts
-│   │   └── output.ts
+│   │   ├── aws.ts               # AWS SDK helpers
+│   │   ├── prompts.ts           # Interactive prompts
+│   │   ├── costs.ts             # Cost calculations
+│   │   ├── presets.ts           # Config presets
+│   │   ├── errors.ts            # Error handling
+│   │   └── metadata.ts          # Deployment metadata
 │   └── types/
 │       └── index.ts
+├── lambda/                       # Lambda source (bundled to dist)
 └── dist/                         # Build output
+    ├── console/                  # Built dashboard
+    └── lambda/                   # Lambda source for deployment
 ```
 
 ## Troubleshooting
@@ -282,34 +365,39 @@ If you've already deployed infrastructure:
 wraps status
 
 # To redeploy, destroy the existing stack first
-# (coming in Phase 3)
+wraps destroy
+wraps init
 ```
 
-## Roadmap
+## What's Included
 
-### Phase 1: MVP ✅
-- [x] Basic CLI structure
-- [x] AWS credential validation
-- [x] Interactive prompts
-- [x] Pulumi stack deployment
-- [x] Success output formatting
+### Core Commands ✅
+- [x] `wraps init` - Deploy new infrastructure
+- [x] `wraps connect` - Connect existing SES
+- [x] `wraps console` - Local web dashboard
+- [x] `wraps status` - Infrastructure status
+- [x] `wraps verify` - DNS verification
+- [x] `wraps upgrade` - Add features
+- [x] `wraps destroy` - Clean removal
+- [x] `wraps completion` - Shell completion
 
-### Phase 2: Core Deployment (Next)
-- [ ] Lambda function bundling
-- [ ] Enhanced error handling
-- [ ] Vercel environment variable setup
-- [ ] CloudWatch alarms
+### Features ✅
+- [x] Feature-based configuration presets
+- [x] Transparent cost estimation
+- [x] Lambda function bundling
+- [x] Vercel OIDC integration
+- [x] Real-time event tracking (EventBridge → SQS → Lambda → DynamoDB)
+- [x] Email history storage
+- [x] Bounce/complaint handling
+- [x] Non-destructive deployments
+- [x] Beautiful interactive prompts
+- [x] Comprehensive error handling
 
-### Phase 3: Existing SES Support
-- [ ] `wraps connect` command
-- [ ] Resource detection
-- [ ] Non-destructive deployment
-
-### Phase 4: Polish
-- [ ] `wraps verify` command (DNS verification)
-- [ ] `wraps upgrade` command
-- [ ] Comprehensive tests
-- [ ] Publishing to npm
+### Coming Soon
+- [ ] Multi-domain support
+- [ ] Advanced analytics dashboard
+- [ ] Email template management
+- [ ] Webhook integrations
 
 ## License
 
