@@ -5,6 +5,7 @@ import { Activity, BarChart3, Mail, Settings } from "lucide-react";
 import * as React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { NavUser } from "@/components/nav-user";
+import { useTheme } from "@/hooks/use-theme";
 import {
   Sidebar,
   SidebarContent,
@@ -66,6 +67,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const location = useLocation();
   const navigate = useNavigate();
   const { setOpen, state } = useSidebar();
+  const { theme } = useTheme();
 
   // Determine active product based on current route
   const getActiveProduct = React.useCallback(() => {
@@ -112,8 +114,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 size="lg"
               >
                 <Link to="/">
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                    <Activity className="size-4" />
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg">
+                    <img
+                      alt="Wraps"
+                      className="size-8 object-contain"
+                      src={
+                        theme === "dark"
+                          ? "/wraps-dark.png"
+                          : "/wraps-light.png"
+                      }
+                    />
                   </div>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">Wraps</span>
