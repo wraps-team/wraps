@@ -6,7 +6,6 @@ import {
   Gauge,
   Lock,
   Mail,
-  MessageSquare,
   Shield,
   Terminal,
   Workflow,
@@ -17,59 +16,59 @@ import { Button } from "@/components/ui/button";
 
 const mainFeatures = [
   {
-    icon: Mail,
-    title: "Email (SES)",
+    icon: Terminal,
+    title: "One-Command Deploy",
     description:
-      "Shipping now. Resend-like DX for AWS SES. Templates, tracking, webhooks.",
+      "Run 'npx wraps init' and get production-ready email infrastructure in under 2 minutes.",
     status: "Available",
   },
   {
-    icon: MessageSquare,
-    title: "SMS (End User Messaging)",
+    icon: Mail,
+    title: "Resend-like SDK",
     description:
-      "Coming next. Text messaging with AWS End User Messaging, not SNS.",
-    status: "Next",
+      "TypeScript-first SDK (@wraps-js/email) with the same clean API you love from Resend.",
+    status: "Available",
   },
   {
-    icon: Workflow,
-    title: "Workflows (SQS + Lambda)",
+    icon: Gauge,
+    title: "Event Tracking & Analytics",
     description:
-      "After SMS. Trigger-based workflows using SQS queues and Lambda functions.",
-    status: "Roadmap",
+      "Real-time delivery, open, click tracking with DynamoDB storage and beautiful dashboards.",
+    status: "Available",
   },
   {
     icon: Lock,
-    title: "Zero Vendor Lock-In",
+    title: "Zero Stored Credentials",
     description:
-      "Infrastructure stays in your AWS account. Stop paying us, keep using AWS.",
-    status: "",
+      "OIDC and IAM roles mean we never see your AWS keys. Your infrastructure, your control.",
+    status: "Available",
   },
 ];
 
 const secondaryFeatures = [
   {
-    icon: Gauge,
-    title: "Resend-like DX",
+    icon: Cloud,
+    title: "Pay AWS Directly",
     description:
-      "Beautiful APIs and dashboards that just work. AWS power, SaaS experience.",
+      "$0.10 per 1,000 emails vs Resend's $1. Most apps pay $5-20/month instead of $100+.",
   },
   {
     icon: Shield,
-    title: "Zero Stored Credentials",
+    title: "Production-Ready Configs",
     description:
-      "OIDC and IAM roles mean we never see your AWS keys. Maximum security.",
+      "Choose Starter ($0.05/mo), Production ($2-5/mo), or Enterprise ($50-100/mo) presets.",
   },
   {
     icon: Terminal,
-    title: "Forever Free Local Console",
+    title: "Local-First Dashboard",
     description:
-      "Full-featured local dashboard. No credit card, no limits, forever.",
+      "Run the console locally with zero setup. Upgrade to hosted when you're ready.",
   },
   {
-    icon: Cloud,
-    title: "Infrastructure Ownership",
+    icon: Workflow,
+    title: "Future-Proof Roadmap",
     description:
-      "You own it, you control it, your data never leaves your AWS account.",
+      "Starting with email, expanding to SMS (End User Messaging) and workflows (SQS + Lambda).",
   },
 ];
 
@@ -80,15 +79,15 @@ export function FeaturesSection() {
         {/* Section Header */}
         <div className="mx-auto mb-16 max-w-2xl text-center">
           <Badge className="mb-4" variant="outline">
-            Product Roadmap
+            How It Works
           </Badge>
           <h2 className="mb-4 font-bold text-3xl tracking-tight sm:text-4xl">
-            One Platform, Multiple AWS Services
+            Enterprise Email Infrastructure, Zero Hassle
           </h2>
           <p className="text-lg text-muted-foreground">
-            We're building infrastructure wrappers for the most common AWS
-            services. Each one gets SaaS-quality DX while staying in your AWS
-            account. Starting with email, expanding to SMS and workflows.
+            Deploy production-grade AWS SES infrastructure with event tracking,
+            analytics, and beautiful dashboards in one command. No AWS expertise
+            required.
           </p>
         </div>
 
@@ -105,13 +104,13 @@ export function FeaturesSection() {
           <div className="space-y-6">
             <div className="space-y-4">
               <h3 className="text-balance font-semibold text-2xl tracking-tight sm:text-3xl">
-                Building One Wrapper at a Time
+                Everything You Need, Nothing You Don't
               </h3>
               <p className="text-pretty text-base text-muted-foreground">
-                We're taking the best AWS services and wrapping them in
-                beautiful developer experiences. Each wrapper deploys to your
-                AWS account, you pay AWS directly, and you keep full control. No
-                lock-in, no surprises.
+                Wraps deploys AWS SES, DynamoDB, Lambda, EventBridge, and IAM
+                roles to your AWS account in one command. You get event
+                tracking, analytics, and a beautiful dashboard while paying AWS
+                directly at their rates.
               </p>
             </div>
 
@@ -180,12 +179,13 @@ export function FeaturesSection() {
           <div className="order-2 space-y-6 lg:order-1">
             <div className="space-y-4">
               <h3 className="text-balance font-semibold text-2xl tracking-tight sm:text-3xl">
-                Beautiful DX meets maximum security
+                Developer Experience That Rivals Resend
               </h3>
               <p className="text-pretty text-base text-muted-foreground">
-                Clean APIs, gorgeous dashboards, and one-command deployments.
-                All while using OIDC and IAM roles so we never touch your AWS
-                credentials. The security of self-hosted, the UX of SaaS.
+                Use our TypeScript SDK with the same clean API you love from
+                Resend. Track opens, clicks, bounces, and complaints in
+                real-time. View analytics in a beautiful dashboard. All while
+                saving 90% on costs.
               </p>
             </div>
 

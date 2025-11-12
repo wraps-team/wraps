@@ -3,6 +3,17 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* League Gothic Condensed Font */
+@font-face {
+  font-family: "League Gothic Condensed";
+  src:
+    url("/fonts/LeagueGothic-Condensed.woff2") format("woff2"),
+    url("/fonts/LeagueGothic-Condensed.woff") format("woff");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
   --font-sans: var(--font-inter);
   --radius-sm: calc(var(--radius) - 4px);

@@ -19,39 +19,39 @@ type FaqItem = {
 const faqItems: FaqItem[] = [
   {
     value: "item-1",
-    question: "How do I integrate ShadcnStore components into my project?",
+    question: "How is this different from using AWS SES directly?",
     answer:
-      "Integration is simple! All our components are built with shadcn/ui and work with React, Next.js, and Vite. Just copy the component code, install any required dependencies, and paste it into your project. Each component comes with detailed installation instructions and examples.",
+      "Wraps deploys all the infrastructure AWS SES needs (IAM roles, EventBridge, DynamoDB, Lambda, SQS) in one command instead of 2+ hours of manual setup. You get event tracking, analytics, webhooks, and a beautiful dashboard out of the box. Plus our TypeScript SDK gives you a Resend-like API instead of raw AWS SDK.",
   },
   {
     value: "item-2",
-    question: "What's the difference between free and premium components?",
+    question: "How much does it really cost vs Resend or Postmark?",
     answer:
-      "Free components include essential UI elements like buttons, forms, and basic layouts. Premium components offer advanced features like complex data tables, analytics dashboards, authentication flows, and complete admin templates. Premium also includes Figma files, priority support, and commercial licenses.",
+      "With Wraps, you pay AWS directly at $0.10 per 1,000 emails. For 50,000 emails/month, that's $5 to AWS + $10-49 to Wraps (if you want hosted dashboard) = $15-54 total. Resend charges $100/month for the same volume. At 500,000 emails/month: Wraps costs $60-99 vs Resend's $500. You save 80-90% at scale.",
   },
   {
     value: "item-3",
-    question: "Can I use these components in commercial projects?",
+    question: "Do you store my AWS credentials?",
     answer:
-      "Yes! Free components come with an MIT license for unlimited use. Premium components include a commercial license that allows usage in client projects, SaaS applications, and commercial products without attribution requirements.",
+      "No! We use OIDC (OpenID Connect) for Vercel deployments or IAM roles for AWS-native deployments. The CLI uses your local AWS credentials for the initial deployment, then creates IAM roles that your app can assume. We never see or store your AWS access keys.",
   },
   {
     value: "item-4",
-    question: "Do you provide support and updates?",
+    question: "What happens if I stop paying for Wraps?",
     answer:
-      "Absolutely! We provide community support for free components through our Discord server and GitHub issues. Premium subscribers get priority email support, regular component updates, and early access to new releases. We also maintain compatibility with the latest shadcn/ui versions.",
+      "Your infrastructure keeps running! All resources are in your AWS account. You lose access to the hosted dashboard (if you had it) but can still use the free local console. Your SDK code keeps working, emails keep sending, and you keep paying AWS directly. Zero vendor lock-in.",
   },
   {
     value: "item-5",
-    question: "What frameworks and tools do you support?",
+    question: "Can I customize the infrastructure deployment?",
     answer:
-      "Our components work with React 18+, Next.js 13+, and Vite. We use TypeScript, Tailwind CSS, and follow shadcn/ui conventions. Components are tested with popular tools like React Hook Form, TanStack Query, and Zustand for state management.",
+      "Yes! Choose between Starter ($0.05/month), Production ($2-5/month), or Enterprise ($50-100/month) presets based on features you need. You can also use 'wraps upgrade' to add features incrementally. For full customization, all infrastructure is deployed as open-source Pulumi code you can fork and modify.",
   },
   {
     value: "item-6",
-    question: "How often do you release new components?",
+    question: "Does this work with my existing SES setup?",
     answer:
-      "We release new components and templates weekly. Premium subscribers get early access to new releases, while free components are updated regularly based on community feedback. You can track our roadmap and request specific components through our GitHub repository.",
+      "Yes! Use 'wraps connect' to scan your existing SES resources and add Wraps features non-destructively. We never modify existing resources—all our infrastructure uses the 'wraps-email-' prefix. You can also use 'wraps init' for a completely fresh deployment.",
   },
 ];
 
@@ -68,8 +68,8 @@ const FaqSection = () => {
             Frequently Asked Questions
           </h2>
           <p className="text-lg text-muted-foreground">
-            Everything you need to know about ShadcnStore components, licensing,
-            and integration. Still have questions? We're here to help!
+            Everything you need to know about Wraps, pricing, security, and
+            deployment. Still have questions? We're here to help!
           </p>
         </div>
 

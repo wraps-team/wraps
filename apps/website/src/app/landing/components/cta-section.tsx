@@ -1,55 +1,44 @@
 "use client";
 
-import { ArrowRight, Github, Package, TrendingUp } from "lucide-react";
+import { ArrowRight, Github, Rocket, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 
 export function CTASection() {
   return (
-    <section className="bg-muted/80 py-16 lg:py-24">
+    <section className="bg-gradient-to-b from-background via-muted/50 to-background py-16 lg:py-24">
       <div className="container mx-auto px-4 lg:px-8">
         <div className="mx-auto max-w-4xl">
           <div className="text-center">
             <div className="space-y-8">
-              {/* Badge and Stats */}
+              {/* Badge */}
               <div className="flex flex-col items-center gap-4">
                 <Badge className="flex items-center gap-2" variant="outline">
-                  <TrendingUp className="size-3" />
-                  Productivity Suite
+                  <Sparkles className="size-3" />
+                  Ready to Deploy
                 </Badge>
-
-                <div className="flex items-center gap-4 text-muted-foreground text-sm">
-                  <span className="flex items-center gap-1">
-                    <div className="size-2 rounded-full bg-green-500" />
-                    150+ Blocks
-                  </span>
-                  <Separator className="h-4!" orientation="vertical" />
-                  <span>25K+ Downloads</span>
-                  <Separator className="h-4!" orientation="vertical" />
-                  <span>4.9★ Rating</span>
-                </div>
               </div>
 
               {/* Main Content */}
               <div className="space-y-6">
                 <h1 className="text-balance font-bold text-4xl tracking-tight sm:text-5xl lg:text-6xl">
-                  Supercharge your team's
+                  Own your email
                   <span className="flex justify-center sm:inline-flex">
                     <span className="relative mx-2">
-                      <span className="bg-linear-to-r from-primary to-secondary bg-clip-text text-transparent">
-                        performance
+                      <span className="bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                        infrastructure
                       </span>
-                      <div className="-bottom-2 absolute start-0 h-1 w-full bg-linear-to-r from-primary/30 to-secondary/30" />
+                      <div className="-bottom-2 absolute start-0 h-1 w-full bg-linear-to-r from-primary/30 to-primary/10" />
                     </span>
+                  </span>
+                  <span className="flex justify-center sm:inline-flex">
                     today
                   </span>
                 </h1>
 
                 <p className="mx-auto max-w-2xl text-balance text-muted-foreground lg:text-xl">
-                  Stop building from scratch. Get production-ready components,
-                  templates and dashboards that integrate seamlessly with your
-                  shadcn/ui projects.
+                  Deploy production-ready AWS SES infrastructure in one command.
+                  Pay AWS directly, keep full control, and never lock in.
                 </p>
               </div>
 
@@ -60,13 +49,9 @@ export function CTASection() {
                   className="cursor-pointer px-8 py-6 font-medium text-lg"
                   size="lg"
                 >
-                  <a
-                    href="https://shadcnstore.com/blocks"
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    <Package className="me-2 size-5" />
-                    Browse Components
+                  <a href="/docs/quickstart">
+                    <Rocket className="me-2 size-5" />
+                    Get Started Free
                   </a>
                 </Button>
                 <Button
@@ -76,7 +61,7 @@ export function CTASection() {
                   variant="outline"
                 >
                   <a
-                    href="https://github.com/silicondeck/shadcn-dashboard-landing-template"
+                    href="https://github.com/wraps-team/wraps"
                     rel="noopener noreferrer"
                     target="_blank"
                   >
@@ -91,18 +76,15 @@ export function CTASection() {
               <div className="flex flex-wrap items-center justify-center gap-6 text-muted-foreground text-sm">
                 <div className="flex items-center gap-2">
                   <div className="me-1 size-2 rounded-full bg-green-600 dark:bg-green-400" />
-
-                  <span>Free components available</span>
+                  <span>Forever free local console</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="me-1 size-2 rounded-full bg-blue-600 dark:bg-blue-400" />
-
-                  <span>Commercial license included</span>
+                  <span>Open source (AGPLv3)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="me-1 size-2 rounded-full bg-purple-600 dark:bg-purple-400" />
-
-                  <span>Regular updates & support</span>
+                  <span>Zero vendor lock-in</span>
                 </div>
               </div>
             </div>

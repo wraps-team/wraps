@@ -3,6 +3,10 @@ import { lazy } from "react";
 // Lazy load components for better performance
 const Landing = lazy(() => import("@/app/landing/page"));
 const SimpleLanding = lazy(() => import("@/app/simple-landing/page"));
+const Docs = lazy(() => import("@/app/docs/page"));
+const QuickstartDocs = lazy(() => import("@/app/docs/quickstart/page"));
+const SDKReferenceDocs = lazy(() => import("@/app/docs/sdk-reference/page"));
+const CLIReferenceDocs = lazy(() => import("@/app/docs/cli-reference/page"));
 const NotFound = lazy(() => import("@/app/not-found/page"));
 
 export type RouteConfig = {
@@ -22,6 +26,24 @@ export const routes: RouteConfig[] = [
   {
     path: "/simple",
     element: <SimpleLanding />,
+  },
+
+  // Documentation
+  {
+    path: "/docs",
+    element: <Docs />,
+  },
+  {
+    path: "/docs/quickstart",
+    element: <QuickstartDocs />,
+  },
+  {
+    path: "/docs/sdk-reference",
+    element: <SDKReferenceDocs />,
+  },
+  {
+    path: "/docs/cli-reference",
+    element: <CLIReferenceDocs />,
   },
 
   // Catch-all route for 404

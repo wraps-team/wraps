@@ -21,34 +21,33 @@ export function HeroSection() {
           <div className="mb-8 flex justify-center">
             <Badge className="border-foreground px-4 py-2" variant="outline">
               <Star className="mr-2 h-3 w-3 fill-current" />
-              Open Source • Forever Free Local Console
+              Open Source • Zero Stored Credentials
               <ArrowRight className="ml-2 h-3 w-3" />
             </Badge>
           </div>
 
           {/* Main Headline */}
           <h1 className="mb-6 font-bold text-4xl tracking-tight sm:text-6xl lg:text-7xl">
-            AWS Infrastructure Wrappers
+            Deploy Email Infrastructure
             <span className="bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
               {" "}
-              with SaaS Provider DX{" "}
+              to Your AWS Account{" "}
             </span>
-            on Your Own AWS Account
+            in 30 Seconds
           </h1>
 
           {/* Subheading */}
           <p className="mx-auto mb-10 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-            Deploy production-ready infrastructure to your AWS account in 30
-            seconds. Starting with SES for email, then AWS End User Messaging
-            for SMS, then SQS + Lambda for workflows. Zero vendor lock-in, AWS
-            pricing, SaaS-quality DX.
+            One command deploys production-ready AWS SES infrastructure with
+            Resend-like developer experience. You own the infrastructure, pay
+            AWS directly (pennies vs dollars), and never lock in.
           </p>
 
           {/* CTA Buttons */}
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
             <Button asChild className="cursor-pointer text-base" size="lg">
-              <a href="#pricing">
-                Get Started Free
+              <a href="/docs/quickstart">
+                Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </a>
             </Button>
@@ -64,9 +63,27 @@ export function HeroSection() {
                 target="_blank"
               >
                 <Star className="mr-2 h-4 w-4" />
-                View on GitHub
+                Star on GitHub
               </a>
             </Button>
+          </div>
+
+          {/* Quick Install */}
+          <div className="mx-auto mt-8 max-w-md">
+            <p className="mb-2 text-muted-foreground text-sm">Quick install:</p>
+            <div className="flex items-center gap-2 rounded-lg border bg-card p-3">
+              <code className="flex-1 text-sm">npx wraps init</code>
+              <Button
+                className="shrink-0"
+                onClick={() => {
+                  navigator.clipboard.writeText("npx wraps init");
+                }}
+                size="sm"
+                variant="ghost"
+              >
+                Copy
+              </Button>
+            </div>
           </div>
         </div>
 

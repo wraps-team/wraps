@@ -1,33 +1,33 @@
 "use client";
 
-import { Download, Package, Star, Users } from "lucide-react";
+import { Clock, DollarSign, Gauge, Zap } from "lucide-react";
 import { DotPattern } from "@/components/dot-pattern";
 import { Card, CardContent } from "@/components/ui/card";
 
 const stats = [
   {
-    icon: Package,
-    value: "500+",
-    label: "Components",
-    description: "Ready-to-use blocks",
+    icon: Clock,
+    value: "<2 min",
+    label: "Deploy Time",
+    description: "From zero to production",
   },
   {
-    icon: Download,
-    value: "25K+",
-    label: "Downloads",
-    description: "Trusted worldwide",
+    icon: DollarSign,
+    value: "90%",
+    label: "Cost Savings",
+    description: "vs Resend at scale",
   },
   {
-    icon: Users,
-    value: "10K+",
-    label: "Developers",
-    description: "Active community",
+    icon: Zap,
+    value: "$0.10",
+    label: "Per 1K Emails",
+    description: "AWS SES pricing",
   },
   {
-    icon: Star,
-    value: "4.9",
-    label: "Rating",
-    description: "User satisfaction",
+    icon: Gauge,
+    value: "100%",
+    label: "Open Source",
+    description: "CLI, SDK, Console",
   },
 ];
 

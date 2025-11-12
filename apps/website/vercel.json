@@ -1,0 +1,12 @@
+{
+  "buildCommand": "cd ../.. && pnpm build --filter=wraps-website",
+  "outputDirectory": "dist",
+  "installCommand": "cd ../.. && pnpm install",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
