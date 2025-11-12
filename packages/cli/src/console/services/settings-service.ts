@@ -146,16 +146,22 @@ export async function fetchEmailIdentity(
           tokens: response.DkimAttributes.Tokens,
           signingEnabled: response.DkimAttributes.SigningEnabled ?? false,
           signingKeyLength: response.DkimAttributes
-            .NextSigningKeyLength as EmailIdentityDetails["dkimAttributes"]["signingKeyLength"],
+            .NextSigningKeyLength as NonNullable<
+            EmailIdentityDetails["dkimAttributes"]
+          >["signingKeyLength"],
         }
       : undefined,
     mailFromAttributes: response.MailFromAttributes
       ? {
           mailFromDomain: response.MailFromAttributes.MailFromDomain,
           mailFromDomainStatus: response.MailFromAttributes
-            .MailFromDomainStatus as EmailIdentityDetails["mailFromAttributes"]["mailFromDomainStatus"],
+            .MailFromDomainStatus as NonNullable<
+            EmailIdentityDetails["mailFromAttributes"]
+          >["mailFromDomainStatus"],
           behaviorOnMxFailure: response.MailFromAttributes
-            .BehaviorOnMxFailure as EmailIdentityDetails["mailFromAttributes"]["behaviorOnMxFailure"],
+            .BehaviorOnMxFailure as NonNullable<
+            EmailIdentityDetails["mailFromAttributes"]
+          >["behaviorOnMxFailure"],
         }
       : undefined,
     configurationSetName: response.ConfigurationSetName,
