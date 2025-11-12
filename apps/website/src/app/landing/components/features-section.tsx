@@ -96,9 +96,9 @@ export function FeaturesSection() {
           {/* Left Image */}
           <Image3D
             alt="Analytics dashboard"
-            darkSrc="feature-1-dark.png"
+            darkSrc="feature-1-dark.webp"
             direction="left"
-            lightSrc="feature-1-light.png"
+            lightSrc="feature-1-light.webp"
           />
           {/* Right Content */}
           <div className="space-y-6">
@@ -230,9 +230,9 @@ export function FeaturesSection() {
           <Image3D
             alt="Performance dashboard"
             className="order-1 lg:order-2"
-            darkSrc="feature-2-dark.png"
+            darkSrc="feature-2-dark.webp"
             direction="right"
-            lightSrc="feature-2-light.png"
+            lightSrc="feature-2-light.webp"
           />
         </div>
       </div>

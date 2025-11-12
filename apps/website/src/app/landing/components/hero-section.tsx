@@ -120,14 +120,14 @@ export function HeroSection() {
               <img
                 alt="Dashboard Preview - Light Mode"
                 className="block w-full rounded-xl object-cover dark:hidden"
-                src={assetUrl("dashboard-light.png")}
+                src={assetUrl("dashboard-light.webp")}
               />
 
               {/* Dark mode dashboard image */}
               <img
                 alt="Dashboard Preview - Dark Mode"
                 className="hidden w-full rounded-xl object-cover dark:block"
-                src={assetUrl("dashboard-dark.png")}
+                src={assetUrl("dashboard-dark.webp")}
               />
 
               {/* Bottom fade effect - gradient overlay that fades the image to background */}
