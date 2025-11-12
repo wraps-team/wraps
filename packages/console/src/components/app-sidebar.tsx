@@ -5,7 +5,6 @@ import { Activity, BarChart3, Mail, Settings } from "lucide-react";
 import * as React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { NavUser } from "@/components/nav-user";
-import { useTheme } from "@/hooks/use-theme";
 import {
   Sidebar,
   SidebarContent,
@@ -19,6 +18,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useTheme } from "@/hooks/use-theme";
 
 type SubItem = {
   title: string;

@@ -1,6 +1,5 @@
 import * as React from "react";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
-import { AggregateDashboard } from "@/components/AggregateDashboard";
 import { AppSidebar } from "@/components/app-sidebar";
 import { EmailDetail } from "@/components/EmailDetail";
 import { EmailLogs } from "@/components/EmailLogs";
@@ -55,7 +54,6 @@ function AppContent() {
 
     switch (location.pathname) {
       case "/":
-        return "Dashboard";
       case "/email":
         return "Emails";
       case "/email/metrics":
@@ -63,7 +61,7 @@ function AppContent() {
       case "/email/settings":
         return "Email Settings";
       default:
-        return "Dashboard";
+        return "Emails";
     }
   };
 
@@ -87,7 +85,7 @@ function AppContent() {
         </header>
         <div className="flex flex-1 flex-col gap-6 p-6">
           <Routes>
-            <Route element={<AggregateDashboard />} path="/" />
+            <Route element={<Navigate replace to="/email" />} path="/" />
             <Route element={<EmailLogs />} path="/email" />
             <Route element={<EmailDetail />} path="/email/:id" />
             <Route element={<EmailMetrics />} path="/email/metrics" />
