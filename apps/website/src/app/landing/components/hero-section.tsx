@@ -68,21 +68,41 @@ export function HeroSection() {
             </Button>
           </div>
 
-          {/* Quick Install */}
-          <div className="mx-auto mt-8 max-w-md">
-            <p className="mb-2 text-muted-foreground text-sm">Quick install:</p>
-            <div className="flex items-center gap-2 rounded-lg border bg-card p-3">
-              <code className="flex-1 text-sm">npx wraps init</code>
-              <Button
-                className="shrink-0"
-                onClick={() => {
-                  navigator.clipboard.writeText("npx wraps init");
-                }}
-                size="sm"
-                variant="ghost"
-              >
-                Copy
-              </Button>
+          {/* Quick Install with Terminal Demo */}
+          <div className="mx-auto mt-12 max-w-2xl">
+            <div className="relative">
+              {/* Glow effect behind terminal */}
+              <div className="-inset-4 absolute rounded-2xl bg-primary/20 blur-2xl" />
+
+              {/* Terminal */}
+              <div className="relative overflow-hidden rounded-xl border-2 bg-card shadow-2xl">
+                <div className="flex items-center gap-2 border-b bg-muted/50 px-4 py-3">
+                  <div className="flex gap-1.5">
+                    <div className="h-3 w-3 rounded-full bg-red-500" />
+                    <div className="h-3 w-3 rounded-full bg-yellow-500" />
+                    <div className="h-3 w-3 rounded-full bg-green-500" />
+                  </div>
+                  <span className="ml-2 font-medium text-muted-foreground text-xs">
+                    terminal
+                  </span>
+                </div>
+                <div className="bg-muted/30 p-4 font-mono text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-primary">$</span>
+                    <code className="flex-1">npx wraps init</code>
+                    <Button
+                      className="shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText("npx wraps init");
+                      }}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -1,16 +1,22 @@
 "use client";
 
-import { CheckCircle2, Copy } from "lucide-react";
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Snippet,
+  SnippetCopyButton,
+  SnippetHeader,
+  SnippetTabsContent,
+  SnippetTabsList,
+  SnippetTabsTrigger,
+} from "@/components/ui/shadcn-io/snippet";
 
 const installCommands = {
   npm: "npm install @wraps-js/email",
   pnpm: "pnpm add @wraps-js/email",
   yarn: "yarn add @wraps-js/email",
+  bun: "bun add @wraps-js/email",
 };
 
 const cliExample = `# Deploy infrastructure to AWS
@@ -36,42 +42,6 @@ const result = await wraps.emails.send({
 if (result.success) {
   console.log('Email sent:', result.data.messageId);
 }`;
-
-function CodeBlock({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="group relative">
-      <pre className="overflow-x-auto rounded-lg border bg-muted/50 p-4 text-sm">
-        <code className="text-foreground">{code}</code>
-      </pre>
-      <Button
-        className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
-        onClick={copyToClipboard}
-        size="sm"
-        variant="ghost"
-      >
-        {copied ? (
-          <>
-            <CheckCircle2 className="mr-1 h-3 w-3" />
-            Copied!
-          </>
-        ) : (
-          <>
-            <Copy className="mr-1 h-3 w-3" />
-            Copy
-          </>
-        )}
-      </Button>
-    </div>
-  );
-}
 
 export function QuickStartSection() {
   return (
@@ -111,7 +81,19 @@ export function QuickStartSection() {
                     to your account.
                   </p>
                 </div>
-                <CodeBlock code={cliExample} />
+                <div className="group relative">
+                  <pre className="overflow-x-auto rounded-lg border bg-muted/50 p-4 text-sm">
+                    <code className="text-foreground">{cliExample}</code>
+                  </pre>
+                  <Button
+                    className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
+                    onClick={() => navigator.clipboard.writeText(cliExample)}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Copy
+                  </Button>
+                </div>
                 <div className="mt-4 rounded-lg bg-muted/50 p-4">
                   <p className="font-medium text-sm">
                     ✨ Takes less than 2 minutes
@@ -144,24 +126,47 @@ export function QuickStartSection() {
                   </p>
 
                   {/* Package Manager Tabs */}
-                  <Tabs className="mb-4" defaultValue="npm">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="npm">npm</TabsTrigger>
-                      <TabsTrigger value="pnpm">pnpm</TabsTrigger>
-                      <TabsTrigger value="yarn">yarn</TabsTrigger>
-                    </TabsList>
+                  <Snippet className="mb-4" defaultValue="npm">
+                    <SnippetHeader>
+                      <SnippetTabsList>
+                        <SnippetTabsTrigger value="npm">npm</SnippetTabsTrigger>
+                        <SnippetTabsTrigger value="pnpm">
+                          pnpm
+                        </SnippetTabsTrigger>
+                        <SnippetTabsTrigger value="yarn">
+                          yarn
+                        </SnippetTabsTrigger>
+                        <SnippetTabsTrigger value="bun">bun</SnippetTabsTrigger>
+                      </SnippetTabsList>
+                      <SnippetCopyButton
+                        className="opacity-100"
+                        value={installCommands.npm}
+                      />
+                    </SnippetHeader>
                     {Object.entries(installCommands).map(([key, command]) => (
-                      <TabsContent key={key} value={key}>
-                        <CodeBlock code={command} />
-                      </TabsContent>
+                      <SnippetTabsContent key={key} value={key}>
+                        {command}
+                      </SnippetTabsContent>
                     ))}
-                  </Tabs>
+                  </Snippet>
                 </div>
 
                 <p className="mb-2 font-medium text-sm">
                   Send your first email:
                 </p>
-                <CodeBlock code={sdkExample} />
+                <div className="group relative">
+                  <pre className="overflow-x-auto rounded-lg border bg-muted/50 p-4 text-sm">
+                    <code className="text-foreground">{sdkExample}</code>
+                  </pre>
+                  <Button
+                    className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
+                    onClick={() => navigator.clipboard.writeText(sdkExample)}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Copy
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>

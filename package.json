@@ -1,5 +1,5 @@
 {
-  "name": "wraps",
+  "name": "wraps-monorepo",
   "private": true,
   "description": "Wraps - wrap your AWS account's SES, SNS, SQS, IoT, and more",
   "repository": {
@@ -11,6 +11,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage --filter=@wraps/cli",
     "lint": "npx ultracite@latest check",
     "typecheck": "turbo run typecheck",
     "check": "npx ultracite@latest check",

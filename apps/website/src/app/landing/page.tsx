@@ -1,3 +1,4 @@
+import { CodeExamplesSection } from "./components/code-examples-section";
 import { CTASection } from "./components/cta-section";
 import { FaqSection } from "./components/faq-section";
 import { FeaturesSection } from "./components/features-section";
@@ -7,6 +8,7 @@ import { LandingNavbar } from "./components/navbar";
 import { PricingSection } from "./components/pricing-section";
 import { QuickStartSection } from "./components/quick-start-section";
 import { StatsSection } from "./components/stats-section";
+import { TechStackSection } from "./components/tech-stack-section";
 
 export default function LandingPage() {
   return (
@@ -18,8 +20,10 @@ export default function LandingPage() {
       <main>
         <HeroSection />
         <QuickStartSection />
+        <CodeExamplesSection />
         <StatsSection />
         <FeaturesSection />
+        <TechStackSection />
         <PricingSection />
         <FaqSection />
         <CTASection />
