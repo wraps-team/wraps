@@ -62,15 +62,15 @@ This will:
 After deploying, install the TypeScript SDK to send emails:
 
 ```bash
-npm install @wraps-js/email
+npm install @wraps.dev/email
 # or
-pnpm add @wraps-js/email
+pnpm add @wraps.dev/email
 ```
 
 **Send your first email:**
 
 ```typescript
-import { Wraps } from '@wraps-js/email';
+import { Wraps } from '@wraps.dev/email';
 
 const wraps = new Wraps();
 
@@ -82,7 +82,7 @@ await wraps.emails.send({
 });
 ```
 
-Learn more: [SDK Documentation](https://github.com/wraps-team/wraps-js) | [npm](https://www.npmjs.com/package/@wraps-js/email)
+Learn more: [SDK Documentation](https://github.com/wraps-team/wraps-js) | [npm](https://www.npmjs.com/package/@wraps.dev/email)
 
 ### 3. Check Status
 
