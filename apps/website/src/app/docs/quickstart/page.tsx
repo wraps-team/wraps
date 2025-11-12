@@ -85,7 +85,7 @@ export default function QuickstartPage() {
                   Terminal
                 </div>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx wraps init</code>
+                  <code className="text-sm">npx @wraps.dev/cli init</code>
                 </pre>
               </CardContent>
             </Card>
@@ -207,7 +207,7 @@ if (result.success) {
                   Terminal
                 </div>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx @wraps/console</code>
+                  <code className="text-sm">npx @wraps.dev/cli console</code>
                 </pre>
               </CardContent>
             </Card>

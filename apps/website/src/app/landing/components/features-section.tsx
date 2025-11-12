@@ -19,7 +19,7 @@ const mainFeatures = [
     icon: Terminal,
     title: "One-Command Deploy",
     description:
-      "Run 'npx wraps init' and get production-ready email infrastructure in under 2 minutes.",
+      "Run 'npx @wraps.dev/cli init' and get production-ready email infrastructure in under 2 minutes.",
     status: "Available",
   },
   {

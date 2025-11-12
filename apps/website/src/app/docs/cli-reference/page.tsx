@@ -87,7 +87,9 @@ export default function CLIReferencePage() {
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx wraps init [options]</code>
+                  <code className="text-sm">
+                    npx @wraps.dev/cli init [options]
+                  </code>
                 </pre>
               </CardContent>
             </Card>
@@ -173,7 +175,7 @@ export default function CLIReferencePage() {
                     Interactive setup (recommended for first time):
                   </p>
                   <pre className="overflow-x-auto rounded bg-muted p-3">
-                    <code className="text-sm">npx wraps init</code>
+                    <code className="text-sm">npx @wraps.dev/cli init</code>
                   </pre>
                 </div>
                 <div>
@@ -182,8 +184,8 @@ export default function CLIReferencePage() {
                   </p>
                   <pre className="overflow-x-auto rounded bg-muted p-3">
                     <code className="text-sm">
-                      npx wraps init --domain yourdomain.com --region us-west-2
-                      --preset production --provider vercel
+                      npx @wraps.dev/cli init --domain yourdomain.com --region
+                      us-west-2 --preset production --provider vercel
                     </code>
                   </pre>
                 </div>
@@ -208,7 +210,7 @@ export default function CLIReferencePage() {
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx wraps status</code>
+                  <code className="text-sm">npx @wraps.dev/cli status</code>
                 </pre>
               </CardContent>
             </Card>
@@ -252,7 +254,7 @@ export default function CLIReferencePage() {
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
                   <code className="text-sm">
-                    npx wraps verify &lt;domain&gt;
+                    npx @wraps.dev/cli verify &lt;domain&gt;
                   </code>
                 </pre>
               </CardContent>
@@ -282,7 +284,7 @@ export default function CLIReferencePage() {
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
                   <code className="text-sm">
-                    npx wraps verify yourdomain.com
+                    npx @wraps.dev/cli verify yourdomain.com
                   </code>
                 </pre>
               </CardContent>
@@ -306,7 +308,9 @@ export default function CLIReferencePage() {
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx wraps connect [options]</code>
+                  <code className="text-sm">
+                    npx @wraps.dev/cli connect [options]
+                  </code>
                 </pre>
               </CardContent>
             </Card>
@@ -367,7 +371,9 @@ export default function CLIReferencePage() {
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx wraps upgrade [options]</code>
+                  <code className="text-sm">
+                    npx @wraps.dev/cli upgrade [options]
+                  </code>
                 </pre>
               </CardContent>
             </Card>
@@ -428,7 +434,7 @@ export default function CLIReferencePage() {
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx @wraps/console</code>
+                  <code className="text-sm">npx @wraps.dev/cli console</code>
                 </pre>
               </CardContent>
             </Card>
@@ -485,7 +491,9 @@ export default function CLIReferencePage() {
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx wraps restore [options]</code>
+                  <code className="text-sm">
+                    npx @wraps.dev/cli restore [options]
+                  </code>
                 </pre>
               </CardContent>
             </Card>
@@ -540,7 +548,9 @@ export default function CLIReferencePage() {
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx wraps destroy [options]</code>
+                  <code className="text-sm">
+                    npx @wraps.dev/cli destroy [options]
+                  </code>
                 </pre>
               </CardContent>
             </Card>

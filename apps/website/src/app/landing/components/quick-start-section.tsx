@@ -20,13 +20,13 @@ const installCommands = {
 };
 
 const cliExample = `# Deploy infrastructure to AWS
-npx wraps init
+npx @wraps.dev/cli init
 
 # Verify your domain
-npx wraps verify yourdomain.com
+npx @wraps.dev/cli verify yourdomain.com
 
 # View deployment status
-npx wraps status`;
+npx @wraps.dev/cli status`;
 
 const sdkExample = `import { Wraps } from '@wraps.dev/email';
 

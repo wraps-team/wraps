@@ -5,7 +5,7 @@
 Deploy production-ready email infrastructure to your AWS account in 30 seconds. No vendor lock-in, AWS pricing, Resend-like DX.
 
 ```bash
-npx @wraps/cli init
+npx @wraps.dev/cli init
 # ✓ SES configured
 # ✓ Domain verification guided
 # ✓ Event tracking enabled
@@ -68,16 +68,16 @@ Wraps deploys communication infrastructure (starting with email) **to your AWS a
 
 ```bash
 # Deploy email infrastructure
-npx @wraps/cli init
+npx @wraps.dev/cli init
 
 # Check deployment status
-npx @wraps/cli status
+npx @wraps.dev/cli status
 
 # Verify domain DNS records
-npx @wraps/cli verify --domain yourapp.com
+npx @wraps.dev/cli verify --domain yourapp.com
 
 # Clean removal
-npx @wraps/cli destroy
+npx @wraps.dev/cli destroy
 ```
 
 ### What Gets Deployed

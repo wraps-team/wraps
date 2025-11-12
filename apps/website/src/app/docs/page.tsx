@@ -78,7 +78,7 @@ export default function DocsPage() {
               <pre className="overflow-x-auto text-sm">
                 <code className="text-foreground">
                   {`# Deploy infrastructure to AWS
-npx wraps init
+npx @wraps.dev/cli init
 
 # Install SDK
 npm install @wraps.dev/email
