@@ -24,9 +24,9 @@ const mainFeatures = [
   },
   {
     icon: Mail,
-    title: "Resend-like SDK",
+    title: "Beautiful Developer Experience",
     description:
-      "TypeScript-first SDK (@wraps.dev/email) with the same clean API you love from Resend.",
+      "TypeScript-first SDK (@wraps.dev/email) with a clean, intuitive API that makes sending emails delightful.",
     status: "Available",
   },
   {
@@ -48,9 +48,9 @@ const mainFeatures = [
 const secondaryFeatures = [
   {
     icon: Cloud,
-    title: "Pay AWS Directly",
+    title: "AWS Pricing, No Markup",
     description:
-      "$0.10 per 1,000 emails vs Resend's $1. Most apps pay $5-20/month instead of $100+.",
+      "Pay AWS directly at $0.10 per 1,000 emails. Scale affordably without worrying about tier limits or surprise bills.",
   },
   {
     icon: Shield,
@@ -179,13 +179,12 @@ export function FeaturesSection() {
           <div className="order-2 space-y-6 lg:order-1">
             <div className="space-y-4">
               <h3 className="text-balance font-semibold text-2xl tracking-tight sm:text-3xl">
-                Developer Experience That Rivals Resend
+                Email Superpowers for Your Team
               </h3>
               <p className="text-pretty text-base text-muted-foreground">
-                Use our TypeScript SDK with the same clean API you love from
-                Resend. Track opens, clicks, bounces, and complaints in
-                real-time. View analytics in a beautiful dashboard. All while
-                saving 90% on costs.
+                Use our TypeScript SDK with a clean, intuitive API. Track opens,
+                clicks, bounces, and complaints in real-time. View analytics in
+                a beautiful dashboard. All running in your own AWS account.
               </p>
             </div>
 

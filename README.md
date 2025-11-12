@@ -18,7 +18,7 @@ npx @wraps.dev/cli init
 
 Wraps deploys communication infrastructure (starting with email) **to your AWS account** with zero stored credentials and a beautiful developer experience. You own the infrastructure, pay AWS directly (pennies vs. dollars), and get SaaS-quality tooling.
 
-**The Problem:** AWS services like SES are powerful and cost-effective but have terrible DX. Developers either pay 10-100x markup for SaaS alternatives (Resend, Postmark) or struggle through complex AWS setup and give up.
+**The Problem:** AWS services like SES are powerful and cost-effective but require significant setup time. We wanted the simplicity of modern email APIs with the flexibility of running in your own AWS account.
 
 **The Solution:** One CLI command deploys production-ready infrastructure to your AWS account. Your infrastructure, your data, our tooling.
 
@@ -36,23 +36,22 @@ Wraps deploys communication infrastructure (starting with email) **to your AWS a
 
 ### Why This Matters
 
-**vs. Resend/Postmark:**
-- ✅ No vendor lock-in (own your infrastructure)
-- ✅ Lower cost at scale (AWS pricing)
+**Great Developer Experience:**
+- ✅ Simple, intuitive TypeScript SDK
+- ✅ Beautiful dashboards and analytics
+- ✅ 30-second setup with one command
+- ✅ Real-time event tracking out of the box
+
+**Full Control & Ownership:**
+- ✅ Infrastructure lives in your AWS account
+- ✅ No vendor lock-in
 - ✅ Data residency control
-- ✅ Compliance simplified (data in your account)
+- ✅ Compliance simplified (data stays in your account)
 
-**vs. Raw AWS:**
-- ✅ 10x better developer experience
-- ✅ 30-second setup vs. 2-hour setup
-- ✅ Beautiful dashboards (not AWS Console chaos)
-- ✅ Managed updates and best practices
-
-**vs. Terraform/Pulumi:**
-- ✅ Purpose-built for communication primitives
-- ✅ No IaC knowledge required
-- ✅ Automatic DNS configuration
-- ✅ Dashboard included
+**Cost-Effective at Scale:**
+- ✅ Pay AWS directly ($0.10 per 1,000 emails)
+- ✅ Transparent pricing with no markup
+- ✅ Scale without worrying about tier limits
 
 ---
 

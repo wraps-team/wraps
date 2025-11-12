@@ -21,13 +21,13 @@ const faqItems: FaqItem[] = [
     value: "item-1",
     question: "How is this different from using AWS SES directly?",
     answer:
-      "Wraps deploys all the infrastructure AWS SES needs (IAM roles, EventBridge, DynamoDB, Lambda, SQS) in one command instead of 2+ hours of manual setup. You get event tracking, analytics, webhooks, and a beautiful dashboard out of the box. Plus our TypeScript SDK gives you a Resend-like API instead of raw AWS SDK.",
+      "Wraps deploys all the infrastructure AWS SES needs (IAM roles, EventBridge, DynamoDB, Lambda, SQS) in one command instead of 2+ hours of manual setup. You get event tracking, analytics, webhooks, and a beautiful dashboard out of the box. Plus our TypeScript SDK gives you a clean, intuitive API that makes sending emails delightful.",
   },
   {
     value: "item-2",
-    question: "How much does it really cost vs Resend or Postmark?",
+    question: "What are the costs for running Wraps?",
     answer:
-      "With Wraps, you pay AWS directly at $0.10 per 1,000 emails. For 50,000 emails/month, that's $5 to AWS + $10-49 to Wraps (if you want hosted dashboard) = $15-54 total. Resend charges $100/month for the same volume. At 500,000 emails/month: Wraps costs $60-99 vs Resend's $500. You save 80-90% at scale.",
+      "With Wraps, you pay AWS directly at $0.10 per 1,000 emails with no markup. For example, 50,000 emails/month costs $5 to AWS. If you choose the optional hosted dashboard (coming soon), there will be a small monthly fee ($10-49). The infrastructure is yours forever—no vendor lock-in, no surprise bills.",
   },
   {
     value: "item-3",

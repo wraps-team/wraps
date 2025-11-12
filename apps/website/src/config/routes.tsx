@@ -3,6 +3,7 @@ import { lazy } from "react";
 // Lazy load components for better performance
 const Landing = lazy(() => import("@/app/landing/page"));
 const SimpleLanding = lazy(() => import("@/app/simple-landing/page"));
+const Calculator = lazy(() => import("@/app/calculator/page"));
 const Docs = lazy(() => import("@/app/docs/page"));
 const QuickstartDocs = lazy(() => import("@/app/docs/quickstart/page"));
 const SDKReferenceDocs = lazy(() => import("@/app/docs/sdk-reference/page"));
@@ -26,6 +27,12 @@ export const routes: RouteConfig[] = [
   {
     path: "/simple",
     element: <SimpleLanding />,
+  },
+
+  // Cost Calculator
+  {
+    path: "/calculator",
+    element: <Calculator />,
   },
 
   // Documentation

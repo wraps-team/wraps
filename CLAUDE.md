@@ -2,9 +2,9 @@
 
 ## Project Overview
 
-**Wraps** is a CLI tool and TypeScript SDK that deploys email infrastructure (AWS SES) to users' AWS accounts with zero stored credentials, Resend-like developer experience, and AWS pricing.
+**Wraps** is a CLI tool and TypeScript SDK that deploys email infrastructure (AWS SES) to users' AWS accounts with zero stored credentials, beautiful developer experience, and AWS pricing.
 
-**Core Value Proposition**: One command deploys production-ready email infrastructure to the user's AWS account with zero credentials stored, Resend-like DX, AWS pricing.
+**Core Value Proposition**: One command deploys production-ready email infrastructure to the user's AWS account with zero credentials stored, intuitive SDK, beautiful DX, and transparent AWS pricing.
 
 **TypeScript SDK**: [`@wraps.dev/email`](https://github.com/wraps-team/wraps-js) provides a simple, type-safe interface for sending emails through the deployed infrastructure. Available on [npm](https://www.npmjs.com/package/@wraps.dev/email).
 
@@ -13,14 +13,14 @@
 ### The Wraps Model
 - Deploy infrastructure **to the user's AWS account** (not ours)
 - Users own their infrastructure and data
-- They pay AWS directly (pennies vs. dollars compared to SaaS alternatives)
+- They pay AWS directly at transparent pricing ($0.10 per 1,000 emails)
 - We provide tooling, dashboard, and great DX
 - No vendor lock-in (infrastructure stays if they churn)
 
 ### Why This Matters
-- **vs. Resend/Postmark**: No vendor lock-in, lower cost at scale, data residency control
-- **vs. Raw AWS**: 10x better DX, 30-second setup vs. 2-hour setup, beautiful dashboards
-- **vs. Terraform/Pulumi**: Purpose-built, managed updates, no IaC knowledge required
+- **Great Developer Experience**: Beautiful DX with TypeScript SDK, dashboards, 30-second setup
+- **Full Ownership**: Infrastructure in your AWS account, no vendor lock-in, data residency control
+- **Cost-Effective**: Pay AWS directly ($0.10 per 1,000 emails), transparent pricing, scale affordably
 
 ## Architecture
 
@@ -180,7 +180,7 @@ if (result.success) {
 **Key Features:**
 - TypeScript-first with full type safety
 - Automatic AWS credential handling (OIDC, IAM roles, or environment variables)
-- Simple, intuitive API similar to Resend
+- Simple, intuitive API that makes sending emails delightful
 - Built on top of AWS SES for reliability and cost-effectiveness
 
 **Package Details:**

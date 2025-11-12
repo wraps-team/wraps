@@ -66,6 +66,15 @@ const FREE_TIER = {
 /**
  * Estimate storage size in GB based on retention period and email volume
  * Note: Each email generates multiple events (SEND, DELIVERY, OPEN, CLICK, etc.)
+ *
+ * This calculates STEADY-STATE storage (after retention period fills up).
+ * Initial months will be cheaper as storage builds up gradually.
+ *
+ * Example for 90-day retention with 10k emails/month:
+ * - Month 1: ~0.015 GB stored
+ * - Month 2: ~0.031 GB stored
+ * - Month 3: ~0.046 GB stored (steady state reached)
+ * - Month 4+: ~0.046 GB stored (old data deleted, new data added)
  */
 function estimateStorageSize(
   emailsPerMonth: number,
@@ -84,7 +93,8 @@ function estimateStorageSize(
     indefinite: 24, // Assume 2 years for cost estimation
   }[retention];
 
-  // Total storage = emails/month * event types * months * record size
+  // Total steady-state storage = emails/month * event types * months * record size
+  // This represents storage after retention period fills up
   const totalKB =
     emailsPerMonth * numEventTypes * retentionMonths * avgRecordSizeKB;
   return totalKB / 1024 / 1024; // Convert to GB
@@ -181,7 +191,7 @@ function calculateDynamoDBCost(
 
   return {
     monthly: writeCost + storageCost,
-    description: `Email history (${retention}, ~${storageGB.toFixed(1)} GB, ${numEventTypes} event types)`,
+    description: `Email history (${retention}, ~${storageGB.toFixed(2)} GB at steady-state, ${numEventTypes} event types)`,
   };
 }
 
@@ -196,14 +206,10 @@ function calculateTrackingCost(
   }
 
   // Tracking is free - it's built into SES
-  // Custom redirect domain might have minimal Route53 costs (~$0.50/month for hosted zone)
-  const cost = config.tracking.customRedirectDomain ? 0.5 : 0;
-
+  // Custom redirect domain DNS records are managed where user already manages DNS
   return {
-    monthly: cost,
-    description: config.tracking.customRedirectDomain
-      ? "Open/click tracking with custom domain (Route53 hosted zone)"
-      : "Open/click tracking (no additional cost)",
+    monthly: 0,
+    description: "Open/click tracking (no additional cost)",
   };
 }
 

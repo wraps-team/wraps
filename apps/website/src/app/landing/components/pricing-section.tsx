@@ -144,13 +144,17 @@ export function PricingSection() {
           <p className="mb-2 font-semibold text-foreground">
             Pay AWS directly for infrastructure
           </p>
-          <p className="text-muted-foreground text-sm">
-            Most apps pay{" "}
+          <p className="mb-4 text-muted-foreground text-sm">
+            With AWS SES pricing at{" "}
+            <strong className="text-foreground">$0.10 per 1,000 emails</strong>,
+            most apps pay{" "}
             <strong className="text-foreground">$5-50/month to AWS</strong>{" "}
-            ($0.10 per 1,000 emails) vs{" "}
-            <strong className="text-foreground">$100-500/month</strong> with
-            Resend or Postmark. You own the infrastructure and never lock in.
+            directly. You own the infrastructure and have zero vendor lock-in.
+            Scale affordably as you grow.
           </p>
+          <Button asChild className="cursor-pointer" variant="outline">
+            <a href="/calculator">Calculate Your Costs →</a>
+          </Button>
         </div>
       </div>
     </section>
