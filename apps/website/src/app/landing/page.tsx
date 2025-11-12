@@ -8,7 +8,6 @@ import { LandingNavbar } from "./components/navbar";
 import { PricingSection } from "./components/pricing-section";
 import { QuickStartSection } from "./components/quick-start-section";
 import { StatsSection } from "./components/stats-section";
-import { TechStackSection } from "./components/tech-stack-section";
 
 export default function LandingPage() {
   return (
@@ -23,7 +22,7 @@ export default function LandingPage() {
         <CodeExamplesSection />
         <StatsSection />
         <FeaturesSection />
-        <TechStackSection />
+        {/* <TechStackSection /> */}
         <PricingSection />
         <FaqSection />
         <CTASection />
