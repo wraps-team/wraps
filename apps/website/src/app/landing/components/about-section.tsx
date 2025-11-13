@@ -29,7 +29,7 @@ const values = [
     icon: Zap,
     title: "SaaS-Quality DX",
     description:
-      "One-command deployments, beautiful dashboards, clean APIs. AWS power with Resend-like developer experience.",
+      "One-command deployments, beautiful dashboards, clean APIs. AWS power with delightful developer experience.",
   },
 ];
 

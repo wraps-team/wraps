@@ -39,8 +39,8 @@ export function HeroSection() {
           {/* Subheading */}
           <p className="mx-auto mb-10 max-w-2xl text-lg text-muted-foreground sm:text-xl">
             One command deploys production-ready AWS SES infrastructure with
-            Resend-like developer experience. You own the infrastructure, pay
-            AWS directly (pennies vs dollars), and never lock in.
+            beautiful developer experience. You own the infrastructure, pay AWS
+            directly (pennies vs dollars), and never lock in.
           </p>
 
           {/* CTA Buttons */}

@@ -403,8 +403,8 @@ export function CodeExamplesSection() {
                 </div>
                 <h3 className="mb-2 font-semibold">Simple API</h3>
                 <p className="text-muted-foreground text-sm">
-                  Clean, intuitive API similar to Resend. Send emails with just
-                  a few lines of code.
+                  Clean, intuitive API. Send emails with just a few lines of
+                  code.
                 </p>
               </CardContent>
             </Card>

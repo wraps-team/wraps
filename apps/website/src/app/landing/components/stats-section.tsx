@@ -15,7 +15,7 @@ const stats = [
     icon: DollarSign,
     value: "90%",
     label: "Cost Savings",
-    description: "vs Resend at scale",
+    description: "vs email SaaS at scale",
   },
   {
     icon: Zap,

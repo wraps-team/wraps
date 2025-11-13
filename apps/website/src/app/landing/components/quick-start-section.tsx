@@ -121,8 +121,8 @@ export function QuickStartSection() {
                     </h3>
                   </div>
                   <p className="mb-4 text-muted-foreground text-sm">
-                    Install the TypeScript SDK and start sending emails with a
-                    Resend-like API.
+                    Install the TypeScript SDK and start sending emails with an
+                    intuitive API.
                   </p>
 
                   {/* Package Manager Tabs */}

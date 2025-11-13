@@ -41,7 +41,7 @@ export default function SDKReferencePage() {
             <p className="text-lg text-muted-foreground">
               A TypeScript-first SDK for sending emails through your
               Wraps-deployed AWS SES infrastructure. Simple, type-safe, and
-              Resend-compatible API.
+              intuitive API.
             </p>
           </div>
 
