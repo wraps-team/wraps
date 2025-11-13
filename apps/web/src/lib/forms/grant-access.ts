@@ -16,7 +16,7 @@ export const grantAccessFormOpts = formOptions({
   defaultValues: {
     userId: "",
     awsAccountId: "",
-    permissions: "READ_ONLY" as const,
-    expiresAt: undefined,
-  } satisfies GrantAccessInput,
+    permissions: "READ_ONLY" as "READ_ONLY" | "FULL_ACCESS" | "ADMIN",
+    expiresAt: "" as string | undefined,
+  },
 });
