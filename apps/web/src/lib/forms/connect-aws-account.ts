@@ -12,6 +12,7 @@ export const connectAWSAccountSchema = z.object({
   roleArn: z
     .string()
     .startsWith("arn:aws:iam::", "Must be a valid IAM role ARN"),
+  externalId: z.string().uuid("External ID must be a valid UUID"),
 });
 
 export type ConnectAWSAccountInput = z.infer<typeof connectAWSAccountSchema>;
@@ -24,5 +25,6 @@ export const connectAWSAccountFormOpts = formOptions({
     accountId: "",
     region: "us-east-1",
     roleArn: "",
+    externalId: "",
   } satisfies ConnectAWSAccountInput,
 });

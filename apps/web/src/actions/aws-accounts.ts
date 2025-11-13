@@ -1,6 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { createServerValidate } from "@tanstack/react-form/nextjs";
 import { auth } from "@wraps/auth";
 import { awsAccount, db } from "@wraps/db";
@@ -62,8 +61,8 @@ export async function connectAWSAccountAction(
       return { error: "Insufficient permissions" };
     }
 
-    // 4. Generate external ID
-    const externalId = randomUUID();
+    // 4. Use the external ID provided from the form (generated on client and used in CloudFormation)
+    const externalId = validatedData.externalId;
 
     // 5. Test connection by attempting to assume role
     try {

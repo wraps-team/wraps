@@ -40,6 +40,7 @@ export function ConnectAWSAccountForm({
     defaultValues: {
       ...connectAWSAccountFormOpts.defaultValues,
       organizationId,
+      externalId,
     },
     transform: useTransform(
       (baseForm) => {
@@ -155,8 +156,9 @@ export function ConnectAWSAccountForm({
           </div>
         ) : null}
 
-        {/* Hidden organization ID */}
+        {/* Hidden fields */}
         <input name="organizationId" type="hidden" value={organizationId} />
+        <input name="externalId" type="hidden" value={externalId} />
 
         {/* Account Name */}
         <form.Field
