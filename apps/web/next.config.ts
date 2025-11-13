@@ -39,13 +39,7 @@ const nextConfig: NextConfig = {
 
   // Redirects for better SEO
   async redirects() {
-    return [
-      {
-        source: "/home",
-        destination: "/dashboard",
-        permanent: true,
-      },
-    ];
+    return [];
   },
 };
 
