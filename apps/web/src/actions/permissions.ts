@@ -1,9 +1,6 @@
 "use server";
 
-import {
-  createServerValidate,
-  type ServerValidateError,
-} from "@tanstack/react-form/nextjs";
+import { createServerValidate } from "@tanstack/react-form/nextjs";
 import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
 import { revalidatePath } from "next/cache";
@@ -110,12 +107,7 @@ export async function grantAccessAction(prev: unknown, formData: FormData) {
       "formState" in e &&
       typeof (e as { formState?: unknown }).formState === "object"
     ) {
-      return (
-        e as ServerValidateError<
-          typeof grantAccessFormOpts.defaultValues,
-          unknown
-        >
-      ).formState;
+      return (e as { formState: unknown }).formState;
     }
 
     // Handle other errors

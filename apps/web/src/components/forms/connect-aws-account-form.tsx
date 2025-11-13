@@ -42,7 +42,13 @@ export function ConnectAWSAccountForm({
       organizationId,
     },
     transform: useTransform(
-      (baseForm) => mergeForm(baseForm, state ?? {}),
+      (baseForm) => {
+        // Only merge if state is a form state (not our custom result)
+        if (state && typeof state === "object" && "values" in state) {
+          return mergeForm(baseForm, state);
+        }
+        return baseForm;
+      },
       [state]
     ),
   });
@@ -109,37 +115,41 @@ export function ConnectAWSAccountForm({
         </h3>
 
         {/* Form-level errors */}
-        {formErrors.length > 0 && (
+        {formErrors.length > 0 ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-            {formErrors.map((error) => (
-              <p className="text-red-600 text-sm" key={String(error)}>
+            {formErrors.map((error, i) => (
+              <p className="text-red-600 text-sm" key={i}>
                 {String(error)}
               </p>
             ))}
           </div>
-        )}
+        ) : null}
 
         {/* Success message */}
-        {isSuccess && (
+        {isSuccess ? (
           <div className="rounded-lg border border-green-200 bg-green-50 p-4">
             <p className="text-green-600 text-sm">
               ✓ AWS account connected successfully!
             </p>
           </div>
-        )}
+        ) : null}
 
         {/* Error message */}
         {state &&
-          typeof state === "object" &&
-          "error" in state &&
-          state.error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-              <p className="font-medium text-red-600 text-sm">{state.error}</p>
-              {state.details && (
-                <p className="mt-1 text-red-500 text-xs">{state.details}</p>
-              )}
-            </div>
-          )}
+        typeof state === "object" &&
+        "error" in state &&
+        state.error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+            <p className="font-medium text-red-600 text-sm">
+              {String(state.error) as string}
+            </p>
+            {"details" in state && state.details ? (
+              <p className="mt-1 text-red-500 text-xs">
+                {String(state.details) as string}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* Hidden organization ID */}
         <input name="organizationId" type="hidden" value={organizationId} />

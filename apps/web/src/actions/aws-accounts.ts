@@ -1,10 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import {
-  createServerValidate,
-  type ServerValidateError,
-} from "@tanstack/react-form/nextjs";
+import { createServerValidate } from "@tanstack/react-form/nextjs";
 import { auth } from "@wraps/auth";
 import { awsAccount, db } from "@wraps/db";
 import { revalidatePath } from "next/cache";
@@ -141,12 +138,7 @@ export async function connectAWSAccountAction(
       "formState" in e &&
       typeof (e as { formState?: unknown }).formState === "object"
     ) {
-      return (
-        e as ServerValidateError<
-          typeof connectAWSAccountFormOpts.defaultValues,
-          unknown
-        >
-      ).formState;
+      return (e as { formState: unknown }).formState;
     }
 
     // Handle other errors

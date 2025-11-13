@@ -1,20 +1,11 @@
 // Permission system for Wraps dashboard
-// Implements Dynamic Access Control (DAC) using better-auth
+// Custom permission system with dedicated aws_account_permission table
 
 // Check access
-export {
-  checkAWSAccountAccess,
-  checkMultipleAccess,
-  getEffectiveAccessLevel,
-} from "./check-access";
+export { checkAWSAccountAccess } from "./check-access";
 
 // Grant access
-export {
-  grantAWSAccountAccess,
-  grantDefaultAccessToMembers,
-  updateAWSAccountAccess,
-} from "./grant-access";
-// Access levels
+export { grantAWSAccountAccess } from "./grant-access";
 export {
   ACCESS_LEVELS,
   type AccessLevel,
@@ -23,15 +14,15 @@ export {
   getActionsForLevel,
   hasAction,
 } from "./levels";
+// List permissions
+export { listUserAWSAccountPermissions } from "./list-permissions";
 // Middleware
-export {
-  requireAWSAccountAccess,
-  requireOrgMembership,
-  requireOrgRole,
-} from "./middleware";
+export { requireAWSAccountAccess } from "./middleware";
 // Revoke access
+export { revokeAWSAccountAccess } from "./revoke-access";
+// Permission levels and types
 export {
-  revokeAllOrgAWSAccess,
-  revokeAWSAccountAccess,
-  revokeBulkAWSAccountAccess,
-} from "./revoke-access";
+  PERMISSION_LEVELS,
+  type Permission,
+  type PermissionLevel,
+} from "./types";

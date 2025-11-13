@@ -7,7 +7,7 @@ import {
   user,
 } from "@wraps/db";
 import { eq } from "drizzle-orm";
-import { beforeAll } from "vitest";
+import { afterAll, beforeAll } from "vitest";
 
 // Test data - we'll insert these into the real database
 export const testUser = {
