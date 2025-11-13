@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Wraps Console Access Role - Grants Wraps dashboard read-only access to CloudWatch metrics and SES data"
+
+Parameters:
+  ExternalId:
+    Type: String
+    Description: "External ID for secure role assumption (provided by Wraps)"
+    MinLength: 1
+    NoEcho: true
+
+  WrapsBackendAccountId:
+    Type: String
+    Description: "AWS Account ID of Wraps hosted backend"
+    Default: "123456789012"
+    AllowedPattern: "^[0-9]{12}$"
+
+  AllowEmailSending:
+    Type: String
+    Description: "Allow Wraps to send emails on your behalf (default: false)"
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+
+Conditions:
+  EnableSending: !Equals [!Ref AllowEmailSending, "true"]
+
+Resources:
+  # IAM Role that Wraps will assume
+  WrapsConsoleAccessRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "wraps-console-access-role"
+      Description: "Allows Wraps dashboard to access CloudWatch metrics and SES data"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${WrapsBackendAccountId}:root"
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                "sts:ExternalId": !Ref ExternalId
+      ManagedPolicyArns:
+        - !Ref WrapsConsoleAccessPolicy
+      Tags:
+        - Key: ManagedBy
+          Value: Wraps
+        - Key: Purpose
+          Value: "Console Access"
+
+  # IAM Policy with required permissions
+  WrapsConsoleAccessPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: "wraps-console-access-policy"
+      Description: "Permissions for Wraps dashboard access"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # CloudWatch Metrics - Read Only
+          - Sid: "CloudWatchMetricsReadOnly"
+            Effect: Allow
+            Action:
+              - "cloudwatch:GetMetricData"
+              - "cloudwatch:GetMetricStatistics"
+              - "cloudwatch:ListMetrics"
+            Resource: "*"
+
+          # SES - Read Access
+          - Sid: "SESReadAccess"
+            Effect: Allow
+            Action:
+              - "ses:GetSendQuota"
+              - "ses:GetSendStatistics"
+              - "ses:GetAccount"
+              - "ses:ListIdentities"
+              - "ses:GetIdentityVerificationAttributes"
+              - "ses:GetIdentityDkimAttributes"
+              - "ses:ListConfigurationSets"
+              - "ses:DescribeConfigurationSet"
+            Resource: "*"
+
+          # SES - Send Access (conditional)
+          - !If
+            - EnableSending
+            - Sid: "SESSendAccess"
+              Effect: Allow
+              Action:
+                - "ses:SendEmail"
+                - "ses:SendRawEmail"
+                - "ses:SendTemplatedEmail"
+                - "ses:SendBulkTemplatedEmail"
+              Resource: "*"
+            - !Ref "AWS::NoValue"
+
+          # DynamoDB - Read Email Events (if using Wraps email tracking)
+          - Sid: "DynamoDBReadEmailEvents"
+            Effect: Allow
+            Action:
+              - "dynamodb:Query"
+              - "dynamodb:Scan"
+              - "dynamodb:GetItem"
+              - "dynamodb:BatchGetItem"
+            Resource:
+              - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-events"
+              - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-events/index/*"
+
+Outputs:
+  RoleArn:
+    Description: "ARN of the Wraps Console Access Role"
+    Value: !GetAtt WrapsConsoleAccessRole.Arn
+    Export:
+      Name: "WrapsConsoleAccessRoleArn"
+
+  ExternalId:
+    Description: "External ID for this role (keep this secret)"
+    Value: !Ref ExternalId
+
+  AccountId:
+    Description: "Your AWS Account ID"
+    Value: !Ref AWS::AccountId
+
+  Region:
+    Description: "AWS Region where this stack is deployed"
+    Value: !Ref AWS::Region
+
+  Instructions:
+    Description: "Next Steps"
+    Value: "Copy the RoleArn and return to the Wraps dashboard to complete setup"

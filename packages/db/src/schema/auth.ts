@@ -120,3 +120,20 @@ export const invitation = pgTable("invitation", {
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
 });
+
+// Access Control plugin table (DAC)
+export const statement = pgTable("statement", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+  organizationId: text("organization_id").references(() => organization.id, {
+    onDelete: "cascade",
+  }),
+  roleId: text("role_id"),
+  effect: text("effect").notNull(), // 'allow' | 'deny'
+  action: text("action").notNull(),
+  resource: text("resource").notNull(),
+  condition: text("condition"), // JSON string
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+});
