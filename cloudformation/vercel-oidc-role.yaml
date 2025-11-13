@@ -2,24 +2,30 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Vercel OIDC Provider and IAM Role for Wraps Backend"
 
 Parameters:
+  VercelTeamSlug:
+    Type: String
+    Description: "Your Vercel Team Slug (from your team URL, e.g., 'wraps' from vercel.com/wraps)"
+    MinLength: 1
+    Default: "wraps"
+
   VercelTeamId:
     Type: String
-    Description: "Your Vercel Team ID (found in Team Settings)"
+    Description: "Your Vercel Team ID (found in Team Settings, e.g., 'team_xxxxx')"
     MinLength: 1
 
   VercelProjectId:
     Type: String
-    Description: "Your Vercel Project ID (found in Project Settings)"
+    Description: "Your Vercel Project ID (found in Project Settings, e.g., 'prj_xxxxx')"
     MinLength: 1
 
 Resources:
-  # OIDC Identity Provider for Vercel (Global Mode)
+  # OIDC Identity Provider for Vercel (Team Mode)
   VercelOIDCProvider:
     Type: AWS::IAM::OIDCProvider
     Properties:
-      Url: https://oidc.vercel.com
+      Url: !Sub "https://oidc.vercel.com/${VercelTeamSlug}"
       ClientIdList:
-        - !Sub "https://vercel.com/${VercelTeamId}"
+        - !Sub "https://vercel.com/${VercelTeamSlug}"
       ThumbprintList:
         # Vercel OIDC thumbprint (verified from Vercel's public keys)
         - "6938fd4d98bab03faadb97b34396831e3780aea1"
@@ -45,10 +51,10 @@ Resources:
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:
-                # Global mode: audience is the team URL
-                "oidc.vercel.com:aud": !Sub "https://vercel.com/${VercelTeamId}"
+                # Team mode: audience includes team slug in the condition key
+                "oidc.vercel.com/wraps:aud": !Sub "https://vercel.com/${VercelTeamId}"
                 # Subject includes team, project, and environment
-                "oidc.vercel.com:sub": !Sub "team:${VercelTeamId}:project:${VercelProjectId}:environment:production"
+                "oidc.vercel.com/wraps:sub": !Sub "team:${VercelTeamId}:project:${VercelProjectId}:environment:production"
       ManagedPolicyArns:
         - !Ref VercelBackendPolicy
       Tags:
