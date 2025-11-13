@@ -1,11 +1,10 @@
-import { cp } from "node:fs/promises";
 import { defineConfig } from "tsup";
 
 export default defineConfig({
   entry: ["src/cli.ts"],
   format: ["esm"],
   dts: true,
-  clean: false, // Don't clean - console UI files are already built here
+  clean: false, // Don't clean - console UI and Lambda bundles are already built here
   shims: true,
   splitting: false,
   bundle: true,
@@ -18,8 +17,5 @@ export default defineConfig({
     await import("node:fs/promises").then((fs) =>
       fs.chmod("dist/cli.js", 0o755)
     );
-    // Copy Lambda source files to dist
-    await cp("lambda", "dist/lambda", { recursive: true });
-    console.log("✓ Copied Lambda sources to dist/");
   },
 });

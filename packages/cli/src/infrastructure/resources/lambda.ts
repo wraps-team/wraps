@@ -45,9 +45,43 @@ export type LambdaFunctions = {
 };
 
 /**
- * Bundle a Lambda function using esbuild
+ * Get the Lambda function code directory
+ *
+ * In production (published package), uses pre-bundled code from dist/lambda/
+ * In development, bundles the TypeScript source on-the-fly
  */
-async function bundleLambda(functionPath: string): Promise<string> {
+async function getLambdaCode(functionName: string): Promise<string> {
+  const packageRoot = getPackageRoot();
+
+  // Check for pre-bundled Lambda code in dist/ (production - published package)
+  const distLambdaPath = join(packageRoot, "dist", "lambda", functionName);
+  const distBundleMarker = join(distLambdaPath, ".bundled");
+
+  if (existsSync(distBundleMarker)) {
+    // Use pre-bundled code from dist/
+    return distLambdaPath;
+  }
+
+  // Check for pre-bundled Lambda code in lambda/ (development build)
+  const lambdaPath = join(packageRoot, "lambda", functionName);
+  const lambdaBundleMarker = join(lambdaPath, ".bundled");
+
+  if (existsSync(lambdaBundleMarker)) {
+    // Use pre-bundled code from lambda/
+    return lambdaPath;
+  }
+
+  // Development mode: bundle on-the-fly from TypeScript source
+  const sourcePath = join(lambdaPath, "index.ts");
+
+  if (!existsSync(sourcePath)) {
+    throw new Error(
+      `Lambda source not found: ${sourcePath}\n` +
+        `This usually means the build process didn't complete successfully.\n` +
+        "Try running: pnpm build"
+    );
+  }
+
   const buildId = randomBytes(8).toString("hex");
   const outdir = join(tmpdir(), `wraps-lambda-${buildId}`);
 
@@ -57,7 +91,7 @@ async function bundleLambda(functionPath: string): Promise<string> {
 
   // Bundle with esbuild
   await build({
-    entryPoints: [functionPath],
+    entryPoints: [sourcePath],
     bundle: true,
     platform: "node",
     target: "node20",
@@ -83,14 +117,8 @@ async function bundleLambda(functionPath: string): Promise<string> {
 export async function deployLambdaFunctions(
   config: LambdaConfig
 ): Promise<LambdaFunctions> {
-  // Get Lambda source directory relative to package root
-  // This works both in dev (packages/cli/src/) and production (packages/cli/dist/)
-  const packageRoot = getPackageRoot();
-  const lambdaDir = join(packageRoot, "lambda");
-
-  // Bundle event-processor
-  const eventProcessorPath = join(lambdaDir, "event-processor", "index.ts");
-  const eventProcessorBundle = await bundleLambda(eventProcessorPath);
+  // Get Lambda code directory (pre-bundled in production, bundled on-the-fly in dev)
+  const eventProcessorCode = await getLambdaCode("event-processor");
 
   // IAM role for Lambda execution
   const lambdaRole = new aws.iam.Role("wraps-email-lambda-role", {
@@ -163,7 +191,7 @@ export async function deployLambdaFunctions(
       runtime: aws.lambda.Runtime.NodeJS20dX,
       handler: "index.handler",
       role: lambdaRole.arn,
-      code: new pulumi.asset.FileArchive(eventProcessorBundle),
+      code: new pulumi.asset.FileArchive(eventProcessorCode),
       timeout: 300, // 5 minutes (matches SQS visibility timeout)
       memorySize: 512,
       environment: {
