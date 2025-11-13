@@ -43,6 +43,7 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@tailwindcss/postcss": "^4.1.12",
     "@tanstack/react-form": "^1.23.8",
+    "@tanstack/react-store": "0.8.0",
     "@tanstack/react-table": "^8.21.3",
     "@wraps/auth": "workspace:*",
     "@wraps/db": "workspace:*",
@@ -80,6 +81,7 @@
     "tailwindcss": "^4.1.11",
     "tw-animate-css": "^1.3.6",
     "typescript": "^5",
+    "vite": "7.2.2",
     "vitest": "^4.0.7"
   }
 }
