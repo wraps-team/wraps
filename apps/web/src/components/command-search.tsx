@@ -113,17 +113,17 @@ const CommandItem = React.forwardRef<
 ));
 CommandItem.displayName = CommandPrimitive.Item.displayName;
 
-interface SearchItem {
+type SearchItem = {
   title: string;
   url: string;
   group: string;
   icon?: LucideIcon;
-}
+};
 
-interface CommandSearchProps {
+type CommandSearchProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
+};
 
 export function CommandSearch({ open, onOpenChange }: CommandSearchProps) {
   const router = useRouter();

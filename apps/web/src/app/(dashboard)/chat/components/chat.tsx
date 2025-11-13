@@ -15,11 +15,11 @@ import { ConversationList } from "./conversation-list";
 import { MessageInput } from "./message-input";
 import { MessageList } from "./message-list";
 
-interface ChatProps {
+type ChatProps = {
   conversations: Conversation[];
   messages: Record<string, Message[]>;
   users: User[];
-}
+};
 
 export function Chat({ conversations, messages, users }: ChatProps) {
   const {
@@ -89,7 +89,9 @@ export function Chat({ conversations, messages, users }: ChatProps) {
     : [];
 
   const handleSendMessage = (content: string) => {
-    if (!selectedConversation) return;
+    if (!selectedConversation) {
+      return;
+    }
 
     const newMessage = {
       id: `msg-${Date.now()}`,

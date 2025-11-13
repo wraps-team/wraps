@@ -13,13 +13,13 @@ export const events: CalendarEvent[] = eventsData.map((event) => {
 
   // Parse the day from the date string (format: "11T09:00:00.000Z")
   const dayAndTime = event.date.split("T");
-  const day = Number.parseInt(dayAndTime[0]);
+  const day = Number.parseInt(dayAndTime[0], 10);
   const timeStr = dayAndTime[1]; // "09:00:00.000Z"
 
   // Parse hours and minutes from time string
   const timeParts = timeStr.split(":");
-  const hours = Number.parseInt(timeParts[0]);
-  const minutes = Number.parseInt(timeParts[1]);
+  const hours = Number.parseInt(timeParts[0], 10);
+  const minutes = Number.parseInt(timeParts[1], 10);
 
   // Create date with current year/month but original day and time
   const eventDate = new Date(currentYear, currentMonth, day, hours, minutes);
@@ -38,7 +38,7 @@ export const eventDates = eventDatesData.map((item) => {
   const currentMonth = now.getMonth();
 
   // Parse day from date string
-  const day = Number.parseInt(item.date.split("T")[0]);
+  const day = Number.parseInt(item.date.split("T")[0], 10);
   const eventDate = new Date(currentYear, currentMonth, day);
 
   return {

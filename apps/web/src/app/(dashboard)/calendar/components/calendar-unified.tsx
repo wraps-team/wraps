@@ -57,9 +57,9 @@ import calendarsData from "../data/calendars.json";
 import eventsData from "../data/events.json";
 import type { CalendarEvent } from "../types";
 
-interface CalendarMainProps {
+type CalendarMainProps = {
   eventDates?: Array<{ date: Date; count: number }>;
-}
+};
 
 export function CalendarMain({ eventDates = [] }: CalendarMainProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());

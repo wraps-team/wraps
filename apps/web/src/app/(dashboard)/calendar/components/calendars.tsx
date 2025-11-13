@@ -24,20 +24,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-interface CalendarItem {
+type CalendarItem = {
   id: string;
   name: string;
   color: string;
   visible: boolean;
   type: "personal" | "work" | "shared";
-}
+};
 
-interface CalendarGroup {
+type CalendarGroup = {
   name: string;
   items: CalendarItem[];
-}
+};
 
-interface CalendarsProps {
+type CalendarsProps = {
   calendars?: {
     name: string;
     items: string[];
@@ -46,7 +46,7 @@ interface CalendarsProps {
   onCalendarEdit?: (calendarId: string) => void;
   onCalendarDelete?: (calendarId: string) => void;
   onNewCalendar?: () => void;
-}
+};
 
 // Enhanced calendar data with colors and visibility
 const enhancedCalendars: CalendarGroup[] = [

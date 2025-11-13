@@ -29,12 +29,12 @@ import {
 } from "@/components/ui/tooltip";
 import type { Conversation, User } from "../use-chat";
 
-interface ChatHeaderProps {
+type ChatHeaderProps = {
   conversation: Conversation | null;
   users: User[];
   onToggleMute?: () => void;
   onToggleInfo?: () => void;
-}
+};
 
 export function ChatHeader({
   conversation,
@@ -87,7 +87,9 @@ export function ChatHeader({
   };
 
   const getStatusColor = () => {
-    if (conversation.type === "group") return "text-muted-foreground";
+    if (conversation.type === "group") {
+      return "text-muted-foreground";
+    }
 
     switch (primaryUser?.status) {
       case "online":

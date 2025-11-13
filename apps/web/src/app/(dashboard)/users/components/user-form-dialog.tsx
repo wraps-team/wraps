@@ -55,9 +55,9 @@ const userFormSchema = z.object({
 
 type UserFormValues = z.infer<typeof userFormSchema>;
 
-interface UserFormDialogProps {
+type UserFormDialogProps = {
   onAddUser: (user: UserFormValues) => void;
-}
+};
 
 export function UserFormDialog({ onAddUser }: UserFormDialogProps) {
   const [open, setOpen] = useState(false);

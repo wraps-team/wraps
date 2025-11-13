@@ -12,11 +12,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { ImportedTheme } from "@/types/theme-customizer";
 
-interface ImportModalProps {
+type ImportModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImport: (theme: ImportedTheme) => void;
-}
+};
 
 export function ImportModal({
   open,

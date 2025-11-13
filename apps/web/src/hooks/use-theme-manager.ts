@@ -14,8 +14,12 @@ export function useThemeManager() {
 
   // Simple, reliable theme detection - just follow the theme provider
   const isDarkMode = React.useMemo(() => {
-    if (theme === "dark") return true;
-    if (theme === "light") return false;
+    if (theme === "dark") {
+      return true;
+    }
+    if (theme === "light") {
+      return false;
+    }
     return (
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -132,7 +136,9 @@ export function useThemeManager() {
   const applyTheme = React.useCallback(
     (themeValue: string, darkMode: boolean) => {
       const theme = colorThemes.find((t) => t.value === themeValue);
-      if (!theme) return;
+      if (!theme) {
+        return;
+      }
 
       // Reset and apply theme variables
       resetTheme();

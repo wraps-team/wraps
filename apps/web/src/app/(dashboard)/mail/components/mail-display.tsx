@@ -32,9 +32,9 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { Mail } from "../data";
 
-interface MailDisplayProps {
+type MailDisplayProps = {
   mail: Mail | null;
-}
+};
 
 export function MailDisplay({ mail }: MailDisplayProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());

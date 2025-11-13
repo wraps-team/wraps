@@ -11,10 +11,10 @@ import { AddTaskModal } from "./add-task-modal";
 import { DataTableFacetedFilter } from "./data-table-faceted-filter";
 import { DataTableViewOptions } from "./data-table-view-options";
 
-interface DataTableToolbarProps<TData> {
+type DataTableToolbarProps<TData> = {
   table: Table<TData>;
   onAddTask?: (task: Task) => void;
-}
+};
 
 export function DataTableToolbar<TData>({
   table,

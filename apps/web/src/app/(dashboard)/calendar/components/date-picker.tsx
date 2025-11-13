@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 
-interface DatePickerProps {
+type DatePickerProps = {
   selectedDate?: Date;
   onDateSelect?: (date: Date) => void;
   events?: Array<{ date: Date; count: number }>;
-}
+};
 
 export function DatePicker({
   selectedDate,

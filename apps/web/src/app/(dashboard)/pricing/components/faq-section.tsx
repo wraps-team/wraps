@@ -12,15 +12,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-interface FAQ {
+type FAQ = {
   id: number;
   question: string;
   answer: string;
-}
+};
 
-interface FAQSectionProps {
+type FAQSectionProps = {
   faqs: FAQ[];
-}
+};
 
 export function FAQSection({ faqs }: FAQSectionProps) {
   return (

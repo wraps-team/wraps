@@ -32,7 +32,7 @@ import { MailDisplay } from "./mail-display";
 import { MailList } from "./mail-list";
 import { Nav } from "./nav";
 
-interface MailProps {
+type MailProps = {
   accounts: {
     label: string;
     email: string;
@@ -42,7 +42,7 @@ interface MailProps {
   defaultLayout?: number[];
   defaultCollapsed?: boolean;
   navCollapsedSize: number;
-}
+};
 
 export function Mail({
   accounts,

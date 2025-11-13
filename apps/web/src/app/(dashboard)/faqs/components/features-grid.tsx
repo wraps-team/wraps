@@ -3,16 +3,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-interface FeatureItem {
+type FeatureItem = {
   id: number;
   title: string;
   description: string;
   icon: string;
-}
+};
 
-interface FeaturesGridProps {
+type FeaturesGridProps = {
   features: FeatureItem[];
-}
+};
 
 const iconMap = {
   Sparkles,

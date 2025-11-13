@@ -8,17 +8,17 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-interface BillingHistoryItem {
+type BillingHistoryItem = {
   id: number;
   month: string;
   plan: string;
   amount: string;
   status: string;
-}
+};
 
-interface BillingHistoryCardProps {
+type BillingHistoryCardProps = {
   history: BillingHistoryItem[];
-}
+};
 
 export function BillingHistoryCard({ history }: BillingHistoryCardProps) {
   return (

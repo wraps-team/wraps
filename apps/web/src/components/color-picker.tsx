@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-interface ColorPickerProps {
+type ColorPickerProps = {
   label: string;
   cssVar: string;
   value: string;
   onChange: (cssVar: string, value: string) => void;
-}
+};
 
 export function ColorPicker({
   label,
@@ -38,7 +38,7 @@ export function ColorPicker({
 
   // Get current computed color for display
   const displayColor = React.useMemo(() => {
-    if (localValue && localValue.startsWith("#")) {
+    if (localValue?.startsWith("#")) {
       return localValue;
     }
 
@@ -46,7 +46,7 @@ export function ColorPicker({
     const computed = getComputedStyle(document.documentElement)
       .getPropertyValue(cssVar)
       .trim();
-    if (computed && computed.startsWith("#")) {
+    if (computed?.startsWith("#")) {
       return computed;
     }
 

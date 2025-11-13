@@ -10,14 +10,14 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-interface AccountSwitcherProps {
+type AccountSwitcherProps = {
   isCollapsed: boolean;
   accounts: {
     label: string;
     email: string;
     icon: React.ReactNode;
   }[];
-}
+};
 
 export function AccountSwitcher({
   isCollapsed,

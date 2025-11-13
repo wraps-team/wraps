@@ -17,16 +17,16 @@ const iconMap = {
   Clock,
 };
 
-interface Feature {
+type Feature = {
   id: number;
   name: string;
   description: string;
   icon: string;
-}
+};
 
-interface FeaturesGridProps {
+type FeaturesGridProps = {
   features: Feature[];
-}
+};
 
 export function FeaturesGrid({ features }: FeaturesGridProps) {
   return (

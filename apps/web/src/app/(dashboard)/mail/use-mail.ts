@@ -2,9 +2,9 @@ import { create } from "zustand";
 import type { Mail } from "./data";
 import { mails } from "./data";
 
-interface Config {
+type Config = {
   selected: Mail["id"] | null;
-}
+};
 
 const useMailStore = create<
   Config & { setState: (newState: Partial<Config>) => void }

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-interface NavProps {
+type NavProps = {
   isCollapsed: boolean;
   links: {
     title: string;
@@ -18,7 +18,7 @@ interface NavProps {
     icon: LucideIcon;
     variant: "default" | "ghost";
   }[];
-}
+};
 
 export function Nav({ links, isCollapsed }: NavProps) {
   return (

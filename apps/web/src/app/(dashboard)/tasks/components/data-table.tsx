@@ -28,11 +28,11 @@ import type { Task } from "../data/schema";
 import { DataTablePagination } from "./data-table-pagination";
 import { DataTableToolbar } from "./data-table-toolbar";
 
-interface DataTableProps<TData, TValue> {
+type DataTableProps<TData, TValue> = {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   onAddTask?: (task: Task) => void;
-}
+};
 
 export function DataTable<TData, TValue>({
   columns,

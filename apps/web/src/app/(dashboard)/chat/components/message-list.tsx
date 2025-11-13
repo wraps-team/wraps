@@ -16,11 +16,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { Message, User } from "../use-chat";
 
-interface MessageListProps {
+type MessageListProps = {
   messages: Message[];
   users: User[];
   currentUserId?: string;
-}
+};
 
 export function MessageList({
   messages,
@@ -91,23 +91,33 @@ export function MessageList({
   };
 
   const shouldShowAvatar = (message: Message, index: number) => {
-    if (message.senderId === currentUserId) return false;
-    if (index === 0) return true;
+    if (message.senderId === currentUserId) {
+      return false;
+    }
+    if (index === 0) {
+      return true;
+    }
 
     const prevMessage = messages[index - 1];
     return prevMessage.senderId !== message.senderId;
   };
 
   const shouldShowName = (message: Message, index: number) => {
-    if (message.senderId === currentUserId) return false;
-    if (index === 0) return true;
+    if (message.senderId === currentUserId) {
+      return false;
+    }
+    if (index === 0) {
+      return true;
+    }
 
     const prevMessage = messages[index - 1];
     return prevMessage.senderId !== message.senderId;
   };
 
   const isConsecutiveMessage = (message: Message, index: number) => {
-    if (index === 0) return false;
+    if (index === 0) {
+      return false;
+    }
 
     const prevMessage = messages[index - 1];
     const timeDiff =
@@ -124,7 +134,7 @@ export function MessageList({
 
     messages.forEach((message) => {
       const messageDate = format(new Date(message.timestamp), "yyyy-MM-dd");
-      const lastGroup = groups[groups.length - 1];
+      const lastGroup = groups.at(-1);
 
       if (lastGroup && lastGroup.date === messageDate) {
         lastGroup.messages.push(message);

@@ -27,11 +27,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { type Conversation, useChat } from "../use-chat";
 
-interface ConversationListProps {
+type ConversationListProps = {
   conversations: Conversation[];
   selectedConversation: string | null;
   onSelectConversation: (conversationId: string) => void;
-}
+};
 
 // Enhanced time formatting function
 function formatMessageTime(timestamp: string): string {
@@ -65,8 +65,12 @@ export function ConversationList({
 
   const sortedConversations = filteredConversations.sort((a, b) => {
     // Pinned conversations first
-    if (a.isPinned && !b.isPinned) return -1;
-    if (!a.isPinned && b.isPinned) return 1;
+    if (a.isPinned && !b.isPinned) {
+      return -1;
+    }
+    if (!a.isPinned && b.isPinned) {
+      return 1;
+    }
 
     // Then by last message timestamp
     return (

@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 
-export interface User {
+export type User = {
   id: string;
   name: string;
   email: string;
@@ -11,9 +11,9 @@ export interface User {
   lastSeen: string;
   role: string;
   department: string;
-}
+};
 
-export interface Message {
+export type Message = {
   id: string;
   content: string;
   timestamp: string;
@@ -26,9 +26,9 @@ export interface Message {
     count: number;
   }>;
   replyTo: string | null;
-}
+};
 
-export interface Conversation {
+export type Conversation = {
   id: string;
   type: "direct" | "group";
   participants: string[];
@@ -43,9 +43,9 @@ export interface Conversation {
   unreadCount: number;
   isPinned: boolean;
   isMuted: boolean;
-}
+};
 
-interface ChatState {
+type ChatState = {
   conversations: Conversation[];
   messages: Record<string, Message[]>;
   users: User[];
@@ -53,9 +53,9 @@ interface ChatState {
   searchQuery: string;
   isTyping: Record<string, boolean>;
   onlineUsers: string[];
-}
+};
 
-interface ChatActions {
+type ChatActions = {
   setConversations: (conversations: Conversation[]) => void;
   setMessages: (conversationId: string, messages: Message[]) => void;
   setUsers: (users: User[]) => void;
@@ -67,7 +67,7 @@ interface ChatActions {
   toggleMute: (conversationId: string) => void;
   setTyping: (conversationId: string, isTyping: boolean) => void;
   setOnlineUsers: (userIds: string[]) => void;
-}
+};
 
 export const useChat = create<ChatState & ChatActions>((set, get) => ({
   // State

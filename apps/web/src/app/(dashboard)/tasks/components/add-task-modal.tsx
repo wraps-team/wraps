@@ -39,10 +39,10 @@ const taskFormSchema = z.object({
 
 type TaskFormData = z.infer<typeof taskFormSchema>;
 
-interface AddTaskModalProps {
+type AddTaskModalProps = {
   onAddTask?: (task: Task) => void;
   trigger?: React.ReactNode;
-}
+};
 
 export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
   const [open, setOpen] = useState(false);

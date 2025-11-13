@@ -3,15 +3,15 @@
 import { useCallback, useState } from "react";
 import type { CalendarEvent } from "./types";
 
-export interface UseCalendarState {
+export type UseCalendarState = {
   selectedDate: Date;
   showEventForm: boolean;
   editingEvent: CalendarEvent | null;
   showCalendarSheet: boolean;
   events: CalendarEvent[];
-}
+};
 
-export interface UseCalendarActions {
+export type UseCalendarActions = {
   setSelectedDate: (date: Date) => void;
   setShowEventForm: (show: boolean) => void;
   setEditingEvent: (event: CalendarEvent | null) => void;
@@ -22,7 +22,7 @@ export interface UseCalendarActions {
   handleSaveEvent: (eventData: Partial<CalendarEvent>) => void;
   handleDeleteEvent: (eventId: number) => void;
   handleEditEvent: (event: CalendarEvent) => void;
-}
+};
 
 export interface UseCalendarReturn
   extends UseCalendarState,

@@ -6,14 +6,14 @@ import { Separator } from "@/components/ui/separator";
 import { Calendars } from "./calendars";
 import { DatePicker } from "./date-picker";
 
-interface CalendarSidebarProps {
+type CalendarSidebarProps = {
   selectedDate?: Date;
   onDateSelect?: (date: Date) => void;
   onNewCalendar?: () => void;
   onNewEvent?: () => void;
   events?: Array<{ date: Date; count: number }>;
   className?: string;
-}
+};
 
 export function CalendarSidebar({
   selectedDate,

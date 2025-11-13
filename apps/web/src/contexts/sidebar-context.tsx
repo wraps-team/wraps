@@ -2,16 +2,16 @@
 
 import * as React from "react";
 
-export interface SidebarConfig {
+export type SidebarConfig = {
   variant: "sidebar" | "floating" | "inset";
   collapsible: "offcanvas" | "icon" | "none";
   side: "left" | "right";
-}
+};
 
-export interface SidebarContextValue {
+export type SidebarContextValue = {
   config: SidebarConfig;
   updateConfig: (config: Partial<SidebarConfig>) => void;
-}
+};
 
 export const SidebarContext = React.createContext<SidebarContextValue | null>(
   null

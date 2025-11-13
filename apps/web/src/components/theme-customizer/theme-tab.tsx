@@ -26,7 +26,7 @@ import { useThemeManager } from "@/hooks/use-theme-manager";
 import type { ImportedTheme } from "@/types/theme-customizer";
 import "./circular-transition.css";
 
-interface ThemeTabProps {
+type ThemeTabProps = {
   selectedTheme: string;
   setSelectedTheme: (theme: string) => void;
   selectedTweakcnTheme: string;
@@ -35,7 +35,7 @@ interface ThemeTabProps {
   setSelectedRadius: (radius: string) => void;
   setImportedTheme: (theme: ImportedTheme | null) => void;
   onImportClick: () => void;
-}
+};
 
 export function ThemeTab({
   selectedTheme,
@@ -87,12 +87,16 @@ export function ThemeTab({
   };
 
   const handleLightMode = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (isDarkMode === false) return;
+    if (isDarkMode === false) {
+      return;
+    }
     toggleTheme(event);
   };
 
   const handleDarkMode = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (isDarkMode === true) return;
+    if (isDarkMode === true) {
+      return;
+    }
     toggleTheme(event);
   };
 

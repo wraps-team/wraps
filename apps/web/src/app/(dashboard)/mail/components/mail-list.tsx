@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 import type { Mail } from "../data";
 import { useMail } from "../use-mail";
 
-interface MailListProps {
+type MailListProps = {
   items: Mail[];
-}
+};
 
 export function MailList({ items }: MailListProps) {
   const [mail, setMail] = useMail();

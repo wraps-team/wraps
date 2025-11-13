@@ -55,7 +55,7 @@ import {
 } from "@/components/ui/table";
 import { UserFormDialog } from "./user-form-dialog";
 
-interface User {
+type User = {
   id: number;
   name: string;
   email: string;
@@ -66,23 +66,23 @@ interface User {
   status: string;
   joinedDate: string;
   lastLogin: string;
-}
+};
 
-interface UserFormValues {
+type UserFormValues = {
   name: string;
   email: string;
   role: string;
   plan: string;
   billing: string;
   status: string;
-}
+};
 
-interface DataTableProps {
+type DataTableProps = {
   users: User[];
   onDeleteUser: (id: number) => void;
   onEditUser: (user: User) => void;
   onAddUser: (userData: UserFormValues) => void;
-}
+};
 
 export function DataTable({
   users,

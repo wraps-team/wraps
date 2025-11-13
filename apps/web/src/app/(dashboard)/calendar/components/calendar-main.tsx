@@ -49,13 +49,13 @@ import { cn } from "@/lib/utils";
 import eventsData from "../data/events.json";
 import type { CalendarEvent } from "../types";
 
-interface CalendarMainProps {
+type CalendarMainProps = {
   selectedDate?: Date;
   onDateSelect?: (date: Date) => void;
   onMenuClick?: () => void;
   events?: CalendarEvent[];
   onEventClick?: (event: CalendarEvent) => void;
-}
+};
 
 export function CalendarMain({
   selectedDate,

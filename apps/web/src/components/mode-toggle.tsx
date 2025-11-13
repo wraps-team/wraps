@@ -8,9 +8,9 @@ import { useCircularTransition } from "@/hooks/use-circular-transition";
 import { useTheme } from "@/hooks/use-theme";
 import "./theme-customizer/circular-transition.css";
 
-interface ModeToggleProps {
+type ModeToggleProps = {
   variant?: "outline" | "ghost" | "default";
-}
+};
 
 export function ModeToggle({ variant = "outline" }: ModeToggleProps) {
   const { theme } = useTheme();

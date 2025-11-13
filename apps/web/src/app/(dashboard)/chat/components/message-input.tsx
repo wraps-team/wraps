@@ -26,11 +26,11 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-interface MessageInputProps {
+type MessageInputProps = {
   onSendMessage: (content: string) => void;
   disabled?: boolean;
   placeholder?: string;
-}
+};
 
 export function MessageInput({
   onSendMessage,

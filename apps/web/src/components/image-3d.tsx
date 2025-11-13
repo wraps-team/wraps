@@ -3,13 +3,13 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-interface Image3DProps {
+type Image3DProps = {
   lightSrc: string;
   darkSrc: string;
   alt: string;
   className?: string;
   direction?: "left" | "right";
-}
+};
 
 export function Image3D({
   lightSrc,

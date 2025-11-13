@@ -25,7 +25,9 @@ export function ThemeProvider({
   );
 
   React.useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      return;
+    }
 
     const root = window.document.documentElement;
 

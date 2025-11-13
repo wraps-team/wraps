@@ -21,9 +21,9 @@ import {
 import { labels } from "../data/data";
 import { taskSchema } from "../data/schema";
 
-interface DataTableRowActionsProps<TData> {
+type DataTableRowActionsProps<TData> = {
   row: Row<TData>;
-}
+};
 
 export function DataTableRowActions<TData>({
   row,

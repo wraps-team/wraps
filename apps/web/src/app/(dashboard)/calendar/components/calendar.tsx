@@ -13,10 +13,10 @@ import { CalendarMain } from "./calendar-main";
 import { CalendarSidebar } from "./calendar-sidebar";
 import { EventForm } from "./event-form";
 
-interface CalendarProps {
+type CalendarProps = {
   events: CalendarEvent[];
   eventDates: Array<{ date: Date; count: number }>;
-}
+};
 
 export function Calendar({ events, eventDates }: CalendarProps) {
   const calendar = useCalendar(events);

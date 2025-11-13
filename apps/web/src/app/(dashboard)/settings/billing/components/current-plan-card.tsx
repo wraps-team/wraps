@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
-interface CurrentPlan {
+type CurrentPlan = {
   planName: string;
   price: string;
   nextBilling: string;
@@ -20,11 +20,11 @@ interface CurrentPlan {
   remainingDays: number;
   needsAttention: boolean;
   attentionMessage: string;
-}
+};
 
-interface CurrentPlanCardProps {
+type CurrentPlanCardProps = {
   plan: CurrentPlan;
-}
+};
 
 export function CurrentPlanCard({ plan }: CurrentPlanCardProps) {
   return (

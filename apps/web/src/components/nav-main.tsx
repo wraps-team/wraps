@@ -41,7 +41,9 @@ export function NavMain({
 
   // Check if any subitem is active to determine if parent should be open
   const shouldBeOpen = (item: (typeof items)[0]) => {
-    if (item.isActive) return true;
+    if (item.isActive) {
+      return true;
+    }
     return item.items?.some((subItem) => pathname === subItem.url);
   };
 

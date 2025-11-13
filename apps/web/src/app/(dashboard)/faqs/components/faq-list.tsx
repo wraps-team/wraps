@@ -14,22 +14,22 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
-interface FAQ {
+type FAQ = {
   id: number;
   question: string;
   answer: string;
   category: string;
-}
+};
 
-interface Category {
+type Category = {
   name: string;
   count: number;
-}
+};
 
-interface FAQListProps {
+type FAQListProps = {
   faqs: FAQ[];
   categories: Category[];
-}
+};
 
 export function FAQList({ faqs, categories }: FAQListProps) {
   const [selectedCategory, setSelectedCategory] = useState("All");

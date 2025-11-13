@@ -33,13 +33,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent } from "../types";
 
-interface EventFormProps {
+type EventFormProps = {
   event?: CalendarEvent | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (event: Partial<CalendarEvent>) => void;
   onDelete?: (eventId: number) => void;
-}
+};
 
 const eventTypes = [
   { value: "meeting", label: "Meeting", color: "bg-blue-500" },

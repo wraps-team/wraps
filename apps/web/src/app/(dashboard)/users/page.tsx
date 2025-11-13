@@ -6,7 +6,7 @@ import { StatCards } from "./components/stat-cards";
 
 import initialUsersData from "./data.json";
 
-interface User {
+type User = {
   id: number;
   name: string;
   email: string;
@@ -17,16 +17,16 @@ interface User {
   status: string;
   joinedDate: string;
   lastLogin: string;
-}
+};
 
-interface UserFormValues {
+type UserFormValues = {
   name: string;
   email: string;
   role: string;
   plan: string;
   billing: string;
   status: string;
-}
+};
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>(initialUsersData);
