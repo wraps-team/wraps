@@ -80,21 +80,7 @@ export function NavMain({
                             className="cursor-pointer"
                             isActive={pathname === subItem.url}
                           >
-                            <Link
-                              href={subItem.url}
-                              rel={
-                                item.title === "Auth Pages" ||
-                                item.title === "Errors"
-                                  ? "noopener noreferrer"
-                                  : undefined
-                              }
-                              target={
-                                item.title === "Auth Pages" ||
-                                item.title === "Errors"
-                                  ? "_blank"
-                                  : undefined
-                              }
-                            >
+                            <Link href={subItem.url}>
                               <span>{subItem.title}</span>
                             </Link>
                           </SidebarMenuSubButton>

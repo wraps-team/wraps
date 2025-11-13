@@ -1,33 +1,34 @@
 import type { Metadata } from "next";
-import { LandingPageContent } from "./(landing)/landing-page-content";
+import { redirect } from "next/navigation";
 
 // Metadata for the landing page
 export const metadata: Metadata = {
-  title: "ShadcnStore - Modern Admin Dashboard Template",
+  title: "Wraps - Email Infrastructure Made Simple",
   description:
-    "A beautiful and comprehensive admin dashboard template built with React, Next.js, TypeScript, and shadcn/ui. Perfect for building modern web applications.",
+    "Deploy production-ready email infrastructure to your AWS account in minutes. Zero stored credentials, beautiful DX, and transparent AWS pricing.",
   keywords: [
-    "admin dashboard",
-    "react",
-    "nextjs",
-    "typescript",
-    "shadcn/ui",
-    "tailwind css",
+    "email infrastructure",
+    "aws ses",
+    "email api",
+    "developer tools",
+    "email service",
   ],
   openGraph: {
-    title: "ShadcnStore - Modern Admin Dashboard Template",
+    title: "Wraps - Email Infrastructure Made Simple",
     description:
-      "A beautiful and comprehensive admin dashboard template built with React, Next.js, TypeScript, and shadcn/ui.",
+      "Deploy production-ready email infrastructure to your AWS account in minutes.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ShadcnStore - Modern Admin Dashboard Template",
+    title: "Wraps - Email Infrastructure Made Simple",
     description:
-      "A beautiful and comprehensive admin dashboard template built with React, Next.js, TypeScript, and shadcn/ui.",
+      "Deploy production-ready email infrastructure to your AWS account in minutes.",
   },
 };
 
 export default function HomePage() {
-  return <LandingPageContent />;
+  // Redirect to dashboard for now
+  // TODO: Create a proper landing page
+  redirect("/dashboard");
 }
