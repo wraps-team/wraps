@@ -51,10 +51,13 @@ Resources:
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:
-                # Team mode: audience includes team slug in the condition key
-                "oidc.vercel.com/wraps:aud": !Sub "https://vercel.com/${VercelTeamId}"
-                # Subject includes team, project, and environment
-                "oidc.vercel.com/wraps:sub": !Sub "team:${VercelTeamId}:project:${VercelProjectId}:environment:production"
+                # Audience uses team slug (not team ID)
+                "oidc.vercel.com/wraps:aud": !Sub "https://vercel.com/${VercelTeamSlug}"
+              StringLike:
+                # Subject uses owner:teamSlug with wildcards for any project/environment
+                "oidc.vercel.com/wraps:sub":
+                  - !Sub "owner:${VercelTeamSlug}:project:*:environment:preview"
+                  - !Sub "owner:${VercelTeamSlug}:project:*:environment:production"
       ManagedPolicyArns:
         - !Ref VercelBackendPolicy
       Tags:
