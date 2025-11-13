@@ -60,7 +60,16 @@ export async function assumeRole(
   });
 
   try {
+    console.log("AssumeRole request:", {
+      roleArn,
+      sessionName,
+      region: stsConfig.region,
+      hasExplicitCredentials: !!stsConfig.credentials,
+    });
+
     const response = await sts.send(command);
+
+    console.log("AssumeRole successful");
 
     if (!response.Credentials) {
       throw new Error("Failed to assume role: No credentials returned");
