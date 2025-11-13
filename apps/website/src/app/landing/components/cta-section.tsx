@@ -38,7 +38,8 @@ export function CTASection() {
 
                 <p className="mx-auto max-w-2xl text-balance text-muted-foreground lg:text-xl">
                   Deploy production-ready AWS SES infrastructure in one command.
-                  Pay AWS directly, keep full control, and never lock in.
+                  Pay AWS directly, own your infrastructure, and keep full
+                  control.
                 </p>
               </div>
 
