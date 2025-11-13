@@ -38,10 +38,23 @@ export async function assumeRole(
   const region = process.env.AWS_REGION || "us-east-1";
   const isUsingVercelOIDC = !!process.env.AWS_ROLE_ARN;
 
+  // Detect misconfiguration: OIDC role configured but explicit credentials present
+  if (
+    isUsingVercelOIDC &&
+    (process.env.AWS_ACCESS_KEY_ID || process.env.AWS_SECRET_ACCESS_KEY)
+  ) {
+    console.error(
+      "WARNING: AWS_ROLE_ARN is set but explicit AWS credentials (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY) are also present. " +
+        "This will prevent OIDC authentication from working. " +
+        "Remove AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY from your Vercel environment variables."
+    );
+  }
+
   let stsConfig: ConstructorParameters<typeof STSClient>[0];
 
   if (isUsingVercelOIDC) {
     // Use Vercel's OIDC credentials provider
+    // IMPORTANT: This only works if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are NOT set
     console.log("Using Vercel OIDC credentials provider", {
       roleArn: process.env.AWS_ROLE_ARN,
     });

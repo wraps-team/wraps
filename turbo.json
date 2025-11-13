@@ -10,7 +10,9 @@
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "AWS_BACKEND_ACCOUNT_ID",
-    "AWS_PROFILE"
+    "AWS_PROFILE",
+    "AWS_ROLE_ARN",
+    "AWS_REGION"
   ],
   "tasks": {
     "build": {
@@ -24,7 +26,9 @@
         "NEXT_PUBLIC_APP_URL",
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
-        "AWS_BACKEND_ACCOUNT_ID"
+        "AWS_BACKEND_ACCOUNT_ID",
+        "AWS_ROLE_ARN",
+        "AWS_REGION"
       ]
     },
     "dev": {
