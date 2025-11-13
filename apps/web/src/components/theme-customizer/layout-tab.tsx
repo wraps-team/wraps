@@ -97,7 +97,7 @@ export function LayoutTab() {
                   {/* Main content area - larger and more prominent */}
                   <div
                     className={`flex-1 ${variant.value === "inset" ? "ms-0 bg-background" : "bg-background/50"} m-1 rounded-sm border border-muted-foreground/20 border-dashed`}
-                  ></div>
+                  />
                 </div>
               </div>
             </div>

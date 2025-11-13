@@ -7,7 +7,7 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/dashboard");
+    router.replace("/");
   }, [router]);
 
   // Show a loading state while redirecting
@@ -15,9 +15,7 @@ export default function HomePage() {
     <div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
         <div className="mx-auto h-8 w-8 animate-spin rounded-full border-primary border-b-2" />
-        <p className="mt-2 text-muted-foreground">
-          Redirecting to dashboard...
-        </p>
+        <p className="mt-2 text-muted-foreground">Redirecting to home...</p>
       </div>
     </div>
   );
