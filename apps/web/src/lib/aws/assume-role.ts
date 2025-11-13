@@ -1,4 +1,5 @@
 import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
+import { awsCredentialsProvider } from "@vercel/oidc-aws-credentials-provider";
 
 export interface AssumeRoleParams {
   roleArn: string;
@@ -29,45 +30,46 @@ export async function assumeRole(
 
   // Create STS client using backend credentials
   // Credential resolution order:
-  // 1. Web Identity Token (OIDC) - used by Vercel via AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE
-  // 2. Explicit env vars (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) - only if not using OIDC
+  // 1. Vercel OIDC (AWS_ROLE_ARN) - uses @vercel/functions awsCredentialsProvider
+  // 2. Explicit env vars (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
   // 3. AWS_PROFILE env var - used for local development
   // 4. Default credentials chain (EC2 instance metadata, etc.)
-  const stsConfig: {
-    region: string;
-    credentials?: { accessKeyId: string; secretAccessKey: string };
-  } = {
-    region: process.env.AWS_REGION || "us-east-1",
-  };
 
-  // If AWS_ROLE_ARN is set, we're using OIDC - the SDK will automatically handle it
-  // Just let the SDK use its default credential provider chain
-  const isUsingOIDC = !!process.env.AWS_ROLE_ARN;
+  const region = process.env.AWS_REGION || "us-east-1";
+  const isUsingVercelOIDC = !!process.env.AWS_ROLE_ARN;
 
-  // Only set explicit credentials if NOT using OIDC and both env vars are present
-  if (
-    !isUsingOIDC &&
+  let stsConfig: ConstructorParameters<typeof STSClient>[0];
+
+  if (isUsingVercelOIDC) {
+    // Use Vercel's OIDC credentials provider
+    console.log("Using Vercel OIDC credentials provider", {
+      roleArn: process.env.AWS_ROLE_ARN,
+    });
+    stsConfig = {
+      region,
+      credentials: awsCredentialsProvider({
+        roleArn: process.env.AWS_ROLE_ARN!,
+      }),
+    };
+  } else if (
     process.env.AWS_ACCESS_KEY_ID &&
     process.env.AWS_SECRET_ACCESS_KEY
   ) {
-    stsConfig.credentials = {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    // Use explicit credentials (CI/CD, manual setup)
+    console.log("Using explicit AWS credentials");
+    stsConfig = {
+      region,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      },
     };
+  } else {
+    // Use default credential provider chain (local development with AWS_PROFILE)
+    console.log("Using default AWS credential provider chain (AWS_PROFILE)");
+    stsConfig = { region };
   }
 
-  console.log("STS Client configuration:", {
-    region: stsConfig.region,
-    isUsingOIDC,
-    hasExplicitCredentials: !!stsConfig.credentials,
-    hasRoleArn: !!process.env.AWS_ROLE_ARN,
-    hasWebIdentityTokenFile: !!process.env.AWS_WEB_IDENTITY_TOKEN_FILE,
-  });
-
-  // When not setting explicit credentials, the SDK will automatically:
-  // 1. Check for AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE (OIDC)
-  // 2. Use AssumeRoleWithWebIdentity to get temporary credentials
-  // 3. Use those credentials for subsequent API calls
   const sts = new STSClient(stsConfig);
 
   // Assume the role with external ID for security
