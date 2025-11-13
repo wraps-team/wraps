@@ -66,25 +66,12 @@ export async function connectAWSAccountAction(
 
     // 5. Test connection by attempting to assume role
     try {
-      console.log("Attempting to assume role:", {
-        roleArn: validatedData.roleArn,
-        externalId,
-        accountId: validatedData.accountId,
-      });
-
       await assumeRole({
         roleArn: validatedData.roleArn,
         externalId,
       });
-
-      console.log("Successfully assumed role:", validatedData.roleArn);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      console.error("Failed to assume role:", {
-        roleArn: validatedData.roleArn,
-        externalId,
-        error: message,
-      });
       return {
         error: "Unable to assume role",
         details: message,
