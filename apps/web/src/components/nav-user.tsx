@@ -2,13 +2,17 @@
 
 import {
   BellDot,
+  Building2,
   CircleUser,
   CreditCard,
   EllipsisVertical,
+  Fingerprint,
   LogOut,
+  Shield,
 } from "lucide-react";
 import Link from "next/link";
-
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Logo } from "@/components/logo";
 import {
   DropdownMenu,
@@ -25,17 +29,28 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useSession } from "@/contexts/session-context";
+import { authClient } from "@/lib/auth-client";
 
-export function NavUser({
-  user,
-}: {
-  user: {
-    name: string;
-    email: string;
-    avatar: string;
-  };
-}) {
+export function NavUser() {
   const { isMobile } = useSidebar();
+  const router = useRouter();
+  const session = useSession();
+  const user = session.data?.user;
+
+  if (!user) {
+    return null;
+  }
+
+  const handleSignOut = async () => {
+    try {
+      await authClient.signOut();
+      toast.success("Signed out successfully");
+      router.push("/auth");
+    } catch (error) {
+      toast.error("Failed to sign out");
+    }
+  };
 
   return (
     <SidebarMenu>
@@ -86,6 +101,27 @@ export function NavUser({
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="cursor-pointer">
+                <Link href="/settings/security">
+                  <Shield />
+                  Security
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link href="/settings/passkeys">
+                  <Fingerprint />
+                  Passkeys
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link href="/organizations">
+                  <Building2 />
+                  Organizations
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem asChild className="cursor-pointer">
                 <Link href="/settings/billing">
                   <CreditCard />
                   Billing
@@ -99,11 +135,12 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild className="cursor-pointer">
-              <Link href="/auth/sign-in">
-                <LogOut />
-                Log out
-              </Link>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={handleSignOut}
+            >
+              <LogOut />
+              Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

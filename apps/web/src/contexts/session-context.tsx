@@ -1,15 +1,10 @@
 "use client";
 
-import type { Session, User } from "better-auth";
 import { createContext, type ReactNode, useContext } from "react";
 import { authClient } from "@/lib/auth-client";
 
-interface SessionContextType {
-  session: Session | null;
-  user: User | null;
-  isPending: boolean;
-  error: Error | null;
-}
+// Use ReturnType to infer the exact type from better-auth's useSession hook
+type SessionContextType = ReturnType<typeof authClient.useSession>;
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
