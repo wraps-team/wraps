@@ -1,6 +1,7 @@
 "use client";
 
-import { Github, Heart, Twitter } from "lucide-react";
+import { Github, Heart } from "lucide-react";
+import { XLogo } from "@/components/icons/x-logo";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -59,11 +60,6 @@ const footerLinks = {
   ],
 };
 
-const socialLinks = [
-  { name: "GitHub", href: "https://github.com/wraps-team/wraps", icon: Github },
-  { name: "Twitter", href: "https://twitter.com/wraps_email", icon: Twitter },
-];
-
 export function LandingFooter() {
   return (
     <footer className="border-t bg-background">
@@ -82,19 +78,28 @@ export function LandingFooter() {
               Own your data, pay AWS directly, and never lock in.
             </p>
             <div className="flex space-x-4 max-lg:justify-center">
-              {socialLinks.map((social) => (
-                <Button asChild key={social.name} size="icon" variant="ghost">
-                  <a
-                    aria-label={social.name}
-                    className="cursor-pointer"
-                    href={social.href}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    <social.icon className="h-4 w-4" />
-                  </a>
-                </Button>
-              ))}
+              <Button asChild size="icon" variant="ghost">
+                <a
+                  aria-label="GitHub"
+                  className="cursor-pointer"
+                  href="https://github.com/wraps-team/wraps"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <Github className="h-4 w-4" />
+                </a>
+              </Button>
+              <Button asChild size="icon" variant="ghost">
+                <a
+                  aria-label="X"
+                  className="cursor-pointer"
+                  href="https://x.com/useWraps"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <XLogo className="h-4 w-4" />
+                </a>
+              </Button>
             </div>
           </div>
 
