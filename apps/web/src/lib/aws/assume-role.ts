@@ -40,8 +40,8 @@ export async function assumeRole(
     region: process.env.AWS_REGION || "us-east-1",
   };
 
-  // If AWS_ROLE_ARN is set, we're using OIDC - don't set explicit credentials
-  // This forces the AWS SDK to use Web Identity Token authentication
+  // If AWS_ROLE_ARN is set, we're using OIDC - the SDK will automatically handle it
+  // Just let the SDK use its default credential provider chain
   const isUsingOIDC = !!process.env.AWS_ROLE_ARN;
 
   // Only set explicit credentials if NOT using OIDC and both env vars are present
@@ -64,6 +64,10 @@ export async function assumeRole(
     hasWebIdentityTokenFile: !!process.env.AWS_WEB_IDENTITY_TOKEN_FILE,
   });
 
+  // When not setting explicit credentials, the SDK will automatically:
+  // 1. Check for AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE (OIDC)
+  // 2. Use AssumeRoleWithWebIdentity to get temporary credentials
+  // 3. Use those credentials for subsequent API calls
   const sts = new STSClient(stsConfig);
 
   // Assume the role with external ID for security
