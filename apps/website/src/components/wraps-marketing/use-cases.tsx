@@ -20,7 +20,7 @@ export function UseCases() {
             </p>
             <div className="rounded-lg bg-muted p-4 font-mono text-xs">
               <div className="mb-2 text-muted-foreground"># Deploy to AWS</div>
-              <div>$ wraps deploy</div>
+              <div>$ npx @wraps.dev/cli init</div>
               <div className="mt-2 text-green-400">
                 ✓ SES configured in us-east-1
               </div>
@@ -39,7 +39,7 @@ export function UseCases() {
               <div className="mb-2 text-muted-foreground">
                 # Start local console
               </div>
-              <div>$ wraps console</div>
+              <div>$ npx @wraps.dev/cli console</div>
               <div className="mt-2 text-blue-400">
                 → Console running on localhost:3000
               </div>

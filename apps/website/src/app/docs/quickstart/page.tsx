@@ -182,7 +182,7 @@ if (result.success) {
                 Before sending emails, you need to verify your domain with AWS
                 SES. Run{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
-                  wraps verify yourdomain.com
+                  npx @wraps.dev/cli verify yourdomain.com
                 </code>{" "}
                 to check your DNS records and get setup instructions.
               </p>
