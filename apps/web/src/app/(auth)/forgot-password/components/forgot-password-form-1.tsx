@@ -1,16 +1,16 @@
-"use client"
+"use client";
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 export function ForgotPasswordForm1({
   className,
@@ -22,7 +22,8 @@ export function ForgotPasswordForm1({
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Forgot your password?</CardTitle>
           <CardDescription>
-            Enter your email address and we&apos;ll send you a link to reset your password
+            Enter your email address and we&apos;ll send you a link to reset
+            your password
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -33,18 +34,21 @@ export function ForgotPasswordForm1({
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
-                    type="email"
                     placeholder="m@example.com"
                     required
+                    type="email"
                   />
                 </div>
-                <Button type="submit" className="w-full cursor-pointer">
+                <Button className="w-full cursor-pointer" type="submit">
                   Send Reset Link
                 </Button>
               </div>
               <div className="text-center text-sm">
                 Remember your password?{" "}
-                <a href="/auth/sign-in" className="underline underline-offset-4">
+                <a
+                  className="underline underline-offset-4"
+                  href="/auth/sign-in"
+                >
                   Back to sign in
                 </a>
               </div>
@@ -53,5 +57,5 @@ export function ForgotPasswordForm1({
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

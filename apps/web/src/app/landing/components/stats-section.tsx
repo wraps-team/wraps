@@ -1,69 +1,65 @@
-"use client"
+"use client";
 
-import {
-  Package,
-  Download,
-  Users,
-  Star
-} from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
-import { DotPattern } from '@/components/dot-pattern'
-
+import { Download, Package, Star, Users } from "lucide-react";
+import { DotPattern } from "@/components/dot-pattern";
+import { Card, CardContent } from "@/components/ui/card";
 
 const stats = [
   {
     icon: Package,
-    value: '500+',
-    label: 'Components',
-    description: 'Ready-to-use blocks'
+    value: "500+",
+    label: "Components",
+    description: "Ready-to-use blocks",
   },
   {
     icon: Download,
-    value: '25K+',
-    label: 'Downloads',
-    description: 'Trusted worldwide'
+    value: "25K+",
+    label: "Downloads",
+    description: "Trusted worldwide",
   },
   {
     icon: Users,
-    value: '10K+',
-    label: 'Developers',
-    description: 'Active community'
+    value: "10K+",
+    label: "Developers",
+    description: "Active community",
   },
   {
     icon: Star,
-    value: '4.9',
-    label: 'Rating',
-    description: 'User satisfaction'
-  }
-]
+    value: "4.9",
+    label: "Rating",
+    description: "User satisfaction",
+  },
+];
 
 export function StatsSection() {
   return (
-    <section className="py-12 sm:py-16 relative">
+    <section className="relative py-12 sm:py-16">
       {/* Background with transparency */}
       <div className="absolute inset-0 bg-gradient-to-r from-primary/8 via-transparent to-secondary/20" />
-      <DotPattern className="opacity-75" size="md" fadeStyle="circle" />
+      <DotPattern className="opacity-75" fadeStyle="circle" size="md" />
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
+      <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+        <div className="grid grid-cols-2 gap-6 md:gap-8 lg:grid-cols-4">
           {stats.map((stat, index) => (
             <Card
+              className="border-border/50 bg-background/60 py-0 text-center backdrop-blur-sm"
               key={index}
-              className="text-center bg-background/60 backdrop-blur-sm border-border/50 py-0"
             >
               <CardContent className="p-6">
-                <div className="flex justify-center mb-4">
-                  <div className="p-3 bg-primary/10 rounded-xl">
+                <div className="mb-4 flex justify-center">
+                  <div className="rounded-xl bg-primary/10 p-3">
                     <stat.icon className="h-6 w-6 text-primary" />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-2xl sm:text-3xl font-bold text-foreground">
+                  <h3 className="font-bold text-2xl text-foreground sm:text-3xl">
                     {stat.value}
                   </h3>
                   <p className="font-semibold text-foreground">{stat.label}</p>
-                  <p className="text-sm text-muted-foreground">{stat.description}</p>
+                  <p className="text-muted-foreground text-sm">
+                    {stat.description}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -71,5 +67,5 @@ export function StatsSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }

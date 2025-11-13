@@ -1,18 +1,18 @@
-import * as React from "react"
+import type * as React from "react";
 
 interface LogoProps extends React.SVGProps<SVGSVGElement> {
-  size?: number
+  size?: number;
 }
 
 export function Logo({ size = 24, className, ...props }: LogoProps) {
   return (
-    <svg 
-      width={size} 
-      height={size} 
-      viewBox="0 0 32 32" 
-      fill="none" 
-      xmlns="http://www.w3.org/2000/svg"
+    <svg
       className={className}
+      fill="none"
+      height={size}
+      viewBox="0 0 32 32"
+      width={size}
+      xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
       <path
@@ -40,5 +40,5 @@ export function Logo({ size = 24, className, ...props }: LogoProps) {
       <circle cx="13.1" cy="26.1" r="1.7" stroke="currentColor" />
       <circle cx="22.1" cy="26.1" r="1.7" stroke="currentColor" />
     </svg>
-  )
+  );
 }

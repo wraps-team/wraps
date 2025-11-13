@@ -1,78 +1,76 @@
-"use client"
+"use client";
 
-import { Plus } from "lucide-react"
-
-import { Calendars } from "./calendars"
-import { DatePicker } from "./date-picker"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Calendars } from "./calendars";
+import { DatePicker } from "./date-picker";
 
 interface CalendarSidebarProps {
-  selectedDate?: Date
-  onDateSelect?: (date: Date) => void
-  onNewCalendar?: () => void
-  onNewEvent?: () => void
-  events?: Array<{ date: Date; count: number }>
-  className?: string
+  selectedDate?: Date;
+  onDateSelect?: (date: Date) => void;
+  onNewCalendar?: () => void;
+  onNewEvent?: () => void;
+  events?: Array<{ date: Date; count: number }>;
+  className?: string;
 }
 
-export function CalendarSidebar({ 
+export function CalendarSidebar({
   selectedDate,
   onDateSelect,
   onNewCalendar,
   onNewEvent,
   events = [],
-  className 
+  className,
 }: CalendarSidebarProps) {
   return (
-    <div className={`flex flex-col h-full bg-background rounded-lg ${className}`}>
+    <div
+      className={`flex h-full flex-col rounded-lg bg-background ${className}`}
+    >
       {/* Add New Event Button */}
-      <div className="p-6 border-b">
-        <Button 
-          className="w-full cursor-pointer"
-          onClick={onNewEvent}
-        >
-          <Plus className="w-4 h-4 mr-2" />
+      <div className="border-b p-6">
+        <Button className="w-full cursor-pointer" onClick={onNewEvent}>
+          <Plus className="mr-2 h-4 w-4" />
           Add New Event
         </Button>
       </div>
 
       {/* Date Picker */}
       <DatePicker
-        selectedDate={selectedDate}
-        onDateSelect={onDateSelect}
         events={events}
+        onDateSelect={onDateSelect}
+        selectedDate={selectedDate}
       />
 
       <Separator />
 
       {/* Calendars */}
       <div className="flex-1 p-4">
-        <Calendars 
-          onNewCalendar={onNewCalendar}
-          onCalendarToggle={(calendarId, visible) => {
-            console.log(`Calendar ${calendarId} visibility: ${visible}`)
+        <Calendars
+          onCalendarDelete={(calendarId) => {
+            console.log(`Delete calendar: ${calendarId}`);
           }}
           onCalendarEdit={(calendarId) => {
-            console.log(`Edit calendar: ${calendarId}`)
+            console.log(`Edit calendar: ${calendarId}`);
           }}
-          onCalendarDelete={(calendarId) => {
-            console.log(`Delete calendar: ${calendarId}`)
+          onCalendarToggle={(calendarId, visible) => {
+            console.log(`Calendar ${calendarId} visibility: ${visible}`);
           }}
+          onNewCalendar={onNewCalendar}
         />
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t">
-        <Button 
-          variant="outline" 
-          className="w-full justify-start cursor-pointer"
+      <div className="border-t p-4">
+        <Button
+          className="w-full cursor-pointer justify-start"
           onClick={onNewCalendar}
+          variant="outline"
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           New Calendar
         </Button>
       </div>
     </div>
-  )
+  );
 }

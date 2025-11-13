@@ -22,10 +22,30 @@
     { "month": "Dec", "sales": 42300, "target": 35000 }
   ],
   "revenueBreakdown": [
-    { "name": "Subscriptions", "value": 45, "amount": 24500, "color": "hsl(210, 100%, 50%)" },
-    { "name": "One-time Sales", "value": 30, "amount": 16300, "color": "hsl(280, 100%, 70%)" },
-    { "name": "Services", "value": 15, "amount": 8150, "color": "hsl(120, 100%, 40%)" },
-    { "name": "Partnerships", "value": 10, "amount": 5430, "color": "hsl(30, 100%, 50%)" }
+    {
+      "name": "Subscriptions",
+      "value": 45,
+      "amount": 24500,
+      "color": "hsl(210, 100%, 50%)"
+    },
+    {
+      "name": "One-time Sales",
+      "value": 30,
+      "amount": 16300,
+      "color": "hsl(280, 100%, 70%)"
+    },
+    {
+      "name": "Services",
+      "value": 15,
+      "amount": 8150,
+      "color": "hsl(120, 100%, 40%)"
+    },
+    {
+      "name": "Partnerships",
+      "value": 10,
+      "amount": 5430,
+      "color": "hsl(30, 100%, 50%)"
+    }
   ],
   "customerGrowth": [
     { "month": "Jan", "new": 245, "returning": 890, "churn": 45 },

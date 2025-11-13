@@ -1,7 +1,7 @@
 // Main theme customizer exports
-export { ThemeCustomizer, ThemeCustomizerTrigger } from './index'
 
+export { ImportModal } from "./import-modal";
+export { ThemeCustomizer, ThemeCustomizerTrigger } from "./index";
+export { LayoutTab } from "./layout-tab";
 // Individual component exports for flexibility
-export { ThemeTab } from './theme-tab'
-export { LayoutTab } from './layout-tab'
-export { ImportModal } from './import-modal'
+export { ThemeTab } from "./theme-tab";

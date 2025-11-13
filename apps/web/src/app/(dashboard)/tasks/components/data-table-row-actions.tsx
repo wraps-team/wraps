@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import type { Row } from "@tanstack/react-table"
-import { MoreHorizontal } from "lucide-react"
+import type { Row } from "@tanstack/react-table";
+import { MoreHorizontal } from "lucide-react";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,26 +16,26 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 
-import { labels } from "../data/data"
-import { taskSchema } from "../data/schema"
+import { labels } from "../data/data";
+import { taskSchema } from "../data/schema";
 
 interface DataTableRowActionsProps<TData> {
-  row: Row<TData>
+  row: Row<TData>;
 }
 
 export function DataTableRowActions<TData>({
   row,
 }: DataTableRowActionsProps<TData>) {
-  const task = taskSchema.parse(row.original)
+  const task = taskSchema.parse(row.original);
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
+          className="flex h-8 w-8 cursor-pointer p-0 data-[state=open]:bg-muted"
           variant="ghost"
-          className="flex h-8 w-8 p-0 data-[state=open]:bg-muted cursor-pointer"
         >
           <MoreHorizontal />
           <span className="sr-only">Open menu</span>
@@ -43,15 +43,23 @@ export function DataTableRowActions<TData>({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[160px]">
         <DropdownMenuItem className="cursor-pointer">Edit</DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer">Make a copy</DropdownMenuItem>
+        <DropdownMenuItem className="cursor-pointer">
+          Make a copy
+        </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer">Favorite</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="cursor-pointer">Labels</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger className="cursor-pointer">
+            Labels
+          </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
             <DropdownMenuRadioGroup value={task.label}>
               {labels.map((label) => (
-                <DropdownMenuRadioItem key={label.value} value={label.value} className="cursor-pointer">
+                <DropdownMenuRadioItem
+                  className="cursor-pointer"
+                  key={label.value}
+                  value={label.value}
+                >
                   {label.label}
                 </DropdownMenuRadioItem>
               ))}
@@ -65,5 +73,5 @@ export function DataTableRowActions<TData>({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }

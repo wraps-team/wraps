@@ -7,7 +7,10 @@ const nextConfig: NextConfig = {
 
   // Image optimization
   images: {
-    domains: ["ui.shadcn.com", "images.unsplash.com"],
+    remotePatterns: [
+      { protocol: "https", hostname: "ui.shadcn.com" },
+      { protocol: "https", hostname: "images.unsplash.com" },
+    ],
     formats: ["image/webp", "image/avif"],
   },
 

@@ -1,47 +1,75 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card"
-import { Rocket, Blocks, LayoutDashboard, ArrowRight } from "lucide-react"
-import Image from "next/image"
+import { ArrowRight, Blocks, LayoutDashboard, Rocket } from "lucide-react";
+import Image from "next/image";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
-
-const SHADCN_BLOCKS_URL = "https://shadcnstore.com/blocks"
+const SHADCN_BLOCKS_URL = "https://shadcnstore.com/blocks";
 
 export function UpgradeToProButton() {
-
-
   return (
-    <div className="fixed z-50 bottom-8 right-4 md:right-6 lg:right-8 flex flex-col items-end gap-2">
-      <HoverCard openDelay={100} closeDelay={100}>
+    <div className="fixed right-4 bottom-8 z-50 flex flex-col items-end gap-2 md:right-6 lg:right-8">
+      <HoverCard closeDelay={100} openDelay={100}>
         <HoverCardTrigger asChild>
           <Button
+            className="cursor-pointer bg-gradient-to-br from-slate-900 to-slate-400 px-6 py-3 font-bold text-white shadow-lg"
+            onClick={() =>
+              typeof window !== "undefined" &&
+              window.open(SHADCN_BLOCKS_URL, "_blank")
+            }
             size="lg"
-            className="px-6 py-3 bg-gradient-to-br shadow-lg from-slate-900 cursor-pointer to-slate-400 text-white font-bold"
-            style={{ minWidth: 180 }} onClick={() => typeof window !== "undefined" && window.open(SHADCN_BLOCKS_URL, "_blank")}
+            style={{ minWidth: 180 }}
           >
             Upgrade to Pro
-            <Rocket size={30} className="ml-1" />
+            <Rocket className="ml-1" size={30} />
           </Button>
         </HoverCardTrigger>
-        <HoverCardContent className="mb-3 w-90 rounded-xl shadow-2xl bg-background border border-border p-3 animate-in fade-in slide-in-from-bottom-4 relative mr-4 md:mr-6 lg:mr-8">
-          <div className="flex flex-col items-center text-center gap-3">
-            <a href={SHADCN_BLOCKS_URL} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
-              <Image src="/hero-images-container.png" alt="shadcn" width={300} height={200} />
+        <HoverCardContent className="fade-in slide-in-from-bottom-4 relative mr-4 mb-3 w-90 animate-in rounded-xl border border-border bg-background p-3 shadow-2xl md:mr-6 lg:mr-8">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <a
+              className="cursor-pointer"
+              href={SHADCN_BLOCKS_URL}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <Image
+                alt="shadcn"
+                height={200}
+                src="/hero-images-container.png"
+                width={300}
+              />
             </a>
-            <h3 className="font-bold text-lg flex items-center py-2 gap-2">
-              <Rocket size={18} className="text-primary" />
+            <h3 className="flex items-center gap-2 py-2 font-bold text-lg">
+              <Rocket className="text-primary" size={18} />
               Unlock Premium Blocks
-              <Badge variant="destructive" className="text-xs px-2 py-0.5 rounded-full shadow">Live</Badge>
+              <Badge
+                className="rounded-full px-2 py-0.5 text-xs shadow"
+                variant="destructive"
+              >
+                Live
+              </Badge>
             </h3>
-            <p className="text-muted-foreground text-sm mb-4">
-              Get access to exclusive premium blocks and dashboards for your next project. Elevate your UI instantly!
+            <p className="mb-4 text-muted-foreground text-sm">
+              Get access to exclusive premium blocks and dashboards for your
+              next project. Elevate your UI instantly!
             </p>
-            <div className="flex flex-row gap-2 w-full mt-2 justify-center">
+            <div className="mt-2 flex w-full flex-row justify-center gap-2">
               <div className="relative w-1/2">
-                <a href={SHADCN_BLOCKS_URL} target="_blank" rel="noopener noreferrer">
-                  <Button className="w-full flex items-center justify-center cursor-pointer" variant="default">
+                <a
+                  href={SHADCN_BLOCKS_URL}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <Button
+                    className="flex w-full cursor-pointer items-center justify-center"
+                    variant="default"
+                  >
                     <Blocks size={16} />
                     Pro Blocks
                     <ArrowRight size={16} />
@@ -49,12 +77,21 @@ export function UpgradeToProButton() {
                 </a>
               </div>
               <div className="relative w-1/2">
-                <Button className="w-full flex items-center justify-center" variant="default" disabled>
+                <Button
+                  className="flex w-full items-center justify-center"
+                  disabled
+                  variant="default"
+                >
                   <LayoutDashboard size={16} />
                   Pro Dashboards
                 </Button>
-                <span className="absolute -top-5 -right-1">
-                  <Badge variant="outline" className="bg-yellow-400 text-yellow-900 border-yellow-400 text-xs px-2 py-0.5 rounded-full shadow">Coming soon</Badge>
+                <span className="-top-5 -right-1 absolute">
+                  <Badge
+                    className="rounded-full border-yellow-400 bg-yellow-400 px-2 py-0.5 text-xs text-yellow-900 shadow"
+                    variant="outline"
+                  >
+                    Coming soon
+                  </Badge>
                 </span>
               </div>
             </div>
@@ -62,5 +99,5 @@ export function UpgradeToProButton() {
         </HoverCardContent>
       </HoverCard>
     </div>
-  )
+  );
 }

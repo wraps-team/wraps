@@ -1,15 +1,15 @@
-import { LoginForm2 } from "./components/login-form-2"
-import { Logo } from "@/components/logo"
-import Link from "next/link"
-import Image from "next/image"
+import Image from "next/image";
+import Link from "next/link";
+import { Logo } from "@/components/logo";
+import { LoginForm2 } from "./components/login-form-2";
 
 export default function LoginPage() {
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
-          <Link href="/" className="flex items-center gap-2 font-medium">
-            <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
+          <Link className="flex items-center gap-2 font-medium" href="/">
+            <div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <Logo size={24} />
             </div>
             ShadcnStore
@@ -21,14 +21,14 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-      <div className="bg-muted relative hidden lg:block">
+      <div className="relative hidden bg-muted lg:block">
         <Image
-          src="https://ui.shadcn.com/placeholder.svg"
           alt="Image"
-          fill
           className="object-cover dark:brightness-[0.95] dark:invert"
+          fill
+          src="https://ui.shadcn.com/placeholder.svg"
         />
       </div>
     </div>
-  )
+  );
 }

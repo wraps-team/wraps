@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Plus } from "lucide-react"
-import { z } from "zod"
-
-import { Button } from "@/components/ui/button"
+import { Plus } from "lucide-react";
+import { useState } from "react";
+import { z } from "zod";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -12,21 +12,20 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
-import { priorities, statuses, labels } from "../data/data"
-import type { Task } from "../data/schema"
+import { labels, priorities, statuses } from "../data/data";
+import type { Task } from "../data/schema";
 
 // Extended task schema for the form
 const taskFormSchema = z.object({
@@ -36,17 +35,17 @@ const taskFormSchema = z.object({
   status: z.string(),
   label: z.string(),
   priority: z.string(),
-})
+});
 
-type TaskFormData = z.infer<typeof taskFormSchema>
+type TaskFormData = z.infer<typeof taskFormSchema>;
 
 interface AddTaskModalProps {
-  onAddTask?: (task: Task) => void
-  trigger?: React.ReactNode
+  onAddTask?: (task: Task) => void;
+  trigger?: React.ReactNode;
 }
 
 export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState<TaskFormData>({
     id: "",
     title: "",
@@ -54,25 +53,25 @@ export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
     status: "todo",
     label: "feature",
     priority: "medium",
-  })
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Generate unique task ID
   const generateTaskId = () => {
-    const prefix = "TASK"
-    const number = Math.floor(Math.random() * 9999) + 1000
-    return `${prefix}-${number}`
-  }
+    const prefix = "TASK";
+    const number = Math.floor(Math.random() * 9999) + 1000;
+    return `${prefix}-${number}`;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    
+    e.preventDefault();
+
     try {
       // Validate form data
       const validatedData = taskFormSchema.parse({
         ...formData,
         id: generateTaskId(),
-      })
+      });
 
       // Create the task
       const newTask: Task = {
@@ -81,10 +80,10 @@ export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
         status: validatedData.status,
         label: validatedData.label,
         priority: validatedData.priority,
-      }
+      };
 
-      onAddTask?.(newTask)
-      
+      onAddTask?.(newTask);
+
       // Reset form and close modal
       setFormData({
         id: "",
@@ -93,21 +92,21 @@ export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
         status: "todo",
         label: "feature",
         priority: "medium",
-      })
-      setErrors({})
-      setOpen(false)
+      });
+      setErrors({});
+      setOpen(false);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {}
+        const newErrors: Record<string, string> = {};
         error.issues.forEach((issue) => {
           if (issue.path[0]) {
-            newErrors[issue.path[0] as string] = issue.message
+            newErrors[issue.path[0] as string] = issue.message;
           }
-        })
-        setErrors(newErrors)
+        });
+        setErrors(newErrors);
       }
     }
-  }
+  };
 
   const handleCancel = () => {
     setFormData({
@@ -117,17 +116,17 @@ export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
       status: "todo",
       label: "feature",
       priority: "medium",
-    })
-    setErrors({})
-    setOpen(false)
-  }
+    });
+    setErrors({});
+    setOpen(false);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog onOpenChange={setOpen} open={open}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button variant="default" size="sm" className="cursor-pointer">
-            <Plus className="w-4 h-4 mr-2" />
+          <Button className="cursor-pointer" size="sm" variant="default">
+            <Plus className="mr-2 h-4 w-4" />
             Add Task
           </Button>
         )}
@@ -136,23 +135,26 @@ export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
         <DialogHeader>
           <DialogTitle>Add New Task</DialogTitle>
           <DialogDescription>
-            Create a new task to track work and progress. Fill in the details below.
+            Create a new task to track work and progress. Fill in the details
+            below.
           </DialogDescription>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
+
+        <form className="space-y-6" onSubmit={handleSubmit}>
           {/* Task Title */}
           <div className="space-y-2">
             <Label htmlFor="title">Task Title *</Label>
             <Input
+              className={errors.title ? "border-red-500" : ""}
               id="title"
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, title: e.target.value }))
+              }
               placeholder="Enter task title..."
               value={formData.title}
-              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-              className={errors.title ? "border-red-500" : ""}
             />
             {errors.title && (
-              <p className="text-sm text-red-500">{errors.title}</p>
+              <p className="text-red-500 text-sm">{errors.title}</p>
             )}
           </div>
 
@@ -161,10 +163,15 @@ export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  description: e.target.value,
+                }))
+              }
               placeholder="Provide additional details about the task..."
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               rows={3}
+              value={formData.description}
             />
           </div>
 
@@ -172,8 +179,10 @@ export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
           <div className="space-y-2">
             <Label htmlFor="status">Status</Label>
             <Select
+              onValueChange={(value) =>
+                setFormData((prev) => ({ ...prev, status: value }))
+              }
               value={formData.status}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select status" />
@@ -197,8 +206,10 @@ export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
           <div className="space-y-2">
             <Label htmlFor="label">Label</Label>
             <Select
+              onValueChange={(value) =>
+                setFormData((prev) => ({ ...prev, label: value }))
+              }
               value={formData.label}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, label: value }))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select label" />
@@ -206,7 +217,7 @@ export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
               <SelectContent>
                 {labels.map((label) => (
                   <SelectItem key={label.value} value={label.value}>
-                    <Badge variant="outline" className="cursor-pointer">
+                    <Badge className="cursor-pointer" variant="outline">
                       {label.label}
                     </Badge>
                   </SelectItem>
@@ -219,8 +230,10 @@ export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
           <div className="space-y-2">
             <Label htmlFor="priority">Priority</Label>
             <Select
+              onValueChange={(value) =>
+                setFormData((prev) => ({ ...prev, priority: value }))
+              }
               value={formData.priority}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select priority" />
@@ -242,16 +255,21 @@ export function AddTaskModal({ onAddTask, trigger }: AddTaskModalProps) {
 
           {/* Action Buttons */}
           <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={handleCancel} className="cursor-pointer">
+            <Button
+              className="cursor-pointer"
+              onClick={handleCancel}
+              type="button"
+              variant="outline"
+            >
               Cancel
             </Button>
-            <Button type="submit" className="cursor-pointer">
-              <Plus className="w-4 h-4 mr-2" />
+            <Button className="cursor-pointer" type="submit">
+              <Plus className="mr-2 h-4 w-4" />
               Create Task
             </Button>
           </div>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

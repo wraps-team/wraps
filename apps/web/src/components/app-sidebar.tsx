@@ -1,27 +1,26 @@
-"use client"
+"use client";
 
-import * as React from "react"
 import {
-  LayoutPanelLeft,
-  LayoutDashboard,
-  Mail,
-  CheckSquare,
-  MessageCircle,
-  Calendar,
-  Shield,
   AlertTriangle,
-  Settings,
-  HelpCircle,
+  Calendar,
+  CheckSquare,
   CreditCard,
+  HelpCircle,
+  LayoutDashboard,
+  LayoutPanelLeft,
   LayoutTemplate,
+  Mail,
+  MessageCircle,
+  Settings,
+  Shield,
   Users,
-} from "lucide-react"
-import Link from "next/link"
-import { Logo } from "@/components/logo"
-import { SidebarNotification } from "@/components/sidebar-notification"
-
-import { NavMain } from "@/components/nav-main"
-import { NavUser } from "@/components/nav-user"
+} from "lucide-react";
+import Link from "next/link";
+import type * as React from "react";
+import { Logo } from "@/components/logo";
+import { NavMain } from "@/components/nav-main";
+import { NavUser } from "@/components/nav-user";
+import { SidebarNotification } from "@/components/sidebar-notification";
 import {
   Sidebar,
   SidebarContent,
@@ -30,7 +29,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 const data = {
   user: {
@@ -133,7 +132,7 @@ const data = {
             {
               title: "Forgot Password 3",
               url: "/forgot-password-3",
-            }
+            },
           ],
         },
         {
@@ -207,7 +206,7 @@ const data = {
       ],
     },
   ],
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -215,10 +214,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
+            <SidebarMenuButton asChild size="lg">
               <Link href="/dashboard">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Logo size={24} className="text-current" />
+                  <Logo className="text-current" size={24} />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">ShadcnStore</span>
@@ -231,7 +230,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         {data.navGroups.map((group) => (
-          <NavMain key={group.label} label={group.label} items={group.items} />
+          <NavMain items={group.items} key={group.label} label={group.label} />
         ))}
       </SidebarContent>
       <SidebarFooter>
@@ -239,5 +238,5 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavUser user={data.user} />
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

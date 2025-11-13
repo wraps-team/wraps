@@ -16,12 +16,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} antialiased`}>
+    <html className={`${inter.variable} antialiased`} lang="en">
       <body className={inter.className}>
         <ThemeProvider defaultTheme="system" storageKey="nextjs-ui-theme">
-          <SidebarConfigProvider>
-            {children}
-          </SidebarConfigProvider>
+          <SidebarConfigProvider>{children}</SidebarConfigProvider>
         </ThemeProvider>
       </body>
     </html>

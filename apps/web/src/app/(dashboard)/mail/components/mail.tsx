@@ -1,6 +1,5 @@
-"use client"
+"use client";
 
-import * as React from "react"
 import {
   AlertCircle,
   Archive,
@@ -13,21 +12,25 @@ import {
   ShoppingCart,
   Trash2,
   Users2,
-} from "lucide-react"
-
-import { cn } from "@/lib/utils"
-import { Input } from "@/components/ui/input"
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
-import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TooltipProvider } from "@/components/ui/tooltip"
-import { AccountSwitcher } from "./account-switcher"
-import { MailDisplay } from "./mail-display"
-import { MailList } from "./mail-list"
-import { Nav } from "./nav"
-import { type Mail } from "../data"
-import { useMail } from "../use-mail"
-import { Button } from "@/components/ui/button"
+} from "lucide-react";
+import * as React from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import type { Mail } from "../data";
+import { useMail } from "../use-mail";
+import { AccountSwitcher } from "./account-switcher";
+import { MailDisplay } from "./mail-display";
+import { MailList } from "./mail-list";
+import { Nav } from "./nav";
 
 interface MailProps {
   accounts: {
@@ -54,18 +57,21 @@ export function Mail({
   return (
     <TooltipProvider delayDuration={0}>
       <ResizablePanelGroup
+        className="h-full items-stretch overflow-hidden rounded-lg border"
         direction="horizontal"
         onLayout={(sizes: number[]) => {
           document.cookie = `react-resizable-panels:layout:mail=${JSON.stringify(sizes)}`;
         }}
-        className="h-full items-stretch rounded-lg border overflow-hidden"
       >
         <ResizablePanel
-          defaultSize={defaultLayout[0]}
+          className={cn(
+            isCollapsed && "w-full transition-all duration-300 ease-in-out"
+          )}
           collapsedSize={navCollapsedSize}
           collapsible={true}
-          minSize={15}
+          defaultSize={defaultLayout[0]}
           maxSize={20}
+          minSize={15}
           onCollapse={() => {
             setIsCollapsed(true);
             document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(true)}`;
@@ -74,7 +80,6 @@ export function Mail({
             setIsCollapsed(false);
             document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(false)}`;
           }}
-          className={cn(isCollapsed && "w-full transition-all duration-300 ease-in-out")}
         >
           <div
             className={cn(
@@ -82,7 +87,7 @@ export function Mail({
               isCollapsed ? "h-[52px]" : "px-2"
             )}
           >
-            <AccountSwitcher isCollapsed={isCollapsed} accounts={accounts} />
+            <AccountSwitcher accounts={accounts} isCollapsed={isCollapsed} />
           </div>
           <Separator className="mx-0" />
           <div className="m-3">
@@ -172,34 +177,40 @@ export function Mail({
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={defaultLayout[1]} minSize={30}>
-          <Tabs defaultValue="all" className="gap-1">
+          <Tabs className="gap-1" defaultValue="all">
             <div className="flex items-center px-4 py-1.5">
-              <h1 className="text-foreground text-xl font-bold">Inbox</h1>
+              <h1 className="font-bold text-foreground text-xl">Inbox</h1>
               <TabsList className="ml-auto">
-                <TabsTrigger value="all" className="cursor-pointer">All mail</TabsTrigger>
-                <TabsTrigger value="unread" className="cursor-pointer">Unread</TabsTrigger>
+                <TabsTrigger className="cursor-pointer" value="all">
+                  All mail
+                </TabsTrigger>
+                <TabsTrigger className="cursor-pointer" value="unread">
+                  Unread
+                </TabsTrigger>
               </TabsList>
             </div>
             <Separator />
-            <div className="bg-background/95 supports-[backdrop-filter]:bg-background/60 p-4 backdrop-blur">
+            <div className="bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
               <form>
                 <div className="relative">
-                  <Search className="text-muted-foreground absolute top-2.5 left-2 size-4 cursor-pointer" />
-                  <Input placeholder="Search" className="pl-8 cursor-text" />
+                  <Search className="absolute top-2.5 left-2 size-4 cursor-pointer text-muted-foreground" />
+                  <Input className="cursor-text pl-8" placeholder="Search" />
                 </div>
               </form>
             </div>
-            <TabsContent value="all" className="m-0">
+            <TabsContent className="m-0" value="all">
               <MailList items={mails} />
             </TabsContent>
-            <TabsContent value="unread" className="m-0">
+            <TabsContent className="m-0" value="unread">
               <MailList items={mails.filter((item) => !item.read)} />
             </TabsContent>
           </Tabs>
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={defaultLayout[2]} minSize={30}>
-          <MailDisplay mail={mails.find((item) => item.id === mail.selected) || null} />
+          <MailDisplay
+            mail={mails.find((item) => item.id === mail.selected) || null}
+          />
         </ResizablePanel>
       </ResizablePanelGroup>
     </TooltipProvider>
