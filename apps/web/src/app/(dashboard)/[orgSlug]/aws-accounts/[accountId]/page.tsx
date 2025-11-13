@@ -1,29 +1,36 @@
 import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
-import { headers } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { AccountHeader } from "@/components/account-header";
 import { MetricsDisplay } from "@/components/metrics-display";
 import { getSESMetricsSummary } from "@/lib/aws/cloudwatch";
+import { getOrganizationBySlug } from "@/lib/organization";
 import { checkAWSAccountAccess } from "@/lib/permissions/check-access";
 
 interface AWSAccountPageProps {
   params: Promise<{
-    organizationId: string;
+    orgSlug: string;
     accountId: string;
   }>;
 }
 
 export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
-  const { organizationId, accountId } = await params;
+  const { orgSlug, accountId } = await params;
 
   // Get session
   const session = await auth.api.getSession({
-    headers: await headers(),
+    headers: await import("next/headers").then((mod) => mod.headers()),
   });
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/auth");
+  }
+
+  // Get organization
+  const organization = await getOrganizationBySlug(orgSlug);
+
+  if (!organization) {
+    redirect("/dashboard");
   }
 
   // Get AWS account
@@ -31,39 +38,39 @@ export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
     where: (a, { eq }) => eq(a.id, accountId),
   });
 
-  if (!account || account.organizationId !== organizationId) {
-    notFound();
+  if (!account || account.organizationId !== organization.id) {
+    redirect(`/${orgSlug}/aws-accounts`);
   }
 
   // Check if user has view permission
   const access = await checkAWSAccountAccess({
     userId: session.user.id,
-    organizationId,
+    organizationId: organization.id,
     awsAccountId: accountId,
     permission: "view",
   });
 
   if (!access.authorized) {
-    redirect(`/dashboard/organizations/${organizationId}`);
+    redirect(`/${orgSlug}`);
   }
 
   // Check all permissions
   const [viewAccess, sendAccess, manageAccess] = await Promise.all([
     checkAWSAccountAccess({
       userId: session.user.id,
-      organizationId,
+      organizationId: organization.id,
       awsAccountId: accountId,
       permission: "view",
     }),
     checkAWSAccountAccess({
       userId: session.user.id,
-      organizationId,
+      organizationId: organization.id,
       awsAccountId: accountId,
       permission: "send",
     }),
     checkAWSAccountAccess({
       userId: session.user.id,
-      organizationId,
+      organizationId: organization.id,
       awsAccountId: accountId,
       permission: "manage",
     }),
@@ -96,16 +103,18 @@ export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
   }
 
   return (
-    <div className="container mx-auto space-y-8 py-8">
+    <>
       {/* Header */}
-      <AccountHeader
-        account={account}
-        organizationId={organizationId}
-        permissions={permissions}
-      />
+      <div className="px-4 lg:px-6">
+        <AccountHeader
+          account={account}
+          orgSlug={orgSlug}
+          permissions={permissions}
+        />
+      </div>
 
       {/* Metrics */}
-      <section>
+      <div className="px-4 lg:px-6">
         <h2 className="mb-4 font-semibold text-xl">
           Email Metrics (Last 7 Days)
         </h2>
@@ -120,10 +129,10 @@ export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
         ) : (
           <div className="text-muted-foreground">Loading metrics...</div>
         )}
-      </section>
+      </div>
 
       {/* Account Details */}
-      <section>
+      <div className="px-4 lg:px-6">
         <h2 className="mb-4 font-semibold text-xl">Account Details</h2>
         <div className="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
           <dl className="space-y-4">
@@ -190,7 +199,7 @@ export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
             )}
           </dl>
         </div>
-      </section>
-    </div>
+      </div>
+    </>
   );
 }

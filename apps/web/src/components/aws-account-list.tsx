@@ -12,12 +12,18 @@ interface AWSAccountListProps {
     }
   >;
   organizationId: string;
+  orgSlug?: string;
 }
 
 export function AWSAccountList({
   accounts,
   organizationId,
+  orgSlug,
 }: AWSAccountListProps) {
+  // Use slug-based URLs if orgSlug is provided, otherwise fall back to old format
+  const baseUrl = orgSlug
+    ? `/${orgSlug}/aws-accounts`
+    : `/dashboard/organizations/${organizationId}/aws-accounts`;
   return (
     <div className="space-y-4">
       {accounts.map(({ permissions, ...account }) => (
@@ -76,14 +82,14 @@ export function AWSAccountList({
             <div className="mt-4 flex gap-2">
               <a
                 className="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                href={`/dashboard/organizations/${organizationId}/aws-accounts/${account.id}`}
+                href={`${baseUrl}/${account.id}`}
               >
                 View Details
               </a>
               {permissions.canManage && (
                 <a
                   className="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                  href={`/dashboard/organizations/${organizationId}/aws-accounts/${account.id}/permissions`}
+                  href={`${baseUrl}/${account.id}/permissions`}
                 >
                   Manage Permissions
                 </a>

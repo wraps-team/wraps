@@ -9,13 +9,13 @@ interface AccountHeaderProps {
     canSend: boolean;
     canManage: boolean;
   };
-  organizationId: string;
+  orgSlug: string;
 }
 
 export function AccountHeader({
   account,
   permissions,
-  organizationId,
+  orgSlug,
 }: AccountHeaderProps) {
   return (
     <div className="space-y-4">
@@ -23,9 +23,9 @@ export function AccountHeader({
       <nav className="flex items-center gap-2 text-sm">
         <Link
           className="text-muted-foreground hover:text-foreground"
-          href={`/dashboard/organizations/${organizationId}`}
+          href={`/${orgSlug}/aws-accounts`}
         >
-          Organization
+          AWS Accounts
         </Link>
         <span className="text-muted-foreground">/</span>
         <span className="font-medium">{account.name}</span>
@@ -47,7 +47,7 @@ export function AccountHeader({
           {permissions.canManage && (
             <Link
               className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
-              href={`/dashboard/organizations/${organizationId}/aws-accounts/${account.id}/permissions`}
+              href={`/${orgSlug}/aws-accounts/${account.id}/permissions`}
             >
               Manage Access
             </Link>

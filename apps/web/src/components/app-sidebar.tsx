@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  Building2,
   LayoutDashboard,
   Mail,
   Settings,
@@ -13,6 +14,7 @@ import type * as React from "react";
 import { Logo } from "@/components/logo";
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
+import { OrganizationSwitcher } from "@/components/organization-switcher";
 import { SidebarNotification } from "@/components/sidebar-notification";
 import {
   Sidebar,
@@ -22,53 +24,89 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { useActiveOrganization } from "@/contexts/organization-context";
 
-const data = {
-  user: {
-    name: "Wraps",
-    email: "hello@wraps.dev",
-    avatar: "",
-  },
-  navGroups: [
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { activeOrganization } = useActiveOrganization();
+  const orgSlug = activeOrganization?.slug ?? "";
+
+  // Organization-scoped navigation
+  const orgScopedNavGroups = orgSlug
+    ? [
+        {
+          label: "Overview",
+          items: [
+            {
+              title: "Dashboard",
+              url: `/${orgSlug}`,
+              icon: LayoutDashboard,
+            },
+          ],
+        },
+        {
+          label: "Email Infrastructure",
+          items: [
+            {
+              title: "Emails",
+              url: `/${orgSlug}/emails`,
+              icon: Mail,
+            },
+            {
+              title: "Analytics",
+              url: `/${orgSlug}/analytics`,
+              icon: BarChart3,
+            },
+            {
+              title: "Webhooks",
+              url: `/${orgSlug}/webhooks`,
+              icon: Webhook,
+            },
+          ],
+        },
+        {
+          label: "Management",
+          items: [
+            {
+              title: "AWS Accounts",
+              url: `/${orgSlug}/aws-accounts`,
+              icon: Building2,
+            },
+            {
+              title: "Members",
+              url: `/${orgSlug}/members`,
+              icon: Users,
+            },
+            {
+              title: "Organization",
+              url: "#",
+              icon: Settings,
+              items: [
+                {
+                  title: "General",
+                  url: `/${orgSlug}/settings/general`,
+                },
+                {
+                  title: "Billing",
+                  url: `/${orgSlug}/settings/billing`,
+                },
+                {
+                  title: "Integrations",
+                  url: `/${orgSlug}/settings/integrations`,
+                },
+              ],
+            },
+          ],
+        },
+      ]
+    : [];
+
+  // User-scoped navigation (always available)
+  const userScopedNavGroups = [
     {
-      label: "Overview",
+      label: "User Settings",
       items: [
-        {
-          title: "Dashboard",
-          url: "/dashboard",
-          icon: LayoutDashboard,
-        },
-      ],
-    },
-    {
-      label: "Email Infrastructure",
-      items: [
-        {
-          title: "Emails",
-          url: "/emails",
-          icon: Mail,
-        },
-        {
-          title: "Analytics",
-          url: "/analytics",
-          icon: BarChart3,
-        },
-        {
-          title: "Webhooks",
-          url: "/webhooks",
-          icon: Webhook,
-        },
-      ],
-    },
-    {
-      label: "Management",
-      items: [
-        {
-          title: "Users",
-          url: "/users",
-          icon: Users,
-        },
         {
           title: "Settings",
           url: "#",
@@ -79,12 +117,8 @@ const data = {
               url: "/settings/account",
             },
             {
-              title: "User Profile",
-              url: "/settings/user",
-            },
-            {
-              title: "Billing",
-              url: "/settings/billing",
+              title: "Profile",
+              url: "/settings/profile",
             },
             {
               title: "Appearance",
@@ -94,18 +128,12 @@ const data = {
               title: "Notifications",
               url: "/settings/notifications",
             },
-            {
-              title: "Connections",
-              url: "/settings/connections",
-            },
           ],
         },
       ],
     },
-  ],
-};
+  ];
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props}>
       <SidebarHeader>
@@ -124,9 +152,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <OrganizationSwitcher />
       </SidebarHeader>
       <SidebarContent>
-        {data.navGroups.map((group) => (
+        {orgScopedNavGroups.map((group) => (
+          <NavMain items={group.items} key={group.label} label={group.label} />
+        ))}
+        {orgSlug && <SidebarSeparator />}
+        {userScopedNavGroups.map((group) => (
           <NavMain items={group.items} key={group.label} label={group.label} />
         ))}
       </SidebarContent>

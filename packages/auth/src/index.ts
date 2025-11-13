@@ -26,6 +26,34 @@ export const auth = betterAuth<BetterAuthOptions>({
     twoFactor({
       issuer: "Wraps",
     }),
-    organization(),
+    organization({
+      ac: {
+        enabled: true,
+      },
+    }),
   ],
+  databaseHooks: {
+    session: {
+      create: {
+        before: async (session) => {
+          // Auto-set active organization to first org user is a member of
+          const member = await db.query.member.findFirst({
+            where: (members, { eq }) => eq(members.userId, session.userId),
+            orderBy: (members, { asc }) => [asc(members.createdAt)],
+          });
+
+          if (member) {
+            return {
+              data: {
+                ...session,
+                activeOrganizationId: member.organizationId,
+              },
+            };
+          }
+
+          return { data: session };
+        },
+      },
+    },
+  },
 });

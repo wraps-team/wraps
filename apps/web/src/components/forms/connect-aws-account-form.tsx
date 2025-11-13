@@ -67,7 +67,11 @@ export function ConnectAWSAccountForm({
     onSuccess();
   }
 
-  const cloudFormationUrl = `https://console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=wraps-console-access&templateURL=${encodeURIComponent("https://wraps-assets.s3.amazonaws.com/cloudformation/wraps-console-access-role.yaml")}&param_ExternalId=${externalId}`;
+  // Use API route to serve CloudFormation template with correct AWS account ID
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const templateUrl = `${appUrl}/api/cloudformation/wraps-console-access-role`;
+
+  const cloudFormationUrl = `https://console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=wraps-console-access&templateURL=${encodeURIComponent(templateUrl)}&param_ExternalId=${externalId}`;
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">

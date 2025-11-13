@@ -27,21 +27,25 @@ export async function assumeRole(
 ): Promise<AssumedRoleCredentials> {
   const { roleArn, externalId, sessionName = "wraps-console-session" } = params;
 
-  // Validate environment variables
-  if (!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY)) {
-    throw new Error(
-      "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set in environment variables"
-    );
-  }
-
   // Create STS client using backend credentials
-  const sts = new STSClient({
+  // Priority: 1) Explicit env vars, 2) AWS_PROFILE env var, 3) Default profile
+  const stsConfig: {
+    region: string;
+    credentials?: { accessKeyId: string; secretAccessKey: string };
+  } = {
     region: "us-east-1",
-    credentials: {
+  };
+
+  // Only set explicit credentials if both env vars are present
+  // Otherwise, AWS SDK will automatically use AWS_PROFILE or default credentials
+  if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+    stsConfig.credentials = {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    },
-  });
+    };
+  }
+
+  const sts = new STSClient(stsConfig);
 
   // Assume the role with external ID for security
   const command = new AssumeRoleCommand({
