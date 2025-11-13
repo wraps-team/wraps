@@ -13,13 +13,13 @@ Parameters:
     MinLength: 1
 
 Resources:
-  # OIDC Identity Provider for Vercel
+  # OIDC Identity Provider for Vercel (Global Mode)
   VercelOIDCProvider:
     Type: AWS::IAM::OIDCProvider
     Properties:
       Url: https://oidc.vercel.com
       ClientIdList:
-        - vercel
+        - !Sub "https://vercel.com/${VercelTeamId}"
       ThumbprintList:
         # Vercel OIDC thumbprint (verified from Vercel's public keys)
         - "6938fd4d98bab03faadb97b34396831e3780aea1"
@@ -45,8 +45,9 @@ Resources:
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:
-                # Only allow your specific Vercel team and project
-                "oidc.vercel.com:aud": "vercel"
+                # Global mode: audience is the team URL
+                "oidc.vercel.com:aud": !Sub "https://vercel.com/${VercelTeamId}"
+                # Subject includes team, project, and environment
                 "oidc.vercel.com:sub": !Sub "team:${VercelTeamId}:project:${VercelProjectId}:environment:production"
       ManagedPolicyArns:
         - !Ref VercelBackendPolicy
