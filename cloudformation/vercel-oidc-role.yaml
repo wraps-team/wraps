@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Vercel OIDC Provider and IAM Role for Wraps Backend"
+
+Parameters:
+  VercelTeamId:
+    Type: String
+    Description: "Your Vercel Team ID (found in Team Settings)"
+    MinLength: 1
+
+  VercelProjectId:
+    Type: String
+    Description: "Your Vercel Project ID (found in Project Settings)"
+    MinLength: 1
+
+Resources:
+  # OIDC Identity Provider for Vercel
+  VercelOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://oidc.vercel.com
+      ClientIdList:
+        - vercel
+      ThumbprintList:
+        # Vercel OIDC thumbprint (verified from Vercel's public keys)
+        - "6938fd4d98bab03faadb97b34396831e3780aea1"
+      Tags:
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Purpose
+          Value: Vercel OIDC Authentication
+
+  # IAM Role for Vercel to Assume (for assuming customer roles)
+  VercelBackendRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: wraps-vercel-backend-role
+      Description: "Role assumed by Vercel deployments to access customer AWS accounts"
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !GetAtt VercelOIDCProvider.Arn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                # Only allow your specific Vercel team and project
+                "oidc.vercel.com:aud": "vercel"
+                "oidc.vercel.com:sub": !Sub "team:${VercelTeamId}:project:${VercelProjectId}:environment:production"
+      ManagedPolicyArns:
+        - !Ref VercelBackendPolicy
+      Tags:
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Purpose
+          Value: Vercel Backend Access
+
+  # IAM Policy - Only allows assuming customer roles
+  VercelBackendPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: wraps-vercel-backend-policy
+      Description: "Allows Vercel to assume customer AWS account roles"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # Allow assuming any role (customers will control access via their role trust policies)
+          - Sid: AssumeCustomerRoles
+            Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Resource: "*"
+
+Outputs:
+  OIDCProviderArn:
+    Description: "ARN of the Vercel OIDC Provider"
+    Value: !GetAtt VercelOIDCProvider.Arn
+    Export:
+      Name: VercelOIDCProviderArn
+
+  BackendRoleArn:
+    Description: "ARN of the Vercel Backend Role"
+    Value: !GetAtt VercelBackendRole.Arn
+    Export:
+      Name: VercelBackendRoleArn
+
+  VercelEnvironmentVariables:
+    Description: "Environment variables to set in Vercel"
+    Value: !Sub |
+      AWS_REGION=us-east-1
+      AWS_ROLE_ARN=${VercelBackendRole.Arn}
+      # Note: Do NOT set AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY
+      # Vercel will automatically get credentials via OIDC
+
+  NextSteps:
+    Description: "Next steps to complete setup"
+    Value: |
+      1. Add these environment variables to your Vercel project:
+         - AWS_REGION=us-east-1
+         - AWS_ROLE_ARN=<BackendRoleArn from outputs>
+
+      2. Remove these environment variables from Vercel (no longer needed):
+         - AWS_ACCESS_KEY_ID
+         - AWS_SECRET_ACCESS_KEY
+
+      3. Redeploy your Vercel project
+
+      4. Vercel will automatically assume this role using OIDC

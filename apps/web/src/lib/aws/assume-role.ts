@@ -28,16 +28,20 @@ export async function assumeRole(
   const { roleArn, externalId, sessionName = "wraps-console-session" } = params;
 
   // Create STS client using backend credentials
-  // Priority: 1) Explicit env vars, 2) AWS_PROFILE env var, 3) Default profile
+  // Credential resolution order:
+  // 1. Explicit env vars (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+  // 2. Web Identity Token (OIDC) - used by Vercel via AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE
+  // 3. AWS_PROFILE env var - used for local development
+  // 4. Default credentials chain (EC2 instance metadata, etc.)
   const stsConfig: {
     region: string;
     credentials?: { accessKeyId: string; secretAccessKey: string };
   } = {
-    region: "us-east-1",
+    region: process.env.AWS_REGION || "us-east-1",
   };
 
   // Only set explicit credentials if both env vars are present
-  // Otherwise, AWS SDK will automatically use AWS_PROFILE or default credentials
+  // Otherwise, AWS SDK will automatically handle OIDC, profiles, or instance credentials
   if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
     stsConfig.credentials = {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
