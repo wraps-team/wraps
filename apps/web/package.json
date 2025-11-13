@@ -46,6 +46,7 @@
     "@tanstack/react-store": "0.8.0",
     "@tanstack/react-table": "^8.21.3",
     "@vercel/oidc-aws-credentials-provider": "3.0.4",
+    "@wraps.dev/email": "0.2.1",
     "@wraps/auth": "workspace:*",
     "@wraps/db": "workspace:*",
     "better-auth": "catalog:",

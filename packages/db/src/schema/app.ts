@@ -8,7 +8,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
-import { organization, user } from "./auth";
+import { member, organization, user } from "./auth";
 
 // Organization billing/plan info
 export const organizationExtension = pgTable("organization_extension", {
@@ -190,6 +190,7 @@ export const organizationRelations = relations(
   organization,
   ({ one, many }) => ({
     extension: one(organizationExtension),
+    members: many(member),
     awsAccounts: many(awsAccount),
     emailTemplates: many(emailTemplate),
     apiKeys: many(apiKey),
@@ -215,6 +216,7 @@ export const awsAccountPermissionRelations = relations(
     user: one(user, {
       fields: [awsAccountPermission.userId],
       references: [user.id],
+      relationName: "userPermissions",
     }),
     awsAccount: one(awsAccount, {
       fields: [awsAccountPermission.awsAccountId],
@@ -223,6 +225,7 @@ export const awsAccountPermissionRelations = relations(
     grantedByUser: one(user, {
       fields: [awsAccountPermission.grantedBy],
       references: [user.id],
+      relationName: "grantedPermissions",
     }),
   })
 );
