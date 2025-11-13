@@ -67,9 +67,9 @@ export function ConnectAWSAccountForm({
     onSuccess();
   }
 
-  // Use API route to serve CloudFormation template with correct AWS account ID
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const templateUrl = `${appUrl}/api/cloudformation/wraps-console-access-role`;
+  // Use S3-hosted CloudFormation template (CloudFormation requires S3 or approved HTTPS sources)
+  const templateUrl =
+    "https://wraps-assets.s3.amazonaws.com/cloudformation/wraps-console-access-role.yaml";
 
   const cloudFormationUrl = `https://console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=wraps-console-access&templateURL=${encodeURIComponent(templateUrl)}&param_ExternalId=${externalId}`;
 
