@@ -50,8 +50,8 @@ describe("Cost Calculation", () => {
       const costs = calculateCosts(config, 10_000);
 
       expect(costs.tracking).toBeDefined();
-      expect(costs.tracking?.monthly).toBe(0.5); // Route53 hosted zone cost
-      expect(costs.tracking?.description).toContain("custom domain");
+      expect(costs.tracking?.monthly).toBe(0); // DNS records managed where user already manages DNS
+      expect(costs.tracking?.description).toContain("no additional cost");
     });
 
     it("should calculate costs with reputation metrics", () => {
@@ -526,8 +526,8 @@ describe("Cost Calculation", () => {
 
       const summary = getCostSummary(config, 10_000);
 
-      expect(summary).toContain("custom domain");
-      expect(summary).toContain("$0.50");
+      expect(summary).toContain("no additional cost");
+      expect(summary).toContain("Free");
     });
 
     it("should format multi-line summary correctly", () => {
