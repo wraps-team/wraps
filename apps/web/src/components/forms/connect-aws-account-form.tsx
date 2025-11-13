@@ -3,7 +3,7 @@
 import { mergeForm, useForm, useTransform } from "@tanstack/react-form";
 import { initialFormState } from "@tanstack/react-form/nextjs";
 import { useStore } from "@tanstack/react-store";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { connectAWSAccountAction } from "@/actions/aws-accounts";
 import { connectAWSAccountFormOpts } from "@/lib/forms/connect-aws-account";
 
@@ -33,7 +33,25 @@ export function ConnectAWSAccountForm({
     initialFormState
   );
 
-  const [externalId] = useState(() => crypto.randomUUID());
+  // Generate External ID once and persist in localStorage to survive page reloads
+  // Use useEffect to avoid hydration mismatch
+  const [externalId, setExternalId] = useState<string>("");
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+
+    const storageKey = `wraps-external-id-${organizationId}`;
+    const saved = localStorage.getItem(storageKey);
+
+    if (saved) {
+      setExternalId(saved);
+    } else {
+      const newId = crypto.randomUUID();
+      localStorage.setItem(storageKey, newId);
+      setExternalId(newId);
+    }
+  }, [organizationId]);
 
   const form = useForm({
     ...connectAWSAccountFormOpts,
@@ -64,8 +82,16 @@ export function ConnectAWSAccountForm({
     state.success === true;
 
   // Handle success callback
-  if (isSuccess && onSuccess) {
-    onSuccess();
+  if (isSuccess) {
+    // Clear the saved External ID from localStorage on success
+    const storageKey = `wraps-external-id-${organizationId}`;
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(storageKey);
+    }
+
+    if (onSuccess) {
+      onSuccess();
+    }
   }
 
   // Use S3-hosted CloudFormation template (CloudFormation requires S3 or approved HTTPS sources)
@@ -73,6 +99,20 @@ export function ConnectAWSAccountForm({
     "https://wraps-assets.s3.amazonaws.com/cloudformation/wraps-console-access-role.yaml";
 
   const cloudFormationUrl = `https://console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=wraps-console-access&templateURL=${encodeURIComponent(templateUrl)}&param_ExternalId=${externalId}`;
+
+  // Show loading state while External ID is being loaded
+  if (!(isClient && externalId)) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-8">
+        <div className="rounded-lg border bg-white p-6 shadow-sm">
+          <div className="animate-pulse">
+            <div className="mb-4 h-6 w-64 rounded bg-gray-200" />
+            <div className="h-20 rounded bg-gray-100" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -82,15 +122,28 @@ export function ConnectAWSAccountForm({
           Step 1: Deploy IAM Role to Your AWS Account
         </h3>
 
-        <div className="mb-4 rounded bg-gray-50 p-4">
-          <p className="mb-2 font-medium text-gray-700 text-sm">
-            Your External ID:
+        <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-4">
+          <p className="mb-2 font-medium text-blue-900 text-sm">
+            Your External ID (saved - safe to reload page):
           </p>
-          <code className="block rounded border bg-white p-2 font-mono text-sm">
-            {externalId}
-          </code>
-          <p className="mt-2 text-gray-500 text-xs">
-            This unique ID ensures secure access to your AWS account.
+          <div className="flex items-center gap-2">
+            <code className="block flex-1 rounded border border-blue-300 bg-white p-2 font-mono text-sm">
+              {externalId}
+            </code>
+            <button
+              className="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
+              onClick={() => {
+                navigator.clipboard.writeText(externalId);
+              }}
+              type="button"
+            >
+              Copy
+            </button>
+          </div>
+          <p className="mt-2 text-blue-700 text-xs">
+            ⓘ This ID is saved in your browser and will be used in
+            CloudFormation. Don't worry if you refresh the page - it won't
+            change.
           </p>
         </div>
 
