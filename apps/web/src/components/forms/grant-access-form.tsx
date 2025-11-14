@@ -13,11 +13,11 @@ type MemberWithUser = InferSelectModel<typeof member> & {
   user: InferSelectModel<typeof user>;
 };
 
-interface GrantAccessFormProps {
+type GrantAccessFormProps = {
   awsAccountId: string;
   members: MemberWithUser[];
   organizationId: string;
-}
+};
 
 export function GrantAccessForm({
   awsAccountId,
