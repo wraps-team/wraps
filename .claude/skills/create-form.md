@@ -124,10 +124,9 @@ const form = useForm<FormValues>({
   </form.Field>
 
   {/* Submit Button */}
-  <form.Subscribe selector={(state) => ({ isSubmitting: state.isSubmitting })}>
-    {({ isSubmitting }) => (
-      <Button type="submit" disabled={isSubmitting}>
-        {isSubmitting && <Spinner className="mr-2" />}
+  <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+    {({ canSubmit, isSubmitting }) => (
+      <Button type="submit" disabled={!canSubmit} loading={isSubmitting}>
         Submit
       </Button>
     )}
@@ -576,11 +575,10 @@ export function ContactForm() {
       </FieldSet>
 
       {/* Submit Button */}
-      <form.Subscribe selector={(state) => ({ isSubmitting: state.isSubmitting })}>
-        {({ isSubmitting }) => (
+      <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+        {({ canSubmit, isSubmitting }) => (
           <div className="flex gap-3">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Spinner className="mr-2" />}
+            <Button type="submit" disabled={!canSubmit} loading={isSubmitting}>
               Send Message
             </Button>
             <Button
