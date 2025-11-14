@@ -31,15 +31,15 @@ import {
 import { connectAWSAccountFormOpts } from "@/lib/forms/connect-aws-account";
 
 const AWS_REGIONS = [
-  { value: "us-east-1", label: "US East (N. Virginia)" },
-  { value: "us-east-2", label: "US East (Ohio)" },
-  { value: "us-west-1", label: "US West (N. California)" },
-  { value: "us-west-2", label: "US West (Oregon)" },
-  { value: "eu-west-1", label: "EU (Ireland)" },
-  { value: "eu-central-1", label: "EU (Frankfurt)" },
-  { value: "ap-southeast-1", label: "Asia Pacific (Singapore)" },
-  { value: "ap-southeast-2", label: "Asia Pacific (Sydney)" },
-  { value: "ap-northeast-1", label: "Asia Pacific (Tokyo)" },
+  { value: "us-east-1", label: "US East 1 (N. Virginia)" },
+  { value: "us-east-2", label: "US East 2 (Ohio)" },
+  { value: "us-west-1", label: "US West 1 (N. California)" },
+  { value: "us-west-2", label: "US West 2 (Oregon)" },
+  { value: "eu-west-1", label: "EU West 1 (Ireland)" },
+  { value: "eu-central-1", label: "EU Central 1 (Frankfurt)" },
+  { value: "ap-southeast-1", label: "Asia Pacific Southeast 1 (Singapore)" },
+  { value: "ap-southeast-2", label: "Asia Pacific Southeast 2 (Sydney)" },
+  { value: "ap-northeast-1", label: "Asia Pacific Northeast 1 (Tokyo)" },
 ];
 
 interface ConnectAWSAccountFormProps {
@@ -341,6 +341,7 @@ export function ConnectAWSAccountForm({
                   <Field data-invalid={isInvalid}>
                     <FieldLabel htmlFor={field.name}>Region</FieldLabel>
                     <Select
+                      defaultValue="us-east-1"
                       name={field.name}
                       onValueChange={(value) => field.handleChange(value)}
                       value={field.state.value}
@@ -351,7 +352,7 @@ export function ConnectAWSAccountForm({
                         id={field.name}
                         onBlur={field.handleBlur}
                       >
-                        <SelectValue />
+                        <SelectValue placeholder="Select a region" />
                       </SelectTrigger>
                       <SelectContent>
                         {AWS_REGIONS.map((region) => (
@@ -419,7 +420,8 @@ export function ConnectAWSAccountForm({
               {([canSubmit, isSubmitting]) => (
                 <Button
                   className="w-full"
-                  disabled={!canSubmit || isSubmitting}
+                  disabled={!canSubmit}
+                  loading={isSubmitting}
                   type="submit"
                 >
                   {isSubmitting ? "Connecting..." : "Connect Account"}

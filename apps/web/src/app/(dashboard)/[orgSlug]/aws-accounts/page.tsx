@@ -3,6 +3,8 @@ import { db } from "@wraps/db";
 import { redirect } from "next/navigation";
 import { AWSAccountList } from "@/components/aws-account-list";
 import { ConnectAccountSection } from "@/components/connect-account-section";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
 interface AWSAccountsPageProps {
@@ -109,12 +111,9 @@ export default async function AWSAccountsPage({
             </p>
           </div>
           {canManageAccounts && (
-            <a
-              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90"
-              href={"#connect-account"}
-            >
-              Connect AWS Account
-            </a>
+            <Button asChild>
+              <a href="#connect-account">Connect AWS Account</a>
+            </Button>
           )}
         </div>
       </div>
@@ -122,16 +121,18 @@ export default async function AWSAccountsPage({
       {/* AWS Accounts List */}
       <div className="px-4 lg:px-6">
         {accountsWithPermissions.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-12 text-center">
-            <p className="mb-4 text-muted-foreground">
-              No AWS accounts connected yet
-            </p>
-            {canManageAccounts && (
-              <p className="text-muted-foreground text-sm">
-                Connect your first AWS account to get started
+          <Card className="border-dashed">
+            <CardContent className="p-12 text-center">
+              <p className="mb-4 text-muted-foreground">
+                No AWS accounts connected yet
               </p>
-            )}
-          </div>
+              {canManageAccounts && (
+                <p className="text-muted-foreground text-sm">
+                  Connect your first AWS account to get started
+                </p>
+              )}
+            </CardContent>
+          </Card>
         ) : (
           <AWSAccountList
             accounts={accountsWithPermissions}

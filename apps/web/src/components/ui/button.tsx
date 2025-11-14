@@ -1,6 +1,7 @@
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
+import { Spinner } from "@/components/ui/spinner";
 
 import { cn } from "@/lib/utils";
 
@@ -40,19 +41,43 @@ function Button({
   variant,
   size,
   asChild = false,
+  loading = false,
+  children,
+  disabled,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    loading?: boolean;
   }) {
   const Comp = asChild ? Slot : "button";
+
+  // When using asChild with loading, we can't render the spinner
+  // because Slot expects a single child. The consumer should handle
+  // the loading state in their child component.
+  if (asChild) {
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        data-slot="button"
+        disabled={disabled || loading}
+        {...props}
+      >
+        {children}
+      </Comp>
+    );
+  }
 
   return (
     <Comp
       className={cn(buttonVariants({ variant, size, className }))}
       data-slot="button"
+      disabled={disabled || loading}
       {...props}
-    />
+    >
+      {loading && <Spinner />}
+      {children}
+    </Comp>
   );
 }
 
