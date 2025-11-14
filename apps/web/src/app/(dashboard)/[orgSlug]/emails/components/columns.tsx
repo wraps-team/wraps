@@ -127,14 +127,20 @@ export const columns: ColumnDef<EmailListItem>[] = [
     cell: ({ row }) => {
       const recipients = row.original.to;
       return (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-mono text-sm">
-            {recipients.length > 0 ? recipients[0] : "(no recipients)"}
-          </span>
-          {recipients.length > 1 && (
-            <span className="text-muted-foreground text-xs">
-              +{recipients.length - 1} more
-            </span>
+        <div className="font-mono text-sm">
+          {recipients.length > 0 ? (
+            <>
+              {recipients[0]}
+              {recipients.length > 1 && (
+                <span className="text-muted-foreground text-xs">
+                  {" "}
+                  +{recipients.length - 1} other
+                  {recipients.length > 2 ? "s" : ""}
+                </span>
+              )}
+            </>
+          ) : (
+            "(no recipients)"
           )}
         </div>
       );
