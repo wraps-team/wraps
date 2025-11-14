@@ -12,6 +12,13 @@
       "**/*.jsonc"
     ]
   },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
   "linter": {
     "rules": {
       "performance": {
