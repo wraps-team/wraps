@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
+import { QueryProvider } from "@/contexts/query-client-context";
 import { SessionProvider } from "@/contexts/session-context";
 import { SidebarConfigProvider } from "@/contexts/sidebar-context";
 import { inter } from "@/lib/fonts";
@@ -19,11 +20,13 @@ export default function RootLayout({
   return (
     <html className={`${inter.variable} antialiased`} lang="en">
       <body className={inter.className}>
-        <SessionProvider>
-          <ThemeProvider defaultTheme="system" storageKey="nextjs-ui-theme">
-            <SidebarConfigProvider>{children}</SidebarConfigProvider>
-          </ThemeProvider>
-        </SessionProvider>
+        <QueryProvider>
+          <SessionProvider>
+            <ThemeProvider defaultTheme="system" storageKey="nextjs-ui-theme">
+              <SidebarConfigProvider>{children}</SidebarConfigProvider>
+            </ThemeProvider>
+          </SessionProvider>
+        </QueryProvider>
       </body>
     </html>
   );

@@ -1,11 +1,22 @@
 import { auth } from "@wraps/auth";
+import type { awsAccountPermission, member, user } from "@wraps/db";
 import { db } from "@wraps/db";
+import type { InferSelectModel } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { AccountHeader } from "@/components/account-header";
 import { GrantAccessForm } from "@/components/forms/grant-access-form";
 import { PermissionsList } from "@/components/permissions-list";
 import { getOrganizationBySlug } from "@/lib/organization";
 import { checkAWSAccountAccess } from "@/lib/permissions/check-access";
+
+type PermissionWithUser = InferSelectModel<typeof awsAccountPermission> & {
+  user: InferSelectModel<typeof user>;
+  grantedByUser: InferSelectModel<typeof user> | null;
+};
+
+type MemberWithUser = InferSelectModel<typeof member> & {
+  user: InferSelectModel<typeof user>;
+};
 
 interface PermissionsPageProps {
   params: Promise<{
@@ -57,7 +68,7 @@ export default async function PermissionsPage({
   }
 
   // Get all permissions for this AWS account
-  const permissions = await db.query.awsAccountPermission.findMany({
+  const permissionsRaw = await db.query.awsAccountPermission.findMany({
     where: (p, { eq }) => eq(p.awsAccountId, accountId),
     with: {
       user: true,
@@ -65,13 +76,19 @@ export default async function PermissionsPage({
     },
   });
 
+  // Type assertion for permissions
+  const permissions = permissionsRaw as unknown as PermissionWithUser[];
+
   // Get all organization members for the grant form
-  const members = await db.query.member.findMany({
+  const membersRaw = await db.query.member.findMany({
     where: (m, { eq }) => eq(m.organizationId, organization.id),
     with: {
       user: true,
     },
   });
+
+  // Type assertion for members
+  const members = membersRaw as unknown as MemberWithUser[];
 
   // Check all permissions for current user
   const [viewAccess, sendAccess, manageAccess] = await Promise.all([

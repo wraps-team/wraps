@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.490.0",
+    "@aws-sdk/client-dynamodb": "^3.490.0",
     "@aws-sdk/client-sts": "^3.490.0",
+    "@aws-sdk/lib-dynamodb": "3.931.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
@@ -44,6 +46,7 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@tailwindcss/postcss": "^4.1.12",
     "@tanstack/react-form": "^1.23.8",
+    "@tanstack/react-query": "5.90.8",
     "@tanstack/react-store": "0.8.0",
     "@tanstack/react-table": "^8.21.3",
     "@vercel/oidc-aws-credentials-provider": "3.0.4",
