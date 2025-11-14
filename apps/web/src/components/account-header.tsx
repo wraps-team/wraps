@@ -96,21 +96,17 @@ export function AccountHeader({
 
       {/* CloudFormation Update Info (only for managers) */}
       {permissions.canManage && (
-        <Card className="border-amber-200 bg-amber-50/50">
+        <Card className="border-blue-200 bg-blue-50/50">
           <CardHeader>
-            <CardTitle className="text-base">
-              Update IAM Role Permissions
-            </CardTitle>
+            <CardTitle className="text-base">IAM Role Configuration</CardTitle>
             <CardDescription>
-              To enable new features like email history, update your
-              CloudFormation stack with the latest permissions.
+              Your External ID for secure role assumption. Keep this secret.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* External ID */}
+          <CardContent>
             <div className="space-y-2">
               <label className="font-medium text-muted-foreground text-sm">
-                External ID (keep this secret)
+                External ID
               </label>
               <div className="flex items-center gap-2">
                 <code className="flex-1 rounded-md border bg-muted px-3 py-2 font-mono text-sm">
@@ -127,37 +123,8 @@ export function AccountHeader({
                   {copiedField === "externalId" ? "Copied!" : "Copy"}
                 </Button>
               </div>
-            </div>
-
-            {/* AWS CLI Command */}
-            <div className="space-y-2">
-              <label className="font-medium text-muted-foreground text-sm">
-                Update via AWS CLI (recommended)
-              </label>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 overflow-x-auto rounded-md border bg-muted px-3 py-2 font-mono text-xs">
-                  aws cloudformation update-stack --stack-name
-                  wraps-console-access --template-url
-                  https://wraps-assets.s3.amazonaws.com/cloudformation/wraps-console-access-role.yaml
-                  --capabilities CAPABILITY_NAMED_IAM --region {account.region}
-                </code>
-                <Button
-                  onClick={() =>
-                    copyToClipboard(
-                      `aws cloudformation update-stack --stack-name wraps-console-access --template-url https://wraps-assets.s3.amazonaws.com/cloudformation/wraps-console-access-role.yaml --capabilities CAPABILITY_NAMED_IAM --region ${account.region}`,
-                      "cli"
-                    )
-                  }
-                  size="sm"
-                  variant="outline"
-                >
-                  <Copy className="h-4 w-4" />
-                  {copiedField === "cli" ? "Copied!" : "Copy"}
-                </Button>
-              </div>
               <p className="text-muted-foreground text-xs">
-                This command will update your stack with the latest permissions.
-                Run it in your terminal with AWS credentials configured.
+                This ID is used when updating your CloudFormation stack.
               </p>
             </div>
           </CardContent>
