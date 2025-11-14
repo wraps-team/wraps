@@ -42,70 +42,63 @@ Resources:
             Condition:
               StringEquals:
                 "sts:ExternalId": !Ref ExternalId
-      ManagedPolicyArns:
-        - !Ref WrapsConsoleAccessPolicy
+      Policies:
+        - PolicyName: "wraps-console-access-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # CloudWatch Metrics - Read Only
+              - Sid: "CloudWatchMetricsReadOnly"
+                Effect: Allow
+                Action:
+                  - "cloudwatch:GetMetricData"
+                  - "cloudwatch:GetMetricStatistics"
+                  - "cloudwatch:ListMetrics"
+                Resource: "*"
+
+              # SES - Read Access
+              - Sid: "SESReadAccess"
+                Effect: Allow
+                Action:
+                  - "ses:GetSendQuota"
+                  - "ses:GetSendStatistics"
+                  - "ses:GetAccount"
+                  - "ses:ListIdentities"
+                  - "ses:GetIdentityVerificationAttributes"
+                  - "ses:GetIdentityDkimAttributes"
+                  - "ses:ListConfigurationSets"
+                  - "ses:DescribeConfigurationSet"
+                Resource: "*"
+
+              # SES - Send Access (conditional)
+              - !If
+                - EnableSending
+                - Sid: "SESSendAccess"
+                  Effect: Allow
+                  Action:
+                    - "ses:SendEmail"
+                    - "ses:SendRawEmail"
+                    - "ses:SendTemplatedEmail"
+                    - "ses:SendBulkTemplatedEmail"
+                  Resource: "*"
+                - !Ref "AWS::NoValue"
+
+              # DynamoDB - Read Email Events (if using Wraps email tracking)
+              - Sid: "DynamoDBReadEmailEvents"
+                Effect: Allow
+                Action:
+                  - "dynamodb:Query"
+                  - "dynamodb:Scan"
+                  - "dynamodb:GetItem"
+                  - "dynamodb:BatchGetItem"
+                Resource:
+                  - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-*"
+                  - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-*/index/*"
       Tags:
         - Key: ManagedBy
           Value: Wraps
         - Key: Purpose
           Value: "Console Access"
-
-  # IAM Policy with required permissions
-  WrapsConsoleAccessPolicy:
-    Type: "AWS::IAM::ManagedPolicy"
-    Properties:
-      ManagedPolicyName: "wraps-console-access-policy"
-      Description: "Permissions for Wraps dashboard access"
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          # CloudWatch Metrics - Read Only
-          - Sid: "CloudWatchMetricsReadOnly"
-            Effect: Allow
-            Action:
-              - "cloudwatch:GetMetricData"
-              - "cloudwatch:GetMetricStatistics"
-              - "cloudwatch:ListMetrics"
-            Resource: "*"
-
-          # SES - Read Access
-          - Sid: "SESReadAccess"
-            Effect: Allow
-            Action:
-              - "ses:GetSendQuota"
-              - "ses:GetSendStatistics"
-              - "ses:GetAccount"
-              - "ses:ListIdentities"
-              - "ses:GetIdentityVerificationAttributes"
-              - "ses:GetIdentityDkimAttributes"
-              - "ses:ListConfigurationSets"
-              - "ses:DescribeConfigurationSet"
-            Resource: "*"
-
-          # SES - Send Access (conditional)
-          - !If
-            - EnableSending
-            - Sid: "SESSendAccess"
-              Effect: Allow
-              Action:
-                - "ses:SendEmail"
-                - "ses:SendRawEmail"
-                - "ses:SendTemplatedEmail"
-                - "ses:SendBulkTemplatedEmail"
-              Resource: "*"
-            - !Ref "AWS::NoValue"
-
-          # DynamoDB - Read Email Events (if using Wraps email tracking)
-          - Sid: "DynamoDBReadEmailEvents"
-            Effect: Allow
-            Action:
-              - "dynamodb:Query"
-              - "dynamodb:Scan"
-              - "dynamodb:GetItem"
-              - "dynamodb:BatchGetItem"
-            Resource:
-              - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-*"
-              - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-*/index/*"
 
 Outputs:
   RoleArn:
