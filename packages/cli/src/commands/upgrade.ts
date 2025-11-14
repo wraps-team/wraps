@@ -210,6 +210,43 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     }
 
     case "tracking-domain": {
+      // First, check if a sending identity (domain) is configured and verified
+      if (!config.domain) {
+        clack.log.error(
+          "No sending domain configured. You must configure a sending domain before adding a custom tracking domain."
+        );
+        clack.log.info(
+          `Use ${pc.cyan("wraps init")} to set up a sending domain first.`
+        );
+        process.exit(1);
+      }
+
+      // Verify that the sending identity is verified
+      const { listSESDomains } = await import("../utils/aws.js");
+      const domains = await progress.execute(
+        "Checking domain verification status",
+        async () => await listSESDomains(region)
+      );
+
+      const sendingDomain = domains.find((d) => d.domain === config.domain);
+
+      if (!sendingDomain?.verified) {
+        clack.log.error(
+          `Sending domain ${pc.cyan(config.domain)} is not verified.`
+        );
+        clack.log.info(
+          "You must verify your sending domain before adding a custom tracking domain."
+        );
+        clack.log.info(
+          `Use ${pc.cyan("wraps verify")} to check DNS records and complete verification.`
+        );
+        process.exit(1);
+      }
+
+      progress.info(
+        `Sending domain ${pc.cyan(config.domain)} is verified ${pc.green("✓")}`
+      );
+
       const trackingDomain = await clack.text({
         message: "Custom tracking redirect domain:",
         placeholder: "track.yourdomain.com",
