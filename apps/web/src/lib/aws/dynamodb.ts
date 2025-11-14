@@ -46,7 +46,7 @@ function normalizeRecipients(to: string[] | Set<string> | undefined): string[] {
  */
 export async function queryEmailEvents(
   params: QueryEmailEventsParams
-): Promise<EmailEvent[]> {
+): Promise<Array<Omit<EmailEvent, "to"> & { to: string[] }>> {
   const { awsAccountId, startTime, endTime, limit = 1000 } = params;
 
   // Get AWS account details from database
