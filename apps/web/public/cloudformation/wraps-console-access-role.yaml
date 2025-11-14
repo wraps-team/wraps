@@ -104,8 +104,8 @@ Resources:
               - "dynamodb:GetItem"
               - "dynamodb:BatchGetItem"
             Resource:
-              - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-events"
-              - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-events/index/*"
+              - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-*"
+              - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-*/index/*"
 
 Outputs:
   RoleArn:

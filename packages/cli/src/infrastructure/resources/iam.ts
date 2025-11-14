@@ -108,7 +108,10 @@ export async function createIAMRole(
         "dynamodb:Scan",
         "dynamodb:BatchGetItem",
       ],
-      Resource: "arn:aws:dynamodb:*:*:table/wraps-email-*",
+      Resource: [
+        "arn:aws:dynamodb:*:*:table/wraps-email-*",
+        "arn:aws:dynamodb:*:*:table/wraps-email-*/index/*",
+      ],
     });
   }
 
