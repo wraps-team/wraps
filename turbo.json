@@ -7,12 +7,16 @@
     "PASSKEY_RP_ID",
     "PASSKEY_RP_NAME",
     "NEXT_PUBLIC_APP_URL",
+    "CORS_ORIGIN",
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "AWS_BACKEND_ACCOUNT_ID",
     "AWS_PROFILE",
     "AWS_ROLE_ARN",
-    "AWS_REGION"
+    "AWS_REGION",
+    "WRAPS_EMAIL_ROLE_ARN",
+    "EMAIL_FROM",
+    "BLOB_READ_WRITE_TOKEN"
   ],
   "tasks": {
     "build": {
@@ -24,11 +28,15 @@
         "PASSKEY_RP_ID",
         "PASSKEY_RP_NAME",
         "NEXT_PUBLIC_APP_URL",
+        "CORS_ORIGIN",
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
         "AWS_BACKEND_ACCOUNT_ID",
         "AWS_ROLE_ARN",
-        "AWS_REGION"
+        "AWS_REGION",
+        "WRAPS_EMAIL_ROLE_ARN",
+        "EMAIL_FROM",
+        "BLOB_READ_WRITE_TOKEN"
       ]
     },
     "dev": {

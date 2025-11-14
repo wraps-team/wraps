@@ -1,7 +1,15 @@
 import { WrapsEmail } from "@wraps.dev/email";
 
-// Initialize the Wraps email client
-const wraps = new WrapsEmail();
+// Initialize the Wraps email client with the role ARN from environment
+// This should be the IAM role created by `wraps init` in your AWS account
+const wraps = new WrapsEmail({
+  region: process.env.AWS_REGION || "us-east-1",
+  // If you have a specific role ARN for sending emails, pass it here
+  // The SDK will assume this role for sending emails
+  ...(process.env.WRAPS_EMAIL_ROLE_ARN && {
+    roleArn: process.env.WRAPS_EMAIL_ROLE_ARN,
+  }),
+});
 
 export interface SendInvitationEmailParams {
   to: string;
