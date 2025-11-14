@@ -107,9 +107,10 @@ export function AWSAccountList({
                     </Button>
                     <Button asChild size="sm" variant="ghost">
                       <a
-                        href={`https://console.aws.amazon.com/cloudformation/home?region=${account.region}#/stacks/update?stackName=wraps-console-access&templateURL=${encodeURIComponent(templateUrl)}`}
+                        href={`https://${account.region}.console.aws.amazon.com/cloudformation/home?region=${account.region}#/stacks/update/template?stackName=wraps-console-access&templateURL=${encodeURIComponent(templateUrl)}`}
                         rel="noopener noreferrer"
                         target="_blank"
+                        title="Update CloudFormation stack with latest IAM permissions"
                       >
                         <ExternalLink className="mr-2 h-4 w-4" />
                         Update IAM Role
