@@ -197,6 +197,14 @@ export type UpgradeOptions = {
 };
 
 /**
+ * Command options for update
+ */
+export type UpdateOptions = {
+  region?: string;
+  yes?: boolean;
+};
+
+/**
  * Command options for destroy
  */
 export type DestroyOptions = {

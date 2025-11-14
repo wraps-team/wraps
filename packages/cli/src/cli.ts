@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import * as clack from "@clack/prompts";
 import args from "args";
 import pc from "picocolors";
@@ -8,6 +11,7 @@ import { destroy } from "./commands/destroy.js";
 import { init } from "./commands/init.js";
 import { restore } from "./commands/restore.js";
 import { status } from "./commands/status.js";
+import { update } from "./commands/update.js";
 import { upgrade } from "./commands/upgrade.js";
 import { verify } from "./commands/verify.js";
 import {
@@ -16,12 +20,26 @@ import {
 } from "./utils/completion.js";
 import { handleCLIError } from "./utils/errors.js";
 
+// Get package version
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(
+  readFileSync(join(__dirname, "../package.json"), "utf-8")
+);
+const VERSION = packageJson.version;
+
 // Setup tab completion
 setupTabCompletion();
 
+// Function to show version
+function showVersion() {
+  console.log(`wraps v${VERSION}`);
+  process.exit(0);
+}
+
 // Function to show help
 function showHelp() {
-  clack.intro(pc.bold("WRAPS CLI"));
+  clack.intro(pc.bold(`WRAPS CLI v${VERSION}`));
   console.log("Deploy email infrastructure to your AWS account\n");
   console.log("Usage: wraps <command> [options]\n");
   console.log("Commands:");
@@ -31,6 +49,9 @@ function showHelp() {
   );
   console.log(
     `  ${pc.cyan("console")}     Start local web dashboard for monitoring`
+  );
+  console.log(
+    `  ${pc.cyan("update")}      Update infrastructure with latest CLI changes`
   );
   console.log(
     `  ${pc.cyan("upgrade")}     Add features to existing connection`
@@ -48,11 +69,17 @@ function showHelp() {
   );
   console.log(`  ${pc.dim("--region")}    AWS region`);
   console.log(`  ${pc.dim("--domain")}    Domain to verify`);
-  console.log(`  ${pc.dim("--account")}   AWS account ID or alias\n`);
+  console.log(`  ${pc.dim("--account")}   AWS account ID or alias`);
+  console.log(`  ${pc.dim("--version, -v")}  Show version number\n`);
   console.log(
     `Run ${pc.cyan("wraps <command> --help")} for more information on a command.\n`
   );
   process.exit(0);
+}
+
+// Check for version before args parses
+if (process.argv.includes("--version") || process.argv.includes("-v")) {
+  showVersion();
 }
 
 // Check for help before args parses (to override args' built-in help)
@@ -159,6 +186,13 @@ async function run() {
         await runConsole({
           port: flags.port,
           noOpen: flags.noOpen,
+        });
+        break;
+
+      case "update":
+        await update({
+          region: flags.region,
+          yes: flags.yes,
         });
         break;
 
