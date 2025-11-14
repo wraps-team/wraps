@@ -1,5 +1,6 @@
 import type { awsAccount } from "@wraps/db";
 import type { InferSelectModel } from "drizzle-orm";
+import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,6 +28,11 @@ export function AWSAccountList({
   const baseUrl = orgSlug
     ? `/${orgSlug}/aws-accounts`
     : `/dashboard/organizations/${organizationId}/aws-accounts`;
+
+  // CloudFormation template URL for updating stacks
+  const templateUrl =
+    "https://wraps-assets.s3.amazonaws.com/cloudformation/wraps-console-access-role.yaml";
+
   return (
     <div className="space-y-4">
       {accounts.map(({ permissions, ...account }) => (
@@ -88,16 +94,28 @@ export function AWSAccountList({
 
             {/* Actions */}
             {permissions.canView && (
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild variant="outline">
                   <a href={`${baseUrl}/${account.id}`}>View Details</a>
                 </Button>
                 {permissions.canManage && (
-                  <Button asChild variant="outline">
-                    <a href={`${baseUrl}/${account.id}/permissions`}>
-                      Manage Permissions
-                    </a>
-                  </Button>
+                  <>
+                    <Button asChild variant="outline">
+                      <a href={`${baseUrl}/${account.id}/permissions`}>
+                        Manage Permissions
+                      </a>
+                    </Button>
+                    <Button asChild size="sm" variant="ghost">
+                      <a
+                        href={`https://console.aws.amazon.com/cloudformation/home?region=${account.region}#/stacks/update?stackName=wraps-console-access&templateURL=${encodeURIComponent(templateUrl)}`}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Update IAM Role
+                      </a>
+                    </Button>
+                  </>
                 )}
               </div>
             )}
