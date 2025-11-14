@@ -44,7 +44,8 @@ export async function createDNSRecords(
   domain: string,
   dkimTokens: string[],
   region: string,
-  customTrackingDomain?: string
+  customTrackingDomain?: string,
+  mailFromDomain?: string
 ): Promise<void> {
   const client = new Route53Client({ region });
 
@@ -97,6 +98,34 @@ export async function createDNSRecords(
         Type: "CNAME",
         TTL: 1800,
         ResourceRecords: [{ Value: `r.${region}.awstrack.me` }],
+      },
+    });
+  }
+
+  // MAIL FROM domain records (if provided)
+  // These records enable DMARC alignment by using a custom subdomain for the envelope sender
+  if (mailFromDomain) {
+    // MX record pointing to SES feedback server
+    changes.push({
+      Action: "UPSERT",
+      ResourceRecordSet: {
+        Name: mailFromDomain,
+        Type: "MX",
+        TTL: 1800,
+        ResourceRecords: [
+          { Value: `10 feedback-smtp.${region}.amazonses.com` },
+        ],
+      },
+    });
+
+    // SPF record for MAIL FROM domain
+    changes.push({
+      Action: "UPSERT",
+      ResourceRecordSet: {
+        Name: mailFromDomain,
+        Type: "TXT",
+        TTL: 1800,
+        ResourceRecords: [{ Value: '"v=spf1 include:amazonses.com ~all"' }],
       },
     });
   }

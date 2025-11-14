@@ -266,7 +266,8 @@ export async function init(options: InitOptions): Promise<void> {
           outputs.domain,
           outputs.dkimTokens,
           region,
-          outputs.customTrackingDomain
+          outputs.customTrackingDomain,
+          outputs.mailFromDomain
         );
         progress.succeed("DNS records created in Route53");
         dnsAutoCreated = true;
@@ -304,5 +305,6 @@ export async function init(options: InitOptions): Promise<void> {
     dnsRecords: dnsRecords.length > 0 ? dnsRecords : undefined,
     dnsAutoCreated,
     domain: outputs.domain,
+    mailFromDomain: outputs.mailFromDomain,
   });
 }

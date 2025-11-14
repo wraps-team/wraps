@@ -6,6 +6,7 @@ import type { SESEventType } from "../../types/index.js";
  */
 export type SESResourcesConfig = {
   domain?: string;
+  mailFromDomain?: string;
   region: string;
   trackingConfig?: {
     enabled: boolean;
@@ -26,6 +27,7 @@ export type SESResources = {
   dkimTokens?: string[];
   dnsAutoCreated?: boolean;
   customTrackingDomain?: string;
+  mailFromDomain?: string;
 };
 
 /**
@@ -93,6 +95,7 @@ export async function createSESResources(
   // Optional: Verify domain if provided
   let domainIdentity: aws.sesv2.EmailIdentity | undefined;
   let dkimTokens: string[] | undefined;
+  let mailFromDomain: string | undefined;
 
   if (config.domain) {
     // Use SES v2 API to create email identity with configuration set
@@ -111,6 +114,22 @@ export async function createSESResources(
     dkimTokens = domainIdentity.dkimSigningAttributes.apply(
       (attrs) => attrs?.tokens || []
     ) as any;
+
+    // Configure MAIL FROM domain for better DMARC alignment
+    // Uses subdomain convention (mail.example.com) to avoid DNS conflicts
+    mailFromDomain = config.mailFromDomain || `mail.${config.domain}`;
+
+    new aws.sesv2.EmailIdentityMailFromAttributes(
+      "wraps-email-mail-from",
+      {
+        emailIdentity: config.domain,
+        mailFromDomain,
+        behaviorOnMxFailure: "USE_DEFAULT_VALUE", // Fallback to amazonses.com if MX record fails
+      },
+      {
+        dependsOn: [domainIdentity], // Ensure domain identity exists first
+      }
+    );
   }
 
   return {
@@ -120,5 +139,6 @@ export async function createSESResources(
     dkimTokens,
     dnsAutoCreated: false, // Will be set after deployment
     customTrackingDomain: config.trackingConfig?.customRedirectDomain,
+    mailFromDomain,
   };
 }

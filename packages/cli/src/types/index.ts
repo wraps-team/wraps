@@ -130,6 +130,7 @@ export type StackOutputs = {
   queueUrl?: string;
   dlqUrl?: string;
   customTrackingDomain?: string;
+  mailFromDomain?: string;
 };
 
 /**

@@ -45,6 +45,7 @@ export async function deployEmailStack(
   if (emailConfig.tracking?.enabled || emailConfig.eventTracking?.enabled) {
     sesResources = await createSESResources({
       domain: emailConfig.domain,
+      mailFromDomain: emailConfig.mailFromDomain,
       region: config.region,
       trackingConfig: emailConfig.tracking,
       eventTypes: emailConfig.eventTracking?.events,
@@ -107,6 +108,7 @@ export async function deployEmailStack(
     queueUrl: sqsResources?.queue.url as any as string | undefined,
     dlqUrl: sqsResources?.dlq.url as any as string | undefined,
     customTrackingDomain: sesResources?.customTrackingDomain,
+    mailFromDomain: sesResources?.mailFromDomain,
   };
 }
 

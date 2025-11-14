@@ -63,12 +63,16 @@ export async function status(_options: StatusOptions): Promise<void> {
           domain: d.domain,
           status: d.verified ? ("verified" as const) : ("pending" as const),
           dkimTokens: identity.DkimAttributes?.Tokens || [],
+          mailFromDomain: identity.MailFromAttributes?.MailFromDomain,
+          mailFromStatus: identity.MailFromAttributes?.MailFromDomainStatus,
         };
       } catch (_error) {
         return {
           domain: d.domain,
           status: d.verified ? ("verified" as const) : ("pending" as const),
           dkimTokens: undefined,
+          mailFromDomain: undefined,
+          mailFromStatus: undefined,
         };
       }
     })

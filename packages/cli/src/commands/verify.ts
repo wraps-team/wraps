@@ -19,6 +19,7 @@ export async function verify(options: VerifyOptions): Promise<void> {
   const sesClient = new SESv2Client({ region });
   let identity;
   let dkimTokens: string[] = [];
+  let mailFromDomain: string | undefined;
 
   try {
     identity = await progress.execute(
@@ -32,6 +33,7 @@ export async function verify(options: VerifyOptions): Promise<void> {
     );
 
     dkimTokens = identity.DkimAttributes?.Tokens || [];
+    mailFromDomain = identity.MailFromAttributes?.MailFromDomain;
   } catch (_error: any) {
     progress.stop();
     clack.log.error(`Domain ${options.domain} not found in SES`);
@@ -43,6 +45,8 @@ export async function verify(options: VerifyOptions): Promise<void> {
 
   // 2. Check DNS records
   const resolver = new Resolver();
+  // Use public DNS servers for more reliable results
+  resolver.setServers(["8.8.8.8", "1.1.1.1"]);
   const dnsResults: Array<{
     name: string;
     type: string;
@@ -109,6 +113,53 @@ export async function verify(options: VerifyOptions): Promise<void> {
     });
   }
 
+  // Check MAIL FROM domain records (if configured)
+  if (mailFromDomain) {
+    // Check MX record for MAIL FROM domain
+    try {
+      const mxRecords = await resolver.resolveMx(mailFromDomain);
+      const expectedMx = `feedback-smtp.${region}.amazonses.com`;
+      const hasMx = mxRecords.some(
+        (r) => r.exchange === expectedMx || r.exchange === `${expectedMx}.`
+      );
+      dnsResults.push({
+        name: mailFromDomain,
+        type: "MX",
+        status: hasMx
+          ? "verified"
+          : mxRecords.length > 0
+            ? "incorrect"
+            : "missing",
+        records: mxRecords.map((r) => `${r.priority} ${r.exchange}`),
+      });
+    } catch (_error) {
+      dnsResults.push({
+        name: mailFromDomain,
+        type: "MX",
+        status: "missing",
+      });
+    }
+
+    // Check SPF record for MAIL FROM domain
+    try {
+      const records = await resolver.resolveTxt(mailFromDomain);
+      const spfRecord = records.flat().find((r) => r.startsWith("v=spf1"));
+      const hasAmazonSES = spfRecord?.includes("include:amazonses.com");
+      dnsResults.push({
+        name: mailFromDomain,
+        type: "TXT (SPF)",
+        status: hasAmazonSES ? "verified" : spfRecord ? "incorrect" : "missing",
+        records: spfRecord ? [spfRecord] : undefined,
+      });
+    } catch (_error) {
+      dnsResults.push({
+        name: mailFromDomain,
+        type: "TXT (SPF)",
+        status: "missing",
+      });
+    }
+  }
+
   progress.stop();
 
   // 3. Display results
@@ -116,23 +167,37 @@ export async function verify(options: VerifyOptions): Promise<void> {
     ? "verified"
     : "pending";
   const dkimStatus = identity.DkimAttributes?.Status || "PENDING";
+  const mailFromStatus =
+    identity.MailFromAttributes?.MailFromDomainStatus || "NOT_CONFIGURED";
 
-  clack.note(
-    [
-      `${pc.bold("Domain:")} ${options.domain}`,
-      `${pc.bold("Verification Status:")} ${
-        verificationStatus === "verified"
-          ? pc.green("✓ Verified")
-          : pc.yellow("⏱ Pending")
-      }`,
-      `${pc.bold("DKIM Status:")} ${
-        dkimStatus === "SUCCESS"
+  const statusLines = [
+    `${pc.bold("Domain:")} ${options.domain}`,
+    `${pc.bold("Verification Status:")} ${
+      verificationStatus === "verified"
+        ? pc.green("✓ Verified")
+        : pc.yellow("⏱ Pending")
+    }`,
+    `${pc.bold("DKIM Status:")} ${
+      dkimStatus === "SUCCESS"
+        ? pc.green("✓ Success")
+        : pc.yellow(`⏱ ${dkimStatus}`)
+    }`,
+  ];
+
+  if (mailFromDomain) {
+    statusLines.push(
+      `${pc.bold("MAIL FROM Domain:")} ${mailFromDomain}`,
+      `${pc.bold("MAIL FROM Status:")} ${
+        mailFromStatus === "SUCCESS"
           ? pc.green("✓ Success")
-          : pc.yellow(`⏱ ${dkimStatus}`)
-      }`,
-    ].join("\n"),
-    "SES Status"
-  );
+          : mailFromStatus === "NOT_CONFIGURED"
+            ? pc.yellow("⏱ Not Configured")
+            : pc.yellow(`⏱ ${mailFromStatus}`)
+      }`
+    );
+  }
+
+  clack.note(statusLines.join("\n"), "SES Status");
 
   // DNS Records
   const dnsLines = dnsResults.map((record) => {

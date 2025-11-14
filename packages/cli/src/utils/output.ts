@@ -96,6 +96,7 @@ export type SuccessOutputs = {
   dnsAutoCreated?: boolean;
   domain?: string;
   customTrackingDomain?: string;
+  mailFromDomain?: string;
 };
 
 /**
@@ -160,6 +161,16 @@ export function displaySuccess(outputs: SuccessOutputs) {
         pc.bold("DMARC Record (TXT):"),
         `  ${pc.cyan(`_dmarc.${domain}`)} ${pc.dim("TXT")} "v=DMARC1; p=quarantine; rua=mailto:postmaster@${domain}"`
       );
+
+      // Add MAIL FROM domain DNS records if configured
+      if (outputs.mailFromDomain) {
+        dnsLines.push(
+          "",
+          pc.bold("MAIL FROM Domain Records (for DMARC alignment):"),
+          `  ${pc.cyan(outputs.mailFromDomain)} ${pc.dim("MX")} "10 feedback-smtp.${outputs.region}.amazonses.com"`,
+          `  ${pc.cyan(outputs.mailFromDomain)} ${pc.dim("TXT")} "v=spf1 include:amazonses.com ~all"`
+        );
+      }
     }
 
     clack.note(dnsLines.join("\n"), "DNS Records to add:");
@@ -229,6 +240,8 @@ export type StatusOutputs = {
     domain: string;
     status: "verified" | "pending" | "failed";
     dkimTokens?: string[];
+    mailFromDomain?: string;
+    mailFromStatus?: string;
   }>;
   resources: {
     roleArn?: string;
@@ -260,7 +273,18 @@ export function displayStatus(status: StatusOutputs) {
           : d.status === "pending"
             ? pc.yellow
             : pc.red;
-      return `    ${d.domain} ${statusColor(`${statusIcon} ${d.status}`)}`;
+
+      let domainLine = `    ${d.domain} ${statusColor(`${statusIcon} ${d.status}`)}`;
+
+      // Add MAIL FROM domain info if configured
+      if (d.mailFromDomain) {
+        const mailFromStatusIcon = d.mailFromStatus === "SUCCESS" ? "✓" : "⏱";
+        const mailFromColor =
+          d.mailFromStatus === "SUCCESS" ? pc.green : pc.yellow;
+        domainLine += `\n      ${pc.dim("MAIL FROM:")} ${d.mailFromDomain} ${mailFromColor(mailFromStatusIcon)}`;
+      }
+
+      return domainLine;
     });
     infoLines.push(`${pc.bold("Domains:")}\n${domainStrings.join("\n")}`);
   }
@@ -337,14 +361,23 @@ export function displayStatus(status: StatusOutputs) {
 
   clack.note(resourceLines.join("\n"), "Resources");
 
-  // Show DNS records for pending domains
-  const pendingDomains = status.domains.filter(
-    (d) => d.status === "pending" && d.dkimTokens
+  // Show DNS records for pending domains OR domains with pending MAIL FROM
+  const domainsNeedingDNS = status.domains.filter(
+    (d) =>
+      (d.status === "pending" && d.dkimTokens) ||
+      (d.mailFromDomain && d.mailFromStatus !== "SUCCESS")
   );
-  if (pendingDomains.length > 0) {
-    for (const domain of pendingDomains) {
-      if (domain.dkimTokens && domain.dkimTokens.length > 0) {
-        const dnsLines = [
+  if (domainsNeedingDNS.length > 0) {
+    for (const domain of domainsNeedingDNS) {
+      const dnsLines = [];
+
+      // DKIM records (only for pending domains)
+      if (
+        domain.status === "pending" &&
+        domain.dkimTokens &&
+        domain.dkimTokens.length > 0
+      ) {
+        dnsLines.push(
           pc.bold("DKIM Records (CNAME):"),
           ...domain.dkimTokens.map(
             (token) =>
@@ -355,15 +388,27 @@ export function displayStatus(status: StatusOutputs) {
           `  ${pc.cyan(domain.domain)} ${pc.dim("TXT")} "v=spf1 include:amazonses.com ~all"`,
           "",
           pc.bold("DMARC Record (TXT):"),
-          `  ${pc.cyan(`_dmarc.${domain.domain}`)} ${pc.dim("TXT")} "v=DMARC1; p=quarantine; rua=mailto:postmaster@${domain.domain}"`,
-        ];
+          `  ${pc.cyan(`_dmarc.${domain.domain}`)} ${pc.dim("TXT")} "v=DMARC1; p=quarantine; rua=mailto:postmaster@${domain.domain}"`
+        );
+      }
 
+      // MAIL FROM records (if configured but not verified)
+      if (domain.mailFromDomain && domain.mailFromStatus !== "SUCCESS") {
+        if (dnsLines.length > 0) dnsLines.push("");
+        dnsLines.push(
+          pc.bold("MAIL FROM Domain Records (for DMARC alignment):"),
+          `  ${pc.cyan(domain.mailFromDomain)} ${pc.dim("MX")} "10 feedback-smtp.${status.region}.amazonses.com"`,
+          `  ${pc.cyan(domain.mailFromDomain)} ${pc.dim("TXT")} "v=spf1 include:amazonses.com ~all"`
+        );
+      }
+
+      if (dnsLines.length > 0) {
         clack.note(dnsLines.join("\n"), `DNS Records for ${domain.domain}`);
       }
     }
 
-    // Show verify command with first pending domain as example
-    const exampleDomain = pendingDomains[0].domain;
+    // Show verify command with first domain needing DNS as example
+    const exampleDomain = domainsNeedingDNS[0].domain;
     console.log(
       `\n${pc.dim("Run:")} ${pc.yellow(`wraps verify --domain ${exampleDomain}`)} ${pc.dim(
         "(after DNS propagates)"
