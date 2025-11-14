@@ -1,6 +1,18 @@
+"use client";
+
 import type { awsAccount } from "@wraps/db";
 import type { InferSelectModel } from "drizzle-orm";
+import { Copy } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 interface AccountHeaderProps {
   account: InferSelectModel<typeof awsAccount>;
@@ -17,6 +29,14 @@ export function AccountHeader({
   permissions,
   orgSlug,
 }: AccountHeaderProps) {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const copyToClipboard = async (text: string, field: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
   return (
     <div className="space-y-4">
       {/* Breadcrumb */}
@@ -73,6 +93,76 @@ export function AccountHeader({
           </span>
         )}
       </div>
+
+      {/* CloudFormation Update Info (only for managers) */}
+      {permissions.canManage && (
+        <Card className="border-amber-200 bg-amber-50/50">
+          <CardHeader>
+            <CardTitle className="text-base">
+              Update IAM Role Permissions
+            </CardTitle>
+            <CardDescription>
+              To enable new features like email history, update your
+              CloudFormation stack with the latest permissions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* External ID */}
+            <div className="space-y-2">
+              <label className="font-medium text-muted-foreground text-sm">
+                External ID (keep this secret)
+              </label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 rounded-md border bg-muted px-3 py-2 font-mono text-sm">
+                  {account.externalId}
+                </code>
+                <Button
+                  onClick={() =>
+                    copyToClipboard(account.externalId, "externalId")
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <Copy className="h-4 w-4" />
+                  {copiedField === "externalId" ? "Copied!" : "Copy"}
+                </Button>
+              </div>
+            </div>
+
+            {/* AWS CLI Command */}
+            <div className="space-y-2">
+              <label className="font-medium text-muted-foreground text-sm">
+                Update via AWS CLI (recommended)
+              </label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 overflow-x-auto rounded-md border bg-muted px-3 py-2 font-mono text-xs">
+                  aws cloudformation update-stack --stack-name
+                  wraps-console-access --template-url
+                  https://wraps-assets.s3.amazonaws.com/cloudformation/wraps-console-access-role.yaml
+                  --capabilities CAPABILITY_NAMED_IAM --region {account.region}
+                </code>
+                <Button
+                  onClick={() =>
+                    copyToClipboard(
+                      `aws cloudformation update-stack --stack-name wraps-console-access --template-url https://wraps-assets.s3.amazonaws.com/cloudformation/wraps-console-access-role.yaml --capabilities CAPABILITY_NAMED_IAM --region ${account.region}`,
+                      "cli"
+                    )
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <Copy className="h-4 w-4" />
+                  {copiedField === "cli" ? "Copied!" : "Copy"}
+                </Button>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                This command will update your stack with the latest permissions.
+                Run it in your terminal with AWS credentials configured.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
