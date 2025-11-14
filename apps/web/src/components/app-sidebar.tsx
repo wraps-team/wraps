@@ -79,23 +79,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               icon: Users,
             },
             {
-              title: "Organization",
-              url: "#",
+              title: "Organization Settings",
+              url: `/${orgSlug}/settings`,
               icon: Settings,
-              items: [
-                {
-                  title: "General",
-                  url: `/${orgSlug}/settings/general`,
-                },
-                {
-                  title: "Billing",
-                  url: `/${orgSlug}/settings/billing`,
-                },
-                {
-                  title: "Integrations",
-                  url: `/${orgSlug}/settings/integrations`,
-                },
-              ],
             },
           ],
         },

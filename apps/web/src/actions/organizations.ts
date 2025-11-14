@@ -8,7 +8,14 @@ import {
   type CreateOrganizationInput,
   createOrganizationSchema,
 } from "@/lib/forms/create-organization";
-import { generateSlug } from "@/lib/organization";
+import {
+  type UpdateOrganizationInput,
+  updateOrganizationSchema,
+} from "@/lib/forms/update-organization";
+import {
+  generateSlug,
+  getOrganizationWithMembership,
+} from "@/lib/organization";
 
 export type CreateOrganizationResult =
   | {
@@ -121,6 +128,132 @@ export async function createOrganizationAction(
     };
   } catch (error) {
     console.error("Error creating organization:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "An unexpected error occurred",
+    };
+  }
+}
+
+export type UpdateOrganizationResult =
+  | {
+      success: true;
+      organization: {
+        id: string;
+        name: string;
+        slug: string;
+      };
+    }
+  | {
+      success: false;
+      error: string;
+      field?: string;
+    };
+
+export async function updateOrganizationAction(
+  orgSlug: string,
+  data: UpdateOrganizationInput
+): Promise<UpdateOrganizationResult> {
+  try {
+    // 1. Get session
+    const session = await auth.api.getSession({
+      headers: await import("next/headers").then((mod) => mod.headers()),
+    });
+
+    if (!session?.user) {
+      return {
+        success: false,
+        error: "You must be logged in to update an organization",
+      };
+    }
+
+    // 2. Get organization with membership
+    const orgWithMembership = await getOrganizationWithMembership(
+      orgSlug,
+      session.user.id
+    );
+
+    if (!orgWithMembership) {
+      return {
+        success: false,
+        error: "Organization not found",
+      };
+    }
+
+    // 3. Check permissions (only owner and admin can update org settings)
+    if (!["owner", "admin"].includes(orgWithMembership.userRole)) {
+      return {
+        success: false,
+        error: "You do not have permission to update organization settings",
+      };
+    }
+
+    // 4. Validate input
+    const validationResult = updateOrganizationSchema.safeParse(data);
+    if (!validationResult.success) {
+      const firstError = validationResult.error.issues[0];
+      return {
+        success: false,
+        error: firstError.message,
+        field: firstError.path[0]?.toString(),
+      };
+    }
+
+    const { name, slug: newSlug, logo } = validationResult.data;
+
+    // 5. Check if slug changed and if new slug already exists
+    if (newSlug && newSlug !== orgWithMembership.slug) {
+      const existingOrg = await db.query.organization.findFirst({
+        where: (orgs, { eq }) => eq(orgs.slug, newSlug),
+      });
+
+      if (existingOrg) {
+        return {
+          success: false,
+          error: "An organization with this slug already exists",
+          field: "slug",
+        };
+      }
+    }
+
+    // 6. Update organization in database
+    const { eq } = await import("drizzle-orm");
+    const [updatedOrg] = await db
+      .update(organization)
+      .set({
+        ...(name && { name }),
+        ...(newSlug && { slug: newSlug }),
+        ...(logo !== undefined && { logo }),
+      })
+      .where(eq(organization.id, orgWithMembership.id))
+      .returning();
+
+    if (!updatedOrg) {
+      return {
+        success: false,
+        error: "Failed to update organization",
+      };
+    }
+
+    // 7. Revalidate paths
+    revalidatePath("/dashboard");
+    revalidatePath(`/${orgSlug}`);
+    if (newSlug && newSlug !== orgSlug) {
+      revalidatePath(`/${newSlug}`);
+    }
+
+    // 8. Return success
+    return {
+      success: true,
+      organization: {
+        id: updatedOrg.id,
+        name: updatedOrg.name,
+        slug: updatedOrg.slug || orgSlug,
+      },
+    };
+  } catch (error) {
+    console.error("Error updating organization:", error);
     return {
       success: false,
       error:
