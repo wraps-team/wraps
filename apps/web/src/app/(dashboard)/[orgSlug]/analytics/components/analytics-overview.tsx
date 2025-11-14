@@ -108,7 +108,7 @@ export function AnalyticsOverview({ orgSlug }: { orgSlug: string }) {
         isLoading={isLoading}
         title="Total Sent"
         trend="up"
-        value={data?.totalSent.toLocaleString() ?? "0"}
+        value={data ? data.totalSent.toLocaleString() : "0"}
       />
       <StatCard
         icon={<TrendingUp className="h-6 w-6" />}
