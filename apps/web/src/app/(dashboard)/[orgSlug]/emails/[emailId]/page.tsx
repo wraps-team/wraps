@@ -71,40 +71,54 @@ const STATUS_VARIANTS: Record<
   delivery_delay: "secondary",
 };
 
-// Mock data - will be replaced with API call
-const mockEmail: Email = {
-  id: "msg-001",
-  messageId: "01234567-89ab-cdef-0123-456789abcdef",
-  from: "hello@example.com",
-  to: ["user@test.com"],
-  replyTo: "support@example.com",
-  subject: "Welcome to our platform!",
-  htmlBody: "<h1>Welcome!</h1><p>Thanks for joining us.</p>",
-  textBody: "Welcome! Thanks for joining us.",
-  status: "clicked",
-  sentAt: Date.now() - 1000 * 60 * 30, // 30 minutes ago
-  events: [
-    {
-      type: "sent",
-      timestamp: Date.now() - 1000 * 60 * 30,
-    },
-    {
-      type: "delivered",
-      timestamp: Date.now() - 1000 * 60 * 28,
-    },
-    {
-      type: "opened",
-      timestamp: Date.now() - 1000 * 60 * 15,
-    },
-    {
-      type: "clicked",
-      timestamp: Date.now() - 1000 * 60 * 10,
-      metadata: {
-        link: "https://example.com/getting-started",
-      },
-    },
-  ],
-};
+async function fetchEmail(
+  orgSlug: string,
+  emailId: string
+): Promise<Email | null> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const url = new URL(`/api/${orgSlug}/emails/${emailId}`, baseUrl);
+
+    const response = await fetch(url.toString(), {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error("Failed to fetch email:", response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Transform API response to Email type
+    return {
+      id: data.id,
+      messageId: data.messageId,
+      from: data.from,
+      to: data.to,
+      replyTo: data.replyTo,
+      subject: data.subject,
+      htmlBody: data.body,
+      textBody: data.body,
+      status: data.status,
+      sentAt: data.sentAt,
+      events: data.events.map(
+        (event: {
+          type: string;
+          timestamp: number;
+          metadata?: Record<string, unknown>;
+        }) => ({
+          type: event.type.toLowerCase().replace(" ", "_"),
+          timestamp: event.timestamp,
+          metadata: event.metadata,
+        })
+      ),
+    };
+  } catch (error) {
+    console.error("Error fetching email:", error);
+    return null;
+  }
+}
 
 function formatTimestamp(timestamp: number): string {
   const date = new Date(timestamp);
@@ -152,9 +166,13 @@ export default async function EmailDetailPage({
     redirect("/dashboard");
   }
 
-  // TODO: Fetch actual email from API
-  // const email = await fetchEmail(orgWithMembership.id, emailId);
-  const email = mockEmail;
+  // Fetch actual email from API
+  const email = await fetchEmail(orgSlug, emailId);
+
+  // If email not found, redirect back to emails list
+  if (!email) {
+    redirect(`/${orgSlug}/emails`);
+  }
 
   return (
     <>

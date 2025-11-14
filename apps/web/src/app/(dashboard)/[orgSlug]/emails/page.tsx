@@ -8,74 +8,46 @@ interface EmailsPageProps {
   params: Promise<{
     orgSlug: string;
   }>;
+  searchParams: Promise<{
+    days?: string;
+    limit?: string;
+  }>;
 }
 
-// Mock data for now - will be replaced with actual API call
-const mockEmails: EmailListItem[] = [
-  {
-    id: "msg-001",
-    messageId: "01234567-89ab-cdef-0123-456789abcdef",
-    from: "hello@example.com",
-    to: ["user@test.com"],
-    subject: "Welcome to our platform!",
-    status: "clicked",
-    sentAt: Date.now() - 1000 * 60 * 30, // 30 minutes ago
-    eventCount: 4,
-    hasOpened: true,
-    hasClicked: true,
-  },
-  {
-    id: "msg-002",
-    messageId: "11234567-89ab-cdef-0123-456789abcdef",
-    from: "hello@example.com",
-    to: ["jane@test.com", "john@test.com"],
-    subject: "Your monthly report is ready",
-    status: "opened",
-    sentAt: Date.now() - 1000 * 60 * 60 * 2, // 2 hours ago
-    eventCount: 3,
-    hasOpened: true,
-    hasClicked: false,
-  },
-  {
-    id: "msg-003",
-    messageId: "21234567-89ab-cdef-0123-456789abcdef",
-    from: "hello@example.com",
-    to: ["support@test.com"],
-    subject: "Password reset request",
-    status: "delivered",
-    sentAt: Date.now() - 1000 * 60 * 60 * 5, // 5 hours ago
-    eventCount: 2,
-    hasOpened: false,
-    hasClicked: false,
-  },
-  {
-    id: "msg-004",
-    messageId: "31234567-89ab-cdef-0123-456789abcdef",
-    from: "hello@example.com",
-    to: ["invalid@nonexistent.domain"],
-    subject: "Newsletter - Week 42",
-    status: "bounced",
-    sentAt: Date.now() - 1000 * 60 * 60 * 24, // 1 day ago
-    eventCount: 2,
-    hasOpened: false,
-    hasClicked: false,
-  },
-  {
-    id: "msg-005",
-    messageId: "41234567-89ab-cdef-0123-456789abcdef",
-    from: "hello@example.com",
-    to: ["user5@test.com"],
-    subject: "Your order has shipped",
-    status: "sent",
-    sentAt: Date.now() - 1000 * 60 * 60 * 24 * 2, // 2 days ago
-    eventCount: 1,
-    hasOpened: false,
-    hasClicked: false,
-  },
-];
+async function fetchEmails(
+  orgSlug: string,
+  days = 7,
+  limit = 100
+): Promise<EmailListItem[]> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const url = new URL(`/api/${orgSlug}/emails`, baseUrl);
+    url.searchParams.set("days", days.toString());
+    url.searchParams.set("limit", limit.toString());
 
-export default async function EmailsPage({ params }: EmailsPageProps) {
+    const response = await fetch(url.toString(), {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error("Failed to fetch emails:", response.statusText);
+      return [];
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error("Error fetching emails:", error);
+    return [];
+  }
+}
+
+export default async function EmailsPage({
+  params,
+  searchParams,
+}: EmailsPageProps) {
   const { orgSlug } = await params;
+  const { days = "7", limit = "100" } = await searchParams;
+
   const session = await auth.api.getSession({
     headers: await import("next/headers").then((mod) => mod.headers()),
   });
@@ -93,9 +65,12 @@ export default async function EmailsPage({ params }: EmailsPageProps) {
     redirect("/dashboard");
   }
 
-  // TODO: Fetch actual emails from API
-  // const emails = await fetchEmails(orgWithMembership.id);
-  const emails = mockEmails;
+  // Fetch actual emails from API
+  const emails = await fetchEmails(
+    orgSlug,
+    Number.parseInt(days, 10),
+    Number.parseInt(limit, 10)
+  );
 
   return (
     <>
