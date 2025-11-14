@@ -160,8 +160,8 @@ importers:
         specifier: 3.0.4
         version: 3.0.4
       '@wraps.dev/email':
-        specifier: 0.3.0
-        version: 0.3.0(react@19.2.0)
+        specifier: 0.3.1
+        version: 0.3.1(react@19.2.0)
       '@wraps/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -4394,8 +4394,8 @@ packages:
   '@vitest/utils@4.0.8':
     resolution: {integrity: sha512-pdk2phO5NDvEFfUTxcTP8RFYjVj/kfLSPIN5ebP2Mu9kcIMeAQTbknqcFEyBcC4z2pJlJI9aS5UQjcYfhmKAow==}
 
-  '@wraps.dev/email@0.3.0':
-    resolution: {integrity: sha512-wu98AnwRpVigfNHmRdO58UknbvQmZGJHn4eeji0JwRkexaPy4+EsfOn1SKYoLt2+fgNF4CZE9BNjdhrX+eSu8Q==}
+  '@wraps.dev/email@0.3.1':
+    resolution: {integrity: sha512-wa2/z0l4aJQ6Jwwxbu+grXk0egHmBlnxpl9+uCEx2NkBF/gm4xUc3yWCVVPdmMFeh8uOGcjgt2JdBaZSGg/dzQ==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@react-email/components': '>=0.0.25'
@@ -9028,8 +9028,8 @@ snapshots:
     dependencies:
       '@aws-sdk/core': 3.922.0
       '@aws-sdk/types': 3.922.0
-      '@smithy/fetch-http-handler': 5.3.5
-      '@smithy/node-http-handler': 4.4.4
+      '@smithy/fetch-http-handler': 5.3.6
+      '@smithy/node-http-handler': 4.4.5
       '@smithy/property-provider': 4.2.5
       '@smithy/protocol-http': 5.3.5
       '@smithy/smithy-client': 4.9.6
@@ -12940,7 +12940,7 @@ snapshots:
       '@vitest/pretty-format': 4.0.8
       tinyrainbow: 3.0.3
 
-  '@wraps.dev/email@0.3.0(react@19.2.0)':
+  '@wraps.dev/email@0.3.1(react@19.2.0)':
     dependencies:
       '@aws-sdk/client-ses': 3.931.0
       '@aws-sdk/credential-providers': 3.931.0

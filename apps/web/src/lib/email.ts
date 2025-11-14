@@ -7,7 +7,6 @@ import { WrapsEmail } from "@wraps.dev/email";
 // Use Vercel's OIDC provider to assume the email role directly
 const wraps = new WrapsEmail({
   region: process.env.AWS_REGION || "us-east-1",
-  // @ts-expect-error - SDK will be updated to accept AwsCredentialIdentityProvider
   credentials: process.env.WRAPS_EMAIL_ROLE_ARN
     ? awsCredentialsProvider({
         roleArn: process.env.WRAPS_EMAIL_ROLE_ARN,
