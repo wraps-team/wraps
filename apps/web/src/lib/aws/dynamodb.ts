@@ -12,7 +12,7 @@ interface EmailEvent {
   sentAt: number;
   accountId: string;
   from: string;
-  to: string[];
+  to: string[] | Set<string>; // Can be array (L) or Set (SS) depending on Lambda version
   subject: string;
   eventType: string;
   eventData: string;
@@ -26,6 +26,18 @@ interface QueryEmailEventsParams {
   startTime: Date;
   endTime: Date;
   limit?: number;
+}
+
+/**
+ * Normalizes the 'to' field from DynamoDB to always be a string array.
+ * DynamoDB String Sets (SS) get unmarshalled as JavaScript Set objects.
+ * New data uses List (L) which unmarshalls as arrays.
+ */
+function normalizeRecipients(to: string[] | Set<string> | undefined): string[] {
+  if (!to) return [];
+  if (to instanceof Set) return Array.from(to);
+  if (Array.isArray(to)) return to;
+  return [];
 }
 
 /**
@@ -96,9 +108,15 @@ export async function queryEmailEvents(
     console.log("[queryEmailEvents] Query result:", {
       count: result.Items?.length || 0,
       scannedCount: result.ScannedCount,
+      sampleItem: result.Items?.[0],
     });
 
-    return (result.Items as EmailEvent[]) || [];
+    // Normalize the recipients field for all events
+    const events = (result.Items as EmailEvent[]) || [];
+    return events.map((event) => ({
+      ...event,
+      to: normalizeRecipients(event.to),
+    }));
   } catch (error) {
     console.error("[queryEmailEvents] Failed to query email events:", {
       error,

@@ -39,8 +39,17 @@ export async function handler(event: SQSEvent) {
       const messageId = mail.messageId;
       const mailTimestamp = new Date(mail.timestamp).getTime();
       const from = mail.source;
-      const to = mail.destination;
+      const to = mail.destination || [];
       const subject = mail.commonHeaders?.subject || "";
+
+      console.log("Processing email event:", {
+        messageId,
+        eventType,
+        to,
+        toLength: to.length,
+        toType: typeof to,
+        isArray: Array.isArray(to),
+      });
 
       // Extract additional data and event-specific timestamp based on event type
       let additionalData: Record<string, unknown> = {};
@@ -126,6 +135,7 @@ export async function handler(event: SQSEvent) {
 
       // Store event in DynamoDB
       // Use eventTimestamp as sort key to ensure each event type creates a unique record
+      // Note: DynamoDB String Sets (SS) cannot be empty, so we use a List (L) for recipients
       await dynamodb.send(
         new PutItemCommand({
           TableName: tableName,
@@ -134,7 +144,7 @@ export async function handler(event: SQSEvent) {
             sentAt: { N: eventTimestamp.toString() },
             accountId: { S: process.env.AWS_ACCOUNT_ID || "unknown" },
             from: { S: from },
-            to: { SS: to },
+            to: { L: to.map((email: string) => ({ S: email })) },
             subject: { S: subject },
             eventType: { S: eventType },
             eventData: { S: JSON.stringify(message) },

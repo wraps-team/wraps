@@ -312,9 +312,20 @@ export default async function EmailDetailPage({
               <div className="space-y-1">
                 <div className="text-muted-foreground text-sm">TO</div>
                 <div className="font-mono text-sm">
-                  {email.to.length > 0
-                    ? email.to.join(", ")
-                    : "(no recipients)"}
+                  {email.to.length > 0 ? (
+                    <>
+                      {email.to[0]}
+                      {email.to.length > 1 && (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          +{email.to.length - 1} other
+                          {email.to.length > 2 ? "s" : ""}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    "(no recipients)"
+                  )}
                 </div>
               </div>
               {email.replyTo && (
