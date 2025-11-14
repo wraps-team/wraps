@@ -1,10 +1,18 @@
+import { awsCredentialsProvider } from "@vercel/oidc-aws-credentials-provider";
 import { WrapsEmail } from "@wraps.dev/email";
 
 // Initialize the Wraps email client with the role ARN from environment
 // This should be the IAM role created by `wraps init` in your AWS account
+//
+// Use Vercel's OIDC provider to assume the email role directly
 const wraps = new WrapsEmail({
-  roleArn: process.env.WRAPS_EMAIL_ROLE_ARN,
   region: process.env.AWS_REGION || "us-east-1",
+  // @ts-expect-error - SDK will be updated to accept AwsCredentialIdentityProvider
+  credentials: process.env.WRAPS_EMAIL_ROLE_ARN
+    ? awsCredentialsProvider({
+        roleArn: process.env.WRAPS_EMAIL_ROLE_ARN,
+      })
+    : undefined,
 });
 
 export type SendInvitationEmailParams = {
