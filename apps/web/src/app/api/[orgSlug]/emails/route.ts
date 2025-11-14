@@ -34,12 +34,15 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const { orgSlug } = await context.params;
 
+    console.log("[API /emails] Request received for org:", orgSlug);
+
     // Authenticate user
     const session = await auth.api.getSession({
       headers: await import("next/headers").then((mod) => mod.headers()),
     });
 
     if (!session?.user) {
+      console.log("[API /emails] Unauthorized - no session");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -50,6 +53,7 @@ export async function GET(request: Request, context: RouteContext) {
     );
 
     if (!orgWithMembership) {
+      console.log("[API /emails] Forbidden - not a member");
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -61,12 +65,22 @@ export async function GET(request: Request, context: RouteContext) {
     const endTime = new Date();
     const startTime = new Date(endTime.getTime() - days * 24 * 60 * 60 * 1000);
 
+    console.log("[API /emails] Query params:", {
+      days,
+      limit,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+    });
+
     // Get all AWS accounts for this organization
     const accounts = await db.query.awsAccount.findMany({
       where: eq(awsAccount.organizationId, orgWithMembership.id),
     });
 
+    console.log("[API /emails] Found accounts:", accounts.length);
+
     if (accounts.length === 0) {
+      console.log("[API /emails] No accounts found, returning empty array");
       return NextResponse.json([]);
     }
 

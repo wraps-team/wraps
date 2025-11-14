@@ -196,10 +196,15 @@ export function EmailsTable({ data, orgSlug }: EmailsTableProps) {
             ) : (
               <TableRow>
                 <TableCell
-                  className="h-24 text-center text-muted-foreground"
+                  className="h-32 text-center"
                   colSpan={columns.length}
                 >
-                  No emails found
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="text-muted-foreground">No emails found</p>
+                    <p className="text-muted-foreground text-sm">
+                      Try adjusting the time range or send your first email
+                    </p>
+                  </div>
                 </TableCell>
               </TableRow>
             )}

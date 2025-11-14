@@ -1,4 +1,7 @@
 import { auth } from "@wraps/auth";
+import { db } from "@wraps/db";
+import { awsAccount } from "@wraps/db/schema/app";
+import { eq } from "drizzle-orm";
 import {
   ArrowLeft,
   Check,
@@ -18,6 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { queryEmailEvents } from "@/lib/aws/dynamodb";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import type { Email, EmailStatus } from "../types";
 import { CopyButton } from "./components/copy-button";
@@ -71,51 +75,144 @@ const STATUS_VARIANTS: Record<
   delivery_delay: "secondary",
 };
 
+// Map SES event types to our EmailStatus
+function mapEventTypeToStatus(eventType: string): EmailStatus {
+  const mapping: Record<string, EmailStatus> = {
+    Send: "sent",
+    Delivery: "delivered",
+    Open: "opened",
+    Click: "clicked",
+    Bounce: "bounced",
+    Complaint: "complained",
+    Reject: "rejected",
+    "Rendering Failure": "rendering_failure",
+    RenderingFailure: "rendering_failure",
+    DeliveryDelay: "delivery_delay",
+  };
+  return (mapping[eventType] as EmailStatus) || "sent";
+}
+
 async function fetchEmail(
-  orgSlug: string,
+  organizationId: string,
   emailId: string
 ): Promise<Email | null> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const url = new URL(`/api/${orgSlug}/emails/${emailId}`, baseUrl);
+    // Search for the email across all accounts (last 90 days)
+    const endTime = new Date();
+    const startTime = new Date(endTime.getTime() - 90 * 24 * 60 * 60 * 1000);
 
-    const response = await fetch(url.toString(), {
-      cache: "no-store",
+    console.log("[fetchEmail] Searching for email:", emailId);
+
+    // Get all AWS accounts for this organization
+    const accounts = await db.query.awsAccount.findMany({
+      where: eq(awsAccount.organizationId, organizationId),
     });
 
-    if (!response.ok) {
-      console.error("Failed to fetch email:", response.statusText);
+    console.log("[fetchEmail] Searching across accounts:", accounts.length);
+
+    if (accounts.length === 0) {
       return null;
     }
 
-    const data = await response.json();
+    // Fetch events from all accounts and find the matching email
+    const allEvents = await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          return await queryEmailEvents({
+            awsAccountId: account.id,
+            startTime,
+            endTime,
+            limit: 1000,
+          });
+        } catch (error) {
+          console.error(
+            `[fetchEmail] Failed to fetch emails for account ${account.id}:`,
+            error
+          );
+          return [];
+        }
+      })
+    );
 
-    // Transform API response to Email type
+    // Find all events for this messageId
+    const emailEvents = allEvents.flat().filter((e) => e.messageId === emailId);
+
+    console.log("[fetchEmail] Found events for email:", emailEvents.length);
+
+    if (emailEvents.length === 0) {
+      return null;
+    }
+
+    // Sort events by timestamp
+    emailEvents.sort((a, b) => a.sentAt - b.sentAt);
+
+    // Get the first event for basic details
+    const firstEvent = emailEvents[0];
+
+    // Determine the final status based on most significant event
+    const statusPriority: EmailStatus[] = [
+      "clicked",
+      "complained",
+      "bounced",
+      "opened",
+      "delivered",
+      "sent",
+      "failed",
+      "rejected",
+      "rendering_failure",
+      "delivery_delay",
+    ];
+
+    let finalStatus: EmailStatus = "sent";
+    let currentPriority = statusPriority.indexOf(finalStatus);
+
+    for (const event of emailEvents) {
+      const eventStatus = mapEventTypeToStatus(event.eventType);
+      const eventPriority = statusPriority.indexOf(eventStatus);
+
+      if (eventPriority < currentPriority) {
+        finalStatus = eventStatus;
+        currentPriority = eventPriority;
+      }
+    }
+
+    // Build the email detail response
     return {
-      id: data.id,
-      messageId: data.messageId,
-      from: data.from,
-      to: data.to,
-      replyTo: data.replyTo,
-      subject: data.subject,
-      htmlBody: data.body,
-      textBody: data.body,
-      status: data.status,
-      sentAt: data.sentAt,
-      events: data.events.map(
-        (event: {
-          type: string;
-          timestamp: number;
-          metadata?: Record<string, unknown>;
-        }) => ({
-          type: event.type.toLowerCase().replace(" ", "_"),
-          timestamp: event.timestamp,
-          metadata: event.metadata,
-        })
-      ),
+      id: emailId,
+      messageId: emailId,
+      from: firstEvent.from,
+      to: firstEvent.to,
+      replyTo: undefined,
+      subject: firstEvent.subject,
+      htmlBody: firstEvent.additionalData
+        ? (() => {
+            try {
+              const data = JSON.parse(firstEvent.additionalData);
+              return data.htmlBody || data.textBody || undefined;
+            } catch {
+              return;
+            }
+          })()
+        : undefined,
+      textBody: undefined,
+      status: finalStatus,
+      sentAt: firstEvent.sentAt,
+      events: emailEvents.map((event) => ({
+        type: event.eventType.toLowerCase().replace(" ", "_") as EmailStatus,
+        timestamp: event.createdAt,
+        metadata: event.additionalData
+          ? (() => {
+              try {
+                return JSON.parse(event.additionalData);
+              } catch {
+                return {};
+              }
+            })()
+          : {},
+      })),
     };
   } catch (error) {
-    console.error("Error fetching email:", error);
+    console.error("[fetchEmail] Error fetching email:", error);
     return null;
   }
 }
@@ -166,8 +263,8 @@ export default async function EmailDetailPage({
     redirect("/dashboard");
   }
 
-  // Fetch actual email from API
-  const email = await fetchEmail(orgSlug, emailId);
+  // Fetch actual email directly (not via API to avoid auth issues)
+  const email = await fetchEmail(orgWithMembership.id, emailId);
 
   // If email not found, redirect back to emails list
   if (!email) {
