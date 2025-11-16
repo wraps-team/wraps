@@ -167,6 +167,10 @@ export async function update(options: UpdateOptions): Promise<void> {
                   domain: result.domain,
                   dkimTokens: result.dkimTokens,
                   customTrackingDomain: result.customTrackingDomain,
+                  mailFromDomain: result.mailFromDomain,
+                  archiveArn: result.archiveArn,
+                  archivingEnabled: result.archivingEnabled,
+                  archiveRetention: result.archiveRetention,
                 };
               },
             },
@@ -201,6 +205,16 @@ export async function update(options: UpdateOptions): Promise<void> {
           domain: pulumiOutputs.domain?.value as string | undefined,
           dkimTokens: pulumiOutputs.dkimTokens?.value as string[] | undefined,
           customTrackingDomain: pulumiOutputs.customTrackingDomain?.value as
+            | string
+            | undefined,
+          mailFromDomain: pulumiOutputs.mailFromDomain?.value as
+            | string
+            | undefined,
+          archiveArn: pulumiOutputs.archiveArn?.value as string | undefined,
+          archivingEnabled: pulumiOutputs.archivingEnabled?.value as
+            | boolean
+            | undefined,
+          archiveRetention: pulumiOutputs.archiveRetention?.value as
             | string
             | undefined,
         };
