@@ -139,7 +139,7 @@ function CopyButton({ text }: { text: string }) {
 /**
  * Domain identity section
  */
-function DomainIdentitySection({
+function _DomainIdentitySection({
   identity,
 }: {
   identity?: EmailIdentityDetails;
@@ -359,7 +359,9 @@ function DmarcSection({ identity }: { identity?: EmailIdentityDetails }) {
   }, [verificationStatus]);
 
   const handleVerify = async () => {
-    if (!identity?.identityName) return;
+    if (!identity?.identityName) {
+      return;
+    }
 
     setIsVerifying(true);
     try {
@@ -503,7 +505,9 @@ function TrackingDomainSection({
   }, [verificationStatus]);
 
   const handleVerify = async () => {
-    if (!(tracking?.customRedirectDomain && region)) return;
+    if (!(tracking?.customRedirectDomain && region)) {
+      return;
+    }
 
     setIsVerifying(true);
     try {

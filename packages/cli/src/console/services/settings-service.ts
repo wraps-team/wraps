@@ -168,7 +168,9 @@ export async function fetchEmailIdentity(
     verifiedForSendingStatus: response.VerifiedForSendingStatus ?? false,
     tags: response.Tags?.reduce(
       (acc, tag) => {
-        if (tag.Key) acc[tag.Key] = tag.Value || "";
+        if (tag.Key) {
+          acc[tag.Key] = tag.Value || "";
+        }
         return acc;
       },
       {} as Record<string, string>

@@ -20,6 +20,8 @@ export type ServerConfig = {
   tableName?: string;
   accountId?: string;
   noOpen: boolean;
+  archiveArn?: string;
+  archivingEnabled?: boolean;
 };
 
 export type ServerInfo = {

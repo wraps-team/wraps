@@ -90,6 +90,19 @@ export async function deployEmailStack(
     });
   }
 
+  // 8. Mail Manager Archive (if email archiving enabled)
+  let archiveResources;
+  if (emailConfig.emailArchiving?.enabled && sesResources) {
+    const { createMailManagerArchive } = await import(
+      "./resources/mail-manager.js"
+    );
+    archiveResources = await createMailManagerArchive({
+      name: "email",
+      retention: emailConfig.emailArchiving.retention,
+      configSetName: sesResources.configSet.configurationSetName,
+    });
+  }
+
   // Return outputs
   return {
     roleArn: role.arn as any as string,
@@ -109,6 +122,11 @@ export async function deployEmailStack(
     dlqUrl: sqsResources?.dlq.url as any as string | undefined,
     customTrackingDomain: sesResources?.customTrackingDomain,
     mailFromDomain: sesResources?.mailFromDomain,
+    archiveArn: archiveResources?.archive.arn as any as string | undefined,
+    archivingEnabled: emailConfig.emailArchiving?.enabled,
+    archiveRetention: emailConfig.emailArchiving?.enabled
+      ? emailConfig.emailArchiving.retention
+      : undefined,
   };
 }
 

@@ -49,6 +49,8 @@ export async function runConsole(options: ConsoleOptions): Promise<void> {
 
   // Extract outputs from stack (optional - console uses current AWS credentials)
   const tableName = stackOutputs.tableName?.value;
+  const archiveArn = stackOutputs.archiveArn?.value;
+  const archivingEnabled = stackOutputs.archivingEnabled?.value ?? false;
 
   // 4. Find available port
   const port =
@@ -68,6 +70,8 @@ export async function runConsole(options: ConsoleOptions): Promise<void> {
     tableName,
     accountId: identity.accountId,
     noOpen: options.noOpen ?? false,
+    archiveArn,
+    archivingEnabled,
   });
 
   console.log(`\\n${pc.bold("Console:")} ${pc.cyan(url)}`);

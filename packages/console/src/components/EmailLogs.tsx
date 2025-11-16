@@ -226,196 +226,192 @@ export function EmailLogs() {
   };
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Emails</CardTitle>
-          <CardDescription>
-            View and manage your email sending history
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs onValueChange={setActiveTab} value={activeTab}>
-            <TabsList>
-              <TabsTrigger value="sending">Sending</TabsTrigger>
-              <TabsTrigger value="receiving">Receiving</TabsTrigger>
-            </TabsList>
+    <Card>
+      <CardHeader>
+        <CardTitle>Emails</CardTitle>
+        <CardDescription>
+          View and manage your email sending history
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Tabs onValueChange={setActiveTab} value={activeTab}>
+          <TabsList>
+            <TabsTrigger value="sending">Sending</TabsTrigger>
+            <TabsTrigger value="receiving">Receiving</TabsTrigger>
+          </TabsList>
 
-            <TabsContent className="space-y-4" value="sending">
-              {/* Error State */}
-              {error && (
-                <div className="rounded-md border border-destructive bg-destructive/10 p-4 text-destructive text-sm">
-                  {error}
-                </div>
-              )}
+          <TabsContent className="space-y-4" value="sending">
+            {/* Error State */}
+            {error && (
+              <div className="rounded-md border border-destructive bg-destructive/10 p-4 text-destructive text-sm">
+                {error}
+              </div>
+            )}
 
-              {/* Filters */}
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    className="pl-8"
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search..."
-                    value={searchQuery}
-                  />
-                </div>
-
-                <Select onValueChange={setDateRange} value={dateRange}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Last 24 hours</SelectItem>
-                    <SelectItem value="7">Last 7 days</SelectItem>
-                    <SelectItem value="15">Last 15 days</SelectItem>
-                    <SelectItem value="30">Last 30 days</SelectItem>
-                    <SelectItem value="90">Last 90 days</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select onValueChange={setStatusFilter} value={statusFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="clicked">Clicked</SelectItem>
-                    <SelectItem value="opened">Opened</SelectItem>
-                    <SelectItem value="delivered">Delivered</SelectItem>
-                    <SelectItem value="sent">Sent</SelectItem>
-                    <SelectItem value="bounced">Bounced</SelectItem>
-                    <SelectItem value="complained">Complained</SelectItem>
-                    <SelectItem value="failed">Failed</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Button size="icon" variant="outline">
-                  <span className="sr-only">Download</span>↓
-                </Button>
+            {/* Filters */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-8"
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search..."
+                  value={searchQuery}
+                />
               </div>
 
-              {/* Table */}
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
+              <Select onValueChange={setDateRange} value={dateRange}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Last 24 hours</SelectItem>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="15">Last 15 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select onValueChange={setStatusFilter} value={statusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="clicked">Clicked</SelectItem>
+                  <SelectItem value="opened">Opened</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="sent">Sent</SelectItem>
+                  <SelectItem value="bounced">Bounced</SelectItem>
+                  <SelectItem value="complained">Complained</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button size="icon" variant="outline">
+                <span className="sr-only">Download</span>↓
+              </Button>
+            </div>
+
+            {/* Table */}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>To</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Sent</TableHead>
+                    <TableHead className="w-[50px]" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
                     <TableRow>
-                      <TableHead>To</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Sent</TableHead>
-                      <TableHead className="w-[50px]" />
+                      <TableCell
+                        className="h-24 text-center text-muted-foreground"
+                        colSpan={5}
+                      >
+                        Loading email logs...
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      <TableRow>
-                        <TableCell
-                          className="h-24 text-center text-muted-foreground"
-                          colSpan={5}
-                        >
-                          Loading email logs...
+                  ) : filteredLogs.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        className="h-24 text-center text-muted-foreground"
+                        colSpan={5}
+                      >
+                        No emails found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredLogs.map((log) => (
+                      <TableRow
+                        className="cursor-pointer hover:bg-muted/50"
+                        key={log.id}
+                        onClick={() => navigate(`/email/${log.id}`)}
+                      >
+                        <TableCell className="font-mono text-sm">
+                          {log.to.length > 0 ? (
+                            <>
+                              {log.to[0]}
+                              {log.to.length > 1 && (
+                                <span className="ml-1 text-muted-foreground text-xs">
+                                  +{log.to.length - 1} more
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              (no recipients)
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge
+                                className={STATUS_CONFIG[log.status]?.className}
+                                variant={
+                                  STATUS_CONFIG[log.status]?.variant ??
+                                  "default"
+                                }
+                              >
+                                {log.status.charAt(0).toUpperCase() +
+                                  log.status.slice(1)}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>
+                                {STATUS_CONFIG[log.status]?.description ??
+                                  "Unknown status"}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell className="max-w-[400px] truncate">
+                          {log.subject}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatTimestamp(log.timestamp)}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Add menu actions here later
+                            }}
+                            size="icon"
+                            variant="ghost"
+                          >
+                            <span className="sr-only">More options</span>⋯
+                          </Button>
                         </TableCell>
                       </TableRow>
-                    ) : filteredLogs.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          className="h-24 text-center text-muted-foreground"
-                          colSpan={5}
-                        >
-                          No emails found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredLogs.map((log) => (
-                        <TableRow
-                          className="cursor-pointer hover:bg-muted/50"
-                          key={log.id}
-                          onClick={() => navigate(`/email/${log.id}`)}
-                        >
-                          <TableCell className="font-mono text-sm">
-                            {log.to.length > 0 ? (
-                              <>
-                                {log.to[0]}
-                                {log.to.length > 1 && (
-                                  <span className="ml-1 text-muted-foreground text-xs">
-                                    +{log.to.length - 1} more
-                                  </span>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground">
-                                (no recipients)
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge
-                                  className={
-                                    STATUS_CONFIG[log.status]?.className
-                                  }
-                                  variant={
-                                    STATUS_CONFIG[log.status]?.variant ??
-                                    "default"
-                                  }
-                                >
-                                  {log.status.charAt(0).toUpperCase() +
-                                    log.status.slice(1)}
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>
-                                  {STATUS_CONFIG[log.status]?.description ??
-                                    "Unknown status"}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TableCell>
-                          <TableCell className="max-w-[400px] truncate">
-                            {log.subject}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {formatTimestamp(log.timestamp)}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // Add menu actions here later
-                              }}
-                              size="icon"
-                              variant="ghost"
-                            >
-                              <span className="sr-only">More options</span>⋯
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
 
-              {/* Pagination would go here */}
-              {filteredLogs.length > 0 && !loading && (
-                <div className="flex items-center justify-between text-muted-foreground text-sm">
-                  <div>
-                    Showing {filteredLogs.length} of {logs.length} emails
-                  </div>
+            {/* Pagination would go here */}
+            {filteredLogs.length > 0 && !loading && (
+              <div className="flex items-center justify-between text-muted-foreground text-sm">
+                <div>
+                  Showing {filteredLogs.length} of {logs.length} emails
                 </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="receiving">
-              <div className="flex h-[400px] items-center justify-center text-muted-foreground">
-                Receiving emails coming soon
               </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-    </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="receiving">
+            <div className="flex h-[400px] items-center justify-center text-muted-foreground">
+              Receiving emails coming soon
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 }

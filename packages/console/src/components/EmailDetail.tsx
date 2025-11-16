@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EmailArchiveViewer } from "./EmailArchiveViewer";
 
 type EmailEvent = {
   type:
@@ -84,6 +85,7 @@ export function EmailDetail() {
   const [email, setEmail] = useState<EmailDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [archivingEnabled, setArchivingEnabled] = useState(false);
 
   useEffect(() => {
     async function fetchEmailDetails() {
@@ -96,6 +98,20 @@ export function EmailDetail() {
 
         if (!token) {
           throw new Error("Authentication token not found");
+        }
+
+        // Fetch deployment config to get archiving status
+        try {
+          const deploymentResponse = await fetch(
+            `/api/settings/deployment?token=${token}`
+          );
+          if (deploymentResponse.ok) {
+            const deploymentData = await deploymentResponse.json();
+            setArchivingEnabled(deploymentData.archivingEnabled ?? false);
+          }
+        } catch (deploymentError) {
+          console.warn("Failed to fetch deployment config:", deploymentError);
+          // Continue with email fetch even if deployment config fails
         }
 
         // URL encode the message ID in case it contains special characters
@@ -122,7 +138,7 @@ export function EmailDetail() {
 
         // Check content type before parsing
         const contentType = response.headers.get("content-type");
-        if (!(contentType && contentType.includes("application/json"))) {
+        if (!contentType?.includes("application/json")) {
           const text = await response.text();
           console.error("Non-JSON response:", text);
           throw new Error("Server returned non-JSON response");
@@ -276,6 +292,12 @@ export function EmailDetail() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Email Archive Viewer */}
+      <EmailArchiveViewer
+        archivingEnabled={archivingEnabled}
+        messageId={email.messageId}
+      />
 
       {/* Event Timeline */}
       <Card>

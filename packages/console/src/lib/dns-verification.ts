@@ -49,7 +49,9 @@ function saveCache(cache: DNSVerificationCache): void {
  * Check if cached verification is still valid
  */
 function isCacheValid(status?: DNSVerificationStatus): boolean {
-  if (!status) return false;
+  if (!status) {
+    return false;
+  }
   const age = Date.now() - status.lastChecked;
   return age < CACHE_DURATION;
 }
@@ -105,7 +107,9 @@ export async function verifyTrackingDomain(
     };
 
     // Update cache
-    if (!cache.trackingDomain) cache.trackingDomain = {};
+    if (!cache.trackingDomain) {
+      cache.trackingDomain = {};
+    }
     cache.trackingDomain[cacheKey] = status;
     saveCache(cache);
 
@@ -119,7 +123,9 @@ export async function verifyTrackingDomain(
     };
 
     // Cache the error too (with shorter duration by design)
-    if (!cache.trackingDomain) cache.trackingDomain = {};
+    if (!cache.trackingDomain) {
+      cache.trackingDomain = {};
+    }
     cache.trackingDomain[cacheKey] = status;
     saveCache(cache);
 
@@ -172,7 +178,9 @@ export async function verifyDmarc(
     };
 
     // Update cache
-    if (!cache.dmarc) cache.dmarc = {};
+    if (!cache.dmarc) {
+      cache.dmarc = {};
+    }
     cache.dmarc[dmarcDomain] = status;
     saveCache(cache);
 
@@ -186,7 +194,9 @@ export async function verifyDmarc(
     };
 
     // Cache the error too
-    if (!cache.dmarc) cache.dmarc = {};
+    if (!cache.dmarc) {
+      cache.dmarc = {};
+    }
     cache.dmarc[dmarcDomain] = status;
     saveCache(cache);
 

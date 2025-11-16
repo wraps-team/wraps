@@ -110,6 +110,19 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     console.log(`  ${pc.green("✓")} Dedicated IP Address`);
   }
 
+  if (config.emailArchiving?.enabled) {
+    const retentionLabel =
+      {
+        "7days": "7 days",
+        "30days": "30 days",
+        "90days": "90 days",
+        "6months": "6 months",
+        "1year": "1 year",
+        "18months": "18 months",
+      }[config.emailArchiving.retention] || "90 days";
+    console.log(`  ${pc.green("✓")} Email Archiving (${retentionLabel})`);
+  }
+
   // Calculate current cost
   const currentCostData = calculateCosts(config, 50_000); // Assume 50k emails/mo for estimate
   console.log(
@@ -128,6 +141,15 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         hint: "Starter → Production → Enterprise",
       },
       {
+        value: "archiving",
+        label: config.emailArchiving?.enabled
+          ? "Change email archiving settings"
+          : "Enable email archiving",
+        hint: config.emailArchiving?.enabled
+          ? "Update retention or disable"
+          : "Store full email content with HTML",
+      },
+      {
         value: "tracking-domain",
         label: "Add/change custom tracking domain",
         hint: "Use your own domain for email links",
@@ -135,7 +157,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       {
         value: "retention",
         label: "Change email history retention",
-        hint: "7 days, 30 days, 90 days, 1 year, indefinite",
+        hint: "7 days, 30 days, 90 days, 6 months, 1 year, 18 months",
       },
       {
         value: "events",
@@ -209,6 +231,184 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       break;
     }
 
+    case "archiving": {
+      if (config.emailArchiving?.enabled) {
+        // Already enabled - allow changing retention or disabling
+        const archivingAction = await clack.select({
+          message: "What would you like to do with email archiving?",
+          options: [
+            {
+              value: "change-retention",
+              label: "Change retention period",
+              hint: `Current: ${config.emailArchiving.retention}`,
+            },
+            {
+              value: "disable",
+              label: "Disable email archiving",
+              hint: "Stop storing full email content",
+            },
+          ],
+        });
+
+        if (clack.isCancel(archivingAction)) {
+          clack.cancel("Upgrade cancelled.");
+          process.exit(0);
+        }
+
+        if (archivingAction === "disable") {
+          const confirmDisable = await clack.confirm({
+            message:
+              "Are you sure? Existing archived emails will remain, but new emails won't be archived.",
+            initialValue: false,
+          });
+
+          if (clack.isCancel(confirmDisable) || !confirmDisable) {
+            clack.cancel("Archiving not disabled.");
+            process.exit(0);
+          }
+
+          updatedConfig = {
+            ...config,
+            emailArchiving: {
+              enabled: false,
+              retention: config.emailArchiving.retention,
+            },
+          };
+        } else {
+          // Change retention
+          const retention = await clack.select({
+            message: "Email archive retention period:",
+            options: [
+              {
+                value: "7days",
+                label: "7 days",
+                hint: "~$1-2/mo for 10k emails",
+              },
+              {
+                value: "30days",
+                label: "30 days",
+                hint: "~$2-4/mo for 10k emails",
+              },
+              {
+                value: "90days",
+                label: "90 days (recommended)",
+                hint: "~$5-10/mo for 10k emails",
+              },
+              {
+                value: "6months",
+                label: "6 months",
+                hint: "~$15-25/mo for 10k emails",
+              },
+              {
+                value: "1year",
+                label: "1 year",
+                hint: "~$25-40/mo for 10k emails",
+              },
+              {
+                value: "18months",
+                label: "18 months",
+                hint: "~$35-60/mo for 10k emails",
+              },
+            ],
+            initialValue: config.emailArchiving.retention,
+          });
+
+          if (clack.isCancel(retention)) {
+            clack.cancel("Upgrade cancelled.");
+            process.exit(0);
+          }
+
+          updatedConfig = {
+            ...config,
+            emailArchiving: {
+              enabled: true,
+              retention: retention as any,
+            },
+          };
+        }
+      } else {
+        // Not enabled - prompt to enable with retention selection
+        const enableArchiving = await clack.confirm({
+          message:
+            "Enable email archiving? (Store full email content with HTML for viewing)",
+          initialValue: true,
+        });
+
+        if (clack.isCancel(enableArchiving)) {
+          clack.cancel("Upgrade cancelled.");
+          process.exit(0);
+        }
+
+        if (!enableArchiving) {
+          clack.log.info("Email archiving not enabled.");
+          process.exit(0);
+        }
+
+        const retention = await clack.select({
+          message: "Email archive retention period:",
+          options: [
+            {
+              value: "7days",
+              label: "7 days",
+              hint: "~$1-2/mo for 10k emails",
+            },
+            {
+              value: "30days",
+              label: "30 days",
+              hint: "~$2-4/mo for 10k emails",
+            },
+            {
+              value: "90days",
+              label: "90 days (recommended)",
+              hint: "~$5-10/mo for 10k emails",
+            },
+            {
+              value: "6months",
+              label: "6 months",
+              hint: "~$15-25/mo for 10k emails",
+            },
+            {
+              value: "1year",
+              label: "1 year",
+              hint: "~$25-40/mo for 10k emails",
+            },
+            {
+              value: "18months",
+              label: "18 months",
+              hint: "~$35-60/mo for 10k emails",
+            },
+          ],
+          initialValue: "90days",
+        });
+
+        if (clack.isCancel(retention)) {
+          clack.cancel("Upgrade cancelled.");
+          process.exit(0);
+        }
+
+        clack.log.info(
+          pc.dim(
+            "Archiving stores full RFC 822 emails with HTML, attachments, and headers"
+          )
+        );
+        clack.log.info(
+          pc.dim(
+            "Cost: $2/GB ingestion + $0.19/GB/month storage (~50KB per email)"
+          )
+        );
+
+        updatedConfig = {
+          ...config,
+          emailArchiving: {
+            enabled: true,
+            retention: retention as any,
+          },
+        };
+      }
+      newPreset = undefined; // Custom config
+      break;
+    }
+
     case "tracking-domain": {
       // First, check if a sending identity (domain) is configured and verified
       if (!config.domain) {
@@ -277,7 +477,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
     case "retention": {
       const retention = await clack.select({
-        message: "Email history retention period:",
+        message: "Email history retention period (event data in DynamoDB):",
         options: [
           { value: "7days", label: "7 days", hint: "Minimal storage cost" },
           { value: "30days", label: "30 days", hint: "Development/testing" },
@@ -286,11 +486,16 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
             label: "90 days (recommended)",
             hint: "Standard retention",
           },
+          {
+            value: "6months",
+            label: "6 months",
+            hint: "Extended retention",
+          },
           { value: "1year", label: "1 year", hint: "Compliance requirements" },
           {
-            value: "indefinite",
-            label: "Indefinite",
-            hint: "Higher storage cost",
+            value: "18months",
+            label: "18 months",
+            hint: "Long-term retention",
           },
         ],
         initialValue: config.eventTracking?.archiveRetention || "90days",
@@ -300,6 +505,17 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         clack.cancel("Upgrade cancelled.");
         process.exit(0);
       }
+
+      clack.log.info(
+        pc.dim(
+          "Note: This is for event data (sent, delivered, opened, etc.) stored in DynamoDB."
+        )
+      );
+      clack.log.info(
+        pc.dim(
+          "For full email content storage, use 'Enable email archiving' option."
+        )
+      );
 
       updatedConfig = {
         ...config,
@@ -492,6 +708,9 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
                   domain: result.domain,
                   dkimTokens: result.dkimTokens,
                   customTrackingDomain: result.customTrackingDomain,
+                  archiveArn: result.archiveArn,
+                  archivingEnabled: result.archivingEnabled,
+                  archiveRetention: result.archiveRetention,
                 };
               },
             },
@@ -526,6 +745,13 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           domain: pulumiOutputs.domain?.value as string | undefined,
           dkimTokens: pulumiOutputs.dkimTokens?.value as string[] | undefined,
           customTrackingDomain: pulumiOutputs.customTrackingDomain?.value as
+            | string
+            | undefined,
+          archiveArn: pulumiOutputs.archiveArn?.value as string | undefined,
+          archivingEnabled: pulumiOutputs.archivingEnabled?.value as
+            | boolean
+            | undefined,
+          archiveRetention: pulumiOutputs.archiveRetention?.value as
             | string
             | undefined,
         };
@@ -582,11 +808,11 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
   if (upgradeAction === "preset" && newPreset) {
     console.log(
-      `Upgraded to ${pc.cyan(newPreset)} preset (${pc.green(formatCost(newCostData.total.monthly) + "/mo")})\n`
+      `Upgraded to ${pc.cyan(newPreset)} preset (${pc.green(`${formatCost(newCostData.total.monthly)}/mo`)})\n`
     );
   } else {
     console.log(
-      `Updated configuration (${pc.green(formatCost(newCostData.total.monthly) + "/mo")})\n`
+      `Updated configuration (${pc.green(`${formatCost(newCostData.total.monthly)}/mo`)})\n`
     );
   }
 }

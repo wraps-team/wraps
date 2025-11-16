@@ -104,6 +104,11 @@ export async function init(options: InitOptions): Promise<void> {
     emailConfig = await promptCustomConfig();
   } else {
     emailConfig = getPreset(preset)!;
+
+    // Prompt for email archiving (optional feature for presets)
+    const { promptEmailArchiving } = await import("../utils/prompts.js");
+    const archivingConfig = await promptEmailArchiving();
+    emailConfig.emailArchiving = archivingConfig;
   }
 
   // Set domain if provided
@@ -115,14 +120,14 @@ export async function init(options: InitOptions): Promise<void> {
   const estimatedVolume = await promptEstimatedVolume();
 
   // Display cost summary
-  progress.info("\n" + pc.bold("Cost Estimate:"));
+  progress.info(`\n${pc.bold("Cost Estimate:")}`);
   const costSummary = getCostSummary(emailConfig, estimatedVolume);
   clack.log.info(costSummary);
 
   // Validate configuration and show warnings
   const warnings = validateConfig(emailConfig);
   if (warnings.length > 0) {
-    progress.info("\n" + pc.yellow(pc.bold("Configuration Warnings:")));
+    progress.info(`\n${pc.yellow(pc.bold("Configuration Warnings:"))}`);
     for (const warning of warnings) {
       clack.log.warn(warning);
     }
@@ -185,6 +190,9 @@ export async function init(options: InitOptions): Promise<void> {
                   domain: result.domain,
                   dkimTokens: result.dkimTokens,
                   customTrackingDomain: result.customTrackingDomain,
+                  archiveArn: result.archiveArn,
+                  archivingEnabled: result.archivingEnabled,
+                  archiveRetention: result.archiveRetention,
                 };
               },
             },
@@ -225,6 +233,13 @@ export async function init(options: InitOptions): Promise<void> {
           domain: pulumiOutputs.domain?.value as string | undefined,
           dkimTokens: pulumiOutputs.dkimTokens?.value as string[] | undefined,
           customTrackingDomain: pulumiOutputs.customTrackingDomain?.value as
+            | string
+            | undefined,
+          archiveArn: pulumiOutputs.archiveArn?.value as string | undefined,
+          archivingEnabled: pulumiOutputs.archivingEnabled?.value as
+            | boolean
+            | undefined,
+          archiveRetention: pulumiOutputs.archiveRetention?.value as
             | string
             | undefined,
         };

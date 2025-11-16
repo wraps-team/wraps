@@ -19,14 +19,15 @@ export type SESEventType =
   | "SUBSCRIPTION";
 
 /**
- * Archive retention periods for email data
+ * Archive retention periods for email data and email archiving
  */
 export type ArchiveRetention =
   | "7days"
   | "30days"
   | "90days"
+  | "6months"
   | "1year"
-  | "indefinite";
+  | "18months";
 
 /**
  * Suppression list reasons
@@ -68,6 +69,12 @@ export type WrapsEmailConfig = {
     archiveRetention?: ArchiveRetention;
   };
 
+  // Email archiving (full email content storage)
+  emailArchiving?: {
+    enabled: boolean;
+    retention: ArchiveRetention;
+  };
+
   // Advanced options
   ipPool?: string;
   dedicatedIp?: boolean;
@@ -97,6 +104,7 @@ export type FeatureCostBreakdown = {
   reputationMetrics?: FeatureCost;
   eventTracking?: FeatureCost;
   dynamoDBHistory?: FeatureCost;
+  emailArchiving?: FeatureCost;
   dedicatedIp?: FeatureCost;
   total: FeatureCost;
 };
@@ -131,6 +139,9 @@ export type StackOutputs = {
   dlqUrl?: string;
   customTrackingDomain?: string;
   mailFromDomain?: string;
+  archiveArn?: string;
+  archivingEnabled?: boolean;
+  archiveRetention?: ArchiveRetention;
 };
 
 /**

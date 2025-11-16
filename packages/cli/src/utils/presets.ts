@@ -9,7 +9,7 @@ import { calculateCosts, formatCost } from "./costs.js";
  * Starter preset - minimal features for low-volume senders
  * Perfect for: Side projects, MVPs, development/staging
  * Volume: Up to 10k emails/month
- * Cost: ~$1-2/month
+ * Cost: ~$1-2/month (without archiving)
  */
 export const STARTER_PRESET: WrapsEmailConfig = {
   tracking: {
@@ -26,6 +26,11 @@ export const STARTER_PRESET: WrapsEmailConfig = {
   eventTracking: {
     enabled: false,
   },
+  // Email archiving disabled by default
+  emailArchiving: {
+    enabled: false,
+    retention: "30days",
+  },
   sendingEnabled: true,
 };
 
@@ -33,7 +38,7 @@ export const STARTER_PRESET: WrapsEmailConfig = {
  * Production preset - recommended for most production applications
  * Perfect for: SaaS apps, B2B products, moderate volume
  * Volume: 10k-500k emails/month
- * Cost: ~$10-50/month (scales with volume)
+ * Cost: ~$10-50/month (scales with volume, add ~$5-15/mo for archiving)
  */
 export const PRODUCTION_PRESET: WrapsEmailConfig = {
   tracking: {
@@ -63,6 +68,11 @@ export const PRODUCTION_PRESET: WrapsEmailConfig = {
     dynamoDBHistory: true,
     archiveRetention: "90days",
   },
+  // Email archiving with 90-day retention
+  emailArchiving: {
+    enabled: false, // User can opt-in
+    retention: "90days",
+  },
   sendingEnabled: true,
 };
 
@@ -70,7 +80,7 @@ export const PRODUCTION_PRESET: WrapsEmailConfig = {
  * Enterprise preset - full features for high-volume senders
  * Perfect for: Large platforms, high-volume transactional email
  * Volume: 500k+ emails/month
- * Cost: ~$100-200/month (includes $24.95 dedicated IP)
+ * Cost: ~$100-200/month (includes $24.95 dedicated IP, add ~$50+/mo for archiving)
  */
 export const ENTERPRISE_PRESET: WrapsEmailConfig = {
   tracking: {
@@ -101,6 +111,11 @@ export const ENTERPRISE_PRESET: WrapsEmailConfig = {
     ],
     dynamoDBHistory: true,
     archiveRetention: "1year",
+  },
+  // Email archiving with 1-year retention
+  emailArchiving: {
+    enabled: false, // User can opt-in
+    retention: "1year",
   },
   dedicatedIp: true,
   sendingEnabled: true,
@@ -170,6 +185,7 @@ export function getPresetInfo(preset: ConfigPreset): PresetInfo {
         "Open & click tracking",
         "TLS encryption required",
         "Automatic bounce/complaint suppression",
+        "Optional: Email archiving (full content storage)",
       ],
     },
     production: {
@@ -182,6 +198,7 @@ export function getPresetInfo(preset: ConfigPreset): PresetInfo {
         "Reputation metrics dashboard",
         "Real-time event tracking (EventBridge)",
         "90-day email history storage",
+        "Optional: Email archiving with rendered viewer",
         "Complete event visibility",
       ],
     },
@@ -194,6 +211,7 @@ export function getPresetInfo(preset: ConfigPreset): PresetInfo {
         "Everything in Production",
         "Dedicated IP address",
         "1-year email history",
+        "Optional: 1-year+ email archiving",
         "All event types tracked",
         "Priority support eligibility",
       ],

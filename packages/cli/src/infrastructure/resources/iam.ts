@@ -138,6 +138,21 @@ export async function createIAMRole(
     });
   }
 
+  // Allow Mail Manager Archive access if email archiving enabled
+  if (config.emailConfig.emailArchiving?.enabled) {
+    statements.push({
+      Effect: "Allow",
+      Action: [
+        "ses:GetArchive",
+        "ses:GetArchiveMessage",
+        "ses:GetArchiveMessageContent",
+        "ses:SearchArchive",
+        "ses:StartArchiveExport",
+      ],
+      Resource: "arn:aws:ses:*:*:mailmanager-archive/*",
+    });
+  }
+
   // Attach policy to role
   new aws.iam.RolePolicy("wraps-email-policy", {
     role: role.name,

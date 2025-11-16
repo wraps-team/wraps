@@ -155,7 +155,7 @@ export function EmailMetrics() {
     data.metrics.clicks.reduce((sum, point) => sum + point.value, 0) || 0;
   const deliveryRate =
     totalSends > 0 ? (totalDeliveries / totalSends) * 100 : 0;
-  const bounceRate = totalSends > 0 ? (totalBounces / totalSends) * 100 : 0;
+  const _bounceRate = totalSends > 0 ? (totalBounces / totalSends) * 100 : 0;
   const openRate =
     totalDeliveries > 0 ? (totalOpens / totalDeliveries) * 100 : 0;
   const clickRate = totalOpens > 0 ? (totalClicks / totalOpens) * 100 : 0;

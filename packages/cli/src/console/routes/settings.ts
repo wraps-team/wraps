@@ -9,6 +9,25 @@ export function createSettingsRouter(config: ServerConfig): Router {
   const router = createRouter();
 
   /**
+   * Get deployment configuration
+   */
+  router.get("/deployment", async (_req: Request, res: Response) => {
+    try {
+      res.json({
+        archivingEnabled: config.archivingEnabled ?? false,
+        archiveArn: config.archiveArn,
+        tableName: config.tableName,
+        region: config.region,
+      });
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      console.error("Error fetching deployment config:", error);
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  /**
    * Get email settings (configuration set + identity)
    */
   router.get("/", async (_req: Request, res: Response) => {

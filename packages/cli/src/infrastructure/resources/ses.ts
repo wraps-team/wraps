@@ -51,7 +51,9 @@ export async function createSESResources(
   if (config.trackingConfig?.customRedirectDomain) {
     configSetOptions.trackingOptions = {
       customRedirectDomain: config.trackingConfig.customRedirectDomain,
-      httpsPolicy: "REQUIRE", // Always require HTTPS for security
+      // Use OPTIONAL because custom domains don't have SSL certificates by default
+      // AWS's tracking domain (r.{region}.awstrack.me) doesn't have certs for custom domains
+      httpsPolicy: "OPTIONAL",
     };
   }
 

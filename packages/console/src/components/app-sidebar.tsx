@@ -88,7 +88,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Update active product when route changes
   React.useEffect(() => {
     setActiveProduct(getActiveProduct());
-  }, [location.pathname, getActiveProduct]);
+  }, [getActiveProduct]);
 
   return (
     <Sidebar

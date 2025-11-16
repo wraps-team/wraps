@@ -249,6 +249,9 @@ export type StatusOutputs = {
     tableName?: string;
     lambdaFunctions?: number;
     snsTopics?: number;
+    archiveArn?: string;
+    archivingEnabled?: boolean;
+    archiveRetention?: string;
   };
 };
 
@@ -318,6 +321,26 @@ export function displayStatus(status: StatusOutputs) {
     );
   }
 
+  // Email Archiving
+  if (status.resources.archivingEnabled) {
+    const retentionLabel =
+      {
+        "7days": "7 days",
+        "30days": "30 days",
+        "90days": "90 days",
+        "6months": "6 months",
+        "1year": "1 year",
+        "18months": "18 months",
+      }[status.resources.archiveRetention || "90days"] || "90 days";
+    featureLines.push(
+      `  ${pc.green("✓")} Email Archiving ${pc.dim(`(${retentionLabel} retention)`)}`
+    );
+  } else {
+    featureLines.push(
+      `  ${pc.dim("○")} Email Archiving ${pc.dim("(run 'wraps upgrade' to enable)")}`
+    );
+  }
+
   featureLines.push(
     `  ${pc.green("✓")} Console Dashboard ${pc.dim("(run 'wraps console')")}`
   );
@@ -359,6 +382,12 @@ export function displayStatus(status: StatusOutputs) {
     );
   }
 
+  if (status.resources.archiveArn) {
+    resourceLines.push(
+      `  ${pc.green("✓")} Mail Manager Archive: ${pc.cyan(status.resources.archiveArn)}`
+    );
+  }
+
   clack.note(resourceLines.join("\n"), "Resources");
 
   // Show DNS records for pending domains OR domains with pending MAIL FROM
@@ -394,7 +423,9 @@ export function displayStatus(status: StatusOutputs) {
 
       // MAIL FROM records (if configured but not verified)
       if (domain.mailFromDomain && domain.mailFromStatus !== "SUCCESS") {
-        if (dnsLines.length > 0) dnsLines.push("");
+        if (dnsLines.length > 0) {
+          dnsLines.push("");
+        }
         dnsLines.push(
           pc.bold("MAIL FROM Domain Records (for DMARC alignment):"),
           `  ${pc.cyan(domain.mailFromDomain)} ${pc.dim("MX")} "10 feedback-smtp.${status.region}.amazonses.com"`,

@@ -36,6 +36,10 @@ const AWS_PRICING = {
   // CloudWatch pricing
   CLOUDWATCH_LOGS_PER_GB: 0.5, // $0.50 per GB ingested
   CLOUDWATCH_LOGS_STORAGE_PER_GB: 0.03, // $0.03 per GB-month
+
+  // SES Mail Manager Archiving
+  MAIL_MANAGER_INGESTION_PER_GB: 2.0, // $2.00 per GB ingested
+  MAIL_MANAGER_STORAGE_PER_GB: 0.19, // $0.19 per GB-month
 } as const;
 
 /**
@@ -89,14 +93,43 @@ function estimateStorageSize(
     "7days": 0.25,
     "30days": 1,
     "90days": 3,
+    "6months": 6,
     "1year": 12,
-    indefinite: 24, // Assume 2 years for cost estimation
+    "18months": 18,
   }[retention];
 
   // Total steady-state storage = emails/month * event types * months * record size
   // This represents storage after retention period fills up
   const totalKB =
     emailsPerMonth * numEventTypes * retentionMonths * avgRecordSizeKB;
+  return totalKB / 1024 / 1024; // Convert to GB
+}
+
+/**
+ * Estimate email archive storage size in GB (for full email content)
+ * Different from event storage - stores complete RFC 822/MIME emails
+ *
+ * This calculates STEADY-STATE storage (after retention period fills up).
+ */
+function estimateArchiveStorageSize(
+  emailsPerMonth: number,
+  retention: ArchiveRetention
+): number {
+  // Average full email size: ~50 KB (HTML, headers, small attachments)
+  const avgEmailSizeKB = 50;
+
+  // Calculate total months of retention
+  const retentionMonths = {
+    "7days": 0.25,
+    "30days": 1,
+    "90days": 3,
+    "6months": 6,
+    "1year": 12,
+    "18months": 18,
+  }[retention];
+
+  // Total steady-state storage = emails/month * months * email size
+  const totalKB = emailsPerMonth * retentionMonths * avgEmailSizeKB;
   return totalKB / 1024 / 1024; // Convert to GB
 }
 
@@ -247,6 +280,35 @@ function calculateDedicatedIpCost(
 }
 
 /**
+ * Calculate cost for email archiving (full email content storage)
+ * Architecture: SES → Mail Manager Archive (S3-backed)
+ */
+function calculateEmailArchivingCost(
+  config: WrapsEmailConfig,
+  emailsPerMonth: number
+): FeatureCost | undefined {
+  if (!config.emailArchiving?.enabled) {
+    return;
+  }
+
+  const retention = config.emailArchiving.retention;
+  const storageGB = estimateArchiveStorageSize(emailsPerMonth, retention);
+
+  // Ingestion cost: one-time per email (charged monthly as new emails arrive)
+  const monthlyDataGB = (emailsPerMonth * 50) / 1024 / 1024; // 50 KB average email
+  const ingestionCost =
+    monthlyDataGB * AWS_PRICING.MAIL_MANAGER_INGESTION_PER_GB;
+
+  // Storage cost: steady-state storage after retention period fills
+  const storageCost = storageGB * AWS_PRICING.MAIL_MANAGER_STORAGE_PER_GB;
+
+  return {
+    monthly: ingestionCost + storageCost,
+    description: `Email archiving (${retention}, ~${storageGB.toFixed(2)} GB at steady-state)`,
+  };
+}
+
+/**
  * Calculate total infrastructure costs
  *
  * @param config Email configuration
@@ -261,6 +323,7 @@ export function calculateCosts(
   const reputationMetrics = calculateReputationMetricsCost(config);
   const eventTracking = calculateEventTrackingCost(config, emailsPerMonth);
   const dynamoDBHistory = calculateDynamoDBCost(config, emailsPerMonth);
+  const emailArchiving = calculateEmailArchivingCost(config, emailsPerMonth);
   const dedicatedIp = calculateDedicatedIpCost(config);
 
   // Calculate SES base costs (always present)
@@ -275,6 +338,7 @@ export function calculateCosts(
     (reputationMetrics?.monthly || 0) +
     (eventTracking?.monthly || 0) +
     (dynamoDBHistory?.monthly || 0) +
+    (emailArchiving?.monthly || 0) +
     (dedicatedIp?.monthly || 0);
 
   return {
@@ -282,6 +346,7 @@ export function calculateCosts(
     reputationMetrics,
     eventTracking,
     dynamoDBHistory,
+    emailArchiving,
     dedicatedIp,
     total: {
       monthly: totalMonthlyCost,
@@ -339,6 +404,11 @@ export function getCostSummary(
   if (costs.dynamoDBHistory) {
     lines.push(
       `  - ${costs.dynamoDBHistory.description}: ${formatCost(costs.dynamoDBHistory.monthly)}`
+    );
+  }
+  if (costs.emailArchiving) {
+    lines.push(
+      `  - ${costs.emailArchiving.description}: ${formatCost(costs.emailArchiving.monthly)}`
     );
   }
   if (costs.dedicatedIp) {

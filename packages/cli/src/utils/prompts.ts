@@ -476,6 +476,73 @@ export async function promptEstimatedVolume(): Promise<number> {
 /**
  * Prompt for custom configuration
  */
+/**
+ * Prompt for email archiving configuration (for presets)
+ */
+export async function promptEmailArchiving(): Promise<{
+  enabled: boolean;
+  retention: string;
+}> {
+  const enabled = await clack.confirm({
+    message:
+      "Enable email archiving? (Store full email content with HTML for viewing in dashboard)",
+    initialValue: false,
+  });
+
+  if (clack.isCancel(enabled)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  if (!enabled) {
+    return { enabled: false, retention: "90days" };
+  }
+
+  const retention = await clack.select({
+    message: "Email archive retention period:",
+    options: [
+      { value: "7days", label: "7 days", hint: "~$1-2/mo for 10k emails" },
+      { value: "30days", label: "30 days", hint: "~$2-4/mo for 10k emails" },
+      {
+        value: "90days",
+        label: "90 days (recommended)",
+        hint: "~$5-10/mo for 10k emails",
+      },
+      {
+        value: "6months",
+        label: "6 months",
+        hint: "~$15-25/mo for 10k emails",
+      },
+      { value: "1year", label: "1 year", hint: "~$25-40/mo for 10k emails" },
+      {
+        value: "18months",
+        label: "18 months",
+        hint: "~$35-60/mo for 10k emails",
+      },
+    ],
+    initialValue: "90days",
+  });
+
+  if (clack.isCancel(retention)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  clack.log.info(
+    pc.dim(
+      "Archiving stores full RFC 822 emails with HTML, attachments, and headers"
+    )
+  );
+  clack.log.info(
+    pc.dim("Cost: $2/GB ingestion + $0.19/GB/month storage (~50KB per email)")
+  );
+
+  return {
+    enabled: true,
+    retention: retention as string,
+  };
+}
+
 export async function promptCustomConfig(): Promise<any> {
   clack.log.info("Custom configuration builder");
   clack.log.info("Configure each feature individually");
@@ -576,6 +643,61 @@ export async function promptCustomConfig(): Promise<any> {
     process.exit(0);
   }
 
+  // Email Archiving
+  const emailArchivingEnabled = await clack.confirm({
+    message:
+      "Enable email archiving? (Store full email content with HTML for viewing)",
+    initialValue: false,
+  });
+
+  if (clack.isCancel(emailArchivingEnabled)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  let emailArchiveRetention: string | symbol = "90days";
+
+  if (emailArchivingEnabled) {
+    emailArchiveRetention = await clack.select({
+      message: "Email archive retention period:",
+      options: [
+        { value: "7days", label: "7 days", hint: "~$1-2/mo for 10k emails" },
+        { value: "30days", label: "30 days", hint: "~$2-4/mo for 10k emails" },
+        {
+          value: "90days",
+          label: "90 days (recommended)",
+          hint: "~$5-10/mo for 10k emails",
+        },
+        {
+          value: "6months",
+          label: "6 months",
+          hint: "~$15-25/mo for 10k emails",
+        },
+        { value: "1year", label: "1 year", hint: "~$25-40/mo for 10k emails" },
+        {
+          value: "18months",
+          label: "18 months",
+          hint: "~$35-60/mo for 10k emails",
+        },
+      ],
+      initialValue: "90days",
+    });
+
+    if (clack.isCancel(emailArchiveRetention)) {
+      clack.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    clack.log.info(
+      pc.dim(
+        "Note: Archiving stores full RFC 822 emails with HTML, attachments, and headers"
+      )
+    );
+    clack.log.info(
+      pc.dim("Cost: $2/GB ingestion + $0.19/GB/month storage (~50KB per email)")
+    );
+  }
+
   return {
     tracking: trackingEnabled
       ? {
@@ -609,6 +731,15 @@ export async function promptCustomConfig(): Promise<any> {
             typeof archiveRetention === "string" ? archiveRetention : "90days",
         }
       : { enabled: false },
+    emailArchiving: emailArchivingEnabled
+      ? {
+          enabled: true,
+          retention:
+            typeof emailArchiveRetention === "string"
+              ? emailArchiveRetention
+              : "90days",
+        }
+      : { enabled: false, retention: "90days" },
     dedicatedIp,
     sendingEnabled: true,
   };

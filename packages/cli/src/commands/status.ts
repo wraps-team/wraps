@@ -95,6 +95,9 @@ export async function status(_options: StatusOptions): Promise<void> {
       tableName: stackOutputs.tableName?.value,
       lambdaFunctions: stackOutputs.lambdaFunctions?.value?.length || 0,
       snsTopics: integrationLevel === "enhanced" ? 1 : 0,
+      archiveArn: stackOutputs.archiveArn?.value,
+      archivingEnabled: stackOutputs.archivingEnabled?.value,
+      archiveRetention: stackOutputs.archiveRetention?.value,
     },
   });
 }
