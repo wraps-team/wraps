@@ -63,7 +63,7 @@
     "@pulumi/pulumi": "^3.100.0",
     "args": "^5.0.3",
     "cosmiconfig": "^9.0.0",
-    "esbuild": "^0.19.0",
+    "esbuild": "^0.25.0",
     "express": "^4.21.2",
     "get-port": "^7.1.0",
     "http-terminator": "^3.2.0",
