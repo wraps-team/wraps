@@ -5,8 +5,9 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
-  Mail,
+  Eye,
   MousePointerClick,
+  Send,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -25,15 +26,26 @@ type EventItemProps = {
 };
 
 const ICON_MAP = {
-  sent: Mail,
+  // SES event types (lowercase)
+  send: Send,
+  delivery: Check,
+  open: Eye,
+  click: MousePointerClick,
+  bounce: X,
+  complaint: X,
+  reject: X,
+  rendering_failure: X,
+  renderingfailure: X,
+  deliverydelay: Clock,
+  // Status types (past tense)
+  sent: Send,
   delivered: Check,
   bounced: X,
   complained: X,
-  opened: Mail,
+  opened: Eye,
   clicked: MousePointerClick,
   failed: X,
   rejected: X,
-  rendering_failure: X,
   delivery_delay: Clock,
 } as const;
 
