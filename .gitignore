@@ -47,7 +47,7 @@ Thumbs.db
 .wraps/
 
 # Project notes (keep local)
-# ai-notes/
+ai-notes/
 
 # Claude Code local settings
 .claude/settings.local.json
