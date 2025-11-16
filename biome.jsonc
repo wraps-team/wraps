@@ -33,7 +33,8 @@
         "useDefaultSwitchClause": "warn",
         "useFilenamingConvention": "warn",
         "useConsistentMemberAccessibility": "warn",
-        "noParameterProperties": "warn"
+        "noParameterProperties": "warn",
+        "useBlockStatements": "warn"
       },
       "nursery": {
         "noShadow": "warn",
@@ -43,7 +44,8 @@
       "complexity": {
         "noExcessiveCognitiveComplexity": "warn",
         "noForEach": "warn",
-        "noBannedTypes": "warn"
+        "noBannedTypes": "warn",
+        "noVoid": "warn"
       },
       "suspicious": {
         "useAwait": "warn",
