@@ -415,42 +415,45 @@ export function EmailArchiveViewer({
           </TabsContent>
         </Tabs>
 
-        {/* Email Metadata */}
-        {archivedEmail.metadata && (
-          <div className="mt-6 space-y-3 rounded-md border p-4">
-            <div className="font-medium text-sm">SMTP Metadata</div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {archivedEmail.metadata.senderIp && (
-                <div className="space-y-1">
-                  <div className="text-muted-foreground text-xs">Sender IP</div>
-                  <div className="font-mono text-sm">
-                    {archivedEmail.metadata.senderIp}
-                  </div>
-                </div>
-              )}
-              {archivedEmail.metadata.tlsProtocol && (
-                <div className="space-y-1">
-                  <div className="text-muted-foreground text-xs">
-                    TLS Protocol
-                  </div>
-                  <div className="font-mono text-sm">
-                    {archivedEmail.metadata.tlsProtocol}
-                  </div>
-                </div>
-              )}
-              {archivedEmail.metadata.senderHostname && (
-                <div className="space-y-1">
-                  <div className="text-muted-foreground text-xs">
-                    Sender Hostname
-                  </div>
-                  <div className="font-mono text-sm">
-                    {archivedEmail.metadata.senderHostname}
-                  </div>
-                </div>
-              )}
+        {/* Email Headers */}
+        {archivedEmail.headers &&
+          Object.keys(archivedEmail.headers).length > 0 && (
+            <div className="mt-6 space-y-3 rounded-md border p-4">
+              <div className="font-medium text-sm">Email Headers</div>
+              <div className="space-y-2">
+                {Object.entries(archivedEmail.headers)
+                  .filter(([key]) =>
+                    [
+                      "from",
+                      "to",
+                      "subject",
+                      "date",
+                      "message-id",
+                      "reply-to",
+                      "cc",
+                      "bcc",
+                      "x-ses-configuration-set",
+                      "x-ses-message-id",
+                      "mime-version",
+                      "content-type",
+                    ].includes(key.toLowerCase())
+                  )
+                  .map(([key, value]) => (
+                    <div
+                      className="grid gap-2 border-b pb-2 last:border-b-0 md:grid-cols-4"
+                      key={key}
+                    >
+                      <div className="font-medium text-muted-foreground text-xs uppercase">
+                        {key}
+                      </div>
+                      <div className="break-all font-mono text-sm md:col-span-3">
+                        {Array.isArray(value) ? value.join(", ") : value}
+                      </div>
+                    </div>
+                  ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </CardContent>
     </Card>
   );
