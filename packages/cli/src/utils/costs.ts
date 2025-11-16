@@ -96,12 +96,13 @@ function estimateStorageSize(
     "6months": 6,
     "1year": 12,
     "18months": 18,
+    indefinite: 120, // Assume 10 years for cost estimation
   }[retention];
 
   // Total steady-state storage = emails/month * event types * months * record size
   // This represents storage after retention period fills up
   const totalKB =
-    emailsPerMonth * numEventTypes * retentionMonths * avgRecordSizeKB;
+    emailsPerMonth * numEventTypes * (retentionMonths ?? 12) * avgRecordSizeKB;
   return totalKB / 1024 / 1024; // Convert to GB
 }
 
@@ -126,10 +127,11 @@ function estimateArchiveStorageSize(
     "6months": 6,
     "1year": 12,
     "18months": 18,
+    indefinite: 120, // Assume 10 years for cost estimation
   }[retention];
 
   // Total steady-state storage = emails/month * months * email size
-  const totalKB = emailsPerMonth * retentionMonths * avgEmailSizeKB;
+  const totalKB = emailsPerMonth * (retentionMonths ?? 12) * avgEmailSizeKB;
   return totalKB / 1024 / 1024; // Convert to GB
 }
 

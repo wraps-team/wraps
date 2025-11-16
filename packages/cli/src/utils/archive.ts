@@ -2,9 +2,7 @@ import {
   GetArchiveMessageCommand,
   type GetArchiveMessageCommandOutput,
   MailManagerClient,
-  SearchArchivedMessagesCommand,
-  type SearchArchivedMessagesCommandOutput,
-} from "@aws-sdk/client-sesv2";
+} from "@aws-sdk/client-mailmanager";
 import { type ParsedMail, simpleParser } from "mailparser";
 
 /**
@@ -81,31 +79,52 @@ export async function getArchivedEmail(
   const headers: Record<string, string | string[] | undefined> = {};
   if (parsed.headers) {
     for (const [key, value] of parsed.headers) {
-      headers[key] = value;
+      // Convert header values to string/string[]
+      if (value instanceof Date) {
+        headers[key] = value.toISOString();
+      } else if (typeof value === "string" || Array.isArray(value)) {
+        headers[key] = value;
+      } else {
+        // Skip complex header types (AddressObject, StructuredHeader, etc.)
+        headers[key] = String(value);
+      }
     }
   }
 
+  // Extract from/to as text
+  const getAddressText = (
+    addr: ParsedMail["from"] | ParsedMail["to"]
+  ): string => {
+    if (!addr) return "";
+    if (Array.isArray(addr)) {
+      return addr.map((a) => a.text).join(", ");
+    }
+    return addr.text || "";
+  };
+
   return {
-    messageId: response.MessageMetadata?.MessageId || messageId,
-    from: parsed.from?.text || "",
-    to: parsed.to?.text || "",
+    messageId, // Use the input messageId since response may not have MessageMetadata
+    from: getAddressText(parsed.from),
+    to: getAddressText(parsed.to),
     subject: parsed.subject || "",
     html: parsed.html || undefined,
     text: parsed.text || undefined,
     attachments,
     headers,
     timestamp: parsed.date || new Date(),
-    metadata: {
-      senderIp: response.MessageMetadata?.SenderIpAddress,
-      tlsProtocol: response.MessageMetadata?.TlsProtocol,
-      tlsCipherSuite: response.MessageMetadata?.TlsCipherSuite,
-      senderHostname: response.MessageMetadata?.SenderHostname,
-    },
+    // Note: MessageMetadata is not available in GetArchiveMessageCommandOutput
+    // These fields would need to be retrieved separately if needed
+    metadata: {},
   };
 }
 
 /**
  * Search archived emails
+ *
+ * TODO: Update this to use the correct Mail Manager Archive Search API:
+ * - StartArchiveSearchCommand to initiate search
+ * - GetArchiveSearchResultsCommand to retrieve results
+ * - Implement polling logic for async search completion
  *
  * @param archiveId Archive ARN or ID
  * @param params Search parameters
@@ -123,48 +142,20 @@ export async function searchArchivedEmails(
     maxResults?: number;
   },
   region: string
-): Promise<SearchArchivedMessagesCommandOutput> {
-  const client = new MailManagerClient({ region });
+): Promise<never> {
+  // TODO: Implement proper search using StartArchiveSearchCommand
+  // and GetArchiveSearchResultsCommand
+  // Suppress unused variable warnings
+  void archiveId;
+  void params;
+  void region;
 
-  // Build search filters
-  const filters: any[] = [];
-
-  if (params.from) {
-    filters.push({
-      StringExpression: {
-        Operator: "CONTAINS",
-        Values: [params.from],
-      },
-    });
-  }
-
-  if (params.to) {
-    filters.push({
-      StringExpression: {
-        Operator: "CONTAINS",
-        Values: [params.to],
-      },
-    });
-  }
-
-  if (params.subject) {
-    filters.push({
-      StringExpression: {
-        Operator: "CONTAINS",
-        Values: [params.subject],
-      },
-    });
-  }
-
-  const command = new SearchArchivedMessagesCommand({
-    ArchiveId: archiveId,
-    Filters: filters.length > 0 ? { Include: filters } : undefined,
-    FromTimestamp: params.startDate,
-    ToTimestamp: params.endDate || new Date(),
-    MaxResults: params.maxResults || 100,
-  });
-
-  return client.send(command);
+  throw new Error(
+    "Archive search is not yet implemented. This requires:\n" +
+      "1. Start search with StartArchiveSearchCommand\n" +
+      "2. Poll for completion\n" +
+      "3. Get results with GetArchiveSearchResultsCommand"
+  );
 }
 
 /**

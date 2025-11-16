@@ -27,7 +27,8 @@ export type ArchiveRetention =
   | "90days"
   | "6months"
   | "1year"
-  | "18months";
+  | "18months"
+  | "indefinite";
 
 /**
  * Suppression list reasons
