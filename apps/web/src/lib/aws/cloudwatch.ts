@@ -7,14 +7,14 @@ import {
 import { db } from "@wraps/db";
 import { getOrAssumeRole } from "./credential-cache";
 
-interface GetMetricsParams {
+type GetMetricsParams = {
   awsAccountId: string;
   metric: string;
   period: number;
   startTime: Date;
   endTime: Date;
   stat?: "Sum" | "Average" | "Maximum" | "Minimum" | "SampleCount";
-}
+};
 
 /**
  * Fetches CloudWatch metrics for a customer's SES account.

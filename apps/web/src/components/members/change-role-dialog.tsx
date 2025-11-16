@@ -22,14 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface ChangeRoleDialogProps {
+type ChangeRoleDialogProps = {
   member: MemberWithUser;
   organizationId: string;
   userRole: "owner" | "admin" | "member";
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onRoleChanged: () => void;
-}
+};
 
 export function ChangeRoleDialog({
   member,

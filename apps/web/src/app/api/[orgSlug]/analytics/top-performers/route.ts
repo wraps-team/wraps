@@ -6,11 +6,11 @@ import { NextResponse } from "next/server";
 import { getEmailEngagementMetrics } from "@/lib/aws/dynamodb";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
-interface RouteContext {
+type RouteContext = {
   params: Promise<{
     orgSlug: string;
   }>;
-}
+};
 
 export async function GET(request: Request, context: RouteContext) {
   try {

@@ -12,14 +12,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAnalyticsOverview } from "../hooks/use-analytics";
 
-interface StatCardProps {
+type StatCardProps = {
   title: string;
   value: string;
   change?: number;
   icon: React.ReactNode;
   trend?: "up" | "down";
   isLoading?: boolean;
-}
+};
 
 function StatCard({
   title,

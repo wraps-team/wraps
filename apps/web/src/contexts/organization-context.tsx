@@ -12,13 +12,13 @@ import {
 } from "react";
 import { authClient } from "@/lib/auth-client";
 
-interface OrganizationContextValue {
+type OrganizationContextValue = {
   activeOrganization: InferSelectModel<typeof organization> | null;
   isLoading: boolean;
   setActiveOrganization: (orgSlug: string) => Promise<void>;
   organizations: InferSelectModel<typeof organization>[];
   userRole: "owner" | "admin" | "member" | null;
-}
+};
 
 const OrganizationContext = createContext<OrganizationContextValue | undefined>(
   undefined

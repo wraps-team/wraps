@@ -7,11 +7,11 @@ import type { EmailStatus } from "@/app/(dashboard)/[orgSlug]/emails/types";
 import { queryEmailEvents } from "@/lib/aws/dynamodb";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
-interface RouteContext {
+type RouteContext = {
   params: Promise<{
     orgSlug: string;
   }>;
-}
+};
 
 // Map SES event types to our EmailStatus
 function mapEventTypeToStatus(eventType: string): EmailStatus {
@@ -127,8 +127,12 @@ export async function GET(request: Request, context: RouteContext) {
 
         if (existing) {
           existing.eventTypes.add(event.eventType);
-          if (event.eventType === "Open") existing.hasOpened = true;
-          if (event.eventType === "Click") existing.hasClicked = true;
+          if (event.eventType === "Open") {
+            existing.hasOpened = true;
+          }
+          if (event.eventType === "Click") {
+            existing.hasClicked = true;
+          }
 
           // Update status to most significant event
           const newStatus = mapEventTypeToStatus(event.eventType);

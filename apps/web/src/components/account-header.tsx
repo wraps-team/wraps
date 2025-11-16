@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-interface AccountHeaderProps {
+type AccountHeaderProps = {
   account: InferSelectModel<typeof awsAccount>;
   permissions: {
     canView: boolean;
@@ -22,7 +22,7 @@ interface AccountHeaderProps {
     canManage: boolean;
   };
   orgSlug: string;
-}
+};
 
 export function AccountHeader({
   account,

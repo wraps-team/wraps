@@ -9,11 +9,11 @@ import { PerformanceMetrics } from "./components/performance-metrics";
 import { RecentActivity } from "./components/recent-activity";
 import { TopPerformers } from "./components/top-performers";
 
-interface AnalyticsPageProps {
+type AnalyticsPageProps = {
   params: Promise<{
     orgSlug: string;
   }>;
-}
+};
 
 export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
   const { orgSlug } = await params;

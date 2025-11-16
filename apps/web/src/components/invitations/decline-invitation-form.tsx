@@ -16,10 +16,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-interface DeclineInvitationFormProps {
+type DeclineInvitationFormProps = {
   invitation: InvitationDetails;
   invitationId: string;
-}
+};
 
 export function DeclineInvitationForm({
   invitation,

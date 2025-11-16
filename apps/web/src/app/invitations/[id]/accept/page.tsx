@@ -2,11 +2,11 @@ import { redirect } from "next/navigation";
 import { getInvitation } from "@/actions/invitations";
 import { AcceptInvitationForm } from "@/components/invitations/accept-invitation-form";
 
-interface AcceptInvitationPageProps {
+type AcceptInvitationPageProps = {
   params: Promise<{
     id: string;
   }>;
-}
+};
 
 export default async function AcceptInvitationPage({
   params,

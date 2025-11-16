@@ -3,11 +3,11 @@ import { redirect } from "next/navigation";
 import { OrganizationSettingsForm } from "@/components/organization-settings-form";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
-interface OrganizationSettingsPageProps {
+type OrganizationSettingsPageProps = {
   params: Promise<{
     orgSlug: string;
   }>;
-}
+};
 
 export default async function OrganizationSettingsPage({
   params,

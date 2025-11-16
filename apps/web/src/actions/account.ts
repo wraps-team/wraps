@@ -53,7 +53,7 @@ export type UpdateAccountResult =
     };
 
 export async function updateAccountAction(
-  prev: unknown,
+  _prev: unknown,
   formData: FormData
 ): Promise<
   UpdateAccountResult | ServerValidateError<UpdateAccountInput, undefined>
@@ -130,7 +130,7 @@ export type ChangePasswordResult =
     };
 
 export async function changePasswordAction(
-  prev: unknown,
+  _prev: unknown,
   formData: FormData
 ): Promise<
   ChangePasswordResult | ServerValidateError<ChangePasswordInput, undefined>

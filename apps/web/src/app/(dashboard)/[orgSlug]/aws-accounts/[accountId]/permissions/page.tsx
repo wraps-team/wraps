@@ -18,12 +18,12 @@ type MemberWithUser = InferSelectModel<typeof member> & {
   user: InferSelectModel<typeof user>;
 };
 
-interface PermissionsPageProps {
+type PermissionsPageProps = {
   params: Promise<{
     orgSlug: string;
     accountId: string;
   }>;
-}
+};
 
 export default async function PermissionsPage({
   params,

@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { generateSlug } from "@/lib/utils/slug";
 
-interface CreateOrganizationFormProps {
+type CreateOrganizationFormProps = {
   onSuccess?: (orgSlug: string) => void;
   onCancel?: () => void;
-}
+};
 
 export function CreateOrganizationForm({
   onSuccess,
@@ -65,7 +65,7 @@ export function CreateOrganizationForm({
           setError(result.error);
         }
       }
-    } catch (err) {
+    } catch (_err) {
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsSubmitting(false);

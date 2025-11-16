@@ -22,12 +22,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface InviteMemberDialogProps {
+type InviteMemberDialogProps = {
   organizationId: string;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onInviteSent: () => void;
-}
+};
 
 export function InviteMemberDialog({
   organizationId,
@@ -42,7 +42,7 @@ export function InviteMemberDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!(email && email.includes("@"))) {
+    if (!email?.includes("@")) {
       toast.error("Please enter a valid email address");
       return;
     }

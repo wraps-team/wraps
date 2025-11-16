@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-interface AWSAccountListProps {
+type AWSAccountListProps = {
   accounts: Array<
     InferSelectModel<typeof awsAccount> & {
       permissions: {
@@ -17,7 +17,7 @@ interface AWSAccountListProps {
   >;
   organizationId: string;
   orgSlug?: string;
-}
+};
 
 export function AWSAccountList({
   accounts,

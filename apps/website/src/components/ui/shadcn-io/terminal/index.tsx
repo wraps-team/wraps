@@ -63,7 +63,9 @@ export const TypingAnimation = ({
   }, [delay]);
 
   useEffect(() => {
-    if (!started) return;
+    if (!started) {
+      return;
+    }
 
     let i = 0;
     const typingEffect = setInterval(() => {
@@ -91,10 +93,10 @@ export const TypingAnimation = ({
   );
 };
 
-interface TerminalProps {
+type TerminalProps = {
   children: React.ReactNode;
   className?: string;
-}
+};
 
 export const Terminal = ({ children, className }: TerminalProps) => (
   <div

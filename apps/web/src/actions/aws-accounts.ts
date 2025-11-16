@@ -32,7 +32,7 @@ export type ConnectAWSAccountResult =
   | { error: string; details?: string };
 
 export async function connectAWSAccountAction(
-  prev: unknown,
+  _prev: unknown,
   formData: FormData
 ) {
   try {
@@ -104,7 +104,9 @@ export async function connectAWSAccountAction(
     });
 
     for (const orgMember of allMembers) {
-      if (orgMember.role === "owner") continue;
+      if (orgMember.role === "owner") {
+        continue;
+      }
 
       const permissions =
         orgMember.role === "admin" ? "FULL_ACCESS" : "READ_ONLY";

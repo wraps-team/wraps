@@ -7,12 +7,12 @@ import type { EmailStatus } from "@/app/(dashboard)/[orgSlug]/emails/types";
 import { queryEmailEvents } from "@/lib/aws/dynamodb";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
-interface RouteContext {
+type RouteContext = {
   params: Promise<{
     orgSlug: string;
     emailId: string;
   }>;
-}
+};
 
 // Map SES event types to our EmailStatus
 function mapEventTypeToStatus(eventType: string): EmailStatus {
@@ -31,7 +31,7 @@ function mapEventTypeToStatus(eventType: string): EmailStatus {
   return (mapping[eventType] as EmailStatus) || "sent";
 }
 
-export async function GET(request: Request, context: RouteContext) {
+export async function GET(_request: Request, context: RouteContext) {
   try {
     const { orgSlug, emailId } = await context.params;
 

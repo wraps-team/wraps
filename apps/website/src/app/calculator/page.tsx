@@ -235,8 +235,12 @@ export default function CostCalculatorPage() {
     : [];
 
   const formatCost = (cost: number) => {
-    if (cost === 0) return "$0.00";
-    if (cost < 0.01) return "< $0.01";
+    if (cost === 0) {
+      return "$0.00";
+    }
+    if (cost < 0.01) {
+      return "< $0.01";
+    }
     return `$${cost.toFixed(2)}`;
   };
 
@@ -287,7 +291,9 @@ export default function CostCalculatorPage() {
                     max={10_000_000}
                     min={0}
                     onChange={(e) =>
-                      setEmailsPerMonth(Number.parseInt(e.target.value) || 0)
+                      setEmailsPerMonth(
+                        Number.parseInt(e.target.value, 10) || 0
+                      )
                     }
                     placeholder="Enter monthly emails"
                     type="number"
@@ -379,7 +385,7 @@ export default function CostCalculatorPage() {
                         <Label htmlFor="event-types">Event Types Tracked</Label>
                         <Select
                           onValueChange={(value) =>
-                            setNumEventTypes(Number.parseInt(value))
+                            setNumEventTypes(Number.parseInt(value, 10))
                           }
                           value={numEventTypes.toString()}
                         >

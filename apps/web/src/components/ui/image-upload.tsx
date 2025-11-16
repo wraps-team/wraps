@@ -6,13 +6,13 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface ImageUploadProps {
+type ImageUploadProps = {
   value?: string | null;
   onChange: (url: string | null) => void;
   disabled?: boolean;
   orgSlug: string;
   className?: string;
-}
+};
 
 export function ImageUpload({
   value,
@@ -28,7 +28,9 @@ export function ImageUpload({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     // Validate file type
     const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
@@ -80,7 +82,9 @@ export function ImageUpload({
   };
 
   const handleRemove = async () => {
-    if (!value) return;
+    if (!value) {
+      return;
+    }
 
     setIsUploading(true);
     setError(null);

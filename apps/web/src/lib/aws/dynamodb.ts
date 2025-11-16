@@ -7,7 +7,7 @@ import {
 import { db } from "@wraps/db";
 import { getOrAssumeRole } from "./credential-cache";
 
-interface EmailEvent {
+type EmailEvent = {
   messageId: string;
   sentAt: number;
   accountId: string;
@@ -19,14 +19,14 @@ interface EmailEvent {
   additionalData?: string;
   createdAt: number;
   expiresAt: number;
-}
+};
 
-interface QueryEmailEventsParams {
+type QueryEmailEventsParams = {
   awsAccountId: string;
   startTime: Date;
   endTime: Date;
   limit?: number;
-}
+};
 
 /**
  * Normalizes the 'to' field from DynamoDB to always be a string array.
@@ -34,9 +34,15 @@ interface QueryEmailEventsParams {
  * New data uses List (L) which unmarshalls as arrays.
  */
 function normalizeRecipients(to: string[] | Set<string> | undefined): string[] {
-  if (!to) return [];
-  if (to instanceof Set) return Array.from(to);
-  if (Array.isArray(to)) return to;
+  if (!to) {
+    return [];
+  }
+  if (to instanceof Set) {
+    return Array.from(to);
+  }
+  if (Array.isArray(to)) {
+    return to;
+  }
   return [];
 }
 
@@ -178,11 +184,21 @@ export async function getEmailEngagementMetrics(
 
     if (existing) {
       existing.eventTypes.add(event.eventType);
-      if (event.eventType === "Open") existing.opens++;
-      if (event.eventType === "Click") existing.clicks++;
-      if (event.eventType === "Delivery") existing.hasDelivered = true;
-      if (event.eventType === "Bounce") existing.hasBounced = true;
-      if (event.eventType === "Complaint") existing.hasComplaint = true;
+      if (event.eventType === "Open") {
+        existing.opens++;
+      }
+      if (event.eventType === "Click") {
+        existing.clicks++;
+      }
+      if (event.eventType === "Delivery") {
+        existing.hasDelivered = true;
+      }
+      if (event.eventType === "Bounce") {
+        existing.hasBounced = true;
+      }
+      if (event.eventType === "Complaint") {
+        existing.hasComplaint = true;
+      }
     } else {
       emailsMap.set(event.messageId, {
         messageId: event.messageId,
@@ -208,7 +224,9 @@ export async function getEmailEngagementMetrics(
     }))
     .sort((a, b) => {
       // Sort by clicks first, then opens
-      if (b.clicks !== a.clicks) return b.clicks - a.clicks;
+      if (b.clicks !== a.clicks) {
+        return b.clicks - a.clicks;
+      }
       return b.opens - a.opens;
     });
 }

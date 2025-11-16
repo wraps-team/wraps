@@ -18,10 +18,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useSession } from "@/lib/auth-client";
 
-interface AcceptInvitationFormProps {
+type AcceptInvitationFormProps = {
   invitation: InvitationDetails;
   invitationId: string;
-}
+};
 
 export function AcceptInvitationForm({
   invitation,

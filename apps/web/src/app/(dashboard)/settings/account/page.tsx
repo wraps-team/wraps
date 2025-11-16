@@ -4,6 +4,7 @@ import { mergeForm, useForm, useTransform } from "@tanstack/react-form";
 import { initialFormState } from "@tanstack/react-form/nextjs";
 import { useStore } from "@tanstack/react-store";
 import { useActionState, useEffect } from "react";
+import { z } from "zod";
 import { changePasswordAction, updateAccountAction } from "@/actions/account";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,7 +60,7 @@ export default function AccountSettings() {
       accountForm.setFieldValue("lastName", lastName);
       accountForm.setFieldValue("email", session.user.email || "");
     }
-  }, [session]);
+  }, [session, accountForm.setFieldValue]);
 
   const accountFormErrors = useStore(
     accountForm.store,
@@ -111,7 +112,7 @@ export default function AccountSettings() {
     if (isPasswordSuccess) {
       passwordForm.reset();
     }
-  }, [isPasswordSuccess]);
+  }, [isPasswordSuccess, passwordForm.reset]);
 
   return (
     <div className="space-y-6 px-4 lg:px-6">
@@ -248,9 +249,10 @@ export default function AccountSettings() {
               name="email"
               validators={{
                 onChange: ({ value }) => {
-                  if (!value) return "Email is required";
-                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
-                    return "Invalid email address";
+                  const result = z.string().email().safeParse(value);
+                  if (!result.success) {
+                    return result.error.issues[0]?.message ?? "Invalid email address";
+                  }
                   return;
                 },
               }}

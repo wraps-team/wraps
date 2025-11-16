@@ -38,10 +38,14 @@ export async function listUserAWSAccountPermissions(params: {
   return awsAccounts
     .map((account) => {
       const grant = grants.find((g) => g.awsAccountId === account.id);
-      if (!grant) return null;
+      if (!grant) {
+        return null;
+      }
 
       // Filter out expired grants
-      if (grant.expiresAt && grant.expiresAt < new Date()) return null;
+      if (grant.expiresAt && grant.expiresAt < new Date()) {
+        return null;
+      }
 
       return {
         awsAccountId: account.id,

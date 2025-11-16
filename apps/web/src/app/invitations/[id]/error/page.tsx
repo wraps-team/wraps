@@ -9,11 +9,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-interface InvitationErrorPageProps {
+type InvitationErrorPageProps = {
   searchParams: Promise<{
     message?: string;
   }>;
-}
+};
 
 export default async function InvitationErrorPage({
   searchParams,

@@ -4,9 +4,9 @@ import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
-interface CopyButtonProps {
+type CopyButtonProps = {
   text: string;
-}
+};
 
 export function CopyButton({ text }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);

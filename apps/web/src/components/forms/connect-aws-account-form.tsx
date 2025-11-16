@@ -42,10 +42,10 @@ const AWS_REGIONS = [
   { value: "ap-northeast-1", label: "Asia Pacific Northeast 1 (Tokyo)" },
 ];
 
-interface ConnectAWSAccountFormProps {
+type ConnectAWSAccountFormProps = {
   organizationId: string;
   onSuccess?: () => void;
-}
+};
 
 export function ConnectAWSAccountForm({
   organizationId,
@@ -289,9 +289,12 @@ export function ConnectAWSAccountForm({
               name="accountId"
               validators={{
                 onChange: ({ value }) => {
-                  if (!value) return "AWS Account ID is required";
-                  if (!/^\d{12}$/.test(value))
+                  if (!value) {
+                    return "AWS Account ID is required";
+                  }
+                  if (!/^\d{12}$/.test(value)) {
                     return "AWS Account ID must be exactly 12 digits";
+                  }
                   return;
                 },
               }}
@@ -373,9 +376,12 @@ export function ConnectAWSAccountForm({
               name="roleArn"
               validators={{
                 onChange: ({ value }) => {
-                  if (!value) return "Role ARN is required";
-                  if (!value.startsWith("arn:aws:iam::"))
+                  if (!value) {
+                    return "Role ARN is required";
+                  }
+                  if (!value.startsWith("arn:aws:iam::")) {
                     return "Must be a valid IAM role ARN";
+                  }
                   return;
                 },
               }}

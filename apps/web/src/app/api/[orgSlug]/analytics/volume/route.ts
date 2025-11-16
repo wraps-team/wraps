@@ -6,11 +6,11 @@ import { NextResponse } from "next/server";
 import { getCloudWatchMetrics, SES_METRICS } from "@/lib/aws/cloudwatch";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
-interface RouteContext {
+type RouteContext = {
   params: Promise<{
     orgSlug: string;
   }>;
-}
+};
 
 export async function GET(request: Request, context: RouteContext) {
   try {
@@ -99,7 +99,9 @@ export async function GET(request: Request, context: RouteContext) {
     >();
 
     for (const metrics of metricsResults) {
-      if (!metrics) continue;
+      if (!metrics) {
+        continue;
+      }
 
       const timestamps = metrics.sent[0]?.Timestamps || [];
       const sentValues = metrics.sent[0]?.Values || [];

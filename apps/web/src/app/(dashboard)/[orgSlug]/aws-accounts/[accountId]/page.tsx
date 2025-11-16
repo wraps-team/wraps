@@ -7,12 +7,12 @@ import { getSESMetricsSummary } from "@/lib/aws/cloudwatch";
 import { getOrganizationBySlug } from "@/lib/organization";
 import { checkAWSAccountAccess } from "@/lib/permissions/check-access";
 
-interface AWSAccountPageProps {
+type AWSAccountPageProps = {
   params: Promise<{
     orgSlug: string;
     accountId: string;
   }>;
-}
+};
 
 export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
   const { orgSlug, accountId } = await params;

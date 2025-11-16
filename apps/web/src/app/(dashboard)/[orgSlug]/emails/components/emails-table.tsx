@@ -35,10 +35,10 @@ import {
 import type { EmailListItem } from "../types";
 import { columns } from "./columns";
 
-interface EmailsTableProps {
+type EmailsTableProps = {
   data: EmailListItem[];
   orgSlug: string;
-}
+};
 
 export function EmailsTable({ data, orgSlug }: EmailsTableProps) {
   const router = useRouter();
@@ -60,12 +60,14 @@ export function EmailsTable({ data, orgSlug }: EmailsTableProps) {
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onGlobalFilterChange: setGlobalFilter,
-    globalFilterFn: (row, columnId, filterValue) => {
+    globalFilterFn: (row, _columnId, filterValue) => {
       const search = filterValue.toLowerCase();
 
       // Search in subject
       const subject = row.original.subject?.toLowerCase() ?? "";
-      if (subject.includes(search)) return true;
+      if (subject.includes(search)) {
+        return true;
+      }
 
       // Search in recipient email addresses
       const recipients = row.original.to;
@@ -75,7 +77,9 @@ export function EmailsTable({ data, orgSlug }: EmailsTableProps) {
 
       // Search in from address
       const from = row.original.from?.toLowerCase() ?? "";
-      if (from.includes(search)) return true;
+      if (from.includes(search)) {
+        return true;
+      }
 
       return false;
     },

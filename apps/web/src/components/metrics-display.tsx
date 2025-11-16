@@ -2,14 +2,16 @@
 
 import type { MetricDataResult } from "@aws-sdk/client-cloudwatch";
 
-interface MetricsDisplayProps {
+type MetricsDisplayProps = {
   metrics: Record<string, MetricDataResult[]>;
-}
+};
 
 export function MetricsDisplay({ metrics }: MetricsDisplayProps) {
   // Calculate totals from the metric data
   const calculateTotal = (data: MetricDataResult[]): number => {
-    if (!data || data.length === 0) return 0;
+    if (!data || data.length === 0) {
+      return 0;
+    }
     const values = data[0]?.Values || [];
     return values.reduce((sum, val) => sum + (val || 0), 0);
   };

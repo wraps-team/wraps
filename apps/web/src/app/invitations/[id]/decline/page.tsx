@@ -2,11 +2,11 @@ import { redirect } from "next/navigation";
 import { getInvitation } from "@/actions/invitations";
 import { DeclineInvitationForm } from "@/components/invitations/decline-invitation-form";
 
-interface DeclineInvitationPageProps {
+type DeclineInvitationPageProps = {
   params: Promise<{
     id: string;
   }>;
-}
+};
 
 export default async function DeclineInvitationPage({
   params,

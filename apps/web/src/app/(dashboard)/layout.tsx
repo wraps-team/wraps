@@ -12,7 +12,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [themeCustomizerOpen, setThemeCustomizerOpen] = React.useState(false);
+  const [_themeCustomizerOpen, _setThemeCustomizerOpen] = React.useState(false);
   const { config } = useSidebarConfig();
 
   return (

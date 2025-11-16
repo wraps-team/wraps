@@ -34,7 +34,7 @@ import {
 
 type OrganizationFormValues = UpdateOrganizationInput;
 
-interface OrganizationSettingsFormProps {
+type OrganizationSettingsFormProps = {
   organization: {
     id: string;
     name: string;
@@ -42,7 +42,7 @@ interface OrganizationSettingsFormProps {
     logo: string | null;
   };
   userRole: "owner" | "admin" | "member";
-}
+};
 
 export function OrganizationSettingsForm({
   organization,

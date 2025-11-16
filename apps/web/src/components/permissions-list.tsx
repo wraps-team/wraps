@@ -10,11 +10,11 @@ type PermissionWithUser = InferSelectModel<typeof awsAccountPermission> & {
   grantedByUser: InferSelectModel<typeof user> | null;
 };
 
-interface PermissionsListProps {
+type PermissionsListProps = {
   permissions: PermissionWithUser[];
   awsAccountId: string;
   organizationId: string;
-}
+};
 
 export function PermissionsList({
   permissions,

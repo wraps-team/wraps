@@ -1,12 +1,12 @@
 import { LRUCache } from "lru-cache";
 import { assumeRole } from "./assume-role";
 
-interface CachedCredentials {
+type CachedCredentials = {
   accessKeyId: string;
   secretAccessKey: string;
   sessionToken: string;
   expiration: Date;
-}
+};
 
 /**
  * LRU cache for temporary AWS credentials.

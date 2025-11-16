@@ -5,13 +5,13 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAnalyticsOverview } from "../hooks/use-analytics";
 
-interface MetricRowProps {
+type MetricRowProps = {
   label: string;
   value: number;
   total: number;
   percentage: number;
   color?: string;
-}
+};
 
 function MetricRow({
   label,

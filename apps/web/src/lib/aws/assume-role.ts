@@ -1,18 +1,18 @@
 import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
 import { awsCredentialsProvider } from "@vercel/oidc-aws-credentials-provider";
 
-export interface AssumeRoleParams {
+export type AssumeRoleParams = {
   roleArn: string;
   externalId: string;
   sessionName?: string;
-}
+};
 
-export interface AssumedRoleCredentials {
+export type AssumedRoleCredentials = {
   accessKeyId: string;
   secretAccessKey: string;
   sessionToken: string;
   expiration: Date;
-}
+};
 
 /**
  * Assumes an IAM role in a customer's AWS account using STS AssumeRole.

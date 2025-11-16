@@ -47,7 +47,7 @@ export function NavUser() {
       await authClient.signOut();
       toast.success("Signed out successfully");
       router.push("/auth");
-    } catch (error) {
+    } catch (_error) {
       toast.error("Failed to sign out");
     }
   };

@@ -27,13 +27,13 @@ import {
 } from "@/components/ui/table";
 import { ChangeRoleDialog } from "./change-role-dialog";
 
-interface MembersTableProps {
+type MembersTableProps = {
   members: MemberWithUser[];
   organizationId: string;
   organizationSlug: string;
   userRole: "owner" | "admin" | "member";
   onMemberUpdated: () => void;
-}
+};
 
 export function MembersTable({
   members,

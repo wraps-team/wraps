@@ -2,11 +2,11 @@ import { auth } from "@wraps/auth";
 import { redirect } from "next/navigation";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
-interface OrganizationDashboardProps {
+type OrganizationDashboardProps = {
   params: Promise<{
     orgSlug: string;
   }>;
-}
+};
 
 export default async function OrganizationDashboard({
   params,

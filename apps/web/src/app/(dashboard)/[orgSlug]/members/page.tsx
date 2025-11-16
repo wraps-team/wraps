@@ -3,11 +3,11 @@ import { redirect } from "next/navigation";
 import { MembersPageContent } from "@/components/members/members-page-content";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
-interface MembersPageProps {
+type MembersPageProps = {
   params: Promise<{
     orgSlug: string;
   }>;
-}
+};
 
 export default async function MembersPage({ params }: MembersPageProps) {
   const { orgSlug } = await params;

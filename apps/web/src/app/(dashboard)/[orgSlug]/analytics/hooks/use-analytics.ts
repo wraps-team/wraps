@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-interface AnalyticsOverview {
+type AnalyticsOverview = {
   totalSent: number;
   totalDelivered: number;
   totalBounced: number;
@@ -10,25 +10,25 @@ interface AnalyticsOverview {
   deliveryRate: number;
   bounceRate: number;
   complaintRate: number;
-}
+};
 
-interface VolumeDataPoint {
+type VolumeDataPoint = {
   date: string;
   timestamp: number;
   sent: number;
   delivered: number;
   bounced: number;
-}
+};
 
-interface EngagementDataPoint {
+type EngagementDataPoint = {
   date: string;
   timestamp: number;
   openRate: number;
   clickRate: number;
   ctr: number;
-}
+};
 
-interface TopPerformer {
+type TopPerformer = {
   subject: string;
   openRate: number;
   clickRate: number;
@@ -36,16 +36,16 @@ interface TopPerformer {
   opens: number;
   clicks: number;
   sentAt: number;
-}
+};
 
-interface RecentActivity {
+type RecentActivity = {
   id: string;
   subject: string;
   eventType: string;
   timestamp: number;
   timestampFormatted: string;
   metadata?: Record<string, unknown>;
-}
+};
 
 export function useAnalyticsOverview(orgSlug: string, days = 30) {
   return useQuery<AnalyticsOverview>({

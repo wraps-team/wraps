@@ -17,11 +17,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-interface InvitationsTableProps {
+type InvitationsTableProps = {
   invitations: PendingInvitation[];
   organizationId: string;
   onInvitationCancelled: () => void;
-}
+};
 
 export function InvitationsTable({
   invitations,

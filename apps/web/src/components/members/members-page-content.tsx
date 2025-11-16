@@ -20,11 +20,11 @@ import { InvitationsTable } from "./invitations-table";
 import { InviteMemberDialog } from "./invite-member-dialog";
 import { MembersTable } from "./members-table";
 
-interface MembersPageContentProps {
+type MembersPageContentProps = {
   organizationId: string;
   organizationSlug: string;
   userRole: "owner" | "admin" | "member";
-}
+};
 
 export function MembersPageContent({
   organizationId,
@@ -33,7 +33,7 @@ export function MembersPageContent({
 }: MembersPageContentProps) {
   const [members, setMembers] = useState<MemberWithUser[]>([]);
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [_isLoading, setIsLoading] = useState(true);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
 
   const canManageMembers = userRole === "owner" || userRole === "admin";
@@ -54,7 +54,7 @@ export function MembersPageContent({
 
   useEffect(() => {
     fetchMembers();
-  }, [organizationId]);
+  }, [fetchMembers]);
 
   return (
     <div className="space-y-6">

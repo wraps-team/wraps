@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     );
 
     // 6. Delete old logo if it exists and is from Vercel Blob
-    if (oldLogoUrl && oldLogoUrl.includes("vercel-storage.com")) {
+    if (oldLogoUrl?.includes("vercel-storage.com")) {
       try {
         await del(oldLogoUrl);
       } catch (error) {

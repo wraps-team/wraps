@@ -2,9 +2,9 @@
 
 import { ConnectAWSAccountForm } from "@/components/forms/connect-aws-account-form";
 
-interface ConnectAccountSectionProps {
+type ConnectAccountSectionProps = {
   organizationId: string;
-}
+};
 
 export function ConnectAccountSection({
   organizationId,

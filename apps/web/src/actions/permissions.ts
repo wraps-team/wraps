@@ -28,7 +28,7 @@ export type GrantAccessResult =
   | { success: true }
   | { error: string; details?: string };
 
-export async function grantAccessAction(prev: unknown, formData: FormData) {
+export async function grantAccessAction(_prev: unknown, formData: FormData) {
   try {
     // 1. Validate form data
     const validatedData = await serverValidateGrant(formData);

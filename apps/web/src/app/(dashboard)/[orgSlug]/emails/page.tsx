@@ -9,7 +9,7 @@ import { getOrganizationWithMembership } from "@/lib/organization";
 import { EmailsTable } from "./components/emails-table";
 import type { EmailListItem } from "./types";
 
-interface EmailsPageProps {
+type EmailsPageProps = {
   params: Promise<{
     orgSlug: string;
   }>;
@@ -17,7 +17,7 @@ interface EmailsPageProps {
     days?: string;
     limit?: string;
   }>;
-}
+};
 
 // Map SES event types to our EmailStatus
 function mapEventTypeToStatus(eventType: string): EmailStatus {
@@ -101,8 +101,12 @@ async function fetchEmails(
 
         if (existing) {
           existing.eventTypes.add(event.eventType);
-          if (event.eventType === "Open") existing.hasOpened = true;
-          if (event.eventType === "Click") existing.hasClicked = true;
+          if (event.eventType === "Open") {
+            existing.hasOpened = true;
+          }
+          if (event.eventType === "Click") {
+            existing.hasClicked = true;
+          }
 
           // Update status to most significant event
           const newStatus = mapEventTypeToStatus(event.eventType);

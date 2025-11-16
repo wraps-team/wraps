@@ -3,12 +3,12 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
-interface OrganizationLayoutProps {
+type OrganizationLayoutProps = {
   children: ReactNode;
   params: Promise<{
     orgSlug: string;
   }>;
-}
+};
 
 export default async function OrganizationLayout({
   children,

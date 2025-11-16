@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
-interface AWSAccountsPageProps {
+type AWSAccountsPageProps = {
   params: Promise<{
     orgSlug: string;
   }>;
-}
+};
 
 export default async function AWSAccountsPage({
   params,

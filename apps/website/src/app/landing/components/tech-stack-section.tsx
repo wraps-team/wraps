@@ -14,23 +14,23 @@ import { Vercel } from "@/components/ui/svgs/vercel";
 import { Vitejs } from "@/components/ui/svgs/vitejs";
 import { Vitest } from "@/components/ui/svgs/vitest";
 
-interface TechItem {
+type TechItem = {
   name: string;
   Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   color: string;
-}
+};
 
-interface TechCategory {
+type TechCategory = {
   category: string;
   description: string;
   technologies: TechItem[];
-}
+};
 
-interface Platform {
+type Platform = {
   name: string;
   Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   description: string;
-}
+};
 
 const techCategories: TechCategory[] = [
   {

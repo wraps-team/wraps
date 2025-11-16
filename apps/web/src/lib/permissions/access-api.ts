@@ -14,25 +14,25 @@
 import { db } from "@wraps/db";
 import { and, eq, like } from "drizzle-orm";
 
-interface CreateStatementParams {
+type CreateStatementParams = {
   userId: string;
   effect: "allow" | "deny";
   action: string;
   resource: string;
   expiresAt?: string;
-}
+};
 
-interface CheckStatementParams {
+type CheckStatementParams = {
   userId: string;
   action: string;
   resource: string;
-}
+};
 
-interface RevokeStatementParams {
+type RevokeStatementParams = {
   userId: string;
   action: string;
   resource: string;
-}
+};
 
 /**
  * Creates an access statement for a user.
@@ -75,7 +75,7 @@ export async function checkAccessStatement(
         eq(s.userId, userId),
         eq(s.effect, "allow"),
         // Match exact action or wildcard (e.g., "aws-account:*")
-        or(eq(s.action, action), eq(s.action, action.split(":")[0] + ":*")),
+        or(eq(s.action, action), eq(s.action, `${action.split(":")[0]}:*`)),
         eq(s.resource, resource),
         // Check expiration: null or future date
         or(isNull(s.expiresAt), gt(s.expiresAt, new Date()))
