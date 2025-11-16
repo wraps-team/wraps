@@ -141,8 +141,8 @@ export default function AccountSettings() {
             {/* Form-level errors */}
             {accountFormErrors.length > 0 && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                {accountFormErrors.map((error, i) => (
-                  <p className="text-red-600 text-sm" key={i}>
+                {accountFormErrors.map((error) => (
+                  <p className="text-red-600 text-sm" key={String(error)}>
                     {String(error)}
                   </p>
                 ))}
@@ -330,8 +330,8 @@ export default function AccountSettings() {
             {/* Form-level errors */}
             {passwordFormErrors.length > 0 && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                {passwordFormErrors.map((error, i) => (
-                  <p className="text-red-600 text-sm" key={i}>
+                {passwordFormErrors.map((error) => (
+                  <p className="text-red-600 text-sm" key={String(error)}>
                     {String(error)}
                   </p>
                 ))}

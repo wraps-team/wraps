@@ -143,11 +143,18 @@ export async function createIAMRole(
     statements.push({
       Effect: "Allow",
       Action: [
-        "ses:GetArchive",
+        // Archive search operations
+        "ses:StartArchiveSearch",
+        "ses:GetArchiveSearchResults",
+        // Archive message retrieval
         "ses:GetArchiveMessage",
         "ses:GetArchiveMessageContent",
-        "ses:SearchArchive",
+        // Archive metadata
+        "ses:GetArchive",
+        "ses:ListArchives",
+        // Archive export (for future use)
         "ses:StartArchiveExport",
+        "ses:GetArchiveExport",
       ],
       Resource: "arn:aws:ses:*:*:mailmanager-archive/*",
     });

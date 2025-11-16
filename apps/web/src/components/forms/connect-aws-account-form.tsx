@@ -214,8 +214,8 @@ export function ConnectAWSAccountForm({
               <Alert variant="destructive">
                 <AlertCircle className="size-4" />
                 <AlertDescription>
-                  {formErrors.map((error, i) => (
-                    <p key={i}>{String(error)}</p>
+                  {formErrors.map((error) => (
+                    <p key={String(error)}>{String(error)}</p>
                   ))}
                 </AlertDescription>
               </Alert>

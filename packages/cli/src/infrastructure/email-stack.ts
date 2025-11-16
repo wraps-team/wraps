@@ -100,6 +100,7 @@ export async function deployEmailStack(
       name: "email",
       retention: emailConfig.emailArchiving.retention,
       configSetName: sesResources.configSet.configurationSetName,
+      region: config.region,
     });
   }
 
@@ -122,7 +123,8 @@ export async function deployEmailStack(
     dlqUrl: sqsResources?.dlq.url as any as string | undefined,
     customTrackingDomain: sesResources?.customTrackingDomain,
     mailFromDomain: sesResources?.mailFromDomain,
-    archiveArn: archiveResources?.archive.arn as any as string | undefined,
+    archiveId: archiveResources?.archiveId,
+    archiveArn: archiveResources?.archiveArn,
     archivingEnabled: emailConfig.emailArchiving?.enabled,
     archiveRetention: emailConfig.emailArchiving?.enabled
       ? emailConfig.emailArchiving.retention

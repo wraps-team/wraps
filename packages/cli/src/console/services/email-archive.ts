@@ -1,4 +1,7 @@
-import { getArchivedEmail } from "../../utils/archive.js";
+import {
+  type ArchiveSearchCriteria,
+  getArchivedEmail,
+} from "../../utils/archive.js";
 
 /**
  * Archived email with full content
@@ -28,20 +31,28 @@ export type ArchivedEmail = {
 type FetchArchivedEmailOptions = {
   region: string;
   archiveArn: string;
+  from?: string;
+  to?: string;
+  subject?: string;
+  timestamp?: Date;
 };
 
 /**
  * Fetch archived email by message ID from AWS SES Mail Manager
  *
- * @param messageId Email message ID
- * @param options Configuration options
+ * This function searches the archive using email metadata (from, to, subject)
+ * to find the archived message, since MailManager doesn't support direct
+ * search by SES Message-ID.
+ *
+ * @param messageId Email message ID (for logging/correlation only)
+ * @param options Configuration options including search criteria
  * @returns Archived email with full content, or null if not found
  */
 export async function fetchArchivedEmail(
   messageId: string,
   options: FetchArchivedEmailOptions
 ): Promise<ArchivedEmail | null> {
-  const { region, archiveArn } = options;
+  const { region, archiveArn, from, to, subject, timestamp } = options;
 
   try {
     console.log("Fetching archived email:", {
@@ -50,8 +61,16 @@ export async function fetchArchivedEmail(
       region,
     });
 
+    // Build search criteria from email metadata
+    const searchCriteria: ArchiveSearchCriteria = {
+      from,
+      to,
+      subject,
+      timestamp,
+    };
+
     // Call the archive utility to get the email
-    const email = await getArchivedEmail(archiveArn, messageId, region);
+    const email = await getArchivedEmail(archiveArn, searchCriteria, region);
 
     console.log("Archived email fetched successfully:", {
       messageId: email.messageId,

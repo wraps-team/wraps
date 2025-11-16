@@ -6,6 +6,7 @@ import {
   StartArchiveSearchCommand,
 } from "@aws-sdk/client-mailmanager";
 import { type ParsedMail, simpleParser } from "mailparser";
+import type { AssumedRoleCredentials } from "./assume-role";
 
 /**
  * Parsed email from archive
@@ -33,6 +34,16 @@ export type ParsedEmail = {
 };
 
 /**
+ * Search criteria for finding archived email
+ */
+export type ArchiveSearchCriteria = {
+  from?: string;
+  to?: string;
+  subject?: string;
+  timestamp?: Date;
+};
+
+/**
  * Extract archive ID from ARN
  * ARN format: arn:aws:ses:region:account-id:mailmanager-archive/archive-id
  * Returns just the archive-id part
@@ -48,16 +59,6 @@ function extractArchiveId(archiveArnOrId: string): string {
 }
 
 /**
- * Search criteria for finding archived email
- */
-export type ArchiveSearchCriteria = {
-  from?: string;
-  to?: string;
-  subject?: string;
-  timestamp?: Date;
-};
-
-/**
  * Get an archived email using search criteria
  *
  * This function performs a two-step process:
@@ -70,14 +71,23 @@ export type ArchiveSearchCriteria = {
  * @param archiveArnOrId Archive ARN or ID (will extract ID if ARN provided)
  * @param searchCriteria Email search criteria (from, to, subject, timestamp)
  * @param region AWS region
+ * @param credentials AWS credentials for assumed role
  * @returns Parsed email with full content
  */
 export async function getArchivedEmail(
   archiveArnOrId: string,
   searchCriteria: ArchiveSearchCriteria,
-  region: string
+  region: string,
+  credentials: AssumedRoleCredentials
 ): Promise<ParsedEmail> {
-  const client = new MailManagerClient({ region });
+  const client = new MailManagerClient({
+    region,
+    credentials: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken,
+    },
+  });
 
   // Extract archive ID from ARN if needed
   const archiveId = extractArchiveId(archiveArnOrId);
@@ -229,7 +239,7 @@ export async function getArchivedEmail(
 
   // Extract attachment metadata (don't include full content to save memory)
   const attachments =
-    parsed.attachments?.map((att) => ({
+    parsed.attachments?.map((att: any) => ({
       filename: att.filename,
       contentType: att.contentType,
       size: att.size,
@@ -281,61 +291,4 @@ export async function getArchivedEmail(
     // These fields would need to be retrieved separately if needed
     metadata: {},
   };
-}
-
-/**
- * Search archived emails
- *
- * TODO: Update this to use the correct Mail Manager Archive Search API:
- * - StartArchiveSearchCommand to initiate search
- * - GetArchiveSearchResultsCommand to retrieve results
- * - Implement polling logic for async search completion
- *
- * @param archiveId Archive ARN or ID
- * @param params Search parameters
- * @param region AWS region
- * @returns Search results
- */
-export async function searchArchivedEmails(
-  archiveId: string,
-  params: {
-    from?: string;
-    to?: string;
-    subject?: string;
-    startDate?: Date;
-    endDate?: Date;
-    maxResults?: number;
-  },
-  region: string
-): Promise<never> {
-  // TODO: Implement proper search using StartArchiveSearchCommand
-  // and GetArchiveSearchResultsCommand
-  // Suppress unused variable warnings
-  void archiveId;
-  void params;
-  void region;
-
-  throw new Error(
-    "Archive search is not yet implemented. This requires:\n" +
-      "1. Start search with StartArchiveSearchCommand\n" +
-      "2. Poll for completion\n" +
-      "3. Get results with GetArchiveSearchResultsCommand"
-  );
-}
-
-/**
- * Sanitize HTML for safe rendering
- * Removes potentially dangerous elements and attributes
- *
- * @param html HTML content
- * @returns Sanitized HTML
- */
-export function sanitizeEmailHtml(html: string): string {
-  // Basic HTML sanitization
-  // For production, consider using a library like DOMPurify
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
-    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, "") // Remove inline event handlers
-    .replace(/javascript:/gi, ""); // Remove javascript: protocols
 }

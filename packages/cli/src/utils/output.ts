@@ -327,11 +327,11 @@ export function displayStatus(status: StatusOutputs) {
       {
         "7days": "7 days",
         "30days": "30 days",
-        "90days": "90 days",
+        "3months": "90 days",
         "6months": "6 months",
         "1year": "1 year",
         "18months": "18 months",
-      }[status.resources.archiveRetention || "90days"] || "90 days";
+      }[status.resources.archiveRetention || "3months"] || "90 days";
     featureLines.push(
       `  ${pc.green("✓")} Email Archiving ${pc.dim(`(${retentionLabel} retention)`)}`
     );

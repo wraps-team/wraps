@@ -124,6 +124,28 @@ export function createEmailsRouter(config: ServerConfig): Router {
         });
       }
 
+      if (!config.tableName) {
+        console.log("No table name configured");
+        return res.status(400).json({
+          error:
+            "Email tracking not enabled. Need email metadata to search archive.",
+        });
+      }
+
+      // First, fetch email details from DynamoDB to get search metadata
+      console.log("Fetching email metadata from DynamoDB...");
+      const emailDetails = await fetchEmailById(id, {
+        region: config.region,
+        tableName: config.tableName,
+      });
+
+      if (!emailDetails) {
+        console.log("Email metadata not found in DynamoDB for ID:", id);
+        return res.status(404).json({
+          error: "Email metadata not found. Cannot search archive.",
+        });
+      }
+
       console.log("Fetching archived email from Mail Manager...");
       const { fetchArchivedEmail } = await import(
         "../services/email-archive.js"
@@ -131,6 +153,10 @@ export function createEmailsRouter(config: ServerConfig): Router {
       const archivedEmail = await fetchArchivedEmail(id, {
         region: config.region,
         archiveArn: config.archiveArn,
+        from: emailDetails.from,
+        to: emailDetails.to[0], // Use first recipient for search
+        subject: emailDetails.subject,
+        timestamp: new Date(emailDetails.sentAt),
       });
 
       if (!archivedEmail) {

@@ -90,13 +90,22 @@ function estimateStorageSize(
 
   // Calculate total months of retention
   const retentionMonths = {
-    "7days": 0.25,
-    "30days": 1,
-    "90days": 3,
+    "3months": 3,
     "6months": 6,
+    "9months": 9,
     "1year": 12,
     "18months": 18,
-    indefinite: 120, // Assume 10 years for cost estimation
+    "2years": 24,
+    "30months": 30,
+    "3years": 36,
+    "4years": 48,
+    "5years": 60,
+    "6years": 72,
+    "7years": 84,
+    "8years": 96,
+    "9years": 108,
+    "10years": 120,
+    permanent: 120, // Assume 10 years for cost estimation
   }[retention];
 
   // Total steady-state storage = emails/month * event types * months * record size
@@ -121,13 +130,22 @@ function estimateArchiveStorageSize(
 
   // Calculate total months of retention
   const retentionMonths = {
-    "7days": 0.25,
-    "30days": 1,
-    "90days": 3,
+    "3months": 3,
     "6months": 6,
+    "9months": 9,
     "1year": 12,
     "18months": 18,
-    indefinite: 120, // Assume 10 years for cost estimation
+    "2years": 24,
+    "30months": 30,
+    "3years": 36,
+    "4years": 48,
+    "5years": 60,
+    "6years": 72,
+    "7years": 84,
+    "8years": 96,
+    "9years": 108,
+    "10years": 120,
+    permanent: 120, // Assume 10 years for cost estimation
   }[retention];
 
   // Total steady-state storage = emails/month * months * email size
@@ -205,7 +223,7 @@ function calculateDynamoDBCost(
     return;
   }
 
-  const retention = config.eventTracking.archiveRetention || "90days";
+  const retention = config.eventTracking.archiveRetention || "3months";
   const numEventTypes = config.eventTracking.events?.length || 8;
 
   // Write costs: one write per event (each email generates multiple events)

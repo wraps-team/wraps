@@ -20,15 +20,25 @@ export type SESEventType =
 
 /**
  * Archive retention periods for email data and email archiving
+ * Aligned with AWS MailManager supported retention periods
  */
 export type ArchiveRetention =
-  | "7days"
-  | "30days"
-  | "90days"
-  | "6months"
-  | "1year"
-  | "18months"
-  | "indefinite";
+  | "3months" // THREE_MONTHS (minimum for MailManager)
+  | "6months" // SIX_MONTHS
+  | "9months" // NINE_MONTHS
+  | "1year" // ONE_YEAR
+  | "18months" // EIGHTEEN_MONTHS
+  | "2years" // TWO_YEARS
+  | "30months" // THIRTY_MONTHS
+  | "3years" // THREE_YEARS
+  | "4years" // FOUR_YEARS
+  | "5years" // FIVE_YEARS
+  | "6years" // SIX_YEARS
+  | "7years" // SEVEN_YEARS
+  | "8years" // EIGHT_YEARS
+  | "9years" // NINE_YEARS
+  | "10years" // TEN_YEARS
+  | "permanent"; // PERMANENT
 
 /**
  * Suppression list reasons
@@ -140,6 +150,7 @@ export type StackOutputs = {
   dlqUrl?: string;
   customTrackingDomain?: string;
   mailFromDomain?: string;
+  archiveId?: string;
   archiveArn?: string;
   archivingEnabled?: boolean;
   archiveRetention?: ArchiveRetention;

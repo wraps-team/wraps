@@ -496,7 +496,7 @@ export async function promptEmailArchiving(): Promise<{
   }
 
   if (!enabled) {
-    return { enabled: false, retention: "90days" };
+    return { enabled: false, retention: "3months" };
   }
 
   const retention = await clack.select({
@@ -505,7 +505,7 @@ export async function promptEmailArchiving(): Promise<{
       { value: "7days", label: "7 days", hint: "~$1-2/mo for 10k emails" },
       { value: "30days", label: "30 days", hint: "~$2-4/mo for 10k emails" },
       {
-        value: "90days",
+        value: "3months",
         label: "90 days (recommended)",
         hint: "~$5-10/mo for 10k emails",
       },
@@ -521,7 +521,7 @@ export async function promptEmailArchiving(): Promise<{
         hint: "~$35-60/mo for 10k emails",
       },
     ],
-    initialValue: "90days",
+    initialValue: "3months",
   });
 
   if (clack.isCancel(retention)) {
@@ -571,7 +571,7 @@ export async function promptCustomConfig(): Promise<any> {
   }
 
   let dynamoDBHistory: boolean | symbol = false;
-  let archiveRetention: string | symbol = "90days";
+  let archiveRetention: string | symbol = "3months";
 
   if (eventTrackingEnabled) {
     dynamoDBHistory = await clack.confirm({
@@ -591,7 +591,7 @@ export async function promptCustomConfig(): Promise<any> {
           { value: "7days", label: "7 days", hint: "Minimal storage cost" },
           { value: "30days", label: "30 days", hint: "Development/testing" },
           {
-            value: "90days",
+            value: "3months",
             label: "90 days (recommended)",
             hint: "Standard retention",
           },
@@ -656,7 +656,7 @@ export async function promptCustomConfig(): Promise<any> {
     process.exit(0);
   }
 
-  let emailArchiveRetention: string | symbol = "90days";
+  let emailArchiveRetention: string | symbol = "3months";
 
   if (emailArchivingEnabled) {
     emailArchiveRetention = await clack.select({
@@ -665,7 +665,7 @@ export async function promptCustomConfig(): Promise<any> {
         { value: "7days", label: "7 days", hint: "~$1-2/mo for 10k emails" },
         { value: "30days", label: "30 days", hint: "~$2-4/mo for 10k emails" },
         {
-          value: "90days",
+          value: "3months",
           label: "90 days (recommended)",
           hint: "~$5-10/mo for 10k emails",
         },
@@ -681,7 +681,7 @@ export async function promptCustomConfig(): Promise<any> {
           hint: "~$35-60/mo for 10k emails",
         },
       ],
-      initialValue: "90days",
+      initialValue: "3months",
     });
 
     if (clack.isCancel(emailArchiveRetention)) {
@@ -729,7 +729,7 @@ export async function promptCustomConfig(): Promise<any> {
           ],
           dynamoDBHistory: Boolean(dynamoDBHistory),
           archiveRetention:
-            typeof archiveRetention === "string" ? archiveRetention : "90days",
+            typeof archiveRetention === "string" ? archiveRetention : "3months",
         }
       : { enabled: false },
     emailArchiving: emailArchivingEnabled
@@ -738,9 +738,9 @@ export async function promptCustomConfig(): Promise<any> {
           retention:
             typeof emailArchiveRetention === "string"
               ? emailArchiveRetention
-              : "90days",
+              : "3months",
         }
-      : { enabled: false, retention: "90days" },
+      : { enabled: false, retention: "3months" },
     dedicatedIp,
     sendingEnabled: true,
   };

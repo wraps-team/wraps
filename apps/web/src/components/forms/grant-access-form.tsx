@@ -68,8 +68,8 @@ export function GrantAccessForm({
       {/* Form-level errors */}
       {formErrors.length > 0 ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          {formErrors.map((error, i) => (
-            <p className="text-red-600 text-sm" key={i}>
+          {formErrors.map((error) => (
+            <p className="text-red-600 text-sm" key={String(error)}>
               {String(error)}
             </p>
           ))}
@@ -134,8 +134,8 @@ export function GrantAccessForm({
             </select>
             {field.state.meta.errors.length > 0 && (
               <div className="mt-1 space-y-1">
-                {field.state.meta.errors.map((error, i) => (
-                  <p className="text-red-600 text-sm" key={i}>
+                {field.state.meta.errors.map((error) => (
+                  <p className="text-red-600 text-sm" key={String(error)}>
                     {String(error)}
                   </p>
                 ))}
@@ -186,8 +186,8 @@ export function GrantAccessForm({
             </select>
             {field.state.meta.errors.length > 0 && (
               <div className="mt-1 space-y-1">
-                {field.state.meta.errors.map((error, i) => (
-                  <p className="text-red-600 text-sm" key={i}>
+                {field.state.meta.errors.map((error) => (
+                  <p className="text-red-600 text-sm" key={String(error)}>
                     {String(error)}
                   </p>
                 ))}
@@ -221,8 +221,8 @@ export function GrantAccessForm({
             </p>
             {field.state.meta.errors.length > 0 && (
               <div className="mt-1 space-y-1">
-                {field.state.meta.errors.map((error, i) => (
-                  <p className="text-red-600 text-sm" key={i}>
+                {field.state.meta.errors.map((error) => (
+                  <p className="text-red-600 text-sm" key={String(error)}>
                     {String(error)}
                   </p>
                 ))}

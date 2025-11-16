@@ -29,7 +29,7 @@ export const STARTER_PRESET: WrapsEmailConfig = {
   // Email archiving disabled by default
   emailArchiving: {
     enabled: false,
-    retention: "30days",
+    retention: "3months",
   },
   sendingEnabled: true,
 };
@@ -38,7 +38,7 @@ export const STARTER_PRESET: WrapsEmailConfig = {
  * Production preset - recommended for most production applications
  * Perfect for: SaaS apps, B2B products, moderate volume
  * Volume: 10k-500k emails/month
- * Cost: ~$10-50/month (scales with volume, add ~$5-15/mo for archiving)
+ * Cost: ~$10-50/month (scales with volume, add ~$5-15/mo for 3-month archiving)
  */
 export const PRODUCTION_PRESET: WrapsEmailConfig = {
   tracking: {
@@ -66,12 +66,12 @@ export const PRODUCTION_PRESET: WrapsEmailConfig = {
       "RENDERING_FAILURE",
     ],
     dynamoDBHistory: true,
-    archiveRetention: "90days",
+    archiveRetention: "3months",
   },
-  // Email archiving with 90-day retention
+  // Email archiving with 3-month retention
   emailArchiving: {
     enabled: false, // User can opt-in
-    retention: "90days",
+    retention: "3months",
   },
   sendingEnabled: true,
 };
@@ -197,7 +197,7 @@ export function getPresetInfo(preset: ConfigPreset): PresetInfo {
         "Everything in Starter",
         "Reputation metrics dashboard",
         "Real-time event tracking (EventBridge)",
-        "90-day email history storage",
+        "3-month email history storage",
         "Optional: Email archiving with rendered viewer",
         "Complete event visibility",
       ],
@@ -308,9 +308,9 @@ export function validateConfig(config: WrapsEmailConfig): string[] {
   }
 
   // Warn about long retention without need
-  if (config.eventTracking?.archiveRetention === "indefinite") {
+  if (config.eventTracking?.archiveRetention === "permanent") {
     warnings.push(
-      "⚠️  Indefinite retention can become expensive. Consider 90-day or 1-year retention."
+      "⚠️  Permanent retention can become expensive. Consider 3-month or 1-year retention."
     );
   }
 

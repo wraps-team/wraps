@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
   },
 
   // Headers for better security and performance
-  async headers() {
+  headers() {
     return [
       {
         source: "/(.*)",
@@ -40,7 +40,7 @@ const nextConfig: NextConfig = {
   },
 
   // Redirects for better SEO
-  async redirects() {
+  redirects() {
     return [];
   },
 };

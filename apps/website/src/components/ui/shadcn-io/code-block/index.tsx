@@ -495,7 +495,7 @@ const CodeBlockFallback = ({ children, ...props }: CodeBlockFallbackProps) => (
           ?.toString()
           .split("\n")
           .map((line, i) => (
-            <span className="line" key={i}>
+            <span className="line" key={`line-${i}-${line.slice(0, 20)}`}>
               {line}
             </span>
           ))}
