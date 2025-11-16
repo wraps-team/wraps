@@ -76,7 +76,7 @@
     "react-resizable-panels": "^3.0.4",
     "recharts": "2.15.4",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.3.1",
+    "tailwind-merge": "^3.4.0",
     "vaul": "^1.1.2",
     "zod": "^4.0.15",
     "zustand": "^5.0.7"
