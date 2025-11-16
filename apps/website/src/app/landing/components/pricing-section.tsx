@@ -83,8 +83,8 @@ export function PricingSection() {
               <div className="border-t pt-8">
                 <h4 className="mb-4 font-semibold">Everything you need:</h4>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {currentPlan.features.map((feature, index) => (
-                    <div className="flex items-start gap-3" key={index}>
+                  {currentPlan.features.map((feature) => (
+                    <div className="flex items-start gap-3" key={feature}>
                       <Check
                         className="mt-0.5 size-5 shrink-0 text-primary"
                         strokeWidth={2.5}
@@ -113,8 +113,8 @@ export function PricingSection() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {comingSoonFeatures.map((feature, index) => (
-              <Card className="border-dashed opacity-75" key={index}>
+            {comingSoonFeatures.map((feature) => (
+              <Card className="border-dashed opacity-75" key={feature.title}>
                 <CardContent className="p-6">
                   <h4 className="mb-2 font-semibold text-lg">
                     {feature.title}
@@ -123,10 +123,10 @@ export function PricingSection() {
                     {feature.description}
                   </p>
                   <ul className="space-y-2">
-                    {feature.features.map((item, itemIndex) => (
+                    {feature.features.map((item) => (
                       <li
                         className="flex items-center gap-2 text-sm"
-                        key={itemIndex}
+                        key={item}
                       >
                         <Check className="size-4 text-muted-foreground" />
                         <span>{item}</span>

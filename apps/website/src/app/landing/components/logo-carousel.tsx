@@ -96,10 +96,10 @@ export function LogoCarousel() {
             <div className="overflow-hidden">
               <div className="flex animate-logo-scroll space-x-8 sm:space-x-12">
                 {/* First set of logos */}
-                {techCompanies.map((company, index) => (
+                {techCompanies.map((company) => (
                   <Card
                     className="flex h-16 w-40 shrink-0 items-center justify-center border-0 bg-transparent opacity-60 shadow-none transition-opacity duration-300 hover:opacity-100"
-                    key={`first-${index}`}
+                    key={`first-${company.id}`}
                   >
                     <div className="flex items-center gap-3">
                       <SimpleIcon iconSlug={company.id} size={28} />
@@ -110,10 +110,10 @@ export function LogoCarousel() {
                   </Card>
                 ))}
                 {/* Second set for seamless loop - identical to first */}
-                {techCompanies.map((company, index) => (
+                {techCompanies.map((company) => (
                   <Card
                     className="flex h-16 w-40 shrink-0 items-center justify-center border-0 bg-transparent opacity-60 shadow-none transition-opacity duration-300 hover:opacity-100"
-                    key={`second-${index}`}
+                    key={`second-${company.id}`}
                   >
                     <div className="flex items-center gap-3">
                       <SimpleIcon iconSlug={company.id} size={28} />

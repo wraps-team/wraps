@@ -65,7 +65,7 @@ export function TopPerformers({ orgSlug }: { orgSlug: string }) {
         {topEmails.map((email, index) => (
           <div
             className="space-y-2 rounded-lg border p-3 transition-colors hover:bg-accent"
-            key={index}
+            key={email.subject || `email-${index}`}
           >
             <div className="flex items-start justify-between gap-2">
               <p className="line-clamp-2 font-medium text-sm leading-tight">

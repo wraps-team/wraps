@@ -45,8 +45,8 @@ const performanceMetrics = [
 export function StatCards() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {performanceMetrics.map((metric, index) => (
-        <Card className="border" key={index}>
+      {performanceMetrics.map((metric) => (
+        <Card className="border" key={metric.title}>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <metric.icon className="size-6 text-muted-foreground" />

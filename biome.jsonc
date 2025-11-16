@@ -49,7 +49,7 @@
       },
       "suspicious": {
         "useAwait": "warn",
-        "noArrayIndexKey": "warn",
+        "noArrayIndexKey": "error",
         "noAlert": "warn",
         "noExplicitAny": "warn",
         "noDocumentCookie": "warn",

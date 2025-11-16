@@ -6,12 +6,12 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { type RouteConfig, routes } from "@/config/routes";
 
 function renderRoutes(routeConfigs: RouteConfig[]) {
-  return routeConfigs.map((route, index) => (
+  return routeConfigs.map((route) => (
     <Route
       element={
         <Suspense fallback={<LoadingSpinner />}>{route.element}</Suspense>
       }
-      key={route.path + index}
+      key={route.path}
       path={route.path}
     >
       {route.children && renderRoutes(route.children)}

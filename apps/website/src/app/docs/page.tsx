@@ -114,10 +114,10 @@ await wraps.emails.send({ ... })`}
               Documentation
             </h2>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-              {quickLinks.map((link, index) => (
+              {quickLinks.map((link) => (
                 <Card
                   className="transition-colors hover:border-primary/50"
-                  key={index}
+                  key={link.href}
                 >
                   <CardHeader>
                     <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">

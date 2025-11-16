@@ -115,10 +115,10 @@ export function FeaturesSection() {
             </div>
 
             <ul className="grid gap-4 sm:grid-cols-2">
-              {mainFeatures.map((feature, index) => (
+              {mainFeatures.map((feature) => (
                 <li
                   className="group flex items-start gap-3 rounded-lg p-2 transition-colors hover:bg-accent/5"
-                  key={index}
+                  key={feature.title}
                 >
                   <div className="mt-0.5 flex shrink-0 items-center justify-center">
                     <feature.icon
@@ -189,10 +189,10 @@ export function FeaturesSection() {
             </div>
 
             <ul className="grid gap-4 sm:grid-cols-2">
-              {secondaryFeatures.map((feature, index) => (
+              {secondaryFeatures.map((feature) => (
                 <li
                   className="group flex items-start gap-3 rounded-lg p-2 transition-colors hover:bg-accent/5"
-                  key={index}
+                  key={feature.title}
                 >
                   <div className="mt-0.5 flex shrink-0 items-center justify-center">
                     <feature.icon

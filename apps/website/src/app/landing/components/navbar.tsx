@@ -89,11 +89,11 @@ export function LandingNavbar() {
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
                       <div className="grid w-[400px] gap-3 p-4">
-                        {docsItems.map((docItem, index) =>
+                        {docsItems.map((docItem) =>
                           docItem.title ? (
                             <div
                               className="px-2 py-1 font-semibold text-muted-foreground text-xs uppercase tracking-wider"
-                              key={`title-${index}`}
+                              key={`title-${docItem.title}`}
                             >
                               {docItem.title}
                             </div>
@@ -239,11 +239,11 @@ export function LandingNavbar() {
                             />
                           </CollapsibleTrigger>
                           <CollapsibleContent className="space-y-1 pl-4">
-                            {docsItems.map((docItem, index) =>
+                            {docsItems.map((docItem) =>
                               docItem.title ? (
                                 <div
                                   className="mt-5 px-4 py-2 font-semibold text-muted-foreground/50 text-xs uppercase tracking-wider"
-                                  key={`title-${index}`}
+                                  key={`title-${docItem.title}`}
                                 >
                                   {docItem.title}
                                 </div>

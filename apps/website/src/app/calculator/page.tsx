@@ -498,10 +498,10 @@ export default function CostCalculatorPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {breakdown.map((item, index) => (
+                    {breakdown.map((item) => (
                       <div
                         className="flex items-start justify-between gap-4 border-b pb-3 last:border-0"
-                        key={index}
+                        key={item.name}
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
@@ -567,7 +567,7 @@ export default function CostCalculatorPage() {
                         return (
                           <div
                             className="flex items-center justify-between text-sm"
-                            key={point.month}
+                            key={`month-${point.month}`}
                           >
                             <span className="text-muted-foreground">
                               Month {point.month}

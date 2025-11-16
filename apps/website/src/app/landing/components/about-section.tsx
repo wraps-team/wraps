@@ -55,8 +55,8 @@ export function AboutSection() {
 
         {/* Modern Values Grid with Enhanced Design */}
         <div className="mb-12 grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 xl:grid-cols-4">
-          {values.map((value, index) => (
-            <Card className="group py-2 shadow-xs" key={index}>
+          {values.map((value) => (
+            <Card className="group py-2 shadow-xs" key={value.title}>
               <CardContent className="p-8">
                 <div className="flex flex-col items-center text-center">
                   <CardDecorator>

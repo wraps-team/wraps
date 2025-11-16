@@ -240,7 +240,7 @@ export function EmailArchiveViewer({
                   {archivedEmail.attachments.map((attachment, index) => (
                     <div
                       className="flex items-center justify-between rounded-md border p-3"
-                      key={index}
+                      key={attachment.filename || `attachment-${index}`}
                     >
                       <div className="space-y-1">
                         <div className="font-mono text-sm">

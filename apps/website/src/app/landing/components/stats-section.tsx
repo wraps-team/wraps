@@ -41,10 +41,10 @@ export function StatsSection() {
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-6 md:gap-8 lg:grid-cols-4">
-          {stats.map((stat, index) => (
+          {stats.map((stat) => (
             <Card
               className="border-border/50 bg-background/60 py-0 text-center backdrop-blur-sm"
-              key={index}
+              key={stat.label}
             >
               <CardContent className="p-6">
                 <div className="mb-4 flex justify-center">
