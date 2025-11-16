@@ -22,8 +22,17 @@ Parameters:
       - "true"
       - "false"
 
+  EnableEmailArchiving:
+    Type: String
+    Description: "Enable access to email archives (requires Wraps email archiving feature)"
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+
 Conditions:
   EnableSending: !Equals [!Ref AllowEmailSending, "true"]
+  EnableArchiving: !Equals [!Ref EnableEmailArchiving, "true"]
 
 Resources:
   # IAM Role that Wraps will assume
@@ -94,6 +103,23 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-*"
                   - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-*/index/*"
+
+              # Mail Manager - Archive Access (conditional, if using Wraps email archiving)
+              - !If
+                - EnableArchiving
+                - Sid: "MailManagerArchiveAccess"
+                  Effect: Allow
+                  Action:
+                    - "ses:StartArchiveSearch"
+                    - "ses:GetArchiveSearchResults"
+                    - "ses:GetArchiveMessage"
+                    - "ses:GetArchiveMessageContent"
+                    - "ses:GetArchive"
+                    - "ses:ListArchives"
+                    - "ses:StartArchiveExport"
+                    - "ses:GetArchiveExport"
+                  Resource: !Sub "arn:aws:ses:*:${AWS::AccountId}:mailmanager-archive/*"
+                - !Ref "AWS::NoValue"
       Tags:
         - Key: ManagedBy
           Value: Wraps
