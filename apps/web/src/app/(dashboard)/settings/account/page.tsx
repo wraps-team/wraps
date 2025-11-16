@@ -251,7 +251,9 @@ export default function AccountSettings() {
                 onChange: ({ value }) => {
                   const result = z.string().email().safeParse(value);
                   if (!result.success) {
-                    return result.error.issues[0]?.message ?? "Invalid email address";
+                    return (
+                      result.error.issues[0]?.message ?? "Invalid email address"
+                    );
                   }
                   return;
                 },

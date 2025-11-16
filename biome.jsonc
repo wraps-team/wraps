@@ -22,7 +22,64 @@
   "linter": {
     "rules": {
       "performance": {
-        "noNamespaceImport": "warn"
+        "noNamespaceImport": "warn",
+        "useTopLevelRegex": "warn",
+        "noBarrelFile": "warn"
+      },
+      "style": {
+        "noNestedTernary": "warn",
+        "useCollapsedElseIf": "warn",
+        "noNonNullAssertion": "warn",
+        "useDefaultSwitchClause": "warn",
+        "useFilenamingConvention": "warn",
+        "useConsistentMemberAccessibility": "warn",
+        "noParameterProperties": "warn"
+      },
+      "nursery": {
+        "noShadow": "warn",
+        "noIncrementDecrement": "warn",
+        "useMaxParams": "warn"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "warn",
+        "noForEach": "warn",
+        "noBannedTypes": "warn"
+      },
+      "suspicious": {
+        "useAwait": "warn",
+        "noArrayIndexKey": "warn",
+        "noAlert": "warn",
+        "noExplicitAny": "warn",
+        "noDocumentCookie": "warn",
+        "noEmptyBlockStatements": "warn",
+        "noExportsInTest": "warn",
+        "noEvolvingTypes": "warn",
+        "noImplicitAnyLet": "warn",
+        "noSkippedTests": "warn"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "warn"
+      },
+      "correctness": {
+        "noUnknownMediaFeatureName": "off",
+        "noUnknownTypeSelector": "warn",
+        "useImageSize": "warn",
+        "noUnusedFunctionParameters": "warn",
+        "useExhaustiveDependencies": "warn",
+        "noUnusedVariables": "warn",
+        "noUndeclaredVariables": "warn"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "warn",
+        "noLabelWithoutControl": "warn",
+        "useButtonType": "warn",
+        "useKeyWithClickEvents": "warn",
+        "noNoninteractiveElementInteractions": "warn",
+        "useSemanticElements": "warn",
+        "noStaticElementInteractions": "warn",
+        "useFocusableInteractive": "warn",
+        "useValidAnchor": "warn",
+        "useAriaPropsForRole": "warn"
       }
     }
   },
