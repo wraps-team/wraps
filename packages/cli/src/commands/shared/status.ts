@@ -1,14 +1,20 @@
 import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import pc from "picocolors";
-import type { StatusOptions } from "../types/index.js";
+import type { StatusOptions } from "../../types/index.js";
 import {
   getAWSRegion,
   listSESDomains,
   validateAWSCredentials,
-} from "../utils/shared/aws.js";
-import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/shared/fs.js";
-import { DeploymentProgress, displayStatus } from "../utils/shared/output.js";
+} from "../../utils/shared/aws.js";
+import {
+  ensurePulumiWorkDir,
+  getPulumiWorkDir,
+} from "../../utils/shared/fs.js";
+import {
+  DeploymentProgress,
+  displayStatus,
+} from "../../utils/shared/output.js";
 
 /**
  * Status command - Show current infrastructure setup

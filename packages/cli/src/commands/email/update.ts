@@ -1,16 +1,25 @@
 import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import pc from "picocolors";
-import { deployEmailStack } from "../infrastructure/email-stack.js";
-import type { EmailStackConfig, UpdateOptions } from "../types/index.js";
-import { getAWSRegion, validateAWSCredentials } from "../utils/shared/aws.js";
-import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/shared/fs.js";
+import { deployEmailStack } from "../../infrastructure/email-stack.js";
+import type { EmailStackConfig, UpdateOptions } from "../../types/index.js";
+import {
+  getAWSRegion,
+  validateAWSCredentials,
+} from "../../utils/shared/aws.js";
+import {
+  ensurePulumiWorkDir,
+  getPulumiWorkDir,
+} from "../../utils/shared/fs.js";
 import {
   loadConnectionMetadata,
   saveConnectionMetadata,
-} from "../utils/shared/metadata.js";
-import { DeploymentProgress, displaySuccess } from "../utils/shared/output.js";
-import { ensurePulumiInstalled } from "../utils/shared/pulumi.js";
+} from "../../utils/shared/metadata.js";
+import {
+  DeploymentProgress,
+  displaySuccess,
+} from "../../utils/shared/output.js";
+import { ensurePulumiInstalled } from "../../utils/shared/pulumi.js";
 
 /**
  * Update command - Redeploy infrastructure to apply CLI updates

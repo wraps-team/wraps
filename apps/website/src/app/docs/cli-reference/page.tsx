@@ -39,8 +39,26 @@ export default function CLIReferencePage() {
             </h1>
             <p className="text-lg text-muted-foreground">
               Complete reference for all Wraps CLI commands. Deploy, manage, and
-              monitor your AWS email infrastructure.
+              monitor your AWS communication infrastructure.
             </p>
+            <div className="mt-4 rounded-lg border bg-muted/50 p-4">
+              <p className="text-muted-foreground text-sm">
+                <strong>Multi-Service Architecture:</strong> Wraps commands are
+                organized by service (e.g.,{" "}
+                <code className="rounded bg-background px-1.5 py-0.5">
+                  wraps email init
+                </code>
+                ,
+                <code className="rounded bg-background px-1.5 py-0.5">
+                  wraps sms init
+                </code>
+                ). Legacy commands like{" "}
+                <code className="rounded bg-background px-1.5 py-0.5">
+                  wraps init
+                </code>{" "}
+                still work but show deprecation warnings.
+              </p>
+            </div>
           </div>
 
           {/* Global Options */}
@@ -70,15 +88,15 @@ export default function CLIReferencePage() {
             </Card>
           </section>
 
-          {/* wraps init */}
+          {/* wraps email init */}
           <section className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
               <Terminal className="h-6 w-6 text-primary" />
-              wraps init
+              wraps email init
             </h2>
             <p className="mb-4 text-muted-foreground">
               Deploy new email infrastructure to your AWS account. This is the
-              primary command for setting up Wraps for the first time.
+              primary command for setting up Wraps email for the first time.
             </p>
 
             <Card className="mb-4">
@@ -88,7 +106,7 @@ export default function CLIReferencePage() {
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
                   <code className="text-sm">
-                    npx @wraps.dev/cli init [options]
+                    npx @wraps.dev/cli email init [options]
                   </code>
                 </pre>
               </CardContent>
@@ -175,7 +193,9 @@ export default function CLIReferencePage() {
                     Interactive setup (recommended for first time):
                   </p>
                   <pre className="overflow-x-auto rounded bg-muted p-3">
-                    <code className="text-sm">npx @wraps.dev/cli init</code>
+                    <code className="text-sm">
+                      npx @wraps.dev/cli email init
+                    </code>
                   </pre>
                 </div>
                 <div>
@@ -184,8 +204,8 @@ export default function CLIReferencePage() {
                   </p>
                   <pre className="overflow-x-auto rounded bg-muted p-3">
                     <code className="text-sm">
-                      npx @wraps.dev/cli init --domain yourdomain.com --region
-                      us-west-2 --preset production --provider vercel
+                      npx @wraps.dev/cli email init --domain yourdomain.com
+                      --region us-west-2 --preset production --provider vercel
                     </code>
                   </pre>
                 </div>
@@ -193,15 +213,16 @@ export default function CLIReferencePage() {
             </Card>
           </section>
 
-          {/* wraps status */}
+          {/* wraps email status */}
           <section className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
               <Terminal className="h-6 w-6 text-primary" />
-              wraps status
+              wraps email status
             </h2>
             <p className="mb-4 text-muted-foreground">
-              Display the current status of your Wraps infrastructure, including
-              deployed resources, active features, and configuration details.
+              Display the current status of your Wraps email infrastructure,
+              including deployed resources, active features, and configuration
+              details.
             </p>
 
             <Card className="mb-4">
@@ -210,7 +231,9 @@ export default function CLIReferencePage() {
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx @wraps.dev/cli status</code>
+                  <code className="text-sm">
+                    npx @wraps.dev/cli email status
+                  </code>
                 </pre>
               </CardContent>
             </Card>
@@ -235,11 +258,11 @@ export default function CLIReferencePage() {
             </Card>
           </section>
 
-          {/* wraps verify */}
+          {/* wraps email verify */}
           <section className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
               <Terminal className="h-6 w-6 text-primary" />
-              wraps verify
+              wraps email verify
             </h2>
             <p className="mb-4 text-muted-foreground">
               Check the DNS verification status of a domain, including DKIM,
@@ -254,7 +277,7 @@ export default function CLIReferencePage() {
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
                   <code className="text-sm">
-                    npx @wraps.dev/cli verify &lt;domain&gt;
+                    npx @wraps.dev/cli email verify --domain &lt;domain&gt;
                   </code>
                 </pre>
               </CardContent>
@@ -284,18 +307,18 @@ export default function CLIReferencePage() {
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
                   <code className="text-sm">
-                    npx @wraps.dev/cli verify yourdomain.com
+                    npx @wraps.dev/cli email verify --domain yourdomain.com
                   </code>
                 </pre>
               </CardContent>
             </Card>
           </section>
 
-          {/* wraps connect */}
+          {/* wraps email connect */}
           <section className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
               <Terminal className="h-6 w-6 text-primary" />
-              wraps connect
+              wraps email connect
             </h2>
             <p className="mb-4 text-muted-foreground">
               Connect to existing AWS SES resources and add Wraps features
@@ -309,7 +332,7 @@ export default function CLIReferencePage() {
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
                   <code className="text-sm">
-                    npx @wraps.dev/cli connect [options]
+                    npx @wraps.dev/cli email connect [options]
                   </code>
                 </pre>
               </CardContent>
@@ -353,11 +376,11 @@ export default function CLIReferencePage() {
             </Card>
           </section>
 
-          {/* wraps upgrade */}
+          {/* wraps email upgrade */}
           <section className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
               <Terminal className="h-6 w-6 text-primary" />
-              wraps upgrade
+              wraps email upgrade
             </h2>
             <p className="mb-4 text-muted-foreground">
               Add additional features to your existing Wraps deployment. Upgrade
@@ -372,7 +395,7 @@ export default function CLIReferencePage() {
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
                   <code className="text-sm">
-                    npx @wraps.dev/cli upgrade [options]
+                    npx @wraps.dev/cli email upgrade [options]
                   </code>
                 </pre>
               </CardContent>
@@ -417,11 +440,11 @@ export default function CLIReferencePage() {
             </Card>
           </section>
 
-          {/* wraps console */}
+          {/* wraps email console */}
           <section className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
               <Terminal className="h-6 w-6 text-primary" />
-              wraps console
+              wraps email console
             </h2>
             <p className="mb-4 text-muted-foreground">
               Launch the local Wraps console dashboard to view email analytics,
@@ -434,7 +457,9 @@ export default function CLIReferencePage() {
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx @wraps.dev/cli console</code>
+                  <code className="text-sm">
+                    npx @wraps.dev/cli email console
+                  </code>
                 </pre>
               </CardContent>
             </Card>
@@ -474,11 +499,11 @@ export default function CLIReferencePage() {
             </Card>
           </section>
 
-          {/* wraps restore */}
+          {/* wraps email restore */}
           <section className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
               <Terminal className="h-6 w-6 text-primary" />
-              wraps restore
+              wraps email restore
             </h2>
             <p className="mb-4 text-muted-foreground">
               Restore Wraps deployment from existing metadata. Useful if you've
@@ -492,7 +517,7 @@ export default function CLIReferencePage() {
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
                   <code className="text-sm">
-                    npx @wraps.dev/cli restore [options]
+                    npx @wraps.dev/cli email restore [options]
                   </code>
                 </pre>
               </CardContent>
@@ -531,11 +556,11 @@ export default function CLIReferencePage() {
             </Card>
           </section>
 
-          {/* wraps destroy */}
+          {/* wraps email destroy */}
           <section className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
               <Terminal className="h-6 w-6 text-primary" />
-              wraps destroy
+              wraps email destroy
             </h2>
             <p className="mb-4 text-muted-foreground">
               Remove all Wraps infrastructure from your AWS account. This is a
@@ -549,7 +574,7 @@ export default function CLIReferencePage() {
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
                   <code className="text-sm">
-                    npx @wraps.dev/cli destroy [options]
+                    npx @wraps.dev/cli email destroy [options]
                   </code>
                 </pre>
               </CardContent>

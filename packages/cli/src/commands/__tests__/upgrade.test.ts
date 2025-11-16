@@ -16,20 +16,20 @@ vi.mock("@pulumi/pulumi/automation", () => ({
   installPulumiCli: vi.fn(),
 }));
 vi.mock("@clack/prompts");
-vi.mock("../../utils/aws.js");
-vi.mock("../../utils/pulumi.js");
-vi.mock("../../utils/fs.js");
-vi.mock("../../utils/metadata.js");
-vi.mock("../../utils/prompts.js");
+vi.mock("../../utils/shared/aws.js");
+vi.mock("../../utils/shared/pulumi.js");
+vi.mock("../../utils/shared/fs.js");
+vi.mock("../../utils/shared/metadata.js");
+vi.mock("../../utils/shared/prompts.js");
 vi.mock("../../infrastructure/email-stack.js");
 
 import * as prompts from "@clack/prompts";
 import { deployEmailStack } from "../../infrastructure/email-stack.js";
-import * as aws from "../../utils/aws.js";
-import * as fsUtils from "../../utils/fs.js";
-import * as metadata from "../../utils/metadata.js";
-import * as promptUtils from "../../utils/prompts.js";
-import * as pulumiUtils from "../../utils/pulumi.js";
+import * as aws from "../../utils/shared/aws.js";
+import * as fsUtils from "../../utils/shared/fs.js";
+import * as metadata from "../../utils/shared/metadata.js";
+import * as promptUtils from "../../utils/shared/prompts.js";
+import * as pulumiUtils from "../../utils/shared/pulumi.js";
 // Import after mocks
 import { upgrade } from "../upgrade.js";
 
@@ -86,17 +86,21 @@ describe("upgrade command", () => {
       region: "us-east-1",
       provider: "vercel",
       timestamp: new Date().toISOString(),
-      emailConfig: {
-        domain: "example.com",
-        tracking: {
-          enabled: true,
-        },
-        suppressionList: {
-          enabled: true,
+      services: {
+        email: {
+          config: {
+            domain: "example.com",
+            tracking: {
+              enabled: true,
+            },
+            suppressionList: {
+              enabled: true,
+            },
+          },
+          preset: "starter",
+          pulumiStackName: "wraps-123456789012-us-east-1",
         },
       },
-      preset: "starter",
-      pulumiStackName: "wraps-123456789012-us-east-1",
     } as any);
 
     vi.mocked(metadata.saveConnectionMetadata).mockResolvedValue(undefined);
@@ -231,7 +235,11 @@ describe("upgrade command", () => {
       // Verify metadata was updated with new preset
       expect(metadata.saveConnectionMetadata).toHaveBeenCalledWith(
         expect.objectContaining({
-          preset: "production",
+          services: expect.objectContaining({
+            email: expect.objectContaining({
+              preset: "production",
+            }),
+          }),
         })
       );
     });
@@ -244,24 +252,28 @@ describe("upgrade command", () => {
         region: "us-east-1",
         provider: "vercel",
         timestamp: new Date().toISOString(),
-        emailConfig: {
-          domain: "example.com",
-          tracking: { enabled: true },
-          eventTracking: {
-            enabled: true,
-            events: [
-              "SEND",
-              "DELIVERY",
-              "OPEN",
-              "CLICK",
-              "BOUNCE",
-              "COMPLAINT",
-            ],
-            dynamoDBHistory: true,
-            archiveRetention: "90days",
+        services: {
+          email: {
+            config: {
+              domain: "example.com",
+              tracking: { enabled: true },
+              eventTracking: {
+                enabled: true,
+                events: [
+                  "SEND",
+                  "DELIVERY",
+                  "OPEN",
+                  "CLICK",
+                  "BOUNCE",
+                  "COMPLAINT",
+                ],
+                dynamoDBHistory: true,
+                archiveRetention: "90days",
+              },
+            },
+            preset: "production",
           },
         },
-        preset: "production",
       } as any);
 
       vi.mocked(prompts.select)
@@ -273,7 +285,11 @@ describe("upgrade command", () => {
 
       expect(metadata.saveConnectionMetadata).toHaveBeenCalledWith(
         expect.objectContaining({
-          preset: "enterprise",
+          services: expect.objectContaining({
+            email: expect.objectContaining({
+              preset: "enterprise",
+            }),
+          }),
         })
       );
     });
@@ -297,11 +313,15 @@ describe("upgrade command", () => {
         region: "us-east-1",
         provider: "vercel",
         timestamp: new Date().toISOString(),
-        emailConfig: {
-          domain: "example.com",
-          dedicatedIp: true,
+        services: {
+          email: {
+            config: {
+              domain: "example.com",
+              dedicatedIp: true,
+            },
+            preset: "enterprise",
+          },
         },
-        preset: "enterprise",
       } as any);
 
       vi.mocked(prompts.select).mockResolvedValueOnce("preset" as never);
@@ -380,14 +400,18 @@ describe("upgrade command", () => {
         region: "us-east-1",
         provider: "vercel",
         timestamp: new Date().toISOString(),
-        emailConfig: {
-          domain: "example.com",
-          tracking: {
-            enabled: true,
-            customRedirectDomain: "old.example.com",
+        services: {
+          email: {
+            config: {
+              domain: "example.com",
+              tracking: {
+                enabled: true,
+                customRedirectDomain: "old.example.com",
+              },
+            },
+            preset: "starter",
           },
         },
-        preset: "starter",
       } as any);
 
       vi.mocked(prompts.select).mockResolvedValueOnce(
@@ -701,7 +725,11 @@ describe("upgrade command", () => {
       // Verify preset is undefined (custom config)
       expect(metadata.saveConnectionMetadata).toHaveBeenCalledWith(
         expect.objectContaining({
-          preset: undefined,
+          services: expect.objectContaining({
+            email: expect.objectContaining({
+              preset: undefined,
+            }),
+          }),
         })
       );
     });
@@ -716,8 +744,12 @@ describe("upgrade command", () => {
         region: "us-east-1",
         provider: "vercel",
         timestamp: new Date().toISOString(),
-        emailConfig: {},
-        preset: "starter",
+        services: {
+          email: {
+            config: {},
+            preset: "starter",
+          },
+        },
       } as any);
 
       vi.mocked(prompts.select).mockResolvedValueOnce("preset" as never);
@@ -739,8 +771,12 @@ describe("upgrade command", () => {
           teamSlug: "existing-team",
         },
         timestamp: new Date().toISOString(),
-        emailConfig: {},
-        preset: "starter",
+        services: {
+          email: {
+            config: {},
+            preset: "starter",
+          },
+        },
       } as any);
 
       vi.mocked(prompts.select).mockResolvedValueOnce("preset" as never);

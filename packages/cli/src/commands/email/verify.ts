@@ -2,9 +2,9 @@ import { Resolver } from "node:dns/promises";
 import { GetEmailIdentityCommand, SESv2Client } from "@aws-sdk/client-sesv2";
 import * as clack from "@clack/prompts";
 import pc from "picocolors";
-import type { VerifyOptions } from "../types/index.js";
-import { getAWSRegion } from "../utils/shared/aws.js";
-import { DeploymentProgress } from "../utils/shared/output.js";
+import type { VerifyOptions } from "../../types/index.js";
+import { getAWSRegion } from "../../utils/shared/aws.js";
+import { DeploymentProgress } from "../../utils/shared/output.js";
 
 /**
  * Verify command - Check domain DNS records and verification status

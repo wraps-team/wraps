@@ -1,7 +1,7 @@
 import dns from "node:dns/promises";
 import type { Request, Response, Router } from "express";
 import { Router as createRouter } from "express";
-import { loadConnectionMetadata } from "../../utils/metadata.js";
+import { loadConnectionMetadata } from "../../utils/shared/metadata.js";
 import type { ServerConfig } from "../server.js";
 import { fetchEmailSettings } from "../services/settings-service.js";
 
@@ -46,7 +46,7 @@ export function createSettingsRouter(config: ServerConfig): Router {
 
       // Get configuration set name and domain from metadata
       const configSetName = "wraps-email-tracking"; // Always use this name
-      const domain = metadata.emailConfig.domain;
+      const domain = metadata.services.email!.config.domain;
 
       // Fetch settings from AWS
       const settings = await fetchEmailSettings(

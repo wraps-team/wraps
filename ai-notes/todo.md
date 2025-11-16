@@ -1,3 +1,16 @@
+SDK:
+  1. ✅ Core email sending (single, bulk, templates)
+  2. ✅ React.email integration
+  3. ✅ Template management (CRUD operations)
+  4. ✅ Error handling with typed errors
+  5. ✅: Attachment support (already stubbed at client.ts:141)
+  6. NEW: Enhanced React template operations
+  await email.templates.updateFromReact({...})
+  await email.templates.previewTemplate('name', data) // Render without sending
+  7. NEW: Rate limiting & retry logic (SDK-level, for application use)
+  8. NEW: Email validation (pre-send checks)
+  9. NEW: Chunked bulk sending (auto-split >50 recipients)
+
 Should ADD to CLI:
 
   1. wraps templates - Template management commands

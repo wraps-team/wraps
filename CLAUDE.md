@@ -70,17 +70,22 @@ wraps/                            # Monorepo root
 ├── packages/
 │   ├── cli/                     # CLI package
 │   │   ├── src/
-│   │   │   ├── cli.ts           # Entry point
+│   │   │   ├── cli.ts           # Entry point (multi-service router)
 │   │   │   ├── commands/        # CLI commands
-│   │   │   │   ├── init.ts     # Deploy new infrastructure
-│   │   │   │   ├── connect.ts  # Connect existing SES
-│   │   │   │   ├── status.ts   # Show current setup
-│   │   │   │   ├── verify.ts   # Verify domain DNS
-│   │   │   │   ├── upgrade.ts  # Upgrade features
-│   │   │   │   ├── restore.ts  # Restore from metadata
-│   │   │   │   └── destroy.ts  # Clean removal
-│   │   │   ├── infrastructure/ # Pulumi stacks
-│   │   │   │   ├── email-stack.ts    # Main Pulumi stack
+│   │   │   │   ├── email/       # Email service commands
+│   │   │   │   │   ├── init.ts    # Deploy email infrastructure
+│   │   │   │   │   ├── connect.ts # Connect existing SES
+│   │   │   │   │   ├── status.ts  # Show email setup
+│   │   │   │   │   ├── verify.ts  # Verify domain DNS
+│   │   │   │   │   ├── upgrade.ts # Upgrade email features
+│   │   │   │   │   ├── restore.ts # Restore email from metadata
+│   │   │   │   │   └── destroy.ts # Remove email infrastructure
+│   │   │   │   ├── sms/         # SMS service commands (coming soon)
+│   │   │   │   ├── init.ts      # Legacy command (deprecated)
+│   │   │   │   ├── connect.ts   # Legacy command (deprecated)
+│   │   │   │   └── ...          # Other legacy commands
+│   │   │   ├── infrastructure/  # Pulumi stacks
+│   │   │   │   ├── email-stack.ts    # Email infrastructure stack
 │   │   │   │   ├── vercel-oidc.ts    # Vercel OIDC setup
 │   │   │   │   └── resources/
 │   │   │   │       ├── iam.ts        # IAM role definitions
@@ -89,18 +94,26 @@ wraps/                            # Monorepo root
 │   │   │   │       ├── lambda.ts     # Lambda functions
 │   │   │   │       ├── sqs.ts        # SQS queues + DLQ
 │   │   │   │       └── eventbridge.ts # EventBridge rules
-│   │   │   ├── utils/           # Shared utilities
-│   │   │   │   ├── aws.ts       # AWS SDK helpers
-│   │   │   │   ├── prompts.ts   # Prompt utilities (@clack/prompts)
-│   │   │   │   ├── costs.ts     # Cost calculation utilities
-│   │   │   │   ├── presets.ts   # Configuration presets
-│   │   │   │   ├── errors.ts    # Error handling
-│   │   │   │   ├── output.ts    # Console output (picocolors)
-│   │   │   │   ├── route53.ts   # Route53 DNS helpers
-│   │   │   │   ├── scanner.ts   # Resource scanner
-│   │   │   │   └── metadata.ts  # Deployment metadata storage
+│   │   │   ├── utils/           # Utilities
+│   │   │   │   ├── shared/      # Shared utilities
+│   │   │   │   │   ├── aws.ts       # AWS SDK helpers
+│   │   │   │   │   ├── prompts.ts   # Prompt utilities (@clack/prompts)
+│   │   │   │   │   ├── metadata.ts  # Multi-service metadata storage
+│   │   │   │   │   ├── errors.ts    # Error handling
+│   │   │   │   │   ├── output.ts    # Console output (picocolors)
+│   │   │   │   │   ├── fs.ts        # File system helpers
+│   │   │   │   │   ├── scanner.ts   # Resource scanner
+│   │   │   │   │   └── pulumi.ts    # Pulumi utilities
+│   │   │   │   ├── email/       # Email-specific utilities
+│   │   │   │   │   ├── costs.ts     # Cost calculations
+│   │   │   │   │   ├── presets.ts   # Config presets
+│   │   │   │   │   └── route53.ts   # Route53 DNS helpers
+│   │   │   │   └── sms/         # SMS-specific utilities (coming soon)
 │   │   │   └── types/
-│   │   │       └── index.ts     # TypeScript types
+│   │   │       ├── index.ts     # Type exports with backwards compat
+│   │   │       ├── shared.ts    # Shared types (Provider, ServiceType, etc.)
+│   │   │       ├── email.ts     # Email-specific types
+│   │   │       └── sms.ts       # SMS-specific types
 │   │   └── lambda/              # Lambda function source
 │   │       └── event-processor/ # SQS -> DynamoDB processor
 │   ├── console-ui/              # Dashboard application (Vite + React)
@@ -190,7 +203,25 @@ if (result.success) {
 
 ## Commands
 
-### 1. `wraps init` - Deploy New Infrastructure
+### Multi-Service Architecture
+
+Wraps CLI now uses a multi-service command structure to support email, SMS, and future services:
+
+```bash
+wraps <service> <command>  # New format
+wraps email init           # Deploy email infrastructure
+wraps sms init            # Deploy SMS infrastructure (coming soon)
+```
+
+**Legacy commands** (deprecated but still work):
+```bash
+wraps init    # ⚠️ Deprecated: Use 'wraps email init'
+wraps status  # ⚠️ Deprecated: Use 'wraps email status'
+```
+
+### Email Commands
+
+#### 1. `wraps email init` - Deploy New Email Infrastructure
 - Validates AWS credentials
 - Prompts for configuration preset (or custom config)
 - Shows estimated monthly costs based on volume
@@ -200,27 +231,37 @@ if (result.success) {
 - Creates IAM roles, SES config, DynamoDB, Lambda, EventBridge, SQS
 - Displays success message with next steps
 
-### 2. `wraps connect` - Connect Existing SES
+#### 2. `wraps email connect` - Connect Existing SES
 - Scans existing AWS resources (SES domains, config sets)
 - Prompts for feature selection
-- Deploys **non-destructively** (always create new resources with `wraps-` prefix)
+- Deploys **non-destructively** (always create new resources with `wraps-email-` prefix)
 - Never modifies existing resources
 
-### 3. `wraps status` - Show Current Setup
+#### 3. `wraps email status` - Show Current Email Setup
 - Displays active features, region, domains
 - Shows all deployed resources
 - Links to dashboard and docs
 
-### 4. `wraps verify` - Verify Domain DNS
+#### 4. `wraps email verify` - Verify Domain DNS
 - Queries DNS records for domain
 - Checks DKIM, SPF, DMARC records
 - Provides guidance if records missing/incorrect
 
-### 5. `wraps upgrade` - Add Features
+#### 5. `wraps email upgrade` - Add Email Features
 - Shows currently enabled features
 - Prompts for additional features to enable
 - Deploys new resources incrementally
 - Updates IAM policies as needed
+- Options: upgrade preset, add custom tracking domain, change retention, enable dedicated IP
+
+#### 6. `wraps email restore` - Restore from Metadata
+- Restores email infrastructure from saved metadata
+- Useful for disaster recovery or re-deployment
+
+#### 7. `wraps email destroy` - Remove Email Infrastructure
+- Destroys all email infrastructure
+- Deletes connection metadata
+- Non-reversible (with confirmation prompt)
 
 ## Critical Design Principles
 

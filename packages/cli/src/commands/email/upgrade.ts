@@ -1,24 +1,33 @@
 import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import pc from "picocolors";
-import { deployEmailStack } from "../infrastructure/email-stack.js";
+import { deployEmailStack } from "../../infrastructure/email-stack.js";
 import type {
   EmailStackConfig,
   UpgradeOptions,
   WrapsEmailConfig,
-} from "../types/index.js";
-import { calculateCosts, formatCost } from "../utils/email/costs.js";
-import { getAllPresetInfo, getPreset } from "../utils/email/presets.js";
-import { getAWSRegion, validateAWSCredentials } from "../utils/shared/aws.js";
-import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/shared/fs.js";
+} from "../../types/index.js";
+import { calculateCosts, formatCost } from "../../utils/email/costs.js";
+import { getAllPresetInfo, getPreset } from "../../utils/email/presets.js";
+import {
+  getAWSRegion,
+  validateAWSCredentials,
+} from "../../utils/shared/aws.js";
+import {
+  ensurePulumiWorkDir,
+  getPulumiWorkDir,
+} from "../../utils/shared/fs.js";
 import {
   loadConnectionMetadata,
   saveConnectionMetadata,
   updateEmailConfig,
-} from "../utils/shared/metadata.js";
-import { DeploymentProgress, displaySuccess } from "../utils/shared/output.js";
-import { promptVercelConfig } from "../utils/shared/prompts.js";
-import { ensurePulumiInstalled } from "../utils/shared/pulumi.js";
+} from "../../utils/shared/metadata.js";
+import {
+  DeploymentProgress,
+  displaySuccess,
+} from "../../utils/shared/output.js";
+import { promptVercelConfig } from "../../utils/shared/prompts.js";
+import { ensurePulumiInstalled } from "../../utils/shared/pulumi.js";
 
 /**
  * Upgrade command - Enhance existing Wraps infrastructure
@@ -423,7 +432,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       }
 
       // Verify that the sending identity is verified
-      const { listSESDomains } = await import("../utils/shared/aws.js");
+      const { listSESDomains } = await import("../../utils/shared/aws.js");
       const domains = await progress.execute(
         "Checking domain verification status",
         async () => await listSESDomains(region)
@@ -621,7 +630,9 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
     case "custom": {
       // Full custom configuration
-      const { promptCustomConfig } = await import("../utils/prompts.js");
+      const { promptCustomConfig } = await import(
+        "../../utils/shared/prompts.js"
+      );
       const customConfig = await promptCustomConfig();
       // Preserve domain from existing config
       updatedConfig = {

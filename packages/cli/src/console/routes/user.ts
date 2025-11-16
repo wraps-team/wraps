@@ -1,6 +1,6 @@
 import type { Request, Response, Router } from "express";
 import { Router as createRouter } from "express";
-import { loadConnectionMetadata } from "../../utils/metadata.js";
+import { loadConnectionMetadata } from "../../utils/shared/metadata.js";
 import type { ServerConfig } from "../server.js";
 
 export function createUserRouter(config: ServerConfig): Router {
@@ -64,8 +64,8 @@ export function createUserRouter(config: ServerConfig): Router {
         accountAlias,
         region,
         provider: metadata?.provider || "unknown",
-        domain: metadata?.emailConfig?.domain || null,
-        preset: metadata?.preset || null,
+        domain: metadata?.services?.email?.config?.domain || null,
+        preset: metadata?.services?.email?.preset || null,
         timestamp: metadata?.timestamp || null,
       };
 

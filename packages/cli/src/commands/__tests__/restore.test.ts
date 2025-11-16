@@ -14,14 +14,14 @@ vi.mock("@pulumi/pulumi/automation", () => ({
   },
 }));
 vi.mock("@clack/prompts");
-vi.mock("../../utils/aws.js");
-vi.mock("../../utils/fs.js");
-vi.mock("../../utils/metadata.js");
+vi.mock("../../utils/shared/aws.js");
+vi.mock("../../utils/shared/fs.js");
+vi.mock("../../utils/shared/metadata.js");
 
 import * as prompts from "@clack/prompts";
-import * as aws from "../../utils/aws.js";
-import * as fsUtils from "../../utils/fs.js";
-import * as metadata from "../../utils/metadata.js";
+import * as aws from "../../utils/shared/aws.js";
+import * as fsUtils from "../../utils/shared/fs.js";
+import * as metadata from "../../utils/shared/metadata.js";
 // Import after mocks
 import { restore } from "../restore.js";
 
@@ -70,16 +70,20 @@ describe("restore command", () => {
       region: "us-east-1",
       provider: "vercel",
       timestamp: new Date().toISOString(),
-      emailConfig: {
-        tracking: { enabled: true },
-        eventTracking: {
-          enabled: true,
-          dynamoDBHistory: true,
-          events: ["Send", "Delivery"],
+      services: {
+        email: {
+          config: {
+            tracking: { enabled: true },
+            eventTracking: {
+              enabled: true,
+              dynamoDBHistory: true,
+              events: ["Send", "Delivery"],
+            },
+          },
+          preset: "production",
+          pulumiStackName: "wraps-123456789012-us-east-1",
         },
       },
-      preset: "production",
-      pulumiStackName: "wraps-123456789012-us-east-1",
     } as any);
     vi.mocked(metadata.deleteConnectionMetadata).mockResolvedValue(undefined);
   });
@@ -233,8 +237,12 @@ describe("restore command", () => {
         region: "us-east-1",
         provider: "vercel",
         timestamp: new Date().toISOString(),
-        emailConfig: {},
-        // No pulumiStackName field
+        services: {
+          email: {
+            config: {},
+            // No pulumiStackName field
+          },
+        },
       } as any);
 
       await restore({ yes: true });
@@ -261,11 +269,15 @@ describe("restore command", () => {
         region: "us-east-1",
         provider: "aws",
         timestamp: new Date().toISOString(),
-        emailConfig: {
-          // No tracking or event tracking
+        services: {
+          email: {
+            config: {
+              // No tracking or event tracking
+            },
+            preset: "starter",
+            pulumiStackName: "wraps-123456789012-us-east-1",
+          },
         },
-        preset: "starter",
-        pulumiStackName: "wraps-123456789012-us-east-1",
       } as any);
 
       await restore({ yes: true });

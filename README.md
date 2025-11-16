@@ -5,7 +5,7 @@
 Deploy production-ready email infrastructure to your AWS account in 30 seconds. No vendor lock-in, AWS pricing, Resend-like DX.
 
 ```bash
-npx @wraps.dev/cli init
+npx @wraps.dev/cli email init
 # ✓ SES configured
 # ✓ Domain verification guided
 # ✓ Event tracking enabled
@@ -67,16 +67,19 @@ Wraps deploys communication infrastructure (starting with email) **to your AWS a
 
 ```bash
 # Deploy email infrastructure
-npx @wraps.dev/cli init
+npx @wraps.dev/cli email init
 
 # Check deployment status
-npx @wraps.dev/cli status
+npx @wraps.dev/cli email status
 
 # Verify domain DNS records
-npx @wraps.dev/cli verify --domain yourapp.com
+npx @wraps.dev/cli email verify --domain yourapp.com
+
+# Upgrade to add more features
+npx @wraps.dev/cli email upgrade
 
 # Clean removal
-npx @wraps.dev/cli destroy
+npx @wraps.dev/cli email destroy
 ```
 
 ### What Gets Deployed
@@ -94,9 +97,10 @@ All resources use the `wraps-email-*` namespace prefix.
 
 ## Features
 
-### Current (v0.1 - Email MVP)
+### Current (v0.3 - Multi-Service Architecture)
 
-- ✅ **One-command deployment** - `wraps init` sets up everything
+- ✅ **Multi-service CLI** - Organized commands: `wraps email init`, `wraps sms init` (coming soon)
+- ✅ **One-command deployment** - `wraps email init` sets up everything
 - ✅ **Domain verification** - Guided DNS setup with Route53 auto-configuration
 - ✅ **Event tracking** - Capture bounces, complaints, opens, clicks
 - ✅ **OIDC support** - Vercel integration (no AWS credentials in production)
@@ -155,29 +159,56 @@ The SDK automatically uses your AWS credentials (IAM roles, OIDC, or environment
 
 ### CLI Commands
 
-**`wraps init`** - Deploy new infrastructure
+#### Email Commands
+
+**`wraps email init`** - Deploy new email infrastructure
 ```bash
-wraps init                          # Interactive prompts
-wraps init --provider vercel        # Specify hosting provider
-wraps init --region us-west-2       # Custom AWS region
-wraps init --domain myapp.com       # Domain to verify
+wraps email init                    # Interactive prompts
+wraps email init --provider vercel  # Specify hosting provider
+wraps email init --region us-west-2 # Custom AWS region
+wraps email init --domain myapp.com # Domain to verify
+wraps email init --preset production # Use production preset
 ```
 
-**`wraps status`** - Show deployment status
+**`wraps email status`** - Show deployment status
 ```bash
-wraps status                        # Current account
-wraps status --account production   # Specific AWS account
+wraps email status                  # Show current email setup
 ```
 
-**`wraps verify`** - Verify domain DNS
+**`wraps email verify`** - Verify domain DNS
 ```bash
-wraps verify --domain myapp.com     # Check DNS propagation
+wraps email verify --domain myapp.com # Check DNS propagation
 ```
 
-**`wraps destroy`** - Remove all infrastructure
+**`wraps email upgrade`** - Upgrade email features
 ```bash
-wraps destroy                       # Interactive confirmation
-wraps destroy --yes                 # Skip confirmation
+wraps email upgrade                 # Interactive upgrade wizard
+```
+
+**`wraps email connect`** - Connect existing SES setup
+```bash
+wraps email connect                 # Import existing SES infrastructure
+```
+
+**`wraps email restore`** - Restore from metadata
+```bash
+wraps email restore                 # Restore infrastructure from saved state
+```
+
+**`wraps email destroy`** - Remove email infrastructure
+```bash
+wraps email destroy                 # Interactive confirmation
+wraps email destroy --yes           # Skip confirmation
+```
+
+#### Legacy Commands (Deprecated)
+
+For backwards compatibility, legacy commands still work but show deprecation warnings:
+```bash
+wraps init      # ⚠️ Deprecated: Use 'wraps email init' instead
+wraps status    # ⚠️ Deprecated: Use 'wraps email status' instead
+wraps verify    # ⚠️ Deprecated: Use 'wraps email verify' instead
+wraps destroy   # ⚠️ Deprecated: Use 'wraps email destroy' instead
 ```
 
 ### Environment Variables

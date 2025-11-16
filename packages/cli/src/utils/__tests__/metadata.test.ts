@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getPreset } from "../email/presets.js";
 import {
   connectionExists,
   createConnectionMetadata,
@@ -9,8 +10,7 @@ import {
   loadConnectionMetadata,
   saveConnectionMetadata,
   updateEmailConfig,
-} from "../metadata.js";
-import { getPreset } from "../presets.js";
+} from "../shared/metadata.js";
 
 // Mock fs module
 vi.mock("fs", async () => {
@@ -33,7 +33,7 @@ vi.mock("fs/promises", async () => {
   };
 });
 
-vi.mock("../fs.js", () => ({
+vi.mock("../shared/fs.js", () => ({
   getWrapsDir: () => "/mock/wraps/dir",
   ensureWrapsDir: vi.fn().mockResolvedValue(undefined),
 }));
@@ -52,8 +52,8 @@ describe("createConnectionMetadata", () => {
     expect(metadata.accountId).toBe("123456789012");
     expect(metadata.region).toBe("us-east-1");
     expect(metadata.provider).toBe("vercel");
-    expect(metadata.preset).toBe("starter");
-    expect(metadata.emailConfig).toEqual(emailConfig);
+    expect(metadata.services.email?.preset).toBe("starter");
+    expect(metadata.services.email?.config).toEqual(emailConfig);
     expect(metadata.timestamp).toBeDefined();
   });
 
@@ -69,8 +69,8 @@ describe("createConnectionMetadata", () => {
       emailConfig
     );
 
-    expect(metadata.preset).toBeUndefined();
-    expect(metadata.emailConfig).toEqual(emailConfig);
+    expect(metadata.services.email?.preset).toBeUndefined();
+    expect(metadata.services.email?.config).toEqual(emailConfig);
   });
 
   it("should generate ISO timestamp", () => {
@@ -121,7 +121,7 @@ describe("updateEmailConfig", () => {
 
     vi.useRealTimers();
 
-    expect(metadata.emailConfig.tracking?.customRedirectDomain).toBe(
+    expect(metadata.services.email?.config.tracking?.customRedirectDomain).toBe(
       "track.example.com"
     );
     expect(metadata.timestamp).not.toBe(oldTimestamp);
@@ -138,17 +138,19 @@ describe("updateEmailConfig", () => {
     );
 
     const originalRetention =
-      metadata.emailConfig.eventTracking?.archiveRetention;
+      metadata.services.email?.config.eventTracking?.archiveRetention;
 
     updateEmailConfig(metadata, {
       eventTracking: {
-        ...metadata.emailConfig.eventTracking,
+        ...metadata.services.email?.config.eventTracking,
         archiveRetention: "1year",
       },
     });
 
-    expect(metadata.emailConfig.eventTracking?.archiveRetention).toBe("1year");
-    expect(metadata.emailConfig.eventTracking?.enabled).toBe(true); // Original value preserved
+    expect(
+      metadata.services.email?.config.eventTracking?.archiveRetention
+    ).toBe("1year");
+    expect(metadata.services.email?.config.eventTracking?.enabled).toBe(true); // Original value preserved
     expect(originalRetention).not.toBe("1year"); // Verify it actually changed
   });
 
@@ -175,7 +177,7 @@ describe("updateEmailConfig", () => {
     vi.useRealTimers();
 
     expect(metadata.timestamp).not.toBe(oldTimestamp);
-    expect(metadata.emailConfig.dedicatedIp).toBe(true);
+    expect(metadata.services.email?.config.dedicatedIp).toBe(true);
   });
 });
 
@@ -223,8 +225,8 @@ describe("saveConnectionMetadata", () => {
 
     expect(parsed.accountId).toBe("123456789012");
     expect(parsed.provider).toBe("vercel");
-    expect(parsed.preset).toBe("production");
-    expect(parsed.emailConfig).toEqual(emailConfig);
+    expect(parsed.services.email.preset).toBe("production");
+    expect(parsed.services.email.config).toEqual(emailConfig);
     expect(savedContent).toContain("\n"); // Check it's formatted
   });
 });
@@ -340,8 +342,8 @@ describe("listConnections", () => {
     expect(connections).toHaveLength(2);
     expect(connections[0].accountId).toBe("123456789012");
     expect(connections[1].accountId).toBe("999888777666");
-    expect(connections[0].preset).toBe("starter");
-    expect(connections[1].preset).toBe("production");
+    expect(connections[0].services.email?.preset).toBe("starter");
+    expect(connections[1].services.email?.preset).toBe("production");
   });
 
   it("should skip non-json files", async () => {

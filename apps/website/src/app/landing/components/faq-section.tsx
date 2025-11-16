@@ -45,13 +45,13 @@ const faqItems: FaqItem[] = [
     value: "item-5",
     question: "Can I customize the infrastructure deployment?",
     answer:
-      "Yes! Choose between Starter ($0.05/month), Production ($2-5/month), or Enterprise ($50-100/month) presets based on features you need. You can also use 'npx @wraps.dev/cli upgrade' to add features incrementally. For full customization, all infrastructure is deployed as open-source Pulumi code you can fork and modify.",
+      "Yes! Choose between Starter ($0.05/month), Production ($2-5/month), or Enterprise ($50-100/month) presets based on features you need. You can also use 'npx @wraps.dev/cli email upgrade' to add features incrementally. For full customization, all infrastructure is deployed as open-source Pulumi code you can fork and modify.",
   },
   {
     value: "item-6",
     question: "Does this work with my existing SES setup?",
     answer:
-      "Yes! Use 'npx @wraps.dev/cli connect' to scan your existing SES resources and add Wraps features non-destructively. We never modify existing resources—all our infrastructure uses the 'wraps-email-' prefix. You can also use 'npx @wraps.dev/cli init' for a completely fresh deployment.",
+      "Yes! Use 'npx @wraps.dev/cli email connect' to scan your existing SES resources and add Wraps features non-destructively. We never modify existing resources—all our infrastructure uses the 'wraps-email-' prefix. You can also use 'npx @wraps.dev/cli email init' for a completely fresh deployment.",
   },
 ];
 

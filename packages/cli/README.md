@@ -44,10 +44,10 @@ npx @wraps.dev/cli init
 
 ## Quick Start
 
-### 1. Deploy New Infrastructure
+### 1. Deploy New Email Infrastructure
 
 ```bash
-wraps init
+wraps email init
 ```
 
 This will:
@@ -87,7 +87,7 @@ Learn more: [SDK Documentation](https://github.com/wraps-team/wraps-js) | [npm](
 ### 3. Check Status
 
 ```bash
-wraps status
+wraps email status
 ```
 
 Shows:
@@ -99,7 +99,9 @@ Shows:
 
 ## Commands
 
-### `wraps init`
+### Email Commands
+
+#### `wraps email init`
 
 Deploy new email infrastructure to your AWS account.
 
@@ -107,56 +109,52 @@ Deploy new email infrastructure to your AWS account.
 - `-p, --provider <provider>` - Hosting provider (vercel, aws, railway, other)
 - `-r, --region <region>` - AWS region (default: us-east-1)
 - `-d, --domain <domain>` - Domain to verify (optional)
+- `--preset <preset>` - Configuration preset (starter, production, enterprise, custom)
+- `-y, --yes` - Skip confirmation prompts
 
 **Examples:**
 
 ```bash
 # Interactive mode (recommended)
-wraps init
+wraps email init
 
 # With flags
-wraps init --provider vercel --region us-east-1 --domain myapp.com
+wraps email init --provider vercel --region us-east-1 --domain myapp.com --preset production
 ```
 
-### `wraps status`
+#### `wraps email status`
 
 Show current infrastructure status.
 
-**Options:**
-- `--account <account>` - AWS account ID or alias (optional)
-
 **Example:**
 
 ```bash
-wraps status
+wraps email status
 ```
 
-### `wraps connect`
+#### `wraps email connect`
 
 Connect to existing AWS SES infrastructure and add Wraps features.
 
-**Options:**
-- `--account <account>` - AWS account ID or alias (optional)
-
 **Example:**
 
 ```bash
-wraps connect
+wraps email connect
 ```
 
-### `wraps console`
+#### `wraps email console`
 
 Start local web dashboard for monitoring email activity.
 
 **Example:**
 
 ```bash
-wraps console
+wraps email console
 ```
 
 Opens a local dashboard at `http://localhost:3000` with real-time email tracking.
 
-### `wraps verify`
+#### `wraps email verify`
 
 Verify domain DNS records and SES status.
 
@@ -166,30 +164,53 @@ Verify domain DNS records and SES status.
 **Example:**
 
 ```bash
-wraps verify --domain myapp.com
+wraps email verify --domain myapp.com
 ```
 
-### `wraps upgrade`
+#### `wraps email upgrade`
 
 Add features to existing infrastructure.
 
 **Example:**
 
 ```bash
-wraps upgrade
+wraps email upgrade
 ```
 
-### `wraps destroy`
+Interactive wizard to:
+- Upgrade to a higher preset (Starter → Production → Enterprise)
+- Add custom tracking domain
+- Change email history retention
+- Customize tracked event types
+- Enable dedicated IP
 
-Remove all deployed Wraps infrastructure.
+#### `wraps email restore`
+
+Restore infrastructure from saved metadata.
 
 **Example:**
 
 ```bash
-wraps destroy
+wraps email restore
 ```
 
-### `wraps completion`
+#### `wraps email destroy`
+
+Remove all deployed email infrastructure.
+
+**Options:**
+- `-y, --yes` - Skip confirmation prompt
+
+**Example:**
+
+```bash
+wraps email destroy
+wraps email destroy --yes  # Skip confirmation
+```
+
+### Global Commands
+
+#### `wraps completion`
 
 Generate shell completion script.
 
@@ -197,6 +218,19 @@ Generate shell completion script.
 
 ```bash
 wraps completion
+```
+
+### Legacy Commands (Deprecated)
+
+For backwards compatibility, these commands still work but show deprecation warnings:
+
+```bash
+wraps init      # → Use 'wraps email init'
+wraps status    # → Use 'wraps email status'
+wraps connect   # → Use 'wraps email connect'
+wraps verify    # → Use 'wraps email verify'
+wraps upgrade   # → Use 'wraps email upgrade'
+wraps destroy   # → Use 'wraps email destroy'
 ```
 
 ## Configuration Presets
@@ -300,18 +334,24 @@ pnpm typecheck
 ```
 packages/cli/
 ├── src/
-│   ├── cli.ts                    # Entry point
+│   ├── cli.ts                    # Entry point (multi-service router)
 │   ├── commands/                 # CLI commands
-│   │   ├── init.ts              # Deploy new infrastructure
-│   │   ├── connect.ts           # Connect existing SES
-│   │   ├── console.ts           # Web dashboard
-│   │   ├── status.ts            # Show current setup
-│   │   ├── verify.ts            # DNS verification
-│   │   ├── upgrade.ts           # Add features
-│   │   └── destroy.ts           # Clean removal
+│   │   ├── email/                # Email service commands
+│   │   │   ├── init.ts          # Deploy email infrastructure
+│   │   │   ├── connect.ts       # Connect existing SES
+│   │   │   ├── console.ts       # Email dashboard
+│   │   │   ├── status.ts        # Show email setup
+│   │   │   ├── verify.ts        # DNS verification
+│   │   │   ├── upgrade.ts       # Add email features
+│   │   │   ├── restore.ts       # Restore from metadata
+│   │   │   └── destroy.ts       # Remove email infrastructure
+│   │   ├── sms/                  # SMS service commands (coming soon)
+│   │   ├── init.ts              # Legacy command (deprecated)
+│   │   ├── status.ts            # Legacy command (deprecated)
+│   │   └── ...                   # Other legacy commands
 │   ├── infrastructure/           # Pulumi stacks
-│   │   ├── email-stack.ts       # Main stack
-│   │   ├── vercel-oidc.ts       # Vercel OIDC setup
+│   │   ├── email-stack.ts       # Email infrastructure stack
+│   │   ├── vercel-oidc.ts       # Vercel OIDC provider setup
 │   │   └── resources/           # Resource definitions
 │   │       ├── iam.ts           # IAM roles and policies
 │   │       ├── ses.ts           # SES configuration
@@ -323,14 +363,23 @@ packages/cli/
 │   ├── lambda/                   # Lambda function source
 │   │   └── event-processor/     # SQS → DynamoDB processor
 │   ├── utils/                    # Utilities
-│   │   ├── aws.ts               # AWS SDK helpers
-│   │   ├── prompts.ts           # Interactive prompts
-│   │   ├── costs.ts             # Cost calculations
-│   │   ├── presets.ts           # Config presets
-│   │   ├── errors.ts            # Error handling
-│   │   └── metadata.ts          # Deployment metadata
+│   │   ├── shared/              # Shared utilities
+│   │   │   ├── aws.ts           # AWS SDK helpers
+│   │   │   ├── prompts.ts       # Interactive prompts
+│   │   │   ├── metadata.ts      # Multi-service metadata
+│   │   │   ├── errors.ts        # Error handling
+│   │   │   ├── output.ts        # Console formatting
+│   │   │   ├── fs.ts            # File system helpers
+│   │   │   └── pulumi.ts        # Pulumi utilities
+│   │   └── email/               # Email-specific utilities
+│   │       ├── costs.ts         # Cost calculations
+│   │       ├── presets.ts       # Config presets
+│   │       └── route53.ts       # DNS helpers
 │   └── types/
-│       └── index.ts
+│       ├── index.ts             # Type exports with backwards compat
+│       ├── shared.ts            # Shared types
+│       ├── email.ts             # Email-specific types
+│       └── sms.ts               # SMS-specific types
 ├── lambda/                       # Lambda source (bundled to dist)
 └── dist/                         # Build output
     ├── console/                  # Built dashboard
@@ -371,15 +420,21 @@ wraps init
 
 ## What's Included
 
-### Core Commands ✅
-- [x] `wraps init` - Deploy new infrastructure
-- [x] `wraps connect` - Connect existing SES
-- [x] `wraps console` - Local web dashboard
-- [x] `wraps status` - Infrastructure status
-- [x] `wraps verify` - DNS verification
-- [x] `wraps upgrade` - Add features
-- [x] `wraps destroy` - Clean removal
+### Email Commands ✅
+- [x] `wraps email init` - Deploy new infrastructure
+- [x] `wraps email connect` - Connect existing SES
+- [x] `wraps email console` - Local web dashboard
+- [x] `wraps email status` - Infrastructure status
+- [x] `wraps email verify` - DNS verification
+- [x] `wraps email upgrade` - Add features
+- [x] `wraps email restore` - Restore from metadata
+- [x] `wraps email destroy` - Clean removal
 - [x] `wraps completion` - Shell completion
+
+### SMS Commands 🚧 (Coming Soon)
+- [ ] `wraps sms init` - Deploy SMS infrastructure
+- [ ] `wraps sms status` - SMS infrastructure status
+- [ ] `wraps sms destroy` - Remove SMS infrastructure
 
 ### Features ✅
 - [x] Feature-based configuration presets
