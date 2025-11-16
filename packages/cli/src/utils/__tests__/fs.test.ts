@@ -33,8 +33,8 @@ describe("fs utilities", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(homedir).mockReturnValue(mockHomeDir);
-    delete process.env.PULUMI_BACKEND_URL;
-    delete process.env.PULUMI_CONFIG_PASSPHRASE;
+    process.env.PULUMI_BACKEND_URL = undefined;
+    process.env.PULUMI_CONFIG_PASSPHRASE = undefined;
   });
 
   describe("getWrapsDir", () => {
@@ -154,7 +154,7 @@ describe("fs utilities", () => {
     });
 
     it("should not create pulumi directory if it already exists", async () => {
-      vi.mocked(existsSync).mockImplementation((path) => {
+      vi.mocked(existsSync).mockImplementation((_path) => {
         // .wraps exists, pulumi exists
         return true;
       });
@@ -195,7 +195,7 @@ describe("fs utilities", () => {
 
       // Should check/create .wraps before pulumi
       expect(calls[0]).toContain(expectedWrapsDir);
-      expect(calls[calls.length - 1]).toContain(expectedPulumiDir);
+      expect(calls.at(-1)).toContain(expectedPulumiDir);
     });
 
     it("should set environment variables even if directories exist", async () => {

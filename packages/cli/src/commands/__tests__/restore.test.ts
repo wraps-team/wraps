@@ -153,7 +153,7 @@ describe("restore command", () => {
     });
 
     it("should select the Pulumi stack", async () => {
-      const mockStack = await setupPulumiMock();
+      const _mockStack = await setupPulumiMock();
       await restore({ yes: true });
 
       const pulumi = await import("@pulumi/pulumi");

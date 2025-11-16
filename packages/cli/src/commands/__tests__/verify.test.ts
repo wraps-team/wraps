@@ -9,6 +9,7 @@ const sesv2Mock = mockClient(SESv2Client);
 const mockResolverInstance = {
   resolveCname: vi.fn(),
   resolveTxt: vi.fn(),
+  setServers: vi.fn(),
 };
 
 vi.mock("dns/promises", () => ({

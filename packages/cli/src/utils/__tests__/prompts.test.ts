@@ -233,7 +233,7 @@ describe("Prompts", () => {
 
     it("should handle cancellation via onCancel", async () => {
       vi.mocked(clack.group).mockImplementation(
-        async (prompts, options: any) => {
+        async (_prompts, options: any) => {
           options.onCancel();
           return {};
         }
@@ -697,11 +697,12 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // dynamoDB history - DISABLED
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(true) // reputation metrics
-        .mockResolvedValueOnce(false); // dedicated IP
+        .mockResolvedValueOnce(false) // dedicated IP
+        .mockResolvedValueOnce(false); // email archiving - DISABLED
 
       await promptCustomConfig();
 
-      // select should not be called for retention
+      // select should not be called for retention (neither history nor archiving)
       expect(clack.select).not.toHaveBeenCalled();
     });
 
@@ -750,6 +751,85 @@ describe("Prompts", () => {
       const result = await promptCustomConfig();
 
       expect(result.sendingEnabled).toBe(true);
+    });
+
+    it("should include email archiving when enabled", async () => {
+      vi.mocked(clack.confirm)
+        .mockResolvedValueOnce(false) // tracking
+        .mockResolvedValueOnce(false) // event tracking
+        .mockResolvedValueOnce(true) // TLS
+        .mockResolvedValueOnce(false) // reputation metrics
+        .mockResolvedValueOnce(false) // dedicated IP
+        .mockResolvedValueOnce(true); // email archiving
+
+      vi.mocked(clack.select).mockResolvedValue("90days");
+
+      const result = await promptCustomConfig();
+
+      expect(result.emailArchiving?.enabled).toBe(true);
+      expect(result.emailArchiving?.retention).toBe("90days");
+    });
+
+    it("should not include email archiving when disabled", async () => {
+      vi.mocked(clack.confirm)
+        .mockResolvedValueOnce(false) // tracking
+        .mockResolvedValueOnce(false) // event tracking
+        .mockResolvedValueOnce(true) // TLS
+        .mockResolvedValueOnce(false) // reputation metrics
+        .mockResolvedValueOnce(false) // dedicated IP
+        .mockResolvedValueOnce(false); // email archiving
+
+      const result = await promptCustomConfig();
+
+      expect(result.emailArchiving).toEqual({
+        enabled: false,
+        retention: "90days",
+      });
+    });
+
+    it("should prompt for retention period when email archiving is enabled", async () => {
+      vi.mocked(clack.confirm)
+        .mockResolvedValueOnce(false) // tracking
+        .mockResolvedValueOnce(false) // event tracking
+        .mockResolvedValueOnce(true) // TLS
+        .mockResolvedValueOnce(false) // reputation metrics
+        .mockResolvedValueOnce(false) // dedicated IP
+        .mockResolvedValueOnce(true); // email archiving
+
+      vi.mocked(clack.select).mockResolvedValue("1year");
+
+      const result = await promptCustomConfig();
+
+      expect(clack.select).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Email archive retention period:",
+          options: expect.arrayContaining([
+            expect.objectContaining({ value: "7days" }),
+            expect.objectContaining({ value: "30days" }),
+            expect.objectContaining({ value: "90days" }),
+            expect.objectContaining({ value: "6months" }),
+            expect.objectContaining({ value: "1year" }),
+            expect.objectContaining({ value: "18months" }),
+          ]),
+        })
+      );
+      expect(result.emailArchiving?.retention).toBe("1year");
+    });
+
+    it("should support all retention period options for email archiving", async () => {
+      vi.mocked(clack.confirm)
+        .mockResolvedValueOnce(false) // tracking
+        .mockResolvedValueOnce(false) // event tracking
+        .mockResolvedValueOnce(true) // TLS
+        .mockResolvedValueOnce(false) // reputation metrics
+        .mockResolvedValueOnce(false) // dedicated IP
+        .mockResolvedValueOnce(true); // email archiving
+
+      vi.mocked(clack.select).mockResolvedValue("18months");
+
+      const result = await promptCustomConfig();
+
+      expect(result.emailArchiving?.retention).toBe("18months");
     });
   });
 });

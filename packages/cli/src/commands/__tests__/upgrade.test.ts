@@ -69,6 +69,9 @@ describe("upgrade command", () => {
       arn: "arn:aws:iam::123456789012:user/test",
     });
     vi.mocked(aws.getAWSRegion).mockResolvedValue("us-east-1");
+    vi.mocked(aws.listSESDomains).mockResolvedValue([
+      { domain: "example.com", verified: true },
+    ]);
 
     // Mock Pulumi utilities
     vi.mocked(pulumiUtils.ensurePulumiInstalled).mockResolvedValue(false);
@@ -279,6 +282,8 @@ describe("upgrade command", () => {
       // TODO: This test requires reliable process.exit mocking which is complex in Vitest
       // The actual code works correctly (calls process.exit(0) at upgrade.ts:189)
       // but mocking process.exit to throw doesn't work reliably in the test environment
+      await setupPulumiMock();
+
       // Mock process.exit to throw instead - MUST be set up first
       const mockExit = vi.spyOn(process, "exit").mockImplementation(((
         code?: string | number | null | undefined

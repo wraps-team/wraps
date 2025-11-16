@@ -41,7 +41,7 @@ describe("Lambda Event Processor", () => {
   });
 
   it("should throw error if TABLE_NAME is not set", async () => {
-    delete process.env.TABLE_NAME;
+    process.env.TABLE_NAME = undefined;
 
     const event: SQSEvent = {
       Records: [],
@@ -80,8 +80,8 @@ describe("Lambda Event Processor", () => {
       expect(putItemCall.Item?.messageId.S).toBe("test-message-id-123");
       expect(putItemCall.Item?.eventType.S).toBe("Send");
       expect(putItemCall.Item?.from.S).toBe("sender@example.com");
-      expect(putItemCall.Item?.to.SS).toEqual([
-        SES_SIMULATOR_ADDRESSES.SUCCESS,
+      expect(putItemCall.Item?.to.L).toEqual([
+        { S: SES_SIMULATOR_ADDRESSES.SUCCESS },
       ]);
     });
   });
@@ -164,7 +164,9 @@ describe("Lambda Event Processor", () => {
 
       const putItemCall = dynamoMock.call(0).args[0].input;
       expect(putItemCall.Item?.eventType.S).toBe("Bounce");
-      expect(putItemCall.Item?.to.SS).toEqual([SES_SIMULATOR_ADDRESSES.BOUNCE]);
+      expect(putItemCall.Item?.to.L).toEqual([
+        { S: SES_SIMULATOR_ADDRESSES.BOUNCE },
+      ]);
 
       const additionalData = JSON.parse(
         putItemCall.Item?.additionalData.S || "{}"
@@ -255,8 +257,8 @@ describe("Lambda Event Processor", () => {
 
       const putItemCall = dynamoMock.call(0).args[0].input;
       expect(putItemCall.Item?.eventType.S).toBe("Complaint");
-      expect(putItemCall.Item?.to.SS).toEqual([
-        SES_SIMULATOR_ADDRESSES.COMPLAINT,
+      expect(putItemCall.Item?.to.L).toEqual([
+        { S: SES_SIMULATOR_ADDRESSES.COMPLAINT },
       ]);
 
       const additionalData = JSON.parse(
@@ -717,8 +719,14 @@ describe("Lambda Event Processor", () => {
       await handler(event);
 
       const putItemCall = dynamoMock.call(0).args[0].input;
-      const expiresAt = Number.parseInt(putItemCall.Item?.expiresAt.N || "0");
-      const createdAt = Number.parseInt(putItemCall.Item?.createdAt.N || "0");
+      const expiresAt = Number.parseInt(
+        putItemCall.Item?.expiresAt.N || "0",
+        10
+      );
+      const createdAt = Number.parseInt(
+        putItemCall.Item?.createdAt.N || "0",
+        10
+      );
 
       // TTL should be approximately 90 days (7776000000 ms) after createdAt
       const expectedTTL = 90 * 24 * 60 * 60 * 1000;
@@ -757,7 +765,7 @@ describe("Lambda Event Processor", () => {
       await handler(event);
 
       const putItemCall = dynamoMock.call(0).args[0].input;
-      const sentAt = Number.parseInt(putItemCall.Item?.sentAt.N || "0");
+      const sentAt = Number.parseInt(putItemCall.Item?.sentAt.N || "0", 10);
       const expectedTimestamp = new Date(deliveryTimestamp).getTime();
 
       expect(sentAt).toBe(expectedTimestamp);

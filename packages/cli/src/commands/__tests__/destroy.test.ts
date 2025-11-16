@@ -123,7 +123,7 @@ describe("destroy command", () => {
     });
 
     it("should select the correct Pulumi stack", async () => {
-      const mockStack = await setupPulumiMock();
+      const _mockStack = await setupPulumiMock();
       await destroy({ yes: true });
 
       const pulumi = await import("@pulumi/pulumi");

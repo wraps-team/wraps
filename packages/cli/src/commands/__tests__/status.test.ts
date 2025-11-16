@@ -20,6 +20,13 @@ vi.mock("@pulumi/pulumi/automation", () => ({
   },
 }));
 
+vi.mock("@pulumi/pulumi", async () => {
+  const automation = await import("@pulumi/pulumi/automation");
+  return {
+    automation,
+  };
+});
+
 // Mock clack
 vi.mock("@clack/prompts", () => ({
   log: {
@@ -138,7 +145,7 @@ describe("status command", () => {
     );
   });
 
-  it.skip("should display status with enhanced integration when configSet exists", async () => {
+  it("should display status with enhanced integration when configSet exists", async () => {
     stsMock.on(GetCallerIdentityCommand).resolves({
       Account: "123456789012",
       UserId: "AIDAI123456789",

@@ -143,22 +143,6 @@ describe("Cost Calculation", () => {
       expect(costs.dynamoDBHistory?.description).toContain("1year");
     });
 
-    it("should calculate DynamoDB history costs with indefinite retention", () => {
-      const config: WrapsEmailConfig = {
-        eventTracking: {
-          enabled: true,
-          dynamoDBHistory: true,
-          archiveRetention: "indefinite",
-        },
-      };
-
-      const costs = calculateCosts(config, 10_000);
-
-      expect(costs.dynamoDBHistory).toBeDefined();
-      expect(costs.dynamoDBHistory?.monthly).toBeGreaterThan(0);
-      expect(costs.dynamoDBHistory?.description).toContain("indefinite");
-    });
-
     it("should calculate combined costs for full production setup", () => {
       const config: WrapsEmailConfig = {
         tracking: {
@@ -652,6 +636,231 @@ describe("Cost Calculation", () => {
 
       // Enterprise with dedicated IP should be $50+ for 100k emails
       expect(costs.total.monthly).toBeGreaterThan(25);
+    });
+  });
+
+  describe("Email Archiving Costs", () => {
+    it("should calculate costs for 7 days retention", () => {
+      const config: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "7days",
+        },
+      };
+
+      const costs = calculateCosts(config, 10_000);
+
+      expect(costs.emailArchiving).toBeDefined();
+      expect(costs.emailArchiving?.monthly).toBeGreaterThan(0);
+      expect(costs.emailArchiving?.description).toContain("7days");
+    });
+
+    it("should calculate costs for 30 days retention", () => {
+      const config: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "30days",
+        },
+      };
+
+      const costs = calculateCosts(config, 10_000);
+
+      expect(costs.emailArchiving).toBeDefined();
+      expect(costs.emailArchiving?.monthly).toBeGreaterThan(0);
+      expect(costs.emailArchiving?.description).toContain("30days");
+    });
+
+    it("should calculate costs for 90 days retention", () => {
+      const config: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "90days",
+        },
+      };
+
+      const costs = calculateCosts(config, 10_000);
+
+      expect(costs.emailArchiving).toBeDefined();
+      expect(costs.emailArchiving?.monthly).toBeGreaterThan(0);
+      expect(costs.emailArchiving?.description).toContain("90days");
+    });
+
+    it("should calculate costs for 6 months retention", () => {
+      const config: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "6months",
+        },
+      };
+
+      const costs = calculateCosts(config, 10_000);
+
+      expect(costs.emailArchiving).toBeDefined();
+      expect(costs.emailArchiving?.monthly).toBeGreaterThan(0);
+      expect(costs.emailArchiving?.description).toContain("6months");
+    });
+
+    it("should calculate costs for 1 year retention", () => {
+      const config: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "1year",
+        },
+      };
+
+      const costs = calculateCosts(config, 10_000);
+
+      expect(costs.emailArchiving).toBeDefined();
+      expect(costs.emailArchiving?.monthly).toBeGreaterThan(0);
+      expect(costs.emailArchiving?.description).toContain("1year");
+    });
+
+    it("should calculate costs for 18 months retention", () => {
+      const config: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "18months",
+        },
+      };
+
+      const costs = calculateCosts(config, 10_000);
+
+      expect(costs.emailArchiving).toBeDefined();
+      expect(costs.emailArchiving?.monthly).toBeGreaterThan(0);
+      expect(costs.emailArchiving?.description).toContain("18months");
+    });
+
+    it("should increase storage costs with longer retention periods", () => {
+      const config7days: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "7days",
+        },
+      };
+
+      const config1year: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "1year",
+        },
+      };
+
+      const costs7days = calculateCosts(config7days, 10_000);
+      const costs1year = calculateCosts(config1year, 10_000);
+
+      // 1 year retention should cost more than 7 days due to storage
+      expect(costs1year.emailArchiving?.monthly).toBeGreaterThan(
+        costs7days.emailArchiving?.monthly || 0
+      );
+    });
+
+    it("should include both ingestion and storage costs", () => {
+      const config: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "90days",
+        },
+      };
+
+      const costs = calculateCosts(config, 10_000);
+
+      // Description should mention retention and storage
+      expect(costs.emailArchiving?.description).toContain("Email archiving");
+      expect(costs.emailArchiving?.description).toContain("90days");
+      expect(costs.emailArchiving?.description).toContain("GB");
+    });
+
+    it("should scale costs with email volume", () => {
+      const config: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "90days",
+        },
+      };
+
+      const costs10k = calculateCosts(config, 10_000);
+      const costs100k = calculateCosts(config, 100_000);
+
+      // 100k emails should cost more than 10k
+      expect(costs100k.emailArchiving?.monthly).toBeGreaterThan(
+        costs10k.emailArchiving?.monthly || 0
+      );
+    });
+
+    it("should not include archiving costs when disabled", () => {
+      const config: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: false,
+          retention: "90days",
+        },
+      };
+
+      const costs = calculateCosts(config, 10_000);
+
+      expect(costs.emailArchiving).toBeUndefined();
+    });
+
+    it("should not include archiving costs when not configured", () => {
+      const config: WrapsEmailConfig = {};
+
+      const costs = calculateCosts(config, 10_000);
+
+      expect(costs.emailArchiving).toBeUndefined();
+    });
+
+    it("should handle zero volume gracefully", () => {
+      const config: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "90days",
+        },
+      };
+
+      const costs = calculateCosts(config, 0);
+
+      // Should not crash with zero volume
+      expect(costs.emailArchiving).toBeDefined();
+      expect(costs.emailArchiving?.monthly).toBe(0);
+    });
+
+    it("should handle high volume without overflow", () => {
+      const config: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "18months",
+        },
+      };
+
+      const costs = calculateCosts(config, 10_000_000); // 10 million
+
+      expect(costs.emailArchiving).toBeDefined();
+      expect(Number.isFinite(costs.emailArchiving?.monthly || 0)).toBe(true);
+      expect(costs.emailArchiving?.monthly).toBeGreaterThan(0);
+    });
+
+    it("should be more expensive than event tracking for same volume", () => {
+      const configArchiving: WrapsEmailConfig = {
+        emailArchiving: {
+          enabled: true,
+          retention: "90days",
+        },
+      };
+
+      const configEvents: WrapsEmailConfig = {
+        eventTracking: {
+          enabled: true,
+          dynamoDBHistory: true,
+          archiveRetention: "90days",
+        },
+      };
+
+      const costsArchiving = calculateCosts(configArchiving, 10_000);
+      const costsEvents = calculateCosts(configEvents, 10_000);
+
+      // Full email archiving should cost more than event tracking
+      expect(costsArchiving.emailArchiving?.monthly).toBeGreaterThan(
+        costsEvents.dynamoDBHistory?.monthly || 0
+      );
     });
   });
 });

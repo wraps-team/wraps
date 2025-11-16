@@ -113,10 +113,10 @@ describe("console command", () => {
 
   describe("Core Flow Tests", () => {
     it("should validate AWS credentials", async () => {
-      const mockStack = await setupPulumiMock();
+      const _mockStack = await setupPulumiMock();
 
       // Start the console in the background and let it hang
-      const consolePromise = runConsole({});
+      const _consolePromise = runConsole({});
 
       // Give it a moment to execute before assertions
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -192,6 +192,8 @@ describe("console command", () => {
         tableName: "wraps-email-history",
         accountId: "123456789012",
         noOpen: false,
+        archiveArn: undefined,
+        archivingEnabled: false,
       });
     });
 

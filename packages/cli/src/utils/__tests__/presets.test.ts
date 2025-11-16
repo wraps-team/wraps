@@ -195,7 +195,7 @@ describe("Preset Configurations", () => {
       });
 
       it("should have higher cost than starter", () => {
-        const starterInfo = getPresetInfo("starter");
+        const _starterInfo = getPresetInfo("starter");
         const prodInfo = getPresetInfo("production");
 
         // Both should have valid costs (not "Free" or "Varies")
@@ -224,7 +224,7 @@ describe("Preset Configurations", () => {
       });
 
       it("should have higher cost than production", () => {
-        const prodInfo = getPresetInfo("production");
+        const _prodInfo = getPresetInfo("production");
         const enterpriseInfo = getPresetInfo("enterprise");
 
         // Both should have valid costs
