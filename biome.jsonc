@@ -94,6 +94,16 @@
       "linter": {
         "enabled": false
       }
+    },
+    {
+      "includes": ["apps/website/src/utils/analytics.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useConsistentTypeDefinitions": "off"
+          }
+        }
+      }
     }
   ]
 }
