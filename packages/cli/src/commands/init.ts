@@ -190,6 +190,7 @@ export async function init(options: InitOptions): Promise<void> {
                   domain: result.domain,
                   dkimTokens: result.dkimTokens,
                   customTrackingDomain: result.customTrackingDomain,
+                  mailFromDomain: result.mailFromDomain,
                   archiveArn: result.archiveArn,
                   archivingEnabled: result.archivingEnabled,
                   archiveRetention: result.archiveRetention,
@@ -233,6 +234,9 @@ export async function init(options: InitOptions): Promise<void> {
           domain: pulumiOutputs.domain?.value as string | undefined,
           dkimTokens: pulumiOutputs.dkimTokens?.value as string[] | undefined,
           customTrackingDomain: pulumiOutputs.customTrackingDomain?.value as
+            | string
+            | undefined,
+          mailFromDomain: pulumiOutputs.mailFromDomain?.value as
             | string
             | undefined,
           archiveArn: pulumiOutputs.archiveArn?.value as string | undefined,

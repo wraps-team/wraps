@@ -119,6 +119,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         "6months": "6 months",
         "1year": "1 year",
         "18months": "18 months",
+        indefinite: "indefinite",
       }[config.emailArchiving.retention] || "90 days";
     console.log(`  ${pc.green("✓")} Email Archiving (${retentionLabel})`);
   }

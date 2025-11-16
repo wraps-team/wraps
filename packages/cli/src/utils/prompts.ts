@@ -1,5 +1,6 @@
 import * as clack from "@clack/prompts";
 import pc from "picocolors";
+import type { ArchiveRetention } from "../types/index.js";
 
 /**
  * Hosting provider type
@@ -481,7 +482,7 @@ export async function promptEstimatedVolume(): Promise<number> {
  */
 export async function promptEmailArchiving(): Promise<{
   enabled: boolean;
-  retention: string;
+  retention: ArchiveRetention;
 }> {
   const enabled = await clack.confirm({
     message:
@@ -539,7 +540,7 @@ export async function promptEmailArchiving(): Promise<{
 
   return {
     enabled: true,
-    retention: retention as string,
+    retention: retention as ArchiveRetention,
   };
 }
 

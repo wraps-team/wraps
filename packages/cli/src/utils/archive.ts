@@ -82,11 +82,16 @@ export async function getArchivedEmail(
       // Convert header values to string/string[]
       if (value instanceof Date) {
         headers[key] = value.toISOString();
-      } else if (typeof value === "string" || Array.isArray(value)) {
+      } else if (typeof value === "string") {
         headers[key] = value;
+      } else if (
+        Array.isArray(value) &&
+        value.every((v) => typeof v === "string")
+      ) {
+        headers[key] = value as string[];
       } else {
-        // Skip complex header types (AddressObject, StructuredHeader, etc.)
-        headers[key] = String(value);
+        // Convert complex header types (AddressObject, StructuredHeader, etc.) to string
+        headers[key] = JSON.stringify(value);
       }
     }
   }
