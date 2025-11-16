@@ -2,14 +2,7 @@ import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
 import { awsAccount } from "@wraps/db/schema/app";
 import { eq } from "drizzle-orm";
-import {
-  ArrowLeft,
-  Check,
-  Clock,
-  Mail,
-  MousePointerClick,
-  X,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { EmailArchiveViewer } from "@/components/email-archive-viewer";
@@ -29,19 +22,6 @@ type EmailDetailPageProps = {
     emailId: string;
   }>;
 };
-
-const EVENT_ICONS = {
-  sent: Mail,
-  delivered: Check,
-  bounced: X,
-  complained: X,
-  opened: Mail,
-  clicked: MousePointerClick,
-  failed: X,
-  rejected: X,
-  rendering_failure: X,
-  delivery_delay: Clock,
-} as const;
 
 const EVENT_COLORS = {
   sent: "text-blue-500",
@@ -354,9 +334,7 @@ export default async function EmailDetailPage({
               <EventItem
                 color={EVENT_COLORS[event.type]}
                 event={event}
-                formatFullTimestamp={formatFullTimestamp}
-                formatTimestamp={formatTimestamp}
-                icon={EVENT_ICONS[event.type] || Clock}
+                iconType={event.type}
                 isLast={index === email.events.length - 1}
                 key={`${event.type}-${event.timestamp}`}
               />

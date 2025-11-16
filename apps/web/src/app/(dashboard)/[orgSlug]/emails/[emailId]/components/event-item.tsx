@@ -1,6 +1,14 @@
 "use client";
 
-import { ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Mail,
+  MousePointerClick,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,23 +19,53 @@ type EventItemProps = {
     timestamp: number;
     metadata?: Record<string, unknown>;
   };
-  icon: React.ComponentType<{ className?: string }>;
+  iconType: string;
   color: string;
   isLast: boolean;
-  formatTimestamp: (timestamp: number) => string;
-  formatFullTimestamp: (timestamp: number) => string;
 };
 
-export function EventItem({
-  event,
-  icon: Icon,
-  color,
-  isLast,
-  formatTimestamp,
-  formatFullTimestamp,
-}: EventItemProps) {
+const ICON_MAP = {
+  sent: Mail,
+  delivered: Check,
+  bounced: X,
+  complained: X,
+  opened: Mail,
+  clicked: MousePointerClick,
+  failed: X,
+  rejected: X,
+  rendering_failure: X,
+  delivery_delay: Clock,
+} as const;
+
+function formatTimestamp(timestamp: number): string {
+  const date = new Date(timestamp);
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function formatFullTimestamp(timestamp: number): string {
+  const date = new Date(timestamp);
+  return date.toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+}
+
+export function EventItem({ event, iconType, color, isLast }: EventItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const hasMetadata = event.metadata && Object.keys(event.metadata).length > 0;
+  const Icon = ICON_MAP[iconType as keyof typeof ICON_MAP] || Clock;
 
   return (
     <div>
