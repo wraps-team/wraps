@@ -1,7 +1,9 @@
 import {
+  GetArchiveCommand,
   GetArchiveMessageCommand,
   type GetArchiveMessageCommandOutput,
   GetArchiveSearchResultsCommand,
+  ListArchivesCommand,
   MailManagerClient,
   StartArchiveSearchCommand,
 } from "@aws-sdk/client-mailmanager";
@@ -56,6 +58,55 @@ function extractArchiveId(archiveArnOrId: string): string {
   }
   // Already just an ID
   return archiveArnOrId;
+}
+
+/**
+ * Find the Wraps archive for an AWS account
+ * Looks for an archive with name starting with "wraps-email-"
+ *
+ * @param region AWS region
+ * @param credentials AWS credentials for assumed role
+ * @returns Archive ARN or null if not found
+ */
+export async function findWrapsArchive(
+  region: string,
+  credentials: AssumedRoleCredentials
+): Promise<string | null> {
+  const client = new MailManagerClient({
+    region,
+    credentials: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken,
+    },
+  });
+
+  try {
+    const listCommand = new ListArchivesCommand({});
+    const listResponse = await client.send(listCommand);
+
+    // Find archive with wraps prefix
+    const wrapsArchive = listResponse.Archives?.find(
+      (archive: { ArchiveName?: string; ArchiveId?: string }) =>
+        archive.ArchiveName?.startsWith("wraps-email-") ||
+        archive.ArchiveName === "wraps-email"
+    );
+
+    if (!wrapsArchive?.ArchiveId) {
+      return null;
+    }
+
+    // Get full archive details to get ARN
+    const getCommand = new GetArchiveCommand({
+      ArchiveId: wrapsArchive.ArchiveId,
+    });
+    const getResponse = await client.send(getCommand);
+
+    return getResponse.ArchiveArn || null;
+  } catch (error) {
+    console.error("Error finding archive:", error);
+    return null;
+  }
 }
 
 /**

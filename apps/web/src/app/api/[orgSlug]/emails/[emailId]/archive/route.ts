@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getOrAssumeRole } from "@/lib/aws/credential-cache";
 import { queryEmailEvents } from "@/lib/aws/dynamodb";
-import { getArchivedEmail } from "@/lib/aws/mailmanager";
+import { findWrapsArchive, getArchivedEmail } from "@/lib/aws/mailmanager";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
 type RouteContext = {
@@ -103,31 +103,27 @@ export async function GET(_request: Request, context: RouteContext) {
       );
     }
 
-    // TODO: Get archive ARN from AWS or configuration
-    // For now, we'll return an error if archiving is not configured
-    // In a production setup, you would:
-    // 1. Store the archive ARN in the database when the stack is deployed
-    // 2. Or query AWS to find the archive ARN dynamically
-    // 3. Or use environment variables for configuration
-
-    // Placeholder archive ARN - this should come from actual configuration
-    const archiveArn = process.env.AWS_SES_ARCHIVE_ARN;
-
-    if (!archiveArn) {
-      return NextResponse.json(
-        {
-          error:
-            "Email archiving is not configured. Please contact your administrator.",
-        },
-        { status: 400 }
-      );
-    }
-
     // Get credentials for the AWS account
     const credentials = await getOrAssumeRole({
       roleArn: awsAccountForEmail.roleArn,
       externalId: awsAccountForEmail.externalId,
     });
+
+    // Find the Wraps archive dynamically by querying AWS
+    const archiveArn = await findWrapsArchive(
+      awsAccountForEmail.region,
+      credentials
+    );
+
+    if (!archiveArn) {
+      return NextResponse.json(
+        {
+          error:
+            "Email archiving is not enabled for this AWS account. Please enable archiving using the CLI: wraps upgrade",
+        },
+        { status: 400 }
+      );
+    }
 
     // Fetch the archived email
     const archivedEmail = await getArchivedEmail(
