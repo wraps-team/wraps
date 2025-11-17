@@ -2,6 +2,7 @@
 
 import type { awsAccount } from "@wraps/db";
 import type { InferSelectModel } from "drizzle-orm";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,17 +24,15 @@ export function AccountHeader({
 }: AccountHeaderProps) {
   return (
     <div className="space-y-4">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm">
-        <Link
-          className="text-muted-foreground hover:text-foreground"
-          href={`/${orgSlug}/aws-accounts`}
-        >
-          AWS Accounts
-        </Link>
-        <span className="text-muted-foreground">/</span>
-        <span className="font-medium">{account.name}</span>
-      </nav>
+      {/* Back Button */}
+      <div className="px-4 lg:px-6">
+        <Button asChild size="sm" variant="ghost">
+          <Link href={`/${orgSlug}/settings?tab=aws-accounts`}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Settings
+          </Link>
+        </Button>
+      </div>
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
