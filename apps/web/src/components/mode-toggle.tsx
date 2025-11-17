@@ -6,7 +6,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { useCircularTransition } from "@/hooks/use-circular-transition";
 import { useTheme } from "@/hooks/use-theme";
-import "./theme-customizer/circular-transition.css";
+import "./circular-transition.css";
 
 type ModeToggleProps = {
   variant?: "outline" | "ghost" | "default";

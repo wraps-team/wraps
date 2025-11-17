@@ -1,0 +1,43 @@
+/* Circular transition animation with pixelation dissolve effect */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+  animation: pixelate-out 0.3s ease-out;
+}
+
+::view-transition-new(root) {
+  z-index: 999;
+  clip-path: circle(0% at var(--x, 50%) var(--y, 50%));
+  animation: reveal 0.3s ease-out;
+}
+
+@keyframes reveal {
+  to {
+    clip-path: circle(150% at var(--x, 50%) var(--y, 50%));
+  }
+}
+
+@keyframes pixelate-out {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+/* Ensure dark mode styles are properly applied during transition */
+.dark::view-transition-new(root) {
+  z-index: 999;
+}
+
+.dark::view-transition-old(root) {
+  z-index: 1;
+}

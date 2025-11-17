@@ -1,13 +1,9 @@
 "use client";
 
-import * as React from "react";
+import type * as React from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import {
-  ThemeCustomizer,
-  ThemeCustomizerTrigger,
-} from "@/components/theme-customizer";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { UpgradeToProButton } from "@/components/upgrade-to-pro-button";
 import { useSidebarConfig } from "@/hooks/use-sidebar-config";
@@ -19,7 +15,6 @@ type BaseLayoutProps = {
 };
 
 export function BaseLayout({ children, title, description }: BaseLayoutProps) {
-  const [themeCustomizerOpen, setThemeCustomizerOpen] = React.useState(false);
   const { config } = useSidebarConfig();
 
   return (
@@ -97,12 +92,6 @@ export function BaseLayout({ children, title, description }: BaseLayoutProps) {
         </>
       )}
 
-      {/* Theme Customizer */}
-      <ThemeCustomizerTrigger onClick={() => setThemeCustomizerOpen(true)} />
-      <ThemeCustomizer
-        onOpenChange={setThemeCustomizerOpen}
-        open={themeCustomizerOpen}
-      />
       <UpgradeToProButton />
     </SidebarProvider>
   );
