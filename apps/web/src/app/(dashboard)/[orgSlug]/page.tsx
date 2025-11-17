@@ -26,7 +26,7 @@ export default async function OrganizationDashboard({
   );
 
   if (!orgWithMembership) {
-    redirect("/dashboard");
+    redirect("/emails");
   }
 
   return (

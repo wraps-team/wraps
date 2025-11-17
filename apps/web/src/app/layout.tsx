@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { ThemeProvider } from "@/components/theme-provider";
 import { QueryProvider } from "@/contexts/query-client-context";
 import { SessionProvider } from "@/contexts/session-context";
@@ -20,13 +21,15 @@ export default function RootLayout({
   return (
     <html className={`${inter.variable} antialiased`} lang="en">
       <body className={inter.className}>
-        <QueryProvider>
-          <SessionProvider>
-            <ThemeProvider defaultTheme="system" storageKey="nextjs-ui-theme">
-              <SidebarConfigProvider>{children}</SidebarConfigProvider>
-            </ThemeProvider>
-          </SessionProvider>
-        </QueryProvider>
+        <NuqsAdapter>
+          <QueryProvider>
+            <SessionProvider>
+              <ThemeProvider defaultTheme="system" storageKey="nextjs-ui-theme">
+                <SidebarConfigProvider>{children}</SidebarConfigProvider>
+              </ThemeProvider>
+            </SessionProvider>
+          </QueryProvider>
+        </NuqsAdapter>
       </body>
     </html>
   );

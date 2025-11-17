@@ -31,6 +31,104 @@ export type ConnectAWSAccountResult =
     }
   | { error: string; details?: string };
 
+export type AWSAccountWithCreator = {
+  id: string;
+  name: string;
+  accountId: string;
+  region: string;
+  roleArn: string;
+  isVerified: boolean;
+  lastVerifiedAt: Date | null;
+  createdAt: Date;
+  createdBy: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+};
+
+export type ListAWSAccountsResult =
+  | {
+      success: true;
+      accounts: AWSAccountWithCreator[];
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+/**
+ * List all AWS accounts for an organization
+ */
+export async function listAWSAccounts(
+  organizationId: string
+): Promise<ListAWSAccountsResult> {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return {
+        success: false,
+        error: "You must be logged in",
+      };
+    }
+
+    // Verify user is a member of this organization
+    const userMembership = await db.query.member.findFirst({
+      where: (m, { and, eq }) =>
+        and(
+          eq(m.organizationId, organizationId),
+          eq(m.userId, session.user.id)
+        ),
+    });
+
+    if (!userMembership) {
+      return {
+        success: false,
+        error: "You don't have access to this organization",
+      };
+    }
+
+    // Fetch all AWS accounts for this organization
+    const accounts = await db.query.awsAccount.findMany({
+      where: (a, { eq }) => eq(a.organizationId, organizationId),
+      with: {
+        createdByUser: {
+          columns: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: (accounts, { desc }) => [desc(accounts.createdAt)],
+    });
+
+    return {
+      success: true,
+      accounts: accounts.map((account) => ({
+        id: account.id,
+        name: account.name,
+        accountId: account.accountId,
+        region: account.region,
+        roleArn: account.roleArn,
+        isVerified: account.isVerified,
+        lastVerifiedAt: account.lastVerifiedAt,
+        createdAt: account.createdAt,
+        createdBy: account.createdByUser,
+      })),
+    };
+  } catch (error) {
+    console.error("Error listing AWS accounts:", error);
+    return {
+      success: false,
+      error: "Failed to fetch AWS accounts",
+    };
+  }
+}
+
 export async function connectAWSAccountAction(
   _prev: unknown,
   formData: FormData

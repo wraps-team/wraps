@@ -2,13 +2,10 @@
 
 import {
   BellDot,
-  Building2,
   CircleUser,
-  CreditCard,
   EllipsisVertical,
-  Fingerprint,
   LogOut,
-  Shield,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -102,31 +99,13 @@ export function NavUser() {
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="cursor-pointer">
                 <Link href="/settings/security">
-                  <Shield />
+                  <ShieldCheck />
                   Security
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild className="cursor-pointer">
-                <Link href="/settings/passkeys">
-                  <Fingerprint />
-                  Passkeys
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild className="cursor-pointer">
-                <Link href="/organizations">
-                  <Building2 />
-                  Organizations
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem asChild className="cursor-pointer">
-                <Link href="/settings/billing">
-                  <CreditCard />
-                  Billing
-                </Link>
-              </DropdownMenuItem>
               <DropdownMenuItem asChild className="cursor-pointer">
                 <Link href="/settings/notifications">
                   <BellDot />

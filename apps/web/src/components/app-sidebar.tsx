@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  BarChart3,
-  Building2,
-  LayoutDashboard,
-  Mail,
-  Settings,
-  Users,
-  Webhook,
-} from "lucide-react";
+import { BarChart3, Mail } from "lucide-react";
 import Link from "next/link";
 import type * as React from "react";
 import { Logo } from "@/components/logo";
@@ -24,7 +16,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { useActiveOrganization } from "@/contexts/organization-context";
 
@@ -35,16 +26,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Organization-scoped navigation
   const orgScopedNavGroups = orgSlug
     ? [
-        {
-          label: "Overview",
-          items: [
-            {
-              title: "Dashboard",
-              url: `/${orgSlug}`,
-              icon: LayoutDashboard,
-            },
-          ],
-        },
         {
           label: "Email Infrastructure",
           items: [
@@ -58,67 +39,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               url: `/${orgSlug}/analytics`,
               icon: BarChart3,
             },
-            {
-              title: "Webhooks",
-              url: `/${orgSlug}/webhooks`,
-              icon: Webhook,
-            },
-          ],
-        },
-        {
-          label: "Management",
-          items: [
-            {
-              title: "AWS Accounts",
-              url: `/${orgSlug}/aws-accounts`,
-              icon: Building2,
-            },
-            {
-              title: "Members",
-              url: `/${orgSlug}/members`,
-              icon: Users,
-            },
-            {
-              title: "Organization Settings",
-              url: `/${orgSlug}/settings`,
-              icon: Settings,
-            },
+            // {
+            //   title: "Webhooks",
+            //   url: `/${orgSlug}/webhooks`,
+            //   icon: Webhook,
+            // },
           ],
         },
       ]
     : [];
-
-  // User-scoped navigation (always available)
-  const userScopedNavGroups = [
-    {
-      label: "User Settings",
-      items: [
-        {
-          title: "Settings",
-          url: "#",
-          icon: Settings,
-          items: [
-            {
-              title: "Account",
-              url: "/settings/account",
-            },
-            {
-              title: "Profile",
-              url: "/settings/profile",
-            },
-            {
-              title: "Appearance",
-              url: "/settings/appearance",
-            },
-            {
-              title: "Notifications",
-              url: "/settings/notifications",
-            },
-          ],
-        },
-      ],
-    },
-  ];
 
   return (
     <Sidebar {...props}>
@@ -136,10 +65,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         {orgScopedNavGroups.map((group) => (
-          <NavMain items={group.items} key={group.label} label={group.label} />
-        ))}
-        {orgSlug && <SidebarSeparator />}
-        {userScopedNavGroups.map((group) => (
           <NavMain items={group.items} key={group.label} label={group.label} />
         ))}
       </SidebarContent>

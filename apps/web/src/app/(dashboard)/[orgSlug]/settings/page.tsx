@@ -1,6 +1,6 @@
 import { auth } from "@wraps/auth";
 import { redirect } from "next/navigation";
-import { OrganizationSettingsForm } from "@/components/organization-settings-form";
+import { OrganizationSettingsTabs } from "@/components/organization-settings-tabs";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
 type OrganizationSettingsPageProps = {
@@ -39,7 +39,7 @@ export default async function OrganizationSettingsPage({
         </p>
       </div>
 
-      <OrganizationSettingsForm
+      <OrganizationSettingsTabs
         organization={orgWithMembership}
         userRole={orgWithMembership.userRole}
       />

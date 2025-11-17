@@ -152,7 +152,7 @@ export function OrganizationSwitcher() {
                     className="flex items-center justify-center gap-2 rounded-md border bg-background px-3 py-2 text-sm transition-colors hover:bg-accent"
                     onClick={() => {
                       if (activeOrganization.slug) {
-                        window.location.href = `/${activeOrganization.slug}/settings/general`;
+                        window.location.href = `/${activeOrganization.slug}/settings`;
                       }
                     }}
                     type="button"
@@ -164,7 +164,7 @@ export function OrganizationSwitcher() {
                     className="flex items-center justify-center gap-2 rounded-md border bg-background px-3 py-2 text-sm transition-colors hover:bg-accent"
                     onClick={() => {
                       if (activeOrganization.slug) {
-                        window.location.href = `/${activeOrganization.slug}/members`;
+                        window.location.href = `/${activeOrganization.slug}/settings?tab=members`;
                       }
                     }}
                     type="button"

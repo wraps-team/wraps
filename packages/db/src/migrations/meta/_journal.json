@@ -15,6 +15,13 @@
       "when": 1763052143940,
       "tag": "0001_polite_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1763409196375,
+      "tag": "0002_perpetual_scorpion",
+      "breakpoints": true
     }
   ]
 }

@@ -1,21 +1,11 @@
 "use client";
 
-import {
-  BadgeCheck,
-  Bell,
-  ChevronsUpDown,
-  CreditCard,
-  Moon,
-  Sparkles,
-  Sun,
-  X,
-} from "lucide-react";
+import { ChevronsUpDown, Moon, Sun, X } from "lucide-react";
 import * as React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -156,44 +146,6 @@ export function NavUser({
                 </div>
               </div>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem
-                onClick={() =>
-                  window.open("https://wraps.dev/pricing", "_blank")
-                }
-              >
-                <Sparkles />
-                Upgrade Plan
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem
-                onClick={() =>
-                  window.open("https://wraps.dev/account", "_blank")
-                }
-              >
-                <BadgeCheck />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  window.open("https://wraps.dev/billing", "_blank")
-                }
-              >
-                <CreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  window.open("https://wraps.dev/changelog", "_blank")
-                }
-              >
-                <Bell />
-                Product Updates
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}

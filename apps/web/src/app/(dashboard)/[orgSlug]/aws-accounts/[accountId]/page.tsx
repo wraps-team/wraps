@@ -39,7 +39,7 @@ export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
   });
 
   if (!account || account.organizationId !== organization.id) {
-    redirect(`/${orgSlug}/aws-accounts`);
+    redirect(`/${orgSlug}/settings?tab=aws-accounts`);
   }
 
   // Check if user has view permission
@@ -51,7 +51,7 @@ export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
   });
 
   if (!access.authorized) {
-    redirect(`/${orgSlug}`);
+    redirect(`/${orgSlug}/emails`);
   }
 
   // Check all permissions
