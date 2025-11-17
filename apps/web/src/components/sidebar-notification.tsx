@@ -28,30 +28,30 @@ export function SidebarNotification() {
 
         <div className="pr-6">
           <h3 className="mt-1 mb-2 flex items-center gap-3 font-semibold text-neutral-900 dark:text-neutral-100">
-            <Logo className="-mt-1" size={42} />
+            <Logo className="-mt-1 rounded-full" size={42} />
             <div>
-              Welcome to{" "}
               <a
                 className="text-primary hover:underline"
-                href="https://shadcnstore.com"
+                href="https://wraps.dev"
                 rel="noopener noreferrer"
                 target="_blank"
               >
-                ShadcnStore
-              </a>
+                Wraps
+              </a>{" "}
+              Updates
             </div>
           </h3>
           <p className="text-muted-foreground text-sm leading-relaxed dark:text-neutral-400">
-            Explore our premium Shadcn UI{" "}
+            {/* Link to docs */}
             <a
               className="text-primary underline"
-              href="https://shadcnstore.com/blocks"
+              href="https://wraps.dev/docs"
               rel="noopener noreferrer"
               target="_blank"
             >
-              blocks
+              Docs
             </a>{" "}
-            to build your next project faster.
+            to get started.
           </p>
         </div>
       </CardContent>

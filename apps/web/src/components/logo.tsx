@@ -33,7 +33,9 @@ export function Logo({ size = 24, className, ...props }: LogoProps) {
       alt="Wraps Logo"
       className={className}
       height={size}
+      priority
       src={logoSrc}
+      style={{ display: "block", objectFit: "contain" }}
       width={size}
       {...props}
     />

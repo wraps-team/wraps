@@ -62,7 +62,7 @@ export function NavUser() {
               size="lg"
             >
               <div className="flex h-8 w-8 items-center justify-center rounded-lg">
-                <Logo size={28} />
+                <Logo className="rounded-sm" size={48} />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
