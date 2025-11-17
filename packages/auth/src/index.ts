@@ -1,6 +1,5 @@
 import { db } from "@wraps/db";
 import * as schema from "@wraps/db/schema/auth";
-import { sendVerificationEmail } from "@wraps/email/emails/verification";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
@@ -24,6 +23,10 @@ export const auth = betterAuth<BetterAuthOptions>({
   },
   emailVerification: {
     sendVerificationEmail: async ({ user, url }) => {
+      // Dynamic import to avoid bundling email package in edge/middleware
+      const { sendVerificationEmail } = await import(
+        "@wraps/email/emails/verification"
+      );
       await sendVerificationEmail({
         to: user.email,
         url,

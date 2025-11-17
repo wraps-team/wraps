@@ -3,7 +3,7 @@ import { auth } from "@wraps/auth";
 import { NextResponse } from "next/server";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp"];

@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["lucide-react", "@radix-ui/react-icons"],
   },
 
+  // Mark server-only packages to prevent bundling in edge/client
+  serverExternalPackages: ["@wraps.dev/email", "@wraps/email"],
+
   // Image optimization
   images: {
     remotePatterns: [
