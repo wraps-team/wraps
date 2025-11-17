@@ -14,6 +14,19 @@ type ImageUploadProps = {
   className?: string;
 };
 
+/**
+ * Securely check if a URL is from Vercel Blob storage
+ * Uses proper URL parsing to prevent bypass attacks
+ */
+function isVercelBlobUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.endsWith(".vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
+
 export function ImageUpload({
   value,
   onChange,
@@ -91,7 +104,7 @@ export function ImageUpload({
 
     try {
       // Only call delete API if it's a Vercel Blob URL
-      if (value.includes("vercel-storage.com")) {
+      if (isVercelBlobUrl(value)) {
         const response = await fetch(
           `/api/upload/organization-logo?url=${encodeURIComponent(value)}&orgSlug=${orgSlug}`,
           {

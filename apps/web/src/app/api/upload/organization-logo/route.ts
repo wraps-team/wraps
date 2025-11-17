@@ -8,6 +8,21 @@ export const runtime = "edge";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
 
+/**
+ * Securely check if a URL is from Vercel Blob storage
+ * Uses proper URL parsing to prevent bypass attacks like:
+ * - https://evil.com/vercel-storage.com
+ * - https://vercel-storage.com.evil.com
+ */
+function isVercelBlobUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.endsWith(".vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     // 1. Authenticate user
@@ -82,7 +97,7 @@ export async function POST(request: Request) {
     );
 
     // 6. Delete old logo if it exists and is from Vercel Blob
-    if (oldLogoUrl?.includes("vercel-storage.com")) {
+    if (oldLogoUrl && isVercelBlobUrl(oldLogoUrl)) {
       try {
         await del(oldLogoUrl);
       } catch (error) {
@@ -152,7 +167,7 @@ export async function DELETE(request: Request) {
     }
 
     // 4. Only delete if it's a Vercel Blob URL
-    if (!url.includes("vercel-storage.com")) {
+    if (!isVercelBlobUrl(url)) {
       return NextResponse.json(
         { error: "Can only delete Vercel Blob URLs" },
         { status: 400 }

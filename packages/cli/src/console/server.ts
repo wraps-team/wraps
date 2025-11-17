@@ -43,6 +43,35 @@ export async function startConsoleServer(
   // Middleware
   app.use(express.json());
 
+  // Simple rate limiting for static file requests (defense-in-depth)
+  // Note: This is a localhost-only dev server with token auth, so this is just
+  // a safeguard against accidental abuse or runaway scripts
+  const requestCounts = new Map<string, { count: number; resetTime: number }>();
+  const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+  const RATE_LIMIT_MAX_REQUESTS = 1000; // 1000 requests per minute per IP
+
+  app.use((req, res, next) => {
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    const now = Date.now();
+    const record = requestCounts.get(ip);
+
+    if (!record || now > record.resetTime) {
+      // New window
+      requestCounts.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+      next();
+    } else if (record.count < RATE_LIMIT_MAX_REQUESTS) {
+      // Within limit
+      record.count++;
+      next();
+    } else {
+      // Rate limit exceeded
+      res.status(429).json({
+        error: "Too many requests, please slow down",
+        retryAfter: Math.ceil((record.resetTime - now) / 1000),
+      });
+    }
+  });
+
   // Security headers
   app.use((_req, res, next) => {
     res.setHeader("X-Frame-Options", "DENY");

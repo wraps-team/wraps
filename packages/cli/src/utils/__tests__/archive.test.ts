@@ -227,5 +227,68 @@ describe("Archive Utilities", () => {
       // Note: The content itself may remain after removing the onclick attribute
       // What matters is the onclick handler is removed
     });
+
+    // Tests for CodeQL security issue: Incomplete multi-character sanitization
+    // https://github.com/wraps-team/wraps/security/code-scanning/11
+    describe("nested tag bypass attacks (CodeQL issue #11-12)", () => {
+      it("should prevent nested script tag bypass: <scr<script>ipt>", () => {
+        const html = '<scr<script>ipt>alert("xss")</scr</script>ipt>';
+        const result = sanitizeEmailHtml(html);
+
+        // After sanitization, should not contain any script tags
+        expect(result).not.toContain("<script");
+        expect(result).not.toContain("</script");
+        expect(result.toLowerCase()).not.toMatch(/<script/);
+      });
+
+      it("should prevent nested iframe tag bypass: <ifr<iframe>ame>", () => {
+        const html = '<ifr<iframe>ame src="evil.com"></ifr</iframe>ame>';
+        const result = sanitizeEmailHtml(html);
+
+        expect(result).not.toContain("<iframe");
+        expect(result).not.toContain("</iframe");
+        expect(result.toLowerCase()).not.toMatch(/<iframe/);
+      });
+
+      it("should prevent multiple levels of nesting", () => {
+        const html = '<scr<scr<script>ipt>ipt>alert("xss")</script>';
+        const result = sanitizeEmailHtml(html);
+
+        expect(result.toLowerCase()).not.toMatch(/<script/);
+      });
+
+      it("should prevent nested event handler bypass", () => {
+        const html = '<div onon<a>click="alert(1)">Click</div>';
+        const result = sanitizeEmailHtml(html);
+
+        // Should not contain onclick after sanitization
+        expect(result.toLowerCase()).not.toContain("onclick");
+      });
+
+      it("should prevent javascript: protocol bypass", () => {
+        const html = '<a href="javajavascript:script:alert(1)">Link</a>';
+        const result = sanitizeEmailHtml(html);
+
+        expect(result.toLowerCase()).not.toContain("javascript:");
+      });
+
+      it("should handle data:text/html injection", () => {
+        const html =
+          '<a href="data:text/html,<script>alert(1)</script>">Link</a>';
+        const result = sanitizeEmailHtml(html);
+
+        expect(result.toLowerCase()).not.toContain("data:text/html");
+      });
+
+      it("should iteratively sanitize until stable", () => {
+        // This tests the while loop that prevents bypass attacks
+        const html = "<scr<scr<script>ipt>ipt>alert(1)</scr</script>ipt>";
+        const result = sanitizeEmailHtml(html);
+
+        // Should be completely sanitized, no script tags at all
+        expect(result.toLowerCase()).not.toMatch(/<script/);
+        expect(result.toLowerCase()).not.toMatch(/<\/script/);
+      });
+    });
   });
 });

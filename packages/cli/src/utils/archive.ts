@@ -5,6 +5,7 @@ import {
   MailManagerClient,
   StartArchiveSearchCommand,
 } from "@aws-sdk/client-mailmanager";
+import DOMPurify from "isomorphic-dompurify";
 import { type ParsedMail, simpleParser } from "mailparser";
 
 /**
@@ -324,18 +325,57 @@ export async function searchArchivedEmails(
 }
 
 /**
- * Sanitize HTML for safe rendering
+ * Sanitize HTML for safe rendering using DOMPurify
  * Removes potentially dangerous elements and attributes
  *
- * @param html HTML content
- * @returns Sanitized HTML
+ * Uses isomorphic-dompurify which provides secure HTML sanitization
+ * that works in both Node.js and browser environments.
+ *
+ * @param html HTML content to sanitize
+ * @returns Sanitized HTML safe for rendering
  */
 export function sanitizeEmailHtml(html: string): string {
-  // Basic HTML sanitization
-  // For production, consider using a library like DOMPurify
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
-    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, "") // Remove inline event handlers
-    .replace(/javascript:/gi, ""); // Remove javascript: protocols
+  // DOMPurify provides comprehensive XSS protection including:
+  // - Script tag removal (including nested bypass attacks like <scr<script>ipt>)
+  // - Event handler removal (onclick, onload, etc.)
+  // - Protocol sanitization (javascript:, data:text/html, etc.)
+  // - Object/embed/iframe removal
+  // - Style-based XSS protection
+  return DOMPurify.sanitize(html, {
+    // Allow common safe HTML elements for email rendering
+    ALLOWED_TAGS: [
+      "p",
+      "div",
+      "span",
+      "a",
+      "img",
+      "br",
+      "strong",
+      "em",
+      "b",
+      "i",
+      "u",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "ul",
+      "ol",
+      "li",
+      "table",
+      "thead",
+      "tbody",
+      "tr",
+      "td",
+      "th",
+      "blockquote",
+      "pre",
+      "code",
+    ],
+    ALLOWED_ATTR: ["href", "src", "alt", "title", "class", "style", "target"],
+    // Keep safe URIs only (removes javascript:, data:text/html, etc.)
+    ALLOW_DATA_ATTR: false,
+  });
 }

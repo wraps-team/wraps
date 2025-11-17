@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Explicit permissions for security best practices
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
