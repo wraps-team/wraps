@@ -2,17 +2,9 @@
 
 import type { awsAccount } from "@wraps/db";
 import type { InferSelectModel } from "drizzle-orm";
-import { Copy } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 type AccountHeaderProps = {
   account: InferSelectModel<typeof awsAccount>;
@@ -29,14 +21,6 @@ export function AccountHeader({
   permissions,
   orgSlug,
 }: AccountHeaderProps) {
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-
-  const copyToClipboard = async (text: string, field: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
   return (
     <div className="space-y-4">
       {/* Breadcrumb */}
@@ -52,10 +36,13 @@ export function AccountHeader({
       </nav>
 
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
           <h1 className="font-bold text-3xl">{account.name}</h1>
-          <div className="mt-2 flex items-center gap-3 text-muted-foreground text-sm">
+          <p className="mt-2 text-muted-foreground">
+            Manage your AWS account connection and email sending infrastructure.
+          </p>
+          <div className="mt-3 flex items-center gap-3 text-muted-foreground text-sm">
             <span className="font-mono">{account.accountId}</span>
             <span>•</span>
             <span>{account.region}</span>
@@ -63,73 +50,23 @@ export function AccountHeader({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2">
-          {permissions.canManage && (
-            <Link
-              className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
-              href={`/${orgSlug}/aws-accounts/${account.id}/permissions`}
-            >
+        {permissions.canManage && (
+          <Button asChild variant="outline">
+            <Link href={`/${orgSlug}/aws-accounts/${account.id}/permissions`}>
               Manage Access
             </Link>
-          )}
-        </div>
+          </Button>
+        )}
       </div>
 
       {/* Permission badges */}
       <div className="flex gap-2">
-        {permissions.canView && (
-          <span className="rounded-md bg-blue-100 px-2 py-1 text-blue-800 text-xs">
-            View
-          </span>
-        )}
-        {permissions.canSend && (
-          <span className="rounded-md bg-green-100 px-2 py-1 text-green-800 text-xs">
-            Send
-          </span>
-        )}
+        {permissions.canView && <Badge variant="secondary">View Access</Badge>}
+        {permissions.canSend && <Badge variant="secondary">Send Access</Badge>}
         {permissions.canManage && (
-          <span className="rounded-md bg-purple-100 px-2 py-1 text-purple-800 text-xs">
-            Manage
-          </span>
+          <Badge variant="secondary">Manage Access</Badge>
         )}
       </div>
-
-      {/* CloudFormation Update Info (only for managers) */}
-      {permissions.canManage && (
-        <Card className="border-blue-200 bg-blue-50/50">
-          <CardHeader>
-            <CardTitle className="text-base">IAM Role Configuration</CardTitle>
-            <CardDescription>
-              Your External ID for secure role assumption. Keep this secret.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <label className="font-medium text-muted-foreground text-sm">
-                External ID
-              </label>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 rounded-md border bg-muted px-3 py-2 font-mono text-sm">
-                  {account.externalId}
-                </code>
-                <Button
-                  onClick={() =>
-                    copyToClipboard(account.externalId, "externalId")
-                  }
-                  size="sm"
-                  variant="outline"
-                >
-                  <Copy className="h-4 w-4" />
-                  {copiedField === "externalId" ? "Copied!" : "Copy"}
-                </Button>
-              </div>
-              <p className="text-muted-foreground text-xs">
-                This ID is used when updating your CloudFormation stack.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
