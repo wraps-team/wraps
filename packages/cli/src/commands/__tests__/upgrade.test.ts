@@ -602,6 +602,64 @@ describe("upgrade command", () => {
       );
       expect(costCalls.length).toBeGreaterThan(0);
     });
+
+    it("should show cost decrease when disabling features", async () => {
+      await setupPulumiMock();
+      // Start with more features enabled
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue({
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "vercel",
+        timestamp: new Date().toISOString(),
+        emailConfig: {
+          domain: "example.com",
+          tracking: { enabled: true },
+          suppressionList: { enabled: true },
+          eventTracking: { enabled: true },
+          historyStorage: { enabled: true, retentionDays: 365 }, // 1 year
+        },
+        preset: undefined, // Custom config
+        pulumiStackName: "wraps-123456789012-us-east-1",
+      } as any);
+
+      // Change retention from 365 days to 7 days (cost decrease)
+      vi.mocked(prompts.select)
+        .mockResolvedValueOnce("retention" as never)
+        .mockResolvedValueOnce("7days" as never);
+      vi.mocked(prompts.confirm).mockResolvedValue(true as never);
+
+      const consoleSpy = vi.spyOn(console, "log");
+
+      await upgrade({});
+
+      // Should show cost comparison - verify both current and new are shown
+      const costCalls = consoleSpy.mock.calls.filter(
+        (call) =>
+          call[0]?.includes("Current:") ||
+          call[0]?.includes("New:") ||
+          call[0]?.includes("Change:")
+      );
+      expect(costCalls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("should handle user declining confirmation", async () => {
+      await setupPulumiMock();
+      const exitSpy = vi
+        .spyOn(process, "exit")
+        .mockImplementation((() => {}) as any);
+
+      vi.mocked(prompts.select).mockResolvedValueOnce("preset" as never);
+      vi.mocked(prompts.confirm).mockResolvedValueOnce(false as never);
+
+      try {
+        await upgrade({});
+      } catch {
+        // Process.exit will stop execution
+      }
+
+      expect(exitSpy).toHaveBeenCalledWith(0);
+      exitSpy.mockRestore();
+    });
   });
 
   describe("Error Handling Tests", () => {
@@ -704,6 +762,59 @@ describe("upgrade command", () => {
           preset: undefined,
         })
       );
+    });
+
+    it("should handle custom tracking domain in outputs", async () => {
+      const pulumi = await import("@pulumi/pulumi");
+      const pulumiAutomation = await import("@pulumi/pulumi/automation");
+
+      const mockStack = {
+        workspace: {
+          selectStack: vi.fn().mockResolvedValue(undefined),
+        },
+        setConfig: vi.fn().mockResolvedValue(undefined),
+        up: vi.fn().mockResolvedValue({
+          outputs: {
+            roleArn: {
+              value: "arn:aws:iam::123456789012:role/wraps-email-role",
+            },
+            configSetName: { value: "wraps-email-tracking" },
+            tableName: { value: "wraps-email-history" },
+            region: { value: "us-east-1" },
+            customTrackingDomain: { value: "track.example.com" },
+          },
+        }),
+      } as any;
+
+      const createOrSelectStackMock = vi
+        .fn()
+        .mockImplementation(async (args) => {
+          if (args.program) {
+            await args.program();
+          }
+          return mockStack;
+        });
+
+      vi.mocked(
+        pulumi.automation.LocalWorkspace.createOrSelectStack
+      ).mockImplementation(createOrSelectStackMock);
+      vi.mocked(
+        pulumiAutomation.LocalWorkspace.createOrSelectStack
+      ).mockImplementation(createOrSelectStackMock);
+
+      vi.mocked(prompts.select).mockResolvedValueOnce("preset" as never);
+      vi.mocked(prompts.select).mockResolvedValueOnce("production" as never);
+      vi.mocked(prompts.confirm).mockResolvedValue(true as never);
+
+      const consoleSpy = vi.spyOn(console, "log");
+
+      await upgrade({});
+
+      // Should display custom tracking domain DNS records
+      const trackingDomainCalls = consoleSpy.mock.calls.filter((call) =>
+        call[0]?.includes("track.example.com")
+      );
+      expect(trackingDomainCalls.length).toBeGreaterThan(0);
     });
   });
 

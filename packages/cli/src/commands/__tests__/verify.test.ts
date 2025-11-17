@@ -1,6 +1,6 @@
 import { GetEmailIdentityCommand, SESv2Client } from "@aws-sdk/client-sesv2";
 import { mockClient } from "aws-sdk-client-mock";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { verify } from "../verify.js";
 
 const sesv2Mock = mockClient(SESv2Client);
@@ -231,5 +231,146 @@ describe("verify command", () => {
     await verify({ domain: "example.com" });
 
     // Should not try to resolve DKIM if no tokens (resolveCname is reset between tests)
+  });
+
+  it("should verify MAIL FROM domain MX records", async () => {
+    sesv2Mock.on(GetEmailIdentityCommand).resolves({
+      VerifiedForSendingStatus: true,
+      DkimAttributes: {
+        Status: "SUCCESS",
+        Tokens: ["token1"],
+      },
+      MailFromAttributes: {
+        MailFromDomain: "mail.example.com",
+        MailFromDomainStatus: "SUCCESS",
+      },
+    });
+
+    mockResolverInstance.resolveCname.mockResolvedValue([
+      "token1.dkim.amazonses.com",
+    ]);
+    mockResolverInstance.resolveTxt
+      .mockResolvedValueOnce([["v=spf1 include:amazonses.com ~all"]])
+      .mockResolvedValueOnce([["v=DMARC1; p=quarantine"]])
+      .mockResolvedValueOnce([["v=spf1 include:amazonses.com ~all"]]);
+
+    // Mock resolveMx
+    mockResolverInstance.resolveMx = vi
+      .fn()
+      .mockResolvedValue([
+        { priority: 10, exchange: "feedback-smtp.us-east-1.amazonses.com" },
+      ]);
+
+    await verify({ domain: "example.com" });
+
+    expect(mockResolverInstance.resolveMx).toHaveBeenCalledWith(
+      "mail.example.com"
+    );
+  });
+
+  it("should detect missing MAIL FROM MX records", async () => {
+    sesv2Mock.on(GetEmailIdentityCommand).resolves({
+      VerifiedForSendingStatus: false,
+      DkimAttributes: {
+        Status: "PENDING",
+        Tokens: ["token1"],
+      },
+      MailFromAttributes: {
+        MailFromDomain: "mail.example.com",
+        MailFromDomainStatus: "PENDING",
+      },
+    });
+
+    mockResolverInstance.resolveCname.mockResolvedValue([
+      "token1.dkim.amazonses.com",
+    ]);
+    mockResolverInstance.resolveTxt
+      .mockResolvedValueOnce([["v=spf1 include:amazonses.com ~all"]])
+      .mockResolvedValueOnce([["v=DMARC1; p=quarantine"]])
+      .mockRejectedValueOnce(new Error("ENOTFOUND"));
+
+    mockResolverInstance.resolveMx = vi
+      .fn()
+      .mockRejectedValue(new Error("ENOTFOUND"));
+
+    await verify({ domain: "example.com" });
+
+    expect(mockResolverInstance.resolveMx).toHaveBeenCalledWith(
+      "mail.example.com"
+    );
+  });
+
+  it("should detect incorrect MAIL FROM MX records", async () => {
+    sesv2Mock.on(GetEmailIdentityCommand).resolves({
+      VerifiedForSendingStatus: false,
+      DkimAttributes: {
+        Status: "PENDING",
+        Tokens: ["token1"],
+      },
+      MailFromAttributes: {
+        MailFromDomain: "mail.example.com",
+        MailFromDomainStatus: "PENDING",
+      },
+    });
+
+    mockResolverInstance.resolveCname.mockResolvedValue([
+      "token1.dkim.amazonses.com",
+    ]);
+    mockResolverInstance.resolveTxt
+      .mockResolvedValueOnce([["v=spf1 include:amazonses.com ~all"]])
+      .mockResolvedValueOnce([["v=DMARC1; p=quarantine"]])
+      .mockResolvedValueOnce([["v=spf1 include:sendgrid.net ~all"]]);
+
+    mockResolverInstance.resolveMx = vi
+      .fn()
+      .mockResolvedValue([{ priority: 10, exchange: "mx.google.com" }]);
+
+    await verify({ domain: "example.com" });
+
+    expect(mockResolverInstance.resolveMx).toHaveBeenCalled();
+  });
+
+  it("should handle some incorrect DNS records", async () => {
+    sesv2Mock.on(GetEmailIdentityCommand).resolves({
+      VerifiedForSendingStatus: false,
+      DkimAttributes: {
+        Status: "PENDING",
+        Tokens: ["token1"],
+      },
+    });
+
+    mockResolverInstance.resolveCname.mockResolvedValue(["wrong.cname.com"]);
+    mockResolverInstance.resolveTxt
+      .mockResolvedValueOnce([["v=spf1 include:sendgrid.net ~all"]])
+      .mockResolvedValueOnce([["v=DMARC1; p=quarantine"]]);
+
+    await verify({ domain: "example.com" });
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining("wraps status")
+    );
+  });
+
+  it("should handle pending verification with all DNS records correct", async () => {
+    sesv2Mock.on(GetEmailIdentityCommand).resolves({
+      VerifiedForSendingStatus: false,
+      DkimAttributes: {
+        Status: "PENDING",
+        Tokens: ["token1"],
+      },
+    });
+
+    mockResolverInstance.resolveCname.mockResolvedValue([
+      "token1.dkim.amazonses.com",
+    ]);
+    mockResolverInstance.resolveTxt
+      .mockResolvedValueOnce([["v=spf1 include:amazonses.com ~all"]])
+      .mockResolvedValueOnce([["v=DMARC1; p=quarantine"]]);
+
+    await verify({ domain: "example.com" });
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining("DNS records can take up to 48 hours")
+    );
   });
 });

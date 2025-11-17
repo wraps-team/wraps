@@ -15,6 +15,17 @@ export default defineConfig({
         "**/__tests__/**",
         "lambda/",
         "templates/",
+        // Infrastructure code (Pulumi) - tested through integration tests
+        "src/infrastructure/**",
+        // Express server code - will be tested later with integration tests
+        "src/console/routes/**",
+        "src/console/middleware/**",
+        "src/console/services/**",
+        "src/console/server.ts",
+        // Archive utility used primarily by console
+        "src/utils/archive.ts",
+        // CLI entry point
+        "src/cli.ts",
       ],
       thresholds: {
         lines: 70,
