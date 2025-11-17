@@ -3,7 +3,11 @@
 import type { awsAccountPermission, user } from "@wraps/db";
 import type { InferSelectModel } from "drizzle-orm";
 import { useState } from "react";
+import { toast } from "sonner";
 import { revokeAccessAction } from "@/actions/permissions";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 type PermissionWithUser = InferSelectModel<typeof awsAccountPermission> & {
   user: InferSelectModel<typeof user>;
@@ -32,63 +36,50 @@ export function PermissionsList({
     try {
       const result = await revokeAccessAction(userId, awsAccountId);
       if ("error" in result) {
-        alert(`Error: ${result.error}`);
+        toast.error(`Error: ${result.error}`);
       } else {
+        toast.success("Access revoked successfully");
         // Refresh the page to show updated permissions
         window.location.reload();
       }
     } catch (error) {
       console.error("Error revoking access:", error);
-      alert("Failed to revoke access");
+      toast.error("Failed to revoke access");
     } finally {
       setRevoking(null);
     }
   };
 
   return (
-    <div className="space-y-4">
-      {permissions.map((permission) => {
+    <div className="space-y-3">
+      {permissions.map((permission, index) => {
         const isExpired =
           permission.expiresAt && new Date(permission.expiresAt) < new Date();
 
         return (
-          <div
-            className="rounded-lg border bg-card p-6 text-card-foreground shadow-sm"
-            key={permission.id}
-          >
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
+          <div key={permission.id}>
+            <div className="flex items-start justify-between py-3">
+              <div className="flex-1 space-y-2">
                 <div>
-                  <h3 className="font-semibold">{permission.user.name}</h3>
-                  <p className="text-muted-foreground text-sm">
+                  <h4 className="font-medium text-sm">
+                    {permission.user.name}
+                  </h4>
+                  <p className="text-muted-foreground text-xs">
                     {permission.user.email}
                   </p>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {Array.isArray(permission.permissions) &&
                     permission.permissions.map((perm) => (
-                      <span
-                        className={`rounded-md px-2 py-1 text-xs ${
-                          perm === "view"
-                            ? "bg-blue-100 text-blue-800"
-                            : perm === "send"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-purple-100 text-purple-800"
-                        }`}
-                        key={perm}
-                      >
+                      <Badge key={perm} variant="secondary">
                         {perm}
-                      </span>
+                      </Badge>
                     ))}
-                  {isExpired && (
-                    <span className="rounded-md bg-red-100 px-2 py-1 text-red-800 text-xs">
-                      Expired
-                    </span>
-                  )}
+                  {isExpired && <Badge variant="destructive">Expired</Badge>}
                 </div>
 
-                <div className="text-muted-foreground text-xs">
+                <div className="space-y-0.5 text-muted-foreground text-xs">
                   <p>
                     Granted by {permission.grantedByUser?.name || "Unknown"} on{" "}
                     {new Date(permission.createdAt).toLocaleDateString()}
@@ -102,15 +93,18 @@ export function PermissionsList({
                 </div>
               </div>
 
-              <button
-                className="rounded-md border border-red-200 bg-red-50 px-3 py-1 text-red-700 text-sm hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+              <Button
                 disabled={revoking === permission.userId}
+                loading={revoking === permission.userId}
                 onClick={() => handleRevoke(permission.userId)}
+                size="sm"
                 type="button"
+                variant="destructive"
               >
-                {revoking === permission.userId ? "Revoking..." : "Revoke"}
-              </button>
+                Revoke
+              </Button>
             </div>
+            {index < permissions.length - 1 && <Separator />}
           </div>
         );
       })}

@@ -4,10 +4,10 @@ import { db } from "@wraps/db";
 import type { InferSelectModel } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { AccountHeader } from "@/components/account-header";
-import { GrantAccessForm } from "@/components/forms/grant-access-form";
-import { PermissionsList } from "@/components/permissions-list";
 import { getOrganizationBySlug } from "@/lib/organization";
 import { checkAWSAccountAccess } from "@/lib/permissions/check-access";
+import { CurrentAccess } from "./components/current-access";
+import { GrantAccessCard } from "./components/grant-access";
 
 type PermissionWithUser = InferSelectModel<typeof awsAccountPermission> & {
   user: InferSelectModel<typeof user>;
@@ -119,48 +119,27 @@ export default async function PermissionsPage({
   };
 
   return (
-    <>
+    <div className="space-y-6 px-4 lg:px-6">
       {/* Header */}
-      <div className="px-4 lg:px-6">
-        <AccountHeader
-          account={account}
-          orgSlug={orgSlug}
-          permissions={userPermissions}
-        />
-      </div>
+      <AccountHeader
+        account={account}
+        orgSlug={orgSlug}
+        permissions={userPermissions}
+      />
 
-      {/* Permissions List */}
-      <div className="px-4 lg:px-6">
-        <h2 className="mb-4 font-semibold text-xl">Current Access</h2>
-        {permissions.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-12 text-center">
-            <p className="text-muted-foreground">
-              No explicit permissions granted yet
-            </p>
-            <p className="mt-2 text-muted-foreground text-sm">
-              Organization owners have full access by default
-            </p>
-          </div>
-        ) : (
-          <PermissionsList
-            awsAccountId={accountId}
-            organizationId={organization.id}
-            permissions={permissions}
-          />
-        )}
-      </div>
+      {/* Current Access */}
+      <CurrentAccess
+        awsAccountId={accountId}
+        organizationId={organization.id}
+        permissions={permissions}
+      />
 
-      {/* Grant Access Form */}
-      <div className="px-4 lg:px-6">
-        <h2 className="mb-4 font-semibold text-xl">Grant Access</h2>
-        <div className="rounded-lg border bg-card p-6 shadow-sm">
-          <GrantAccessForm
-            awsAccountId={accountId}
-            members={members}
-            organizationId={organization.id}
-          />
-        </div>
-      </div>
-    </>
+      {/* Grant Access */}
+      <GrantAccessCard
+        awsAccountId={accountId}
+        members={members}
+        organizationId={organization.id}
+      />
+    </div>
   );
 }

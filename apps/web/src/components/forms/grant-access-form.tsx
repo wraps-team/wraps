@@ -7,6 +7,7 @@ import type { member, user } from "@wraps/db";
 import type { InferSelectModel } from "drizzle-orm";
 import { useActionState } from "react";
 import { grantAccessAction } from "@/actions/permissions";
+import { Button } from "@/components/ui/button";
 import { grantAccessFormOpts } from "@/lib/forms/grant-access";
 
 type MemberWithUser = InferSelectModel<typeof member> & {
@@ -109,40 +110,37 @@ export function GrantAccessForm({
           onChange: ({ value }) => (value ? undefined : "User is required"),
         }}
       >
-        {(field) => (
-          <div>
-            <label
-              className="mb-2 block font-medium text-gray-700 text-sm"
-              htmlFor={field.name}
-            >
-              User
-            </label>
-            <select
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              id={field.name}
-              name={field.name}
-              onBlur={field.handleBlur}
-              onChange={(e) => field.handleChange(e.target.value)}
-              value={field.state.value}
-            >
-              <option value="">Select a user...</option>
-              {members.map((member) => (
-                <option key={member.userId} value={member.userId}>
-                  {member.user.name} ({member.user.email}) - {member.role}
-                </option>
-              ))}
-            </select>
-            {field.state.meta.errors.length > 0 && (
-              <div className="mt-1 space-y-1">
-                {field.state.meta.errors.map((error) => (
-                  <p className="text-red-600 text-sm" key={String(error)}>
-                    {String(error)}
-                  </p>
+        {(field) => {
+          const isInvalid =
+            field.state.meta.isTouched && !field.state.meta.isValid;
+          return (
+            <div className="space-y-2">
+              <label className="font-medium text-sm" htmlFor={field.name}>
+                User
+              </label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:font-medium file:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                id={field.name}
+                name={field.name}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                value={field.state.value}
+              >
+                <option value="">Select a user...</option>
+                {members.map((member) => (
+                  <option key={member.userId} value={member.userId}>
+                    {member.user.name} ({member.user.email}) - {member.role}
+                  </option>
                 ))}
-              </div>
-            )}
-          </div>
-        )}
+              </select>
+              {isInvalid && field.state.meta.errors.length > 0 && (
+                <p className="text-destructive text-sm">
+                  {String(field.state.meta.errors[0])}
+                </p>
+              )}
+            </div>
+          );
+        }}
       </form.Field>
 
       {/* Permission Level */}
@@ -153,83 +151,77 @@ export function GrantAccessForm({
             value ? undefined : "Permission level is required",
         }}
       >
-        {(field) => (
-          <div>
-            <label
-              className="mb-2 block font-medium text-gray-700 text-sm"
-              htmlFor={field.name}
-            >
-              Permission Level
-            </label>
-            <select
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              id={field.name}
-              name={field.name}
-              onBlur={field.handleBlur}
-              onChange={(e) =>
-                field.handleChange(
-                  e.target.value as "READ_ONLY" | "FULL_ACCESS" | "ADMIN"
-                )
-              }
-              value={field.state.value}
-            >
-              <option value="">Select permission level...</option>
-              <option value="READ_ONLY">
-                Read Only - View metrics and logs
-              </option>
-              <option value="FULL_ACCESS">
-                Full Access - View and send emails
-              </option>
-              <option value="ADMIN">
-                Admin - Full control including management
-              </option>
-            </select>
-            {field.state.meta.errors.length > 0 && (
-              <div className="mt-1 space-y-1">
-                {field.state.meta.errors.map((error) => (
-                  <p className="text-red-600 text-sm" key={String(error)}>
-                    {String(error)}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {(field) => {
+          const isInvalid =
+            field.state.meta.isTouched && !field.state.meta.isValid;
+          return (
+            <div className="space-y-2">
+              <label className="font-medium text-sm" htmlFor={field.name}>
+                Permission Level
+              </label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:font-medium file:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                id={field.name}
+                name={field.name}
+                onBlur={field.handleBlur}
+                onChange={(e) =>
+                  field.handleChange(
+                    e.target.value as "READ_ONLY" | "FULL_ACCESS" | "ADMIN"
+                  )
+                }
+                value={field.state.value}
+              >
+                <option value="">Select permission level...</option>
+                <option value="READ_ONLY">
+                  Read Only - View metrics and logs
+                </option>
+                <option value="FULL_ACCESS">
+                  Full Access - View and send emails
+                </option>
+                <option value="ADMIN">
+                  Admin - Full control including management
+                </option>
+              </select>
+              {isInvalid && field.state.meta.errors.length > 0 && (
+                <p className="text-destructive text-sm">
+                  {String(field.state.meta.errors[0])}
+                </p>
+              )}
+            </div>
+          );
+        }}
       </form.Field>
 
       {/* Optional: Expiration Date */}
       <form.Field name="expiresAt">
-        {(field) => (
-          <div>
-            <label
-              className="mb-2 block font-medium text-gray-700 text-sm"
-              htmlFor={field.name}
-            >
-              Expires At (Optional)
-            </label>
-            <input
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              id={field.name}
-              name={field.name}
-              onBlur={field.handleBlur}
-              onChange={(e) => field.handleChange(e.target.value)}
-              type="datetime-local"
-              value={field.state.value}
-            />
-            <p className="mt-1 text-gray-500 text-xs">
-              Leave empty for permanent access
-            </p>
-            {field.state.meta.errors.length > 0 && (
-              <div className="mt-1 space-y-1">
-                {field.state.meta.errors.map((error) => (
-                  <p className="text-red-600 text-sm" key={String(error)}>
-                    {String(error)}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {(field) => {
+          const isInvalid =
+            field.state.meta.isTouched && !field.state.meta.isValid;
+          return (
+            <div className="space-y-2">
+              <label className="font-medium text-sm" htmlFor={field.name}>
+                Expires At (Optional)
+              </label>
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:font-medium file:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                id={field.name}
+                name={field.name}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                type="datetime-local"
+                value={field.state.value}
+              />
+              <p className="text-muted-foreground text-xs">
+                Leave empty for permanent access
+              </p>
+              {isInvalid && field.state.meta.errors.length > 0 && (
+                <p className="text-destructive text-sm">
+                  {String(field.state.meta.errors[0])}
+                </p>
+              )}
+            </div>
+          );
+        }}
       </form.Field>
 
       {/* Submit button */}
@@ -237,13 +229,14 @@ export function GrantAccessForm({
         selector={(formState) => [formState.canSubmit, formState.isSubmitting]}
       >
         {([canSubmit, isSubmitting]) => (
-          <button
-            className="w-full rounded-lg bg-blue-600 px-6 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          <Button
+            className="w-full"
             disabled={!canSubmit || isSubmitting}
+            loading={isSubmitting}
             type="submit"
           >
-            {isSubmitting ? "Granting Access..." : "Grant Access"}
-          </button>
+            Grant Access
+          </Button>
         )}
       </form.Subscribe>
     </form>
