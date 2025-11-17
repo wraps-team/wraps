@@ -114,7 +114,7 @@ describe("Cost Calculation", () => {
         eventTracking: {
           enabled: true,
           dynamoDBHistory: true,
-          archiveRetention: "90days",
+          archiveRetention: "3months",
           events: ["SEND", "DELIVERY", "BOUNCE", "COMPLAINT"],
         },
       };
@@ -123,7 +123,7 @@ describe("Cost Calculation", () => {
 
       expect(costs.dynamoDBHistory).toBeDefined();
       expect(costs.dynamoDBHistory?.monthly).toBeGreaterThan(0);
-      expect(costs.dynamoDBHistory?.description).toContain("90days");
+      expect(costs.dynamoDBHistory?.description).toContain("3months");
       expect(costs.dynamoDBHistory?.description).toContain("4 event types");
     });
 
@@ -155,7 +155,7 @@ describe("Cost Calculation", () => {
           enabled: true,
           eventBridge: true,
           dynamoDBHistory: true,
-          archiveRetention: "90days",
+          archiveRetention: "3months",
           events: [
             "SEND",
             "DELIVERY",
@@ -228,7 +228,7 @@ describe("Cost Calculation", () => {
           enabled: true,
           eventBridge: true,
           dynamoDBHistory: true,
-          archiveRetention: "90days",
+          archiveRetention: "3months",
         },
       };
 
@@ -294,19 +294,19 @@ describe("Cost Calculation", () => {
 
   describe("Storage Cost Calculations", () => {
     it("should increase storage costs with longer retention periods", () => {
-      const config7days: WrapsEmailConfig = {
+      const config3months: WrapsEmailConfig = {
         eventTracking: {
           enabled: true,
           dynamoDBHistory: true,
-          archiveRetention: "7days",
+          archiveRetention: "3months",
         },
       };
 
-      const config90days: WrapsEmailConfig = {
+      const config6months: WrapsEmailConfig = {
         eventTracking: {
           enabled: true,
           dynamoDBHistory: true,
-          archiveRetention: "90days",
+          archiveRetention: "6months",
         },
       };
 
@@ -319,22 +319,22 @@ describe("Cost Calculation", () => {
       };
 
       // Use higher volume to exceed free tier and see cost differences
-      const costs7days = calculateCosts(config7days, 100_000);
-      const costs90days = calculateCosts(config90days, 100_000);
+      const costs3months = calculateCosts(config3months, 100_000);
+      const costs6months = calculateCosts(config6months, 100_000);
       const costs1year = calculateCosts(config1year, 100_000);
 
       // All configs should have DynamoDB history costs
-      expect(costs7days.dynamoDBHistory).toBeDefined();
-      expect(costs90days.dynamoDBHistory).toBeDefined();
+      expect(costs3months.dynamoDBHistory).toBeDefined();
+      expect(costs6months.dynamoDBHistory).toBeDefined();
       expect(costs1year.dynamoDBHistory).toBeDefined();
 
       // Verify retention descriptions are correct
-      expect(costs7days.dynamoDBHistory?.description).toContain("7days");
-      expect(costs90days.dynamoDBHistory?.description).toContain("90days");
+      expect(costs3months.dynamoDBHistory?.description).toContain("3months");
+      expect(costs6months.dynamoDBHistory?.description).toContain("6months");
       expect(costs1year.dynamoDBHistory?.description).toContain("1year");
 
       // Longer retention should have equal or higher costs (mostly write costs, small storage differences)
-      expect(costs7days.dynamoDBHistory?.monthly).toBeLessThanOrEqual(
+      expect(costs3months.dynamoDBHistory?.monthly).toBeLessThanOrEqual(
         costs1year.dynamoDBHistory?.monthly || 0
       );
     });
@@ -344,7 +344,7 @@ describe("Cost Calculation", () => {
         eventTracking: {
           enabled: true,
           dynamoDBHistory: true,
-          archiveRetention: "90days",
+          archiveRetention: "3months",
           events: ["SEND", "DELIVERY", "BOUNCE", "COMPLAINT"],
         },
       };
@@ -353,7 +353,7 @@ describe("Cost Calculation", () => {
         eventTracking: {
           enabled: true,
           dynamoDBHistory: true,
-          archiveRetention: "90days",
+          archiveRetention: "3months",
           events: [
             "SEND",
             "DELIVERY",
@@ -456,7 +456,7 @@ describe("Cost Calculation", () => {
           enabled: true,
           eventBridge: true,
           dynamoDBHistory: true,
-          archiveRetention: "90days",
+          archiveRetention: "3months",
         },
       };
 
@@ -600,7 +600,7 @@ describe("Cost Calculation", () => {
           enabled: true,
           eventBridge: true,
           dynamoDBHistory: true,
-          archiveRetention: "90days",
+          archiveRetention: "3months",
         },
         suppressionList: {
           enabled: true,
@@ -640,11 +640,11 @@ describe("Cost Calculation", () => {
   });
 
   describe("Email Archiving Costs", () => {
-    it("should calculate costs for 7 days retention", () => {
+    it("should calculate costs for 3 months retention", () => {
       const config: WrapsEmailConfig = {
         emailArchiving: {
           enabled: true,
-          retention: "7days",
+          retention: "3months",
         },
       };
 
@@ -652,37 +652,7 @@ describe("Cost Calculation", () => {
 
       expect(costs.emailArchiving).toBeDefined();
       expect(costs.emailArchiving?.monthly).toBeGreaterThan(0);
-      expect(costs.emailArchiving?.description).toContain("7days");
-    });
-
-    it("should calculate costs for 30 days retention", () => {
-      const config: WrapsEmailConfig = {
-        emailArchiving: {
-          enabled: true,
-          retention: "30days",
-        },
-      };
-
-      const costs = calculateCosts(config, 10_000);
-
-      expect(costs.emailArchiving).toBeDefined();
-      expect(costs.emailArchiving?.monthly).toBeGreaterThan(0);
-      expect(costs.emailArchiving?.description).toContain("30days");
-    });
-
-    it("should calculate costs for 90 days retention", () => {
-      const config: WrapsEmailConfig = {
-        emailArchiving: {
-          enabled: true,
-          retention: "90days",
-        },
-      };
-
-      const costs = calculateCosts(config, 10_000);
-
-      expect(costs.emailArchiving).toBeDefined();
-      expect(costs.emailArchiving?.monthly).toBeGreaterThan(0);
-      expect(costs.emailArchiving?.description).toContain("90days");
+      expect(costs.emailArchiving?.description).toContain("3months");
     });
 
     it("should calculate costs for 6 months retention", () => {
@@ -731,10 +701,10 @@ describe("Cost Calculation", () => {
     });
 
     it("should increase storage costs with longer retention periods", () => {
-      const config7days: WrapsEmailConfig = {
+      const config3months: WrapsEmailConfig = {
         emailArchiving: {
           enabled: true,
-          retention: "7days",
+          retention: "3months",
         },
       };
 
@@ -745,12 +715,12 @@ describe("Cost Calculation", () => {
         },
       };
 
-      const costs7days = calculateCosts(config7days, 10_000);
+      const costs3months = calculateCosts(config3months, 10_000);
       const costs1year = calculateCosts(config1year, 10_000);
 
-      // 1 year retention should cost more than 7 days due to storage
+      // 1 year retention should cost more than 3 months due to storage
       expect(costs1year.emailArchiving?.monthly).toBeGreaterThan(
-        costs7days.emailArchiving?.monthly || 0
+        costs3months.emailArchiving?.monthly || 0
       );
     });
 
@@ -758,7 +728,7 @@ describe("Cost Calculation", () => {
       const config: WrapsEmailConfig = {
         emailArchiving: {
           enabled: true,
-          retention: "90days",
+          retention: "3months",
         },
       };
 
@@ -766,7 +736,7 @@ describe("Cost Calculation", () => {
 
       // Description should mention retention and storage
       expect(costs.emailArchiving?.description).toContain("Email archiving");
-      expect(costs.emailArchiving?.description).toContain("90days");
+      expect(costs.emailArchiving?.description).toContain("3months");
       expect(costs.emailArchiving?.description).toContain("GB");
     });
 
@@ -774,7 +744,7 @@ describe("Cost Calculation", () => {
       const config: WrapsEmailConfig = {
         emailArchiving: {
           enabled: true,
-          retention: "90days",
+          retention: "3months",
         },
       };
 
@@ -791,7 +761,7 @@ describe("Cost Calculation", () => {
       const config: WrapsEmailConfig = {
         emailArchiving: {
           enabled: false,
-          retention: "90days",
+          retention: "3months",
         },
       };
 
@@ -812,7 +782,7 @@ describe("Cost Calculation", () => {
       const config: WrapsEmailConfig = {
         emailArchiving: {
           enabled: true,
-          retention: "90days",
+          retention: "3months",
         },
       };
 
@@ -842,7 +812,7 @@ describe("Cost Calculation", () => {
       const configArchiving: WrapsEmailConfig = {
         emailArchiving: {
           enabled: true,
-          retention: "90days",
+          retention: "3months",
         },
       };
 
@@ -850,7 +820,7 @@ describe("Cost Calculation", () => {
         eventTracking: {
           enabled: true,
           dynamoDBHistory: true,
-          archiveRetention: "90days",
+          archiveRetention: "3months",
         },
       };
 

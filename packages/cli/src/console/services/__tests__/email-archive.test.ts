@@ -47,7 +47,12 @@ describe("Email Archive Service", () => {
       expect(result).toEqual(mockEmail);
       expect(getArchivedEmail).toHaveBeenCalledWith(
         mockOptions.archiveArn,
-        mockMessageId,
+        {
+          from: undefined,
+          to: undefined,
+          subject: undefined,
+          timestamp: undefined,
+        },
         mockOptions.region
       );
     });
@@ -306,7 +311,12 @@ describe("Email Archive Service", () => {
 
       expect(getArchivedEmail).toHaveBeenCalledWith(
         expect.any(String),
-        mockMessageId,
+        {
+          from: undefined,
+          to: undefined,
+          subject: undefined,
+          timestamp: undefined,
+        },
         "eu-west-1"
       );
     });

@@ -642,9 +642,10 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(true) // dynamoDB history
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(true) // reputation metrics
-        .mockResolvedValueOnce(false); // dedicated IP
+        .mockResolvedValueOnce(false) // dedicated IP
+        .mockResolvedValueOnce(false); // email archiving
 
-      vi.mocked(clack.select).mockResolvedValue("90days");
+      vi.mocked(clack.select).mockResolvedValue("3months");
 
       const result = await promptCustomConfig();
 
@@ -680,7 +681,8 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(true) // dynamoDB history
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(true) // reputation metrics
-        .mockResolvedValueOnce(false); // dedicated IP
+        .mockResolvedValueOnce(false) // dedicated IP
+        .mockResolvedValueOnce(false); // email archiving
 
       vi.mocked(clack.select).mockResolvedValue("1year");
 
@@ -713,9 +715,10 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(true) // dynamoDB history
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(true) // reputation metrics
-        .mockResolvedValueOnce(false); // dedicated IP
+        .mockResolvedValueOnce(false) // dedicated IP
+        .mockResolvedValueOnce(false); // email archiving
 
-      vi.mocked(clack.select).mockResolvedValue("90days");
+      vi.mocked(clack.select).mockResolvedValue("3months");
 
       const result = await promptCustomConfig();
 
@@ -762,12 +765,12 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(true); // email archiving
 
-      vi.mocked(clack.select).mockResolvedValue("90days");
+      vi.mocked(clack.select).mockResolvedValue("3months");
 
       const result = await promptCustomConfig();
 
       expect(result.emailArchiving?.enabled).toBe(true);
-      expect(result.emailArchiving?.retention).toBe("90days");
+      expect(result.emailArchiving?.retention).toBe("3months");
     });
 
     it("should not include email archiving when disabled", async () => {
@@ -783,7 +786,7 @@ describe("Prompts", () => {
 
       expect(result.emailArchiving).toEqual({
         enabled: false,
-        retention: "90days",
+        retention: "3months",
       });
     });
 
@@ -806,7 +809,7 @@ describe("Prompts", () => {
           options: expect.arrayContaining([
             expect.objectContaining({ value: "7days" }),
             expect.objectContaining({ value: "30days" }),
-            expect.objectContaining({ value: "90days" }),
+            expect.objectContaining({ value: "3months" }),
             expect.objectContaining({ value: "6months" }),
             expect.objectContaining({ value: "1year" }),
             expect.objectContaining({ value: "18months" }),
