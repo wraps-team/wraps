@@ -51,24 +51,27 @@ export function OrganizationSettingsAwsAccounts({
   const [accounts, setAccounts] = useState<AWSAccountWithCreator[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const canEdit = userRole === "owner" || userRole === "admin";
 
+  // Trigger a refresh
+  const refreshData = () => setRefreshKey((prev) => prev + 1);
+
   // Load AWS accounts
   useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  async function loadData() {
-    setLoading(true);
-    const result = await listAWSAccounts(organization.id);
-    if (result.success) {
-      setAccounts(result.accounts);
-    } else {
-      toast.error(result.error);
+    async function loadData(organizationId: string) {
+      setLoading(true);
+      const result = await listAWSAccounts(organizationId);
+      if (result.success) {
+        setAccounts(result.accounts);
+      } else {
+        toast.error(result.error);
+      }
+      setLoading(false);
     }
-    setLoading(false);
-  }
+    loadData(organization.id);
+  }, [organization.id, refreshKey]);
 
   const formatDate = (date: Date | null) => {
     if (!date) {
@@ -83,7 +86,7 @@ export function OrganizationSettingsAwsAccounts({
 
   function handleConnectSuccess() {
     setConnectDialogOpen(false);
-    loadData(); // Reload accounts list
+    refreshData(); // Reload accounts list
     toast.success("AWS account connected successfully");
   }
 

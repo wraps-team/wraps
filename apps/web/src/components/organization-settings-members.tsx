@@ -98,25 +98,28 @@ export function OrganizationSettingsMembers({
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const canEdit = userRole === "owner" || userRole === "admin";
 
+  // Trigger a refresh
+  const refreshData = () => setRefreshKey((prev) => prev + 1);
+
   // Load members and invitations
   useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  async function loadData() {
-    setLoading(true);
-    const result = await listMembers(organization.id);
-    if (result.success) {
-      setMembers(result.members);
-      setInvitations(result.invitations);
-    } else {
-      toast.error(result.error);
+    async function loadData(organizationId: string) {
+      setLoading(true);
+      const result = await listMembers(organizationId);
+      if (result.success) {
+        setMembers(result.members);
+        setInvitations(result.invitations);
+      } else {
+        toast.error(result.error);
+      }
+      setLoading(false);
     }
-    setLoading(false);
-  }
+    loadData(organization.id);
+  }, [organization.id, refreshKey]);
 
   const getInitials = (name: string) =>
     name
@@ -141,7 +144,7 @@ export function OrganizationSettingsMembers({
       setInviteDialogOpen(false);
       setInviteEmail("");
       setInviteRole("member");
-      loadData(); // Reload to show new invitation
+      refreshData(); // Reload to show new invitation
     } else {
       toast.error(result.error);
     }
@@ -154,7 +157,7 @@ export function OrganizationSettingsMembers({
     const result = await updateMemberRole(memberId, newRole, organization.id);
     if (result.success) {
       toast.success("Member role updated");
-      loadData();
+      refreshData();
     } else {
       toast.error(result.error);
     }
@@ -168,7 +171,7 @@ export function OrganizationSettingsMembers({
     const result = await removeMember(memberId, organization.id);
     if (result.success) {
       toast.success("Member removed");
-      loadData();
+      refreshData();
     } else {
       toast.error(result.error);
     }
@@ -178,7 +181,7 @@ export function OrganizationSettingsMembers({
     const result = await cancelInvitation(invitationId, organization.id);
     if (result.success) {
       toast.success("Invitation cancelled");
-      loadData();
+      refreshData();
     } else {
       toast.error(result.error);
     }
