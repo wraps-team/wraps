@@ -1,6 +1,6 @@
 "use client";
 
-import type { awsAccountPermission, user } from "@wraps/db";
+import type { awsAccountPermission, member, user } from "@wraps/db";
 import type { InferSelectModel } from "drizzle-orm";
 import { PermissionsList } from "@/components/permissions-list";
 import {
@@ -16,17 +16,25 @@ type PermissionWithUser = InferSelectModel<typeof awsAccountPermission> & {
   grantedByUser: InferSelectModel<typeof user> | null;
 };
 
+type MemberWithUser = InferSelectModel<typeof member> & {
+  user: InferSelectModel<typeof user>;
+};
+
 type CurrentAccessProps = {
   permissions: PermissionWithUser[];
+  owners: MemberWithUser[];
   awsAccountId: string;
   organizationId: string;
 };
 
 export function CurrentAccess({
   permissions,
+  owners,
   awsAccountId,
   organizationId,
 }: CurrentAccessProps) {
+  const hasAnyAccess = owners.length > 0 || permissions.length > 0;
+
   return (
     <Card>
       <CardHeader>
@@ -36,21 +44,17 @@ export function CurrentAccess({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {permissions.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-12 text-center">
-            <p className="text-muted-foreground">
-              No explicit permissions granted yet
-            </p>
-            <p className="mt-2 text-muted-foreground text-sm">
-              Organization owners have full access by default
-            </p>
-          </div>
-        ) : (
+        {hasAnyAccess ? (
           <PermissionsList
             awsAccountId={awsAccountId}
             organizationId={organizationId}
+            owners={owners}
             permissions={permissions}
           />
+        ) : (
+          <div className="rounded-lg border border-dashed p-12 text-center">
+            <p className="text-muted-foreground">No access configured</p>
+          </div>
         )}
       </CardContent>
     </Card>

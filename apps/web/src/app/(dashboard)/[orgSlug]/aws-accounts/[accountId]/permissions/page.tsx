@@ -90,6 +90,9 @@ export default async function PermissionsPage({
   // Type assertion for members
   const members = membersRaw as unknown as MemberWithUser[];
 
+  // Get organization owners (they have implicit full access)
+  const owners = members.filter((m) => m.role === "owner");
+
   // Check all permissions for current user
   const [viewAccess, sendAccess, manageAccess] = await Promise.all([
     checkAWSAccountAccess({
@@ -131,6 +134,7 @@ export default async function PermissionsPage({
       <CurrentAccess
         awsAccountId={accountId}
         organizationId={organization.id}
+        owners={owners}
         permissions={permissions}
       />
 

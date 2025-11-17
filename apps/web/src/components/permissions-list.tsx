@@ -1,6 +1,6 @@
 "use client";
 
-import type { awsAccountPermission, user } from "@wraps/db";
+import type { awsAccountPermission, member, user } from "@wraps/db";
 import type { InferSelectModel } from "drizzle-orm";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -14,14 +14,20 @@ type PermissionWithUser = InferSelectModel<typeof awsAccountPermission> & {
   grantedByUser: InferSelectModel<typeof user> | null;
 };
 
+type MemberWithUser = InferSelectModel<typeof member> & {
+  user: InferSelectModel<typeof user>;
+};
+
 type PermissionsListProps = {
   permissions: PermissionWithUser[];
+  owners: MemberWithUser[];
   awsAccountId: string;
   organizationId: string;
 };
 
 export function PermissionsList({
   permissions,
+  owners,
   awsAccountId,
   organizationId,
 }: PermissionsListProps) {
@@ -52,6 +58,39 @@ export function PermissionsList({
 
   return (
     <div className="space-y-3">
+      {/* Organization owners (implicit full access) */}
+      {owners.map((owner, index) => (
+        <div key={owner.userId}>
+          <div className="flex items-start justify-between py-3">
+            <div className="flex-1 space-y-2">
+              <div>
+                <h4 className="font-medium text-sm">{owner.user.name}</h4>
+                <p className="text-muted-foreground text-xs">
+                  {owner.user.email}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                <Badge variant="secondary">View</Badge>
+                <Badge variant="secondary">Send</Badge>
+                <Badge variant="secondary">Manage</Badge>
+              </div>
+
+              <div className="space-y-0.5 text-muted-foreground text-xs">
+                <p>Organization Owner (implicit access)</p>
+              </div>
+            </div>
+
+            {/* Owners can't have their access revoked */}
+            <div className="h-9 w-20" />
+          </div>
+          {(index < owners.length - 1 || permissions.length > 0) && (
+            <Separator />
+          )}
+        </div>
+      ))}
+
+      {/* Explicit permissions */}
       {permissions.map((permission, index) => {
         const isExpired =
           permission.expiresAt && new Date(permission.expiresAt) < new Date();

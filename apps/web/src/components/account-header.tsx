@@ -4,7 +4,6 @@ import type { awsAccount } from "@wraps/db";
 import type { InferSelectModel } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 type AccountHeaderProps = {
@@ -55,15 +54,6 @@ export function AccountHeader({
               Manage Access
             </Link>
           </Button>
-        )}
-      </div>
-
-      {/* Permission badges */}
-      <div className="flex gap-2">
-        {permissions.canView && <Badge variant="secondary">View Access</Badge>}
-        {permissions.canSend && <Badge variant="secondary">Send Access</Badge>}
-        {permissions.canManage && (
-          <Badge variant="secondary">Manage Access</Badge>
         )}
       </div>
     </div>
