@@ -186,6 +186,54 @@ describe("saveConnectionMetadata", () => {
     vi.mocked(writeFile).mockResolvedValue(undefined);
   });
 
+  it("should create connections directory if it doesn't exist", async () => {
+    const { mkdir } = await import("node:fs/promises");
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(mkdir).mockResolvedValue(undefined);
+
+    const emailConfig = getPreset("starter")!;
+    const metadata = createConnectionMetadata(
+      "123456789012",
+      "us-east-1",
+      "vercel",
+      emailConfig,
+      "starter"
+    );
+
+    await saveConnectionMetadata(metadata);
+
+    expect(mkdir).toHaveBeenCalledWith("/mock/wraps/dir/connections", {
+      recursive: true,
+    });
+  });
+
+  it("should throw error when save fails", async () => {
+    const emailConfig = getPreset("starter")!;
+    const metadata = createConnectionMetadata(
+      "123456789012",
+      "us-east-1",
+      "vercel",
+      emailConfig,
+      "starter"
+    );
+
+    vi.mocked(writeFile).mockRejectedValue(new Error("Permission denied"));
+
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    await expect(saveConnectionMetadata(metadata)).rejects.toThrow(
+      "Permission denied"
+    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Error saving connection metadata:",
+      "Permission denied"
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it("should save metadata to correct file path", async () => {
     const emailConfig = getPreset("starter")!;
     const metadata = createConnectionMetadata(
@@ -390,6 +438,24 @@ describe("listConnections", () => {
 
     expect(connections).toHaveLength(1);
     expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("should return empty array when listing fails", async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdir).mockRejectedValue(new Error("Permission denied"));
+
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const connections = await listConnections();
+
+    expect(connections).toEqual([]);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Error listing connections:",
+      "Permission denied"
+    );
 
     consoleErrorSpy.mockRestore();
   });
