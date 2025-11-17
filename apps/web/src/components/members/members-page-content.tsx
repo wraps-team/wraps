@@ -1,7 +1,7 @@
 "use client";
 
 import { UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   listMembers,
@@ -38,7 +38,7 @@ export function MembersPageContent({
 
   const canManageMembers = userRole === "owner" || userRole === "admin";
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     setIsLoading(true);
     const result = await listMembers(organizationId);
 
@@ -50,7 +50,7 @@ export function MembersPageContent({
     }
 
     setIsLoading(false);
-  };
+  }, [organizationId]);
 
   useEffect(() => {
     fetchMembers();

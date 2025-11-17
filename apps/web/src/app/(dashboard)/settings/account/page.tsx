@@ -5,7 +5,7 @@ import { initialFormState } from "@tanstack/react-form/nextjs";
 import { useStore } from "@tanstack/react-store";
 import { useActionState, useEffect } from "react";
 import { z } from "zod";
-import { changePasswordAction, updateAccountAction } from "@/actions/account";
+import { updateAccountAction } from "@/actions/account";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,10 +18,7 @@ import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { authClient } from "@/lib/auth-client";
-import {
-  changePasswordFormOpts,
-  updateAccountFormOpts,
-} from "@/lib/forms/update-account";
+import { updateAccountFormOpts } from "@/lib/forms/update-account";
 
 export default function AccountSettings() {
   const { data: session } = authClient.useSession();
@@ -72,47 +69,6 @@ export default function AccountSettings() {
     typeof accountState === "object" &&
     "success" in accountState &&
     accountState.success === true;
-
-  // Password change form
-  const [passwordState, passwordAction, isPasswordPending] = useActionState<
-    any,
-    FormData
-  >(changePasswordAction, initialFormState);
-
-  const passwordForm = useForm({
-    ...changePasswordFormOpts,
-    transform: useTransform(
-      (baseForm) => {
-        if (
-          passwordState &&
-          typeof passwordState === "object" &&
-          "values" in passwordState
-        ) {
-          return mergeForm(baseForm, passwordState);
-        }
-        return baseForm;
-      },
-      [passwordState]
-    ),
-  });
-
-  const passwordFormErrors = useStore(
-    passwordForm.store,
-    (formState) => formState.errors
-  );
-
-  const isPasswordSuccess =
-    passwordState &&
-    typeof passwordState === "object" &&
-    "success" in passwordState &&
-    passwordState.success === true;
-
-  // Reset password form on success
-  useEffect(() => {
-    if (isPasswordSuccess) {
-      passwordForm.reset();
-    }
-  }, [isPasswordSuccess, passwordForm.reset]);
 
   return (
     <div className="space-y-6 px-4 lg:px-6">
@@ -311,201 +267,6 @@ export default function AccountSettings() {
             </div>
           )}
         </accountForm.Subscribe>
-      </form>
-
-      {/* Password Change Form */}
-      <form
-        action={passwordAction as never}
-        className="space-y-6"
-        onSubmit={() => passwordForm.handleSubmit()}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle>Change Password</CardTitle>
-            <CardDescription>
-              Update your password to keep your account secure.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Form-level errors */}
-            {passwordFormErrors.length > 0 && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                {passwordFormErrors.map((error) => (
-                  <p className="text-red-600 text-sm" key={String(error)}>
-                    {String(error)}
-                  </p>
-                ))}
-              </div>
-            )}
-
-            {/* Success message */}
-            {isPasswordSuccess && (
-              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                <p className="text-green-600 text-sm">
-                  ✓{" "}
-                  {passwordState &&
-                  typeof passwordState === "object" &&
-                  "message" in passwordState
-                    ? String(passwordState.message)
-                    : "Password changed successfully"}
-                </p>
-              </div>
-            )}
-
-            {/* Error message */}
-            {passwordState &&
-              typeof passwordState === "object" &&
-              "error" in passwordState &&
-              passwordState.error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                  <p className="font-medium text-red-600 text-sm">
-                    {String(passwordState.error)}
-                  </p>
-                </div>
-              )}
-
-            <passwordForm.Field
-              name="currentPassword"
-              validators={{
-                onChange: ({ value }) =>
-                  value.length < 1 ? "Current password is required" : undefined,
-              }}
-            >
-              {(field) => {
-                const isInvalid =
-                  field.state.meta.isTouched && !field.state.meta.isValid;
-                return (
-                  <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor={field.name}>
-                      Current Password
-                    </FieldLabel>
-                    <FieldContent>
-                      <Input
-                        aria-invalid={isInvalid}
-                        id={field.name}
-                        name={field.name}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        placeholder="Enter current password"
-                        type="password"
-                        value={field.state.value}
-                      />
-                      {isInvalid && field.state.meta.errors.length > 0 && (
-                        <p className="text-destructive text-sm">
-                          {String(field.state.meta.errors[0])}
-                        </p>
-                      )}
-                    </FieldContent>
-                  </Field>
-                );
-              }}
-            </passwordForm.Field>
-
-            <passwordForm.Field
-              name="newPassword"
-              validators={{
-                onChange: ({ value }) =>
-                  value.length < 8
-                    ? "Password must be at least 8 characters"
-                    : undefined,
-              }}
-            >
-              {(field) => {
-                const isInvalid =
-                  field.state.meta.isTouched && !field.state.meta.isValid;
-                return (
-                  <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor={field.name}>New Password</FieldLabel>
-                    <FieldContent>
-                      <Input
-                        aria-invalid={isInvalid}
-                        id={field.name}
-                        name={field.name}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        placeholder="Enter new password"
-                        type="password"
-                        value={field.state.value}
-                      />
-                      {isInvalid && field.state.meta.errors.length > 0 && (
-                        <p className="text-destructive text-sm">
-                          {String(field.state.meta.errors[0])}
-                        </p>
-                      )}
-                    </FieldContent>
-                  </Field>
-                );
-              }}
-            </passwordForm.Field>
-
-            <passwordForm.Field
-              name="confirmPassword"
-              validators={{
-                onChangeListenTo: ["newPassword"],
-                onChange: ({ value, fieldApi }) => {
-                  const newPassword =
-                    fieldApi.form.getFieldValue("newPassword");
-                  if (value !== newPassword) {
-                    return "Passwords do not match";
-                  }
-                  return;
-                },
-              }}
-            >
-              {(field) => {
-                const isInvalid =
-                  field.state.meta.isTouched && !field.state.meta.isValid;
-                return (
-                  <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor={field.name}>
-                      Confirm New Password
-                    </FieldLabel>
-                    <FieldContent>
-                      <Input
-                        aria-invalid={isInvalid}
-                        id={field.name}
-                        name={field.name}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        placeholder="Confirm new password"
-                        type="password"
-                        value={field.state.value}
-                      />
-                      {isInvalid && field.state.meta.errors.length > 0 && (
-                        <p className="text-destructive text-sm">
-                          {String(field.state.meta.errors[0])}
-                        </p>
-                      )}
-                    </FieldContent>
-                  </Field>
-                );
-              }}
-            </passwordForm.Field>
-          </CardContent>
-        </Card>
-
-        <passwordForm.Subscribe selector={(formState) => [formState.canSubmit]}>
-          {([canSubmit]) => (
-            <div className="flex space-x-2">
-              <Button
-                className="cursor-pointer"
-                disabled={!canSubmit || isPasswordPending}
-                loading={isPasswordPending}
-                type="submit"
-              >
-                {isPasswordPending ? "Changing Password..." : "Change Password"}
-              </Button>
-              <Button
-                className="cursor-pointer"
-                onClick={() => passwordForm.reset()}
-                type="button"
-                variant="outline"
-              >
-                Cancel
-              </Button>
-            </div>
-          )}
-        </passwordForm.Subscribe>
       </form>
 
       {/* Danger Zone */}

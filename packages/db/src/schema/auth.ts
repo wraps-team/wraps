@@ -16,6 +16,7 @@ export const user = pgTable("user", {
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
   twoFactorEnabled: boolean("two_factor_enabled"),
+  lastLoginMethod: text("last_login_method"),
 });
 
 export const session = pgTable("session", {

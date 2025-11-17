@@ -148,6 +148,9 @@ export default function SignUpForm({
                         type="password"
                         value={field.state.value}
                       />
+                      <p className="text-muted-foreground text-xs">
+                        Minimum 6 characters. Choose a strong, unique password.
+                      </p>
                       {field.state.meta.errors.map((error) => (
                         <p
                           className="text-destructive text-sm"
@@ -164,12 +167,11 @@ export default function SignUpForm({
                   {(state) => (
                     <Button
                       className="w-full cursor-pointer"
-                      disabled={!state.canSubmit || state.isSubmitting}
+                      disabled={!state.canSubmit}
+                      loading={state.isSubmitting}
                       type="submit"
                     >
-                      {state.isSubmitting
-                        ? "Creating account..."
-                        : "Create Account"}
+                      Create Account
                     </Button>
                   )}
                 </form.Subscribe>

@@ -1,16 +1,12 @@
 {
-  "name": "@wraps/auth",
+  "name": "@wraps/email",
+  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./*": {
-      "types": "./dist/*.d.ts",
-      "default": "./src/*.ts"
     }
   },
-  "type": "module",
   "scripts": {
     "build": "tsdown"
   },
@@ -21,10 +17,9 @@
     "typescript": "catalog:"
   },
   "dependencies": {
-    "better-auth": "catalog:",
-    "dotenv": "catalog:",
-    "zod": "catalog:",
-    "@wraps/db": "workspace:*",
-    "@wraps/email": "workspace:*"
+    "@aws-sdk/client-ses": "^3.490.0",
+    "@aws-sdk/client-sts": "^3.927.0",
+    "@vercel/oidc-aws-credentials-provider": "3.0.4",
+    "@wraps.dev/email": "^0.3.0"
   }
 }

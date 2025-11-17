@@ -3,11 +3,13 @@
 import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import Loader from "./loader";
+import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -30,6 +32,13 @@ export default function SignInForm({
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/dashboard";
   const { isPending } = authClient.useSession();
+  const [show2FA, setShow2FA] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [is2FALoading, setIs2FALoading] = useState(false);
+  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
+
+  // Get the last used login method
+  const lastMethod = authClient.getLastUsedLoginMethod();
 
   const form = useForm({
     defaultValues: {
@@ -37,13 +46,19 @@ export default function SignInForm({
       password: "",
     },
     onSubmit: async ({ value }) => {
-      await authClient.signIn.email(
+      const result = await authClient.signIn.email(
         {
           email: value.email,
           password: value.password,
         },
         {
-          onSuccess: () => {
+          onSuccess: (ctx) => {
+            // Check if 2FA is required
+            if (ctx.data.twoFactorRedirect) {
+              setShow2FA(true);
+              toast.info("Please enter your 2FA code");
+              return;
+            }
             router.push(redirectTo);
             toast.success("Sign in successful");
           },
@@ -61,8 +76,95 @@ export default function SignInForm({
     },
   });
 
+  const handle2FAVerification = async () => {
+    if (!twoFactorCode || twoFactorCode.length !== 6) {
+      toast.error("Please enter a valid 6-digit code");
+      return;
+    }
+
+    setIs2FALoading(true);
+    try {
+      const result = await authClient.twoFactor.verifyTotp({
+        code: twoFactorCode,
+      });
+
+      if (result.error) {
+        toast.error(result.error.message || "Invalid 2FA code");
+        return;
+      }
+
+      router.push(redirectTo);
+      toast.success("Sign in successful");
+    } catch (error) {
+      toast.error("Failed to verify 2FA code");
+    } finally {
+      setIs2FALoading(false);
+    }
+  };
+
   if (isPending) {
     return <Loader />;
+  }
+
+  // Show 2FA verification if required
+  if (show2FA) {
+    return (
+      <div className={cn("flex flex-col gap-6", className)} {...props}>
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl">Two-Factor Authentication</CardTitle>
+            <CardDescription>
+              Enter the 6-digit code from your authenticator app
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="2fa-code">Verification Code</Label>
+                <Input
+                  autoFocus
+                  className="text-center font-mono text-lg tracking-widest"
+                  id="2fa-code"
+                  maxLength={6}
+                  onChange={(e) =>
+                    setTwoFactorCode(
+                      e.target.value.replace(/\D/g, "").slice(0, 6)
+                    )
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && twoFactorCode.length === 6) {
+                      handle2FAVerification();
+                    }
+                  }}
+                  placeholder="000000"
+                  type="text"
+                  value={twoFactorCode}
+                />
+              </div>
+              <Button
+                className="w-full cursor-pointer"
+                disabled={twoFactorCode.length !== 6}
+                loading={is2FALoading}
+                onClick={handle2FAVerification}
+              >
+                Verify
+              </Button>
+              <Button
+                className="w-full cursor-pointer"
+                onClick={() => {
+                  setShow2FA(false);
+                  setTwoFactorCode("");
+                }}
+                type="button"
+                variant="outline"
+              >
+                Back to Sign In
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -144,11 +246,20 @@ export default function SignInForm({
                 <form.Subscribe>
                   {(state) => (
                     <Button
-                      className="w-full cursor-pointer"
-                      disabled={!state.canSubmit || state.isSubmitting}
+                      className="relative w-full cursor-pointer"
+                      disabled={!state.canSubmit}
+                      loading={state.isSubmitting}
                       type="submit"
                     >
-                      {state.isSubmitting ? "Signing in..." : "Login"}
+                      Login
+                      {lastMethod === "email" && (
+                        <Badge
+                          className="-translate-y-1/2 absolute top-1/2 right-2 ml-auto"
+                          variant="secondary"
+                        >
+                          Last used
+                        </Badge>
+                      )}
                     </Button>
                   )}
                 </form.Subscribe>
@@ -166,18 +277,29 @@ export default function SignInForm({
               </div>
 
               <Button
-                className="w-full"
+                className="relative w-full"
+                loading={isPasskeyLoading}
                 onClick={async () => {
+                  setIsPasskeyLoading(true);
                   try {
-                    await authClient.signIn.passkey({
-                      autoFill: true,
-                    });
+                    const result = await authClient.signIn.passkey();
+
+                    if (result.error) {
+                      toast.error(
+                        result.error.message || "Failed to sign in with passkey"
+                      );
+                      return;
+                    }
+
                     router.push(redirectTo);
                     toast.success("Signed in with passkey");
                   } catch (error: any) {
+                    console.error("Passkey error:", error);
                     toast.error(
-                      error.message || "Failed to sign in with passkey"
+                      error.message || "Failed to authenticate with passkey"
                     );
+                  } finally {
+                    setIsPasskeyLoading(false);
                   }
                 }}
                 type="button"
@@ -197,6 +319,14 @@ export default function SignInForm({
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
                 Sign in with Passkey
+                {lastMethod === "passkey" && !isPasskeyLoading && (
+                  <Badge
+                    className="-translate-y-1/2 absolute top-1/2 right-2 ml-auto"
+                    variant="secondary"
+                  >
+                    Last used
+                  </Badge>
+                )}
               </Button>
 
               <div className="text-center text-sm">

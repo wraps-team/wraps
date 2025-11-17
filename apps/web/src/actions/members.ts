@@ -383,7 +383,7 @@ export async function inviteMember(
 
     // Send invitation email using @wraps.dev/email
     try {
-      const { sendInvitationEmail } = await import("@/lib/email");
+      const { sendInvitationEmail } = await import("@wraps/email");
       await sendInvitationEmail({
         to: email,
         inviterName: session.user.name,

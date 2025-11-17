@@ -3,7 +3,11 @@ import * as schema from "@wraps/db/schema/auth";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { organization } from "better-auth/plugins";
+import {
+  haveIBeenPwned,
+  lastLoginMethod,
+  organization,
+} from "better-auth/plugins";
 import { passkey } from "better-auth/plugins/passkey";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
@@ -15,9 +19,26 @@ export const auth = betterAuth<BetterAuthOptions>({
   trustedOrigins: [process.env.CORS_ORIGIN || ""],
   emailAndPassword: {
     enabled: true,
+    requireEmailVerification: false, // Set to true when ready to enforce
+  },
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      const { sendVerificationEmail } = await import("@wraps/email");
+      await sendVerificationEmail({
+        to: user.email,
+        url,
+      });
+    },
   },
   plugins: [
     nextCookies(),
+    haveIBeenPwned({
+      customPasswordCompromisedMessage:
+        "This password has been exposed in a data breach. Please choose a more secure password.",
+    }),
+    lastLoginMethod({
+      storeInDatabase: true,
+    }),
     passkey({
       rpID: process.env.PASSKEY_RP_ID || "localhost",
       rpName: process.env.PASSKEY_RP_NAME || "Wraps",
@@ -26,11 +47,7 @@ export const auth = betterAuth<BetterAuthOptions>({
     twoFactor({
       issuer: "Wraps",
     }),
-    organization({
-      ac: {
-        enabled: true,
-      },
-    }),
+    organization(),
   ],
   databaseHooks: {
     session: {
