@@ -90,7 +90,7 @@ export function OrganizationSettingsMembers({
   organization,
   userRole,
 }: OrganizationSettingsMembersProps) {
-  const router = useRouter();
+  const _router = useRouter();
   const [members, setMembers] = useState<MemberWithUser[]>([]);
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +104,7 @@ export function OrganizationSettingsMembers({
   // Load members and invitations
   useEffect(() => {
     loadData();
-  }, [organization.id]);
+  }, [loadData]);
 
   async function loadData() {
     setLoading(true);

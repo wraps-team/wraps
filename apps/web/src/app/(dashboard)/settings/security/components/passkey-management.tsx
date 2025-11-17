@@ -97,10 +97,12 @@ export function PasskeyManagement() {
   };
 
   const handleDeletePasskey = async () => {
-    if (!selectedPasskey) return;
+    if (!selectedPasskey) {
+      return;
+    }
 
     setIsLoading(true);
-    const res = await authClient.passkey.deletePasskey({
+    const _res = await authClient.passkey.deletePasskey({
       id: selectedPasskey.id,
       fetchOptions: {
         onRequest: () => {
@@ -120,7 +122,7 @@ export function PasskeyManagement() {
     });
   };
 
-  const getDeviceIcon = (deviceType?: string) => {
+  const _getDeviceIcon = (deviceType?: string) => {
     if (deviceType === "platform") {
       return <Smartphone className="h-5 w-5 text-muted-foreground" />;
     }

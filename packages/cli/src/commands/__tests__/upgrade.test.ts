@@ -278,7 +278,7 @@ describe("upgrade command", () => {
       );
     });
 
-    it.skip("should prevent downgrade to lower preset", async () => {
+    it("should prevent downgrade to lower preset", async () => {
       // TODO: This test requires reliable process.exit mocking which is complex in Vitest
       // The actual code works correctly (calls process.exit(0) at upgrade.ts:189)
       // but mocking process.exit to throw doesn't work reliably in the test environment

@@ -57,7 +57,7 @@ export function OrganizationSettingsAwsAccounts({
   // Load AWS accounts
   useEffect(() => {
     loadData();
-  }, [organization.id]);
+  }, [loadData]);
 
   async function loadData() {
     setLoading(true);
@@ -71,7 +71,9 @@ export function OrganizationSettingsAwsAccounts({
   }
 
   const formatDate = (date: Date | null) => {
-    if (!date) return "Never";
+    if (!date) {
+      return "Never";
+    }
     return new Date(date).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",

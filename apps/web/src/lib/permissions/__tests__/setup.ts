@@ -17,6 +17,8 @@ export const testUser = {
   emailVerified: false,
   createdAt: new Date(),
   updatedAt: new Date(),
+  image: null,
+  twoFactorEnabled: false,
 };
 
 export const testUser2 = {
@@ -26,6 +28,8 @@ export const testUser2 = {
   emailVerified: false,
   createdAt: new Date(),
   updatedAt: new Date(),
+  image: null,
+  twoFactorEnabled: false,
 };
 
 export const testOrganization = {

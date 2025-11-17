@@ -46,7 +46,7 @@ export default function SignInForm({
       password: "",
     },
     onSubmit: async ({ value }) => {
-      const result = await authClient.signIn.email(
+      const _result = await authClient.signIn.email(
         {
           email: value.email,
           password: value.password,
@@ -95,7 +95,7 @@ export default function SignInForm({
 
       router.push(redirectTo);
       toast.success("Sign in successful");
-    } catch (error) {
+    } catch (_error) {
       toast.error("Failed to verify 2FA code");
     } finally {
       setIs2FALoading(false);

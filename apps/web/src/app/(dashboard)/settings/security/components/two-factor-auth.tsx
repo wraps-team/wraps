@@ -34,10 +34,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient, useSession } from "@/lib/auth-client";
 
-interface TwoFactorSetup {
+type TwoFactorSetup = {
   totpURI: string;
   backupCodes: string[];
-}
+};
 
 export function TwoFactorAuth() {
   const { data: session } = useSession();
@@ -167,12 +167,14 @@ export function TwoFactorAuth() {
     }
   };
 
-  const handleGenerateBackupCodes = async () => {
+  const _handleGenerateBackupCodes = async () => {
     setPasswordAction("enable"); // Use enable action to get password
     setShowPasswordPrompt(true);
 
     // After password is provided, generate codes
-    if (!password) return;
+    if (!password) {
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -481,8 +483,8 @@ export function TwoFactorAuth() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/50 p-4">
-              {backupCodes.map((code, index) => (
-                <code className="font-mono text-sm" key={index}>
+              {backupCodes.map((code) => (
+                <code className="font-mono text-sm" key={code}>
                   {code}
                 </code>
               ))}

@@ -24,12 +24,12 @@ import {
 } from "@/components/ui/card";
 import { authClient, useSession } from "@/lib/auth-client";
 
-interface ActiveSession {
+type ActiveSession = {
   id: string;
   token: string;
   userAgent?: string;
   ipAddress?: string;
-}
+};
 
 export function ActiveSessions() {
   const { data: session } = useSession();
@@ -37,9 +37,8 @@ export function ActiveSessions() {
   const [isLoading, setIsLoading] = useState(true);
   const [isTerminating, setIsTerminating] = useState<string>();
   const [isRevokingAll, setIsRevokingAll] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<ActiveSession | null>(
-    null
-  );
+  const [_selectedSession, _setSelectedSession] =
+    useState<ActiveSession | null>(null);
 
   // Fetch all active sessions on mount
   useEffect(() => {
@@ -102,7 +101,9 @@ export function ActiveSessions() {
   };
 
   const getDeviceIcon = (userAgent?: string) => {
-    if (!userAgent) return <Laptop className="h-5 w-5 text-muted-foreground" />;
+    if (!userAgent) {
+      return <Laptop className="h-5 w-5 text-muted-foreground" />;
+    }
 
     const deviceType = new UAParser(userAgent).getDevice().type;
     if (deviceType === "mobile" || deviceType === "tablet") {

@@ -261,7 +261,9 @@ export async function getArchivedEmail(
   const getAddressText = (
     addr: ParsedMail["from"] | ParsedMail["to"]
   ): string => {
-    if (!addr) return "";
+    if (!addr) {
+      return "";
+    }
     if (Array.isArray(addr)) {
       return addr.map((a) => a.text).join(", ");
     }

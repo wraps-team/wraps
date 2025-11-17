@@ -194,7 +194,7 @@ async function fetchEmail(
   }
 }
 
-function formatTimestamp(timestamp: number): string {
+function _formatTimestamp(timestamp: number): string {
   const date = new Date(timestamp);
   return date.toLocaleString("en-US", {
     month: "short",
