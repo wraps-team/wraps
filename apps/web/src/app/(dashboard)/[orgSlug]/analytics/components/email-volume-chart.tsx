@@ -43,6 +43,37 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+function createYAxisFormatter(data: any[]) {
+  // Find the maximum value across all data points
+  const maxValue = Math.max(
+    ...data.flatMap((d) => [d.sent || 0, d.delivered || 0, d.bounced || 0])
+  );
+
+  // Determine the appropriate scale based on max value
+  if (maxValue >= 100_000) {
+    // Use 100k, 200k, etc.
+    return (value: number) => `${Math.round(value / 1000)}k`;
+  }
+  if (maxValue >= 10_000) {
+    // Use 10.0k, 20.0k, etc.
+    return (value: number) => `${(value / 1000).toFixed(1)}k`;
+  }
+  if (maxValue >= 1000) {
+    // Use 1.0k, 2.0k, etc.
+    return (value: number) => `${(value / 1000).toFixed(1)}k`;
+  }
+  if (maxValue >= 100) {
+    // Use 100, 200, etc.
+    return (value: number) => `${Math.round(value / 100) * 100}`;
+  }
+  if (maxValue >= 10) {
+    // Use 10, 20, etc.
+    return (value: number) => `${Math.round(value / 10) * 10}`;
+  }
+  // Use 1, 2, 3, etc.
+  return (value: number) => `${Math.round(value)}`;
+}
+
 export function EmailVolumeChart({ orgSlug }: { orgSlug: string }) {
   const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = React.useState("90d");
@@ -150,7 +181,7 @@ export function EmailVolumeChart({ orgSlug }: { orgSlug: string }) {
               />
               <YAxis
                 axisLine={false}
-                tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                tickFormatter={createYAxisFormatter(chartData)}
                 tickLine={false}
                 tickMargin={8}
               />
