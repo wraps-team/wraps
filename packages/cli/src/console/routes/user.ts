@@ -33,7 +33,9 @@ export function createUserRouter(config: ServerConfig): Router {
       try {
         if (config.roleArn) {
           console.log("[User API] Attempting to fetch account alias via IAM");
-          const { assumeRole } = await import("../../utils/assume-role.js");
+          const { assumeRole } = await import(
+            "../../utils/shared/assume-role.js"
+          );
           const { IAMClient, ListAccountAliasesCommand } = await import(
             "@aws-sdk/client-iam"
           );

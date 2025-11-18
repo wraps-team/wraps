@@ -93,10 +93,23 @@ function estimateStorageSize(
     "7days": 0.25,
     "30days": 1,
     "90days": 3,
+    "3months": 3,
     "6months": 6,
+    "9months": 9,
     "1year": 12,
     "18months": 18,
-    indefinite: 120, // Assume 10 years for cost estimation
+    "2years": 24,
+    "30months": 30,
+    "3years": 36,
+    "4years": 48,
+    "5years": 60,
+    "6years": 72,
+    "7years": 84,
+    "8years": 96,
+    "9years": 108,
+    "10years": 120,
+    indefinite: 120,
+    permanent: 120,
   }[retention];
 
   // Total steady-state storage = emails/month * event types * months * record size
@@ -124,10 +137,23 @@ function estimateArchiveStorageSize(
     "7days": 0.25,
     "30days": 1,
     "90days": 3,
+    "3months": 3,
     "6months": 6,
+    "9months": 9,
     "1year": 12,
     "18months": 18,
-    indefinite: 120, // Assume 10 years for cost estimation
+    "2years": 24,
+    "30months": 30,
+    "3years": 36,
+    "4years": 48,
+    "5years": 60,
+    "6years": 72,
+    "7years": 84,
+    "8years": 96,
+    "9years": 108,
+    "10years": 120,
+    indefinite: 120,
+    permanent: 120,
   }[retention];
 
   // Total steady-state storage = emails/month * months * email size

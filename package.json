@@ -16,6 +16,8 @@
     "lint:fix": "npx ultracite@latest fix",
     "typecheck": "turbo run typecheck",
     "check": "npx ultracite@latest check",
+    "check:errors": "npx ultracite@latest check --diagnostic-level=error",
+    "check:all": "pnpm check:errors && pnpm typecheck && pnpm build && pnpm test",
     "fix": "npx ultracite@latest fix",
     "clean": "turbo run clean && rm -rf node_modules",
     "cli": "node packages/cli/dist/cli.js",

@@ -90,6 +90,9 @@ function estimateStorageSize(
 
   // Calculate total months of retention
   const retentionMonths = {
+    "7days": 0.25,
+    "30days": 1,
+    "90days": 3,
     "3months": 3,
     "6months": 6,
     "9months": 9,
@@ -105,7 +108,8 @@ function estimateStorageSize(
     "8years": 96,
     "9years": 108,
     "10years": 120,
-    permanent: 120, // Assume 10 years for cost estimation
+    indefinite: 120,
+    permanent: 120,
   }[retention];
 
   // Total steady-state storage = emails/month * event types * months * record size
@@ -130,6 +134,9 @@ function estimateArchiveStorageSize(
 
   // Calculate total months of retention
   const retentionMonths = {
+    "7days": 0.25,
+    "30days": 1,
+    "90days": 3,
     "3months": 3,
     "6months": 6,
     "9months": 9,
@@ -145,7 +152,8 @@ function estimateArchiveStorageSize(
     "8years": 96,
     "9years": 108,
     "10years": 120,
-    permanent: 120, // Assume 10 years for cost estimation
+    indefinite: 120,
+    permanent: 120,
   }[retention];
 
   // Total steady-state storage = emails/month * months * email size

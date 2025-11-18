@@ -14,10 +14,23 @@ export type ArchiveRetention =
   | "7days"
   | "30days"
   | "90days"
+  | "3months"
   | "6months"
+  | "9months"
   | "1year"
   | "18months"
-  | "indefinite";
+  | "2years"
+  | "30months"
+  | "3years"
+  | "4years"
+  | "5years"
+  | "6years"
+  | "7years"
+  | "8years"
+  | "9years"
+  | "10years"
+  | "indefinite"
+  | "permanent";
 
 /**
  * Cost information for a feature

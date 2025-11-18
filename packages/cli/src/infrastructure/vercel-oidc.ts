@@ -11,10 +11,7 @@ export type VercelOIDCConfig = {
 /**
  * Get existing OIDC provider ARN by URL
  */
-async function getExistingOIDCProviderArn(
-  url: string,
-  accountId: string
-): Promise<string | null> {
+async function getExistingOIDCProviderArn(url: string): Promise<string | null> {
   try {
     const { IAMClient, ListOpenIDConnectProvidersCommand } = await import(
       "@aws-sdk/client-iam"
@@ -46,7 +43,7 @@ export async function createVercelOIDC(
   const url = `https://oidc.vercel.com/${config.teamSlug}`;
 
   // Check if OIDC provider already exists
-  const existingArn = await getExistingOIDCProviderArn(url, config.accountId);
+  const existingArn = await getExistingOIDCProviderArn(url);
 
   if (existingArn) {
     // Import existing OIDC provider instead of creating new one

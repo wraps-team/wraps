@@ -125,10 +125,23 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         "7days": "7 days",
         "30days": "30 days",
         "90days": "90 days",
+        "3months": "3 months",
         "6months": "6 months",
+        "9months": "9 months",
         "1year": "1 year",
         "18months": "18 months",
+        "2years": "2 years",
+        "30months": "30 months",
+        "3years": "3 years",
+        "4years": "4 years",
+        "5years": "5 years",
+        "6years": "6 years",
+        "7years": "7 years",
+        "8years": "8 years",
+        "9years": "9 years",
+        "10years": "10 years",
         indefinite: "indefinite",
+        permanent: "permanent",
       }[config.emailArchiving.retention] || "90 days";
     console.log(`  ${pc.green("✓")} Email Archiving (${retentionLabel})`);
   }
@@ -935,29 +948,10 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   }
 
   // Check if HTTPS tracking was enabled but CloudFront wasn't created (manual DNS validation needed)
-  let needsCertificateValidation = false;
-  let certificateStatus: string | undefined;
-
-  if (
+  const needsCertificateValidation =
     outputs.httpsTrackingEnabled &&
     acmValidationRecords.length > 0 &&
-    !outputs.cloudFrontDomain
-  ) {
-    // Check actual certificate status in AWS
-    try {
-      const { ACMClient, DescribeCertificateCommand } = await import(
-        "@aws-sdk/client-acm"
-      );
-      const acmClient = new ACMClient({ region: "us-east-1" }); // ACM certs are in us-east-1
-
-      // We need to find the certificate ARN - it should be in the outputs or we can list certs
-      // For now, we'll just set the flag based on whether CloudFront exists
-      needsCertificateValidation = true;
-    } catch (error) {
-      // If we can't check, assume validation is needed
-      needsCertificateValidation = true;
-    }
-  }
+    !outputs.cloudFrontDomain;
 
   // 15. Display success message
   displaySuccess({

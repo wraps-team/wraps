@@ -89,8 +89,9 @@ async function eventDestinationExists(
       })
     );
 
-    return response.EventDestinations?.some(
-      (dest) => dest.Name === eventDestName
+    return (
+      response.EventDestinations?.some((dest) => dest.Name === eventDestName) ??
+      false
     );
   } catch (error: any) {
     if (error.name === "NotFoundException") {

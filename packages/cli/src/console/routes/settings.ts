@@ -212,7 +212,7 @@ export function createSettingsRouter(config: ServerConfig): Router {
       // Update sending options via AWS SDK
       const { SESv2Client, PutConfigurationSetSendingOptionsCommand } =
         await import("@aws-sdk/client-sesv2");
-      const { assumeRole } = await import("../../utils/assume-role.js");
+      const { assumeRole } = await import("../../utils/shared/assume-role.js");
 
       const credentials = config.roleArn
         ? await assumeRole(config.roleArn, config.region)
@@ -269,7 +269,7 @@ export function createSettingsRouter(config: ServerConfig): Router {
       // Update reputation options via AWS SDK
       const { SESv2Client, PutConfigurationSetReputationOptionsCommand } =
         await import("@aws-sdk/client-sesv2");
-      const { assumeRole } = await import("../../utils/assume-role.js");
+      const { assumeRole } = await import("../../utils/shared/assume-role.js");
 
       const credentials = config.roleArn
         ? await assumeRole(config.roleArn, config.region)
@@ -334,7 +334,9 @@ export function createSettingsRouter(config: ServerConfig): Router {
         // Update tracking options via AWS SDK
         const { SESv2Client, PutConfigurationSetTrackingOptionsCommand } =
           await import("@aws-sdk/client-sesv2");
-        const { assumeRole } = await import("../../utils/assume-role.js");
+        const { assumeRole } = await import(
+          "../../utils/shared/assume-role.js"
+        );
 
         const credentials = config.roleArn
           ? await assumeRole(config.roleArn, config.region)

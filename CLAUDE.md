@@ -597,3 +597,4 @@ pnpm fix
 - Write tests for new features
 - Use TypeScript strict mode
 - Keep CLI commands simple and focused
+- run `pnpm check:all` before comitting
