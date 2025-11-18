@@ -87,15 +87,15 @@ Learn more: [SDK Documentation](https://github.com/wraps-team/wraps-js) | [npm](
 ### 3. Check Status
 
 ```bash
-wraps email status
+wraps status
 ```
 
 Shows:
-- Active features and configuration
-- AWS region
+- Active features and configuration across all services
+- AWS region and account
 - Verified domains
 - Deployed resources
-- Links to console dashboard
+- Links to dashboard
 
 ## Commands
 
@@ -122,16 +122,6 @@ wraps email init
 wraps email init --provider vercel --region us-east-1 --domain myapp.com --preset production
 ```
 
-#### `wraps email status`
-
-Show current infrastructure status.
-
-**Example:**
-
-```bash
-wraps email status
-```
-
 #### `wraps email connect`
 
 Connect to existing AWS SES infrastructure and add Wraps features.
@@ -140,31 +130,6 @@ Connect to existing AWS SES infrastructure and add Wraps features.
 
 ```bash
 wraps email connect
-```
-
-#### `wraps email console`
-
-Start local web dashboard for monitoring email activity.
-
-**Example:**
-
-```bash
-wraps email console
-```
-
-Opens a local dashboard at `http://localhost:3000` with real-time email tracking.
-
-#### `wraps email verify`
-
-Verify domain DNS records and SES status.
-
-**Options:**
-- `-d, --domain <domain>` - Domain to verify
-
-**Example:**
-
-```bash
-wraps email verify --domain myapp.com
 ```
 
 #### `wraps email domains`
@@ -267,9 +232,50 @@ wraps email restore
 wraps email restore --region us-west-2 --force  # Skip confirmation
 ```
 
-#### `wraps email destroy`
+### Global Commands
 
-Remove all deployed email infrastructure.
+These commands work across all services (email, SMS when available):
+
+#### `wraps status`
+
+Show infrastructure status across all services.
+
+**Options:**
+- `--account <account>` - Filter by AWS account ID or alias
+
+**Example:**
+
+```bash
+wraps status
+```
+
+Shows:
+- Active services and their configurations
+- AWS region and account
+- Verified domains
+- Deployed resources
+- Links to dashboard
+
+#### `wraps dashboard`
+
+Launch local web dashboard for monitoring all services.
+
+**Options:**
+- `--port <port>` - Port to run dashboard on (default: 5555)
+- `--no-open` - Don't automatically open browser
+
+**Example:**
+
+```bash
+wraps dashboard
+wraps dashboard --port 3000 --no-open
+```
+
+Opens at `http://localhost:5555` with real-time tracking for email activity, delivery rates, bounces, complaints, and more.
+
+#### `wraps destroy`
+
+Remove all deployed infrastructure across all services.
 
 **Options:**
 - `-f, --force` - Force destroy without confirmation (destructive)
@@ -277,11 +283,9 @@ Remove all deployed email infrastructure.
 **Example:**
 
 ```bash
-wraps email destroy
-wraps email destroy --force  # Skip confirmation
+wraps destroy
+wraps destroy --force  # Skip confirmation
 ```
-
-### Global Commands
 
 #### `wraps completion`
 
@@ -299,12 +303,12 @@ For backwards compatibility, these commands still work but show deprecation warn
 
 ```bash
 wraps init      # → Use 'wraps email init'
-wraps status    # → Use 'wraps email status'
 wraps connect   # → Use 'wraps email connect'
-wraps verify    # → Use 'wraps email verify'
+wraps verify    # → Use 'wraps email domains verify'
 wraps upgrade   # → Use 'wraps email upgrade'
-wraps destroy   # → Use 'wraps email destroy'
 ```
+
+**Note:** `status`, `dashboard`, and `destroy` are now global commands that work across all services.
 
 ## Configuration Presets
 
@@ -493,12 +497,15 @@ wraps init
 
 ## What's Included
 
+### Global Commands ✅
+- [x] `wraps status` - Show infrastructure status (all services)
+- [x] `wraps dashboard` - Local web dashboard (all services)
+- [x] `wraps destroy` - Remove all infrastructure (all services)
+- [x] `wraps completion` - Shell completion
+
 ### Email Commands ✅
 - [x] `wraps email init` - Deploy new infrastructure
 - [x] `wraps email connect` - Connect existing SES
-- [x] `wraps email console` - Local web dashboard
-- [x] `wraps email status` - Infrastructure status
-- [x] `wraps email verify` - DNS verification
 - [x] `wraps email domains` - Domain management
   - [x] `wraps email domains add` - Add domain to SES
   - [x] `wraps email domains list` - List all domains
@@ -507,13 +514,9 @@ wraps init
   - [x] `wraps email domains remove` - Remove domain
 - [x] `wraps email upgrade` - Add features
 - [x] `wraps email restore` - Restore from metadata
-- [x] `wraps email destroy` - Clean removal
-- [x] `wraps completion` - Shell completion
 
 ### SMS Commands 🚧 (Coming Soon)
 - [ ] `wraps sms init` - Deploy SMS infrastructure
-- [ ] `wraps sms status` - SMS infrastructure status
-- [ ] `wraps sms destroy` - Remove SMS infrastructure
 
 ### Features ✅
 - [x] Feature-based configuration presets
