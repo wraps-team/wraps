@@ -169,6 +169,143 @@ SES → EventBridge → SQS + DLQ → Lambda → DynamoDB
 - BOUNCE, COMPLAINT, REJECT
 - RENDERING_FAILURE, DELIVERY_DELAY, SUBSCRIPTION
 
+## Metadata & Migration System
+
+Wraps uses a versioned metadata system to store deployment configuration and enable seamless migrations as the CLI evolves.
+
+### Metadata Structure
+
+All deployment metadata is stored in `~/.wraps/connections/{accountId}-{region}.json`:
+
+```typescript
+{
+  "version": "1.0.0",              // Metadata format version
+  "accountId": "123456789012",
+  "region": "us-east-1",
+  "provider": "vercel",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vercel": {                      // Provider-specific config
+    "teamSlug": "my-team",
+    "projectName": "my-project"
+  },
+  "services": {
+    "email": {                     // Service-specific config
+      "preset": "production",
+      "config": {
+        "tracking": { "enabled": true },
+        "sendingEnabled": true
+      },
+      "pulumiStackName": "wraps-email-123-us-east-1",
+      "deployedAt": "2024-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
+
+### Automatic Migrations
+
+The metadata system automatically migrates old formats to new versions when loading:
+
+**Location**: `packages/cli/src/utils/shared/metadata.ts`
+
+```typescript
+export async function loadConnectionMetadata(
+  accountId: string,
+  region: string
+): Promise<ConnectionMetadata | null> {
+  const data = JSON.parse(content);
+
+  // 1. Migrate legacy format (pre-multi-service)
+  if (isLegacyMetadata(data)) {
+    const migrated = migrateLegacyMetadata(data);
+    await saveConnectionMetadata(migrated);  // Auto-save
+    return migrated;
+  }
+
+  // 2. Add version if missing
+  if (!data.version) {
+    data.version = "1.0.0";
+    await saveConnectionMetadata(data);
+  }
+
+  return data;
+}
+```
+
+### Benefits
+
+1. **Zero User Intervention**: Migrations happen automatically on load
+2. **Backward Compatible**: Old metadata files are seamlessly upgraded
+3. **Safe Upgrades**: Migrated data is saved for faster future loads
+4. **Future-Proof**: Easy to add new versions and migration paths
+5. **Testable**: Each migration function can be unit tested
+
+### Adding New Migrations
+
+When making breaking changes to metadata structure:
+
+1. **Bump Version**: Increment `CURRENT_VERSION` (e.g., "1.0.0" → "1.1.0")
+
+2. **Create Migration Function**:
+   ```typescript
+   function migrateV1ToV1_1(data: any): ConnectionMetadata {
+     return {
+       ...data,
+       version: "1.1.0",
+       newField: data.oldField || "default",  // Add new field
+     };
+   }
+   ```
+
+3. **Add to Migration Chain**:
+   ```typescript
+   if (data.version === "1.0.0") {
+     data = migrateV1ToV1_1(data);
+     await saveConnectionMetadata(data);
+   }
+   ```
+
+4. **Write Tests**: Add tests for the migration in `metadata.test.ts`
+
+### Example: Real Migration
+
+The CLI already successfully migrated from legacy format to v1.0.0:
+
+**Before** (legacy - no services):
+```json
+{
+  "accountId": "123456789012",
+  "emailConfig": { ... },
+  "preset": "production"
+}
+```
+
+**After** (v1.0.0 - multi-service):
+```json
+{
+  "version": "1.0.0",
+  "accountId": "123456789012",
+  "services": {
+    "email": {
+      "config": { ... },
+      "preset": "production"
+    }
+  }
+}
+```
+
+This migration happens **transparently** - users never need to manually update their metadata files!
+
+### Multi-Service Architecture
+
+The current v1.0.0 metadata format supports multiple services per AWS account/region:
+
+- **Email**: AWS SES configuration
+- **SMS**: AWS End User Messaging (coming soon)
+- **Queue**: AWS SQS/EventBridge (future)
+
+Each service maintains its own configuration, preset, and deployment timestamp while sharing the same AWS account credentials.
+
 ## TypeScript SDK
 
 After deploying infrastructure with the CLI, developers use the [`@wraps.dev/email`](https://github.com/wraps-team/wraps-js) SDK to send emails:
