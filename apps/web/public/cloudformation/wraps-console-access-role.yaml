@@ -46,7 +46,8 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Sub "arn:aws:iam::${WrapsBackendAccountId}:root"
+              AWS:
+                - !Sub "arn:aws:iam::${WrapsBackendAccountId}:root"
             Action: "sts:AssumeRole"
             Condition:
               StringEquals:
