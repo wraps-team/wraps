@@ -3,7 +3,7 @@ import {
   DeploymentProgress,
   displayStatus,
   displaySuccess,
-} from "../output.js";
+} from "../shared/output.js";
 
 // Mock @clack/prompts
 vi.mock("@clack/prompts", () => ({
@@ -173,6 +173,51 @@ describe("displaySuccess", () => {
       })
     ).not.toThrow();
   });
+
+  it("should display success with MAIL FROM domain", () => {
+    expect(() =>
+      displaySuccess({
+        roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
+        region: "us-east-1",
+        domain: "example.com",
+        mailFromDomain: "mail.example.com",
+        dnsRecords: [
+          {
+            name: "token1._domainkey.example.com",
+            type: "CNAME",
+            value: "token1.dkim.amazonses.com",
+          },
+        ],
+      })
+    ).not.toThrow();
+  });
+
+  it("should display success with custom tracking domain DNS records", () => {
+    expect(() =>
+      displaySuccess({
+        roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
+        region: "us-east-1",
+        customTrackingDomain: "track.example.com",
+        trackingDomainDnsRecords: [
+          {
+            name: "track.example.com",
+            type: "CNAME",
+            value: "r.us-east-1.awstrack.me",
+          },
+        ],
+      })
+    ).not.toThrow();
+  });
+
+  it("should display success with custom tracking domain without DNS records", () => {
+    expect(() =>
+      displaySuccess({
+        roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
+        region: "us-east-1",
+        customTrackingDomain: "track.example.com",
+      })
+    ).not.toThrow();
+  });
 });
 
 describe("displayStatus", () => {
@@ -263,6 +308,122 @@ describe("displayStatus", () => {
           lambdaFunctions: 3,
           snsTopics: 2,
         },
+      })
+    ).not.toThrow();
+  });
+
+  it("should display status with MAIL FROM domain", () => {
+    expect(() =>
+      displayStatus({
+        integrationLevel: "enhanced",
+        region: "us-east-1",
+        domains: [
+          {
+            domain: "example.com",
+            status: "verified",
+            mailFromDomain: "mail.example.com",
+            mailFromStatus: "SUCCESS",
+          },
+        ],
+        resources: {},
+      })
+    ).not.toThrow();
+  });
+
+  it("should display status with pending MAIL FROM domain", () => {
+    expect(() =>
+      displayStatus({
+        integrationLevel: "enhanced",
+        region: "us-east-1",
+        domains: [
+          {
+            domain: "example.com",
+            status: "verified",
+            mailFromDomain: "mail.example.com",
+            mailFromStatus: "PENDING",
+          },
+        ],
+        resources: {},
+      })
+    ).not.toThrow();
+  });
+
+  it("should display archiving feature with different retention periods", () => {
+    const retentions = [
+      "7days",
+      "30days",
+      "90days",
+      "6months",
+      "1year",
+      "18months",
+    ] as const;
+
+    for (const retention of retentions) {
+      expect(() =>
+        displayStatus({
+          integrationLevel: "enhanced",
+          region: "us-east-1",
+          domains: [],
+          resources: {
+            archivingEnabled: true,
+            archiveRetention: retention,
+            archiveArn: "arn:aws:ses:us-east-1:123456789012:archive/wraps",
+          },
+        })
+      ).not.toThrow();
+    }
+  });
+
+  it("should display status with domains needing DNS records", () => {
+    expect(() =>
+      displayStatus({
+        integrationLevel: "enhanced",
+        region: "us-east-1",
+        domains: [
+          {
+            domain: "pending.com",
+            status: "pending",
+            dkimTokens: ["token1", "token2", "token3"],
+          },
+        ],
+        resources: {},
+      })
+    ).not.toThrow();
+  });
+
+  it("should display status with domain needing MAIL FROM DNS", () => {
+    expect(() =>
+      displayStatus({
+        integrationLevel: "enhanced",
+        region: "us-east-1",
+        domains: [
+          {
+            domain: "example.com",
+            status: "verified",
+            mailFromDomain: "mail.example.com",
+            mailFromStatus: "PENDING",
+          },
+        ],
+        resources: {},
+      })
+    ).not.toThrow();
+  });
+
+  it("should display status with both pending domain and MAIL FROM", () => {
+    expect(() =>
+      displayStatus({
+        integrationLevel: "enhanced",
+        region: "us-east-1",
+        domains: [
+          {
+            domain: "pending.com",
+            status: "pending",
+            dkimTokens: ["token1", "token2", "token3"],
+            mailFromDomain: "mail.pending.com",
+            mailFromStatus: "PENDING",
+          },
+        ],
+        resources: {},
       })
     ).not.toThrow();
   });

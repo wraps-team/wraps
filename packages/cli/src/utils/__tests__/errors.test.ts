@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { errors, handleCLIError, WrapsError } from "../errors.js";
+import { errors, handleCLIError, WrapsError } from "../shared/errors.js";
 
 describe("WrapsError", () => {
   it("should create error with all properties", () => {
@@ -104,6 +104,50 @@ describe("handleCLIError", () => {
 
     handleCLIError(undefined);
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("should handle WrapsError with only suggestion (no docsUrl)", () => {
+    const error = new WrapsError(
+      "Error with suggestion",
+      "ERROR_WITH_SUGGESTION",
+      "Try this fix"
+    );
+
+    handleCLIError(error);
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Suggestion:")
+    );
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Try this fix")
+    );
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("should handle WrapsError with only docsUrl (no suggestion)", () => {
+    const error = new WrapsError(
+      "Error with docs",
+      "ERROR_WITH_DOCS",
+      undefined,
+      "https://docs.wraps.dev/error"
+    );
+
+    handleCLIError(error);
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Documentation:")
+    );
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining("https://docs.wraps.dev/error")
+    );
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("should print blank line before error message", () => {
+    const error = new Error("Test error");
+    handleCLIError(error);
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith("");
   });
 });
 

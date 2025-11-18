@@ -12,8 +12,8 @@ import {
   isSESSandbox,
   listSESDomains,
   validateAWSCredentials,
-} from "../aws.js";
-import { WrapsError } from "../errors.js";
+} from "../shared/aws.js";
+import { WrapsError } from "../shared/errors.js";
 
 const stsMock = mockClient(STSClient);
 const sesMock = mockClient(SESClient);
@@ -267,5 +267,13 @@ describe("isSESSandbox", () => {
     sesMock.on(ListIdentitiesCommand).rejects(error);
 
     await expect(isSESSandbox("us-east-1")).rejects.toThrow("Access denied");
+  });
+
+  it("should handle network errors by rethrowing", async () => {
+    const error = new Error("Network timeout");
+    (error as any).name = "NetworkError";
+    sesMock.on(ListIdentitiesCommand).rejects(error);
+
+    await expect(isSESSandbox("us-east-1")).rejects.toThrow("Network timeout");
   });
 });

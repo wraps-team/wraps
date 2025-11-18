@@ -1,7 +1,7 @@
 import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
 import { mockClient } from "aws-sdk-client-mock";
 import { beforeEach, describe, expect, it } from "vitest";
-import { assumeRole } from "../assume-role.js";
+import { assumeRole } from "../shared/assume-role.js";
 
 const stsMock = mockClient(STSClient);
 

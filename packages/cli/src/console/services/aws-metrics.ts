@@ -3,7 +3,7 @@ import {
   GetMetricDataCommand,
   type MetricDataQuery,
 } from "@aws-sdk/client-cloudwatch";
-import { assumeRole } from "../../utils/assume-role.js";
+import { assumeRole } from "../../utils/shared/assume-role.js";
 
 export type MetricsData = {
   sends: Array<{ timestamp: number; value: number }>;

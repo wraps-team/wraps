@@ -3,13 +3,18 @@ import { readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getPreset } from "../email/presets.js";
 import {
+  addServiceToConnection,
   connectionExists,
   createConnectionMetadata,
   deleteConnectionMetadata,
+  getConfiguredServices,
+  hasService,
   listConnections,
   loadConnectionMetadata,
+  removeServiceFromConnection,
   saveConnectionMetadata,
   updateEmailConfig,
+  updateServiceConfig,
 } from "../shared/metadata.js";
 
 // Mock fs module
@@ -481,5 +486,377 @@ describe("connectionExists", () => {
     const exists = await connectionExists("123456789012", "us-east-1");
 
     expect(exists).toBe(false);
+  });
+});
+
+describe("loadConnectionMetadata - legacy migration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should migrate legacy metadata and save migrated version", async () => {
+    const legacyMetadata = {
+      accountId: "123456789012",
+      region: "us-east-1",
+      provider: "vercel" as const,
+      timestamp: "2024-01-01T00:00:00.000Z",
+      preset: "production" as const,
+      emailConfig: {
+        tracking: { enabled: true, opens: true, clicks: true },
+        sendingEnabled: true,
+        eventTracking: { enabled: true },
+      },
+      vercel: {
+        teamSlug: "my-team",
+        projectName: "my-project",
+      },
+      pulumiStackName: "wraps-123-us-east-1",
+    };
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(legacyMetadata));
+    vi.mocked(writeFile).mockResolvedValue(undefined);
+
+    const result = await loadConnectionMetadata("123456789012", "us-east-1");
+
+    expect(result).toBeDefined();
+    expect(result?.version).toBe("1.0.0");
+    expect(result?.services.email).toBeDefined();
+    expect(result?.services.email?.config).toEqual(legacyMetadata.emailConfig);
+    expect(result?.services.email?.preset).toBe("production");
+    expect(result?.services.email?.pulumiStackName).toBe("wraps-123-us-east-1");
+    expect(writeFile).toHaveBeenCalled(); // Migrated version should be saved
+  });
+
+  it("should add version to metadata missing version field", async () => {
+    const metadataWithoutVersion = {
+      accountId: "123456789012",
+      region: "us-east-1",
+      provider: "aws" as const,
+      timestamp: "2024-01-01T00:00:00.000Z",
+      services: {
+        email: {
+          config: {
+            tracking: { enabled: true },
+            sendingEnabled: true,
+          },
+          deployedAt: "2024-01-01T00:00:00.000Z",
+        },
+      },
+    };
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFile).mockResolvedValue(
+      JSON.stringify(metadataWithoutVersion)
+    );
+    vi.mocked(writeFile).mockResolvedValue(undefined);
+
+    const result = await loadConnectionMetadata("123456789012", "us-east-1");
+
+    expect(result?.version).toBe("1.0.0");
+    expect(writeFile).toHaveBeenCalled(); // Version should be added and saved
+  });
+});
+
+describe("updateEmailConfig - error handling", () => {
+  it("should throw error when email service not configured", () => {
+    const metadata = {
+      version: "1.0.0",
+      accountId: "123456789012",
+      region: "us-east-1",
+      provider: "aws" as const,
+      timestamp: new Date().toISOString(),
+      services: {}, // No email service configured
+    };
+
+    expect(() => {
+      updateEmailConfig(metadata, { sendingEnabled: true });
+    }).toThrow("Email service not configured in metadata");
+  });
+});
+
+describe("multi-service metadata functions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("addServiceToConnection", () => {
+    it("should create new connection metadata with email service", () => {
+      const emailConfig = {
+        tracking: { enabled: true },
+        sendingEnabled: true,
+      };
+
+      const result = addServiceToConnection(
+        "123456789012",
+        "us-east-1",
+        "vercel",
+        "email",
+        emailConfig,
+        "starter"
+      );
+
+      expect(result.accountId).toBe("123456789012");
+      expect(result.region).toBe("us-east-1");
+      expect(result.provider).toBe("vercel");
+      expect(result.version).toBe("1.0.0");
+      expect(result.services.email).toBeDefined();
+      expect(result.services.email?.config).toEqual(emailConfig);
+      expect(result.services.email?.preset).toBe("starter");
+    });
+
+    it("should add email service to existing connection", () => {
+      const existingMetadata = {
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "aws" as const,
+        timestamp: "2024-01-01T00:00:00.000Z",
+        services: {},
+      };
+
+      const emailConfig = {
+        tracking: { enabled: true },
+        sendingEnabled: true,
+      };
+
+      const result = addServiceToConnection(
+        "123456789012",
+        "us-east-1",
+        "aws",
+        "email",
+        emailConfig,
+        "production",
+        existingMetadata
+      );
+
+      expect(result).toBe(existingMetadata); // Should modify existing object
+      expect(result.services.email).toBeDefined();
+      expect(result.services.email?.preset).toBe("production");
+    });
+
+    it("should add SMS service to existing connection", () => {
+      const existingMetadata = {
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "aws" as const,
+        timestamp: "2024-01-01T00:00:00.000Z",
+        services: {
+          email: {
+            config: { tracking: { enabled: true }, sendingEnabled: true },
+            deployedAt: "2024-01-01T00:00:00.000Z",
+          },
+        },
+      };
+
+      const smsConfig = {
+        sendingEnabled: true,
+      };
+
+      const result = addServiceToConnection(
+        "123456789012",
+        "us-east-1",
+        "aws",
+        "sms",
+        smsConfig,
+        undefined,
+        existingMetadata
+      );
+
+      expect(result.services.sms).toBeDefined();
+      expect(result.services.sms?.config).toEqual(smsConfig);
+      expect(result.services.email).toBeDefined(); // Email service preserved
+    });
+  });
+
+  describe("updateServiceConfig", () => {
+    it("should update email service config", () => {
+      const metadata = {
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "aws" as const,
+        timestamp: "2024-01-01T00:00:00.000Z",
+        services: {
+          email: {
+            config: {
+              tracking: { enabled: true },
+              sendingEnabled: true,
+            },
+            deployedAt: "2024-01-01T00:00:00.000Z",
+          },
+        },
+      };
+
+      const oldTimestamp = metadata.timestamp;
+      vi.useFakeTimers();
+      vi.advanceTimersByTime(100);
+
+      updateServiceConfig(metadata, "email", { dedicatedIp: true });
+
+      vi.useRealTimers();
+
+      expect(metadata.services.email?.config.dedicatedIp).toBe(true);
+      expect(metadata.services.email?.config.sendingEnabled).toBe(true); // Preserved
+      expect(metadata.timestamp).not.toBe(oldTimestamp);
+    });
+
+    it("should update SMS service config", () => {
+      const metadata = {
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "aws" as const,
+        timestamp: "2024-01-01T00:00:00.000Z",
+        services: {
+          sms: {
+            config: {
+              sendingEnabled: true,
+            },
+            deployedAt: "2024-01-01T00:00:00.000Z",
+          },
+        },
+      };
+
+      updateServiceConfig(metadata, "sms", { sendingEnabled: false });
+
+      expect(metadata.services.sms?.config.sendingEnabled).toBe(false);
+    });
+
+    it("should throw error when service not configured", () => {
+      const metadata = {
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "aws" as const,
+        timestamp: "2024-01-01T00:00:00.000Z",
+        services: {},
+      };
+
+      expect(() => {
+        updateServiceConfig(metadata, "email", { sendingEnabled: true });
+      }).toThrow("email service not configured in metadata");
+    });
+  });
+
+  describe("removeServiceFromConnection", () => {
+    it("should remove email service", () => {
+      const metadata = {
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "aws" as const,
+        timestamp: "2024-01-01T00:00:00.000Z",
+        services: {
+          email: {
+            config: { tracking: { enabled: true }, sendingEnabled: true },
+            deployedAt: "2024-01-01T00:00:00.000Z",
+          },
+        },
+      };
+
+      removeServiceFromConnection(metadata, "email");
+
+      expect(metadata.services.email).toBeUndefined();
+    });
+
+    it("should remove SMS service", () => {
+      const metadata = {
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "aws" as const,
+        timestamp: "2024-01-01T00:00:00.000Z",
+        services: {
+          sms: {
+            config: { sendingEnabled: true },
+            deployedAt: "2024-01-01T00:00:00.000Z",
+          },
+        },
+      };
+
+      removeServiceFromConnection(metadata, "sms");
+
+      expect(metadata.services.sms).toBeUndefined();
+    });
+  });
+
+  describe("hasService", () => {
+    it("should return true when email service exists", () => {
+      const metadata = {
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "aws" as const,
+        timestamp: "2024-01-01T00:00:00.000Z",
+        services: {
+          email: {
+            config: { tracking: { enabled: true }, sendingEnabled: true },
+            deployedAt: "2024-01-01T00:00:00.000Z",
+          },
+        },
+      };
+
+      expect(hasService(metadata, "email")).toBe(true);
+      expect(hasService(metadata, "sms")).toBe(false);
+    });
+
+    it("should return false when service does not exist", () => {
+      const metadata = {
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "aws" as const,
+        timestamp: "2024-01-01T00:00:00.000Z",
+        services: {},
+      };
+
+      expect(hasService(metadata, "email")).toBe(false);
+      expect(hasService(metadata, "sms")).toBe(false);
+    });
+  });
+
+  describe("getConfiguredServices", () => {
+    it("should return array of configured services", () => {
+      const metadata = {
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "aws" as const,
+        timestamp: "2024-01-01T00:00:00.000Z",
+        services: {
+          email: {
+            config: { tracking: { enabled: true }, sendingEnabled: true },
+            deployedAt: "2024-01-01T00:00:00.000Z",
+          },
+          sms: {
+            config: { sendingEnabled: true },
+            deployedAt: "2024-01-01T00:00:00.000Z",
+          },
+        },
+      };
+
+      const services = getConfiguredServices(metadata);
+
+      expect(services).toContain("email");
+      expect(services).toContain("sms");
+      expect(services).toHaveLength(2);
+    });
+
+    it("should return empty array when no services configured", () => {
+      const metadata = {
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "aws" as const,
+        timestamp: "2024-01-01T00:00:00.000Z",
+        services: {},
+      };
+
+      const services = getConfiguredServices(metadata);
+
+      expect(services).toEqual([]);
+    });
   });
 });

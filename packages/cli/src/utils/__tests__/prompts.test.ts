@@ -15,7 +15,7 @@ import {
   promptRegion,
   promptSelectIdentities,
   promptVercelConfig,
-} from "../prompts.js";
+} from "../shared/prompts.js";
 
 // Mock @clack/prompts
 vi.mock("@clack/prompts", () => ({
@@ -645,7 +645,7 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving
 
-      vi.mocked(clack.select).mockResolvedValue("3months");
+      vi.mocked(clack.select).mockResolvedValue("90days");
 
       const result = await promptCustomConfig();
 
@@ -718,7 +718,7 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving
 
-      vi.mocked(clack.select).mockResolvedValue("3months");
+      vi.mocked(clack.select).mockResolvedValue("90days");
 
       const result = await promptCustomConfig();
 
@@ -765,12 +765,12 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(true); // email archiving
 
-      vi.mocked(clack.select).mockResolvedValue("3months");
+      vi.mocked(clack.select).mockResolvedValue("90days");
 
       const result = await promptCustomConfig();
 
       expect(result.emailArchiving?.enabled).toBe(true);
-      expect(result.emailArchiving?.retention).toBe("3months");
+      expect(result.emailArchiving?.retention).toBe("90days");
     });
 
     it("should not include email archiving when disabled", async () => {
@@ -786,7 +786,7 @@ describe("Prompts", () => {
 
       expect(result.emailArchiving).toEqual({
         enabled: false,
-        retention: "3months",
+        retention: "90days",
       });
     });
 
@@ -809,7 +809,7 @@ describe("Prompts", () => {
           options: expect.arrayContaining([
             expect.objectContaining({ value: "7days" }),
             expect.objectContaining({ value: "30days" }),
-            expect.objectContaining({ value: "3months" }),
+            expect.objectContaining({ value: "90days" }),
             expect.objectContaining({ value: "6months" }),
             expect.objectContaining({ value: "1year" }),
             expect.objectContaining({ value: "18months" }),

@@ -11,7 +11,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "test": "turbo run test",
-    "test:coverage": "turbo run test:coverage --filter=@wraps/cli",
+    "test:coverage": "turbo run test:coverage --filter=@wraps.dev/cli",
     "lint": "npx ultracite@latest check",
     "lint:fix": "npx ultracite@latest fix",
     "typecheck": "turbo run typecheck",

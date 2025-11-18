@@ -12,7 +12,7 @@ vi.mock("@pulumi/pulumi/automation/index.js", () => ({
 }));
 
 // Mock errors
-vi.mock("../errors.js", () => ({
+vi.mock("../shared/errors.js", () => ({
   errors: {
     pulumiNotInstalled: vi.fn(() => new Error("Pulumi CLI not installed")),
   },
@@ -20,8 +20,8 @@ vi.mock("../errors.js", () => ({
 
 // Import after mocks
 import * as automation from "@pulumi/pulumi/automation/index.js";
-import { errors } from "../errors.js";
-import { checkPulumiInstalled, ensurePulumiInstalled } from "../pulumi.js";
+import { errors } from "../shared/errors.js";
+import { checkPulumiInstalled, ensurePulumiInstalled } from "../shared/pulumi.js";
 
 describe("pulumi utilities", () => {
   beforeEach(() => {

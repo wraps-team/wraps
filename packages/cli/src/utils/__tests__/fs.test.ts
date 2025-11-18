@@ -23,7 +23,7 @@ import {
   ensureWrapsDir,
   getPulumiWorkDir,
   getWrapsDir,
-} from "../fs.js";
+} from "../shared/fs.js";
 
 describe("fs utilities", () => {
   const mockHomeDir = "/home/testuser";

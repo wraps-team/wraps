@@ -29,7 +29,7 @@ import {
   scanSESConfigurationSets,
   scanSESIdentities,
   scanSNSTopics,
-} from "../scanner.js";
+} from "../shared/scanner.js";
 
 const sesMock = mockClient(SESClient);
 const snsMock = mockClient(SNSClient);

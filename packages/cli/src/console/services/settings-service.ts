@@ -3,7 +3,7 @@ import {
   GetEmailIdentityCommand,
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
-import { assumeRole } from "../../utils/assume-role.js";
+import { assumeRole } from "../../utils/shared/assume-role.js";
 
 export type EmailSettings = {
   configurationSet?: ConfigurationSetDetails;
