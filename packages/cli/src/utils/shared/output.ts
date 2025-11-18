@@ -187,7 +187,9 @@ export function displaySuccess(outputs: SuccessOutputs) {
           `  ${pc.cyan(record.name)} ${pc.dim(record.type)} "${record.value}"`
       ),
       "",
-      pc.dim("Note: These records are required to validate your SSL certificate."),
+      pc.dim(
+        "Note: These records are required to validate your SSL certificate."
+      ),
       pc.dim(
         "CloudFront will be enabled automatically after certificate validation."
       ),
@@ -393,9 +395,7 @@ export function displayStatus(status: StatusOutputs) {
     featureLines.push(
       `  ${pc.green("✓")} Custom Tracking Domain ${pc.dim(`(${trackingLabel})`)}`
     );
-    featureLines.push(
-      `      ${pc.cyan(status.tracking.customTrackingDomain)}`
-    );
+    featureLines.push(`      ${pc.cyan(status.tracking.customTrackingDomain)}`);
   } else {
     featureLines.push(
       `  ${pc.dim("○")} Custom Tracking Domain ${pc.dim("(run 'wraps upgrade' to enable)")}`
@@ -508,8 +508,6 @@ export function displayStatus(status: StatusOutputs) {
     );
   }
 
-  console.log(
-    `\n${pc.bold("Dashboard:")} ${pc.blue("https://app.wraps.dev")}`
-  );
+  console.log(`\n${pc.bold("Dashboard:")} ${pc.blue("https://app.wraps.dev")}`);
   console.log(`${pc.bold("Docs:")} ${pc.blue("https://wraps.dev/docs")}\n`);
 }

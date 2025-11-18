@@ -98,9 +98,13 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
   if (metadata.services.email?.pulumiStackName) {
     await progress.execute("Removing Wraps infrastructure", async () => {
       try {
+        if (!metadata.services.email?.pulumiStackName) {
+          throw new Error("No Pulumi stack name found in metadata");
+        }
+
         const stack = await pulumi.automation.LocalWorkspace.selectStack(
           {
-            stackName: metadata.services.email?.pulumiStackName!,
+            stackName: metadata.services.email.pulumiStackName,
             projectName: "wraps-email",
             program: async () => {}, // Empty program
           },
@@ -118,7 +122,7 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
 
         // Remove the stack
         await stack.workspace.removeStack(
-          metadata.services.email?.pulumiStackName!
+          metadata.services.email.pulumiStackName
         );
       } catch (error: any) {
         throw new Error(`Failed to destroy Pulumi stack: ${error.message}`);

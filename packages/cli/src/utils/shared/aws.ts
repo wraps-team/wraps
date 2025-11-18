@@ -1,7 +1,4 @@
-import {
-  ACMClient,
-  DescribeCertificateCommand,
-} from "@aws-sdk/client-acm";
+import { ACMClient, DescribeCertificateCommand } from "@aws-sdk/client-acm";
 import {
   GetIdentityVerificationAttributesCommand,
   ListIdentitiesCommand,

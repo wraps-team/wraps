@@ -89,9 +89,8 @@ async function eventDestinationExists(
       })
     );
 
-    return (
-      response.EventDestinations?.some((dest) => dest.Name === eventDestName) ||
-      false
+    return response.EventDestinations?.some(
+      (dest) => dest.Name === eventDestName
     );
   } catch (error: any) {
     if (error.name === "NotFoundException") {
@@ -149,13 +148,9 @@ export async function createSESResources(
   const exists = await configurationSetExists(configSetName, config.region);
 
   const configSet = exists
-    ? new aws.sesv2.ConfigurationSet(
-        configSetName,
-        configSetOptions,
-        {
-          import: configSetName, // Import existing configuration set
-        }
-      )
+    ? new aws.sesv2.ConfigurationSet(configSetName, configSetOptions, {
+        import: configSetName, // Import existing configuration set
+      })
     : new aws.sesv2.ConfigurationSet(configSetName, configSetOptions);
 
   // SES can only send to the default EventBridge bus

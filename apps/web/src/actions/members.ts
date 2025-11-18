@@ -240,7 +240,7 @@ export async function updateMemberRole(
 
     // Revalidate the members page
     const org = await db.query.organization.findFirst({
-      where: (orgs, { eq }) => eq(orgs.id, organizationId),
+      where: (orgs, { eq: eqOp }) => eqOp(orgs.id, organizationId),
     });
 
     if (org?.slug) {
@@ -372,7 +372,7 @@ export async function inviteMember(
 
     // Get organization details for email
     const org = await db.query.organization.findFirst({
-      where: (orgs, { eq }) => eq(orgs.id, organizationId),
+      where: (orgs, { eq: eqOp }) => eqOp(orgs.id, organizationId),
     });
 
     if (!org) {
@@ -499,7 +499,7 @@ export async function removeMember(
 
     // Revalidate the members page
     const org = await db.query.organization.findFirst({
-      where: (orgs, { eq }) => eq(orgs.id, organizationId),
+      where: (orgs, { eq: eqOp }) => eqOp(orgs.id, organizationId),
     });
 
     if (org?.slug) {
@@ -574,7 +574,7 @@ export async function cancelInvitation(
 
     // Revalidate the members page
     const org = await db.query.organization.findFirst({
-      where: (orgs, { eq }) => eq(orgs.id, organizationId),
+      where: (orgs, { eq: eqOp }) => eqOp(orgs.id, organizationId),
     });
 
     if (org?.slug) {

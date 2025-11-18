@@ -66,7 +66,7 @@ export async function createOrganizationAction(
 
     // 4. Check if slug already exists
     const existingOrg = await db.query.organization.findFirst({
-      where: (orgs, { eq }) => eq(orgs.slug, slug),
+      where: (orgs, { eq: eqOp }) => eqOp(orgs.slug, slug),
     });
 
     if (existingOrg) {
@@ -205,7 +205,7 @@ export async function updateOrganizationAction(
     // 5. Check if slug changed and if new slug already exists
     if (newSlug && newSlug !== orgWithMembership.slug) {
       const existingOrg = await db.query.organization.findFirst({
-        where: (orgs, { eq }) => eq(orgs.slug, newSlug),
+        where: (orgs, { eq: eqOp }) => eqOp(orgs.slug, newSlug),
       });
 
       if (existingOrg) {

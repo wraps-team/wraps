@@ -77,7 +77,7 @@ export async function updateAccountAction(
     // Check if email is being changed and if it's already in use
     if (validatedData.email !== session.user.email) {
       const existingUser = await db.query.user.findFirst({
-        where: (users, { eq }) => eq(users.email, validatedData.email),
+        where: (users, { eq: eqOp }) => eqOp(users.email, validatedData.email),
       });
 
       if (existingUser) {

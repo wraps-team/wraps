@@ -5,9 +5,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DocsNav } from "./docs-nav";
 
-interface DocsLayoutProps {
+type DocsLayoutProps = {
   children: React.ReactNode;
-}
+};
 
 export function DocsLayout({ children }: DocsLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -62,7 +62,7 @@ export function DocsLayout({ children }: DocsLayoutProps) {
             onClick={() => setSidebarOpen(false)}
           >
             <aside
-              className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-64 overflow-y-auto border-r bg-background p-6"
+              className="fixed top-16 left-0 h-[calc(100vh-4rem)] w-64 overflow-y-auto border-r bg-background p-6"
               onClick={(e) => e.stopPropagation()}
             >
               <DocsNav />

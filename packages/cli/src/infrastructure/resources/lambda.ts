@@ -257,7 +257,8 @@ export async function deployLambdaFunctions(
           },
           tags: {
             ManagedBy: "wraps-cli",
-            Description: "Process SES email events from SQS and store in DynamoDB",
+            Description:
+              "Process SES email events from SQS and store in DynamoDB",
           },
         },
         {
@@ -280,7 +281,8 @@ export async function deployLambdaFunctions(
         },
         tags: {
           ManagedBy: "wraps-cli",
-          Description: "Process SES email events from SQS and store in DynamoDB",
+          Description:
+            "Process SES email events from SQS and store in DynamoDB",
         },
       });
 

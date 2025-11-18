@@ -103,7 +103,7 @@ export async function listAWSAccounts(
           },
         },
       },
-      orderBy: (accounts, { desc }) => [desc(accounts.createdAt)],
+      orderBy: (accs, { desc }) => [desc(accs.createdAt)],
     });
 
     return {

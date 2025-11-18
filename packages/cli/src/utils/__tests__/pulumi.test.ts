@@ -21,7 +21,10 @@ vi.mock("../shared/errors.js", () => ({
 // Import after mocks
 import * as automation from "@pulumi/pulumi/automation/index.js";
 import { errors } from "../shared/errors.js";
-import { checkPulumiInstalled, ensurePulumiInstalled } from "../shared/pulumi.js";
+import {
+  checkPulumiInstalled,
+  ensurePulumiInstalled,
+} from "../shared/pulumi.js";
 
 describe("pulumi utilities", () => {
   beforeEach(() => {

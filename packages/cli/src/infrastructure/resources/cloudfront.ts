@@ -1,5 +1,5 @@
 import * as aws from "@pulumi/aws";
-import * as pulumi from "@pulumi/pulumi";
+import type * as pulumi from "@pulumi/pulumi";
 
 /**
  * CloudFront resources configuration
@@ -13,9 +13,7 @@ export type CloudFrontTrackingConfig = {
 /**
  * Find existing CloudFront distribution by alias (CNAME)
  */
-async function findDistributionByAlias(
-  alias: string
-): Promise<string | null> {
+async function findDistributionByAlias(alias: string): Promise<string | null> {
   try {
     const { CloudFrontClient, ListDistributionsCommand } = await import(
       "@aws-sdk/client-cloudfront"
@@ -169,7 +167,7 @@ export async function createCloudFrontTracking(
       // Minimal caching for tracking redirects
       minTtl: 0,
       defaultTtl: 0,
-      maxTtl: 31536000,
+      maxTtl: 31_536_000,
 
       compress: true,
     },

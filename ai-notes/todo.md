@@ -18,9 +18,9 @@ Let's do the following:
 1. ✅ Remove legacy commands now (No one is really using this yet afaik)
 2. ✅ Rename update command to config
 3. ✅ Consolidate verify into domains command group
-4. 🏗️ Standardize flag naming
+4. ✅ Standardize flag naming
 5. ✅ move it to global scope since it's not email-specific: `wraps dashboard`  # Works for all service
-6. ◻ Add a version field to metadata to support future migrations
+6. 🏗️ Add a version field to metadata to support future migrations
 
 
   ---

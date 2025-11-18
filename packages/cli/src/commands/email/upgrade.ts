@@ -491,13 +491,13 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           )
         );
         clack.log.info(
-          pc.dim("This ensures all tracking links use secure HTTPS connections.")
+          pc.dim(
+            "This ensures all tracking links use secure HTTPS connections."
+          )
         );
 
         // Check if domain has Route53 hosted zone
-        const { findHostedZone } = await import(
-          "../../utils/email/route53.js"
-        );
+        const { findHostedZone } = await import("../../utils/email/route53.js");
         const hostedZone = await progress.execute(
           "Checking for Route53 hosted zone",
           async () =>
@@ -930,10 +930,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   }
 
   // Add ACM certificate validation records if HTTPS tracking is enabled
-  if (
-    outputs.httpsTrackingEnabled &&
-    outputs.acmCertificateValidationRecords
-  ) {
+  if (outputs.httpsTrackingEnabled && outputs.acmCertificateValidationRecords) {
     acmValidationRecords.push(...outputs.acmCertificateValidationRecords);
   }
 
@@ -995,10 +992,10 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   if (needsCertificateValidation) {
     console.log(pc.bold("⚠️  HTTPS Tracking - Next Steps:\n"));
     console.log(
-      `  1. Add the SSL certificate validation DNS record shown above to your DNS provider`
+      "  1. Add the SSL certificate validation DNS record shown above to your DNS provider"
     );
     console.log(
-      `  2. Wait for DNS propagation and certificate validation (5-30 minutes)`
+      "  2. Wait for DNS propagation and certificate validation (5-30 minutes)"
     );
     console.log(
       `  3. Run ${pc.cyan("wraps email upgrade")} again to complete CloudFront setup\n`

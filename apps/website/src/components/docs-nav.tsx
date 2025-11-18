@@ -67,7 +67,7 @@ export function DocsNav() {
   return (
     <nav className="w-full">
       {navItems.map((section) => (
-        <div key={section.title} className="pb-8">
+        <div className="pb-8" key={section.title}>
           <h4 className="mb-3 px-2 font-semibold text-muted-foreground text-sm uppercase tracking-wider">
             {section.title}
           </h4>
@@ -78,7 +78,6 @@ export function DocsNav() {
 
               return (
                 <a
-                  key={item.href}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                     isActive
@@ -87,6 +86,7 @@ export function DocsNav() {
                     item.disabled && "pointer-events-none opacity-50"
                   )}
                   href={item.disabled ? undefined : item.href}
+                  key={item.href}
                 >
                   <Icon className="h-4 w-4" />
                   {item.title}

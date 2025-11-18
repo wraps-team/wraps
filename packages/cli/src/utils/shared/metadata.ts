@@ -381,9 +381,11 @@ export function removeServiceFromConnection(
   service: ServiceType
 ): void {
   if (service === "email") {
-    delete metadata.services.email;
+    const { email, ...rest } = metadata.services;
+    metadata.services = rest;
   } else if (service === "sms") {
-    delete metadata.services.sms;
+    const { sms, ...rest } = metadata.services;
+    metadata.services = rest;
   }
   metadata.timestamp = new Date().toISOString();
 }
