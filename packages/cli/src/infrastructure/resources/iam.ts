@@ -19,7 +19,10 @@ export type IAMRoleConfig = {
 async function roleExists(roleName: string): Promise<boolean> {
   try {
     const { IAMClient, GetRoleCommand } = await import("@aws-sdk/client-iam");
-    const iam = new IAMClient({});
+    // IAM is global but SDK still requires a region
+    const iam = new IAMClient({
+      region: process.env.AWS_REGION || "us-east-1",
+    });
 
     await iam.send(new GetRoleCommand({ RoleName: roleName }));
     return true;

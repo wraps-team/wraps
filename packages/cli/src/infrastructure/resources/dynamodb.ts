@@ -23,7 +23,9 @@ async function tableExists(tableName: string): Promise<boolean> {
     const { DynamoDBClient, DescribeTableCommand } = await import(
       "@aws-sdk/client-dynamodb"
     );
-    const dynamodb = new DynamoDBClient({});
+    const dynamodb = new DynamoDBClient({
+      region: process.env.AWS_REGION || "us-east-1",
+    });
 
     await dynamodb.send(new DescribeTableCommand({ TableName: tableName }));
     return true;

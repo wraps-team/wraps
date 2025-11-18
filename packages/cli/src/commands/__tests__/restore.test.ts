@@ -171,6 +171,7 @@ describe("restore command", () => {
           workDir: "/mock/.wraps/pulumi",
           envVars: {
             PULUMI_CONFIG_PASSPHRASE: "",
+            AWS_REGION: "us-east-1",
           },
           secretsProvider: "passphrase",
         }

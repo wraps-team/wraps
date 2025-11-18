@@ -839,6 +839,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
               workDir: getPulumiWorkDir(),
               envVars: {
                 PULUMI_CONFIG_PASSPHRASE: "",
+                AWS_REGION: region,
               },
               secretsProvider: "passphrase",
             }

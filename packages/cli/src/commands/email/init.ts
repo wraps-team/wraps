@@ -213,6 +213,7 @@ export async function init(options: InitOptions): Promise<void> {
               // Use local file-based backend (no Pulumi Cloud login required)
               envVars: {
                 PULUMI_CONFIG_PASSPHRASE: "", // Use empty passphrase for local state
+                AWS_REGION: region,
               },
               secretsProvider: "passphrase",
             }

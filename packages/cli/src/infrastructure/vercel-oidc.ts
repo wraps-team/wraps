@@ -16,7 +16,10 @@ async function getExistingOIDCProviderArn(url: string): Promise<string | null> {
     const { IAMClient, ListOpenIDConnectProvidersCommand } = await import(
       "@aws-sdk/client-iam"
     );
-    const iam = new IAMClient({});
+    // IAM is global but SDK still requires a region
+    const iam = new IAMClient({
+      region: process.env.AWS_REGION || "us-east-1",
+    });
 
     const response = await iam.send(new ListOpenIDConnectProvidersCommand({}));
 

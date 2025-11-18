@@ -142,6 +142,13 @@ export async function connect(options: ConnectOptions): Promise<void> {
         )
       : getPreset(preset)!;
 
+  // 8a. Set the domain from the first selected identity (if it's a domain, not an email)
+  // Filter to only domains (exclude email addresses)
+  const domainIdentities = selectedIdentities.filter((id) => !id.includes("@"));
+  if (domainIdentities.length > 0) {
+    emailConfig.domain = domainIdentities[0];
+  }
+
   // 9. Confirm deployment
   if (!options.yes) {
     const confirmed = await confirmConnect();
@@ -191,6 +198,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
               workDir: getPulumiWorkDir(),
               envVars: {
                 PULUMI_CONFIG_PASSPHRASE: "",
+                AWS_REGION: region,
               },
               secretsProvider: "passphrase",
             }

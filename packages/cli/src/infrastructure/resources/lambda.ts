@@ -53,7 +53,9 @@ async function lambdaFunctionExists(functionName: string): Promise<boolean> {
     const { LambdaClient, GetFunctionCommand } = await import(
       "@aws-sdk/client-lambda"
     );
-    const lambda = new LambdaClient({});
+    const lambda = new LambdaClient({
+      region: process.env.AWS_REGION || "us-east-1",
+    });
 
     await lambda.send(new GetFunctionCommand({ FunctionName: functionName }));
     return true;
@@ -77,7 +79,9 @@ async function findEventSourceMapping(
     const { LambdaClient, ListEventSourceMappingsCommand } = await import(
       "@aws-sdk/client-lambda"
     );
-    const lambda = new LambdaClient({});
+    const lambda = new LambdaClient({
+      region: process.env.AWS_REGION || "us-east-1",
+    });
 
     const response = await lambda.send(
       new ListEventSourceMappingsCommand({

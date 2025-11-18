@@ -112,6 +112,7 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
             workDir: getPulumiWorkDir(),
             envVars: {
               PULUMI_CONFIG_PASSPHRASE: "",
+              AWS_REGION: region,
             },
             secretsProvider: "passphrase",
           }
