@@ -4,33 +4,13 @@ import { ArrowRight, CheckCircle2, Terminal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DocsLayout } from "@/components/docs-layout";
 
 export default function QuickstartPage() {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <a className="flex items-center gap-2" href="/">
-              <span className="font-bold text-xl">Wraps</span>
-            </a>
-            <div className="flex gap-2">
-              <Button asChild variant="ghost">
-                <a href="/docs">Docs</a>
-              </Button>
-              <Button asChild variant="ghost">
-                <a href="/">Home</a>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl">
-          {/* Page Header */}
-          <div className="mb-12">
+    <DocsLayout>
+      {/* Page Header */}
+      <div className="mb-12">
             <Badge className="mb-4" variant="outline">
               Quickstart Guide
             </Badge>
@@ -182,7 +162,7 @@ if (result.success) {
                 Before sending emails, you need to verify your domain with AWS
                 SES. Run{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
-                  npx @wraps.dev/cli email verify --domain yourdomain.com
+                  npx @wraps.dev/cli email domains verify -d yourdomain.com
                 </code>{" "}
                 to check your DNS records and get setup instructions.
               </p>
@@ -198,7 +178,7 @@ if (result.success) {
               View Analytics (Optional)
             </h2>
             <p className="mb-4 text-muted-foreground">
-              Run the local console to view email analytics and event tracking:
+              Run the local dashboard to view email analytics and event tracking:
             </p>
             <Card className="mb-4">
               <CardContent className="p-6">
@@ -207,14 +187,14 @@ if (result.success) {
                   Terminal
                 </div>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx @wraps.dev/cli console</code>
+                  <code className="text-sm">npx @wraps.dev/cli dashboard</code>
                 </pre>
               </CardContent>
             </Card>
             <p className="text-muted-foreground text-sm">
-              The console will open at{" "}
+              The dashboard will open at{" "}
               <code className="rounded bg-muted px-1.5 py-0.5">
-                http://localhost:3000
+                http://localhost:5555
               </code>{" "}
               where you can view email history, delivery rates, bounces,
               complaints, and more.
@@ -282,8 +262,6 @@ if (result.success) {
               </Button>
             </CardContent>
           </Card>
-        </div>
-      </div>
-    </div>
+    </DocsLayout>
   );
 }

@@ -17,24 +17,28 @@ const quickLinks = [
     title: "Quickstart",
     description: "Deploy your first email infrastructure in 2 minutes",
     href: "/docs/quickstart",
+    disabled: false,
   },
   {
     icon: Code,
     title: "SDK Reference",
     description: "Learn how to use @wraps.dev/email in your application",
     href: "/docs/sdk-reference",
+    disabled: false,
   },
   {
     icon: Terminal,
     title: "CLI Commands",
     description: "Complete reference for all wraps CLI commands",
     href: "/docs/cli-reference",
+    disabled: false,
   },
   {
     icon: Book,
     title: "Guides",
     description: "Step-by-step guides for common use cases",
     href: "/docs/guides",
+    disabled: true,
   },
 ];
 
@@ -116,23 +120,40 @@ await wraps.emails.send({ ... })`}
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               {quickLinks.map((link) => (
                 <Card
-                  className="transition-colors hover:border-primary/50"
+                  className={
+                    link.disabled
+                      ? "opacity-60"
+                      : "transition-colors hover:border-primary/50"
+                  }
                   key={link.href}
                 >
                   <CardHeader>
                     <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                       <link.icon className="h-5 w-5 text-primary" />
                     </div>
-                    <CardTitle className="text-lg">{link.title}</CardTitle>
+                    <CardTitle className="text-lg">
+                      {link.title}
+                      {link.disabled && (
+                        <span className="ml-2 text-muted-foreground text-xs">
+                          (Coming Soon)
+                        </span>
+                      )}
+                    </CardTitle>
                     <CardDescription>{link.description}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Button asChild className="w-full" variant="ghost">
-                      <a href={link.href}>
-                        Read more
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </a>
-                    </Button>
+                    {link.disabled ? (
+                      <Button className="w-full" disabled variant="ghost">
+                        Coming Soon
+                      </Button>
+                    ) : (
+                      <Button asChild className="w-full" variant="ghost">
+                        <a href={link.href}>
+                          Read more
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </a>
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               ))}

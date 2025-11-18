@@ -5,33 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DocsLayout } from "@/components/docs-layout";
 
 export default function SDKReferencePage() {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <a className="flex items-center gap-2" href="/">
-              <span className="font-bold text-xl">Wraps</span>
-            </a>
-            <div className="flex gap-2">
-              <Button asChild variant="ghost">
-                <a href="/docs">Docs</a>
-              </Button>
-              <Button asChild variant="ghost">
-                <a href="/">Home</a>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl">
-          {/* Page Header */}
-          <div className="mb-12">
+    <DocsLayout>
+      {/* Page Header */}
+      <div className="mb-12">
             <Badge className="mb-4" variant="outline">
               SDK Reference
             </Badge>
@@ -491,8 +471,6 @@ const result: SendEmailResult = await wraps.emails.send(params);`}</code>
               </Card>
             </div>
           </section>
-        </div>
-      </div>
-    </div>
+    </DocsLayout>
   );
 }

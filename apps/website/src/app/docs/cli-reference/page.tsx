@@ -4,33 +4,13 @@ import { ArrowRight, Terminal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DocsLayout } from "@/components/docs-layout";
 
 export default function CLIReferencePage() {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <a className="flex items-center gap-2" href="/">
-              <span className="font-bold text-xl">Wraps</span>
-            </a>
-            <div className="flex gap-2">
-              <Button asChild variant="ghost">
-                <a href="/docs">Docs</a>
-              </Button>
-              <Button asChild variant="ghost">
-                <a href="/">Home</a>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl">
-          {/* Page Header */}
-          <div className="mb-12">
+    <DocsLayout>
+      {/* Page Header */}
+      <div className="mb-12">
             <Badge className="mb-4" variant="outline">
               CLI Reference
             </Badge>
@@ -213,16 +193,17 @@ export default function CLIReferencePage() {
             </Card>
           </section>
 
-          {/* wraps email status */}
+          {/* wraps status */}
           <section className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
               <Terminal className="h-6 w-6 text-primary" />
-              wraps email status
+              wraps status
             </h2>
             <p className="mb-4 text-muted-foreground">
-              Display the current status of your Wraps email infrastructure,
-              including deployed resources, active features, and configuration
-              details.
+              Display the current status of your Wraps infrastructure across all
+              services, including deployed resources, active features, and
+              configuration details. This is a global command that shows status for
+              all configured services.
             </p>
 
             <Card className="mb-4">
@@ -231,9 +212,7 @@ export default function CLIReferencePage() {
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">
-                    npx @wraps.dev/cli email status
-                  </code>
+                  <code className="text-sm">npx @wraps.dev/cli status</code>
                 </pre>
               </CardContent>
             </Card>
@@ -258,60 +237,346 @@ export default function CLIReferencePage() {
             </Card>
           </section>
 
-          {/* wraps email verify */}
+          {/* wraps email domains */}
           <section className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
               <Terminal className="h-6 w-6 text-primary" />
-              wraps email verify
+              wraps email domains
             </h2>
             <p className="mb-4 text-muted-foreground">
-              Check the DNS verification status of a domain, including DKIM,
-              SPF, and DMARC records. Provides guidance if records are missing
-              or incorrect.
+              Manage domains in AWS SES. Add domains, list all configured
+              domains, retrieve DKIM tokens, verify DNS records, and remove
+              domains from SES.
             </p>
 
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle className="text-lg">Usage</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">
-                    npx @wraps.dev/cli email verify --domain &lt;domain&gt;
-                  </code>
-                </pre>
-              </CardContent>
-            </Card>
+            {/* domains add */}
+            <div className="mb-8 ml-4">
+              <h3 className="mb-3 font-semibold text-xl">
+                wraps email domains add
+              </h3>
+              <p className="mb-4 text-muted-foreground text-sm">
+                Add a new domain to AWS SES with DKIM signing enabled.
+              </p>
 
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle className="text-lg">What It Checks</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="list-disc space-y-2 pl-5 text-muted-foreground text-sm">
-                  <li>SES domain verification status</li>
-                  <li>DKIM DNS records (3 CNAME records)</li>
-                  <li>SPF record (TXT record for sender verification)</li>
-                  <li>
-                    DMARC record (TXT record for email authentication policy)
-                  </li>
-                  <li>Provides copy-paste ready DNS record values</li>
-                </ul>
-              </CardContent>
-            </Card>
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="text-lg">Usage</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <pre className="overflow-x-auto rounded bg-muted p-4">
+                    <code className="text-sm">
+                      npx @wraps.dev/cli email domains add -d
+                      &lt;domain&gt;
+                    </code>
+                  </pre>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Example</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">
-                    npx @wraps.dev/cli email verify --domain yourdomain.com
-                  </code>
-                </pre>
-              </CardContent>
-            </Card>
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="text-lg">Options</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 text-sm">
+                    <li>
+                      <code className="rounded bg-muted px-2 py-1">
+                        -d, --domain &lt;domain&gt;
+                      </code>{" "}
+                      <span className="text-muted-foreground">
+                        (required) Domain name to add
+                      </span>
+                    </li>
+                    <li>
+                      <code className="rounded bg-muted px-2 py-1">
+                        -r, --region &lt;region&gt;
+                      </code>{" "}
+                      <span className="text-muted-foreground">
+                        AWS region (uses saved connection region if not
+                        specified)
+                      </span>
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Example</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <pre className="overflow-x-auto rounded bg-muted p-4">
+                    <code className="text-sm">
+                      npx @wraps.dev/cli email domains add -d yourdomain.com
+                    </code>
+                  </pre>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* domains list */}
+            <div className="mb-8 ml-4">
+              <h3 className="mb-3 font-semibold text-xl">
+                wraps email domains list
+              </h3>
+              <p className="mb-4 text-muted-foreground text-sm">
+                List all domains configured in AWS SES with their verification
+                and DKIM status.
+              </p>
+
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="text-lg">Usage</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <pre className="overflow-x-auto rounded bg-muted p-4">
+                    <code className="text-sm">
+                      npx @wraps.dev/cli email domains list
+                    </code>
+                  </pre>
+                </CardContent>
+              </Card>
+
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="text-lg">Options</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 text-sm">
+                    <li>
+                      <code className="rounded bg-muted px-2 py-1">
+                        -r, --region &lt;region&gt;
+                      </code>{" "}
+                      <span className="text-muted-foreground">
+                        AWS region (uses saved connection region if not
+                        specified)
+                      </span>
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* domains get-dkim */}
+            <div className="mb-8 ml-4">
+              <h3 className="mb-3 font-semibold text-xl">
+                wraps email domains get-dkim
+              </h3>
+              <p className="mb-4 text-muted-foreground text-sm">
+                Retrieve DKIM tokens for a domain to configure DNS records.
+              </p>
+
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="text-lg">Usage</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <pre className="overflow-x-auto rounded bg-muted p-4">
+                    <code className="text-sm">
+                      npx @wraps.dev/cli email domains get-dkim -d
+                      &lt;domain&gt;
+                    </code>
+                  </pre>
+                </CardContent>
+              </Card>
+
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="text-lg">Options</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 text-sm">
+                    <li>
+                      <code className="rounded bg-muted px-2 py-1">
+                        -d, --domain &lt;domain&gt;
+                      </code>{" "}
+                      <span className="text-muted-foreground">
+                        (required) Domain name to get DKIM tokens for
+                      </span>
+                    </li>
+                    <li>
+                      <code className="rounded bg-muted px-2 py-1">
+                        -r, --region &lt;region&gt;
+                      </code>{" "}
+                      <span className="text-muted-foreground">
+                        AWS region (uses saved connection region if not
+                        specified)
+                      </span>
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Example</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <pre className="overflow-x-auto rounded bg-muted p-4">
+                    <code className="text-sm">
+                      npx @wraps.dev/cli email domains get-dkim -d
+                      yourdomain.com
+                    </code>
+                  </pre>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* domains verify */}
+            <div className="mb-8 ml-4">
+              <h3 className="mb-3 font-semibold text-xl">
+                wraps email domains verify
+              </h3>
+              <p className="mb-4 text-muted-foreground text-sm">
+                Check the DNS verification status of a domain, including DKIM,
+                SPF, and DMARC records. Provides guidance if records are missing
+                or incorrect.
+              </p>
+
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="text-lg">Usage</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <pre className="overflow-x-auto rounded bg-muted p-4">
+                    <code className="text-sm">
+                      npx @wraps.dev/cli email domains verify -d
+                      &lt;domain&gt;
+                    </code>
+                  </pre>
+                </CardContent>
+              </Card>
+
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="text-lg">Options</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 text-sm">
+                    <li>
+                      <code className="rounded bg-muted px-2 py-1">
+                        -d, --domain &lt;domain&gt;
+                      </code>{" "}
+                      <span className="text-muted-foreground">
+                        (required) Domain name to verify
+                      </span>
+                    </li>
+                    <li>
+                      <code className="rounded bg-muted px-2 py-1">
+                        -r, --region &lt;region&gt;
+                      </code>{" "}
+                      <span className="text-muted-foreground">
+                        AWS region (uses saved connection region if not
+                        specified)
+                      </span>
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="text-lg">What It Checks</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="list-disc space-y-2 pl-5 text-muted-foreground text-sm">
+                    <li>SES domain verification status</li>
+                    <li>DKIM DNS records (3 CNAME records)</li>
+                    <li>SPF record (TXT record for sender verification)</li>
+                    <li>
+                      DMARC record (TXT record for email authentication policy)
+                    </li>
+                    <li>MAIL FROM MX records (if custom MAIL FROM configured)</li>
+                    <li>Provides copy-paste ready DNS record values</li>
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Example</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <pre className="overflow-x-auto rounded bg-muted p-4">
+                    <code className="text-sm">
+                      npx @wraps.dev/cli email domains verify -d yourdomain.com
+                    </code>
+                  </pre>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* domains remove */}
+            <div className="mb-8 ml-4">
+              <h3 className="mb-3 font-semibold text-xl">
+                wraps email domains remove
+              </h3>
+              <p className="mb-4 text-muted-foreground text-sm">
+                Remove a domain from AWS SES. This action cannot be undone.
+              </p>
+
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="text-lg">Usage</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <pre className="overflow-x-auto rounded bg-muted p-4">
+                    <code className="text-sm">
+                      npx @wraps.dev/cli email domains remove -d
+                      &lt;domain&gt;
+                    </code>
+                  </pre>
+                </CardContent>
+              </Card>
+
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="text-lg">Options</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 text-sm">
+                    <li>
+                      <code className="rounded bg-muted px-2 py-1">
+                        -d, --domain &lt;domain&gt;
+                      </code>{" "}
+                      <span className="text-muted-foreground">
+                        (required) Domain name to remove
+                      </span>
+                    </li>
+                    <li>
+                      <code className="rounded bg-muted px-2 py-1">
+                        -f, --force
+                      </code>{" "}
+                      <span className="text-muted-foreground">
+                        Skip confirmation prompt (use with caution)
+                      </span>
+                    </li>
+                    <li>
+                      <code className="rounded bg-muted px-2 py-1">
+                        -r, --region &lt;region&gt;
+                      </code>{" "}
+                      <span className="text-muted-foreground">
+                        AWS region (uses saved connection region if not
+                        specified)
+                      </span>
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Example</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <pre className="overflow-x-auto rounded bg-muted p-4">
+                    <code className="text-sm">
+                      npx @wraps.dev/cli email domains remove -d yourdomain.com
+                      -f
+                    </code>
+                  </pre>
+                </CardContent>
+              </Card>
+            </div>
           </section>
 
           {/* wraps email connect */}
@@ -440,15 +705,16 @@ export default function CLIReferencePage() {
             </Card>
           </section>
 
-          {/* wraps email console */}
+          {/* wraps dashboard */}
           <section className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
               <Terminal className="h-6 w-6 text-primary" />
-              wraps email console
+              wraps dashboard
             </h2>
             <p className="mb-4 text-muted-foreground">
-              Launch the local Wraps console dashboard to view email analytics,
-              event tracking, and infrastructure status.
+              Launch the local Wraps dashboard to view analytics, event tracking,
+              and infrastructure status across all services. This is a global command
+              that shows data for all configured services.
             </p>
 
             <Card className="mb-4">
@@ -457,9 +723,7 @@ export default function CLIReferencePage() {
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">
-                    npx @wraps.dev/cli email console
-                  </code>
+                  <code className="text-sm">npx @wraps.dev/cli dashboard</code>
                 </pre>
               </CardContent>
             </Card>
@@ -475,7 +739,15 @@ export default function CLIReferencePage() {
                       --port &lt;port&gt;
                     </code>
                     <p className="mt-2 text-muted-foreground text-sm">
-                      Port to run the console on (default: 3000)
+                      Port to run the dashboard on (default: 5555)
+                    </p>
+                  </div>
+                  <div>
+                    <code className="rounded bg-muted px-2 py-1">
+                      --no-open
+                    </code>
+                    <p className="mt-2 text-muted-foreground text-sm">
+                      Don't automatically open browser
                     </p>
                   </div>
                 </div>
@@ -556,15 +828,16 @@ export default function CLIReferencePage() {
             </Card>
           </section>
 
-          {/* wraps email destroy */}
+          {/* wraps destroy */}
           <section className="mb-12">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
               <Terminal className="h-6 w-6 text-primary" />
-              wraps email destroy
+              wraps destroy
             </h2>
             <p className="mb-4 text-muted-foreground">
-              Remove all Wraps infrastructure from your AWS account. This is a
-              destructive operation and requires confirmation.
+              Remove all Wraps infrastructure from your AWS account across all
+              services. This is a global command and destructive operation that
+              requires confirmation.
             </p>
 
             <Card className="mb-4">
@@ -574,7 +847,7 @@ export default function CLIReferencePage() {
               <CardContent>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
                   <code className="text-sm">
-                    npx @wraps.dev/cli email destroy [options]
+                    npx @wraps.dev/cli destroy [options]
                   </code>
                 </pre>
               </CardContent>
@@ -587,7 +860,7 @@ export default function CLIReferencePage() {
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <code className="rounded bg-muted px-2 py-1">--force</code>
+                    <code className="rounded bg-muted px-2 py-1">-f, --force</code>
                     <p className="mt-2 text-muted-foreground text-sm">
                       Skip confirmation prompt (use with caution)
                     </p>
@@ -778,8 +1051,6 @@ export default function CLIReferencePage() {
               </Button>
             </CardContent>
           </Card>
-        </div>
-      </div>
-    </div>
+    </DocsLayout>
   );
 }
