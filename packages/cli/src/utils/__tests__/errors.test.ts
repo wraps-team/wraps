@@ -7,7 +7,7 @@ describe("WrapsError", () => {
       "Test error message",
       "TEST_ERROR",
       "Try this suggestion",
-      "https://docs.wraps.dev/test"
+      "https://wraps.dev/docs/test"
     );
 
     expect(error).toBeInstanceOf(Error);
@@ -15,7 +15,7 @@ describe("WrapsError", () => {
     expect(error.message).toBe("Test error message");
     expect(error.code).toBe("TEST_ERROR");
     expect(error.suggestion).toBe("Try this suggestion");
-    expect(error.docsUrl).toBe("https://docs.wraps.dev/test");
+    expect(error.docsUrl).toBe("https://wraps.dev/docs/test");
     expect(error.name).toBe("WrapsError");
   });
 
@@ -51,7 +51,7 @@ describe("handleCLIError", () => {
       "AWS credentials not found",
       "NO_AWS_CREDENTIALS",
       "Run: aws configure",
-      "https://docs.wraps.dev/credentials"
+      "https://wraps.dev/docs/credentials"
     );
 
     handleCLIError(error);
@@ -66,7 +66,7 @@ describe("handleCLIError", () => {
       expect.stringContaining("Documentation:")
     );
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining("https://docs.wraps.dev/credentials")
+      expect.stringContaining("https://wraps.dev/docs/credentials")
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
@@ -129,7 +129,7 @@ describe("handleCLIError", () => {
       "Error with docs",
       "ERROR_WITH_DOCS",
       undefined,
-      "https://docs.wraps.dev/error"
+      "https://wraps.dev/docs/error"
     );
 
     handleCLIError(error);
@@ -138,7 +138,7 @@ describe("handleCLIError", () => {
       expect.stringContaining("Documentation:")
     );
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining("https://docs.wraps.dev/error")
+      expect.stringContaining("https://wraps.dev/docs/error")
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
@@ -161,7 +161,7 @@ describe("error factory functions", () => {
       expect(error.code).toBe("NO_AWS_CREDENTIALS");
       expect(error.suggestion).toContain("aws configure");
       expect(error.docsUrl).toBe(
-        "https://docs.wraps.dev/setup/aws-credentials"
+        "https://wraps.dev/docs/setup/aws-credentials"
       );
     });
   });
@@ -177,7 +177,7 @@ describe("error factory functions", () => {
       expect(error.suggestion).toContain(
         "wraps destroy --stack wraps-123456789-us-east-1"
       );
-      expect(error.docsUrl).toBe("https://docs.wraps.dev/cli/upgrade");
+      expect(error.docsUrl).toBe("https://wraps.dev/docs/cli/upgrade");
     });
   });
 
@@ -201,7 +201,7 @@ describe("error factory functions", () => {
       expect(error.message).toContain("Failed to create IAM role");
       expect(error.code).toBe("PULUMI_ERROR");
       expect(error.suggestion).toContain("AWS permissions");
-      expect(error.docsUrl).toBe("https://docs.wraps.dev/troubleshooting");
+      expect(error.docsUrl).toBe("https://wraps.dev/docs/troubleshooting");
     });
   });
 
@@ -213,7 +213,7 @@ describe("error factory functions", () => {
       expect(error.message).toContain("No Wraps infrastructure found");
       expect(error.code).toBe("NO_STACK");
       expect(error.suggestion).toContain("wraps init");
-      expect(error.docsUrl).toBe("https://docs.wraps.dev/cli/init");
+      expect(error.docsUrl).toBe("https://wraps.dev/docs/cli/init");
     });
   });
 

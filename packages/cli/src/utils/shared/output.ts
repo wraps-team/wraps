@@ -92,10 +92,12 @@ export type SuccessOutputs = {
   region: string;
   dnsRecords?: DNSRecord[];
   trackingDomainDnsRecords?: DNSRecord[];
+  acmValidationRecords?: DNSRecord[];
   tableName?: string;
   dnsAutoCreated?: boolean;
   domain?: string;
   customTrackingDomain?: string;
+  httpsTrackingEnabled?: boolean;
   mailFromDomain?: string;
 };
 
@@ -123,7 +125,7 @@ export function displaySuccess(outputs: SuccessOutputs) {
     "",
     pc.bold("Next steps:"),
     `  1. Install SDK: ${pc.yellow("npm install @wraps/sdk")}`,
-    `  2. View dashboard: ${pc.blue("https://dashboard.wraps.dev")}`,
+    `  2. View dashboard: ${pc.blue("https://app.wraps.dev")}`,
     ""
   );
 
@@ -176,13 +178,35 @@ export function displaySuccess(outputs: SuccessOutputs) {
     clack.note(dnsLines.join("\n"), "DNS Records to add:");
   }
 
+  // Show ACM certificate validation records if HTTPS tracking is enabled
+  if (outputs.acmValidationRecords && outputs.acmValidationRecords.length > 0) {
+    const acmDnsLines = [
+      pc.bold("SSL Certificate Validation (ACM):"),
+      ...outputs.acmValidationRecords.map(
+        (record) =>
+          `  ${pc.cyan(record.name)} ${pc.dim(record.type)} "${record.value}"`
+      ),
+      "",
+      pc.dim("Note: These records are required to validate your SSL certificate."),
+      pc.dim(
+        "CloudFront will be enabled automatically after certificate validation."
+      ),
+    ];
+
+    clack.note(
+      acmDnsLines.join("\n"),
+      "SSL Certificate Validation DNS Records:"
+    );
+  }
+
   // Show tracking domain DNS records if custom tracking domain is configured
   if (
     outputs.trackingDomainDnsRecords &&
     outputs.trackingDomainDnsRecords.length > 0
   ) {
+    const trackingProtocol = outputs.httpsTrackingEnabled ? "HTTPS" : "HTTP";
     const trackingDnsLines = [
-      pc.bold("Custom Tracking Domain - Redirect CNAME:"),
+      pc.bold(`Custom Tracking Domain - ${trackingProtocol} Redirect CNAME:`),
       ...outputs.trackingDomainDnsRecords.map(
         (record) =>
           `  ${pc.cyan(record.name)} ${pc.dim(record.type)} "${record.value}"`
@@ -193,6 +217,13 @@ export function displaySuccess(outputs: SuccessOutputs) {
       ),
       pc.dim("your custom domain for open and click tracking."),
     ];
+
+    if (outputs.httpsTrackingEnabled) {
+      trackingDnsLines.push(
+        "",
+        pc.dim("HTTPS tracking is enabled via CloudFront with SSL certificate.")
+      );
+    }
 
     clack.note(
       trackingDnsLines.join("\n"),
@@ -209,8 +240,10 @@ export function displaySuccess(outputs: SuccessOutputs) {
   }
 
   // Show tracking domain separately if we only have tracking domain (no other DNS records)
+  // ONLY for HTTP tracking - HTTPS tracking DNS records are shown after CloudFront is created
   if (
     outputs.customTrackingDomain &&
+    !outputs.httpsTrackingEnabled && // Only show for HTTP tracking
     !outputs.dnsAutoCreated &&
     (!outputs.dnsRecords || outputs.dnsRecords.length === 0) &&
     (!outputs.trackingDomainDnsRecords ||
@@ -252,6 +285,11 @@ export type StatusOutputs = {
     archiveArn?: string;
     archivingEnabled?: boolean;
     archiveRetention?: string;
+  };
+  tracking?: {
+    customTrackingDomain?: string;
+    httpsEnabled?: boolean;
+    cloudFrontDomain?: string;
   };
 };
 
@@ -338,6 +376,29 @@ export function displayStatus(status: StatusOutputs) {
   } else {
     featureLines.push(
       `  ${pc.dim("○")} Email Archiving ${pc.dim("(run 'wraps upgrade' to enable)")}`
+    );
+  }
+
+  // Custom Tracking Domain
+  if (status.tracking?.customTrackingDomain) {
+    const protocol = status.tracking.httpsEnabled ? "HTTPS" : "HTTP";
+    const cloudFrontStatus = status.tracking.httpsEnabled
+      ? status.tracking.cloudFrontDomain
+        ? pc.green("✓ Active")
+        : pc.yellow("⏱ Pending")
+      : "";
+    const trackingLabel = status.tracking.httpsEnabled
+      ? `${protocol} tracking ${cloudFrontStatus}`
+      : `${protocol} tracking`;
+    featureLines.push(
+      `  ${pc.green("✓")} Custom Tracking Domain ${pc.dim(`(${trackingLabel})`)}`
+    );
+    featureLines.push(
+      `      ${pc.cyan(status.tracking.customTrackingDomain)}`
+    );
+  } else {
+    featureLines.push(
+      `  ${pc.dim("○")} Custom Tracking Domain ${pc.dim("(run 'wraps upgrade' to enable)")}`
     );
   }
 
@@ -448,7 +509,7 @@ export function displayStatus(status: StatusOutputs) {
   }
 
   console.log(
-    `\n${pc.bold("Dashboard:")} ${pc.blue("https://dashboard.wraps.dev")}`
+    `\n${pc.bold("Dashboard:")} ${pc.blue("https://app.wraps.dev")}`
   );
-  console.log(`${pc.bold("Docs:")} ${pc.blue("https://docs.wraps.dev")}\n`);
+  console.log(`${pc.bold("Docs:")} ${pc.blue("https://wraps.dev/docs")}\n`);
 }

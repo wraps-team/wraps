@@ -599,6 +599,6 @@ AGPLv3
 
 ## Support
 
-- Documentation: https://docs.wraps.dev
+- Documentation: https://wraps.dev/docs
 - Issues: https://github.com/wraps-team/wraps/issues
-- Dashboard: https://dashboard.wraps.dev
+- Dashboard: https://app.wraps.dev

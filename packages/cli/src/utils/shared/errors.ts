@@ -56,7 +56,7 @@ export const errors = {
       "AWS credentials not found",
       "NO_AWS_CREDENTIALS",
       "Run: aws configure\nOr set AWS_PROFILE environment variable",
-      "https://docs.wraps.dev/setup/aws-credentials"
+      "https://wraps.dev/docs/setup/aws-credentials"
     ),
 
   stackExists: (stackName: string) =>
@@ -64,7 +64,7 @@ export const errors = {
       `Stack "${stackName}" already exists`,
       "STACK_EXISTS",
       `To update: wraps upgrade\nTo remove: wraps destroy --stack ${stackName}`,
-      "https://docs.wraps.dev/cli/upgrade"
+      "https://wraps.dev/docs/cli/upgrade"
     ),
 
   invalidRegion: (region: string) =>
@@ -80,7 +80,7 @@ export const errors = {
       `Infrastructure deployment failed: ${message}`,
       "PULUMI_ERROR",
       "Check your AWS permissions and try again",
-      "https://docs.wraps.dev/troubleshooting"
+      "https://wraps.dev/docs/troubleshooting"
     ),
 
   noStack: () =>
@@ -88,7 +88,7 @@ export const errors = {
       "No Wraps infrastructure found in this AWS account",
       "NO_STACK",
       "Run: wraps init\nTo deploy new infrastructure",
-      "https://docs.wraps.dev/cli/init"
+      "https://wraps.dev/docs/cli/init"
     ),
 
   pulumiNotInstalled: () =>
