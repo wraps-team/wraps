@@ -230,6 +230,7 @@ Interactive wizard allows you to add:
   - Use your own domain instead of AWS default (`r.{region}.awstrack.me`)
   - Requires single CNAME DNS record
   - Improves email appearance and trust
+  - **Note:** Currently uses HTTP (not HTTPS). CloudFront + SSL support coming in v1.1.0
 
 **Event Tracking:**
 - Customize tracked SES event types (SEND, DELIVERY, OPEN, CLICK, BOUNCE, COMPLAINT, etc.)
@@ -543,7 +544,7 @@ wraps init
   - [x] `wraps email domains verify` - Verify DNS records
   - [x] `wraps email domains remove` - Remove domain
 - [x] `wraps email upgrade` - Incrementally add features:
-  - Configuration presets (Starter → Production → Enterprise)
+  - Configuration preset upgrades (Starter → Production → Enterprise)
   - MAIL FROM domain for DMARC alignment
   - Custom tracking domain for branded links
   - Event type customization
@@ -573,11 +574,24 @@ wraps init
 - [x] Multi-service architecture ready (email, SMS coming soon)
 
 ### Coming Soon
-- [ ] Hosted App
+
+#### v1.1.0 - Q1 2025
+- [ ] **HTTPS Custom Tracking Domains**
+  - [ ] Automatic CloudFront distribution creation
+  - [ ] ACM certificate provisioning and validation
+  - [ ] HTTPS enforcement for tracking links
+  - [ ] Seamless upgrade path from HTTP tracking domains
+
+#### Future Releases
+- [ ] **SMS Service** (`wraps sms`)
+  - [ ] AWS End User Messaging integration
+  - [ ] Multi-channel communication support
+
+- [ ] **Hosted App**
   - [ ] Advanced analytics dashboard
-  - [ ] Email Templates
+  - [ ] Email templates
   - [ ] Bulk sending tools
-  - [ ] Tenant Management
+  - [ ] Tenant management
 
 ## License
 
