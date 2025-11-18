@@ -133,6 +133,9 @@ describe("upgrade command", () => {
         selectStack: vi.fn().mockResolvedValue(undefined),
       },
       setConfig: vi.fn().mockResolvedValue(undefined),
+      refresh: vi.fn().mockResolvedValue({
+        summary: { kind: "refresh", result: "succeeded" },
+      }),
       up: vi.fn().mockResolvedValue({
         outputs: {
           roleArn: {
@@ -712,6 +715,9 @@ describe("upgrade command", () => {
           selectStack: vi.fn().mockResolvedValue(undefined),
         },
         setConfig: vi.fn().mockResolvedValue(undefined),
+        refresh: vi.fn().mockResolvedValue({
+          summary: { kind: "refresh", result: "succeeded" },
+        }),
         up: vi
           .fn()
           .mockRejectedValue(
@@ -806,6 +812,9 @@ describe("upgrade command", () => {
           selectStack: vi.fn().mockResolvedValue(undefined),
         },
         setConfig: vi.fn().mockResolvedValue(undefined),
+        refresh: vi.fn().mockResolvedValue({
+          summary: { kind: "refresh", result: "succeeded" },
+        }),
         up: vi.fn().mockResolvedValue({
           outputs: {
             roleArn: {

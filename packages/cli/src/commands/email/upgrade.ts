@@ -473,14 +473,106 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         process.exit(0);
       }
 
-      updatedConfig = {
-        ...config,
-        tracking: {
-          ...config.tracking,
-          enabled: true,
-          customRedirectDomain: trackingDomain || undefined,
-        },
-      };
+      // Ask if HTTPS tracking should be enabled
+      const enableHttps = await clack.confirm({
+        message: "Enable HTTPS tracking with CloudFront + SSL certificate?",
+        initialValue: true,
+      });
+
+      if (clack.isCancel(enableHttps)) {
+        clack.cancel("Upgrade cancelled.");
+        process.exit(0);
+      }
+
+      if (enableHttps) {
+        clack.log.info(
+          pc.dim(
+            "HTTPS tracking creates a CloudFront distribution with an SSL certificate."
+          )
+        );
+        clack.log.info(
+          pc.dim("This ensures all tracking links use secure HTTPS connections.")
+        );
+
+        // Check if domain has Route53 hosted zone
+        const { findHostedZone } = await import(
+          "../../utils/email/route53.js"
+        );
+        const hostedZone = await progress.execute(
+          "Checking for Route53 hosted zone",
+          async () =>
+            await findHostedZone(trackingDomain || config.domain!, region)
+        );
+
+        if (hostedZone) {
+          progress.info(
+            `Found Route53 hosted zone: ${pc.cyan(hostedZone.name)} ${pc.green("✓")}`
+          );
+          clack.log.info(
+            pc.dim(
+              "DNS records (SSL certificate validation + CloudFront) will be created automatically."
+            )
+          );
+        } else {
+          clack.log.warn(
+            `No Route53 hosted zone found for ${pc.cyan(trackingDomain || config.domain!)}`
+          );
+          clack.log.info(
+            pc.dim(
+              "You'll need to manually create DNS records for SSL certificate validation and CloudFront."
+            )
+          );
+          clack.log.info(
+            pc.dim("DNS record details will be shown after deployment.")
+          );
+        }
+
+        const confirmHttps = await clack.confirm({
+          message: hostedZone
+            ? "Proceed with automatic HTTPS setup?"
+            : "Proceed with manual HTTPS setup (requires DNS configuration)?",
+          initialValue: true,
+        });
+
+        if (clack.isCancel(confirmHttps) || !confirmHttps) {
+          clack.log.info("HTTPS tracking not enabled. Using HTTP tracking.");
+          updatedConfig = {
+            ...config,
+            tracking: {
+              ...config.tracking,
+              enabled: true,
+              customRedirectDomain: trackingDomain || undefined,
+              httpsEnabled: false,
+            },
+          };
+        } else {
+          updatedConfig = {
+            ...config,
+            tracking: {
+              ...config.tracking,
+              enabled: true,
+              customRedirectDomain: trackingDomain || undefined,
+              httpsEnabled: true,
+            },
+          };
+        }
+      } else {
+        clack.log.info(
+          pc.dim(
+            "Using HTTP tracking (standard). Links will use http:// protocol."
+          )
+        );
+        updatedConfig = {
+          ...config,
+          tracking: {
+            ...config.tracking,
+            enabled: true,
+            customRedirectDomain: trackingDomain || undefined,
+            httpsEnabled: false,
+          },
+        };
+      }
+
       newPreset = undefined; // Custom config
       break;
     }
@@ -720,6 +812,10 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
                   domain: result.domain,
                   dkimTokens: result.dkimTokens,
                   customTrackingDomain: result.customTrackingDomain,
+                  httpsTrackingEnabled: result.httpsTrackingEnabled,
+                  cloudFrontDomain: result.cloudFrontDomain,
+                  acmCertificateValidationRecords:
+                    result.acmCertificateValidationRecords,
                   archiveArn: result.archiveArn,
                   archivingEnabled: result.archivingEnabled,
                   archiveRetention: result.archiveRetention,
@@ -741,6 +837,10 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         );
         await stack.setConfig("aws:region", { value: region });
 
+        // Refresh state to sync with AWS before upgrading
+        // This ensures Pulumi knows about resources that already exist
+        await stack.refresh({ onOutput: () => {} });
+
         // Pulumi will automatically detect changes and only update what's needed
         const upResult = await stack.up({ onOutput: () => {} });
         const pulumiOutputs = upResult.outputs;
@@ -759,6 +859,16 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           dkimTokens: pulumiOutputs.dkimTokens?.value as string[] | undefined,
           customTrackingDomain: pulumiOutputs.customTrackingDomain?.value as
             | string
+            | undefined,
+          httpsTrackingEnabled: pulumiOutputs.httpsTrackingEnabled?.value as
+            | boolean
+            | undefined,
+          cloudFrontDomain: pulumiOutputs.cloudFrontDomain?.value as
+            | string
+            | undefined,
+          acmCertificateValidationRecords: pulumiOutputs
+            .acmCertificateValidationRecords?.value as
+            | Array<{ name: string; type: string; value: string }>
             | undefined,
           archiveArn: pulumiOutputs.archiveArn?.value as string | undefined,
           archivingEnabled: pulumiOutputs.archivingEnabled?.value as
@@ -795,14 +905,61 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
   // 14. Format tracking domain DNS records if custom tracking domain was added
   const trackingDomainDnsRecords = [];
+  const acmValidationRecords = [];
+
   if (outputs.customTrackingDomain) {
-    // Custom tracking domains need a CNAME pointing to the regional tracking endpoint
-    // This is different from DKIM verification - it's for redirect tracking
-    trackingDomainDnsRecords.push({
-      name: outputs.customTrackingDomain,
-      type: "CNAME",
-      value: `r.${outputs.region}.awstrack.me`,
-    });
+    // For HTTPS tracking, only show CNAME if CloudFront exists
+    // For HTTP tracking, point to SES tracking endpoint
+    if (outputs.httpsTrackingEnabled) {
+      // Only add tracking domain CNAME if CloudFront is created
+      if (outputs.cloudFrontDomain) {
+        trackingDomainDnsRecords.push({
+          name: outputs.customTrackingDomain,
+          type: "CNAME",
+          value: outputs.cloudFrontDomain,
+        });
+      }
+    } else {
+      // HTTP tracking - use SES tracking endpoint
+      trackingDomainDnsRecords.push({
+        name: outputs.customTrackingDomain,
+        type: "CNAME",
+        value: `r.${outputs.region}.awstrack.me`,
+      });
+    }
+  }
+
+  // Add ACM certificate validation records if HTTPS tracking is enabled
+  if (
+    outputs.httpsTrackingEnabled &&
+    outputs.acmCertificateValidationRecords
+  ) {
+    acmValidationRecords.push(...outputs.acmCertificateValidationRecords);
+  }
+
+  // Check if HTTPS tracking was enabled but CloudFront wasn't created (manual DNS validation needed)
+  let needsCertificateValidation = false;
+  let certificateStatus: string | undefined;
+
+  if (
+    outputs.httpsTrackingEnabled &&
+    acmValidationRecords.length > 0 &&
+    !outputs.cloudFrontDomain
+  ) {
+    // Check actual certificate status in AWS
+    try {
+      const { ACMClient, DescribeCertificateCommand } = await import(
+        "@aws-sdk/client-acm"
+      );
+      const acmClient = new ACMClient({ region: "us-east-1" }); // ACM certs are in us-east-1
+
+      // We need to find the certificate ARN - it should be in the outputs or we can list certs
+      // For now, we'll just set the flag based on whether CloudFront exists
+      needsCertificateValidation = true;
+    } catch (error) {
+      // If we can't check, assume validation is needed
+      needsCertificateValidation = true;
+    }
   }
 
   // 15. Display success message
@@ -815,7 +972,10 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       trackingDomainDnsRecords.length > 0
         ? trackingDomainDnsRecords
         : undefined,
+    acmValidationRecords:
+      acmValidationRecords.length > 0 ? acmValidationRecords : undefined,
     customTrackingDomain: outputs.customTrackingDomain,
+    httpsTrackingEnabled: outputs.httpsTrackingEnabled,
   });
 
   // Show what was upgraded
@@ -828,6 +988,31 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   } else {
     console.log(
       `Updated configuration (${pc.green(`${formatCost(newCostData.total.monthly)}/mo`)})\n`
+    );
+  }
+
+  // Show next steps for HTTPS tracking if certificate validation is pending
+  if (needsCertificateValidation) {
+    console.log(pc.bold("⚠️  HTTPS Tracking - Next Steps:\n"));
+    console.log(
+      `  1. Add the SSL certificate validation DNS record shown above to your DNS provider`
+    );
+    console.log(
+      `  2. Wait for DNS propagation and certificate validation (5-30 minutes)`
+    );
+    console.log(
+      `  3. Run ${pc.cyan("wraps email upgrade")} again to complete CloudFront setup\n`
+    );
+    console.log(
+      pc.dim(
+        "  Note: CloudFront distribution will be created once the certificate is validated.\n"
+      )
+    );
+  } else if (outputs.httpsTrackingEnabled && outputs.cloudFrontDomain) {
+    console.log(
+      pc.green("✓") +
+        " " +
+        pc.bold("HTTPS tracking is fully configured and ready to use!\n")
     );
   }
 }

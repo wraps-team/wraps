@@ -1,6 +1,6 @@
 {
   "name": "@wraps.dev/cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "CLI for deploying Wraps email infrastructure to your AWS account",
   "type": "module",
   "main": "./dist/cli.js",
@@ -47,7 +47,9 @@
   "author": "Wraps",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-acm": "3.933.0",
     "@aws-sdk/client-cloudformation": "^3.490.0",
+    "@aws-sdk/client-cloudfront": "3.933.0",
     "@aws-sdk/client-cloudwatch": "^3.490.0",
     "@aws-sdk/client-dynamodb": "^3.490.0",
     "@aws-sdk/client-iam": "3.932.0",
@@ -60,8 +62,8 @@
     "@aws-sdk/client-sts": "^3.490.0",
     "@aws-sdk/util-dynamodb": "3.927.0",
     "@clack/prompts": "^0.11.0",
-    "@pulumi/aws": "^6.20.0",
-    "@pulumi/pulumi": "^3.100.0",
+    "@pulumi/aws": "^7.11.1",
+    "@pulumi/pulumi": "^3.207.0",
     "args": "^5.0.3",
     "cosmiconfig": "^9.0.0",
     "esbuild": "^0.25.12",

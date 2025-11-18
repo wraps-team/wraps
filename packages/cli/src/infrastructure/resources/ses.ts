@@ -13,9 +13,94 @@ export type SESResourcesConfig = {
     opens?: boolean;
     clicks?: boolean;
     customRedirectDomain?: string;
+    httpsEnabled?: boolean;
   };
   eventTypes?: SESEventType[];
 };
+
+/**
+ * Check if SES configuration set exists
+ */
+async function configurationSetExists(
+  configSetName: string,
+  region: string
+): Promise<boolean> {
+  try {
+    const { SESv2Client, GetConfigurationSetCommand } = await import(
+      "@aws-sdk/client-sesv2"
+    );
+    const ses = new SESv2Client({ region });
+
+    await ses.send(
+      new GetConfigurationSetCommand({ ConfigurationSetName: configSetName })
+    );
+    return true;
+  } catch (error: any) {
+    if (error.name === "NotFoundException") {
+      return false;
+    }
+    console.error("Error checking for existing configuration set:", error);
+    return false;
+  }
+}
+
+/**
+ * Check if email identity exists
+ */
+async function emailIdentityExists(
+  emailIdentity: string,
+  region: string
+): Promise<boolean> {
+  try {
+    const { SESv2Client, GetEmailIdentityCommand } = await import(
+      "@aws-sdk/client-sesv2"
+    );
+    const ses = new SESv2Client({ region });
+
+    await ses.send(
+      new GetEmailIdentityCommand({ EmailIdentity: emailIdentity })
+    );
+    return true;
+  } catch (error: any) {
+    if (error.name === "NotFoundException") {
+      return false;
+    }
+    console.error("Error checking for existing email identity:", error);
+    return false;
+  }
+}
+
+/**
+ * Check if configuration set event destination exists
+ */
+async function eventDestinationExists(
+  configSetName: string,
+  eventDestName: string,
+  region: string
+): Promise<boolean> {
+  try {
+    const { SESv2Client, GetConfigurationSetEventDestinationsCommand } =
+      await import("@aws-sdk/client-sesv2");
+    const ses = new SESv2Client({ region });
+
+    const response = await ses.send(
+      new GetConfigurationSetEventDestinationsCommand({
+        ConfigurationSetName: configSetName,
+      })
+    );
+
+    return (
+      response.EventDestinations?.some((dest) => dest.Name === eventDestName) ||
+      false
+    );
+  } catch (error: any) {
+    if (error.name === "NotFoundException") {
+      return false;
+    }
+    console.error("Error checking for existing event destination:", error);
+    return false;
+  }
+}
 
 /**
  * SES resources output
@@ -46,21 +131,32 @@ export async function createSESResources(
   };
 
   // Add custom tracking domain if provided
-  // Note: The tracking domain only needs a CNAME DNS record pointing to r.{region}.awstrack.me
-  // It does NOT need to be verified as a separate email identity in SES
+  // Note: The tracking domain only needs a CNAME DNS record
+  // - Without HTTPS: CNAME points to r.{region}.awstrack.me
+  // - With HTTPS: CNAME points to CloudFront distribution domain
   if (config.trackingConfig?.customRedirectDomain) {
     configSetOptions.trackingOptions = {
       customRedirectDomain: config.trackingConfig.customRedirectDomain,
-      // Use OPTIONAL because custom domains don't have SSL certificates by default
-      // AWS's tracking domain (r.{region}.awstrack.me) doesn't have certs for custom domains
-      httpsPolicy: "OPTIONAL",
+      // HTTPS policy depends on whether HTTPS tracking is enabled
+      // - REQUIRE: When using CloudFront with SSL certificate
+      // - OPTIONAL: When using direct SES tracking endpoint (no SSL)
+      httpsPolicy: config.trackingConfig.httpsEnabled ? "REQUIRE" : "OPTIONAL",
     };
   }
 
-  const configSet = new aws.sesv2.ConfigurationSet(
-    "wraps-email-tracking",
-    configSetOptions
-  );
+  // Check if configuration set already exists
+  const configSetName = "wraps-email-tracking";
+  const exists = await configurationSetExists(configSetName, config.region);
+
+  const configSet = exists
+    ? new aws.sesv2.ConfigurationSet(
+        configSetName,
+        configSetOptions,
+        {
+          import: configSetName, // Import existing configuration set
+        }
+      )
+    : new aws.sesv2.ConfigurationSet(configSetName, configSetOptions);
 
   // SES can only send to the default EventBridge bus
   // We'll use EventBridge rules to route from default bus to SQS
@@ -69,30 +165,42 @@ export async function createSESResources(
     name: "default",
   });
 
+  // Check if event destination already exists
+  const eventDestName = "wraps-email-eventbridge";
+  const eventDestExists = await eventDestinationExists(
+    configSetName,
+    eventDestName,
+    config.region
+  );
+
   // Event destination for all SES events -> EventBridge (default bus)
-  new aws.sesv2.ConfigurationSetEventDestination("wraps-email-all-events", {
-    configurationSetName: configSet.configurationSetName,
-    eventDestinationName: "wraps-email-eventbridge",
-    eventDestination: {
-      enabled: true,
-      matchingEventTypes: [
-        "SEND",
-        "DELIVERY",
-        "OPEN",
-        "CLICK",
-        "BOUNCE",
-        "COMPLAINT",
-        "REJECT",
-        "RENDERING_FAILURE",
-        "DELIVERY_DELAY",
-        "SUBSCRIPTION",
-      ],
-      eventBridgeDestination: {
-        // SES requires default bus - cannot use custom bus
-        eventBusArn: defaultEventBus.arn,
+  // Note: ConfigurationSetEventDestination doesn't support import, but checking
+  // prevents errors when it already exists
+  if (!eventDestExists) {
+    new aws.sesv2.ConfigurationSetEventDestination("wraps-email-all-events", {
+      configurationSetName: configSet.configurationSetName,
+      eventDestinationName: eventDestName,
+      eventDestination: {
+        enabled: true,
+        matchingEventTypes: [
+          "SEND",
+          "DELIVERY",
+          "OPEN",
+          "CLICK",
+          "BOUNCE",
+          "COMPLAINT",
+          "REJECT",
+          "RENDERING_FAILURE",
+          "DELIVERY_DELAY",
+          "SUBSCRIPTION",
+        ],
+        eventBridgeDestination: {
+          // SES requires default bus - cannot use custom bus
+          eventBusArn: defaultEventBus.arn,
+        },
       },
-    },
-  });
+    });
+  }
 
   // Optional: Verify domain if provided
   let domainIdentity: aws.sesv2.EmailIdentity | undefined;
@@ -100,17 +208,40 @@ export async function createSESResources(
   let mailFromDomain: string | undefined;
 
   if (config.domain) {
+    // Check if email identity already exists
+    const identityExists = await emailIdentityExists(
+      config.domain,
+      config.region
+    );
+
     // Use SES v2 API to create email identity with configuration set
-    domainIdentity = new aws.sesv2.EmailIdentity("wraps-email-domain", {
-      emailIdentity: config.domain,
-      configurationSetName: configSet.configurationSetName, // Link configuration set to domain
-      dkimSigningAttributes: {
-        nextSigningKeyLength: "RSA_2048_BIT",
-      },
-      tags: {
-        ManagedBy: "wraps-cli",
-      },
-    });
+    domainIdentity = identityExists
+      ? new aws.sesv2.EmailIdentity(
+          "wraps-email-domain",
+          {
+            emailIdentity: config.domain,
+            configurationSetName: configSet.configurationSetName, // Link configuration set to domain
+            dkimSigningAttributes: {
+              nextSigningKeyLength: "RSA_2048_BIT",
+            },
+            tags: {
+              ManagedBy: "wraps-cli",
+            },
+          },
+          {
+            import: config.domain, // Import existing identity
+          }
+        )
+      : new aws.sesv2.EmailIdentity("wraps-email-domain", {
+          emailIdentity: config.domain,
+          configurationSetName: configSet.configurationSetName, // Link configuration set to domain
+          dkimSigningAttributes: {
+            nextSigningKeyLength: "RSA_2048_BIT",
+          },
+          tags: {
+            ManagedBy: "wraps-cli",
+          },
+        });
 
     // Extract DKIM tokens for DNS configuration
     dkimTokens = domainIdentity.dkimSigningAttributes.apply(

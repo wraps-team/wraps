@@ -105,5 +105,12 @@ export async function status(_options: StatusOptions): Promise<void> {
       archivingEnabled: stackOutputs.archivingEnabled?.value,
       archiveRetention: stackOutputs.archiveRetention?.value,
     },
+    tracking: stackOutputs.customTrackingDomain?.value
+      ? {
+          customTrackingDomain: stackOutputs.customTrackingDomain?.value,
+          httpsEnabled: stackOutputs.httpsTrackingEnabled?.value,
+          cloudFrontDomain: stackOutputs.cloudFrontDomain?.value,
+        }
+      : undefined,
   });
 }

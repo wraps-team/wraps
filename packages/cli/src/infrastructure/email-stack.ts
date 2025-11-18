@@ -40,7 +40,50 @@ export async function deployEmailStack(
     emailConfig,
   });
 
-  // 3. SES resources (if tracking or event tracking enabled)
+  // 3. CloudFront + ACM (if HTTPS tracking enabled)
+  let cloudFrontResources;
+  let acmResources;
+
+  if (
+    emailConfig.tracking?.enabled &&
+    emailConfig.tracking.customRedirectDomain &&
+    emailConfig.tracking.httpsEnabled
+  ) {
+    // Check for Route53 hosted zone (for automatic DNS validation)
+    const { findHostedZone } = await import("../utils/email/route53.js");
+    const hostedZone = await findHostedZone(
+      emailConfig.tracking.customRedirectDomain,
+      config.region
+    );
+
+    // Create ACM certificate (in us-east-1 for CloudFront)
+    const { createACMCertificate } = await import("./resources/acm.js");
+    acmResources = await createACMCertificate({
+      domain: emailConfig.tracking.customRedirectDomain,
+      hostedZoneId: hostedZone?.id,
+    });
+
+    // Create CloudFront distribution with SSL certificate
+    // Import CloudFront creation function
+    const { createCloudFrontTracking } = await import(
+      "./resources/cloudfront.js"
+    );
+
+    // Determine which certificate ARN to use:
+    // - Route53: Use certificateValidation.certificateArn (waits for validation)
+    // - Manual DNS: Use certificate.arn directly (CloudFront will fail if not validated)
+    const certificateArn = acmResources.certificateValidation
+      ? acmResources.certificateValidation.certificateArn
+      : acmResources.certificate.arn;
+
+    cloudFrontResources = await createCloudFrontTracking({
+      customTrackingDomain: emailConfig.tracking.customRedirectDomain,
+      region: config.region,
+      certificateArn,
+    });
+  }
+
+  // 4. SES resources (if tracking or event tracking enabled)
   let sesResources;
   if (emailConfig.tracking?.enabled || emailConfig.eventTracking?.enabled) {
     sesResources = await createSESResources({
@@ -52,7 +95,7 @@ export async function deployEmailStack(
     });
   }
 
-  // 4. DynamoDB tables (if history storage enabled)
+  // 5. DynamoDB tables (if history storage enabled)
   let dynamoTables;
   if (emailConfig.eventTracking?.dynamoDBHistory) {
     dynamoTables = await createDynamoDBTables({
@@ -60,13 +103,13 @@ export async function deployEmailStack(
     });
   }
 
-  // 5. SQS queues (if event tracking enabled)
+  // 6. SQS queues (if event tracking enabled)
   let sqsResources;
   if (emailConfig.eventTracking?.enabled) {
     sqsResources = await createSQSResources();
   }
 
-  // 6. EventBridge rule to route SES events to SQS (if event tracking enabled)
+  // 7. EventBridge rule to route SES events to SQS (if event tracking enabled)
   if (emailConfig.eventTracking?.enabled && sesResources && sqsResources) {
     await createEventBridgeResources({
       eventBusArn: sesResources.eventBus.arn,
@@ -75,7 +118,7 @@ export async function deployEmailStack(
     });
   }
 
-  // 7. Lambda functions (if event tracking and DynamoDB enabled)
+  // 8. Lambda functions (if event tracking and DynamoDB enabled)
   let lambdaFunctions;
   if (
     emailConfig.eventTracking?.dynamoDBHistory &&
@@ -87,10 +130,11 @@ export async function deployEmailStack(
       tableName: dynamoTables.emailHistory.name,
       queueArn: sqsResources.queue.arn,
       accountId,
+      region: config.region,
     });
   }
 
-  // 8. Mail Manager Archive (if email archiving enabled)
+  // 9. Mail Manager Archive (if email archiving enabled)
   let archiveResources;
   if (emailConfig.emailArchiving?.enabled && sesResources) {
     const { createMailManagerArchive } = await import(
@@ -122,8 +166,14 @@ export async function deployEmailStack(
     queueUrl: sqsResources?.queue.url as any as string | undefined,
     dlqUrl: sqsResources?.dlq.url as any as string | undefined,
     customTrackingDomain: sesResources?.customTrackingDomain,
+    httpsTrackingEnabled: emailConfig.tracking?.httpsEnabled,
+    cloudFrontDomain: cloudFrontResources?.domainName as any as
+      | string
+      | undefined,
+    acmCertificateValidationRecords: acmResources?.validationRecords as any as
+      | Array<{ name: string; type: string; value: string }>
+      | undefined,
     mailFromDomain: sesResources?.mailFromDomain,
-    archiveId: archiveResources?.archiveId,
     archiveArn: archiveResources?.archiveArn,
     archivingEnabled: emailConfig.emailArchiving?.enabled,
     archiveRetention: emailConfig.emailArchiving?.enabled

@@ -7,6 +7,12 @@ import {
 
 /**
  * Find Route53 hosted zone for a domain
+ *
+ * This function searches for a hosted zone that matches the given domain.
+ * It will try the exact domain first, then fall back to parent domains.
+ * For example, if given "track.example.com", it will check:
+ * 1. track.example.com
+ * 2. example.com
  */
 export async function findHostedZone(
   domain: string,
@@ -14,6 +20,7 @@ export async function findHostedZone(
 ): Promise<{ id: string; name: string } | null> {
   const client = new Route53Client({ region });
 
+  // Try exact domain first
   try {
     const response = await client.send(
       new ListHostedZonesByNameCommand({
@@ -29,11 +36,18 @@ export async function findHostedZone(
         name: zone.Name,
       };
     }
-
-    return null;
   } catch (_error) {
-    return null;
+    // Continue to try parent domains
   }
+
+  // Try parent domains (e.g., track.example.com -> example.com)
+  const parts = domain.split(".");
+  if (parts.length > 2) {
+    const parentDomain = parts.slice(1).join(".");
+    return findHostedZone(parentDomain, region);
+  }
+
+  return null;
 }
 
 /**
@@ -45,7 +59,8 @@ export async function createDNSRecords(
   dkimTokens: string[],
   region: string,
   customTrackingDomain?: string,
-  mailFromDomain?: string
+  mailFromDomain?: string,
+  cloudFrontDomain?: string
 ): Promise<void> {
   const client = new Route53Client({ region });
 
@@ -91,13 +106,17 @@ export async function createDNSRecords(
   // Custom tracking domain CNAME (if provided)
   // This allows SES to rewrite links for open/click tracking using your custom domain
   if (customTrackingDomain) {
+    // If CloudFront domain is provided, use it (HTTPS tracking)
+    // Otherwise, use direct SES tracking endpoint (HTTP tracking)
+    const targetDomain = cloudFrontDomain || `r.${region}.awstrack.me`;
+
     changes.push({
       Action: "UPSERT",
       ResourceRecordSet: {
         Name: customTrackingDomain,
         Type: "CNAME",
         TTL: 1800,
-        ResourceRecords: [{ Value: `r.${region}.awstrack.me` }],
+        ResourceRecords: [{ Value: targetDomain }],
       },
     });
   }

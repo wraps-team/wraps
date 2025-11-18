@@ -38,6 +38,7 @@ export type WrapsEmailConfig = {
     opens?: boolean;
     clicks?: boolean;
     customRedirectDomain?: string;
+    httpsEnabled?: boolean; // Enable HTTPS with CloudFront + ACM
   };
 
   // Security
@@ -122,6 +123,13 @@ export type EmailStackOutputs = {
   queueUrl?: string;
   dlqUrl?: string;
   customTrackingDomain?: string;
+  httpsTrackingEnabled?: boolean;
+  cloudFrontDomain?: string;
+  acmCertificateValidationRecords?: Array<{
+    name: string;
+    type: string;
+    value: string;
+  }>;
   mailFromDomain?: string;
   archiveArn?: string;
   archivingEnabled?: boolean;

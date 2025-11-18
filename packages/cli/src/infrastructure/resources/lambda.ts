@@ -34,6 +34,7 @@ export type LambdaConfig = {
   tableName: pulumi.Output<string>;
   queueArn: pulumi.Output<string>;
   accountId: string;
+  region: string;
 };
 
 /**
@@ -43,6 +44,55 @@ export type LambdaFunctions = {
   eventProcessor: aws.lambda.Function;
   eventSourceMapping: aws.lambda.EventSourceMapping;
 };
+
+/**
+ * Check if Lambda function exists
+ */
+async function lambdaFunctionExists(functionName: string): Promise<boolean> {
+  try {
+    const { LambdaClient, GetFunctionCommand } = await import(
+      "@aws-sdk/client-lambda"
+    );
+    const lambda = new LambdaClient({});
+
+    await lambda.send(new GetFunctionCommand({ FunctionName: functionName }));
+    return true;
+  } catch (error: any) {
+    if (error.name === "ResourceNotFoundException") {
+      return false;
+    }
+    console.error("Error checking for existing Lambda function:", error);
+    return false;
+  }
+}
+
+/**
+ * Find existing event source mapping for Lambda function and SQS queue
+ */
+async function findEventSourceMapping(
+  functionName: string,
+  queueArn: string
+): Promise<string | null> {
+  try {
+    const { LambdaClient, ListEventSourceMappingsCommand } = await import(
+      "@aws-sdk/client-lambda"
+    );
+    const lambda = new LambdaClient({});
+
+    const response = await lambda.send(
+      new ListEventSourceMappingsCommand({
+        FunctionName: functionName,
+        EventSourceArn: queueArn,
+      })
+    );
+
+    // Return UUID of the first matching event source mapping
+    return response.EventSourceMappings?.[0]?.UUID || null;
+  } catch (error: any) {
+    console.error("Error finding event source mapping:", error);
+    return null;
+  }
+}
 
 /**
  * Get the Lambda function code directory
@@ -183,42 +233,87 @@ export async function deployLambdaFunctions(
       ),
   });
 
+  // Check if Lambda function already exists
+  const functionName = "wraps-email-event-processor";
+  const exists = await lambdaFunctionExists(functionName);
+
   // Create event-processor Lambda
-  const eventProcessor = new aws.lambda.Function(
-    "wraps-email-event-processor",
-    {
-      name: "wraps-email-event-processor",
-      runtime: aws.lambda.Runtime.NodeJS20dX,
-      handler: "index.handler",
-      role: lambdaRole.arn,
-      code: new pulumi.asset.FileArchive(eventProcessorCode),
-      timeout: 300, // 5 minutes (matches SQS visibility timeout)
-      memorySize: 512,
-      environment: {
-        variables: {
-          TABLE_NAME: config.tableName,
-          AWS_ACCOUNT_ID: config.accountId,
+  const eventProcessor = exists
+    ? new aws.lambda.Function(
+        functionName,
+        {
+          name: functionName,
+          runtime: aws.lambda.Runtime.NodeJS20dX,
+          handler: "index.handler",
+          role: lambdaRole.arn,
+          code: new pulumi.asset.FileArchive(eventProcessorCode),
+          timeout: 300, // 5 minutes (matches SQS visibility timeout)
+          memorySize: 512,
+          environment: {
+            variables: {
+              TABLE_NAME: config.tableName,
+              AWS_ACCOUNT_ID: config.accountId,
+            },
+          },
+          tags: {
+            ManagedBy: "wraps-cli",
+            Description: "Process SES email events from SQS and store in DynamoDB",
+          },
         },
-      },
-      tags: {
-        ManagedBy: "wraps-cli",
-        Description: "Process SES email events from SQS and store in DynamoDB",
-      },
-    }
+        {
+          import: functionName, // Import existing function
+        }
+      )
+    : new aws.lambda.Function(functionName, {
+        name: functionName,
+        runtime: aws.lambda.Runtime.NodeJS20dX,
+        handler: "index.handler",
+        role: lambdaRole.arn,
+        code: new pulumi.asset.FileArchive(eventProcessorCode),
+        timeout: 300, // 5 minutes (matches SQS visibility timeout)
+        memorySize: 512,
+        environment: {
+          variables: {
+            TABLE_NAME: config.tableName,
+            AWS_ACCOUNT_ID: config.accountId,
+          },
+        },
+        tags: {
+          ManagedBy: "wraps-cli",
+          Description: "Process SES email events from SQS and store in DynamoDB",
+        },
+      });
+
+  // Check if event source mapping already exists
+  // Construct the queue ARN from the known queue name, region, and account ID
+  const queueArnValue = `arn:aws:sqs:${config.region}:${config.accountId}:wraps-email-events`;
+  const existingMappingUuid = await findEventSourceMapping(
+    functionName,
+    queueArnValue
   );
 
   // Create SQS event source mapping for Lambda
   // This automatically polls SQS and invokes the Lambda function
-  const eventSourceMapping = new aws.lambda.EventSourceMapping(
-    "wraps-email-event-source-mapping",
-    {
-      eventSourceArn: config.queueArn,
-      functionName: eventProcessor.name,
-      batchSize: 10, // Process up to 10 messages per invocation
-      maximumBatchingWindowInSeconds: 5, // Wait up to 5 seconds to batch messages
-      functionResponseTypes: ["ReportBatchItemFailures"], // Enable partial batch responses
-    }
-  );
+  const mappingConfig = {
+    eventSourceArn: config.queueArn,
+    functionName: eventProcessor.name,
+    batchSize: 10, // Process up to 10 messages per invocation
+    maximumBatchingWindowInSeconds: 5, // Wait up to 5 seconds to batch messages
+    functionResponseTypes: ["ReportBatchItemFailures"], // Enable partial batch responses
+  };
+
+  const eventSourceMapping = existingMappingUuid
+    ? new aws.lambda.EventSourceMapping(
+        "wraps-email-event-source-mapping",
+        mappingConfig,
+        {
+          import: existingMappingUuid, // Import with the UUID
+        }
+      )
+    : new aws.lambda.EventSourceMapping(
+        "wraps-email-event-source-mapping",
+        mappingConfig
+      );
 
   return {
     eventProcessor,

@@ -1,4 +1,8 @@
 import {
+  ACMClient,
+  DescribeCertificateCommand,
+} from "@aws-sdk/client-acm";
+import {
   GetIdentityVerificationAttributesCommand,
   ListIdentitiesCommand,
   SESClient,
@@ -155,5 +159,58 @@ export async function isSESSandbox(region: string): Promise<boolean> {
       return true;
     }
     throw error;
+  }
+}
+
+/**
+ * ACM certificate status
+ */
+export type ACMCertificateStatus = {
+  status: string;
+  domainName: string;
+  validationRecords: Array<{
+    name: string;
+    type: string;
+    value: string;
+  }>;
+};
+
+/**
+ * Check ACM certificate validation status
+ * Note: ACM certificates for CloudFront must be in us-east-1
+ */
+export async function getACMCertificateStatus(
+  certificateArn: string
+): Promise<ACMCertificateStatus | null> {
+  const acm = new ACMClient({ region: "us-east-1" });
+
+  try {
+    const response = await acm.send(
+      new DescribeCertificateCommand({
+        CertificateArn: certificateArn,
+      })
+    );
+
+    const certificate = response.Certificate;
+    if (!certificate) {
+      return null;
+    }
+
+    // Extract validation records
+    const validationRecords =
+      certificate.DomainValidationOptions?.map((option) => ({
+        name: option.ResourceRecord?.Name || "",
+        type: option.ResourceRecord?.Type || "",
+        value: option.ResourceRecord?.Value || "",
+      })) || [];
+
+    return {
+      status: certificate.Status || "UNKNOWN",
+      domainName: certificate.DomainName || "",
+      validationRecords,
+    };
+  } catch (error) {
+    console.error("Error getting ACM certificate status:", error);
+    return null;
   }
 }

@@ -14,6 +14,25 @@ export type IAMRoleConfig = {
 };
 
 /**
+ * Check if IAM role exists
+ */
+async function roleExists(roleName: string): Promise<boolean> {
+  try {
+    const { IAMClient, GetRoleCommand } = await import("@aws-sdk/client-iam");
+    const iam = new IAMClient({});
+
+    await iam.send(new GetRoleCommand({ RoleName: roleName }));
+    return true;
+  } catch (error: any) {
+    if (error.name === "NoSuchEntityException") {
+      return false;
+    }
+    console.error("Error checking for existing IAM role:", error);
+    return false;
+  }
+}
+
+/**
  * Create IAM role for email infrastructure
  */
 export async function createIAMRole(
@@ -58,14 +77,33 @@ export async function createIAMRole(
     throw new Error("Other providers not yet implemented");
   }
 
-  const role = new aws.iam.Role("wraps-email-role", {
-    name: "wraps-email-role",
-    assumeRolePolicy,
-    tags: {
-      ManagedBy: "wraps-cli",
-      Provider: config.provider,
-    },
-  });
+  // Check if role already exists
+  const roleName = "wraps-email-role";
+  const exists = await roleExists(roleName);
+
+  const role = exists
+    ? new aws.iam.Role(
+        roleName,
+        {
+          name: roleName,
+          assumeRolePolicy,
+          tags: {
+            ManagedBy: "wraps-cli",
+            Provider: config.provider,
+          },
+        },
+        {
+          import: roleName, // Import existing role (use role name, not ARN)
+        }
+      )
+    : new aws.iam.Role(roleName, {
+        name: roleName,
+        assumeRolePolicy,
+        tags: {
+          ManagedBy: "wraps-cli",
+          Provider: config.provider,
+        },
+      });
 
   // Build policy statements based on enabled features
   const statements: any[] = [];
