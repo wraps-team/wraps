@@ -347,7 +347,7 @@ describe("verify command", () => {
     await verify({ domain: "example.com" });
 
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining("wraps status")
+      expect.stringContaining("wraps email status")
     );
   });
 

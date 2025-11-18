@@ -120,14 +120,14 @@ describe("restore command", () => {
   describe("Core Flow Tests", () => {
     it("should validate AWS credentials", async () => {
       await setupPulumiMock();
-      await restore({ yes: true });
+      await restore({ force: true });
 
       expect(aws.validateAWSCredentials).toHaveBeenCalled();
     });
 
     it("should load connection metadata", async () => {
       await setupPulumiMock();
-      await restore({ yes: true });
+      await restore({ force: true });
 
       expect(metadata.loadConnectionMetadata).toHaveBeenCalledWith(
         "123456789012",
@@ -139,7 +139,7 @@ describe("restore command", () => {
       await setupPulumiMock();
       vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(null);
 
-      await expect(restore({ yes: true })).rejects.toThrow();
+      await expect(restore({ force: true })).rejects.toThrow();
     });
 
     it("should confirm removal when --yes flag not provided", async () => {
@@ -151,14 +151,14 @@ describe("restore command", () => {
 
     it("should skip confirmation when --yes flag is provided", async () => {
       await setupPulumiMock();
-      await restore({ yes: true });
+      await restore({ force: true });
 
       expect(prompts.confirm).not.toHaveBeenCalled();
     });
 
     it("should select the Pulumi stack", async () => {
       const _mockStack = await setupPulumiMock();
-      await restore({ yes: true });
+      await restore({ force: true });
 
       const pulumi = await import("@pulumi/pulumi");
       expect(pulumi.automation.LocalWorkspace.selectStack).toHaveBeenCalledWith(
@@ -179,14 +179,14 @@ describe("restore command", () => {
 
     it("should destroy the Pulumi stack", async () => {
       const mockStack = await setupPulumiMock();
-      await restore({ yes: true });
+      await restore({ force: true });
 
       expect(mockStack.destroy).toHaveBeenCalled();
     });
 
     it("should remove the stack from workspace", async () => {
       const mockStack = await setupPulumiMock();
-      await restore({ yes: true });
+      await restore({ force: true });
 
       expect(mockStack.workspace.removeStack).toHaveBeenCalledWith(
         "wraps-123456789012-us-east-1"
@@ -195,7 +195,7 @@ describe("restore command", () => {
 
     it("should delete connection metadata", async () => {
       await setupPulumiMock();
-      await restore({ yes: true });
+      await restore({ force: true });
 
       expect(metadata.deleteConnectionMetadata).toHaveBeenCalledWith(
         "123456789012",
@@ -227,7 +227,7 @@ describe("restore command", () => {
       const mockStack = await setupPulumiMock();
       mockStack.destroy.mockRejectedValue(new Error("Destroy failed"));
 
-      await expect(restore({ yes: true })).rejects.toThrow();
+      await expect(restore({ force: true })).rejects.toThrow();
     });
 
     it("should handle missing pulumiStackName in metadata", async () => {
@@ -245,7 +245,7 @@ describe("restore command", () => {
         },
       } as any);
 
-      await restore({ yes: true });
+      await restore({ force: true });
 
       // Should skip Pulumi stack destruction but still delete metadata
       expect(metadata.deleteConnectionMetadata).toHaveBeenCalled();
@@ -255,7 +255,7 @@ describe("restore command", () => {
   describe("Display Tests", () => {
     it("should display resources to be removed based on config", async () => {
       await setupPulumiMock();
-      await restore({ yes: true });
+      await restore({ force: true });
 
       // Metadata has tracking, event tracking, and DynamoDB enabled
       // Console output should show these resources
@@ -280,7 +280,7 @@ describe("restore command", () => {
         },
       } as any);
 
-      await restore({ yes: true });
+      await restore({ force: true });
 
       expect(metadata.deleteConnectionMetadata).toHaveBeenCalled();
     });
@@ -289,7 +289,7 @@ describe("restore command", () => {
   describe("Region Handling Tests", () => {
     it("should use provided region option", async () => {
       await setupPulumiMock();
-      await restore({ yes: true, region: "eu-west-1" });
+      await restore({ force: true, region: "eu-west-1" });
 
       expect(metadata.loadConnectionMetadata).toHaveBeenCalledWith(
         "123456789012",
@@ -299,7 +299,7 @@ describe("restore command", () => {
 
     it("should use default region when not provided", async () => {
       await setupPulumiMock();
-      await restore({ yes: true });
+      await restore({ force: true });
 
       expect(aws.getAWSRegion).toHaveBeenCalled();
       expect(metadata.loadConnectionMetadata).toHaveBeenCalledWith(

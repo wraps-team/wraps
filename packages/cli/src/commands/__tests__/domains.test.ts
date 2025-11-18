@@ -311,7 +311,7 @@ describe("Domain Management Commands", () => {
 
       const clack = await import("@clack/prompts");
 
-      await removeDomain({ domain: "test.com", yes: true });
+      await removeDomain({ domain: "test.com", force: true });
 
       // confirm should not be called when yes=true
       expect(clack.confirm).not.toHaveBeenCalled();
@@ -358,7 +358,7 @@ describe("Domain Management Commands", () => {
       sesClientMock.on(GetEmailIdentityCommand).rejects(notFoundError);
 
       // Function will return early after calling process.exit()
-      await removeDomain({ domain: "nonexistent.com", yes: true });
+      await removeDomain({ domain: "nonexistent.com", force: true });
 
       expect(mockExit).toHaveBeenCalledWith(1);
     });

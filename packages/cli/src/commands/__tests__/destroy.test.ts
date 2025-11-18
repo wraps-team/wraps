@@ -103,7 +103,7 @@ describe("destroy command", () => {
   describe("Core Flow Tests", () => {
     it("should validate AWS credentials", async () => {
       await setupPulumiMock();
-      await destroy({ yes: true });
+      await destroy({ force: true });
 
       expect(aws.validateAWSCredentials).toHaveBeenCalled();
     });
@@ -117,14 +117,14 @@ describe("destroy command", () => {
 
     it("should skip confirmation when --yes flag is provided", async () => {
       await setupPulumiMock();
-      await destroy({ yes: true });
+      await destroy({ force: true });
 
       expect(prompts.confirm).not.toHaveBeenCalled();
     });
 
     it("should select the correct Pulumi stack", async () => {
       const _mockStack = await setupPulumiMock();
-      await destroy({ yes: true });
+      await destroy({ force: true });
 
       const pulumi = await import("@pulumi/pulumi");
       expect(pulumi.automation.LocalWorkspace.selectStack).toHaveBeenCalledWith(
@@ -137,14 +137,14 @@ describe("destroy command", () => {
 
     it("should destroy the Pulumi stack", async () => {
       const mockStack = await setupPulumiMock();
-      await destroy({ yes: true });
+      await destroy({ force: true });
 
       expect(mockStack.destroy).toHaveBeenCalled();
     });
 
     it("should remove the stack from workspace", async () => {
       const mockStack = await setupPulumiMock();
-      await destroy({ yes: true });
+      await destroy({ force: true });
 
       expect(mockStack.workspace.removeStack).toHaveBeenCalledWith(
         "wraps-123456789012-us-east-1"
@@ -153,7 +153,7 @@ describe("destroy command", () => {
 
     it("should delete connection metadata", async () => {
       await setupPulumiMock();
-      await destroy({ yes: true });
+      await destroy({ force: true });
 
       expect(metadata.deleteConnectionMetadata).toHaveBeenCalledWith(
         "123456789012",
@@ -166,7 +166,7 @@ describe("destroy command", () => {
     it("should handle no Pulumi stack found gracefully", async () => {
       await setupPulumiMock(true);
 
-      await expect(destroy({ yes: true })).rejects.toThrow();
+      await expect(destroy({ force: true })).rejects.toThrow();
 
       // Should still try to delete metadata
       expect(metadata.deleteConnectionMetadata).toHaveBeenCalledWith(
@@ -203,7 +203,7 @@ describe("destroy command", () => {
       const mockStack = await setupPulumiMock();
       mockStack.destroy.mockRejectedValue(new Error("Destroy failed"));
 
-      await expect(destroy({ yes: true })).rejects.toThrow("Destroy failed");
+      await expect(destroy({ force: true })).rejects.toThrow("Destroy failed");
     });
   });
 
@@ -243,7 +243,7 @@ describe("destroy command", () => {
         }
       );
 
-      await destroy({ yes: true });
+      await destroy({ force: true });
 
       expect(callOrder).toEqual([
         "validateCredentials",
@@ -258,7 +258,7 @@ describe("destroy command", () => {
       await setupPulumiMock();
       vi.mocked(aws.getAWSRegion).mockResolvedValue("eu-west-1");
 
-      await destroy({ yes: true });
+      await destroy({ force: true });
 
       const pulumi = await import("@pulumi/pulumi");
       expect(pulumi.automation.LocalWorkspace.selectStack).toHaveBeenCalledWith(
@@ -282,7 +282,7 @@ describe("destroy command", () => {
         arn: "test",
       });
 
-      await destroy({ yes: true });
+      await destroy({ force: true });
 
       const pulumi = await import("@pulumi/pulumi");
       expect(pulumi.automation.LocalWorkspace.selectStack).toHaveBeenCalledWith(

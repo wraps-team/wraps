@@ -27,7 +27,7 @@ import { startConsoleServer } from "../../console/server.js";
 import * as aws from "../../utils/shared/aws.js";
 import * as fsUtils from "../../utils/shared/fs.js";
 // Import after mocks
-import { runConsole } from "../shared/dashboard.js";
+import { dashboard } from "../shared/dashboard.js";
 
 describe("console command", () => {
   let mockSpinner: {
@@ -116,7 +116,7 @@ describe("console command", () => {
       const _mockStack = await setupPulumiMock();
 
       // Start the console in the background and let it hang
-      const _consolePromise = runConsole({});
+      const _consolePromise = dashboard({});
 
       // Give it a moment to execute before assertions
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -129,7 +129,7 @@ describe("console command", () => {
     it("should get AWS region", async () => {
       await setupPulumiMock();
 
-      runConsole({});
+      dashboard({});
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(aws.getAWSRegion).toHaveBeenCalled();
@@ -138,7 +138,7 @@ describe("console command", () => {
     it("should select Pulumi stack", async () => {
       await setupPulumiMock();
 
-      runConsole({});
+      dashboard({});
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       const pulumi = await import("@pulumi/pulumi");
@@ -153,13 +153,13 @@ describe("console command", () => {
     it("should exit if no Wraps infrastructure found", async () => {
       await setupPulumiMock(true);
 
-      await expect(runConsole({})).rejects.toThrow();
+      await expect(dashboard({})).rejects.toThrow();
     });
 
     it("should use default port range if not specified", async () => {
       await setupPulumiMock();
 
-      runConsole({});
+      dashboard({});
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(getPort).toHaveBeenCalledWith({
@@ -170,7 +170,7 @@ describe("console command", () => {
     it("should use specified port if provided", async () => {
       await setupPulumiMock();
 
-      runConsole({ port: 8080 });
+      dashboard({ port: 8080 });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(getPort).not.toHaveBeenCalled();
@@ -182,7 +182,7 @@ describe("console command", () => {
     it("should start console server with correct parameters", async () => {
       await setupPulumiMock();
 
-      runConsole({});
+      dashboard({});
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(startConsoleServer).toHaveBeenCalledWith({
@@ -200,7 +200,7 @@ describe("console command", () => {
     it("should open browser by default", async () => {
       await setupPulumiMock();
 
-      runConsole({});
+      dashboard({});
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(open).toHaveBeenCalledWith("http://localhost:5555");
@@ -209,7 +209,7 @@ describe("console command", () => {
     it("should not open browser when --no-open flag is provided", async () => {
       await setupPulumiMock();
 
-      runConsole({ noOpen: true });
+      dashboard({ noOpen: true });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(open).not.toHaveBeenCalled();
@@ -220,7 +220,7 @@ describe("console command", () => {
         tableName: { value: "custom-table-name" },
       });
 
-      runConsole({});
+      dashboard({});
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(startConsoleServer).toHaveBeenCalledWith(
@@ -248,7 +248,7 @@ describe("console command", () => {
         mockStack
       );
 
-      runConsole({});
+      dashboard({});
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(startConsoleServer).toHaveBeenCalledWith(
@@ -265,7 +265,7 @@ describe("console command", () => {
         new Error("Invalid credentials")
       );
 
-      await expect(runConsole({})).rejects.toThrow();
+      await expect(dashboard({})).rejects.toThrow();
     });
 
     it("should handle server start failures", async () => {
@@ -274,7 +274,7 @@ describe("console command", () => {
         new Error("Port already in use")
       );
 
-      await expect(runConsole({})).rejects.toThrow();
+      await expect(dashboard({})).rejects.toThrow();
     });
   });
 
@@ -282,7 +282,7 @@ describe("console command", () => {
     it("should pass noOpen flag to server", async () => {
       await setupPulumiMock();
 
-      runConsole({ noOpen: true });
+      dashboard({ noOpen: true });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(startConsoleServer).toHaveBeenCalledWith(
@@ -295,7 +295,7 @@ describe("console command", () => {
     it("should use current AWS credentials instead of assuming role", async () => {
       await setupPulumiMock();
 
-      runConsole({});
+      dashboard({});
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(startConsoleServer).toHaveBeenCalledWith(
