@@ -27,7 +27,7 @@ import { startConsoleServer } from "../../console/server.js";
 import * as aws from "../../utils/shared/aws.js";
 import * as fsUtils from "../../utils/shared/fs.js";
 // Import after mocks
-import { runConsole } from "../console.js";
+import { runConsole } from "../shared/dashboard.js";
 
 describe("console command", () => {
   let mockSpinner: {

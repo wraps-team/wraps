@@ -31,7 +31,7 @@ import * as metadata from "../../utils/shared/metadata.js";
 import * as promptUtils from "../../utils/shared/prompts.js";
 import * as pulumiUtils from "../../utils/shared/pulumi.js";
 // Import after mocks
-import { upgrade } from "../upgrade.js";
+import { upgrade } from "../email/upgrade.js";
 
 describe("upgrade command", () => {
   let mockSpinner: {

@@ -24,7 +24,7 @@ import * as aws from "../../utils/shared/aws.js";
 import * as fsUtils from "../../utils/shared/fs.js";
 import * as metadata from "../../utils/shared/metadata.js";
 // Import after mocks
-import { destroy } from "../destroy.js";
+import { destroy } from "../shared/destroy.js";
 
 describe("destroy command", () => {
   let mockSpinner: {

@@ -23,7 +23,7 @@ import * as aws from "../../utils/shared/aws.js";
 import * as fsUtils from "../../utils/shared/fs.js";
 import * as metadata from "../../utils/shared/metadata.js";
 // Import after mocks
-import { restore } from "../restore.js";
+import { restore } from "../email/restore.js";
 
 describe("restore command", () => {
   let mockSpinner: {

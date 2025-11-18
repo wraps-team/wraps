@@ -5,6 +5,7 @@
 
 // Re-export email types
 export type {
+  EmailConfigOptions,
   EmailConfigPreset,
   EmailConnectOptions,
   EmailFeatureCostBreakdown,
@@ -25,6 +26,7 @@ export type {
 export type {
   ArchiveRetention,
   ConsoleOptions,
+  DashboardOptions,
   DestroyOptions,
   FeatureCost,
   Provider,

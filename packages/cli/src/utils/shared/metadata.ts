@@ -25,6 +25,7 @@ export type ServiceConfig<TConfig, TPreset> = {
  * Connection metadata - supports multiple services per AWS account/region
  */
 export type ConnectionMetadata = {
+  version: string; // Metadata format version (e.g., "1.0.0")
   accountId: string;
   region: string;
   provider: Provider;
@@ -92,6 +93,7 @@ function migrateLegacyMetadata(
   legacy: LegacyConnectionMetadata
 ): ConnectionMetadata {
   return {
+    version: "1.0.0",
     accountId: legacy.accountId,
     region: legacy.region,
     provider: legacy.provider,
@@ -143,6 +145,12 @@ export async function loadConnectionMetadata(
       // Save migrated version
       await saveConnectionMetadata(migrated);
       return migrated;
+    }
+
+    // Add version if missing (for backwards compatibility with early multi-service format)
+    if (!data.version) {
+      data.version = "1.0.0";
+      await saveConnectionMetadata(data);
     }
 
     return data as ConnectionMetadata;
@@ -242,6 +250,7 @@ export function createConnectionMetadata(
   preset?: EmailConfigPreset
 ): ConnectionMetadata {
   return {
+    version: "1.0.0",
     accountId,
     region,
     provider,
@@ -310,6 +319,7 @@ export function addServiceToConnection(
 
   // Create new connection metadata
   const metadata: ConnectionMetadata = {
+    version: "1.0.0",
     accountId,
     region,
     provider,

@@ -3,15 +3,24 @@ SDK:
   2. ✅ React.email integration
   3. ✅ Template management (CRUD operations)
   4. ✅ Error handling with typed errors
-  5. ✅: Attachment support (already stubbed at client.ts:141)
-  6. NEW: Enhanced React template operations
+  5. ✅ Attachment support (already stubbed at client.ts:141)
+  6. ❓ Enhanced React template operations
   await email.templates.updateFromReact({...})
   await email.templates.previewTemplate('name', data) // Render without sending
-  7. NEW: Rate limiting & retry logic (SDK-level, for application use)
-  8. NEW: Email validation (pre-send checks)
-  9. NEW: Chunked bulk sending (auto-split >50 recipients)
+  7. ❌ Rate limiting & retry logic (SDK-level, for application use)
+  8. ❓ Email validation (pre-send checks)
+  9. ❌ Chunked bulk sending (auto-split >50 recipients)
 
 Should ADD to CLI:
+
+Let's do the following:
+
+1. ✅ Remove legacy commands now (No one is really using this yet afaik)
+2. ✅ Rename update command to config
+3. 🏗️ Consolidate verify into domains command group
+4. ◻ Standardize flag naming
+5. ◻ move it to global scope since it's not email-specific: `wraps dashboard`  # Works for all service
+6. ◻ Add a version field to metadata to support future migrations
 
   1. wraps templates - Template management commands
   wraps templates list

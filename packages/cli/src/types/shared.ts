@@ -58,3 +58,11 @@ export type StatusOptions = {
   account?: string;
   service?: ServiceType; // Show specific service or all
 };
+
+/**
+ * Command options for dashboard
+ */
+export type DashboardOptions = {
+  port?: number;
+  noOpen?: boolean;
+};

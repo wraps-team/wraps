@@ -4,7 +4,7 @@ import getPort from "get-port";
 import open from "open";
 import pc from "picocolors";
 import { startConsoleServer } from "../../console/server.js";
-import type { ConsoleOptions } from "../../types/index.js";
+import type { DashboardOptions } from "../../types/index.js";
 import {
   getAWSRegion,
   validateAWSCredentials,
@@ -16,10 +16,10 @@ import {
 import { DeploymentProgress } from "../../utils/shared/output.js";
 
 /**
- * Console command - Start local web dashboard
+ * Dashboard command - Start local web dashboard
  */
-export async function runConsole(options: ConsoleOptions): Promise<void> {
-  clack.intro(pc.bold("Wraps Console"));
+export async function dashboard(options: DashboardOptions): Promise<void> {
+  clack.intro(pc.bold("Wraps Dashboard"));
 
   const progress = new DeploymentProgress();
 
@@ -64,7 +64,7 @@ export async function runConsole(options: ConsoleOptions): Promise<void> {
 
   // 5. Start server
   progress.stop();
-  clack.log.success("Starting console server...");
+  clack.log.success("Starting dashboard server...");
   console.log(
     `${pc.dim("Using current AWS credentials (no role assumption)")}\\n`
   );
@@ -80,7 +80,7 @@ export async function runConsole(options: ConsoleOptions): Promise<void> {
     archivingEnabled,
   });
 
-  console.log(`\\n${pc.bold("Console:")} ${pc.cyan(url)}`);
+  console.log(`\\n${pc.bold("Dashboard:")} ${pc.cyan(url)}`);
   console.log(`${pc.dim("Press Ctrl+C to stop")}\\n`);
 
   // 6. Open browser (unless --no-open)

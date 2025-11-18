@@ -5,17 +5,23 @@ import { fileURLToPath } from "node:url";
 import * as clack from "@clack/prompts";
 import args from "args";
 import pc from "picocolors";
-// Legacy imports for backwards compatibility
-import { connect } from "./commands/connect.js";
-import { init } from "./commands/init.js";
-import { restore } from "./commands/restore.js";
+import { config } from "./commands/email/config.js";
+// Email commands
+import { connect } from "./commands/email/connect.js";
+import {
+  addDomain,
+  getDkim,
+  listDomains,
+  removeDomain,
+  verifyDomain,
+} from "./commands/email/domains.js";
+import { init } from "./commands/email/init.js";
+import { restore } from "./commands/email/restore.js";
+import { upgrade } from "./commands/email/upgrade.js";
 // Shared commands
-import { runConsole } from "./commands/shared/console.js";
+import { dashboard } from "./commands/shared/dashboard.js";
 import { destroy } from "./commands/shared/destroy.js";
 import { status } from "./commands/shared/status.js";
-import { update } from "./commands/update.js";
-import { upgrade } from "./commands/upgrade.js";
-import { verify } from "./commands/verify.js";
 import {
   printCompletionScript,
   setupTabCompletion,
@@ -51,25 +57,24 @@ function showHelp() {
   );
   console.log("Email Commands:");
   console.log(
-    `  ${pc.cyan("email init")}       Deploy new email infrastructure`
+    `  ${pc.cyan("email init")}           Deploy new email infrastructure`
   );
-  console.log(`  ${pc.cyan("email connect")}    Connect to existing AWS SES`);
-  console.log(`  ${pc.cyan("email verify")}     Verify domain DNS records`);
-  console.log(`  ${pc.cyan("email update")}     Update infrastructure`);
-  console.log(`  ${pc.cyan("email upgrade")}    Add features`);
   console.log(
-    `  ${pc.cyan("email restore")}    Restore original configuration\n`
+    `  ${pc.cyan("email connect")}        Connect to existing AWS SES`
+  );
+  console.log(`  ${pc.cyan("email domains verify")} Verify domain DNS records`);
+  console.log(`  ${pc.cyan("email config")}         Update infrastructure`);
+  console.log(`  ${pc.cyan("email upgrade")}        Add features`);
+  console.log(
+    `  ${pc.cyan("email restore")}        Restore original configuration\n`
   );
   console.log("Global Commands:");
   console.log(`  ${pc.cyan("status")}       Show all infrastructure status`);
-  console.log(`  ${pc.cyan("console")}      Start local web dashboard`);
+  console.log(`  ${pc.cyan("dashboard")}    Start local web dashboard`);
   console.log(`  ${pc.cyan("destroy")}      Remove deployed infrastructure`);
   console.log(
     `  ${pc.cyan("completion")}   Generate shell completion script\n`
   );
-  console.log("Legacy Commands (deprecated):");
-  console.log(`  ${pc.dim("init, connect, verify, update, upgrade, restore")}`);
-  console.log(`  ${pc.dim("Use 'wraps email <command>' instead")}\n`);
   console.log("Options:");
   console.log(
     `  ${pc.dim("--provider")}  Hosting provider (vercel, aws, railway, other)`
@@ -172,21 +177,8 @@ async function run() {
           });
           break;
 
-        case "verify":
-          if (!flags.domain) {
-            clack.log.error("--domain flag is required");
-            console.log(
-              `\nUsage: ${pc.cyan("wraps email verify --domain yourapp.com")}\n`
-            );
-            process.exit(1);
-          }
-          await verify({
-            domain: flags.domain,
-          });
-          break;
-
-        case "update":
-          await update({
+        case "config":
+          await config({
             region: flags.region,
             yes: flags.yes,
           });
@@ -205,6 +197,78 @@ async function run() {
             yes: flags.yes,
           });
           break;
+
+        case "domains": {
+          // Handle domains subcommands
+          const domainsSubCommand = args.sub[2];
+
+          switch (domainsSubCommand) {
+            case "add": {
+              if (!flags.domain) {
+                clack.log.error("--domain flag is required");
+                console.log(
+                  `\nUsage: ${pc.cyan("wraps email domains add --domain yourapp.com")}\n`
+                );
+                process.exit(1);
+              }
+              await addDomain({ domain: flags.domain });
+              break;
+            }
+
+            case "list":
+              await listDomains();
+              break;
+
+            case "verify": {
+              if (!flags.domain) {
+                clack.log.error("--domain flag is required");
+                console.log(
+                  `\nUsage: ${pc.cyan("wraps email domains verify --domain yourapp.com")}\n`
+                );
+                process.exit(1);
+              }
+              await verifyDomain({ domain: flags.domain });
+              break;
+            }
+
+            case "get-dkim": {
+              if (!flags.domain) {
+                clack.log.error("--domain flag is required");
+                console.log(
+                  `\nUsage: ${pc.cyan("wraps email domains get-dkim --domain yourapp.com")}\n`
+                );
+                process.exit(1);
+              }
+              await getDkim({ domain: flags.domain });
+              break;
+            }
+
+            case "remove": {
+              if (!flags.domain) {
+                clack.log.error("--domain flag is required");
+                console.log(
+                  `\nUsage: ${pc.cyan("wraps email domains remove --domain yourapp.com")}\n`
+                );
+                process.exit(1);
+              }
+              await removeDomain({
+                domain: flags.domain,
+                yes: flags.yes,
+              });
+              break;
+            }
+
+            default:
+              clack.log.error(
+                `Unknown domains command: ${domainsSubCommand || "(none)"}`
+              );
+              console.log(
+                `\nAvailable commands: ${pc.cyan("add")}, ${pc.cyan("list")}, ${pc.cyan("verify")}, ${pc.cyan("get-dkim")}, ${pc.cyan("remove")}\n`
+              );
+              process.exit(1);
+          }
+          break;
+        }
 
         default:
           clack.log.error(`Unknown email command: ${subCommand}`);
@@ -225,7 +289,7 @@ async function run() {
       process.exit(0);
     }
 
-    // Handle global commands and legacy commands (backwards compatibility)
+    // Handle global commands
     switch (primaryCommand) {
       // Global commands (work across all services)
       case "status":
@@ -234,8 +298,8 @@ async function run() {
         });
         break;
 
-      case "console":
-        await runConsole({
+      case "dashboard":
+        await dashboard({
           port: flags.port,
           noOpen: flags.noOpen,
         });
@@ -249,77 +313,6 @@ async function run() {
 
       case "completion":
         printCompletionScript();
-        break;
-
-      // Legacy commands (deprecated - redirect to email service)
-      case "init":
-        console.log(
-          pc.yellow("⚠️  Deprecated: Use 'wraps email init' instead\n")
-        );
-        await init({
-          provider: flags.provider,
-          region: flags.region,
-          domain: flags.domain,
-          preset: flags.preset,
-          yes: flags.yes,
-        });
-        break;
-
-      case "connect":
-        console.log(
-          pc.yellow("⚠️  Deprecated: Use 'wraps email connect' instead\n")
-        );
-        await connect({
-          provider: flags.provider,
-          region: flags.region,
-          yes: flags.yes,
-        });
-        break;
-
-      case "verify":
-        console.log(
-          pc.yellow("⚠️  Deprecated: Use 'wraps email verify' instead\n")
-        );
-        if (!flags.domain) {
-          clack.log.error("--domain flag is required");
-          console.log(
-            `\nUsage: ${pc.cyan("wraps email verify --domain yourapp.com")}\n`
-          );
-          process.exit(1);
-        }
-        await verify({
-          domain: flags.domain,
-        });
-        break;
-
-      case "update":
-        console.log(
-          pc.yellow("⚠️  Deprecated: Use 'wraps email update' instead\n")
-        );
-        await update({
-          region: flags.region,
-          yes: flags.yes,
-        });
-        break;
-
-      case "upgrade":
-        console.log(
-          pc.yellow("⚠️  Deprecated: Use 'wraps email upgrade' instead\n")
-        );
-        await upgrade({
-          region: flags.region,
-          yes: flags.yes,
-        });
-        break;
-
-      case "restore":
-        console.log(
-          pc.yellow("⚠️  Deprecated: Use 'wraps email restore' instead\n")
-        );
-        await restore({
-          region: flags.region,
-          yes: flags.yes,
-        });
         break;
 
       // Show help for service without subcommand

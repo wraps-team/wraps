@@ -188,10 +188,16 @@ export type EmailUpgradeOptions = {
 /**
  * Command options for email update
  */
-export type EmailUpdateOptions = {
+/**
+ * Command options for email config
+ */
+export type EmailConfigOptions = {
   region?: string;
   yes?: boolean;
 };
+
+/** @deprecated Use EmailConfigOptions instead */
+export type EmailUpdateOptions = EmailConfigOptions;
 
 /**
  * Command options for email restore

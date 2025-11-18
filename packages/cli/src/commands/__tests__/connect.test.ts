@@ -33,7 +33,7 @@ import * as promptUtils from "../../utils/shared/prompts.js";
 import * as pulumiUtils from "../../utils/shared/pulumi.js";
 import * as scanner from "../../utils/shared/scanner.js";
 // Import after mocks
-import { connect } from "../connect.js";
+import { connect } from "../email/connect.js";
 
 describe("connect command", () => {
   let mockSpinner: {

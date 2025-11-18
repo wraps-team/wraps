@@ -37,7 +37,7 @@ import * as metadata from "../../utils/shared/metadata.js";
 import * as promptUtils from "../../utils/shared/prompts.js";
 import * as pulumiUtils from "../../utils/shared/pulumi.js";
 // Import after mocks
-import { init } from "../init.js";
+import { init } from "../email/init.js";
 
 describe("init command", () => {
   let mockSpinner: {
