@@ -167,6 +167,74 @@ Verify domain DNS records and SES status.
 wraps email verify --domain myapp.com
 ```
 
+#### `wraps email domains`
+
+Manage SES domains (add, list, verify, get DKIM tokens, remove).
+
+##### `wraps email domains add`
+
+Add a new domain to SES with DKIM signing.
+
+**Options:**
+- `-d, --domain <domain>` - Domain to add
+
+**Example:**
+
+```bash
+wraps email domains add --domain myapp.com
+```
+
+##### `wraps email domains list`
+
+List all SES domains with verification status.
+
+**Example:**
+
+```bash
+wraps email domains list
+```
+
+##### `wraps email domains get-dkim`
+
+Get DKIM tokens for a domain (for DNS configuration).
+
+**Options:**
+- `-d, --domain <domain>` - Domain to get DKIM tokens for
+
+**Example:**
+
+```bash
+wraps email domains get-dkim --domain myapp.com
+```
+
+##### `wraps email domains verify`
+
+Verify domain DNS records (DKIM, SPF, DMARC, MX).
+
+**Options:**
+- `-d, --domain <domain>` - Domain to verify
+
+**Example:**
+
+```bash
+wraps email domains verify --domain myapp.com
+```
+
+##### `wraps email domains remove`
+
+Remove a domain from SES.
+
+**Options:**
+- `-d, --domain <domain>` - Domain to remove
+- `-f, --force` - Skip confirmation prompt
+
+**Example:**
+
+```bash
+wraps email domains remove --domain myapp.com
+wraps email domains remove --domain myapp.com --force  # Skip confirmation
+```
+
 #### `wraps email upgrade`
 
 Add features to existing infrastructure.
@@ -188,10 +256,15 @@ Interactive wizard to:
 
 Restore infrastructure from saved metadata.
 
+**Options:**
+- `-r, --region <region>` - AWS region to restore from
+- `-f, --force` - Force restore without confirmation (destructive)
+
 **Example:**
 
 ```bash
 wraps email restore
+wraps email restore --region us-west-2 --force  # Skip confirmation
 ```
 
 #### `wraps email destroy`
@@ -199,13 +272,13 @@ wraps email restore
 Remove all deployed email infrastructure.
 
 **Options:**
-- `-y, --yes` - Skip confirmation prompt
+- `-f, --force` - Force destroy without confirmation (destructive)
 
 **Example:**
 
 ```bash
 wraps email destroy
-wraps email destroy --yes  # Skip confirmation
+wraps email destroy --force  # Skip confirmation
 ```
 
 ### Global Commands
@@ -426,6 +499,12 @@ wraps init
 - [x] `wraps email console` - Local web dashboard
 - [x] `wraps email status` - Infrastructure status
 - [x] `wraps email verify` - DNS verification
+- [x] `wraps email domains` - Domain management
+  - [x] `wraps email domains add` - Add domain to SES
+  - [x] `wraps email domains list` - List all domains
+  - [x] `wraps email domains get-dkim` - Get DKIM tokens
+  - [x] `wraps email domains verify` - Verify DNS records
+  - [x] `wraps email domains remove` - Remove domain
 - [x] `wraps email upgrade` - Add features
 - [x] `wraps email restore` - Restore from metadata
 - [x] `wraps email destroy` - Clean removal
@@ -449,10 +528,11 @@ wraps init
 - [x] Comprehensive error handling
 
 ### Coming Soon
-- [ ] Multi-domain support
 - [ ] Advanced analytics dashboard
 - [ ] Email template management
 - [ ] Webhook integrations
+- [ ] MAIL FROM domain configuration
+- [ ] Custom tracking domain setup
 
 ## License
 

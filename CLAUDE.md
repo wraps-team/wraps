@@ -247,21 +247,72 @@ wraps status  # ⚠️ Deprecated: Use 'wraps email status'
 - Checks DKIM, SPF, DMARC records
 - Provides guidance if records missing/incorrect
 
-#### 5. `wraps email upgrade` - Add Email Features
+#### 5. `wraps email domains` - Domain Management
+Comprehensive domain management commands for AWS SES:
+
+##### `wraps email domains add` - Add Domain to SES
+- Creates email identity in SES
+- Configures DKIM signing (RSA 2048-bit)
+- Returns DKIM tokens for DNS configuration
+- Options: `-d/--domain <domain>`
+
+##### `wraps email domains list` - List All Domains
+- Lists all SES email identities (domains only)
+- Shows verification status
+- Displays DKIM status
+- Filters out email addresses
+
+##### `wraps email domains get-dkim` - Get DKIM Tokens
+- Retrieves DKIM tokens for domain
+- Displays DNS records to configure
+- Shows current DKIM status
+- Options: `-d/--domain <domain>`
+
+##### `wraps email domains verify` - Verify DNS Records
+- Checks DKIM CNAME records
+- Verifies SPF TXT record
+- Validates DMARC TXT record
+- Checks MAIL FROM MX records (if configured)
+- Options: `-d/--domain <domain>`
+
+##### `wraps email domains remove` - Remove Domain
+- Deletes email identity from SES
+- Confirms before deletion (unless `--force`)
+- Options: `-d/--domain <domain>`, `-f/--force`
+
+#### 6. `wraps email upgrade` - Add Email Features
 - Shows currently enabled features
 - Prompts for additional features to enable
 - Deploys new resources incrementally
 - Updates IAM policies as needed
 - Options: upgrade preset, add custom tracking domain, change retention, enable dedicated IP
 
-#### 6. `wraps email restore` - Restore from Metadata
+#### 7. `wraps email restore` - Restore from Metadata
 - Restores email infrastructure from saved metadata
 - Useful for disaster recovery or re-deployment
+- Options: `-r/--region <region>`, `-f/--force`
 
-#### 7. `wraps email destroy` - Remove Email Infrastructure
+#### 8. `wraps email destroy` - Remove Email Infrastructure
 - Destroys all email infrastructure
 - Deletes connection metadata
 - Non-reversible (with confirmation prompt)
+- Options: `-f/--force`
+
+### CLI Flag Conventions
+
+Wraps uses consistent flag naming with short aliases across all commands:
+
+**Common Flags:**
+- `-p, --provider` - Hosting provider (vercel, aws, railway, other)
+- `-r, --region` - AWS region
+- `-d, --domain` - Domain name
+- `-y, --yes` - Skip confirmation for non-destructive operations
+- `-f, --force` - Force operation without confirmation (destructive operations)
+
+**Destructive vs Non-Destructive:**
+- Use `--yes/-y` for non-destructive operations (init, connect, upgrade)
+- Use `--force/-f` for destructive operations (destroy, restore, domains remove)
+- This distinction helps prevent accidental data loss
 
 ## Critical Design Principles
 
