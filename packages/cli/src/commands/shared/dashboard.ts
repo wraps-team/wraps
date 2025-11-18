@@ -48,7 +48,7 @@ export async function dashboard(options: DashboardOptions): Promise<void> {
     progress.stop();
     clack.log.error("No Wraps infrastructure found");
     console.log(
-      `\\nRun ${pc.cyan("wraps init")} to deploy infrastructure first.\\n`
+      `\\nRun ${pc.cyan("wraps email init")} to deploy infrastructure first.\\n`
     );
     process.exit(1);
   }

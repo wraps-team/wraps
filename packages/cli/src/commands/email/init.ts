@@ -268,7 +268,7 @@ export async function init(options: InitOptions): Promise<void> {
       clack.log.warn("\nThe Pulumi stack is locked from a previous run.");
       clack.log.info("To fix this, run:");
       clack.log.info(`  ${pc.cyan("rm -rf ~/.wraps/pulumi/.pulumi/locks")}`);
-      clack.log.info("\nThen try running wraps init again.");
+      clack.log.info("\nThen try running wraps email init again.");
     }
 
     throw new Error(`Pulumi deployment failed: ${error.message}`);

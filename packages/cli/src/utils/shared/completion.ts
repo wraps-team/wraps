@@ -19,7 +19,7 @@ export function printCompletionScript() {
   console.log("# For now, here are the available commands:\n");
   console.log("# Commands:");
   console.log(
-    "#   wraps init [--provider vercel|aws|railway|other] [--region <region>] [--domain <domain>]"
+    "#   wraps email init [--provider vercel|aws|railway|other] [--region <region>] [--domain <domain>]"
   );
   console.log("#   wraps status [--account <account-id>]");
   console.log("#   wraps completion\n");

@@ -212,7 +212,7 @@ describe("error factory functions", () => {
       expect(error).toBeInstanceOf(WrapsError);
       expect(error.message).toContain("No Wraps infrastructure found");
       expect(error.code).toBe("NO_STACK");
-      expect(error.suggestion).toContain("wraps init");
+      expect(error.suggestion).toContain("wraps email init");
       expect(error.docsUrl).toBe("https://wraps.dev/docs/cli/init");
     });
   });

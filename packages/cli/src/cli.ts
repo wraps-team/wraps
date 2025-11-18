@@ -157,9 +157,84 @@ args.options([
 const flags = args.parse(process.argv);
 const [primaryCommand, subCommand] = args.sub;
 
-// Show help if no command
+// If no command provided, show interactive service selection
 if (!primaryCommand) {
-  showHelp();
+  async function selectService() {
+    clack.intro(pc.bold(`WRAPS CLI v${VERSION}`));
+    console.log("Welcome! Let's get started deploying your infrastructure.\n");
+
+    const service = await clack.select({
+      message: "Which service would you like to set up?",
+      options: [
+        {
+          value: "email",
+          label: "Email",
+          hint: "AWS SES email infrastructure",
+        },
+        {
+          value: "sms",
+          label: "SMS",
+          hint: "Coming soon - AWS End User Messaging",
+        },
+      ],
+    });
+
+    if (clack.isCancel(service)) {
+      clack.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    if (service === "sms") {
+      clack.log.warn("SMS infrastructure is coming soon!");
+      console.log(
+        `\nCheck back soon or follow our progress at ${pc.cyan("https://github.com/wraps-team/wraps")}\n`
+      );
+      process.exit(0);
+    }
+
+    // For email service, ask if they want to init or connect
+    const action = await clack.select({
+      message: "What would you like to do?",
+      options: [
+        {
+          value: "init",
+          label: "Deploy new infrastructure",
+          hint: "Create new AWS SES infrastructure",
+        },
+        {
+          value: "connect",
+          label: "Connect existing infrastructure",
+          hint: "Connect to existing AWS SES setup",
+        },
+      ],
+    });
+
+    if (clack.isCancel(action)) {
+      clack.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    // Run the appropriate command
+    if (action === "init") {
+      await init({
+        provider: flags.provider,
+        region: flags.region,
+        domain: flags.domain,
+        preset: flags.preset,
+        yes: flags.yes,
+      });
+    } else {
+      await connect({
+        provider: flags.provider,
+        region: flags.region,
+        yes: flags.yes,
+      });
+    }
+  }
+
+  selectService().catch(handleCLIError);
+  // Early exit - don't run the main run() function
+  process.exit(0);
 }
 
 // Route to appropriate command

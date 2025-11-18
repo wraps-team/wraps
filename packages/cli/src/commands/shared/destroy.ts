@@ -92,6 +92,6 @@ export async function destroy(options: DestroyOptions): Promise<void> {
   progress.stop();
   clack.outro(pc.green("All Wraps infrastructure has been removed"));
   console.log(
-    `\nRun ${pc.cyan("wraps init")} to deploy infrastructure again.\n`
+    `\nRun ${pc.cyan("wraps email init")} to deploy infrastructure again.\n`
   );
 }

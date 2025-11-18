@@ -67,7 +67,7 @@ export async function config(options: EmailConfigOptions): Promise<void> {
       `No Wraps connection found for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
     );
     clack.log.info(
-      `Use ${pc.cyan("wraps init")} to create new infrastructure or ${pc.cyan("wraps connect")} to connect existing.`
+      `Use ${pc.cyan("wraps email init")} to create new infrastructure or ${pc.cyan("wraps email connect")} to connect existing.`
     );
     process.exit(1);
   }

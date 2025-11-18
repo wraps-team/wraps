@@ -46,7 +46,9 @@ export async function status(_options: StatusOptions): Promise<void> {
   } catch (_error: any) {
     progress.stop();
     clack.log.error("No Wraps infrastructure found");
-    console.log(`\nRun ${pc.cyan("wraps init")} to deploy infrastructure.\n`);
+    console.log(
+      `\nRun ${pc.cyan("wraps email init")} to deploy infrastructure.\n`
+    );
     process.exit(1);
   }
 

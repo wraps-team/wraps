@@ -55,7 +55,7 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
       `No Wraps connection found for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
     );
     clack.log.info(
-      `Use ${pc.cyan("wraps init")} or ${pc.cyan("wraps connect")} to create a connection first.`
+      `Use ${pc.cyan("wraps email init")} or ${pc.cyan("wraps email connect")} to create a connection first.`
     );
     process.exit(1);
   }

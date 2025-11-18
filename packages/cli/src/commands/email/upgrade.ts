@@ -70,7 +70,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       `No Wraps connection found for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
     );
     clack.log.info(
-      `Use ${pc.cyan("wraps init")} to create new infrastructure or ${pc.cyan("wraps connect")} to connect existing.`
+      `Use ${pc.cyan("wraps email init")} to create new infrastructure or ${pc.cyan("wraps email connect")} to connect existing.`
     );
     process.exit(1);
   }
@@ -439,7 +439,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           "No sending domain configured. You must configure a sending domain before adding a custom tracking domain."
         );
         clack.log.info(
-          `Use ${pc.cyan("wraps init")} to set up a sending domain first.`
+          `Use ${pc.cyan("wraps email init")} to set up a sending domain first.`
         );
         process.exit(1);
       }

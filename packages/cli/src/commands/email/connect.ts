@@ -95,7 +95,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
   if (scan.identities.length === 0) {
     clack.log.warn("No SES identities found in this region.");
     clack.log.info(
-      `Use ${pc.cyan("wraps init")} to create new email infrastructure instead.`
+      `Use ${pc.cyan("wraps email init")} to create new email infrastructure instead.`
     );
     process.exit(0);
   }
@@ -230,7 +230,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
       clack.log.warn("\nThe Pulumi stack is locked from a previous run.");
       clack.log.info("To fix this, run:");
       clack.log.info(`  ${pc.cyan("rm -rf ~/.wraps/pulumi/.pulumi/locks")}`);
-      clack.log.info("\nThen try running wraps connect again.");
+      clack.log.info("\nThen try running wraps email connect again.");
     }
 
     throw new Error(`Pulumi deployment failed: ${error.message}`);

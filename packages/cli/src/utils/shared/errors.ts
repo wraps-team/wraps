@@ -87,7 +87,7 @@ export const errors = {
     new WrapsError(
       "No Wraps infrastructure found in this AWS account",
       "NO_STACK",
-      "Run: wraps init\nTo deploy new infrastructure",
+      "Run: wraps email init\nTo deploy new infrastructure",
       "https://wraps.dev/docs/cli/init"
     ),
 
