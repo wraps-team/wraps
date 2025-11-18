@@ -1,17 +1,26 @@
 import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import pc from "picocolors";
-import { deployEmailStack } from "../infrastructure/email-stack.js";
-import type { ConnectOptions, EmailStackConfig } from "../types/index.js";
-import { getPreset } from "../utils/email/presets.js";
-import { getAWSRegion, validateAWSCredentials } from "../utils/shared/aws.js";
-import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/shared/fs.js";
+import { deployEmailStack } from "../../infrastructure/email-stack.js";
+import type { ConnectOptions, EmailStackConfig } from "../../types/index.js";
+import { getPreset } from "../../utils/email/presets.js";
+import {
+  getAWSRegion,
+  validateAWSCredentials,
+} from "../../utils/shared/aws.js";
+import {
+  ensurePulumiWorkDir,
+  getPulumiWorkDir,
+} from "../../utils/shared/fs.js";
 import {
   createConnectionMetadata,
   loadConnectionMetadata,
   saveConnectionMetadata,
-} from "../utils/shared/metadata.js";
-import { DeploymentProgress, displaySuccess } from "../utils/shared/output.js";
+} from "../../utils/shared/metadata.js";
+import {
+  DeploymentProgress,
+  displaySuccess,
+} from "../../utils/shared/output.js";
 import {
   confirmConnect,
   promptConfigPreset,
@@ -19,9 +28,9 @@ import {
   promptRegion,
   promptSelectIdentities,
   promptVercelConfig,
-} from "../utils/shared/prompts.js";
-import { ensurePulumiInstalled } from "../utils/shared/pulumi.js";
-import { scanAWSResources } from "../utils/shared/scanner.js";
+} from "../../utils/shared/prompts.js";
+import { ensurePulumiInstalled } from "../../utils/shared/pulumi.js";
+import { scanAWSResources } from "../../utils/shared/scanner.js";
 
 /**
  * Connect command - Connect to existing AWS SES infrastructure
@@ -128,7 +137,9 @@ export async function connect(options: ConnectOptions): Promise<void> {
   const preset = await promptConfigPreset();
   const emailConfig =
     preset === "custom"
-      ? await import("../utils/prompts.js").then((m) => m.promptCustomConfig())
+      ? await import("../../utils/shared/prompts.js").then((m) =>
+          m.promptCustomConfig()
+        )
       : getPreset(preset)!;
 
   // 9. Confirm deployment

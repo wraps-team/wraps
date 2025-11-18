@@ -89,12 +89,14 @@ export function HeroSection() {
                 <div className="bg-muted/30 p-4 font-mono text-sm">
                   <div className="flex items-center gap-2">
                     <span className="text-primary">$</span>
-                    <code className="flex-1">npx @wraps.dev/cli init</code>
+                    <code className="flex-1">
+                      npx @wraps.dev/cli email init
+                    </code>
                     <Button
                       className="shrink-0"
                       onClick={() => {
                         navigator.clipboard.writeText(
-                          "npx @wraps.dev/cli init"
+                          "npx @wraps.dev/cli email init"
                         );
                       }}
                       size="sm"

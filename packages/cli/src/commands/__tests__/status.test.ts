@@ -29,6 +29,8 @@ vi.mock("@pulumi/pulumi", async () => {
 
 // Mock clack
 vi.mock("@clack/prompts", () => ({
+  intro: vi.fn(),
+  outro: vi.fn(),
   log: {
     error: vi.fn(),
     success: vi.fn(),
@@ -41,8 +43,8 @@ vi.mock("@clack/prompts", () => ({
 }));
 
 // Mock output module
-vi.mock("../../utils/output.js", async () => {
-  const actual = await vi.importActual("../../utils/output.js");
+vi.mock("../../utils/shared/output.js", async () => {
+  const actual = await vi.importActual("../../utils/shared/output.js");
   return {
     ...actual,
     displayStatus: vi.fn(),
@@ -50,7 +52,7 @@ vi.mock("../../utils/output.js", async () => {
 });
 
 // Mock fs module
-vi.mock("../../utils/fs.js", () => ({
+vi.mock("../../utils/shared/fs.js", () => ({
   getPulumiWorkDir: () => "/mock/pulumi/dir",
   ensurePulumiWorkDir: vi.fn().mockResolvedValue(undefined),
 }));
@@ -133,7 +135,7 @@ describe("status command", () => {
       },
     });
 
-    const { displayStatus } = await import("../../utils/output.js");
+    const { displayStatus } = await import("../../utils/shared/output.js");
 
     await status({});
 
@@ -176,7 +178,7 @@ describe("status command", () => {
       },
     });
 
-    const { displayStatus } = await import("../../utils/output.js");
+    const { displayStatus } = await import("../../utils/shared/output.js");
 
     await status({});
 
@@ -233,7 +235,7 @@ describe("status command", () => {
         },
       });
 
-    const { displayStatus } = await import("../../utils/output.js");
+    const { displayStatus } = await import("../../utils/shared/output.js");
 
     await status({});
 

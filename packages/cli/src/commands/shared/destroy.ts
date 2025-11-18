@@ -1,11 +1,17 @@
 import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import pc from "picocolors";
-import type { DestroyOptions } from "../types/index.js";
-import { getAWSRegion, validateAWSCredentials } from "../utils/shared/aws.js";
-import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/shared/fs.js";
-import { deleteConnectionMetadata } from "../utils/shared/metadata.js";
-import { DeploymentProgress } from "../utils/shared/output.js";
+import type { DestroyOptions } from "../../types/index.js";
+import {
+  getAWSRegion,
+  validateAWSCredentials,
+} from "../../utils/shared/aws.js";
+import {
+  ensurePulumiWorkDir,
+  getPulumiWorkDir,
+} from "../../utils/shared/fs.js";
+import { deleteConnectionMetadata } from "../../utils/shared/metadata.js";
+import { DeploymentProgress } from "../../utils/shared/output.js";
 
 /**
  * Destroy command - Remove all deployed infrastructure

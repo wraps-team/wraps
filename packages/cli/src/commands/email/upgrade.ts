@@ -1,24 +1,33 @@
 import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import pc from "picocolors";
-import { deployEmailStack } from "../infrastructure/email-stack.js";
+import { deployEmailStack } from "../../infrastructure/email-stack.js";
 import type {
   EmailStackConfig,
   UpgradeOptions,
   WrapsEmailConfig,
-} from "../types/index.js";
-import { calculateCosts, formatCost } from "../utils/email/costs.js";
-import { getAllPresetInfo, getPreset } from "../utils/email/presets.js";
-import { getAWSRegion, validateAWSCredentials } from "../utils/shared/aws.js";
-import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/shared/fs.js";
+} from "../../types/index.js";
+import { calculateCosts, formatCost } from "../../utils/email/costs.js";
+import { getAllPresetInfo, getPreset } from "../../utils/email/presets.js";
+import {
+  getAWSRegion,
+  validateAWSCredentials,
+} from "../../utils/shared/aws.js";
+import {
+  ensurePulumiWorkDir,
+  getPulumiWorkDir,
+} from "../../utils/shared/fs.js";
 import {
   loadConnectionMetadata,
   saveConnectionMetadata,
   updateEmailConfig,
-} from "../utils/shared/metadata.js";
-import { DeploymentProgress, displaySuccess } from "../utils/shared/output.js";
-import { promptVercelConfig } from "../utils/shared/prompts.js";
-import { ensurePulumiInstalled } from "../utils/shared/pulumi.js";
+} from "../../utils/shared/metadata.js";
+import {
+  DeploymentProgress,
+  displaySuccess,
+} from "../../utils/shared/output.js";
+import { promptVercelConfig } from "../../utils/shared/prompts.js";
+import { ensurePulumiInstalled } from "../../utils/shared/pulumi.js";
 
 /**
  * Upgrade command - Enhance existing Wraps infrastructure
@@ -101,7 +110,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     console.log(`  ${pc.green("✓")} Event Tracking (EventBridge)`);
     if (config.eventTracking.dynamoDBHistory) {
       console.log(
-        `    ${pc.dim("└─")} Email History: ${pc.cyan(config.eventTracking.archiveRetention || "3months")}`
+        `    ${pc.dim("└─")} Email History: ${pc.cyan(config.eventTracking.archiveRetention || "90days")}`
       );
     }
   }
@@ -113,23 +122,14 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   if (config.emailArchiving?.enabled) {
     const retentionLabel =
       {
-        "3months": "3 months",
+        "7days": "7 days",
+        "30days": "30 days",
+        "90days": "90 days",
         "6months": "6 months",
-        "9months": "9 months",
         "1year": "1 year",
         "18months": "18 months",
-        "2years": "2 years",
-        "30months": "30 months",
-        "3years": "3 years",
-        "4years": "4 years",
-        "5years": "5 years",
-        "6years": "6 years",
-        "7years": "7 years",
-        "8years": "8 years",
-        "9years": "9 years",
-        "10years": "10 years",
-        permanent: "permanent",
-      }[config.emailArchiving.retention] || "3 months";
+        indefinite: "indefinite",
+      }[config.emailArchiving.retention] || "90 days";
     console.log(`  ${pc.green("✓")} Email Archiving (${retentionLabel})`);
   }
 
@@ -290,8 +290,18 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
             message: "Email archive retention period:",
             options: [
               {
-                value: "3months",
-                label: "3 months (minimum)",
+                value: "7days",
+                label: "7 days",
+                hint: "~$1-2/mo for 10k emails",
+              },
+              {
+                value: "30days",
+                label: "30 days",
+                hint: "~$2-4/mo for 10k emails",
+              },
+              {
+                value: "90days",
+                label: "90 days (recommended)",
                 hint: "~$5-10/mo for 10k emails",
               },
               {
@@ -301,38 +311,13 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
               },
               {
                 value: "1year",
-                label: "1 year (recommended)",
+                label: "1 year",
                 hint: "~$25-40/mo for 10k emails",
               },
               {
-                value: "2years",
-                label: "2 years",
-                hint: "~$50-80/mo for 10k emails",
-              },
-              {
-                value: "3years",
-                label: "3 years",
-                hint: "~$75-120/mo for 10k emails",
-              },
-              {
-                value: "5years",
-                label: "5 years",
-                hint: "~$125-200/mo for 10k emails",
-              },
-              {
-                value: "7years",
-                label: "7 years",
-                hint: "~$175-280/mo for 10k emails",
-              },
-              {
-                value: "10years",
-                label: "10 years",
-                hint: "~$250-400/mo for 10k emails",
-              },
-              {
-                value: "permanent",
-                label: "Permanent",
-                hint: "Expensive, not recommended",
+                value: "18months",
+                label: "18 months",
+                hint: "~$35-60/mo for 10k emails",
               },
             ],
             initialValue: config.emailArchiving.retention,
@@ -373,8 +358,18 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           message: "Email archive retention period:",
           options: [
             {
-              value: "3months",
-              label: "3 months (minimum)",
+              value: "7days",
+              label: "7 days",
+              hint: "~$1-2/mo for 10k emails",
+            },
+            {
+              value: "30days",
+              label: "30 days",
+              hint: "~$2-4/mo for 10k emails",
+            },
+            {
+              value: "90days",
+              label: "90 days (recommended)",
               hint: "~$5-10/mo for 10k emails",
             },
             {
@@ -384,41 +379,16 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
             },
             {
               value: "1year",
-              label: "1 year (recommended)",
+              label: "1 year",
               hint: "~$25-40/mo for 10k emails",
             },
             {
-              value: "2years",
-              label: "2 years",
-              hint: "~$50-80/mo for 10k emails",
-            },
-            {
-              value: "3years",
-              label: "3 years",
-              hint: "~$75-120/mo for 10k emails",
-            },
-            {
-              value: "5years",
-              label: "5 years",
-              hint: "~$125-200/mo for 10k emails",
-            },
-            {
-              value: "7years",
-              label: "7 years",
-              hint: "~$175-280/mo for 10k emails",
-            },
-            {
-              value: "10years",
-              label: "10 years",
-              hint: "~$250-400/mo for 10k emails",
-            },
-            {
-              value: "permanent",
-              label: "Permanent",
-              hint: "Expensive, not recommended",
+              value: "18months",
+              label: "18 months",
+              hint: "~$35-60/mo for 10k emails",
             },
           ],
-          initialValue: "3months",
+          initialValue: "90days",
         });
 
         if (clack.isCancel(retention)) {
@@ -462,7 +432,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       }
 
       // Verify that the sending identity is verified
-      const { listSESDomains } = await import("../utils/shared/aws.js");
+      const { listSESDomains } = await import("../../utils/shared/aws.js");
       const domains = await progress.execute(
         "Checking domain verification status",
         async () => await listSESDomains(region)
@@ -519,9 +489,11 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       const retention = await clack.select({
         message: "Email history retention period (event data in DynamoDB):",
         options: [
+          { value: "7days", label: "7 days", hint: "Minimal storage cost" },
+          { value: "30days", label: "30 days", hint: "Development/testing" },
           {
-            value: "3months",
-            label: "3 months (recommended)",
+            value: "90days",
+            label: "90 days (recommended)",
             hint: "Standard retention",
           },
           {
@@ -535,18 +507,8 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
             label: "18 months",
             hint: "Long-term retention",
           },
-          {
-            value: "2years",
-            label: "2 years",
-            hint: "Extended compliance",
-          },
-          {
-            value: "permanent",
-            label: "Permanent",
-            hint: "Not recommended (expensive)",
-          },
         ],
-        initialValue: config.eventTracking?.archiveRetention || "3months",
+        initialValue: config.eventTracking?.archiveRetention || "90days",
       });
 
       if (clack.isCancel(retention)) {
@@ -668,7 +630,9 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
     case "custom": {
       // Full custom configuration
-      const { promptCustomConfig } = await import("../utils/prompts.js");
+      const { promptCustomConfig } = await import(
+        "../../utils/shared/prompts.js"
+      );
       const customConfig = await promptCustomConfig();
       // Preserve domain from existing config
       updatedConfig = {

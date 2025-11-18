@@ -1,13 +1,16 @@
 import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import pc from "picocolors";
-import { getAWSRegion, validateAWSCredentials } from "../utils/shared/aws.js";
-import { getPulumiWorkDir } from "../utils/shared/fs.js";
+import {
+  getAWSRegion,
+  validateAWSCredentials,
+} from "../../utils/shared/aws.js";
+import { getPulumiWorkDir } from "../../utils/shared/fs.js";
 import {
   deleteConnectionMetadata,
   loadConnectionMetadata,
-} from "../utils/shared/metadata.js";
-import { DeploymentProgress } from "../utils/shared/output.js";
+} from "../../utils/shared/metadata.js";
+import { DeploymentProgress } from "../../utils/shared/output.js";
 
 /**
  * Restore command options
@@ -71,14 +74,13 @@ export async function restore(options: RestoreOptions): Promise<void> {
     `\n${pc.bold("The following Wraps resources will be removed:")}\n`
   );
 
-  const emailConfig = metadata.services.email?.config;
-  if (emailConfig?.tracking?.enabled) {
+  if (metadata.services.email!.config.tracking?.enabled) {
     console.log(`  ${pc.cyan("✓")} Configuration Set (wraps-email-tracking)`);
   }
-  if (emailConfig?.eventTracking?.dynamoDBHistory) {
+  if (metadata.services.email!.config.eventTracking?.dynamoDBHistory) {
     console.log(`  ${pc.cyan("✓")} DynamoDB Table (wraps-email-history)`);
   }
-  if (emailConfig?.eventTracking?.enabled) {
+  if (metadata.services.email!.config.eventTracking?.enabled) {
     console.log(`  ${pc.cyan("✓")} EventBridge Rules`);
     console.log(`  ${pc.cyan("✓")} SQS Queues`);
     console.log(`  ${pc.cyan("✓")} Lambda Functions`);
@@ -100,13 +102,12 @@ export async function restore(options: RestoreOptions): Promise<void> {
   }
 
   // 6. Destroy Pulumi stack
-  const pulumiStackName = metadata.services.email?.pulumiStackName;
-  if (pulumiStackName) {
+  if (metadata.services.email?.pulumiStackName) {
     await progress.execute("Removing Wraps infrastructure", async () => {
       try {
         const stack = await pulumi.automation.LocalWorkspace.selectStack(
           {
-            stackName: pulumiStackName,
+            stackName: metadata.services.email?.pulumiStackName!,
             projectName: "wraps-email",
             program: async () => {}, // Empty program
           },
@@ -123,7 +124,9 @@ export async function restore(options: RestoreOptions): Promise<void> {
         await stack.destroy({ onOutput: () => {} });
 
         // Remove the stack
-        await stack.workspace.removeStack(pulumiStackName);
+        await stack.workspace.removeStack(
+          metadata.services.email?.pulumiStackName!
+        );
       } catch (error: any) {
         throw new Error(`Failed to destroy Pulumi stack: ${error.message}`);
       }

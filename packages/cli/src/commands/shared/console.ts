@@ -3,11 +3,17 @@ import * as pulumi from "@pulumi/pulumi";
 import getPort from "get-port";
 import open from "open";
 import pc from "picocolors";
-import { startConsoleServer } from "../console/server.js";
-import type { ConsoleOptions } from "../types/index.js";
-import { getAWSRegion, validateAWSCredentials } from "../utils/shared/aws.js";
-import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/shared/fs.js";
-import { DeploymentProgress } from "../utils/shared/output.js";
+import { startConsoleServer } from "../../console/server.js";
+import type { ConsoleOptions } from "../../types/index.js";
+import {
+  getAWSRegion,
+  validateAWSCredentials,
+} from "../../utils/shared/aws.js";
+import {
+  ensurePulumiWorkDir,
+  getPulumiWorkDir,
+} from "../../utils/shared/fs.js";
+import { DeploymentProgress } from "../../utils/shared/output.js";
 
 /**
  * Console command - Start local web dashboard

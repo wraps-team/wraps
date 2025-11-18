@@ -15,14 +15,14 @@ vi.mock("@pulumi/pulumi/automation", () => ({
 }));
 vi.mock("@clack/prompts");
 vi.mock("node:fs");
-vi.mock("../../utils/aws.js");
-vi.mock("../../utils/fs.js");
-vi.mock("../../utils/metadata.js");
+vi.mock("../../utils/shared/aws.js");
+vi.mock("../../utils/shared/fs.js");
+vi.mock("../../utils/shared/metadata.js");
 
 import * as prompts from "@clack/prompts";
-import * as aws from "../../utils/aws.js";
-import * as fsUtils from "../../utils/fs.js";
-import * as metadata from "../../utils/metadata.js";
+import * as aws from "../../utils/shared/aws.js";
+import * as fsUtils from "../../utils/shared/fs.js";
+import * as metadata from "../../utils/shared/metadata.js";
 // Import after mocks
 import { destroy } from "../destroy.js";
 

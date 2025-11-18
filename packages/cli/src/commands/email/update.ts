@@ -1,16 +1,25 @@
 import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import pc from "picocolors";
-import { deployEmailStack } from "../infrastructure/email-stack.js";
-import type { EmailStackConfig, UpdateOptions } from "../types/index.js";
-import { getAWSRegion, validateAWSCredentials } from "../utils/shared/aws.js";
-import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/shared/fs.js";
+import { deployEmailStack } from "../../infrastructure/email-stack.js";
+import type { EmailStackConfig, UpdateOptions } from "../../types/index.js";
+import {
+  getAWSRegion,
+  validateAWSCredentials,
+} from "../../utils/shared/aws.js";
+import {
+  ensurePulumiWorkDir,
+  getPulumiWorkDir,
+} from "../../utils/shared/fs.js";
 import {
   loadConnectionMetadata,
   saveConnectionMetadata,
-} from "../utils/shared/metadata.js";
-import { DeploymentProgress, displaySuccess } from "../utils/shared/output.js";
-import { ensurePulumiInstalled } from "../utils/shared/pulumi.js";
+} from "../../utils/shared/metadata.js";
+import {
+  DeploymentProgress,
+  displaySuccess,
+} from "../../utils/shared/output.js";
+import { ensurePulumiInstalled } from "../../utils/shared/pulumi.js";
 
 /**
  * Update command - Redeploy infrastructure to apply CLI updates
@@ -167,10 +176,6 @@ export async function update(options: UpdateOptions): Promise<void> {
                   domain: result.domain,
                   dkimTokens: result.dkimTokens,
                   customTrackingDomain: result.customTrackingDomain,
-                  mailFromDomain: result.mailFromDomain,
-                  archiveArn: result.archiveArn,
-                  archivingEnabled: result.archivingEnabled,
-                  archiveRetention: result.archiveRetention,
                 };
               },
             },
@@ -206,16 +211,6 @@ export async function update(options: UpdateOptions): Promise<void> {
           domain: pulumiOutputs.domain?.value as string | undefined,
           dkimTokens: pulumiOutputs.dkimTokens?.value as string[] | undefined,
           customTrackingDomain: pulumiOutputs.customTrackingDomain?.value as
-            | string
-            | undefined,
-          mailFromDomain: pulumiOutputs.mailFromDomain?.value as
-            | string
-            | undefined,
-          archiveArn: pulumiOutputs.archiveArn?.value as string | undefined,
-          archivingEnabled: pulumiOutputs.archivingEnabled?.value as
-            | boolean
-            | undefined,
-          archiveRetention: pulumiOutputs.archiveRetention?.value as
             | string
             | undefined,
         };

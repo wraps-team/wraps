@@ -1,22 +1,31 @@
 import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import pc from "picocolors";
-import { deployEmailStack } from "../infrastructure/email-stack.js";
+import { deployEmailStack } from "../../infrastructure/email-stack.js";
 import type {
   EmailStackConfig,
   InitOptions,
   WrapsEmailConfig,
-} from "../types/index.js";
-import { getCostSummary } from "../utils/email/costs.js";
-import { getPreset, validateConfig } from "../utils/email/presets.js";
-import { getAWSRegion, validateAWSCredentials } from "../utils/shared/aws.js";
-import { ensurePulumiWorkDir, getPulumiWorkDir } from "../utils/shared/fs.js";
+} from "../../types/index.js";
+import { getCostSummary } from "../../utils/email/costs.js";
+import { getPreset, validateConfig } from "../../utils/email/presets.js";
+import {
+  getAWSRegion,
+  validateAWSCredentials,
+} from "../../utils/shared/aws.js";
+import {
+  ensurePulumiWorkDir,
+  getPulumiWorkDir,
+} from "../../utils/shared/fs.js";
 import {
   createConnectionMetadata,
   loadConnectionMetadata,
   saveConnectionMetadata,
-} from "../utils/shared/metadata.js";
-import { DeploymentProgress, displaySuccess } from "../utils/shared/output.js";
+} from "../../utils/shared/metadata.js";
+import {
+  DeploymentProgress,
+  displaySuccess,
+} from "../../utils/shared/output.js";
 import {
   confirmDeploy,
   promptConfigPreset,
@@ -26,8 +35,8 @@ import {
   promptProvider,
   promptRegion,
   promptVercelConfig,
-} from "../utils/shared/prompts.js";
-import { ensurePulumiInstalled } from "../utils/shared/pulumi.js";
+} from "../../utils/shared/prompts.js";
+import { ensurePulumiInstalled } from "../../utils/shared/pulumi.js";
 
 /**
  * Init command - Deploy new email infrastructure
@@ -106,7 +115,9 @@ export async function init(options: InitOptions): Promise<void> {
     emailConfig = getPreset(preset)!;
 
     // Prompt for email archiving (optional feature for presets)
-    const { promptEmailArchiving } = await import("../utils/shared/prompts.js");
+    const { promptEmailArchiving } = await import(
+      "../../utils/shared/prompts.js"
+    );
     const archivingConfig = await promptEmailArchiving();
     emailConfig.emailArchiving = archivingConfig;
   }
@@ -275,7 +286,7 @@ export async function init(options: InitOptions): Promise<void> {
   let dnsAutoCreated = false;
   if (outputs.domain && outputs.dkimTokens && outputs.dkimTokens.length > 0) {
     const { findHostedZone, createDNSRecords } = await import(
-      "../utils/email/route53.js"
+      "../../utils/email/route53.js"
     );
     const hostedZone = await findHostedZone(outputs.domain, region);
 

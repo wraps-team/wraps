@@ -18,24 +18,24 @@ vi.mock("@pulumi/pulumi/automation", () => ({
 vi.mock("@clack/prompts");
 vi.mock("node:fs");
 vi.mock("node:path");
-vi.mock("../../utils/aws.js");
-vi.mock("../../utils/pulumi.js");
-vi.mock("../../utils/fs.js");
-vi.mock("../../utils/metadata.js");
-vi.mock("../../utils/route53.js");
-vi.mock("../../utils/prompts.js");
+vi.mock("../../utils/shared/aws.js");
+vi.mock("../../utils/shared/pulumi.js");
+vi.mock("../../utils/shared/fs.js");
+vi.mock("../../utils/shared/metadata.js");
+vi.mock("../../utils/email/route53.js");
+vi.mock("../../utils/shared/prompts.js");
 vi.mock("../../infrastructure/email-stack.js");
 
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as prompts from "@clack/prompts";
 import { deployEmailStack } from "../../infrastructure/email-stack.js";
-import * as aws from "../../utils/aws.js";
-import * as fsUtils from "../../utils/fs.js";
-import * as metadata from "../../utils/metadata.js";
-import * as promptUtils from "../../utils/prompts.js";
-import * as pulumiUtils from "../../utils/pulumi.js";
-import * as route53Utils from "../../utils/route53.js";
+import * as route53Utils from "../../utils/email/route53.js";
+import * as aws from "../../utils/shared/aws.js";
+import * as fsUtils from "../../utils/shared/fs.js";
+import * as metadata from "../../utils/shared/metadata.js";
+import * as promptUtils from "../../utils/shared/prompts.js";
+import * as pulumiUtils from "../../utils/shared/pulumi.js";
 // Import after mocks
 import { init } from "../init.js";
 
@@ -100,8 +100,12 @@ describe("init command", () => {
           region,
           provider,
           timestamp: new Date().toISOString(),
-          emailConfig,
-          preset,
+          services: {
+            email: {
+              config: emailConfig,
+              preset,
+            },
+          },
         }) as any
     );
 
@@ -188,14 +192,21 @@ describe("init command", () => {
     it("should prevent re-initialization when connection exists", async () => {
       // Mock existing connection
       vi.mocked(metadata.loadConnectionMetadata).mockReturnValue({
+        accountId: "123456789012",
         provider: "vercel",
         region: "us-east-1",
-        domain: "existing.com",
-        preset: "starter",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        stackName: "wraps-email-us-east-1",
-        config: {},
+        timestamp: new Date().toISOString(),
+        services: {
+          email: {
+            config: {
+              domain: "existing.com",
+              tracking: { enabled: true, opens: true, clicks: true },
+              sendingEnabled: true,
+            },
+            preset: "starter",
+            pulumiStackName: "wraps-email-us-east-1",
+          },
+        },
       });
 
       await expect(init({})).rejects.toThrow();
@@ -434,8 +445,12 @@ describe("init command", () => {
         expect.objectContaining({
           provider: "vercel",
           region: "us-west-2",
-          preset: "starter",
           accountId: "123456789012",
+          services: expect.objectContaining({
+            email: expect.objectContaining({
+              preset: "starter",
+            }),
+          }),
         })
       );
     });
@@ -469,7 +484,11 @@ describe("init command", () => {
 
       expect(metadata.saveConnectionMetadata).toHaveBeenCalledWith(
         expect.objectContaining({
-          pulumiStackName: "wraps-123456789012-eu-central-1",
+          services: expect.objectContaining({
+            email: expect.objectContaining({
+              pulumiStackName: "wraps-123456789012-eu-central-1",
+            }),
+          }),
         })
       );
     });

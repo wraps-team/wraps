@@ -17,15 +17,15 @@ vi.mock("@clack/prompts");
 vi.mock("get-port");
 vi.mock("open");
 vi.mock("../../console/server.js");
-vi.mock("../../utils/aws.js");
-vi.mock("../../utils/fs.js");
+vi.mock("../../utils/shared/aws.js");
+vi.mock("../../utils/shared/fs.js");
 
 import * as prompts from "@clack/prompts";
 import getPort from "get-port";
 import open from "open";
 import { startConsoleServer } from "../../console/server.js";
-import * as aws from "../../utils/aws.js";
-import * as fsUtils from "../../utils/fs.js";
+import * as aws from "../../utils/shared/aws.js";
+import * as fsUtils from "../../utils/shared/fs.js";
 // Import after mocks
 import { runConsole } from "../console.js";
 

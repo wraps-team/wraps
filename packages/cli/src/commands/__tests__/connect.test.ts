@@ -16,22 +16,22 @@ vi.mock("@pulumi/pulumi/automation", () => ({
   installPulumiCli: vi.fn(),
 }));
 vi.mock("@clack/prompts");
-vi.mock("../../utils/aws.js");
-vi.mock("../../utils/fs.js");
-vi.mock("../../utils/metadata.js");
-vi.mock("../../utils/pulumi.js");
-vi.mock("../../utils/prompts.js");
-vi.mock("../../utils/scanner.js");
+vi.mock("../../utils/shared/aws.js");
+vi.mock("../../utils/shared/fs.js");
+vi.mock("../../utils/shared/metadata.js");
+vi.mock("../../utils/shared/pulumi.js");
+vi.mock("../../utils/shared/prompts.js");
+vi.mock("../../utils/shared/scanner.js");
 vi.mock("../../infrastructure/email-stack.js");
 
 import * as prompts from "@clack/prompts";
 import { deployEmailStack } from "../../infrastructure/email-stack.js";
-import * as aws from "../../utils/aws.js";
-import * as fsUtils from "../../utils/fs.js";
-import * as metadata from "../../utils/metadata.js";
-import * as promptUtils from "../../utils/prompts.js";
-import * as pulumiUtils from "../../utils/pulumi.js";
-import * as scanner from "../../utils/scanner.js";
+import * as aws from "../../utils/shared/aws.js";
+import * as fsUtils from "../../utils/shared/fs.js";
+import * as metadata from "../../utils/shared/metadata.js";
+import * as promptUtils from "../../utils/shared/prompts.js";
+import * as pulumiUtils from "../../utils/shared/pulumi.js";
+import * as scanner from "../../utils/shared/scanner.js";
 // Import after mocks
 import { connect } from "../connect.js";
 
@@ -87,8 +87,12 @@ describe("connect command", () => {
           region,
           provider,
           timestamp: new Date().toISOString(),
-          emailConfig,
-          preset,
+          services: {
+            email: {
+              config: emailConfig,
+              preset,
+            },
+          },
         }) as any
     );
 
@@ -427,7 +431,11 @@ describe("connect command", () => {
         expect.objectContaining({
           provider: "vercel",
           accountId: "123456789012",
-          preset: "starter",
+          services: expect.objectContaining({
+            email: expect.objectContaining({
+              preset: "starter",
+            }),
+          }),
         })
       );
     });
@@ -452,7 +460,11 @@ describe("connect command", () => {
 
       expect(metadata.saveConnectionMetadata).toHaveBeenCalledWith(
         expect.objectContaining({
-          pulumiStackName: "wraps-123456789012-eu-central-1",
+          services: expect.objectContaining({
+            email: expect.objectContaining({
+              pulumiStackName: "wraps-123456789012-eu-central-1",
+            }),
+          }),
         })
       );
     });

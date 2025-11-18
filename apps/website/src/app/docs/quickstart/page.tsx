@@ -85,7 +85,7 @@ export default function QuickstartPage() {
                   Terminal
                 </div>
                 <pre className="overflow-x-auto rounded bg-muted p-4">
-                  <code className="text-sm">npx @wraps.dev/cli init</code>
+                  <code className="text-sm">npx @wraps.dev/cli email init</code>
                 </pre>
               </CardContent>
             </Card>
@@ -182,7 +182,7 @@ if (result.success) {
                 Before sending emails, you need to verify your domain with AWS
                 SES. Run{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
-                  npx @wraps.dev/cli verify yourdomain.com
+                  npx @wraps.dev/cli email verify --domain yourdomain.com
                 </code>{" "}
                 to check your DNS records and get setup instructions.
               </p>
