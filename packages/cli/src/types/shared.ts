@@ -47,7 +47,7 @@ export type ConsoleOptions = {
  * Command options for destroy
  */
 export type DestroyOptions = {
-  yes?: boolean;
+  force?: boolean; // Destructive operation
   service?: ServiceType; // Destroy specific service or all
 };
 

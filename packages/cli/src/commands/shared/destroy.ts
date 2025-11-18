@@ -31,7 +31,7 @@ export async function destroy(options: DestroyOptions): Promise<void> {
   const region = await getAWSRegion();
 
   // 3. Confirm destruction
-  if (!options.yes) {
+  if (!options.force) {
     const confirmed = await clack.confirm({
       message: pc.red(
         "Are you sure you want to destroy all Wraps infrastructure?"

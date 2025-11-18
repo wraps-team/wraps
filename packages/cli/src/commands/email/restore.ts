@@ -1,6 +1,7 @@
 import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import pc from "picocolors";
+import type { EmailRestoreOptions } from "../../types/index.js";
 import {
   getAWSRegion,
   validateAWSCredentials,
@@ -13,21 +14,13 @@ import {
 import { DeploymentProgress } from "../../utils/shared/output.js";
 
 /**
- * Restore command options
- */
-export type RestoreOptions = {
-  region?: string;
-  yes?: boolean;
-};
-
-/**
  * Restore command - Remove Wraps infrastructure (alias for destroy)
  *
  * Note: This command removes all Wraps-managed resources.
  * Since Wraps always creates NEW resources (wraps- prefix) and never modifies
  * existing infrastructure, there's nothing to "restore" - only to remove.
  */
-export async function restore(options: RestoreOptions): Promise<void> {
+export async function restore(options: EmailRestoreOptions): Promise<void> {
   clack.intro(pc.bold("Wraps Restore - Remove Wraps Infrastructure"));
 
   clack.log.info(
@@ -89,7 +82,7 @@ export async function restore(options: RestoreOptions): Promise<void> {
   console.log("");
 
   // 5. Confirm removal
-  if (!options.yes) {
+  if (!options.force) {
     const confirmed = await clack.confirm({
       message: "Proceed with removal? This cannot be undone.",
       initialValue: false,

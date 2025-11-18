@@ -204,5 +204,5 @@ export type EmailUpdateOptions = EmailConfigOptions;
  */
 export type EmailRestoreOptions = {
   region?: string;
-  yes?: boolean;
+  force?: boolean; // Destructive operation - restores previous configuration
 };

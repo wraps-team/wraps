@@ -77,12 +77,15 @@ function showHelp() {
   );
   console.log("Options:");
   console.log(
-    `  ${pc.dim("--provider")}  Hosting provider (vercel, aws, railway, other)`
+    `  ${pc.dim("-p, --provider")}  Hosting provider (vercel, aws, railway, other)`
   );
-  console.log(`  ${pc.dim("--region")}    AWS region`);
-  console.log(`  ${pc.dim("--domain")}    Domain to verify`);
-  console.log(`  ${pc.dim("--account")}   AWS account ID or alias`);
-  console.log(`  ${pc.dim("--version, -v")}  Show version number\n`);
+  console.log(`  ${pc.dim("-r, --region")}    AWS region`);
+  console.log(`  ${pc.dim("-d, --domain")}    Domain name`);
+  console.log(`  ${pc.dim("--account")}        AWS account ID or alias`);
+  console.log(`  ${pc.dim("--preset")}         Configuration preset`);
+  console.log(`  ${pc.dim("-y, --yes")}        Skip confirmation prompts`);
+  console.log(`  ${pc.dim("-f, --force")}      Force destructive operations`);
+  console.log(`  ${pc.dim("-v, --version")}    Show version number\n`);
   console.log(
     `Run ${pc.cyan("wraps <service> <command> --help")} for more information.\n`
   );
@@ -102,18 +105,18 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 // Configure args
 args.options([
   {
-    name: "provider",
+    name: ["p", "provider"],
     description: "Hosting provider (vercel, aws, railway, other)",
     defaultValue: undefined,
   },
   {
-    name: "region",
+    name: ["r", "region"],
     description: "AWS region",
     defaultValue: undefined,
   },
   {
-    name: "domain",
-    description: "Domain to verify",
+    name: ["d", "domain"],
+    description: "Domain name",
     defaultValue: undefined,
   },
   {
@@ -128,13 +131,19 @@ args.options([
     defaultValue: undefined,
   },
   {
-    name: "yes",
-    description: "Skip confirmation prompts",
+    name: ["y", "yes"],
+    description: "Skip confirmation prompts (non-destructive operations)",
+    defaultValue: false,
+  },
+  {
+    name: ["f", "force"],
+    description:
+      "Force operation without confirmation (destructive operations)",
     defaultValue: false,
   },
   {
     name: "port",
-    description: "Port for console server",
+    description: "Port for dashboard server",
     defaultValue: undefined,
   },
   {
@@ -194,7 +203,7 @@ async function run() {
         case "restore":
           await restore({
             region: flags.region,
-            yes: flags.yes,
+            force: flags.force,
           });
           break;
 
@@ -247,13 +256,13 @@ async function run() {
               if (!flags.domain) {
                 clack.log.error("--domain flag is required");
                 console.log(
-                  `\nUsage: ${pc.cyan("wraps email domains remove --domain yourapp.com")}\n`
+                  `\nUsage: ${pc.cyan("wraps email domains remove --domain yourapp.com --force")}\n`
                 );
                 process.exit(1);
               }
               await removeDomain({
                 domain: flags.domain,
-                yes: flags.yes,
+                force: flags.force,
               });
               break;
             }
@@ -307,7 +316,7 @@ async function run() {
 
       case "destroy":
         await destroy({
-          yes: flags.yes,
+          force: flags.force,
         });
         break;
 

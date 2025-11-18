@@ -485,7 +485,7 @@ export async function getDkim(options: { domain: string }): Promise<void> {
  */
 export async function removeDomain(options: {
   domain: string;
-  yes?: boolean;
+  force?: boolean; // Destructive operation
 }): Promise<void> {
   clack.intro(pc.bold(`Remove domain ${options.domain} from SES`));
 
@@ -504,7 +504,7 @@ export async function removeDomain(options: {
     progress.stop();
 
     // Confirm deletion
-    if (!options.yes) {
+    if (!options.force) {
       const shouldContinue = await clack.confirm({
         message: `Are you sure you want to remove ${pc.red(options.domain)} from SES?`,
         initialValue: false,
