@@ -202,7 +202,11 @@ wraps email domains remove --domain myapp.com --force  # Skip confirmation
 
 #### `wraps email upgrade`
 
-Add features to existing infrastructure.
+Add features to existing infrastructure incrementally without redeployment.
+
+**Options:**
+- `-r, --region <region>` - AWS region (uses saved connection if not specified)
+- `-y, --yes` - Skip confirmation prompts
 
 **Example:**
 
@@ -210,12 +214,38 @@ Add features to existing infrastructure.
 wraps email upgrade
 ```
 
-Interactive wizard to:
+Interactive wizard allows you to add:
+
+**Configuration Presets:**
 - Upgrade to a higher preset (Starter → Production → Enterprise)
-- Add custom tracking domain
-- Change email history retention
-- Customize tracked event types
-- Enable dedicated IP
+- Each preset includes additional features with transparent cost estimates
+
+**Domain Configuration:**
+- **MAIL FROM Domain** - Custom MAIL FROM domain for better DMARC alignment
+  - Default: `mail.{yourdomain.com}`
+  - Requires MX and SPF DNS records
+  - Improves email deliverability and sender reputation
+
+- **Custom Tracking Domain** - Branded tracking domain for opens/clicks
+  - Use your own domain instead of AWS default (`r.{region}.awstrack.me`)
+  - Requires single CNAME DNS record
+  - Improves email appearance and trust
+
+**Event Tracking:**
+- Customize tracked SES event types (SEND, DELIVERY, OPEN, CLICK, BOUNCE, COMPLAINT, etc.)
+- Select specific events to reduce processing costs
+- Full control over what gets stored in DynamoDB
+
+**Email History:**
+- Change retention period (7 days, 30 days, 90 days, 1 year)
+- Adjust based on compliance requirements
+- Transparent DynamoDB storage cost updates
+
+**Advanced Features:**
+- **Dedicated IP Address** - Reserved IP for high-volume sending
+  - Improves sender reputation control
+  - Required for 50,000+ emails/day
+  - Additional AWS charges apply (~$24.95/month)
 
 #### `wraps email restore`
 
@@ -512,34 +542,46 @@ wraps init
   - [x] `wraps email domains get-dkim` - Get DKIM tokens
   - [x] `wraps email domains verify` - Verify DNS records
   - [x] `wraps email domains remove` - Remove domain
-- [x] `wraps email upgrade` - Add features
+- [x] `wraps email upgrade` - Incrementally add features:
+  - Configuration presets (Starter → Production → Enterprise)
+  - MAIL FROM domain for DMARC alignment
+  - Custom tracking domain for branded links
+  - Event type customization
+  - Email history retention periods
+  - Dedicated IP addresses
 - [x] `wraps email restore` - Restore from metadata
 
 ### SMS Commands 🚧 (Coming Soon)
 - [ ] `wraps sms init` - Deploy SMS infrastructure
 
 ### Features ✅
-- [x] Feature-based configuration presets
-- [x] Transparent cost estimation
-- [x] Lambda function bundling
-- [x] Vercel OIDC integration
+- [x] Feature-based configuration presets (Starter, Production, Enterprise, Custom)
+- [x] Transparent cost estimation with monthly projections
+- [x] MAIL FROM domain configuration for DMARC alignment
+- [x] Custom tracking domain for branded email links
+- [x] Customizable event type tracking (10 SES event types)
+- [x] Flexible email history retention (7 days to 1 year)
+- [x] Dedicated IP address support for high-volume senders
+- [x] Lambda function bundling with esbuild
+- [x] Vercel OIDC integration (no AWS credentials needed)
 - [x] Real-time event tracking (EventBridge → SQS → Lambda → DynamoDB)
-- [x] Email history storage
-- [x] Bounce/complaint handling
-- [x] Non-destructive deployments
-- [x] Beautiful interactive prompts
-- [x] Comprehensive error handling
+- [x] Comprehensive domain management (add, list, verify, remove)
+- [x] Bounce/complaint handling with suppression lists
+- [x] Non-destructive deployments (never modifies existing resources)
+- [x] Beautiful interactive prompts (@clack/prompts)
+- [x] Comprehensive error handling with helpful suggestions
+- [x] Multi-service architecture ready (email, SMS coming soon)
 
 ### Coming Soon
-- [ ] Advanced analytics dashboard
-- [ ] Email template management
-- [ ] Webhook integrations
-- [ ] MAIL FROM domain configuration
-- [ ] Custom tracking domain setup
+- [ ] Hosted App
+  - [ ] Advanced analytics dashboard
+  - [ ] Email Templates
+  - [ ] Bulk sending tools
+  - [ ] Tenant Management
 
 ## License
 
-MIT
+AGPLv3
 
 ## Support
 
