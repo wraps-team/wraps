@@ -265,6 +265,7 @@ export type ScanFeaturesResult =
         eventHistoryEnabled: boolean;
         eventTrackingEnabled: boolean;
         configSetName?: string;
+        customTrackingDomain?: string;
       };
     }
   | {
@@ -392,8 +393,9 @@ export async function scanAWSAccountFeatures(
       // Continue
     }
 
-    // 8. Scan for SES Configuration Set
+    // 8. Scan for SES Configuration Set and Custom Tracking Domain
     let configSetName: string | undefined;
+    let customTrackingDomain: string | undefined;
 
     try {
       const sesClient = new SESv2Client({
@@ -410,6 +412,17 @@ export async function scanAWSAccountFeatures(
       // If the command succeeds, the config set exists
       if (configSetResponse) {
         configSetName = "wraps-email";
+
+        // Extract custom tracking domain if configured
+        // VdmOptions contains DashboardOptions with EngagementMetrics
+        const vdmOptions = configSetResponse.VdmOptions;
+        const dashboardOptions = vdmOptions?.DashboardOptions;
+        if (dashboardOptions?.EngagementMetrics === "ENABLED") {
+          // Custom tracking domain is stored in TrackingOptions
+          customTrackingDomain =
+            configSetResponse.TrackingOptions?.CustomRedirectDomain ??
+            undefined;
+        }
       }
     } catch (error) {
       // Config set doesn't exist or different name - that's ok
@@ -422,6 +435,10 @@ export async function scanAWSAccountFeatures(
       .set({
         archivingEnabled,
         archiveArn: archiveArn ?? null,
+        eventHistoryEnabled,
+        eventTrackingEnabled,
+        configSetName: configSetName ?? null,
+        customTrackingDomain: customTrackingDomain ?? null,
         updatedAt: new Date(),
       })
       .where(eq(awsAccount.id, awsAccountId));
@@ -438,6 +455,7 @@ export async function scanAWSAccountFeatures(
         eventHistoryEnabled,
         eventTrackingEnabled,
         configSetName,
+        customTrackingDomain,
       },
     };
   } catch (error) {

@@ -36,6 +36,13 @@
       "when": 1763589660693,
       "tag": "0004_opposite_blur",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1763593529286,
+      "tag": "0005_clear_terror",
+      "breakpoints": true
     }
   ]
 }

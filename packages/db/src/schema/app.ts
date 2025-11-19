@@ -55,6 +55,14 @@ export const awsAccount = pgTable(
     // Features
     archivingEnabled: boolean("archiving_enabled").default(false).notNull(),
     archiveArn: text("archive_arn"),
+    eventHistoryEnabled: boolean("event_history_enabled")
+      .default(false)
+      .notNull(),
+    eventTrackingEnabled: boolean("event_tracking_enabled")
+      .default(false)
+      .notNull(),
+    configSetName: text("config_set_name"),
+    customTrackingDomain: text("custom_tracking_domain"),
 
     // Audit
     createdBy: text("created_by").references(() => user.id),
