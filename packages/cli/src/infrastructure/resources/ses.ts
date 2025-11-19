@@ -99,6 +99,11 @@ export async function createSESResources(
           tlsPolicy: "REQUIRE", // Require TLS 1.2+ for all emails
         }
       : undefined,
+    suppressionOptions: {
+      // Automatically suppress hard bounces and complaints at the configuration set level
+      // This provides protection even if account-level suppression isn't configured
+      suppressedReasons: ["BOUNCE", "COMPLAINT"],
+    },
     tags: {
       ManagedBy: "wraps-cli",
       Description: "Wraps email tracking configuration set",

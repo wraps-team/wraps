@@ -1,6 +1,6 @@
 {
   "name": "@wraps.dev/cli",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "CLI for deploying Wraps email infrastructure to your AWS account",
   "type": "module",
   "main": "./dist/cli.js",
