@@ -108,6 +108,11 @@ async function fetchEmails(
             existing.hasClicked = true;
           }
 
+          // Always use the earliest sentAt (should be consistent, but this ensures it)
+          if (event.sentAt < existing.sentAt) {
+            existing.sentAt = event.sentAt;
+          }
+
           // Update status to most significant event
           const newStatus = mapEventTypeToStatus(event.eventType);
           const statusPriority: EmailStatus[] = [
@@ -195,7 +200,7 @@ export default async function EmailsPage({
     redirect("/dashboard");
   }
 
-  // Fetch actual emails directly (not via API to avoid auth issues)
+  // Fetch actual emails directly
   const emails = await fetchEmails(
     orgWithMembership.id,
     Number.parseInt(days, 10),
