@@ -26,8 +26,10 @@ export default async function OrganizationDashboard({
   );
 
   if (!orgWithMembership) {
-    redirect("/emails");
+    redirect("/");
   }
+
+  redirect(`/${orgSlug}/emails`);
 
   return (
     <>
@@ -35,7 +37,7 @@ export default async function OrganizationDashboard({
       <div className="px-4 lg:px-6">
         <div className="flex flex-col gap-2">
           <h1 className="font-bold text-2xl tracking-tight">
-            {orgWithMembership.name} Dashboard
+            {orgWithMembership?.name} Dashboard
           </h1>
           <p className="text-muted-foreground">
             Welcome to your organization dashboard

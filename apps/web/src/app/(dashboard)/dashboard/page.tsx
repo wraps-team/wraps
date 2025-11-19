@@ -2,6 +2,7 @@ import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
 import { member, organization } from "@wraps/db/schema/auth";
 import { eq } from "drizzle-orm";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
@@ -83,10 +84,12 @@ export default async function DashboardPage() {
               >
                 <div className="flex items-start gap-4">
                   {org.logo ? (
-                    <img
+                    <Image
                       alt={org.name}
                       className="h-12 w-12 rounded-lg object-cover"
+                      height={48}
                       src={org.logo}
+                      width={48}
                     />
                   ) : (
                     <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary font-semibold text-primary-foreground">
