@@ -72,9 +72,9 @@ export function AccountFeatures({
   // Get feature status - use scan result if available, otherwise use account data
   const features = scanResult?.features || {
     archivingEnabled: account.archivingEnabled,
-    eventHistoryEnabled: false,
-    eventTrackingEnabled: false,
-    configSetName: undefined,
+    eventHistoryEnabled: account.eventHistoryEnabled,
+    eventTrackingEnabled: account.eventTrackingEnabled,
+    configSetName: account.configSetName ?? undefined,
   };
 
   return (
@@ -158,19 +158,6 @@ export function AccountFeatures({
             )}
           </div>
         </div>
-
-        {/* Archive ARN (if enabled) */}
-        {features.archivingEnabled && account.archiveArn && (
-          <>
-            <Separator />
-            <div>
-              <h4 className="mb-1 font-medium text-sm">Archive ARN</h4>
-              <p className="break-all font-mono text-muted-foreground text-xs">
-                {account.archiveArn}
-              </p>
-            </div>
-          </>
-        )}
 
         <Separator />
 
