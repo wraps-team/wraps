@@ -76,8 +76,7 @@ Resources:
                   - "ses:ListIdentities"
                   - "ses:GetIdentityVerificationAttributes"
                   - "ses:GetIdentityDkimAttributes"
-                  - "ses:ListConfigurationSets"
-                  - "ses:DescribeConfigurationSet"
+                  - "ses:GetConfigurationSet"
                 Resource: "*"
 
               # SES - Send Access (conditional)
@@ -97,6 +96,7 @@ Resources:
               - Sid: "DynamoDBReadEmailEvents"
                 Effect: Allow
                 Action:
+                  - "dynamodb:DescribeTable"
                   - "dynamodb:Query"
                   - "dynamodb:Scan"
                   - "dynamodb:GetItem"
@@ -104,6 +104,14 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-*"
                   - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/wraps-email-*/index/*"
+
+              # EventBridge - Read Email Event Rules (for feature detection)
+              - Sid: "EventBridgeReadEmailRules"
+                Effect: Allow
+                Action:
+                  - "events:DescribeRule"
+                Resource:
+                  - !Sub "arn:aws:events:*:${AWS::AccountId}:rule/wraps-email-*"
 
               # Mail Manager - Archive Access (conditional, if using Wraps email archiving)
               - !If

@@ -1,9 +1,9 @@
 "use server";
 
-import { DynamoDBClient, ListTablesCommand } from "@aws-sdk/client-dynamodb";
+import { DescribeTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
+  DescribeRuleCommand,
   EventBridgeClient,
-  ListRulesCommand,
 } from "@aws-sdk/client-eventbridge";
 import { GetConfigurationSetCommand, SESv2Client } from "@aws-sdk/client-sesv2";
 import { createServerValidate } from "@tanstack/react-form/nextjs";
@@ -358,14 +358,25 @@ export async function scanAWSAccountFeatures(
         credentials: awsCredentials,
       });
 
-      const tablesResponse = await dynamoClient.send(new ListTablesCommand({}));
-      const wrapsTable = tablesResponse.TableNames?.find((name) =>
-        name.startsWith("wraps-email-")
+      // Try to describe the specific Wraps email history table
+      // This only requires DescribeTable permission on our table, not ListTables
+      await dynamoClient.send(
+        new DescribeTableCommand({
+          TableName: "wraps-email-history",
+        })
       );
-      eventHistoryEnabled = !!wrapsTable;
-    } catch (error) {
-      console.error("Error scanning for DynamoDB table:", error);
-      // Continue
+      // If the command succeeds, the table exists
+      eventHistoryEnabled = true;
+    } catch (error: any) {
+      // ResourceNotFoundException means table doesn't exist
+      // AccessDeniedException means user hasn't granted permissions
+      // Either way, assume event history is disabled
+      if (
+        error.name !== "ResourceNotFoundException" &&
+        error.name !== "AccessDeniedException"
+      ) {
+        console.error("Error scanning for DynamoDB table:", error);
+      }
     }
 
     // 7. Scan for EventBridge rules (event tracking)
@@ -377,20 +388,26 @@ export async function scanAWSAccountFeatures(
         credentials: awsCredentials,
       });
 
-      const rulesResponse = await eventBridgeClient.send(
-        new ListRulesCommand({
+      // Try to describe the specific Wraps email tracking rule
+      // This only requires DescribeRule permission on our rule, not ListRules
+      await eventBridgeClient.send(
+        new DescribeRuleCommand({
+          Name: "wraps-email-tracking",
           EventBusName: "default",
         })
       );
-      const wrapsRule = rulesResponse.Rules?.find(
-        (rule: { Name?: string; Description?: string }) =>
-          rule.Name?.startsWith("wraps-email-") ||
-          rule.Description?.includes("Wraps")
-      );
-      eventTrackingEnabled = !!wrapsRule;
-    } catch (error) {
-      console.error("Error scanning for EventBridge rules:", error);
-      // Continue
+      // If the command succeeds, the rule exists
+      eventTrackingEnabled = true;
+    } catch (error: any) {
+      // ResourceNotFoundException means rule doesn't exist
+      // AccessDeniedException means user hasn't granted permissions
+      // Either way, assume event tracking is disabled
+      if (
+        error.name !== "ResourceNotFoundException" &&
+        error.name !== "AccessDeniedException"
+      ) {
+        console.error("Error scanning for EventBridge rules:", error);
+      }
     }
 
     // 8. Scan for SES Configuration Set and Custom Tracking Domain
@@ -424,9 +441,16 @@ export async function scanAWSAccountFeatures(
             undefined;
         }
       }
-    } catch (error) {
-      // Config set doesn't exist or different name - that's ok
-      console.error("Error scanning for config set:", error);
+    } catch (error: any) {
+      // ResourceNotFoundException means config set doesn't exist
+      // AccessDeniedException means user hasn't granted permissions
+      // Either way, assume config set is not available
+      if (
+        error.name !== "NotFoundException" &&
+        error.name !== "AccessDeniedException"
+      ) {
+        console.error("Error scanning for config set:", error);
+      }
     }
 
     // 9. Update database with discovered features
