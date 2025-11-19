@@ -66,7 +66,11 @@ function extractArchiveId(archiveArnOrId: string): string {
  *
  * @param region AWS region
  * @param credentials AWS credentials for assumed role
- * @returns Archive ARN or null if not found
+ * @returns Archive ARN or null if not found or if user hasn't granted archive permissions
+ *
+ * Note: If the IAM role doesn't have ses:ListArchives permission, this will return null
+ * instead of throwing an error. This allows graceful feature detection without requiring
+ * users to grant archive permissions until they actually enable archiving.
  */
 export async function findWrapsArchive(
   region: string,
@@ -103,7 +107,13 @@ export async function findWrapsArchive(
     const getResponse = await client.send(getCommand);
 
     return getResponse.ArchiveArn || null;
-  } catch (error) {
+  } catch (error: any) {
+    // If user hasn't granted archive permissions, assume archiving is disabled
+    if (error.name === "AccessDeniedException") {
+      return null;
+    }
+
+    // Log other errors for debugging
     console.error("Error finding archive:", error);
     return null;
   }

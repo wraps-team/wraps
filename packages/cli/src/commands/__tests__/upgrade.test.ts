@@ -76,7 +76,11 @@ describe("upgrade command", () => {
     // Deep merge overrides
     const result = { ...base };
     for (const [key, value] of Object.entries(overrides)) {
-      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      if (
+        typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value)
+      ) {
         result[key as keyof typeof base] = {
           ...(base[key as keyof typeof base] as any),
           ...(value as any),

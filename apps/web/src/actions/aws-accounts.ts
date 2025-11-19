@@ -343,8 +343,9 @@ export async function scanAWSAccountFeatures(
         (await findWrapsArchive(account.region, credentials)) ?? undefined;
       archivingEnabled = !!archiveArn;
     } catch (error) {
-      console.error("Error scanning for archive:", error);
-      // Continue - archiving just not enabled
+      // findWrapsArchive already handles errors gracefully
+      // If AccessDeniedException: user hasn't granted archive permissions
+      // Assume archiving is disabled and continue
     }
 
     // 6. Scan for DynamoDB table (event history)
