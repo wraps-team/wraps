@@ -18,6 +18,7 @@ import {
   getPulumiWorkDir,
 } from "../../utils/shared/fs.js";
 import {
+  applyConfigUpdates,
   loadConnectionMetadata,
   saveConnectionMetadata,
   updateEmailConfig,
@@ -245,9 +246,6 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       }
 
       // Get preset config but preserve user-customized fields from existing config
-      const { applyConfigUpdates } = await import(
-        "../../utils/shared/metadata.js"
-      );
       const presetConfig = getPreset(selectedPreset as any)!;
 
       // Apply preset updates to existing config (preserves user customizations)
@@ -739,9 +737,6 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       // Full custom configuration
       const { promptCustomConfig } = await import(
         "../../utils/shared/prompts.js"
-      );
-      const { applyConfigUpdates } = await import(
-        "../../utils/shared/metadata.js"
       );
 
       // Pass existing config to preserve values

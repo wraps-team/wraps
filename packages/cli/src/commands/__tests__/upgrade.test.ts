@@ -19,7 +19,15 @@ vi.mock("@clack/prompts");
 vi.mock("../../utils/shared/aws.js");
 vi.mock("../../utils/shared/pulumi.js");
 vi.mock("../../utils/shared/fs.js");
-vi.mock("../../utils/shared/metadata.js");
+vi.mock("../../utils/shared/metadata.js", async () => {
+  const actual = await vi.importActual("../../utils/shared/metadata.js");
+  return {
+    ...actual,
+    loadConnectionMetadata: vi.fn(),
+    saveConnectionMetadata: vi.fn(),
+    updateEmailConfig: vi.fn(),
+  };
+});
 vi.mock("../../utils/shared/prompts.js");
 vi.mock("../../infrastructure/email-stack.js");
 
@@ -38,6 +46,46 @@ describe("upgrade command", () => {
     start: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
     message: ReturnType<typeof vi.fn>;
+  };
+
+  // Helper to create complete starter config with deep merge
+  const createStarterConfig = (overrides: any = {}) => {
+    const base = {
+      domain: "example.com",
+      tracking: {
+        enabled: true,
+        opens: true,
+        clicks: true,
+      },
+      tlsRequired: true,
+      reputationMetrics: false,
+      suppressionList: {
+        enabled: true,
+        reasons: ["BOUNCE", "COMPLAINT"],
+      },
+      eventTracking: {
+        enabled: false,
+      },
+      emailArchiving: {
+        enabled: false,
+        retention: "30days",
+      },
+      sendingEnabled: true,
+    };
+
+    // Deep merge overrides
+    const result = { ...base };
+    for (const [key, value] of Object.entries(overrides)) {
+      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        result[key as keyof typeof base] = {
+          ...(base[key as keyof typeof base] as any),
+          ...(value as any),
+        };
+      } else {
+        result[key as keyof typeof base] = value as any;
+      }
+    }
+    return result;
   };
 
   beforeEach(() => {
@@ -88,15 +136,7 @@ describe("upgrade command", () => {
       timestamp: new Date().toISOString(),
       services: {
         email: {
-          config: {
-            domain: "example.com",
-            tracking: {
-              enabled: true,
-            },
-            suppressionList: {
-              enabled: true,
-            },
-          },
+          config: createStarterConfig(),
           preset: "starter",
           pulumiStackName: "wraps-123456789012-us-east-1",
         },
@@ -168,7 +208,9 @@ describe("upgrade command", () => {
   describe("Core Flow Tests", () => {
     it("should validate AWS credentials", async () => {
       await setupPulumiMock();
-      vi.mocked(prompts.select).mockResolvedValue("preset" as never);
+      vi.mocked(prompts.select)
+        .mockResolvedValueOnce("preset" as never)
+        .mockResolvedValueOnce("production" as never);
       vi.mocked(prompts.confirm).mockResolvedValue(true as never);
 
       await upgrade({});
@@ -178,7 +220,9 @@ describe("upgrade command", () => {
 
     it("should check Pulumi installation", async () => {
       await setupPulumiMock();
-      vi.mocked(prompts.select).mockResolvedValue("preset" as never);
+      vi.mocked(prompts.select)
+        .mockResolvedValueOnce("preset" as never)
+        .mockResolvedValueOnce("production" as never);
       vi.mocked(prompts.confirm).mockResolvedValue(true as never);
 
       await upgrade({});
@@ -188,7 +232,9 @@ describe("upgrade command", () => {
 
     it("should load existing connection metadata", async () => {
       await setupPulumiMock();
-      vi.mocked(prompts.select).mockResolvedValue("preset" as never);
+      vi.mocked(prompts.select)
+        .mockResolvedValueOnce("preset" as never)
+        .mockResolvedValueOnce("production" as never);
       vi.mocked(prompts.confirm).mockResolvedValue(true as never);
 
       await upgrade({});
@@ -201,7 +247,9 @@ describe("upgrade command", () => {
 
     it("should display current configuration", async () => {
       await setupPulumiMock();
-      vi.mocked(prompts.select).mockResolvedValue("preset" as never);
+      vi.mocked(prompts.select)
+        .mockResolvedValueOnce("preset" as never)
+        .mockResolvedValueOnce("production" as never);
       vi.mocked(prompts.confirm).mockResolvedValue(true as never);
 
       await upgrade({});
@@ -212,7 +260,9 @@ describe("upgrade command", () => {
 
     it("should prompt for upgrade action", async () => {
       await setupPulumiMock();
-      vi.mocked(prompts.select).mockResolvedValue("preset" as never);
+      vi.mocked(prompts.select)
+        .mockResolvedValueOnce("preset" as never)
+        .mockResolvedValueOnce("production" as never);
       vi.mocked(prompts.confirm).mockResolvedValue(true as never);
 
       await upgrade({});
@@ -257,11 +307,11 @@ describe("upgrade command", () => {
         timestamp: new Date().toISOString(),
         services: {
           email: {
-            config: {
-              domain: "example.com",
-              tracking: { enabled: true },
+            config: createStarterConfig({
+              reputationMetrics: true,
               eventTracking: {
                 enabled: true,
+                eventBridge: true,
                 events: [
                   "SEND",
                   "DELIVERY",
@@ -273,7 +323,7 @@ describe("upgrade command", () => {
                 dynamoDBHistory: true,
                 archiveRetention: "90days",
               },
-            },
+            }),
             preset: "production",
           },
         },
@@ -319,10 +369,28 @@ describe("upgrade command", () => {
         timestamp: new Date().toISOString(),
         services: {
           email: {
-            config: {
-              domain: "example.com",
+            config: createStarterConfig({
+              reputationMetrics: true,
               dedicatedIp: true,
-            },
+              eventTracking: {
+                enabled: true,
+                eventBridge: true,
+                events: [
+                  "SEND",
+                  "DELIVERY",
+                  "OPEN",
+                  "CLICK",
+                  "BOUNCE",
+                  "COMPLAINT",
+                  "REJECT",
+                  "RENDERING_FAILURE",
+                  "DELIVERY_DELAY",
+                  "SUBSCRIPTION",
+                ],
+                dynamoDBHistory: true,
+                archiveRetention: "1year",
+              },
+            }),
             preset: "enterprise",
           },
         },
@@ -406,13 +474,14 @@ describe("upgrade command", () => {
         timestamp: new Date().toISOString(),
         services: {
           email: {
-            config: {
-              domain: "example.com",
+            config: createStarterConfig({
               tracking: {
                 enabled: true,
+                opens: true,
+                clicks: true,
                 customRedirectDomain: "old.example.com",
               },
-            },
+            }),
             preset: "starter",
           },
         },
@@ -641,13 +710,15 @@ describe("upgrade command", () => {
         timestamp: new Date().toISOString(),
         services: {
           email: {
-            config: {
-              domain: "example.com",
-              tracking: { enabled: true },
-              suppressionList: { enabled: true },
-              eventTracking: { enabled: true },
-              historyStorage: { enabled: true, retentionDays: 365 }, // 1 year
-            },
+            config: createStarterConfig({
+              eventTracking: {
+                enabled: true,
+                eventBridge: true,
+                events: ["SEND", "DELIVERY", "OPEN", "CLICK"],
+                dynamoDBHistory: true,
+                archiveRetention: "1year",
+              },
+            }),
             preset: undefined, // Custom config
             pulumiStackName: "wraps-123456789012-us-east-1",
           },
@@ -680,7 +751,9 @@ describe("upgrade command", () => {
         .spyOn(process, "exit")
         .mockImplementation((() => {}) as any);
 
-      vi.mocked(prompts.select).mockResolvedValueOnce("preset" as never);
+      vi.mocked(prompts.select)
+        .mockResolvedValueOnce("preset" as never)
+        .mockResolvedValueOnce("production" as never);
       vi.mocked(prompts.confirm).mockResolvedValueOnce(false as never);
 
       try {
@@ -741,7 +814,9 @@ describe("upgrade command", () => {
         pulumiAutomation.LocalWorkspace.createOrSelectStack
       ).mockImplementation(createOrSelectStackMock);
 
-      vi.mocked(prompts.select).mockResolvedValueOnce("preset" as never);
+      vi.mocked(prompts.select)
+        .mockResolvedValueOnce("preset" as never)
+        .mockResolvedValueOnce("production" as never);
       vi.mocked(prompts.confirm).mockResolvedValue(true as never);
 
       await expect(upgrade({})).rejects.toThrow(/locked/);
@@ -871,13 +946,15 @@ describe("upgrade command", () => {
         timestamp: new Date().toISOString(),
         services: {
           email: {
-            config: {},
+            config: createStarterConfig(),
             preset: "starter",
           },
         },
       } as any);
 
-      vi.mocked(prompts.select).mockResolvedValueOnce("preset" as never);
+      vi.mocked(prompts.select)
+        .mockResolvedValueOnce("preset" as never)
+        .mockResolvedValueOnce("production" as never);
       vi.mocked(prompts.confirm).mockResolvedValue(true as never);
 
       await upgrade({});
@@ -898,13 +975,15 @@ describe("upgrade command", () => {
         timestamp: new Date().toISOString(),
         services: {
           email: {
-            config: {},
+            config: createStarterConfig(),
             preset: "starter",
           },
         },
       } as any);
 
-      vi.mocked(prompts.select).mockResolvedValueOnce("preset" as never);
+      vi.mocked(prompts.select)
+        .mockResolvedValueOnce("preset" as never)
+        .mockResolvedValueOnce("production" as never);
       vi.mocked(prompts.confirm).mockResolvedValue(true as never);
 
       await upgrade({});

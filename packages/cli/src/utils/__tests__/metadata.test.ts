@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getPreset } from "../email/presets.js";
 import {
   addServiceToConnection,
+  applyConfigUpdates,
   connectionExists,
   createConnectionMetadata,
   deleteConnectionMetadata,
@@ -857,6 +858,328 @@ describe("multi-service metadata functions", () => {
       const services = getConfiguredServices(metadata);
 
       expect(services).toEqual([]);
+    });
+  });
+});
+
+describe("applyConfigUpdates", () => {
+  describe("preserving user customizations", () => {
+    it("should preserve custom tracking domain when upgrading preset", () => {
+      const existingConfig = {
+        domain: "example.com",
+        tracking: {
+          enabled: true,
+          opens: true,
+          clicks: true,
+          customRedirectDomain: "track.example.com",
+          httpsEnabled: true,
+        },
+        sendingEnabled: true,
+        reputationMetrics: false,
+      };
+
+      const productionPreset = getPreset("production")!;
+      const result = applyConfigUpdates(existingConfig, productionPreset);
+
+      expect(result.tracking?.customRedirectDomain).toBe("track.example.com");
+      expect(result.tracking?.httpsEnabled).toBe(true);
+      expect(result.reputationMetrics).toBe(true); // Updated from preset
+      expect(result.domain).toBe("example.com"); // Preserved
+    });
+
+    it("should preserve domain when upgrading preset", () => {
+      const existingConfig = {
+        domain: "myapp.com",
+        tracking: { enabled: true, opens: true, clicks: true },
+        sendingEnabled: true,
+      };
+
+      const enterprisePreset = getPreset("enterprise")!;
+      const result = applyConfigUpdates(existingConfig, enterprisePreset);
+
+      expect(result.domain).toBe("myapp.com");
+      expect(result.dedicatedIp).toBe(true); // From enterprise preset
+    });
+
+    it("should preserve mailFromDomain when upgrading", () => {
+      const existingConfig = {
+        domain: "example.com",
+        mailFromDomain: "mail.example.com",
+        tracking: { enabled: true, opens: true, clicks: true },
+        sendingEnabled: true,
+      };
+
+      const productionPreset = getPreset("production")!;
+      const result = applyConfigUpdates(existingConfig, productionPreset);
+
+      expect(result.mailFromDomain).toBe("mail.example.com");
+    });
+
+    it("should adopt preset event types when upgrading (events are part of preset definition)", () => {
+      const existingConfig = {
+        tracking: { enabled: true, opens: true, clicks: true },
+        sendingEnabled: true,
+        eventTracking: {
+          enabled: true,
+          eventBridge: true,
+          events: ["SEND", "DELIVERY", "BOUNCE"],
+          dynamoDBHistory: true,
+          archiveRetention: "30days",
+        },
+      };
+
+      const productionPreset = getPreset("production")!;
+      const result = applyConfigUpdates(existingConfig, productionPreset);
+
+      // Events are upgraded to preset's event list (this is intentional - preset defines which events to track)
+      expect(result.eventTracking?.events).toEqual(
+        productionPreset.eventTracking?.events
+      );
+      expect(result.eventTracking?.enabled).toBe(true);
+      // But archiveRetention is upgraded to preset value
+      expect(result.eventTracking?.archiveRetention).toBe("90days");
+    });
+
+    it("should merge tracking config without losing existing fields", () => {
+      const existingConfig = {
+        tracking: {
+          enabled: true,
+          opens: true,
+          clicks: true,
+          customRedirectDomain: "track.myapp.com",
+          httpsEnabled: true,
+        },
+        sendingEnabled: true,
+      };
+
+      const updates = {
+        tracking: {
+          enabled: true,
+          opens: false, // Change opens
+          clicks: true,
+        },
+      };
+
+      const result = applyConfigUpdates(existingConfig, updates);
+
+      expect(result.tracking?.customRedirectDomain).toBe("track.myapp.com");
+      expect(result.tracking?.httpsEnabled).toBe(true);
+      expect(result.tracking?.opens).toBe(false); // Updated value
+    });
+  });
+
+  describe("deep merging nested objects", () => {
+    it("should deep merge eventTracking", () => {
+      const existingConfig = {
+        tracking: { enabled: true, opens: true, clicks: true },
+        sendingEnabled: true,
+        eventTracking: {
+          enabled: true,
+          eventBridge: true,
+          events: ["SEND", "DELIVERY"],
+          dynamoDBHistory: true,
+          archiveRetention: "7days",
+        },
+      };
+
+      const updates = {
+        eventTracking: {
+          enabled: true,
+          eventBridge: true,
+          events: ["SEND", "DELIVERY", "OPEN", "CLICK"],
+          dynamoDBHistory: true,
+          archiveRetention: "90days",
+        },
+      };
+
+      const result = applyConfigUpdates(existingConfig, updates);
+
+      expect(result.eventTracking?.archiveRetention).toBe("90days");
+      expect(result.eventTracking?.events).toEqual([
+        "SEND",
+        "DELIVERY",
+        "OPEN",
+        "CLICK",
+      ]);
+      expect(result.eventTracking?.enabled).toBe(true);
+    });
+
+    it("should deep merge suppressionList", () => {
+      const existingConfig = {
+        tracking: { enabled: true, opens: true, clicks: true },
+        sendingEnabled: true,
+        suppressionList: {
+          enabled: true,
+          reasons: ["BOUNCE"],
+        },
+      };
+
+      const updates = {
+        suppressionList: {
+          enabled: true,
+          reasons: ["BOUNCE", "COMPLAINT"],
+        },
+      };
+
+      const result = applyConfigUpdates(existingConfig, updates);
+
+      expect(result.suppressionList?.reasons).toEqual(["BOUNCE", "COMPLAINT"]);
+      expect(result.suppressionList?.enabled).toBe(true);
+    });
+
+    it("should deep merge emailArchiving", () => {
+      const existingConfig = {
+        tracking: { enabled: true, opens: true, clicks: true },
+        sendingEnabled: true,
+        emailArchiving: {
+          enabled: false,
+          retention: "30days",
+        },
+      };
+
+      const updates = {
+        emailArchiving: {
+          enabled: true,
+          retention: "1year",
+        },
+      };
+
+      const result = applyConfigUpdates(existingConfig, updates);
+
+      expect(result.emailArchiving?.enabled).toBe(true);
+      expect(result.emailArchiving?.retention).toBe("1year");
+    });
+  });
+
+  describe("handling undefined values", () => {
+    it("should skip undefined values in updates", () => {
+      const existingConfig = {
+        tracking: { enabled: true, opens: true, clicks: true },
+        sendingEnabled: true,
+        dedicatedIp: true,
+      };
+
+      const updates = {
+        dedicatedIp: undefined,
+        reputationMetrics: true,
+      };
+
+      const result = applyConfigUpdates(existingConfig, updates);
+
+      expect(result.dedicatedIp).toBe(true); // Preserved, not overwritten by undefined
+      expect(result.reputationMetrics).toBe(true);
+    });
+  });
+
+  describe("primitive value updates", () => {
+    it("should update primitive values", () => {
+      const existingConfig = {
+        tracking: { enabled: true, opens: true, clicks: true },
+        sendingEnabled: false,
+        tlsRequired: false,
+        reputationMetrics: false,
+      };
+
+      const updates = {
+        sendingEnabled: true,
+        tlsRequired: true,
+        reputationMetrics: true,
+        dedicatedIp: true,
+      };
+
+      const result = applyConfigUpdates(existingConfig, updates);
+
+      expect(result.sendingEnabled).toBe(true);
+      expect(result.tlsRequired).toBe(true);
+      expect(result.reputationMetrics).toBe(true);
+      expect(result.dedicatedIp).toBe(true);
+    });
+  });
+
+  describe("real-world upgrade scenarios", () => {
+    it("should handle starter -> production upgrade preserving custom domain", () => {
+      const starterConfig = {
+        domain: "myapp.com",
+        tracking: {
+          enabled: true,
+          opens: true,
+          clicks: true,
+          customRedirectDomain: "email.myapp.com",
+        },
+        tlsRequired: true,
+        reputationMetrics: false,
+        suppressionList: {
+          enabled: true,
+          reasons: ["BOUNCE", "COMPLAINT"],
+        },
+        eventTracking: {
+          enabled: false,
+        },
+        emailArchiving: {
+          enabled: false,
+          retention: "30days",
+        },
+        sendingEnabled: true,
+      };
+
+      const productionPreset = getPreset("production")!;
+      const result = applyConfigUpdates(starterConfig, productionPreset);
+
+      // User customizations preserved
+      expect(result.domain).toBe("myapp.com");
+      expect(result.tracking?.customRedirectDomain).toBe("email.myapp.com");
+
+      // Preset upgrades applied
+      expect(result.reputationMetrics).toBe(true);
+      expect(result.eventTracking?.enabled).toBe(true);
+      expect(result.eventTracking?.archiveRetention).toBe("90days");
+    });
+
+    it("should handle production -> enterprise upgrade preserving all customizations", () => {
+      const productionConfig = {
+        domain: "enterprise.com",
+        mailFromDomain: "bounce.enterprise.com",
+        tracking: {
+          enabled: true,
+          opens: true,
+          clicks: true,
+          customRedirectDomain: "track.enterprise.com",
+          httpsEnabled: true,
+        },
+        tlsRequired: true,
+        reputationMetrics: true,
+        suppressionList: {
+          enabled: true,
+          reasons: ["BOUNCE", "COMPLAINT"],
+        },
+        eventTracking: {
+          enabled: true,
+          eventBridge: true,
+          events: ["SEND", "DELIVERY", "OPEN", "CLICK", "BOUNCE", "COMPLAINT"],
+          dynamoDBHistory: true,
+          archiveRetention: "90days",
+        },
+        emailArchiving: {
+          enabled: true,
+          retention: "90days",
+        },
+        sendingEnabled: true,
+      };
+
+      const enterprisePreset = getPreset("enterprise")!;
+      const result = applyConfigUpdates(productionConfig, enterprisePreset);
+
+      // All user customizations preserved
+      expect(result.domain).toBe("enterprise.com");
+      expect(result.mailFromDomain).toBe("bounce.enterprise.com");
+      expect(result.tracking?.customRedirectDomain).toBe(
+        "track.enterprise.com"
+      );
+      expect(result.tracking?.httpsEnabled).toBe(true);
+
+      // Enterprise features applied
+      expect(result.dedicatedIp).toBe(true);
+      expect(result.eventTracking?.archiveRetention).toBe("1year");
     });
   });
 });
