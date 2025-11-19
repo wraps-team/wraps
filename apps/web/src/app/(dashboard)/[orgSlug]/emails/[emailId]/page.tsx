@@ -72,7 +72,7 @@ function mapEventTypeToStatus(eventType: string): EmailStatus {
 async function fetchEmail(
   organizationId: string,
   emailId: string
-): Promise<Email | null> {
+): Promise<(Email & { archivingEnabled: boolean }) | null> {
   try {
     // Search for the email across all accounts (last 90 days)
     const endTime = new Date();
@@ -92,31 +92,42 @@ async function fetchEmail(
     }
 
     // Fetch events from all accounts and find the matching email
-    const allEvents = await Promise.all(
+    const allEventsWithAccount = await Promise.all(
       accounts.map(async (account) => {
         try {
-          return await queryEmailEvents({
+          const events = await queryEmailEvents({
             awsAccountId: account.id,
             startTime,
             endTime,
             limit: 1000,
           });
+          return { account, events };
         } catch (error) {
           console.error(
             `[fetchEmail] Failed to fetch emails for account ${account.id}:`,
             error
           );
-          return [];
+          return { account, events: [] };
         }
       })
     );
 
-    // Find all events for this messageId
-    const emailEvents = allEvents.flat().filter((e) => e.messageId === emailId);
+    // Find which account has this email
+    let emailAccount: (typeof accounts)[0] | null = null;
+    let emailEvents: any[] = [];
+
+    for (const { account, events } of allEventsWithAccount) {
+      const matchingEvents = events.filter((e) => e.messageId === emailId);
+      if (matchingEvents.length > 0) {
+        emailAccount = account;
+        emailEvents = matchingEvents;
+        break;
+      }
+    }
 
     console.log("[fetchEmail] Found events for email:", emailEvents.length);
 
-    if (emailEvents.length === 0) {
+    if (emailEvents.length === 0 || !emailAccount) {
       return null;
     }
 
@@ -174,6 +185,7 @@ async function fetchEmail(
       textBody: undefined,
       status: finalStatus,
       sentAt: firstEvent.sentAt,
+      archivingEnabled: emailAccount.archivingEnabled,
       events: emailEvents.map((event) => ({
         type: event.eventType.toLowerCase().replace(/ /g, "_") as EmailStatus,
         timestamp: event.createdAt,
@@ -342,12 +354,14 @@ export default async function EmailDetailPage({
           )}
         </EventTimeline>
 
-        {/* Email Archive Viewer */}
-        <EmailArchiveViewer
-          archivingEnabled={true}
-          messageId={email.messageId}
-          orgSlug={orgSlug}
-        />
+        {/* Email Archive Viewer - only show if archiving is enabled */}
+        {email.archivingEnabled && (
+          <EmailArchiveViewer
+            archivingEnabled={email.archivingEnabled}
+            messageId={email.messageId}
+            orgSlug={orgSlug}
+          />
+        )}
       </div>
     </>
   );

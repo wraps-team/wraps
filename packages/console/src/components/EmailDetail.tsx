@@ -293,11 +293,13 @@ export function EmailDetail() {
         </CardContent>
       </Card>
 
-      {/* Email Archive Viewer */}
-      <EmailArchiveViewer
-        archivingEnabled={archivingEnabled}
-        messageId={email.messageId}
-      />
+      {/* Email Archive Viewer - only show if archiving is enabled */}
+      {archivingEnabled && (
+        <EmailArchiveViewer
+          archivingEnabled={archivingEnabled}
+          messageId={email.messageId}
+        />
+      )}
 
       {/* Event Timeline */}
       <Card>

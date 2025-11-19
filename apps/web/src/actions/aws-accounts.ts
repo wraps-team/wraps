@@ -1,11 +1,20 @@
 "use server";
 
+import { DynamoDBClient, ListTablesCommand } from "@aws-sdk/client-dynamodb";
+import {
+  EventBridgeClient,
+  ListRulesCommand,
+} from "@aws-sdk/client-eventbridge";
+import { GetConfigurationSetCommand, SESv2Client } from "@aws-sdk/client-sesv2";
 import { createServerValidate } from "@tanstack/react-form/nextjs";
 import { auth } from "@wraps/auth";
 import { awsAccount, db } from "@wraps/db";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { assumeRole } from "@/lib/aws/assume-role";
+import { getOrAssumeRole } from "@/lib/aws/credential-cache";
+import { findWrapsArchive } from "@/lib/aws/mailmanager";
 import {
   connectAWSAccountFormOpts,
   connectAWSAccountSchema,
@@ -244,5 +253,198 @@ export async function connectAWSAccountAction(
     const message = e instanceof Error ? e.message : "Internal error";
     console.error("Error connecting AWS account:", e);
     return { error: "Internal error", details: message };
+  }
+}
+
+export type ScanFeaturesResult =
+  | {
+      success: true;
+      features: {
+        archivingEnabled: boolean;
+        archiveArn?: string;
+        eventHistoryEnabled: boolean;
+        eventTrackingEnabled: boolean;
+        configSetName?: string;
+      };
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+/**
+ * Scan AWS account for deployed features and update database
+ * This detects features like email archiving by querying AWS resources
+ */
+export async function scanAWSAccountFeatures(
+  awsAccountId: string,
+  organizationId: string
+): Promise<ScanFeaturesResult> {
+  try {
+    // 1. Get session
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return {
+        success: false,
+        error: "Unauthorized",
+      };
+    }
+
+    // 2. Check org membership and permissions
+    const membership = await db.query.member.findFirst({
+      where: (m, { and, eq }) =>
+        and(
+          eq(m.userId, session.user.id),
+          eq(m.organizationId, organizationId)
+        ),
+    });
+
+    if (!(membership && ["owner", "admin"].includes(membership.role))) {
+      return {
+        success: false,
+        error: "Insufficient permissions",
+      };
+    }
+
+    // 3. Get AWS account
+    const account = await db.query.awsAccount.findFirst({
+      where: (a, { and, eq }) =>
+        and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
+    });
+
+    if (!account) {
+      return {
+        success: false,
+        error: "AWS account not found",
+      };
+    }
+
+    // 4. Get credentials for the AWS account
+    const credentials = await getOrAssumeRole({
+      roleArn: account.roleArn,
+      externalId: account.externalId,
+    });
+
+    const awsCredentials = {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken,
+    };
+
+    // 5. Scan for email archiving
+    let archivingEnabled = false;
+    let archiveArn: string | undefined;
+
+    try {
+      archiveArn =
+        (await findWrapsArchive(account.region, credentials)) ?? undefined;
+      archivingEnabled = !!archiveArn;
+    } catch (error) {
+      console.error("Error scanning for archive:", error);
+      // Continue - archiving just not enabled
+    }
+
+    // 6. Scan for DynamoDB table (event history)
+    let eventHistoryEnabled = false;
+
+    try {
+      const dynamoClient = new DynamoDBClient({
+        region: account.region,
+        credentials: awsCredentials,
+      });
+
+      const tablesResponse = await dynamoClient.send(new ListTablesCommand({}));
+      const wrapsTable = tablesResponse.TableNames?.find((name) =>
+        name.startsWith("wraps-email-")
+      );
+      eventHistoryEnabled = !!wrapsTable;
+    } catch (error) {
+      console.error("Error scanning for DynamoDB table:", error);
+      // Continue
+    }
+
+    // 7. Scan for EventBridge rules (event tracking)
+    let eventTrackingEnabled = false;
+
+    try {
+      const eventBridgeClient = new EventBridgeClient({
+        region: account.region,
+        credentials: awsCredentials,
+      });
+
+      const rulesResponse = await eventBridgeClient.send(
+        new ListRulesCommand({
+          EventBusName: "default",
+        })
+      );
+      const wrapsRule = rulesResponse.Rules?.find(
+        (rule: { Name?: string; Description?: string }) =>
+          rule.Name?.startsWith("wraps-email-") ||
+          rule.Description?.includes("Wraps")
+      );
+      eventTrackingEnabled = !!wrapsRule;
+    } catch (error) {
+      console.error("Error scanning for EventBridge rules:", error);
+      // Continue
+    }
+
+    // 8. Scan for SES Configuration Set
+    let configSetName: string | undefined;
+
+    try {
+      const sesClient = new SESv2Client({
+        region: account.region,
+        credentials: awsCredentials,
+      });
+
+      // Try common Wraps configuration set name
+      const configSetResponse = await sesClient.send(
+        new GetConfigurationSetCommand({
+          ConfigurationSetName: "wraps-email",
+        })
+      );
+      // If the command succeeds, the config set exists
+      if (configSetResponse) {
+        configSetName = "wraps-email";
+      }
+    } catch (error) {
+      // Config set doesn't exist or different name - that's ok
+      console.error("Error scanning for config set:", error);
+    }
+
+    // 9. Update database with discovered features
+    await db
+      .update(awsAccount)
+      .set({
+        archivingEnabled,
+        archiveArn: archiveArn ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(awsAccount.id, awsAccountId));
+
+    // 10. Revalidate pages
+    revalidatePath(`/${organizationId}/aws-accounts/${awsAccountId}`);
+    revalidatePath(`/${organizationId}/aws-accounts`);
+
+    return {
+      success: true,
+      features: {
+        archivingEnabled,
+        archiveArn,
+        eventHistoryEnabled,
+        eventTrackingEnabled,
+        configSetName,
+      },
+    };
+  } catch (error) {
+    console.error("Error scanning AWS account features:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return {
+      success: false,
+      error: `Failed to scan features: ${message}`,
+    };
   }
 }

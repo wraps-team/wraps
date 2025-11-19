@@ -15,8 +15,10 @@
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.490.0",
     "@aws-sdk/client-dynamodb": "^3.490.0",
+    "@aws-sdk/client-eventbridge": "3.935.0",
     "@aws-sdk/client-mailmanager": "3.925.0",
     "@aws-sdk/client-ses": "^3.490.0",
+    "@aws-sdk/client-sesv2": "3.925.0",
     "@aws-sdk/client-sts": "^3.927.0",
     "@aws-sdk/lib-dynamodb": "3.931.0",
     "@dnd-kit/core": "^6.3.1",

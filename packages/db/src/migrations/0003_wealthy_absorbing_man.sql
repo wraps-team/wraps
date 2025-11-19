@@ -1,0 +1,1 @@
+ALTER TABLE "aws_account" ADD COLUMN "archiving_enabled" boolean DEFAULT false NOT NULL;

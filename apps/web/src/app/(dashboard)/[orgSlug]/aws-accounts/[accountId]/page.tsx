@@ -6,6 +6,7 @@ import { getSESMetricsSummary } from "@/lib/aws/cloudwatch";
 import { getOrganizationBySlug } from "@/lib/organization";
 import { checkAWSAccountAccess } from "@/lib/permissions/check-access";
 import { AccountDetails } from "./components/account-details";
+import { AccountFeatures } from "./components/account-features";
 import { EmailMetrics } from "./components/email-metrics";
 import { IAMConfiguration } from "./components/iam-configuration";
 
@@ -115,6 +116,9 @@ export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
 
       {/* Email Metrics */}
       <EmailMetrics error={metricsError} metrics={metrics} />
+
+      {/* Deployed Features */}
+      <AccountFeatures account={account} organizationId={organization.id} />
 
       {/* Account Details */}
       <AccountDetails account={account} />

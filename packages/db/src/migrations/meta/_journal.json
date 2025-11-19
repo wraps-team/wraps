@@ -22,6 +22,20 @@
       "when": 1763409196375,
       "tag": "0002_perpetual_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1763589434473,
+      "tag": "0003_wealthy_absorbing_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1763589660693,
+      "tag": "0004_opposite_blur",
+      "breakpoints": true
     }
   ]
 }

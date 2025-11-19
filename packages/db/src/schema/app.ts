@@ -52,6 +52,10 @@ export const awsAccount = pgTable(
     isVerified: boolean("is_verified").default(false).notNull(),
     lastVerifiedAt: timestamp("last_verified_at"),
 
+    // Features
+    archivingEnabled: boolean("archiving_enabled").default(false).notNull(),
+    archiveArn: text("archive_arn"),
+
     // Audit
     createdBy: text("created_by").references(() => user.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
