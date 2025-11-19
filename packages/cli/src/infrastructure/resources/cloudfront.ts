@@ -8,6 +8,7 @@ export type CloudFrontTrackingConfig = {
   customTrackingDomain: string;
   region: string; // SES region for the origin
   certificateArn: pulumi.Output<string>;
+  hostedZoneId?: string; // Optional Route53 hosted zone for automatic DNS record creation
 };
 
 /**
@@ -207,6 +208,10 @@ export async function createCloudFrontTracking(
         "wraps-email-tracking-cdn",
         distributionConfig
       );
+
+  // Note: DNS CNAME record for custom tracking domain is created separately
+  // via Route53 SDK in route53.ts (using UPSERT for idempotency)
+  // This prevents Pulumi resource conflicts on subsequent deployments
 
   return {
     distribution,

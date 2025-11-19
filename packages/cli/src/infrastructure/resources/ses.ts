@@ -16,6 +16,8 @@ export type SESResourcesConfig = {
     httpsEnabled?: boolean;
   };
   eventTypes?: SESEventType[];
+  eventTrackingEnabled?: boolean; // NEW: Whether to create EventBridge event destination
+  tlsRequired?: boolean; // Require TLS encryption for all emails
 };
 
 /**
@@ -71,38 +73,6 @@ async function emailIdentityExists(
 }
 
 /**
- * Check if configuration set event destination exists
- */
-async function eventDestinationExists(
-  configSetName: string,
-  eventDestName: string,
-  region: string
-): Promise<boolean> {
-  try {
-    const { SESv2Client, GetConfigurationSetEventDestinationsCommand } =
-      await import("@aws-sdk/client-sesv2");
-    const ses = new SESv2Client({ region });
-
-    const response = await ses.send(
-      new GetConfigurationSetEventDestinationsCommand({
-        ConfigurationSetName: configSetName,
-      })
-    );
-
-    return (
-      response.EventDestinations?.some((dest) => dest.Name === eventDestName) ??
-      false
-    );
-  } catch (error: any) {
-    if (error.name === "NotFoundException") {
-      return false;
-    }
-    console.error("Error checking for existing event destination:", error);
-    return false;
-  }
-}
-
-/**
  * SES resources output
  */
 export type SESResources = {
@@ -124,6 +94,11 @@ export async function createSESResources(
   // Configuration set for tracking (using SESv2 which supports tags)
   const configSetOptions: aws.sesv2.ConfigurationSetArgs = {
     configurationSetName: "wraps-email-tracking",
+    deliveryOptions: config.tlsRequired
+      ? {
+          tlsPolicy: "REQUIRE", // Require TLS 1.2+ for all emails
+        }
+      : undefined,
     tags: {
       ManagedBy: "wraps-cli",
       Description: "Wraps email tracking configuration set",
@@ -161,18 +136,11 @@ export async function createSESResources(
     name: "default",
   });
 
-  // Check if event destination already exists
-  const eventDestName = "wraps-email-eventbridge";
-  const eventDestExists = await eventDestinationExists(
-    configSetName,
-    eventDestName,
-    config.region
-  );
-
   // Event destination for all SES events -> EventBridge (default bus)
-  // Note: ConfigurationSetEventDestination doesn't support import, but checking
-  // prevents errors when it already exists
-  if (!eventDestExists) {
+  // Only create if event tracking is enabled
+  if (config.eventTrackingEnabled) {
+    const eventDestName = "wraps-email-eventbridge";
+
     new aws.sesv2.ConfigurationSetEventDestination("wraps-email-all-events", {
       configurationSetName: configSet.configurationSetName,
       eventDestinationName: eventDestName,
@@ -248,6 +216,8 @@ export async function createSESResources(
     // Uses subdomain convention (mail.example.com) to avoid DNS conflicts
     mailFromDomain = config.mailFromDomain || `mail.${config.domain}`;
 
+    // Always create/update MAIL FROM attributes
+    // Note: This resource doesn't support import, but it will update existing config
     new aws.sesv2.EmailIdentityMailFromAttributes(
       "wraps-email-mail-from",
       {

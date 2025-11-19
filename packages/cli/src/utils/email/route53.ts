@@ -91,6 +91,12 @@ export async function createDNSRecords(
   });
 
   // DMARC TXT record
+  // If MAIL FROM domain is provided, use it for the reporting address (rua)
+  // Otherwise, use the main domain
+  const dmarcReportEmail = mailFromDomain
+    ? `postmaster@${mailFromDomain}`
+    : `postmaster@${domain}`;
+
   changes.push({
     Action: "UPSERT",
     ResourceRecordSet: {
@@ -98,7 +104,7 @@ export async function createDNSRecords(
       Type: "TXT",
       TTL: 1800,
       ResourceRecords: [
-        { Value: `"v=DMARC1; p=quarantine; rua=mailto:postmaster@${domain}"` },
+        { Value: `"v=DMARC1; p=quarantine; rua=mailto:${dmarcReportEmail}"` },
       ],
     },
   });

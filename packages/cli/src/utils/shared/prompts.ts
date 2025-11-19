@@ -544,14 +544,14 @@ export async function promptEmailArchiving(): Promise<{
   };
 }
 
-export async function promptCustomConfig(): Promise<any> {
+export async function promptCustomConfig(existingConfig?: any): Promise<any> {
   clack.log.info("Custom configuration builder");
   clack.log.info("Configure each feature individually");
 
   // Tracking
   const trackingEnabled = await clack.confirm({
     message: "Enable open & click tracking?",
-    initialValue: true,
+    initialValue: existingConfig?.tracking?.enabled ?? true,
   });
 
   if (clack.isCancel(trackingEnabled)) {
@@ -562,7 +562,7 @@ export async function promptCustomConfig(): Promise<any> {
   // Event tracking
   const eventTrackingEnabled = await clack.confirm({
     message: "Enable real-time event tracking (EventBridge)?",
-    initialValue: true,
+    initialValue: existingConfig?.eventTracking?.enabled ?? true,
   });
 
   if (clack.isCancel(eventTrackingEnabled)) {
@@ -576,7 +576,7 @@ export async function promptCustomConfig(): Promise<any> {
   if (eventTrackingEnabled) {
     dynamoDBHistory = await clack.confirm({
       message: "Store email history in DynamoDB?",
-      initialValue: true,
+      initialValue: existingConfig?.eventTracking?.dynamoDBHistory ?? true,
     });
 
     if (clack.isCancel(dynamoDBHistory)) {
@@ -602,6 +602,8 @@ export async function promptCustomConfig(): Promise<any> {
             hint: "Higher storage cost",
           },
         ],
+        initialValue:
+          existingConfig?.eventTracking?.archiveRetention || "90days",
       });
 
       if (clack.isCancel(archiveRetention)) {
@@ -614,7 +616,7 @@ export async function promptCustomConfig(): Promise<any> {
   // Security
   const tlsRequired = await clack.confirm({
     message: "Require TLS encryption for all emails?",
-    initialValue: true,
+    initialValue: existingConfig?.tlsRequired ?? true,
   });
 
   if (clack.isCancel(tlsRequired)) {
@@ -625,7 +627,7 @@ export async function promptCustomConfig(): Promise<any> {
   // Reputation metrics
   const reputationMetrics = await clack.confirm({
     message: "Enable reputation metrics dashboard?",
-    initialValue: true,
+    initialValue: existingConfig?.reputationMetrics ?? true,
   });
 
   if (clack.isCancel(reputationMetrics)) {
@@ -636,7 +638,7 @@ export async function promptCustomConfig(): Promise<any> {
   // Dedicated IP
   const dedicatedIp = await clack.confirm({
     message: "Request dedicated IP address? (requires 100k+ emails/day)",
-    initialValue: false,
+    initialValue: existingConfig?.dedicatedIp ?? false,
   });
 
   if (clack.isCancel(dedicatedIp)) {
@@ -648,7 +650,7 @@ export async function promptCustomConfig(): Promise<any> {
   const emailArchivingEnabled = await clack.confirm({
     message:
       "Enable email archiving? (Store full email content with HTML for viewing)",
-    initialValue: false,
+    initialValue: existingConfig?.emailArchiving?.enabled ?? false,
   });
 
   if (clack.isCancel(emailArchivingEnabled)) {
@@ -681,7 +683,7 @@ export async function promptCustomConfig(): Promise<any> {
           hint: "~$35-60/mo for 10k emails",
         },
       ],
-      initialValue: "90days",
+      initialValue: existingConfig?.emailArchiving?.retention || "90days",
     });
 
     if (clack.isCancel(emailArchiveRetention)) {

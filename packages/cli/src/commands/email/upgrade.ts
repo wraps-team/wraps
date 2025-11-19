@@ -244,12 +244,14 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         process.exit(0);
       }
 
-      // Get preset config but preserve domain from existing config
+      // Get preset config but preserve user-customized fields from existing config
+      const { applyConfigUpdates } = await import(
+        "../../utils/shared/metadata.js"
+      );
       const presetConfig = getPreset(selectedPreset as any)!;
-      updatedConfig = {
-        ...presetConfig,
-        domain: config.domain, // Preserve original domain
-      };
+
+      // Apply preset updates to existing config (preserves user customizations)
+      updatedConfig = applyConfigUpdates(config, presetConfig);
       newPreset = selectedPreset as string;
       break;
     }
@@ -738,12 +740,15 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       const { promptCustomConfig } = await import(
         "../../utils/shared/prompts.js"
       );
-      const customConfig = await promptCustomConfig();
-      // Preserve domain from existing config
-      updatedConfig = {
-        ...customConfig,
-        domain: config.domain,
-      };
+      const { applyConfigUpdates } = await import(
+        "../../utils/shared/metadata.js"
+      );
+
+      // Pass existing config to preserve values
+      const customConfig = await promptCustomConfig(config);
+
+      // Apply custom config updates to existing config (preserves user-customized fields)
+      updatedConfig = applyConfigUpdates(config, customConfig);
       newPreset = undefined;
       break;
     }
@@ -908,7 +913,43 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     throw new Error(`Pulumi upgrade failed: ${error.message}`);
   }
 
-  // 13. Update metadata
+  // 13. Create DNS records in Route53 (if hosted zone exists)
+  if (outputs.domain && outputs.dkimTokens && outputs.dkimTokens.length > 0) {
+    const { findHostedZone, createDNSRecords } = await import(
+      "../../utils/email/route53.js"
+    );
+    const hostedZone = await findHostedZone(outputs.domain, region);
+
+    if (hostedZone) {
+      try {
+        progress.start("Creating DNS records in Route53");
+
+        // Determine mailFromDomain - use updatedConfig if available, otherwise construct default
+        const mailFromDomain =
+          updatedConfig.mailFromDomain || `mail.${outputs.domain}`;
+
+        await createDNSRecords(
+          hostedZone.id,
+          outputs.domain,
+          outputs.dkimTokens,
+          region,
+          outputs.customTrackingDomain,
+          mailFromDomain,
+          outputs.cloudFrontDomain
+        );
+        progress.succeed("DNS records created in Route53");
+      } catch (error: any) {
+        progress.fail(
+          `Failed to create DNS records automatically: ${error.message}`
+        );
+        progress.info(
+          "You can manually add the required DNS records shown below"
+        );
+      }
+    }
+  }
+
+  // 14. Update metadata
   updateEmailConfig(metadata, updatedConfig);
   if (metadata.services.email) {
     metadata.services.email.preset = newPreset as any;
@@ -917,7 +958,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
   progress.info("Connection metadata updated");
 
-  // 14. Format tracking domain DNS records if custom tracking domain was added
+  // 15. Format tracking domain DNS records if custom tracking domain was added
   const trackingDomainDnsRecords = [];
   const acmValidationRecords = [];
 

@@ -244,7 +244,42 @@ export async function connect(options: ConnectOptions): Promise<void> {
     throw new Error(`Pulumi deployment failed: ${error.message}`);
   }
 
-  // 12. Save metadata
+  // 12. Create DNS records in Route53 (if hosted zone exists)
+  if (outputs.domain && outputs.dkimTokens && outputs.dkimTokens.length > 0) {
+    const { findHostedZone, createDNSRecords } = await import(
+      "../../utils/email/route53.js"
+    );
+    const hostedZone = await findHostedZone(outputs.domain, region);
+
+    if (hostedZone) {
+      try {
+        progress.start("Creating DNS records in Route53");
+
+        // Determine mailFromDomain - use outputs if available, otherwise construct default
+        const mailFromDomain =
+          emailConfig.mailFromDomain || `mail.${outputs.domain}`;
+
+        await createDNSRecords(
+          hostedZone.id,
+          outputs.domain,
+          outputs.dkimTokens,
+          region,
+          outputs.customTrackingDomain,
+          mailFromDomain
+        );
+        progress.succeed("DNS records created in Route53");
+      } catch (error: any) {
+        progress.fail(
+          `Failed to create DNS records automatically: ${error.message}`
+        );
+        progress.info(
+          "You can manually add the required DNS records shown below"
+        );
+      }
+    }
+  }
+
+  // 13. Save metadata
   const metadata = createConnectionMetadata(
     identity.accountId,
     region,
@@ -262,7 +297,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
 
   progress.info("Connection metadata saved");
 
-  // 13. Display success message
+  // 14. Display success message
   displaySuccess({
     roleArn: outputs.roleArn,
     configSetName: outputs.configSetName,

@@ -266,6 +266,67 @@ export function createConnectionMetadata(
 }
 
 /**
+ * Apply config updates to existing config while preserving user-customized fields.
+ *
+ * This function starts with the existing config and applies updates,
+ * while ensuring user-customized fields are never lost:
+ * - domain (sending identity)
+ * - mailFromDomain (custom MAIL FROM subdomain)
+ * - tracking.customRedirectDomain (custom tracking domain)
+ * - tracking.httpsEnabled (HTTPS tracking via CloudFront)
+ */
+export function applyConfigUpdates(
+  existingConfig: WrapsEmailConfig,
+  updates: Partial<WrapsEmailConfig>
+): WrapsEmailConfig {
+  // Start with existing config (ensures all required fields are present)
+  const result = { ...existingConfig };
+
+  // Apply each update, with special handling for nested objects
+  for (const [key, value] of Object.entries(updates)) {
+    if (value === undefined) continue;
+
+    if (key === "tracking" && typeof value === "object") {
+      // Merge tracking updates while preserving user-customized fields
+      const trackingUpdate = value as NonNullable<WrapsEmailConfig["tracking"]>;
+      result.tracking = {
+        ...result.tracking,
+        ...trackingUpdate,
+        // Always preserve these if they exist in original
+        customRedirectDomain:
+          result.tracking?.customRedirectDomain ||
+          trackingUpdate.customRedirectDomain,
+        httpsEnabled:
+          result.tracking?.httpsEnabled ?? trackingUpdate.httpsEnabled,
+      };
+    } else if (key === "eventTracking" && typeof value === "object") {
+      // Deep merge eventTracking
+      result.eventTracking = {
+        ...result.eventTracking,
+        ...(value as NonNullable<WrapsEmailConfig["eventTracking"]>),
+      } as NonNullable<WrapsEmailConfig["eventTracking"]>;
+    } else if (key === "suppressionList" && typeof value === "object") {
+      // Deep merge suppressionList
+      result.suppressionList = {
+        ...result.suppressionList,
+        ...(value as NonNullable<WrapsEmailConfig["suppressionList"]>),
+      } as NonNullable<WrapsEmailConfig["suppressionList"]>;
+    } else if (key === "emailArchiving" && typeof value === "object") {
+      // Deep merge emailArchiving
+      result.emailArchiving = {
+        ...result.emailArchiving,
+        ...(value as NonNullable<WrapsEmailConfig["emailArchiving"]>),
+      } as NonNullable<WrapsEmailConfig["emailArchiving"]>;
+    } else {
+      // Direct assignment for primitives and other objects
+      result[key as keyof WrapsEmailConfig] = value as any;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Update email configuration in metadata
  * @deprecated Use updateServiceConfig instead
  */
@@ -277,10 +338,12 @@ export function updateEmailConfig(
     throw new Error("Email service not configured in metadata");
   }
 
-  metadata.services.email.config = {
-    ...metadata.services.email.config,
-    ...emailConfig,
-  };
+  // Apply updates while preserving user-customized fields
+  metadata.services.email.config = applyConfigUpdates(
+    metadata.services.email.config,
+    emailConfig
+  );
+
   metadata.timestamp = new Date().toISOString();
 }
 

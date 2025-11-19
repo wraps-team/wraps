@@ -80,6 +80,7 @@ export async function deployEmailStack(
       customTrackingDomain: emailConfig.tracking.customRedirectDomain,
       region: config.region,
       certificateArn,
+      hostedZoneId: hostedZone?.id, // Pass hosted zone ID for automatic DNS record creation
     });
   }
 
@@ -92,6 +93,8 @@ export async function deployEmailStack(
       region: config.region,
       trackingConfig: emailConfig.tracking,
       eventTypes: emailConfig.eventTracking?.events,
+      eventTrackingEnabled: emailConfig.eventTracking?.enabled, // Pass flag to create EventBridge destination
+      tlsRequired: emailConfig.tlsRequired, // Require TLS encryption for all emails
     });
   }
 
