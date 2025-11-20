@@ -1,37 +1,110 @@
 "use client";
 
-import { Activity, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  Clock,
+  Mail,
+  MousePointerClick,
+  XCircle,
+} from "lucide-react";
+import Link from "next/link";
+import { Fragment } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemSeparator,
+  ItemTitle,
+} from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { useRecentActivity } from "../hooks/use-analytics";
 
 const getActivityIcon = (type: string) => {
-  if (type === "Delivery" || type === "Send") {
-    return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+  if (type === "Delivery") {
+    return (
+      <CheckCircle2 className="h-4 w-4 text-green-700 dark:text-green-400" />
+    );
   }
-  if (type === "Bounce" || type === "Reject") {
-    return <XCircle className="h-4 w-4 text-red-500" />;
+  if (type === "Send") {
+    return <Clock className="h-4 w-4 text-gray-700 dark:text-gray-400" />;
+  }
+  if (type === "Open") {
+    return <Mail className="h-4 w-4 text-blue-700 dark:text-blue-400" />;
+  }
+  if (type === "Click") {
+    return (
+      <MousePointerClick className="h-4 w-4 text-purple-700 dark:text-purple-400" />
+    );
+  }
+  if (type === "Bounce") {
+    return <XCircle className="h-4 w-4 text-orange-700 dark:text-orange-400" />;
   }
   if (type === "Complaint") {
-    return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+    return <XCircle className="h-4 w-4 text-red-700 dark:text-red-400" />;
   }
-  return <Activity className="h-4 w-4" />;
+  if (type === "Reject") {
+    return <XCircle className="h-4 w-4 text-red-700 dark:text-red-400" />;
+  }
+  return <Clock className="h-4 w-4 text-gray-700 dark:text-gray-400" />;
 };
 
-const getActivityBadgeVariant = (type: string) => {
-  if (
-    type === "Delivery" ||
-    type === "Send" ||
-    type === "Open" ||
-    type === "Click"
-  ) {
-    return "default" as const;
-  }
-  if (type === "Bounce" || type === "Reject") {
-    return "destructive" as const;
-  }
-  return "secondary" as const;
+const getActivityBadgeConfig = (type: string) => {
+  const configs: Record<
+    string,
+    {
+      variant: "default" | "secondary" | "destructive" | "outline";
+      className: string;
+    }
+  > = {
+    Send: {
+      variant: "default",
+      className:
+        "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20",
+    },
+    Delivery: {
+      variant: "default",
+      className:
+        "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20",
+    },
+    Open: {
+      variant: "default",
+      className:
+        "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
+    },
+    Click: {
+      variant: "default",
+      className:
+        "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",
+    },
+    Bounce: {
+      variant: "default",
+      className:
+        "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20",
+    },
+    Complaint: {
+      variant: "default",
+      className:
+        "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
+    },
+    Reject: {
+      variant: "default",
+      className:
+        "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
+    },
+  };
+
+  return (
+    configs[type] || {
+      variant: "secondary" as const,
+      className:
+        "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20",
+    }
+  );
 };
 
 const formatTimestamp = (timestamp: number) => {
@@ -62,7 +135,7 @@ export function RecentActivity({ orgSlug }: { orgSlug: string }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
+            <Clock className="h-5 w-5" />
             Recent Activity
           </CardTitle>
         </CardHeader>
@@ -80,7 +153,7 @@ export function RecentActivity({ orgSlug }: { orgSlug: string }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
+            <Clock className="h-5 w-5" />
             Recent Activity
           </CardTitle>
         </CardHeader>
@@ -97,39 +170,43 @@ export function RecentActivity({ orgSlug }: { orgSlug: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Activity className="h-5 w-5" />
+          <Clock className="h-5 w-5" />
           Recent Activity
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {activities.map((activity) => (
-            <div
-              className="flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-accent"
-              key={activity.id}
-            >
-              <div className="mt-0.5">
-                {getActivityIcon(activity.eventType)}
-              </div>
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-medium text-sm leading-tight">
-                    {activity.subject}
-                  </p>
-                  <Badge
-                    className="shrink-0"
-                    variant={getActivityBadgeVariant(activity.eventType)}
-                  >
-                    {activity.eventType}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                  <span>{formatTimestamp(activity.timestamp)}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <ItemGroup>
+          {activities.map((activity, index) => {
+            const messageId = activity.id.split("-").slice(0, -1).join("-");
+            return (
+              <Fragment key={activity.id}>
+                <Item asChild>
+                  <Link href={`/${orgSlug}/emails/${messageId}`}>
+                    <ItemMedia>{getActivityIcon(activity.eventType)}</ItemMedia>
+                    <ItemContent>
+                      <ItemTitle>{activity.subject}</ItemTitle>
+                      <ItemDescription>
+                        {formatTimestamp(activity.timestamp)}
+                      </ItemDescription>
+                    </ItemContent>
+                    <Badge
+                      className={cn(
+                        "ml-auto",
+                        getActivityBadgeConfig(activity.eventType).className
+                      )}
+                      variant={
+                        getActivityBadgeConfig(activity.eventType).variant
+                      }
+                    >
+                      {activity.eventType}
+                    </Badge>
+                  </Link>
+                </Item>
+                {index !== activities.length - 1 && <ItemSeparator />}
+              </Fragment>
+            );
+          })}
+        </ItemGroup>
       </CardContent>
     </Card>
   );

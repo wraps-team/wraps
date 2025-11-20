@@ -13,6 +13,7 @@ import { queryEmailEvents } from "@/lib/aws/dynamodb";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import type { Email, EmailStatus } from "../types";
 import { CopyButton } from "./components/copy-button";
+import { EmailFields } from "./components/email-fields";
 import { EventItem } from "./components/event-item";
 import { EventTimeline } from "./components/event-timeline";
 
@@ -280,15 +281,17 @@ export default async function EmailDetailPage({
             <div className="space-y-4">
               {/* Subject Line & Status */}
               <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <h1 className="mb-2 font-bold text-2xl">{email.subject}</h1>
                   <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
                     <span>{formatFullTimestamp(email.sentAt)}</span>
                     <span>•</span>
-                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                      {email.messageId}
-                    </code>
-                    <CopyButton text={email.messageId} />
+                    <div className="flex min-w-0 max-w-full flex-row items-center gap-1">
+                      <code className="min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                        {email.messageId}
+                      </code>
+                      <CopyButton text={email.messageId} />
+                    </div>
                   </div>
                 </div>
                 <Badge
@@ -299,38 +302,8 @@ export default async function EmailDetailPage({
                 </Badge>
               </div>
 
-              {/* From/To - Compact Grid */}
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="flex items-start gap-3 rounded-lg border bg-muted/20 p-3">
-                  <div className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                    From
-                  </div>
-                  <div className="flex-1 break-all font-mono text-sm">
-                    {email.from}
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 rounded-lg border bg-muted/20 p-3">
-                  <div className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                    To
-                  </div>
-                  <div className="flex-1 break-all font-mono text-sm">
-                    {email.to.length > 0 ? (
-                      <>
-                        {email.to[0]}
-                        {email.to.length > 1 && (
-                          <Badge className="ml-2 text-xs" variant="secondary">
-                            +{email.to.length - 1}
-                          </Badge>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        (no recipients)
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
+              {/* To/From - Compact Grid */}
+              <EmailFields from={email.from} to={email.to} />
             </div>
           </CardContent>
         </Card>

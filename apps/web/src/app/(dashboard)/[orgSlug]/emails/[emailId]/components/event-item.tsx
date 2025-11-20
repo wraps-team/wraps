@@ -85,18 +85,25 @@ export function EventItem({ event, iconType, color, isLast }: EventItemProps) {
         {/* Timeline Indicator */}
         <div className="flex flex-col items-center">
           <div
-            className={`rounded-full border-2 border-background bg-gradient-to-br from-background to-muted p-2.5 shadow-sm ${color}`}
+            className={`rounded-full border-2 border-background bg-linear-to-br from-background to-muted p-2.5 shadow-sm ${color}`}
           >
             <Icon className="h-4 w-4" />
           </div>
           {!isLast && (
-            <div className="my-1 w-0.5 flex-1 bg-gradient-to-b from-border to-transparent" />
+            <div className="my-1 w-0.5 flex-1 bg-linear-to-b from-border to-transparent" />
           )}
         </div>
 
         {/* Event Content */}
-        <div className="flex-1 pb-6">
-          <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div
+            className={`flex items-start justify-between ${
+              hasMetadata
+                ? "-ml-2 cursor-pointer rounded-lg p-2 transition-colors hover:bg-muted/50"
+                : ""
+            }`}
+            onClick={() => hasMetadata && setIsExpanded(!isExpanded)}
+          >
             <div className="flex-1 space-y-1">
               <div className="flex items-center gap-2">
                 <div className="font-semibold capitalize">
@@ -118,18 +125,13 @@ export function EventItem({ event, iconType, color, isLast }: EventItemProps) {
                 {formatTimestamp(event.timestamp)}
               </div>
               {hasMetadata && (
-                <Button
-                  className="h-8 w-8 p-0"
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  size="sm"
-                  variant="ghost"
-                >
+                <div className="flex h-8 w-8 items-center justify-center">
                   {isExpanded ? (
                     <ChevronDown className="h-4 w-4" />
                   ) : (
                     <ChevronRight className="h-4 w-4" />
                   )}
-                </Button>
+                </div>
               )}
             </div>
           </div>

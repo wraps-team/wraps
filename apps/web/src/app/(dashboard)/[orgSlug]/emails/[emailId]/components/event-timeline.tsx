@@ -26,7 +26,7 @@ export function EventTimeline({ children, eventCount }: EventTimelineProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">{children}</div>
+        <div className="space-y-2">{children}</div>
       </CardContent>
     </Card>
   );

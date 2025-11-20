@@ -7,7 +7,6 @@ import { EmailVolumeChart } from "./components/email-volume-chart";
 import { EngagementChart } from "./components/engagement-chart";
 import { PerformanceMetrics } from "./components/performance-metrics";
 import { RecentActivity } from "./components/recent-activity";
-import { TopPerformers } from "./components/top-performers";
 
 type AnalyticsPageProps = {
   params: Promise<{
@@ -61,12 +60,7 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
         <EngagementChart orgSlug={orgSlug} />
 
         {/* Performance Metrics */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <PerformanceMetrics orgSlug={orgSlug} />
-          </div>
-          <TopPerformers orgSlug={orgSlug} />
-        </div>
+        <PerformanceMetrics orgSlug={orgSlug} />
 
         {/* Recent Activity */}
         <RecentActivity orgSlug={orgSlug} />
