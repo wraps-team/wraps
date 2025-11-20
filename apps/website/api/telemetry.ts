@@ -4,7 +4,31 @@
  */
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getPostHogClient } from "../src/lib/posthog";
+import { PostHog } from "posthog-node";
+
+/**
+ * PostHog client singleton for serverless function
+ */
+let posthogClient: PostHog | null = null;
+
+function getPostHogClient(): PostHog {
+  if (!posthogClient) {
+    const apiKey = process.env.POSTHOG_API_KEY;
+    const host = process.env.POSTHOG_HOST || "https://app.posthog.com";
+
+    if (!apiKey) {
+      throw new Error("POSTHOG_API_KEY environment variable is required");
+    }
+
+    posthogClient = new PostHog(apiKey, {
+      host,
+      flushAt: 20,
+      flushInterval: 10000,
+    });
+  }
+
+  return posthogClient;
+}
 
 // Types
 type TelemetryEvent = {
