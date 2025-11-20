@@ -217,7 +217,10 @@ export default async function handler(
       });
     }
 
-    // Return success (PostHog batches internally)
+    // Flush events before returning (critical for serverless functions)
+    await posthog.flush();
+
+    // Return success
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.status(200).json({
       ok: true,
