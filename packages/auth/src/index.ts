@@ -10,6 +10,14 @@ import {
 } from "better-auth/plugins";
 import { passkey } from "better-auth/plugins/passkey";
 import { twoFactor } from "better-auth/plugins/two-factor";
+import { stripe } from "@better-auth/stripe";
+import Stripe from "stripe";
+
+// Initialize Stripe client
+const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+  apiVersion: "2024-12-18.acacia",
+  typescript: true,
+});
 
 export const auth = betterAuth<BetterAuthOptions>({
   database: drizzleAdapter(db, {
@@ -51,6 +59,45 @@ export const auth = betterAuth<BetterAuthOptions>({
       issuer: "Wraps",
     }),
     organization(),
+    stripe({
+      stripeClient,
+      webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+      plans: [
+        {
+          name: "pro",
+          priceId: process.env.STRIPE_PRO_PRICE_ID || "",
+          annualDiscountPriceId: process.env.STRIPE_PRO_ANNUAL_PRICE_ID,
+          limits: {
+            emails: 100000, // 100k emails/month
+            awsAccounts: 3,
+            members: 10,
+          },
+          freeTrial: {
+            days: 14,
+          },
+        },
+        {
+          name: "enterprise",
+          priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID || "",
+          annualDiscountPriceId: process.env.STRIPE_ENTERPRISE_ANNUAL_PRICE_ID,
+          limits: {
+            emails: -1, // Unlimited
+            awsAccounts: -1, // Unlimited
+            members: -1, // Unlimited
+          },
+        },
+      ],
+      onSubscriptionComplete: async ({ subscription, user }) => {
+        console.log(`Subscription created for user ${user.id}:`, subscription);
+        // Could send welcome email here
+      },
+      onSubscriptionUpdate: async ({ subscription, user }) => {
+        console.log(`Subscription updated for user ${user.id}:`, subscription);
+      },
+      onSubscriptionCancel: async ({ subscription, user }) => {
+        console.log(`Subscription canceled for user ${user.id}:`, subscription);
+      },
+    }),
   ],
   databaseHooks: {
     session: {
