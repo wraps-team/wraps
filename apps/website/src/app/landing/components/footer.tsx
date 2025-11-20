@@ -52,6 +52,8 @@ const footerLinks = {
     },
   ],
   legal: [
+    { name: "Privacy Policy", href: "/privacy" },
+    { name: "Terms of Service", href: "/terms" },
     {
       name: "License (AGPLv3)",
       href: "https://github.com/wraps-team/wraps/blob/main/LICENSE",
@@ -193,11 +195,25 @@ export function LandingFooter() {
           <div className="mt-4 flex items-center space-x-4 text-muted-foreground text-sm md:mt-0">
             <a
               className="cursor-pointer transition-colors hover:text-foreground"
+              href="/privacy"
+            >
+              Privacy
+            </a>
+            <span>•</span>
+            <a
+              className="cursor-pointer transition-colors hover:text-foreground"
+              href="/terms"
+            >
+              Terms
+            </a>
+            <span>•</span>
+            <a
+              className="cursor-pointer transition-colors hover:text-foreground"
               href="https://github.com/wraps-team/wraps/blob/main/LICENSE"
               rel="noopener noreferrer"
               target="_blank"
             >
-              License (AGPLv3)
+              License
             </a>
           </div>
         </div>

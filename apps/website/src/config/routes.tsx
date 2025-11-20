@@ -8,6 +8,8 @@ const Docs = lazy(() => import("@/app/docs/page"));
 const QuickstartDocs = lazy(() => import("@/app/docs/quickstart/page"));
 const SDKReferenceDocs = lazy(() => import("@/app/docs/sdk-reference/page"));
 const CLIReferenceDocs = lazy(() => import("@/app/docs/cli-reference/page"));
+const Privacy = lazy(() => import("@/app/privacy/page"));
+const Terms = lazy(() => import("@/app/terms/page"));
 const NotFound = lazy(() => import("@/app/not-found/page"));
 
 export type RouteConfig = {
@@ -51,6 +53,16 @@ export const routes: RouteConfig[] = [
   {
     path: "/docs/cli-reference",
     element: <CLIReferenceDocs />,
+  },
+
+  // Legal pages
+  {
+    path: "/privacy",
+    element: <Privacy />,
+  },
+  {
+    path: "/terms",
+    element: <Terms />,
   },
 
   // Catch-all route for 404
