@@ -291,6 +291,23 @@ pnpm build  # Builds all packages in dependency order
 
 ---
 
+## Privacy & Telemetry
+
+Wraps collects **anonymous usage data** to improve the CLI. We only collect command names, success/failure status, and system info. We **never** collect AWS credentials, domains, email content, or any personally identifiable information.
+
+**Learn more**: [docs/telemetry.md](docs/telemetry.md)
+
+**Opt-out anytime**:
+```bash
+wraps telemetry disable
+# or set environment variable
+export WRAPS_TELEMETRY_DISABLED=1
+```
+
+Telemetry is automatically disabled in CI environments.
+
+---
+
 ## Want to Contribute?
 
 We'd love your help! Wraps is open source and community-driven.

@@ -1,5 +1,6 @@
 import * as clack from "@clack/prompts";
 import pc from "picocolors";
+import { trackError } from "../../telemetry/events.js";
 
 /**
  * Custom error class for Wraps CLI errors
@@ -24,6 +25,9 @@ export function handleCLIError(error: unknown): never {
   console.error(""); // Blank line
 
   if (error instanceof WrapsError) {
+    // Track error (code only, never message)
+    trackError(error.code, "unknown");
+
     clack.log.error(error.message);
 
     if (error.suggestion) {
@@ -40,6 +44,8 @@ export function handleCLIError(error: unknown): never {
   }
 
   // Unknown error
+  trackError("UNKNOWN_ERROR", "unknown");
+
   clack.log.error("An unexpected error occurred");
   console.error(error);
   console.log(`\n${pc.dim("If this persists, please report at:")}`);

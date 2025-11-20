@@ -24,6 +24,14 @@ import { upgrade } from "./commands/email/upgrade.js";
 import { dashboard } from "./commands/shared/dashboard.js";
 import { destroy } from "./commands/shared/destroy.js";
 import { status } from "./commands/shared/status.js";
+// Telemetry commands
+import {
+  telemetryDisable,
+  telemetryEnable,
+  telemetryStatus,
+} from "./commands/telemetry.js";
+import { getTelemetryClient } from "./telemetry/client.js";
+import { trackCommand } from "./telemetry/events.js";
 import {
   printCompletionScript,
   setupTabCompletion,
@@ -78,8 +86,9 @@ function showHelp() {
   console.log("Global Commands:");
   console.log(`  ${pc.cyan("status")}       Show all infrastructure status`);
   console.log(`  ${pc.cyan("destroy")}      Remove deployed infrastructure`);
+  console.log(`  ${pc.cyan("completion")}   Generate shell completion script`);
   console.log(
-    `  ${pc.cyan("completion")}   Generate shell completion script\n`
+    `  ${pc.cyan("telemetry")}    Manage anonymous telemetry settings\n`
   );
   console.log("Options:");
   console.log(
@@ -245,6 +254,31 @@ if (!primaryCommand) {
 
 // Route to appropriate command
 async function run() {
+  const startTime = Date.now();
+  const telemetry = getTelemetryClient();
+
+  // Show first-run telemetry notification
+  if (telemetry.shouldShowNotification()) {
+    console.log();
+    clack.log.info(pc.bold("Anonymous Telemetry"));
+    console.log(
+      `  Wraps collects ${pc.cyan("anonymous usage data")} to improve the CLI.`
+    );
+    console.log(
+      `  We ${pc.bold("never")} collect: domains, AWS credentials, email content, or PII.`
+    );
+    console.log(
+      `  We ${pc.bold("only")} collect: command names, success/failure, CLI version, OS.`
+    );
+    console.log();
+    console.log(`  Opt-out anytime: ${pc.cyan("wraps telemetry disable")}`);
+    console.log(`  Or set: ${pc.cyan("WRAPS_TELEMETRY_DISABLED=1")}`);
+    console.log(`  Learn more: ${pc.cyan("https://wraps.dev/docs/telemetry")}`);
+    console.log();
+
+    telemetry.markNotificationShown();
+  }
+
   try {
     // Handle service-specific subcommands (e.g., wraps email init)
     if (primaryCommand === "email" && subCommand) {
@@ -437,6 +471,32 @@ async function run() {
         printCompletionScript();
         break;
 
+      case "telemetry": {
+        // Handle telemetry subcommands
+        switch (subCommand) {
+          case "enable":
+            await telemetryEnable();
+            break;
+
+          case "disable":
+            await telemetryDisable();
+            break;
+
+          case "status":
+          case undefined:
+            await telemetryStatus();
+            break;
+
+          default:
+            clack.log.error(`Unknown telemetry command: ${subCommand}`);
+            console.log(
+              `\nAvailable commands: ${pc.cyan("enable")}, ${pc.cyan("disable")}, ${pc.cyan("status")}\n`
+            );
+            process.exit(1);
+        }
+        break;
+      }
+
       // Show help for service without subcommand
       case "email":
       case "sms":
@@ -453,8 +513,32 @@ async function run() {
         );
         process.exit(1);
     }
+    // Track successful command execution
+    const duration = Date.now() - startTime;
+    const commandName = subCommand
+      ? `${primaryCommand}:${subCommand}`
+      : primaryCommand;
+
+    trackCommand(commandName, {
+      success: true,
+      duration_ms: duration,
+    });
   } catch (error) {
+    // Track failed command execution
+    const duration = Date.now() - startTime;
+    const commandName = subCommand
+      ? `${primaryCommand}:${subCommand}`
+      : primaryCommand;
+
+    trackCommand(commandName, {
+      success: false,
+      duration_ms: duration,
+    });
+
     handleCLIError(error);
+  } finally {
+    // Ensure telemetry events are sent before exit
+    await telemetry.shutdown();
   }
 }
 
