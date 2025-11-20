@@ -2,6 +2,8 @@ import { auth } from "@wraps/auth";
 import { redirect } from "next/navigation";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { AnalyticsOverview } from "./components/analytics-overview";
+import { BounceTypeChart } from "./components/bounce-type-chart";
+import { ComplaintChart } from "./components/complaint-chart";
 import { DeliverabilityChart } from "./components/deliverability-chart";
 import { EmailVolumeChart } from "./components/email-volume-chart";
 import { EngagementChart } from "./components/engagement-chart";
@@ -58,6 +60,12 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
 
         {/* Engagement Section */}
         <EngagementChart orgSlug={orgSlug} />
+
+        {/* Reputation Monitoring */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <BounceTypeChart orgSlug={orgSlug} />
+          <ComplaintChart orgSlug={orgSlug} />
+        </div>
 
         {/* Performance Metrics */}
         <PerformanceMetrics orgSlug={orgSlug} />

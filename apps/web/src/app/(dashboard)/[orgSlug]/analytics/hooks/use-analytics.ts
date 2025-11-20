@@ -47,6 +47,25 @@ type RecentActivity = {
   metadata?: Record<string, unknown>;
 };
 
+type BounceDataPoint = {
+  date: string;
+  timestamp: number;
+  permanent: number;
+  transient: number;
+  undetermined: number;
+  total: number;
+  sent: number;
+  bounceRate: number;
+};
+
+type ComplaintDataPoint = {
+  date: string;
+  timestamp: number;
+  complaints: number;
+  sent: number;
+  complaintRate: number;
+};
+
 export function useAnalyticsOverview(orgSlug: string, days = 30) {
   return useQuery<AnalyticsOverview>({
     queryKey: ["analytics", "overview", orgSlug, days],
@@ -124,5 +143,37 @@ export function useRecentActivity(orgSlug: string, limit = 20) {
       return response.json();
     },
     staleTime: 1 * 60 * 1000, // 1 minute (more frequent for activity feed)
+  });
+}
+
+export function useBounceData(orgSlug: string, days = 30) {
+  return useQuery<BounceDataPoint[]>({
+    queryKey: ["analytics", "bounces", orgSlug, days],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/${orgSlug}/analytics/bounces?days=${days}`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch bounce data");
+      }
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useComplaintData(orgSlug: string, days = 30) {
+  return useQuery<ComplaintDataPoint[]>({
+    queryKey: ["analytics", "complaints", orgSlug, days],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/${orgSlug}/analytics/complaints?days=${days}`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch complaint data");
+      }
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }

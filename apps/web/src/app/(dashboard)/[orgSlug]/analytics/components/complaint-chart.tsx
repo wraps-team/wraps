@@ -1,7 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ReferenceLine,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   Card,
   CardAction,
@@ -26,52 +33,25 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useVolumeData } from "../hooks/use-analytics";
+import { useComplaintData } from "../hooks/use-analytics";
 
 const chartConfig = {
-  sent: {
-    label: "Sent",
+  complaintRate: {
+    label: "Complaint Rate",
     theme: {
-      light: "oklch(0.45 0.15 250)",  // Deep blue (like blue-700)
-      dark: "oklch(0.65 0.15 250)",   // Light blue (like blue-400)
+      light: "oklch(0.5 0.15 15)",    // Deep red (like red-700)
+      dark: "oklch(0.7 0.15 15)",     // Light red (like red-400)
     },
   },
 } satisfies ChartConfig;
 
-function createYAxisFormatter(data: any[]) {
-  // Find the maximum value across all data points
-  const maxValue = Math.max(
-    ...data.flatMap((d) => [d.sent || 0, d.delivered || 0, d.bounced || 0])
-  );
-
-  // Determine the appropriate scale based on max value
-  if (maxValue >= 100_000) {
-    // Use 100k, 200k, etc.
-    return (value: number) => `${Math.round(value / 1000)}k`;
-  }
-  if (maxValue >= 10_000) {
-    // Use 10.0k, 20.0k, etc.
-    return (value: number) => `${(value / 1000).toFixed(1)}k`;
-  }
-  if (maxValue >= 1000) {
-    // Use 1.0k, 2.0k, etc.
-    return (value: number) => `${(value / 1000).toFixed(1)}k`;
-  }
-  if (maxValue >= 100) {
-    // Use 100, 200, etc.
-    return (value: number) => `${Math.round(value / 100) * 100}`;
-  }
-  if (maxValue >= 10) {
-    // Use 10, 20, etc.
-    return (value: number) => `${Math.round(value / 10) * 10}`;
-  }
-  // Use 1, 2, 3, etc.
-  return (value: number) => `${Math.round(value)}`;
+function formatPercentage(value: number) {
+  return `${value.toFixed(2)}%`;
 }
 
-export function EmailVolumeChart({ orgSlug }: { orgSlug: string }) {
+export function ComplaintChart({ orgSlug }: { orgSlug: string }) {
   const isMobile = useIsMobile();
-  const [timeRange, setTimeRange] = React.useState("90d");
+  const [timeRange, setTimeRange] = React.useState("30d");
 
   React.useEffect(() => {
     if (isMobile) {
@@ -80,19 +60,23 @@ export function EmailVolumeChart({ orgSlug }: { orgSlug: string }) {
   }, [isMobile]);
 
   const days = timeRange === "90d" ? 90 : timeRange === "30d" ? 30 : 7;
-  const { data: volumeData, isLoading, error } = useVolumeData(orgSlug, days);
+  const {
+    data: complaintData,
+    isLoading,
+    error,
+  } = useComplaintData(orgSlug, days);
 
-  const chartData = volumeData || [];
+  const chartData = complaintData || [];
 
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Email Volume</CardTitle>
+        <CardTitle>Complaint Rate</CardTitle>
         <CardDescription>
           <span className="@[540px]/card:block hidden">
-            Daily email sending volume over time
+            Complaint rate over time (0.08% threshold for account safety)
           </span>
-          <span className="@[540px]/card:hidden">Daily volume</span>
+          <span className="@[540px]/card:hidden">Complaint rate (%)</span>
         </CardDescription>
         <CardAction>
           <ToggleGroup
@@ -112,7 +96,7 @@ export function EmailVolumeChart({ orgSlug }: { orgSlug: string }) {
               className="flex @[767px]/card:hidden w-32 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
               size="sm"
             >
-              <SelectValue placeholder="90 days" />
+              <SelectValue placeholder="30 days" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
               <SelectItem className="rounded-lg" value="90d">
@@ -133,11 +117,11 @@ export function EmailVolumeChart({ orgSlug }: { orgSlug: string }) {
           <Skeleton className="h-[300px] w-full" />
         ) : error ? (
           <div className="flex h-[300px] items-center justify-center text-muted-foreground text-sm">
-            Failed to load volume data
+            Failed to load complaint data
           </div>
         ) : chartData.length === 0 ? (
           <div className="flex h-[300px] items-center justify-center text-muted-foreground text-sm">
-            No data available for this time period
+            No complaints for this time period (that's great!)
           </div>
         ) : (
           <ChartContainer
@@ -146,15 +130,21 @@ export function EmailVolumeChart({ orgSlug }: { orgSlug: string }) {
           >
             <AreaChart data={chartData}>
               <defs>
-                <linearGradient id="fillSent" x1="0" x2="0" y1="0" y2="1">
+                <linearGradient
+                  id="fillComplaintRate"
+                  x1="0"
+                  x2="0"
+                  y1="0"
+                  y2="1"
+                >
                   <stop
                     offset="5%"
-                    stopColor="var(--color-sent)"
+                    stopColor="var(--color-complaintRate)"
                     stopOpacity={0.4}
                   />
                   <stop
                     offset="95%"
-                    stopColor="var(--color-sent)"
+                    stopColor="var(--color-complaintRate)"
                     stopOpacity={0.05}
                   />
                 </linearGradient>
@@ -176,13 +166,14 @@ export function EmailVolumeChart({ orgSlug }: { orgSlug: string }) {
               />
               <YAxis
                 axisLine={false}
-                tickFormatter={createYAxisFormatter(chartData)}
+                tickFormatter={formatPercentage}
                 tickLine={false}
                 tickMargin={8}
               />
               <ChartTooltip
                 content={
                   <ChartTooltipContent
+                    formatter={(value) => `${value}%`}
                     indicator="line"
                     labelFormatter={(value) =>
                       new Date(value).toLocaleDateString("en-US", {
@@ -194,10 +185,17 @@ export function EmailVolumeChart({ orgSlug }: { orgSlug: string }) {
                   />
                 }
               />
+              <ReferenceLine
+                label="Risk Threshold (0.08%)"
+                stroke="hsl(var(--destructive))"
+                strokeDasharray="3 3"
+                strokeWidth={2}
+                y={0.08}
+              />
               <Area
-                dataKey="sent"
-                fill="url(#fillSent)"
-                stroke="var(--color-sent)"
+                dataKey="complaintRate"
+                fill="url(#fillComplaintRate)"
+                stroke="var(--color-complaintRate)"
                 strokeWidth={2}
                 type="monotone"
               />
