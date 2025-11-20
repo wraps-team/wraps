@@ -111,7 +111,7 @@ Resources:
                 Action:
                   - "events:DescribeRule"
                 Resource:
-                  - !Sub "arn:aws:events:*:${AWS::AccountId}:rule/wraps-email-*"
+                  - !Sub "arn:aws:events:*:${AWS::AccountId}:rule/wraps-email-events-to-sqs"
 
               # Mail Manager - Archive Access (conditional, if using Wraps email archiving)
               - !If

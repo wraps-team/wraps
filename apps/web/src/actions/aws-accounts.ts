@@ -392,7 +392,7 @@ export async function scanAWSAccountFeatures(
       // This only requires DescribeRule permission on our rule, not ListRules
       await eventBridgeClient.send(
         new DescribeRuleCommand({
-          Name: "wraps-email-tracking",
+          Name: "wraps-email-events-to-sqs",
           EventBusName: "default",
         })
       );
@@ -423,12 +423,12 @@ export async function scanAWSAccountFeatures(
       // Try common Wraps configuration set name
       const configSetResponse = await sesClient.send(
         new GetConfigurationSetCommand({
-          ConfigurationSetName: "wraps-email",
+          ConfigurationSetName: "wraps-email-tracking",
         })
       );
       // If the command succeeds, the config set exists
       if (configSetResponse) {
-        configSetName = "wraps-email";
+        configSetName = "wraps-email-tracking";
 
         // Extract custom tracking domain if configured
         // VdmOptions contains DashboardOptions with EngagementMetrics

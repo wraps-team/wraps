@@ -42,7 +42,7 @@ export function AccountFeatures({
       archivingEnabled: boolean;
       eventHistoryEnabled: boolean;
       eventTrackingEnabled: boolean;
-      configSetName?: string;
+      customTrackingDomain?: string;
     };
   } | null>(null);
 
@@ -74,7 +74,7 @@ export function AccountFeatures({
     archivingEnabled: account.archivingEnabled,
     eventHistoryEnabled: account.eventHistoryEnabled,
     eventTrackingEnabled: account.eventTrackingEnabled,
-    configSetName: account.configSetName ?? undefined,
+    customTrackingDomain: account.customTrackingDomain ?? undefined,
   };
 
   return (
@@ -219,35 +219,31 @@ export function AccountFeatures({
           </div>
         </div>
 
-        <Separator />
-
-        {/* Configuration Set */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
-              <Settings2 className="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <h4 className="font-medium text-sm">Configuration Set</h4>
-              <p className="text-muted-foreground text-xs">
-                SES email tracking configuration
-              </p>
-            </div>
-          </div>
-          <div>
-            {features.configSetName ? (
+        {/* Custom Tracking Domain (if configured) */}
+        {features.customTrackingDomain && (
+          <>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+                  <Settings2 className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-sm">
+                    Custom Tracking Domain
+                  </h4>
+                  <p className="text-muted-foreground text-xs">
+                    {features.customTrackingDomain}
+                  </p>
+                </div>
+              </div>
               <Badge className="gap-1" variant="default">
                 <CheckCircle2 className="h-3 w-3" />
-                {features.configSetName}
+                Configured
               </Badge>
-            ) : (
-              <Badge className="gap-1" variant="secondary">
-                <XCircle className="h-3 w-3" />
-                Not Found
-              </Badge>
-            )}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
 
         <Separator />
 
