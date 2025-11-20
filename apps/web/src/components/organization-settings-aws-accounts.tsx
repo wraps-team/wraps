@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Loader2,
   Plus,
+  Trash2,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -14,9 +15,20 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   type AWSAccountWithCreator,
+  deleteAWSAccount,
   listAWSAccounts,
 } from "@/actions/aws-accounts";
 import { ConnectAWSAccountForm } from "@/components/forms/connect-aws-account-form";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,6 +63,10 @@ export function OrganizationSettingsAwsAccounts({
   const [accounts, setAccounts] = useState<AWSAccountWithCreator[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [accountToDelete, setAccountToDelete] =
+    useState<AWSAccountWithCreator | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const canEdit = userRole === "owner" || userRole === "admin";
@@ -90,6 +106,29 @@ export function OrganizationSettingsAwsAccounts({
     toast.success("AWS account connected successfully");
   }
 
+  function handleDeleteClick(account: AWSAccountWithCreator) {
+    setAccountToDelete(account);
+    setDeleteDialogOpen(true);
+  }
+
+  async function handleDeleteConfirm() {
+    if (!accountToDelete) return;
+
+    setDeleting(true);
+    const result = await deleteAWSAccount(accountToDelete.id, organization.id);
+
+    if (result.success) {
+      toast.success("AWS account deleted successfully");
+      setDeleteDialogOpen(false);
+      setAccountToDelete(null);
+      refreshData(); // Reload accounts list
+    } else {
+      toast.error(result.error);
+    }
+
+    setDeleting(false);
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -115,6 +154,48 @@ export function OrganizationSettingsAwsAccounts({
           />
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog onOpenChange={setDeleteDialogOpen} open={deleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete AWS Account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{" "}
+              <strong>{accountToDelete?.name}</strong> (
+              {accountToDelete?.accountId})?
+              <br />
+              <br />
+              This action cannot be undone. All associated data and
+              configurations will be permanently removed from Wraps.
+              <br />
+              <br />
+              <strong className="text-destructive">
+                Note: This will NOT delete any resources in your AWS account.
+                You'll need to manually delete the CloudFormation stack if you
+                no longer need it.
+              </strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+              onClick={handleDeleteConfirm}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Account"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card>
         <CardHeader>
@@ -191,12 +272,23 @@ export function OrganizationSettingsAwsAccounts({
                       </p>
                     </div>
                   </div>
-                  <Link href={`/${orgSlug}/aws-accounts/${account.id}`}>
-                    <Button variant="outline">
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      Manage
-                    </Button>
-                  </Link>
+                  <div className="flex gap-2">
+                    <Link href={`/${orgSlug}/aws-accounts/${account.id}`}>
+                      <Button variant="outline">
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Manage
+                      </Button>
+                    </Link>
+                    {canEdit && (
+                      <Button
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => handleDeleteClick(account)}
+                        variant="outline"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

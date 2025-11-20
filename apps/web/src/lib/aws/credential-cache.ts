@@ -1,5 +1,5 @@
 import { LRUCache } from "lru-cache";
-import { assumeRole } from "./assume-role";
+import { getCredentials } from "./assume-role";
 
 type CachedCredentials = {
   accessKeyId: string;
@@ -46,10 +46,18 @@ const credentialCache = new LRUCache<string, CachedCredentials>({
  * ```
  */
 export async function getOrAssumeRole(params: {
-  roleArn: string;
-  externalId: string;
+  roleArn?: string;
+  externalId?: string;
+  region?: string;
 }): Promise<CachedCredentials> {
-  const cacheKey = `${params.roleArn}:${params.externalId}`;
+  // In dev mode, caching is less important since we're not doing expensive STS calls
+  // But we still cache to maintain consistent behavior
+  const isDev = process.env.DEV_MODE_SKIP_ROLE_ASSUMPTION === "true";
+
+  // Use a cache key based on what's available
+  const cacheKey = isDev
+    ? `dev:${params.region || "default"}`
+    : `${params.roleArn}:${params.externalId}`;
 
   // Check cache
   const cached = credentialCache.get(cacheKey);
@@ -65,8 +73,8 @@ export async function getOrAssumeRole(params: {
     credentialCache.delete(cacheKey);
   }
 
-  // Cache miss or expired - assume role
-  const credentials = await assumeRole(params);
+  // Cache miss or expired - get credentials (may assume role or use ambient)
+  const credentials = await getCredentials(params);
 
   const cachedCreds: CachedCredentials = {
     accessKeyId: credentials.accessKeyId,

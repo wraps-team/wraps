@@ -1,10 +1,6 @@
 "use server";
 
 import { DescribeTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  DescribeRuleCommand,
-  EventBridgeClient,
-} from "@aws-sdk/client-eventbridge";
 import { GetConfigurationSetCommand, SESv2Client } from "@aws-sdk/client-sesv2";
 import { createServerValidate } from "@tanstack/react-form/nextjs";
 import { auth } from "@wraps/auth";
@@ -12,7 +8,7 @@ import { awsAccount, db } from "@wraps/db";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { assumeRole } from "@/lib/aws/assume-role";
+import { getCredentials } from "@/lib/aws/assume-role";
 import { getOrAssumeRole } from "@/lib/aws/credential-cache";
 import { findWrapsArchive } from "@/lib/aws/mailmanager";
 import {
@@ -171,16 +167,17 @@ export async function connectAWSAccountAction(
     // 4. Use the external ID provided from the form (generated on client and used in CloudFormation)
     const externalId = validatedData.externalId;
 
-    // 5. Test connection by attempting to assume role
+    // 5. Test connection by attempting to get credentials (may assume role or use dev mode)
     try {
-      await assumeRole({
+      await getCredentials({
         roleArn: validatedData.roleArn,
         externalId,
+        region: validatedData.region,
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       return {
-        error: "Unable to assume role",
+        error: "Unable to connect to AWS account",
         details: message,
       };
     }
@@ -226,7 +223,8 @@ export async function connectAWSAccountAction(
       });
     }
 
-    // 8. Revalidate dashboard
+    // 8. Revalidate pages that display AWS accounts
+    revalidatePath(`/${validatedData.organizationId}/settings`, "page");
     revalidatePath("/dashboard");
     revalidatePath(`/dashboard/organizations/${validatedData.organizationId}`);
 
@@ -379,38 +377,7 @@ export async function scanAWSAccountFeatures(
       }
     }
 
-    // 7. Scan for EventBridge rules (event tracking)
-    let eventTrackingEnabled = false;
-
-    try {
-      const eventBridgeClient = new EventBridgeClient({
-        region: account.region,
-        credentials: awsCredentials,
-      });
-
-      // Try to describe the specific Wraps email tracking rule
-      // This only requires DescribeRule permission on our rule, not ListRules
-      await eventBridgeClient.send(
-        new DescribeRuleCommand({
-          Name: "wraps-email-events-to-sqs",
-          EventBusName: "default",
-        })
-      );
-      // If the command succeeds, the rule exists
-      eventTrackingEnabled = true;
-    } catch (error: any) {
-      // ResourceNotFoundException means rule doesn't exist
-      // AccessDeniedException means user hasn't granted permissions
-      // Either way, assume event tracking is disabled
-      if (
-        error.name !== "ResourceNotFoundException" &&
-        error.name !== "AccessDeniedException"
-      ) {
-        console.error("Error scanning for EventBridge rules:", error);
-      }
-    }
-
-    // 8. Scan for SES Configuration Set and Custom Tracking Domain
+    // 7. Scan for SES Configuration Set and Custom Tracking Domain
     let configSetName: string | undefined;
     let customTrackingDomain: string | undefined;
 
@@ -426,6 +393,7 @@ export async function scanAWSAccountFeatures(
           ConfigurationSetName: "wraps-email-tracking",
         })
       );
+
       // If the command succeeds, the config set exists
       if (configSetResponse) {
         configSetName = "wraps-email-tracking";
@@ -452,6 +420,10 @@ export async function scanAWSAccountFeatures(
         console.error("Error scanning for config set:", error);
       }
     }
+
+    // 8. Determine event tracking status
+    // Event tracking is enabled if DynamoDB table exists (created by EventBridge rule + Lambda)
+    const eventTrackingEnabled = eventHistoryEnabled;
 
     // 9. Update database with discovered features
     await db
@@ -488,6 +460,75 @@ export async function scanAWSAccountFeatures(
     return {
       success: false,
       error: `Failed to scan features: ${message}`,
+    };
+  }
+}
+
+export type DeleteAWSAccountResult =
+  | {
+      success: true;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+/**
+ * Delete an AWS account from the organization
+ */
+export async function deleteAWSAccount(
+  awsAccountId: string,
+  organizationId: string
+): Promise<DeleteAWSAccountResult> {
+  try {
+    // 1. Get session
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    // 2. Check if user is owner or admin of the organization
+    const member = await db.query.member.findFirst({
+      where: (m, { and, eq }) =>
+        and(
+          eq(m.userId, session.user.id),
+          eq(m.organizationId, organizationId)
+        ),
+    });
+
+    if (!member || (member.role !== "owner" && member.role !== "admin")) {
+      return {
+        success: false,
+        error: "Only owners and admins can delete AWS accounts",
+      };
+    }
+
+    // 3. Verify the account belongs to this organization
+    const account = await db.query.awsAccount.findFirst({
+      where: (a, { and, eq }) =>
+        and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
+    });
+
+    if (!account) {
+      return { success: false, error: "AWS account not found" };
+    }
+
+    // 4. Delete the account (cascade will delete related records)
+    await db.delete(awsAccount).where(eq(awsAccount.id, awsAccountId));
+
+    // 5. Revalidate the settings page
+    revalidatePath("/[orgSlug]/settings", "page");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting AWS account:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return {
+      success: false,
+      error: `Failed to delete AWS account: ${message}`,
     };
   }
 }

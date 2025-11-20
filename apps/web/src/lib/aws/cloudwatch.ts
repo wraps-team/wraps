@@ -60,6 +60,7 @@ export async function getCloudWatchMetrics(
   const credentials = await getOrAssumeRole({
     roleArn: account.roleArn,
     externalId: account.externalId,
+    region: account.region,
   });
 
   // Create CloudWatch client with temporary credentials

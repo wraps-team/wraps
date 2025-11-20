@@ -5,6 +5,7 @@ import { initialFormState } from "@tanstack/react-form/nextjs";
 import { useStore } from "@tanstack/react-store";
 import { AlertCircle, CheckCircle, Copy, ExternalLink } from "lucide-react";
 import { useActionState, useEffect, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { connectAWSAccountAction } from "@/actions/aws-accounts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,22 @@ type ConnectAWSAccountFormProps = {
   organizationId: string;
   onSuccess?: () => void;
 };
+
+// Submit button component that uses useFormStatus
+function SubmitButton({ canSubmit }: { canSubmit: boolean }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button
+      className="w-full"
+      disabled={!canSubmit || pending}
+      loading={pending}
+      type="submit"
+    >
+      {pending ? "Connecting..." : "Connect Account"}
+    </Button>
+  );
+}
 
 export function ConnectAWSAccountForm({
   organizationId,
@@ -276,7 +293,7 @@ export function ConnectAWSAccountForm({
                       onChange={(e) => field.handleChange(e.target.value)}
                       placeholder="Production"
                       type="text"
-                      value={field.state.value}
+                      value={field.state.value ?? ""}
                     />
                     {isInvalid && <FieldError errors={errors} />}
                   </Field>
@@ -318,7 +335,7 @@ export function ConnectAWSAccountForm({
                       onChange={(e) => field.handleChange(e.target.value)}
                       placeholder="123456789012"
                       type="text"
-                      value={field.state.value}
+                      value={field.state.value ?? ""}
                     />
                     {isInvalid && <FieldError errors={errors} />}
                   </Field>
@@ -347,7 +364,7 @@ export function ConnectAWSAccountForm({
                       defaultValue="us-east-1"
                       name={field.name}
                       onValueChange={(value) => field.handleChange(value)}
-                      value={field.state.value}
+                      value={field.state.value ?? "us-east-1"}
                     >
                       <SelectTrigger
                         aria-invalid={isInvalid}
@@ -404,7 +421,7 @@ export function ConnectAWSAccountForm({
                       onChange={(e) => field.handleChange(e.target.value)}
                       placeholder="arn:aws:iam::123456789012:role/wraps-console-access-role"
                       type="text"
-                      value={field.state.value}
+                      value={field.state.value ?? ""}
                     />
                     <FieldDescription>
                       Find this in the CloudFormation stack outputs after
@@ -417,22 +434,8 @@ export function ConnectAWSAccountForm({
             </form.Field>
 
             {/* Submit button */}
-            <form.Subscribe
-              selector={(formState) => [
-                formState.canSubmit,
-                formState.isSubmitting,
-              ]}
-            >
-              {([canSubmit, isSubmitting]) => (
-                <Button
-                  className="w-full"
-                  disabled={!canSubmit}
-                  loading={isSubmitting}
-                  type="submit"
-                >
-                  {isSubmitting ? "Connecting..." : "Connect Account"}
-                </Button>
-              )}
+            <form.Subscribe selector={(formState) => formState.canSubmit}>
+              {(canSubmit) => <SubmitButton canSubmit={canSubmit} />}
             </form.Subscribe>
           </CardContent>
         </form>

@@ -68,6 +68,7 @@ export async function queryEmailEvents(
   const credentials = await getOrAssumeRole({
     roleArn: account.roleArn,
     externalId: account.externalId,
+    region: account.region,
   });
 
   // Create DynamoDB Document client with temporary credentials
