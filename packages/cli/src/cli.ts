@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import * as clack from "@clack/prompts";
 import args from "args";
 import pc from "picocolors";
+// Dashboard commands
+import { updateRole } from "./commands/dashboard/update-role.js";
 import { config } from "./commands/email/config.js";
 // Email commands
 import { connect } from "./commands/email/connect.js";
@@ -68,9 +70,13 @@ function showHelp() {
   console.log(
     `  ${pc.cyan("email restore")}        Restore original configuration\n`
   );
+  console.log("Console & Dashboard:");
+  console.log(`  ${pc.cyan("console")}               Start local web console`);
+  console.log(
+    `  ${pc.cyan("dashboard update-role")} Update hosted dashboard IAM permissions\n`
+  );
   console.log("Global Commands:");
   console.log(`  ${pc.cyan("status")}       Show all infrastructure status`);
-  console.log(`  ${pc.cyan("dashboard")}    Start local web dashboard`);
   console.log(`  ${pc.cyan("destroy")}      Remove deployed infrastructure`);
   console.log(
     `  ${pc.cyan("completion")}   Generate shell completion script\n`
@@ -364,6 +370,25 @@ async function run() {
       return;
     }
 
+    // Handle Dashboard subcommands
+    if (primaryCommand === "dashboard" && subCommand) {
+      switch (subCommand) {
+        case "update-role":
+          await updateRole({
+            region: flags.region,
+            force: flags.force,
+          });
+          break;
+
+        default:
+          clack.log.error(`Unknown dashboard command: ${subCommand}`);
+          console.log(`\nAvailable commands: ${pc.cyan("update-role")}\n`);
+          console.log(`Run ${pc.cyan("wraps --help")} for more information.\n`);
+          process.exit(1);
+      }
+      return;
+    }
+
     // Handle SMS subcommands (coming soon)
     if (primaryCommand === "sms" && subCommand) {
       clack.log.warn("SMS infrastructure is coming soon!");
@@ -382,11 +407,24 @@ async function run() {
         });
         break;
 
-      case "dashboard":
+      case "console":
         await dashboard({
           port: flags.port,
           noOpen: flags.noOpen,
         });
+        break;
+
+      case "dashboard":
+        // Deprecated: 'wraps dashboard' without subcommand redirects to 'wraps console'
+        if (!subCommand) {
+          clack.log.warn(
+            `'wraps dashboard' is deprecated. Use ${pc.cyan("wraps console")} instead.`
+          );
+          await dashboard({
+            port: flags.port,
+            noOpen: flags.noOpen,
+          });
+        }
         break;
 
       case "destroy":

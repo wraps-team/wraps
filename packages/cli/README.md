@@ -287,22 +287,24 @@ Shows:
 - Deployed resources
 - Links to dashboard
 
-#### `wraps dashboard`
+#### `wraps console`
 
-Launch local web dashboard for monitoring all services.
+Launch local web console for monitoring all services.
 
 **Options:**
-- `--port <port>` - Port to run dashboard on (default: 5555)
+- `--port <port>` - Port to run console on (default: 5555)
 - `--no-open` - Don't automatically open browser
 
 **Example:**
 
 ```bash
-wraps dashboard
-wraps dashboard --port 3000 --no-open
+wraps console
+wraps console --port 3000 --no-open
 ```
 
 Opens at `http://localhost:5555` with real-time tracking for email activity, delivery rates, bounces, complaints, and more.
+
+**Note:** The `wraps dashboard` command is deprecated. Use `wraps console` instead.
 
 #### `wraps destroy`
 
@@ -530,9 +532,12 @@ wraps init
 
 ### Global Commands ✅
 - [x] `wraps status` - Show infrastructure status (all services)
-- [x] `wraps dashboard` - Local web dashboard (all services)
+- [x] `wraps console` - Local web console (all services)
 - [x] `wraps destroy` - Remove all infrastructure (all services)
 - [x] `wraps completion` - Shell completion
+
+### Dashboard Commands ✅
+- [x] `wraps dashboard update-role` - Update hosted dashboard IAM permissions
 
 ### Email Commands ✅
 - [x] `wraps email init` - Deploy new infrastructure

@@ -687,16 +687,16 @@ export default function CLIReferencePage() {
         </Card>
       </section>
 
-      {/* wraps dashboard */}
+      {/* wraps console */}
       <section className="mb-12">
         <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
           <Terminal className="h-6 w-6 text-primary" />
-          wraps dashboard
+          wraps console
         </h2>
         <p className="mb-4 text-muted-foreground">
-          Launch the local Wraps dashboard to view analytics, event tracking,
-          and infrastructure status across all services. This is a global
-          command that shows data for all configured services.
+          Launch the local Wraps console to view analytics, event tracking, and
+          infrastructure status across all services. This is a global command
+          that shows data for all configured services.
         </p>
 
         <Card className="mb-4">
@@ -705,7 +705,7 @@ export default function CLIReferencePage() {
           </CardHeader>
           <CardContent>
             <pre className="overflow-x-auto rounded bg-muted p-4">
-              <code className="text-sm">npx @wraps.dev/cli dashboard</code>
+              <code className="text-sm">npx @wraps.dev/cli console</code>
             </pre>
           </CardContent>
         </Card>
@@ -721,7 +721,7 @@ export default function CLIReferencePage() {
                   --port &lt;port&gt;
                 </code>
                 <p className="mt-2 text-muted-foreground text-sm">
-                  Port to run the dashboard on (default: 5555)
+                  Port to run the console on (default: 5555)
                 </p>
               </div>
               <div>

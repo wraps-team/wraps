@@ -32,6 +32,7 @@ export type {
   Provider,
   ServiceType,
   StatusOptions,
+  UpdateRoleOptions,
 } from "./shared.js";
 
 // Re-export SMS types

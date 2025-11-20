@@ -148,6 +148,7 @@ export async function createIAMRole(
         "dynamodb:Query",
         "dynamodb:Scan",
         "dynamodb:BatchGetItem",
+        "dynamodb:DescribeTable",
       ],
       Resource: [
         "arn:aws:dynamodb:*:*:table/wraps-email-*",

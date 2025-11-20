@@ -79,3 +79,11 @@ export type DashboardOptions = {
   port?: number;
   noOpen?: boolean;
 };
+
+/**
+ * Command options for updating dashboard access role
+ */
+export type UpdateRoleOptions = {
+  region?: string;
+  force?: boolean; // Skip confirmation prompt
+};
