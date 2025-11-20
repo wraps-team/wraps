@@ -65,6 +65,7 @@
     "@pulumi/aws": "^7.11.1",
     "@pulumi/pulumi": "^3.207.0",
     "args": "^5.0.3",
+    "conf": "^13.0.1",
     "cosmiconfig": "^9.0.0",
     "esbuild": "^0.25.12",
     "express": "^4.21.2",
@@ -74,13 +75,15 @@
     "mailparser": "3.9.0",
     "open": "^10.1.0",
     "picocolors": "^1.1.1",
-    "tabtab": "^3.0.2"
+    "tabtab": "^3.0.2",
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "@types/args": "5.0.4",
     "@types/express": "^5.0.0",
     "@types/mailparser": "3.4.6",
     "@types/node": "^20.11.0",
+    "@types/uuid": "^10.0.0",
     "@vitest/coverage-v8": "4.0.7",
     "aws-sdk-client-mock": "4.1.0",
     "aws-sdk-client-mock-vitest": "7.0.1",
