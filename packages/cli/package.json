@@ -63,7 +63,7 @@
     "@aws-sdk/util-dynamodb": "3.927.0",
     "@clack/prompts": "^0.11.0",
     "@pulumi/aws": "^7.11.1",
-    "@pulumi/pulumi": "^3.207.0",
+    "@pulumi/pulumi": "^3.208.0",
     "args": "^5.0.3",
     "conf": "^13.0.1",
     "cosmiconfig": "^9.0.0",
