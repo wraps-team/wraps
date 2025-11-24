@@ -58,8 +58,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     });
 
     if (!error && data) {
-      // Navigate to the organization's dashboard
-      router.push(`/${orgSlug}`);
+      // Navigate to the organization's emails page
+      router.push(`/${orgSlug}/emails`);
       router.refresh();
     }
   };

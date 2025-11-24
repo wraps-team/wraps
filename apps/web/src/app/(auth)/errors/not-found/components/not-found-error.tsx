@@ -24,10 +24,7 @@ export function NotFoundError() {
           another location.
         </p>
         <div className="mt-6 flex items-center justify-center gap-4 md:mt-8">
-          <Button
-            className="cursor-pointer"
-            onClick={() => router.push("/dashboard")}
-          >
+          <Button className="cursor-pointer" onClick={() => router.push("/")}>
             Go Back Home
           </Button>
           <Button

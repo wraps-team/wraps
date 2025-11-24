@@ -1,17 +1,9 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -32,21 +24,22 @@ const appearanceFormSchema = z.object({
 type AppearanceFormValues = z.infer<typeof appearanceFormSchema>;
 
 export default function AppearanceSettings() {
-  const form = useForm<AppearanceFormValues>({
-    resolver: zodResolver(appearanceFormSchema),
+  const form = useForm({
     defaultValues: {
       theme: "dark",
       fontFamily: "",
       fontSize: "",
       sidebarWidth: "",
       contentWidth: "",
+    } as AppearanceFormValues,
+    validators: {
+      onChange: appearanceFormSchema,
+    },
+    onSubmit: async ({ value }) => {
+      console.log("Form submitted:", value);
+      // Here you would typically save the data
     },
   });
-
-  function onSubmit(data: AppearanceFormValues) {
-    console.log("Form submitted:", data);
-    // Here you would typically save the data
-  }
 
   return (
     <div className="space-y-6 px-4 lg:px-6">
@@ -57,193 +50,196 @@ export default function AppearanceSettings() {
         </p>
       </div>
 
-      <Form {...form}>
-        <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
-          {/* Theme Section */}
-          <h3 className="mb-2 font-medium text-lg">Theme</h3>
-          <FormField
-            control={form.control}
-            name="theme"
-            render={({ field }) => (
-              <FormItem className="space-y-3">
-                <FormControl>
-                  <RadioGroup
-                    className="flex gap-4"
-                    defaultValue={field.value}
-                    onValueChange={field.onChange}
+      <form
+        className="space-y-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+      >
+        {/* Theme Section */}
+        <h3 className="mb-2 font-medium text-lg">Theme</h3>
+        <form.Field name="theme">
+          {(field) => (
+            <div className="space-y-3">
+              <RadioGroup
+                className="flex gap-4"
+                onValueChange={(value) =>
+                  field.handleChange(value as "light" | "dark")
+                }
+                value={field.state.value}
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem
+                    className="sr-only"
+                    id="light"
+                    value="light"
+                  />
+                  <Label
+                    className="cursor-pointer [&:has([data-state=checked])>div]:border-primary"
+                    htmlFor="light"
                   >
-                    <FormItem>
-                      <FormLabel className="cursor-pointer [&:has([data-state=checked])>div]:border-primary">
-                        <FormControl>
-                          <RadioGroupItem className="sr-only" value="light" />
-                        </FormControl>
-                        <div className="rounded-md border-2 border-muted p-4 transition-colors hover:border-accent">
+                    <div className="rounded-md border-2 border-muted p-4 transition-colors hover:border-accent">
+                      <div className="space-y-2">
+                        <div className="h-20 w-20 rounded-md border bg-white p-3">
                           <div className="space-y-2">
-                            <div className="h-20 w-20 rounded-md border bg-white p-3">
-                              <div className="space-y-2">
-                                <div className="h-2 w-3/4 rounded bg-gray-200" />
-                                <div className="h-2 w-1/2 rounded bg-gray-200" />
-                                <div className="flex space-x-2">
-                                  <div className="h-2 w-2 rounded-full bg-gray-300" />
-                                  <div className="h-2 flex-1 rounded bg-gray-200" />
-                                </div>
-                                <div className="flex space-x-2">
-                                  <div className="h-2 w-2 rounded-full bg-gray-300" />
-                                  <div className="h-2 flex-1 rounded bg-gray-200" />
-                                </div>
-                              </div>
+                            <div className="h-2 w-3/4 rounded bg-gray-200" />
+                            <div className="h-2 w-1/2 rounded bg-gray-200" />
+                            <div className="flex space-x-2">
+                              <div className="h-2 w-2 rounded-full bg-gray-300" />
+                              <div className="h-2 flex-1 rounded bg-gray-200" />
                             </div>
-                            <span className="font-medium text-sm">Light</span>
+                            <div className="flex space-x-2">
+                              <div className="h-2 w-2 rounded-full bg-gray-300" />
+                              <div className="h-2 flex-1 rounded bg-gray-200" />
+                            </div>
                           </div>
                         </div>
-                      </FormLabel>
-                    </FormItem>
-                    <FormItem>
-                      <FormLabel className="cursor-pointer [&:has([data-state=checked])>div]:border-primary">
-                        <FormControl>
-                          <RadioGroupItem className="sr-only" value="dark" />
-                        </FormControl>
-                        <div className="rounded-md border-2 border-muted p-4 transition-colors hover:border-accent">
+                        <span className="font-medium text-sm">Light</span>
+                      </div>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem className="sr-only" id="dark" value="dark" />
+                  <Label
+                    className="cursor-pointer [&:has([data-state=checked])>div]:border-primary"
+                    htmlFor="dark"
+                  >
+                    <div className="rounded-md border-2 border-muted p-4 transition-colors hover:border-accent">
+                      <div className="space-y-2">
+                        <div className="h-20 w-20 rounded-md border border-gray-700 bg-gray-900 p-3">
                           <div className="space-y-2">
-                            <div className="h-20 w-20 rounded-md border border-gray-700 bg-gray-900 p-3">
-                              <div className="space-y-2">
-                                <div className="h-2 w-3/4 rounded bg-gray-600" />
-                                <div className="h-2 w-1/2 rounded bg-gray-600" />
-                                <div className="flex space-x-2">
-                                  <div className="h-2 w-2 rounded-full bg-gray-500" />
-                                  <div className="h-2 flex-1 rounded bg-gray-600" />
-                                </div>
-                                <div className="flex space-x-2">
-                                  <div className="h-2 w-2 rounded-full bg-gray-500" />
-                                  <div className="h-2 flex-1 rounded bg-gray-600" />
-                                </div>
-                              </div>
+                            <div className="h-2 w-3/4 rounded bg-gray-600" />
+                            <div className="h-2 w-1/2 rounded bg-gray-600" />
+                            <div className="flex space-x-2">
+                              <div className="h-2 w-2 rounded-full bg-gray-500" />
+                              <div className="h-2 flex-1 rounded bg-gray-600" />
                             </div>
-                            <span className="font-medium text-sm">Dark</span>
+                            <div className="flex space-x-2">
+                              <div className="h-2 w-2 rounded-full bg-gray-500" />
+                              <div className="h-2 flex-1 rounded bg-gray-600" />
+                            </div>
                           </div>
                         </div>
-                      </FormLabel>
-                    </FormItem>
-                  </RadioGroup>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                        <span className="font-medium text-sm">Dark</span>
+                      </div>
+                    </div>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
+        </form.Field>
 
-          <FormField
-            control={form.control}
-            name="fontFamily"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Font Family</FormLabel>
-                <Select
-                  defaultValue={field.value}
-                  onValueChange={field.onChange}
-                >
-                  <FormControl>
-                    <SelectTrigger className="cursor-pointer">
-                      <SelectValue placeholder="Select a font" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="inter">Inter</SelectItem>
-                    <SelectItem value="roboto">Roboto</SelectItem>
-                    <SelectItem value="system">System Default</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="fontSize"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Font Size</FormLabel>
-                <Select
-                  defaultValue={field.value}
-                  onValueChange={field.onChange}
-                >
-                  <FormControl>
-                    <SelectTrigger className="cursor-pointer">
-                      <SelectValue placeholder="Select font size" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="small">Small</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="large">Large</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <form.Field name="fontFamily">
+          {(field) => (
+            <div className="space-y-2">
+              <Label>Font Family</Label>
+              <Select
+                onValueChange={field.handleChange}
+                value={field.state.value || ""}
+              >
+                <SelectTrigger className="cursor-pointer">
+                  <SelectValue placeholder="Select a font" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="inter">Inter</SelectItem>
+                  <SelectItem value="roboto">Roboto</SelectItem>
+                  <SelectItem value="system">System Default</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </form.Field>
+        <form.Field name="fontSize">
+          {(field) => (
+            <div className="space-y-2">
+              <Label>Font Size</Label>
+              <Select
+                onValueChange={field.handleChange}
+                value={field.state.value || ""}
+              >
+                <SelectTrigger className="cursor-pointer">
+                  <SelectValue placeholder="Select font size" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="small">Small</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="large">Large</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </form.Field>
 
-          {/* Layout Section */}
-          <FormField
-            control={form.control}
-            name="sidebarWidth"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Sidebar Width</FormLabel>
-                <Select
-                  defaultValue={field.value}
-                  onValueChange={field.onChange}
-                >
-                  <FormControl>
-                    <SelectTrigger className="cursor-pointer">
-                      <SelectValue placeholder="Select sidebar width" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="compact">Compact</SelectItem>
-                    <SelectItem value="comfortable">Comfortable</SelectItem>
-                    <SelectItem value="spacious">Spacious</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="contentWidth"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Content Width</FormLabel>
-                <Select
-                  defaultValue={field.value}
-                  onValueChange={field.onChange}
-                >
-                  <FormControl>
-                    <SelectTrigger className="cursor-pointer">
-                      <SelectValue placeholder="Select content width" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="fixed">Fixed</SelectItem>
-                    <SelectItem value="fluid">Fluid</SelectItem>
-                    <SelectItem value="container">Container</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        {/* Layout Section */}
+        <form.Field name="sidebarWidth">
+          {(field) => (
+            <div className="space-y-2">
+              <Label>Sidebar Width</Label>
+              <Select
+                onValueChange={field.handleChange}
+                value={field.state.value || ""}
+              >
+                <SelectTrigger className="cursor-pointer">
+                  <SelectValue placeholder="Select sidebar width" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="compact">Compact</SelectItem>
+                  <SelectItem value="comfortable">Comfortable</SelectItem>
+                  <SelectItem value="spacious">Spacious</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </form.Field>
+        <form.Field name="contentWidth">
+          {(field) => (
+            <div className="space-y-2">
+              <Label>Content Width</Label>
+              <Select
+                onValueChange={field.handleChange}
+                value={field.state.value || ""}
+              >
+                <SelectTrigger className="cursor-pointer">
+                  <SelectValue placeholder="Select content width" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fixed">Fixed</SelectItem>
+                  <SelectItem value="fluid">Fluid</SelectItem>
+                  <SelectItem value="container">Container</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </form.Field>
 
-          <div className="mt-12 flex space-x-2">
-            <Button className="cursor-pointer" type="submit">
-              Save Preferences
-            </Button>
-            <Button className="cursor-pointer" type="button" variant="outline">
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </Form>
+        <div className="mt-12 flex space-x-2">
+          <form.Subscribe
+            selector={(state) => [state.canSubmit, state.isSubmitting]}
+          >
+            {([canSubmit, isSubmitting]) => (
+              <Button
+                className="cursor-pointer"
+                disabled={!canSubmit}
+                type="submit"
+              >
+                {isSubmitting ? "Saving..." : "Save Preferences"}
+              </Button>
+            )}
+          </form.Subscribe>
+          <Button
+            className="cursor-pointer"
+            onClick={() => form.reset()}
+            type="button"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

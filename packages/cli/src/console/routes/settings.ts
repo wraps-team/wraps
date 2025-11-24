@@ -46,7 +46,7 @@ export function createSettingsRouter(config: ServerConfig): Router {
 
       // Get configuration set name and domain from metadata
       const configSetName = "wraps-email-tracking"; // Always use this name
-      const domain = metadata.services.email!.config.domain;
+      const domain = metadata.services.email?.config.domain;
 
       // Fetch settings from AWS
       const settings = await fetchEmailSettings(

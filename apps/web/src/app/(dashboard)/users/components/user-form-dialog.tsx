@@ -1,9 +1,8 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "@tanstack/react-form";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,15 +14,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -62,8 +54,7 @@ type UserFormDialogProps = {
 export function UserFormDialog({ onAddUser }: UserFormDialogProps) {
   const [open, setOpen] = useState(false);
 
-  const form = useForm<UserFormValues>({
-    resolver: zodResolver(userFormSchema),
+  const form = useForm({
     defaultValues: {
       name: "",
       email: "",
@@ -71,14 +62,16 @@ export function UserFormDialog({ onAddUser }: UserFormDialogProps) {
       plan: "",
       billing: "",
       status: "",
+    } as UserFormValues,
+    validators: {
+      onChange: userFormSchema,
+    },
+    onSubmit: async ({ value }) => {
+      onAddUser(value);
+      form.reset();
+      setOpen(false);
     },
   });
-
-  function onSubmit(data: UserFormValues) {
-    onAddUser(data);
-    form.reset();
-    setOpen(false);
-  }
 
   return (
     <Dialog onOpenChange={setOpen} open={open}>
@@ -95,150 +88,175 @@ export function UserFormDialog({ onAddUser }: UserFormDialogProps) {
             Create a new user account. Click save when you&apos;re done.
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter full name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            form.handleSubmit();
+          }}
+        >
+          <form.Field name="name">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Name</Label>
+                <Input
+                  id={field.name}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  placeholder="Enter full name"
+                  value={field.state.value}
+                />
+                {field.state.meta.errors ? (
+                  <p className="text-destructive text-sm">
+                    {field.state.meta.errors.join(", ")}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </form.Field>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  placeholder="Enter email address"
+                  value={field.state.value}
+                />
+                {field.state.meta.errors ? (
+                  <p className="text-destructive text-sm">
+                    {field.state.meta.errors.join(", ")}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </form.Field>
+          <div className="grid grid-cols-2 gap-4">
+            <form.Field name="role">
+              {(field) => (
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Select
+                    onValueChange={field.handleChange}
+                    value={field.state.value}
+                  >
+                    <SelectTrigger className="w-full cursor-pointer">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Admin">Admin</SelectItem>
+                      <SelectItem value="Author">Author</SelectItem>
+                      <SelectItem value="Editor">Editor</SelectItem>
+                      <SelectItem value="Maintainer">Maintainer</SelectItem>
+                      <SelectItem value="Subscriber">Subscriber</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {field.state.meta.errors ? (
+                    <p className="text-destructive text-sm">
+                      {field.state.meta.errors.join(", ")}
+                    </p>
+                  ) : null}
+                </div>
               )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter email address" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            </form.Field>
+            <form.Field name="plan">
+              {(field) => (
+                <div className="space-y-2">
+                  <Label>Plan</Label>
+                  <Select
+                    onValueChange={field.handleChange}
+                    value={field.state.value}
+                  >
+                    <SelectTrigger className="w-full cursor-pointer">
+                      <SelectValue placeholder="Select plan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Basic">Basic</SelectItem>
+                      <SelectItem value="Professional">Professional</SelectItem>
+                      <SelectItem value="Enterprise">Enterprise</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {field.state.meta.errors ? (
+                    <p className="text-destructive text-sm">
+                      {field.state.meta.errors.join(", ")}
+                    </p>
+                  ) : null}
+                </div>
               )}
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select
-                      defaultValue={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full cursor-pointer">
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                        <SelectItem value="Author">Author</SelectItem>
-                        <SelectItem value="Editor">Editor</SelectItem>
-                        <SelectItem value="Maintainer">Maintainer</SelectItem>
-                        <SelectItem value="Subscriber">Subscriber</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="plan"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Plan</FormLabel>
-                    <Select
-                      defaultValue={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full cursor-pointer">
-                          <SelectValue placeholder="Select plan" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Basic">Basic</SelectItem>
-                        <SelectItem value="Professional">
-                          Professional
-                        </SelectItem>
-                        <SelectItem value="Enterprise">Enterprise</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="billing"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Billing</FormLabel>
-                    <Select
-                      defaultValue={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full cursor-pointer">
-                          <SelectValue placeholder="Select billing" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Auto Debit">Auto Debit</SelectItem>
-                        <SelectItem value="UPI">UPI</SelectItem>
-                        <SelectItem value="Paypal">Paypal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select
-                      defaultValue={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full cursor-pointer">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Active">Active</SelectItem>
-                        <SelectItem value="Pending">Pending</SelectItem>
-                        <SelectItem value="Error">Error</SelectItem>
-                        <SelectItem value="Inactive">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <DialogFooter>
-              <Button className="cursor-pointer" type="submit">
-                Save User
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+            </form.Field>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <form.Field name="billing">
+              {(field) => (
+                <div className="space-y-2">
+                  <Label>Billing</Label>
+                  <Select
+                    onValueChange={field.handleChange}
+                    value={field.state.value}
+                  >
+                    <SelectTrigger className="w-full cursor-pointer">
+                      <SelectValue placeholder="Select billing" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Auto Debit">Auto Debit</SelectItem>
+                      <SelectItem value="UPI">UPI</SelectItem>
+                      <SelectItem value="Paypal">Paypal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {field.state.meta.errors ? (
+                    <p className="text-destructive text-sm">
+                      {field.state.meta.errors.join(", ")}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </form.Field>
+            <form.Field name="status">
+              {(field) => (
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select
+                    onValueChange={field.handleChange}
+                    value={field.state.value}
+                  >
+                    <SelectTrigger className="w-full cursor-pointer">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Error">Error</SelectItem>
+                      <SelectItem value="Inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {field.state.meta.errors ? (
+                    <p className="text-destructive text-sm">
+                      {field.state.meta.errors.join(", ")}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </form.Field>
+          </div>
+          <DialogFooter>
+            <form.Subscribe
+              selector={(state) => [state.canSubmit, state.isSubmitting]}
+            >
+              {([canSubmit, isSubmitting]) => (
+                <Button
+                  className="cursor-pointer"
+                  disabled={!canSubmit}
+                  type="submit"
+                >
+                  {isSubmitting ? "Saving..." : "Save User"}
+                </Button>
+              )}
+            </form.Subscribe>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -28,7 +28,7 @@ export default function SignUpForm({
 } & React.ComponentProps<"div">) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") || "/dashboard";
+  const _redirectTo = searchParams.get("redirect") || "/dashboard";
   const { isPending } = authClient.useSession();
 
   const form = useForm({
@@ -38,27 +38,40 @@ export default function SignUpForm({
       password: "",
     },
     onSubmit: async ({ value }) => {
-      await authClient.signUp.email(
-        {
-          email: value.email,
-          password: value.password,
-          name: value.name,
-        },
-        {
-          onSuccess: () => {
-            router.push(redirectTo);
-            toast.success("Sign up successful");
-          },
-          onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
-          },
-        }
-      );
+      // Step 1: Sign up the user
+      const signupResult = await authClient.signUp.email({
+        email: value.email,
+        password: value.password,
+        name: value.name,
+      });
+
+      if (signupResult.error) {
+        toast.error(signupResult.error.message || "Failed to create account");
+        return;
+      }
+
+      // Step 2: Sign in immediately (since email verification is disabled)
+      const signinResult = await authClient.signIn.email({
+        email: value.email,
+        password: value.password,
+      });
+
+      if (signinResult.error) {
+        toast.error(
+          "Account created but failed to sign in. Please try signing in manually."
+        );
+        router.push("/auth?mode=signin");
+        return;
+      }
+
+      // Step 3: Redirect to onboarding to create organization
+      toast.success("Account created successfully!");
+      router.push("/onboarding");
     },
     validators: {
       onSubmit: z.object({
         name: z.string().min(1, "Name is required"),
-        email: z.email("Invalid email address"),
+        email: z.string().email("Invalid email address"),
         password: z.string().min(6, "Password must be at least 6 characters"),
       }),
     },

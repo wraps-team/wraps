@@ -66,7 +66,7 @@ export async function GET(request: Request, context: RouteContext) {
             awsAccountId: account.id,
             startTime,
             endTime,
-            limit: 10000,
+            limit: 10_000,
           });
         } catch (error) {
           console.error(

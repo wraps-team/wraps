@@ -98,7 +98,7 @@ export function OrganizationSettingsMembers({
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [_refreshKey, setRefreshKey] = useState(0);
 
   const canEdit = userRole === "owner" || userRole === "admin";
 
@@ -119,7 +119,7 @@ export function OrganizationSettingsMembers({
       setLoading(false);
     }
     loadData(organization.id);
-  }, [organization.id, refreshKey]);
+  }, [organization.id]);
 
   const getInitials = (name: string) =>
     name

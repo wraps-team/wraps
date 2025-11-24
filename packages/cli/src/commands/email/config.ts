@@ -83,7 +83,15 @@ export async function config(options: EmailConfigOptions): Promise<void> {
     console.log(`  Preset: ${pc.cyan("custom")}`);
   }
 
-  const config = metadata.services.email!.config;
+  const config = metadata.services.email?.config;
+
+  if (!config) {
+    clack.log.error("No email configuration found in metadata");
+    clack.log.info(
+      `Use ${pc.cyan("wraps email init")} to create new infrastructure.`
+    );
+    process.exit(1);
+  }
 
   // Show sending domain if configured
   if (config.domain) {

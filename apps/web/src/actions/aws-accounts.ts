@@ -225,7 +225,6 @@ export async function connectAWSAccountAction(
 
     // 8. Revalidate pages that display AWS accounts
     revalidatePath(`/${validatedData.organizationId}/settings`, "page");
-    revalidatePath("/dashboard");
     revalidatePath(`/dashboard/organizations/${validatedData.organizationId}`);
 
     return {
@@ -341,7 +340,7 @@ export async function scanAWSAccountFeatures(
       archiveArn =
         (await findWrapsArchive(account.region, credentials)) ?? undefined;
       archivingEnabled = !!archiveArn;
-    } catch (error) {
+    } catch (_error) {
       // findWrapsArchive already handles errors gracefully
       // If AccessDeniedException: user hasn't granted archive permissions
       // Assume archiving is disabled and continue

@@ -105,6 +105,17 @@ export async function createOrganizationAction(
       createdAt: new Date(),
     });
 
+    // 6.5. Create organization extension with default settings
+    const { organizationExtension } = await import("@wraps/db/schema/app");
+    await db.insert(organizationExtension).values({
+      organizationId: newOrg.id,
+      plan: "free",
+      awsAccountCount: 0,
+      memberCount: 1,
+      onboardingCompleted: false,
+      updatedAt: new Date(),
+    });
+
     // 7. Set as active organization
     const { session: sessionTable } = await import("@wraps/db/schema/auth");
     const { eq } = await import("drizzle-orm");

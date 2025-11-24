@@ -1,8 +1,7 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "@tanstack/react-form";
 import { Bell, Mail, MessageSquare } from "lucide-react";
-import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,14 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -70,8 +62,7 @@ const notificationsFormSchema = z.object({
 type NotificationsFormValues = z.infer<typeof notificationsFormSchema>;
 
 export default function NotificationSettings() {
-  const form = useForm<NotificationsFormValues>({
-    resolver: zodResolver(notificationsFormSchema),
+  const form = useForm({
     defaultValues: {
       emailSecurity: false,
       emailUpdates: true,
@@ -99,13 +90,15 @@ export default function NotificationSettings() {
       systemMaintenanceBrowser: true,
       systemMaintenanceApp: false,
       notificationTiming: "online",
+    } as NotificationsFormValues,
+    validators: {
+      onChange: notificationsFormSchema,
+    },
+    onSubmit: async ({ value }) => {
+      console.log("Notifications settings submitted:", value);
+      // Here you would typically save the settings
     },
   });
-
-  function onSubmit(data: NotificationsFormValues) {
-    console.log("Notifications settings submitted:", data);
-    // Here you would typically save the settings
-  }
 
   return (
     <div className="space-y-6 px-4 lg:px-6">
@@ -116,616 +109,589 @@ export default function NotificationSettings() {
         </p>
       </div>
 
-      <Form {...form}>
-        <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Email Notifications</CardTitle>
-                <CardDescription>
-                  Choose what email notifications you want to receive.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="emailSecurity"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-3">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1">
-                          <FormLabel>Security alerts</FormLabel>
-                          <p className="text-muted-foreground text-sm">
-                            Get notified when there are security events on your
-                            account.
-                          </p>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="emailUpdates"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-3">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1">
-                          <FormLabel>Product updates</FormLabel>
-                          <p className="text-muted-foreground text-sm">
-                            Receive updates about new features and improvements.
-                          </p>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="emailMarketing"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-3">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1">
-                          <FormLabel>Marketing emails</FormLabel>
-                          <p className="text-muted-foreground text-sm">
-                            Receive emails about our latest offers and
-                            promotions.
-                          </p>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Push Notifications</CardTitle>
-                <CardDescription>
-                  Configure browser and mobile push notifications.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="pushMessages"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-3">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1">
-                          <FormLabel>New messages</FormLabel>
-                          <p className="text-muted-foreground text-sm">
-                            Get notified when you receive new messages.
-                          </p>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="pushMentions"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-3">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1">
-                          <FormLabel>Mentions</FormLabel>
-                          <p className="text-muted-foreground text-sm">
-                            Get notified when someone mentions you.
-                          </p>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="pushTasks"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-3">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1">
-                          <FormLabel>Task updates</FormLabel>
-                          <p className="text-muted-foreground text-sm">
-                            Get notified about task assignments and updates.
-                          </p>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+      <form
+        className="space-y-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+      >
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Notification Frequency</CardTitle>
+              <CardTitle>Email Notifications</CardTitle>
               <CardDescription>
-                Control how often you receive notifications.
+                Choose what email notifications you want to receive.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="emailFrequency"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email Frequency</FormLabel>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <form.Field name="emailSecurity">
+                  {(field) => (
+                    <div className="flex items-center space-x-3">
+                      <Checkbox
+                        checked={field.state.value}
+                        id={field.name}
+                        onCheckedChange={(checked) =>
+                          field.handleChange(checked === true)
+                        }
+                      />
+                      <div className="space-y-1">
+                        <Label htmlFor={field.name}>Security alerts</Label>
+                        <p className="text-muted-foreground text-sm">
+                          Get notified when there are security events on your
+                          account.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </form.Field>
+                <form.Field name="emailUpdates">
+                  {(field) => (
+                    <div className="flex items-center space-x-3">
+                      <Checkbox
+                        checked={field.state.value}
+                        id={field.name}
+                        onCheckedChange={(checked) =>
+                          field.handleChange(checked === true)
+                        }
+                      />
+                      <div className="space-y-1">
+                        <Label htmlFor={field.name}>Product updates</Label>
+                        <p className="text-muted-foreground text-sm">
+                          Receive updates about new features and improvements.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </form.Field>
+                <form.Field name="emailMarketing">
+                  {(field) => (
+                    <div className="flex items-center space-x-3">
+                      <Checkbox
+                        checked={field.state.value}
+                        id={field.name}
+                        onCheckedChange={(checked) =>
+                          field.handleChange(checked === true)
+                        }
+                      />
+                      <div className="space-y-1">
+                        <Label htmlFor={field.name}>Marketing emails</Label>
+                        <p className="text-muted-foreground text-sm">
+                          Receive emails about our latest offers and promotions.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </form.Field>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Push Notifications</CardTitle>
+              <CardDescription>
+                Configure browser and mobile push notifications.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <form.Field name="pushMessages">
+                  {(field) => (
+                    <div className="flex items-center space-x-3">
+                      <Checkbox
+                        checked={field.state.value}
+                        id={field.name}
+                        onCheckedChange={(checked) =>
+                          field.handleChange(checked === true)
+                        }
+                      />
+                      <div className="space-y-1">
+                        <Label htmlFor={field.name}>New messages</Label>
+                        <p className="text-muted-foreground text-sm">
+                          Get notified when you receive new messages.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </form.Field>
+                <form.Field name="pushMentions">
+                  {(field) => (
+                    <div className="flex items-center space-x-3">
+                      <Checkbox
+                        checked={field.state.value}
+                        id={field.name}
+                        onCheckedChange={(checked) =>
+                          field.handleChange(checked === true)
+                        }
+                      />
+                      <div className="space-y-1">
+                        <Label htmlFor={field.name}>Mentions</Label>
+                        <p className="text-muted-foreground text-sm">
+                          Get notified when someone mentions you.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </form.Field>
+                <form.Field name="pushTasks">
+                  {(field) => (
+                    <div className="flex items-center space-x-3">
+                      <Checkbox
+                        checked={field.state.value}
+                        id={field.name}
+                        onCheckedChange={(checked) =>
+                          field.handleChange(checked === true)
+                        }
+                      />
+                      <div className="space-y-1">
+                        <Label htmlFor={field.name}>Task updates</Label>
+                        <p className="text-muted-foreground text-sm">
+                          Get notified about task assignments and updates.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </form.Field>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Notification Frequency</CardTitle>
+            <CardDescription>
+              Control how often you receive notifications.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <form.Field name="emailFrequency">
+              {(field) => (
+                <div className="space-y-2">
+                  <Label>Email Frequency</Label>
+                  <Select
+                    onValueChange={field.handleChange}
+                    value={field.state.value}
+                  >
+                    <SelectTrigger className="w-full cursor-pointer">
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="instant">Instant</SelectItem>
+                      <SelectItem value="hourly">Hourly digest</SelectItem>
+                      <SelectItem value="daily">Daily digest</SelectItem>
+                      <SelectItem value="weekly">Weekly digest</SelectItem>
+                      <SelectItem value="never">Never</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </form.Field>
+            <div className="space-y-2">
+              <Label>Quiet Hours</Label>
+              <div className="flex space-x-2">
+                <form.Field name="quietHoursStart">
+                  {(field) => (
                     <Select
-                      defaultValue={field.value}
-                      onValueChange={field.onChange}
+                      onValueChange={field.handleChange}
+                      value={field.state.value}
                     >
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select frequency" />
-                        </SelectTrigger>
-                      </FormControl>
+                      <SelectTrigger className="w-50 cursor-pointer">
+                        <SelectValue placeholder="Start" />
+                      </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="instant">Instant</SelectItem>
-                        <SelectItem value="hourly">Hourly digest</SelectItem>
-                        <SelectItem value="daily">Daily digest</SelectItem>
-                        <SelectItem value="weekly">Weekly digest</SelectItem>
-                        <SelectItem value="never">Never</SelectItem>
+                        <SelectItem value="22:00">10:00 PM</SelectItem>
+                        <SelectItem value="23:00">11:00 PM</SelectItem>
+                        <SelectItem value="00:00">12:00 AM</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormItem>
-                <FormLabel>Quiet Hours</FormLabel>
-                <div className="flex space-x-2">
-                  <FormField
-                    control={form.control}
-                    name="quietHoursStart"
-                    render={({ field }) => (
-                      <Select
-                        defaultValue={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="w-50">
-                            <SelectValue placeholder="Start" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="22:00">10:00 PM</SelectItem>
-                          <SelectItem value="23:00">11:00 PM</SelectItem>
-                          <SelectItem value="00:00">12:00 AM</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <span className="self-center">to</span>
-                  <FormField
-                    control={form.control}
-                    name="quietHoursEnd"
-                    render={({ field }) => (
-                      <Select
-                        defaultValue={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="w-50">
-                            <SelectValue placeholder="End" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="06:00">6:00 AM</SelectItem>
-                          <SelectItem value="07:00">7:00 AM</SelectItem>
-                          <SelectItem value="08:00">8:00 AM</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-              </FormItem>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>
-                We need permission from your browser to show notifications.{" "}
-                <Button className="h-auto p-0 text-primary" variant="link">
-                  Request Permission
-                </Button>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[200px]">TYPE</TableHead>
-                      <TableHead className="text-center">EMAIL</TableHead>
-                      <TableHead className="text-center">BROWSER</TableHead>
-                      <TableHead className="text-center">APP</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        Order updates
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FormField
-                          control={form.control}
-                          name="orderUpdatesEmail"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FormField
-                          control={form.control}
-                          name="orderUpdatesBrowser"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FormField
-                          control={form.control}
-                          name="orderUpdatesApp"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        Invoice reminders
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FormField
-                          control={form.control}
-                          name="invoiceRemindersEmail"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FormField
-                          control={form.control}
-                          name="invoiceRemindersBrowser"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FormField
-                          control={form.control}
-                          name="invoiceRemindersApp"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        Promotional offers
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FormField
-                          control={form.control}
-                          name="promotionalOffersEmail"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FormField
-                          control={form.control}
-                          name="promotionalOffersBrowser"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FormField
-                          control={form.control}
-                          name="promotionalOffersApp"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        System maintenance
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FormField
-                          control={form.control}
-                          name="systemMaintenanceEmail"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FormField
-                          control={form.control}
-                          name="systemMaintenanceBrowser"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <FormField
-                          control={form.control}
-                          name="systemMaintenanceApp"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-
-                <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="notificationTiming"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          When should we send you notifications?
-                        </FormLabel>
-                        <Select
-                          defaultValue={field.value}
-                          onValueChange={field.onChange}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="w-full max-w-sm">
-                              <SelectValue placeholder="Select timing" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="online">
-                              Only When I&apos;m online
-                            </SelectItem>
-                            <SelectItem value="always">Always</SelectItem>
-                            <SelectItem value="never">Never</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                  )}
+                </form.Field>
+                <span className="self-center">to</span>
+                <form.Field name="quietHoursEnd">
+                  {(field) => (
+                    <Select
+                      onValueChange={field.handleChange}
+                      value={field.state.value}
+                    >
+                      <SelectTrigger className="w-50 cursor-pointer">
+                        <SelectValue placeholder="End" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="06:00">6:00 AM</SelectItem>
+                        <SelectItem value="07:00">7:00 AM</SelectItem>
+                        <SelectItem value="08:00">8:00 AM</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </form.Field>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Channels</CardTitle>
-              <CardDescription>
-                Choose your preferred notification channels for different types
-                of alerts.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+        <Card>
+          <CardHeader>
+            <CardTitle>Notification Preferences</CardTitle>
+            <CardDescription>
+              We need permission from your browser to show notifications.{" "}
+              <Button className="h-auto p-0 text-primary" variant="link">
+                Request Permission
+              </Button>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[200px]">TYPE</TableHead>
+                    <TableHead className="text-center">EMAIL</TableHead>
+                    <TableHead className="text-center">BROWSER</TableHead>
+                    <TableHead className="text-center">APP</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-medium">Order updates</TableCell>
+                    <TableCell className="text-center">
+                      <form.Field name="orderUpdatesEmail">
+                        {(field) => (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <form.Field name="orderUpdatesBrowser">
+                        {(field) => (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <form.Field name="orderUpdatesApp">
+                        {(field) => (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">
+                      Invoice reminders
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <form.Field name="invoiceRemindersEmail">
+                        {(field) => (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <form.Field name="invoiceRemindersBrowser">
+                        {(field) => (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <form.Field name="invoiceRemindersApp">
+                        {(field) => (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">
+                      Promotional offers
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <form.Field name="promotionalOffersEmail">
+                        {(field) => (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <form.Field name="promotionalOffersBrowser">
+                        {(field) => (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <form.Field name="promotionalOffersApp">
+                        {(field) => (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">
+                      System maintenance
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <form.Field name="systemMaintenanceEmail">
+                        {(field) => (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <form.Field name="systemMaintenanceBrowser">
+                        {(field) => (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <form.Field name="systemMaintenanceApp">
+                        {(field) => (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+
               <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="channelEmail"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <Mail className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <FormLabel className="mb-1 font-medium">
-                            Email
-                          </FormLabel>
-                          <div className="text-muted-foreground text-sm">
-                            Receive notifications via email
-                          </div>
-                        </div>
-                      </div>
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
+                <form.Field name="notificationTiming">
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label>When should we send you notifications?</Label>
+                      <Select
+                        onValueChange={field.handleChange}
+                        value={field.state.value}
+                      >
+                        <SelectTrigger className="w-full max-w-sm cursor-pointer">
+                          <SelectValue placeholder="Select timing" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="online">
+                            Only When I&apos;m online
+                          </SelectItem>
+                          <SelectItem value="always">Always</SelectItem>
+                          <SelectItem value="never">Never</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   )}
-                />
-                <Separator />
-                <FormField
-                  control={form.control}
-                  name="channelPush"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <Bell className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <FormLabel className="mb-1 font-medium">
-                            Push Notifications
-                          </FormLabel>
-                          <div className="text-muted-foreground text-sm">
-                            Receive browser push notifications
-                          </div>
-                        </div>
-                      </div>
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <Separator />
-                <FormField
-                  control={form.control}
-                  name="channelSms"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <MessageSquare className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <FormLabel className="mb-1 font-medium">
-                            SMS
-                          </FormLabel>
-                          <div className="text-muted-foreground text-sm">
-                            Receive notifications via SMS
-                          </div>
-                        </div>
-                      </div>
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                </form.Field>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          <div className="flex space-x-2">
-            <Button className="cursor-pointer" type="submit">
-              Save Preferences
-            </Button>
-            <Button className="cursor-pointer" type="reset" variant="outline">
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </Form>
+        <Card>
+          <CardHeader>
+            <CardTitle>Notification Channels</CardTitle>
+            <CardDescription>
+              Choose your preferred notification channels for different types of
+              alerts.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <form.Field name="channelEmail">
+                {(field) => (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Mail className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <Label
+                          className="mb-1 font-medium"
+                          htmlFor={field.name}
+                        >
+                          Email
+                        </Label>
+                        <div className="text-muted-foreground text-sm">
+                          Receive notifications via email
+                        </div>
+                      </div>
+                    </div>
+                    <Checkbox
+                      checked={field.state.value}
+                      id={field.name}
+                      onCheckedChange={(checked) =>
+                        field.handleChange(checked === true)
+                      }
+                    />
+                  </div>
+                )}
+              </form.Field>
+              <Separator />
+              <form.Field name="channelPush">
+                {(field) => (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Bell className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <Label
+                          className="mb-1 font-medium"
+                          htmlFor={field.name}
+                        >
+                          Push Notifications
+                        </Label>
+                        <div className="text-muted-foreground text-sm">
+                          Receive browser push notifications
+                        </div>
+                      </div>
+                    </div>
+                    <Checkbox
+                      checked={field.state.value}
+                      id={field.name}
+                      onCheckedChange={(checked) =>
+                        field.handleChange(checked === true)
+                      }
+                    />
+                  </div>
+                )}
+              </form.Field>
+              <Separator />
+              <form.Field name="channelSms">
+                {(field) => (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <Label
+                          className="mb-1 font-medium"
+                          htmlFor={field.name}
+                        >
+                          SMS
+                        </Label>
+                        <div className="text-muted-foreground text-sm">
+                          Receive notifications via SMS
+                        </div>
+                      </div>
+                    </div>
+                    <Checkbox
+                      checked={field.state.value}
+                      id={field.name}
+                      onCheckedChange={(checked) =>
+                        field.handleChange(checked === true)
+                      }
+                    />
+                  </div>
+                )}
+              </form.Field>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex space-x-2">
+          <form.Subscribe
+            selector={(state) => [state.canSubmit, state.isSubmitting]}
+          >
+            {([canSubmit, isSubmitting]) => (
+              <Button
+                className="cursor-pointer"
+                disabled={!canSubmit}
+                type="submit"
+              >
+                {isSubmitting ? "Saving..." : "Save Preferences"}
+              </Button>
+            )}
+          </form.Subscribe>
+          <Button
+            className="cursor-pointer"
+            onClick={() => form.reset()}
+            type="button"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

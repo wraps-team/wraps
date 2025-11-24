@@ -353,7 +353,7 @@ describe("upgrade command", () => {
 
     it.skip("should prevent downgrade to lower preset", async () => {
       // TODO: This test requires reliable process.exit mocking which is complex in Vitest
-      // The actual code works correctly (calls process.exit(0) at upgrade.ts:221)
+      // The actual code works correctly (calls process.exit(0) at upgrade.ts:243)
       // but mocking process.exit to throw doesn't work reliably in the test environment
       // Skipping until we can refactor to use a testable error handling pattern
       await setupPulumiMock();

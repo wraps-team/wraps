@@ -39,8 +39,8 @@ const chartConfig = {
   complaintRate: {
     label: "Complaint Rate",
     theme: {
-      light: "oklch(0.5 0.15 15)",    // Deep red (like red-700)
-      dark: "oklch(0.7 0.15 15)",     // Light red (like red-400)
+      light: "oklch(0.5 0.15 15)", // Deep red (like red-700)
+      dark: "oklch(0.7 0.15 15)", // Light red (like red-400)
     },
   },
 } satisfies ChartConfig;

@@ -11,6 +11,12 @@ import { inter } from "@/lib/fonts";
 export const metadata: Metadata = {
   title: "Shadcn Dashboard",
   description: "A dashboard built with Next.js and shadcn/ui",
+  icons: {
+    icon: [
+      { url: "/favicon-light.png", media: "(prefers-color-scheme: light)" },
+      { url: "/favicon-dark.png", media: "(prefers-color-scheme: dark)" },
+    ],
+  },
 };
 
 export default function RootLayout({

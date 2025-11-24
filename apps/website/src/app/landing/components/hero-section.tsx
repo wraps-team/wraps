@@ -117,6 +117,14 @@ export function HeroSection() {
             {/* Top background glow effect - positioned above the image */}
             <div className="lg:-top-8 -translate-x-1/2 absolute top-2 left-1/2 mx-auto h-24 w-[90%] transform rounded-full bg-primary/50 blur-3xl lg:h-80" />
 
+            {/* Abstract Logo - Additional Art */}
+            <div className="-right-20 -top-20 -z-10 absolute hidden rotate-12 opacity-20 lg:block">
+              <img alt="" height={400} src="/wraps-abstract.png" width={400} />
+            </div>
+            <div className="-left-20 -bottom-20 -z-10 -rotate-12 absolute hidden opacity-20 lg:block">
+              <img alt="" height={300} src="/wraps-abstract.png" width={300} />
+            </div>
+
             <div className="relative rounded-xl border bg-card shadow-2xl">
               {/* Light mode dashboard image */}
               <img

@@ -67,7 +67,7 @@ export function OrganizationSettingsAwsAccounts({
   const [accountToDelete, setAccountToDelete] =
     useState<AWSAccountWithCreator | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [_refreshKey, setRefreshKey] = useState(0);
 
   const canEdit = userRole === "owner" || userRole === "admin";
 
@@ -87,7 +87,7 @@ export function OrganizationSettingsAwsAccounts({
       setLoading(false);
     }
     loadData(organization.id);
-  }, [organization.id, refreshKey]);
+  }, [organization.id]);
 
   const formatDate = (date: Date | null) => {
     if (!date) {
@@ -112,7 +112,9 @@ export function OrganizationSettingsAwsAccounts({
   }
 
   async function handleDeleteConfirm() {
-    if (!accountToDelete) return;
+    if (!accountToDelete) {
+      return;
+    }
 
     setDeleting(true);
     const result = await deleteAWSAccount(accountToDelete.id, organization.id);

@@ -70,9 +70,16 @@ export function LandingFooter() {
         <div className="grid grid-cols-4 gap-8 lg:grid-cols-6">
           {/* Brand Column */}
           <div className="col-span-4 max-w-2xl lg:col-span-2">
-            <div className="mb-4 flex items-center max-lg:justify-center">
-              <a className="flex cursor-pointer items-center" href="/">
-                <Logo size={32} />
+            <div className="mb-4 flex w-full items-center max-lg:justify-center">
+              <a className="flex w-full cursor-pointer items-center" href="/">
+                <Logo
+                  style={{
+                    width: "100%",
+                    height: "auto",
+                    aspectRatio: "3/1",
+                    position: "relative",
+                  }}
+                />
               </a>
             </div>
             <p className="mb-6 text-muted-foreground max-lg:flex max-lg:justify-center max-lg:text-center">

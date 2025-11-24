@@ -17,6 +17,8 @@ export const user = pgTable("user", {
   updatedAt: timestamp("updated_at").notNull(),
   twoFactorEnabled: boolean("two_factor_enabled"),
   lastLoginMethod: text("last_login_method"),
+  // Stripe plugin field
+  stripeCustomerId: text("stripe_customer_id"),
 });
 
 export const session = pgTable("session", {
@@ -140,6 +142,24 @@ export const statement = pgTable("statement", {
   updatedAt: timestamp("updated_at").notNull(),
 });
 
+// Stripe plugin subscription table
+export const subscription = pgTable("subscription", {
+  id: text("id").primaryKey(),
+  plan: text("plan").notNull(),
+  referenceId: text("reference_id").notNull(), // Organization ID or User ID
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  status: text("status").notNull(), // 'active' | 'trialing' | 'canceled' | 'past_due' etc.
+  periodStart: timestamp("period_start"),
+  periodEnd: timestamp("period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end"),
+  seats: integer("seats"),
+  trialStart: timestamp("trial_start"),
+  trialEnd: timestamp("trial_end"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
@@ -213,4 +233,9 @@ export const statementRelations = relations(statement, ({ one }) => ({
     fields: [statement.organizationId],
     references: [organization.id],
   }),
+}));
+
+export const subscriptionRelations = relations(subscription, ({ one }) => ({
+  // Note: referenceId can point to either user or organization
+  // The application logic determines which one based on context
 }));

@@ -2,6 +2,7 @@
 
 import { useQueryState } from "nuqs";
 import { OrganizationSettingsAwsAccounts } from "@/components/organization-settings-aws-accounts";
+import { OrganizationSettingsBilling } from "@/components/organization-settings-billing";
 import { OrganizationSettingsGeneral } from "@/components/organization-settings-general";
 import { OrganizationSettingsMembers } from "@/components/organization-settings-members";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,10 +27,11 @@ export function OrganizationSettingsTabs({
 
   return (
     <Tabs onValueChange={setActiveTab} value={activeTab}>
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="general">General</TabsTrigger>
         <TabsTrigger value="aws-accounts">AWS Accounts</TabsTrigger>
         <TabsTrigger value="members">Members</TabsTrigger>
+        <TabsTrigger value="billing">Billing</TabsTrigger>
       </TabsList>
       <TabsContent className="mt-6" value="general">
         <OrganizationSettingsGeneral
@@ -45,6 +47,12 @@ export function OrganizationSettingsTabs({
       </TabsContent>
       <TabsContent className="mt-6" value="members">
         <OrganizationSettingsMembers
+          organization={organization}
+          userRole={userRole}
+        />
+      </TabsContent>
+      <TabsContent className="mt-6" value="billing">
+        <OrganizationSettingsBilling
           organization={organization}
           userRole={userRole}
         />

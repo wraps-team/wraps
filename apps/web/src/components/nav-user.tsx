@@ -10,7 +10,6 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Logo } from "@/components/logo";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +27,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useSession } from "@/contexts/session-context";
 import { authClient } from "@/lib/auth-client";
+import { Avatar, AvatarFallback } from "./ui/avatar";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
@@ -59,7 +59,15 @@ export function NavUser() {
               size="lg"
             >
               <div className="flex h-8 w-8 items-center justify-center rounded-lg">
-                <Logo className="rounded-sm" size={48} />
+                <Avatar className="ring-1">
+                  <AvatarFallback>
+                    {user.name
+                      .split(" ")
+                      .map((word) => word[0]?.toUpperCase() || "")
+                      .join("")
+                      .slice(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
@@ -78,8 +86,16 @@ export function NavUser() {
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <div className="h-8 w-8 rounded-lg">
-                  <Logo size={28} />
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg">
+                  <Avatar className="ring-1">
+                    <AvatarFallback>
+                      {user.name
+                        .split(" ")
+                        .map((word) => word[0]?.toUpperCase() || "")
+                        .join("")
+                        .slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.name}</span>

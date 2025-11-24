@@ -284,7 +284,9 @@ export function applyConfigUpdates(
 
   // Apply each update, with special handling for nested objects
   for (const [key, value] of Object.entries(updates)) {
-    if (value === undefined) continue;
+    if (value === undefined) {
+      continue;
+    }
 
     if (key === "tracking" && typeof value === "object") {
       // Merge tracking updates while preserving user-customized fields
@@ -460,8 +462,12 @@ export function hasService(
   metadata: ConnectionMetadata,
   service: ServiceType
 ): boolean {
-  if (service === "email") return metadata.services.email !== undefined;
-  if (service === "sms") return metadata.services.sms !== undefined;
+  if (service === "email") {
+    return metadata.services.email !== undefined;
+  }
+  if (service === "sms") {
+    return metadata.services.sms !== undefined;
+  }
   return false;
 }
 
@@ -472,7 +478,11 @@ export function getConfiguredServices(
   metadata: ConnectionMetadata
 ): ServiceType[] {
   const services: ServiceType[] = [];
-  if (metadata.services.email) services.push("email");
-  if (metadata.services.sms) services.push("sms");
+  if (metadata.services.email) {
+    services.push("email");
+  }
+  if (metadata.services.sms) {
+    services.push("sms");
+  }
   return services;
 }

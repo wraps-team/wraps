@@ -67,13 +67,13 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
     `\n${pc.bold("The following Wraps resources will be removed:")}\n`
   );
 
-  if (metadata.services.email!.config.tracking?.enabled) {
+  if (metadata.services.email?.config.tracking?.enabled) {
     console.log(`  ${pc.cyan("✓")} Configuration Set (wraps-email-tracking)`);
   }
-  if (metadata.services.email!.config.eventTracking?.dynamoDBHistory) {
+  if (metadata.services.email?.config.eventTracking?.dynamoDBHistory) {
     console.log(`  ${pc.cyan("✓")} DynamoDB Table (wraps-email-history)`);
   }
-  if (metadata.services.email!.config.eventTracking?.enabled) {
+  if (metadata.services.email?.config.eventTracking?.enabled) {
     console.log(`  ${pc.cyan("✓")} EventBridge Rules`);
     console.log(`  ${pc.cyan("✓")} SQS Queues`);
     console.log(`  ${pc.cyan("✓")} Lambda Functions`);

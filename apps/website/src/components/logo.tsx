@@ -1,35 +1,30 @@
 import type * as React from "react";
 
-interface LogoProps extends React.SVGProps<SVGSVGElement> {
+interface LogoProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: number;
 }
 
 export function Logo({ size = 40, className, ...props }: LogoProps) {
+  // Use Next.js Image for optimized loading if possible, or standard img for simplicity in this component structure
+  // Since this is a shared component potentially used in different contexts, let's check if we can use Next.js Image.
+  // The file imports React but not Next.js Image. Let's stick to a simple img tag or import Image if it's a Next.js app (it is).
+
   return (
-    <svg
+    <div
       className={className}
-      fill="currentColor"
-      height={size}
-      viewBox="0 0 120 52"
-      width={size * 2.2}
-      xmlns="http://www.w3.org/2000/svg"
+      style={{ width: size * 3, height: size, position: "relative" }}
       {...props}
     >
-      <text
-        dominantBaseline="middle"
-        fill="currentColor"
-        fontFamily="'League Gothic Condensed', 'Impact', 'Arial Narrow', sans-serif"
-        fontSize="64"
-        fontWeight="700"
-        letterSpacing="0"
-        stroke="currentColor"
-        strokeWidth="0.5"
-        textAnchor="start"
-        x="0"
-        y="32"
-      >
-        WRAPS
-      </text>
-    </svg>
+      <img
+        alt="Wraps Logo"
+        className="h-full w-full object-contain dark:hidden"
+        src="/wraps-light.png"
+      />
+      <img
+        alt="Wraps Logo"
+        className="hidden h-full w-full object-contain dark:block"
+        src="/wraps-dark.png"
+      />
+    </div>
   );
 }

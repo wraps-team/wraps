@@ -12,6 +12,7 @@
     }
   },
   "scripts": {
+    "dev": "drizzle-kit studio",
     "build": "tsdown",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",

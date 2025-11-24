@@ -37,18 +37,18 @@ export function TrustedBySection() {
         <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-12 lg:gap-16">
           {projects.map((project) => (
             <a
-              key={project.name}
-              href={project.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group transition-opacity hover:opacity-80"
               aria-label={`Visit ${project.name}`}
+              className="group transition-opacity hover:opacity-80"
+              href={project.website}
+              key={project.name}
+              rel="noopener noreferrer"
+              target="_blank"
             >
               <div className="flex h-16 items-center sm:h-20">
                 <img
-                  src={project.logo}
                   alt={`${project.name} logo`}
                   className="h-full w-auto max-w-[120px] object-contain grayscale transition-all group-hover:grayscale-0 sm:max-w-[160px]"
+                  src={project.logo}
                 />
               </div>
             </a>

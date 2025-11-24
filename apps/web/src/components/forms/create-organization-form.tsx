@@ -50,11 +50,11 @@ export function CreateOrganizationForm({
       });
 
       if (result.success) {
-        // Success! Redirect to the new organization
+        // Success! Redirect to the new organization's onboarding
         if (onSuccess) {
           onSuccess(result.organization.slug);
         } else {
-          router.push(`/${result.organization.slug}`);
+          router.push(`/${result.organization.slug}/onboarding`);
           router.refresh();
         }
       } else {

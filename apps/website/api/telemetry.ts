@@ -23,7 +23,7 @@ function getPostHogClient(): PostHog {
     posthogClient = new PostHog(apiKey, {
       host,
       flushAt: 20,
-      flushInterval: 10000,
+      flushInterval: 10_000,
     });
   }
 

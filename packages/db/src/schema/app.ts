@@ -25,6 +25,10 @@ export const organizationExtension = pgTable("organization_extension", {
   awsAccountCount: integer("aws_account_count").default(0).notNull(),
   memberCount: integer("member_count").default(1).notNull(),
 
+  // Onboarding tracking
+  onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
+  onboardingCompletedAt: timestamp("onboarding_completed_at"),
+
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

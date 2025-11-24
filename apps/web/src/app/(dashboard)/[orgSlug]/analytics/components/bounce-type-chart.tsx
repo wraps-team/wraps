@@ -5,7 +5,6 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
-  Legend,
   ReferenceLine,
   XAxis,
   YAxis,
@@ -21,8 +20,6 @@ import {
 import {
   type ChartConfig,
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
@@ -42,8 +39,8 @@ const chartConfig = {
   bounceRate: {
     label: "Bounce Rate",
     theme: {
-      light: "oklch(0.5 0.15 50)",    // Deep orange (like orange-700)
-      dark: "oklch(0.7 0.15 35)",     // Light orange (like orange-400)
+      light: "oklch(0.5 0.15 50)", // Deep orange (like orange-700)
+      dark: "oklch(0.7 0.15 35)", // Light orange (like orange-400)
     },
   },
 } satisfies ChartConfig;

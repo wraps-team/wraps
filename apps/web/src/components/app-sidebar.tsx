@@ -7,7 +7,6 @@ import { Logo } from "@/components/logo";
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
-import { SidebarNotification } from "@/components/sidebar-notification";
 import {
   Sidebar,
   SidebarContent,
@@ -55,7 +54,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg">
-              <Link href="/dashboard">
+              <Link href={orgSlug ? `/${orgSlug}/emails` : "/dashboard"}>
                 <Logo className="rounded-sm" size={42} />
               </Link>
             </SidebarMenuButton>
@@ -69,7 +68,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ))}
       </SidebarContent>
       <SidebarFooter>
-        <SidebarNotification />
+        {/* <SidebarNotification /> */}
         <NavUser />
       </SidebarFooter>
     </Sidebar>
