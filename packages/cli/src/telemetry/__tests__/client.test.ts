@@ -18,6 +18,11 @@ describe("TelemetryClient", () => {
     process.env.WRAPS_TELEMETRY_DISABLED = undefined;
     process.env.WRAPS_TELEMETRY_DEBUG = undefined;
     process.env.CI = undefined;
+    // Clear CI provider env vars that isCI() checks
+    process.env.GITHUB_ACTIONS = undefined;
+    process.env.GITLAB_CI = undefined;
+    process.env.CIRCLECI = undefined;
+    process.env.TRAVIS = undefined;
 
     // Create client in debug mode (won't send real requests)
     client = new TelemetryClient({ debug: true });
