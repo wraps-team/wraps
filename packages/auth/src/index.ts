@@ -13,11 +13,14 @@ import { passkey } from "better-auth/plugins/passkey";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import Stripe from "stripe";
 
-// Initialize Stripe client
-const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-10-29.clover",
-  typescript: true,
-});
+// Only initialize Stripe client if the secret key is available
+// This prevents build-time errors when env vars aren't set (e.g., during Next.js static generation)
+const stripeClient = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: "2025-10-29.clover",
+      typescript: true,
+    })
+  : null;
 
 export const auth = betterAuth<BetterAuthOptions>({
   database: drizzleAdapter(db, {
@@ -59,101 +62,106 @@ export const auth = betterAuth<BetterAuthOptions>({
       issuer: "Wraps",
     }),
     organization(),
-    stripe({
-      stripeClient,
-      stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
-      subscription: {
-        enabled: true,
-        authorizeReference: async ({ user, referenceId }) => {
-          // Verify user is a member of the organization
-          const membership = await db.query.member.findFirst({
-            where: (members, { and, eq }) =>
-              and(
-                eq(members.userId, user.id),
-                eq(members.organizationId, referenceId)
-              ),
-          });
+    // Only include Stripe plugin if the client is available (requires STRIPE_SECRET_KEY)
+    ...(stripeClient
+      ? [
+          stripe({
+            stripeClient,
+            stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+            subscription: {
+              enabled: true,
+              authorizeReference: async ({ user, referenceId }) => {
+                // Verify user is a member of the organization
+                const membership = await db.query.member.findFirst({
+                  where: (members, { and, eq }) =>
+                    and(
+                      eq(members.userId, user.id),
+                      eq(members.organizationId, referenceId)
+                    ),
+                });
 
-          if (!membership) {
-            throw new Error(
-              "Unauthorized: You are not a member of this organization"
-            );
-          }
+                if (!membership) {
+                  throw new Error(
+                    "Unauthorized: You are not a member of this organization"
+                  );
+                }
 
-          // Optionally: restrict to owners/admins only
-          if (membership.role !== "owner" && membership.role !== "admin") {
-            throw new Error(
-              "Unauthorized: Only organization owners and admins can manage subscriptions"
-            );
-          }
+                // Optionally: restrict to owners/admins only
+                if (membership.role !== "owner" && membership.role !== "admin") {
+                  throw new Error(
+                    "Unauthorized: Only organization owners and admins can manage subscriptions"
+                  );
+                }
 
-          return true;
-        },
-        plans: [
-          {
-            name: "pro",
-            priceId: process.env.STRIPE_PRO_PRICE_ID || "",
-            annualDiscountPriceId: process.env.STRIPE_PRO_ANNUAL_PRICE_ID,
-            limits: {
-              emails: 100_000, // 100k emails/month
-              awsAccounts: 3,
-              members: 10,
+                return true;
+              },
+              plans: [
+                {
+                  name: "pro",
+                  priceId: process.env.STRIPE_PRO_PRICE_ID || "",
+                  annualDiscountPriceId: process.env.STRIPE_PRO_ANNUAL_PRICE_ID,
+                  limits: {
+                    emails: 100_000, // 100k emails/month
+                    awsAccounts: 3,
+                    members: 10,
+                  },
+                  freeTrial: {
+                    days: 14,
+                  },
+                },
+                {
+                  name: "enterprise",
+                  priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID || "",
+                  annualDiscountPriceId:
+                    process.env.STRIPE_ENTERPRISE_ANNUAL_PRICE_ID,
+                  limits: {
+                    emails: -1, // Unlimited
+                    awsAccounts: -1, // Unlimited
+                    members: -1, // Unlimited
+                  },
+                },
+              ],
+              onSubscriptionComplete: async ({
+                subscription,
+                user,
+              }: {
+                subscription: any;
+                user: any;
+              }) => {
+                console.log(
+                  `Subscription created for user ${user.id}:`,
+                  subscription
+                );
+                // Could send welcome email here
+              },
+              onSubscriptionUpdate: async ({
+                subscription,
+                user,
+              }: {
+                subscription: any;
+                user: any;
+              }) => {
+                console.log(
+                  `Subscription updated for user ${user.id}:`,
+                  subscription
+                );
+              },
+              onSubscriptionCancel: async ({
+                subscription,
+                user,
+              }: {
+                subscription: any;
+                user: any;
+              }) => {
+                console.log(
+                  `Subscription canceled for user ${user.id}:`,
+                  subscription
+                );
+              },
             },
-            freeTrial: {
-              days: 14,
-            },
-          },
-          {
-            name: "enterprise",
-            priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID || "",
-            annualDiscountPriceId:
-              process.env.STRIPE_ENTERPRISE_ANNUAL_PRICE_ID,
-            limits: {
-              emails: -1, // Unlimited
-              awsAccounts: -1, // Unlimited
-              members: -1, // Unlimited
-            },
-          },
-        ],
-        onSubscriptionComplete: async ({
-          subscription,
-          user,
-        }: {
-          subscription: any;
-          user: any;
-        }) => {
-          console.log(
-            `Subscription created for user ${user.id}:`,
-            subscription
-          );
-          // Could send welcome email here
-        },
-        onSubscriptionUpdate: async ({
-          subscription,
-          user,
-        }: {
-          subscription: any;
-          user: any;
-        }) => {
-          console.log(
-            `Subscription updated for user ${user.id}:`,
-            subscription
-          );
-        },
-        onSubscriptionCancel: async ({
-          subscription,
-          user,
-        }: {
-          subscription: any;
-          user: any;
-        }) => {
-          console.log(
-            `Subscription canceled for user ${user.id}:`,
-            subscription
-          );
-        },
-      },
-    }),
+          }),
+        ]
+      : []),
   ],
   databaseHooks: {
     session: {
