@@ -1,18 +1,18 @@
 import { sendEmail } from "../lib/client";
 
 export type SendVerificationEmailParams = {
-  to: string;
-  url: string;
+	to: string;
+	url: string;
 };
 
 /**
  * Send email verification email using Wraps SDK
  */
 export async function sendVerificationEmail({
-  to,
-  url,
+	to,
+	url,
 }: SendVerificationEmailParams) {
-  const htmlBody = `<!DOCTYPE html>
+	const htmlBody = `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
@@ -60,7 +60,7 @@ export async function sendVerificationEmail({
   </body>
 </html>`;
 
-  const textBody = `Verify Your Email Address
+	const textBody = `Verify Your Email Address
 
 Thank you for signing up with Wraps! To complete your registration and access all features, please verify your email address.
 
@@ -72,10 +72,10 @@ Note: This verification link will expire in 24 hours. If you didn't create an ac
 ---
 This email was sent by Wraps. If you have any questions, please contact us at support@wraps.dev`;
 
-  return sendEmail({
-    to,
-    subject: "Verify your email address - Wraps",
-    html: htmlBody,
-    text: textBody,
-  });
+	return sendEmail({
+		to,
+		subject: "Verify your email address - Wraps",
+		html: htmlBody,
+		text: textBody,
+	});
 }

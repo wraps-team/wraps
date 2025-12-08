@@ -1,5 +1,4 @@
-// Re-export all auth tables
-
-// Re-export all app tables
+// Re-export all schema tables
 export * from "./app";
 export * from "./auth";
+export * from "./templates";

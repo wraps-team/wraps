@@ -8,9 +8,9 @@ import { v4 as uuidv4 } from "uuid";
 import type { TelemetryConfig } from "./types.js";
 
 const CONFIG_DEFAULTS: TelemetryConfig = {
-  enabled: true,
-  anonymousId: uuidv4(),
-  notificationShown: false,
+	enabled: true,
+	anonymousId: uuidv4(),
+	notificationShown: false,
 };
 
 /**
@@ -33,67 +33,67 @@ const CONFIG_DEFAULTS: TelemetryConfig = {
  * ```
  */
 export class TelemetryConfigManager {
-  private readonly config: Conf<TelemetryConfig>;
+	private readonly config: Conf<TelemetryConfig>;
 
-  constructor() {
-    this.config = new Conf<TelemetryConfig>({
-      projectName: "wraps",
-      configName: "telemetry",
-      defaults: CONFIG_DEFAULTS,
-    });
-  }
+	constructor() {
+		this.config = new Conf<TelemetryConfig>({
+			projectName: "wraps",
+			configName: "telemetry",
+			defaults: CONFIG_DEFAULTS,
+		});
+	}
 
-  /**
-   * Check if telemetry is enabled
-   */
-  isEnabled(): boolean {
-    return this.config.get("enabled");
-  }
+	/**
+	 * Check if telemetry is enabled
+	 */
+	isEnabled(): boolean {
+		return this.config.get("enabled");
+	}
 
-  /**
-   * Enable or disable telemetry
-   */
-  setEnabled(enabled: boolean): void {
-    this.config.set("enabled", enabled);
-  }
+	/**
+	 * Enable or disable telemetry
+	 */
+	setEnabled(enabled: boolean): void {
+		this.config.set("enabled", enabled);
+	}
 
-  /**
-   * Get the anonymous user ID
-   */
-  getAnonymousId(): string {
-    return this.config.get("anonymousId");
-  }
+	/**
+	 * Get the anonymous user ID
+	 */
+	getAnonymousId(): string {
+		return this.config.get("anonymousId");
+	}
 
-  /**
-   * Check if the first-run notification has been shown
-   */
-  hasShownNotification(): boolean {
-    return this.config.get("notificationShown");
-  }
+	/**
+	 * Check if the first-run notification has been shown
+	 */
+	hasShownNotification(): boolean {
+		return this.config.get("notificationShown");
+	}
 
-  /**
-   * Mark the first-run notification as shown
-   */
-  markNotificationShown(): void {
-    this.config.set("notificationShown", true);
-  }
+	/**
+	 * Mark the first-run notification as shown
+	 */
+	markNotificationShown(): void {
+		this.config.set("notificationShown", true);
+	}
 
-  /**
-   * Get the full path to the configuration file
-   */
-  getConfigPath(): string {
-    return this.config.path;
-  }
+	/**
+	 * Get the full path to the configuration file
+	 */
+	getConfigPath(): string {
+		return this.config.path;
+	}
 
-  /**
-   * Reset configuration to defaults
-   */
-  reset(): void {
-    this.config.clear();
-    // Set new defaults with fresh UUID
-    this.config.set({
-      ...CONFIG_DEFAULTS,
-      anonymousId: uuidv4(),
-    });
-  }
+	/**
+	 * Reset configuration to defaults
+	 */
+	reset(): void {
+		this.config.clear();
+		// Set new defaults with fresh UUID
+		this.config.set({
+			...CONFIG_DEFAULTS,
+			anonymousId: uuidv4(),
+		});
+	}
 }

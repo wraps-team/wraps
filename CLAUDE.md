@@ -598,3 +598,4 @@ pnpm fix
 - Use TypeScript strict mode
 - Keep CLI commands simple and focused
 - run `pnpm check:all` before comitting
+- you can use `pnpm check` and `pnpm fix` from the root of our repo.

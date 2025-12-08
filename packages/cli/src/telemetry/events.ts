@@ -21,27 +21,27 @@ import { getTelemetryClient } from "./client.js";
  * ```
  */
 export function trackCommand(
-  command: string,
-  metadata?: {
-    success?: boolean;
-    duration_ms?: number;
-    preset?: string;
-    provider?: string;
-    service?: string;
-    [key: string]: unknown;
-  }
+	command: string,
+	metadata?: {
+		success?: boolean;
+		duration_ms?: number;
+		preset?: string;
+		provider?: string;
+		service?: string;
+		[key: string]: unknown;
+	},
 ): void {
-  const client = getTelemetryClient();
+	const client = getTelemetryClient();
 
-  // Sanitize metadata to ensure no PII
-  const sanitized = metadata ? { ...metadata } : {};
+	// Sanitize metadata to ensure no PII
+	const sanitized = metadata ? { ...metadata } : {};
 
-  // Remove any potentially sensitive fields
-  sanitized.domain = undefined;
-  sanitized.accountId = undefined;
-  sanitized.email = undefined;
+	// Remove any potentially sensitive fields
+	sanitized.domain = undefined;
+	sanitized.accountId = undefined;
+	sanitized.email = undefined;
 
-  client.track(`command:${command}`, sanitized);
+	client.track(`command:${command}`, sanitized);
 }
 
 /**
@@ -60,23 +60,23 @@ export function trackCommand(
  * ```
  */
 export function trackServiceInit(
-  service: string,
-  success: boolean,
-  metadata?: {
-    preset?: string;
-    provider?: string;
-    features?: string[];
-    duration_ms?: number;
-    [key: string]: unknown;
-  }
+	service: string,
+	success: boolean,
+	metadata?: {
+		preset?: string;
+		provider?: string;
+		features?: string[];
+		duration_ms?: number;
+		[key: string]: unknown;
+	},
 ): void {
-  const client = getTelemetryClient();
+	const client = getTelemetryClient();
 
-  client.track("service:init", {
-    service,
-    success,
-    ...metadata,
-  });
+	client.track("service:init", {
+		service,
+		success,
+		...metadata,
+	});
 }
 
 /**
@@ -94,20 +94,20 @@ export function trackServiceInit(
  * ```
  */
 export function trackServiceDeployed(
-  service: string,
-  metadata?: {
-    duration_ms?: number;
-    features?: string[];
-    preset?: string;
-    [key: string]: unknown;
-  }
+	service: string,
+	metadata?: {
+		duration_ms?: number;
+		features?: string[];
+		preset?: string;
+		[key: string]: unknown;
+	},
 ): void {
-  const client = getTelemetryClient();
+	const client = getTelemetryClient();
 
-  client.track("service:deployed", {
-    service,
-    ...metadata,
-  });
+	client.track("service:deployed", {
+		service,
+		...metadata,
+	});
 }
 
 /**
@@ -122,15 +122,15 @@ export function trackServiceDeployed(
  * ```
  */
 export function trackConsoleStart(
-  mode: "local" | "hosted",
-  metadata?: Record<string, unknown>
+	mode: "local" | "hosted",
+	metadata?: Record<string, unknown>,
 ): void {
-  const client = getTelemetryClient();
+	const client = getTelemetryClient();
 
-  client.track("console:started", {
-    mode,
-    ...metadata,
-  });
+	client.track("console:started", {
+		mode,
+		...metadata,
+	});
 }
 
 /**
@@ -144,12 +144,12 @@ export function trackConsoleStart(
  * ```
  */
 export function trackConsoleStop(metadata?: {
-  duration_s?: number;
-  [key: string]: unknown;
+	duration_s?: number;
+	[key: string]: unknown;
 }): void {
-  const client = getTelemetryClient();
+	const client = getTelemetryClient();
 
-  client.track("console:stopped", metadata || {});
+	client.track("console:stopped", metadata || {});
 }
 
 /**
@@ -170,17 +170,17 @@ export function trackConsoleStop(metadata?: {
  * ```
  */
 export function trackError(
-  errorCode: string,
-  command: string,
-  metadata?: Record<string, unknown>
+	errorCode: string,
+	command: string,
+	metadata?: Record<string, unknown>,
 ): void {
-  const client = getTelemetryClient();
+	const client = getTelemetryClient();
 
-  client.track("error:occurred", {
-    error_code: errorCode,
-    command,
-    ...metadata,
-  });
+	client.track("error:occurred", {
+		error_code: errorCode,
+		command,
+		...metadata,
+	});
 }
 
 /**
@@ -198,12 +198,12 @@ export function trackError(
  * ```
  */
 export function trackFeature(
-  feature: string,
-  metadata?: Record<string, unknown>
+	feature: string,
+	metadata?: Record<string, unknown>,
 ): void {
-  const client = getTelemetryClient();
+	const client = getTelemetryClient();
 
-  client.track(`feature:${feature}`, metadata || {});
+	client.track(`feature:${feature}`, metadata || {});
 }
 
 /**
@@ -222,20 +222,20 @@ export function trackFeature(
  * ```
  */
 export function trackServiceUpgrade(
-  service: string,
-  metadata?: {
-    from_preset?: string;
-    to_preset?: string;
-    added_features?: string[];
-    [key: string]: unknown;
-  }
+	service: string,
+	metadata?: {
+		from_preset?: string;
+		to_preset?: string;
+		added_features?: string[];
+		[key: string]: unknown;
+	},
 ): void {
-  const client = getTelemetryClient();
+	const client = getTelemetryClient();
 
-  client.track("service:upgraded", {
-    service,
-    ...metadata,
-  });
+	client.track("service:upgraded", {
+		service,
+		...metadata,
+	});
 }
 
 /**
@@ -250,13 +250,13 @@ export function trackServiceUpgrade(
  * ```
  */
 export function trackServiceRemoved(
-  service: string,
-  metadata?: Record<string, unknown>
+	service: string,
+	metadata?: Record<string, unknown>,
 ): void {
-  const client = getTelemetryClient();
+	const client = getTelemetryClient();
 
-  client.track("service:removed", {
-    service,
-    ...metadata,
-  });
+	client.track("service:removed", {
+		service,
+		...metadata,
+	});
 }
