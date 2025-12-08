@@ -16,48 +16,48 @@ const __dirname = dirname(__filename);
 const packageRoot = join(__dirname, "..");
 
 async function bundleLambda(name: string, entryPoint: string) {
-	const outdir = join(packageRoot, "dist", "lambda", name);
+  const outdir = join(packageRoot, "dist", "lambda", name);
 
-	if (!existsSync(outdir)) {
-		mkdirSync(outdir, { recursive: true });
-	}
+  if (!existsSync(outdir)) {
+    mkdirSync(outdir, { recursive: true });
+  }
 
-	console.log(`Building Lambda: ${name}...`);
+  console.log(`Building Lambda: ${name}...`);
 
-	await build({
-		entryPoints: [entryPoint],
-		bundle: true,
-		platform: "node",
-		target: "node20",
-		format: "esm",
-		outfile: join(outdir, "index.mjs"),
-		external: ["@aws-sdk/*"], // AWS SDK v3 is included in Lambda runtime
-		minify: true,
-		sourcemap: false,
-	});
+  await build({
+    entryPoints: [entryPoint],
+    bundle: true,
+    platform: "node",
+    target: "node20",
+    format: "esm",
+    outfile: join(outdir, "index.mjs"),
+    external: ["@aws-sdk/*"], // AWS SDK v3 is included in Lambda runtime
+    minify: true,
+    sourcemap: false,
+  });
 
-	// Create a marker file so we know this is a pre-bundled Lambda
-	writeFileSync(
-		join(outdir, ".bundled"),
-		`Bundled at: ${new Date().toISOString()}\n`,
-	);
+  // Create a marker file so we know this is a pre-bundled Lambda
+  writeFileSync(
+    join(outdir, ".bundled"),
+    `Bundled at: ${new Date().toISOString()}\n`
+  );
 
-	console.log(`✓ Built ${name} -> dist/lambda/${name}/index.mjs`);
-	return outdir;
+  console.log(`✓ Built ${name} -> dist/lambda/${name}/index.mjs`);
+  return outdir;
 }
 
 async function main() {
-	console.log("Building Lambda functions...\n");
+  console.log("Building Lambda functions...\n");
 
-	await bundleLambda(
-		"event-processor",
-		join(packageRoot, "lambda", "event-processor", "index.ts"),
-	);
+  await bundleLambda(
+    "event-processor",
+    join(packageRoot, "lambda", "event-processor", "index.ts")
+  );
 
-	console.log("\n✓ All Lambda functions bundled successfully");
+  console.log("\n✓ All Lambda functions bundled successfully");
 }
 
 main().catch((error) => {
-	console.error("Failed to bundle Lambda functions:", error);
-	process.exit(1);
+  console.error("Failed to bundle Lambda functions:", error);
+  process.exit(1);
 });

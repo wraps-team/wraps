@@ -1,11 +1,11 @@
 import { sendEmail } from "../lib/client";
 
 export type SendInvitationEmailParams = {
-	to: string;
-	inviterName: string;
-	organizationName: string;
-	role: string;
-	invitationId: string;
+  to: string;
+  inviterName: string;
+  organizationName: string;
+  role: string;
+  invitationId: string;
 };
 
 /**
@@ -15,17 +15,17 @@ export type SendInvitationEmailParams = {
  * through the dogfood account's Wraps infrastructure.
  */
 export async function sendInvitationEmail({
-	to,
-	inviterName,
-	organizationName,
-	role,
-	invitationId,
+  to,
+  inviterName,
+  organizationName,
+  role,
+  invitationId,
 }: SendInvitationEmailParams) {
-	const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-	const acceptUrl = `${appUrl}/invitations/${invitationId}/accept`;
-	const declineUrl = `${appUrl}/invitations/${invitationId}/decline`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const acceptUrl = `${appUrl}/invitations/${invitationId}/accept`;
+  const declineUrl = `${appUrl}/invitations/${invitationId}/decline`;
 
-	const htmlBody = `<!DOCTYPE html>
+  const htmlBody = `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
@@ -73,7 +73,7 @@ export async function sendInvitationEmail({
   </body>
 </html>`;
 
-	const textBody = `You've been invited to join ${organizationName}!
+  const textBody = `You've been invited to join ${organizationName}!
 
 ${inviterName} has invited you to join ${organizationName} on Wraps as a ${role}.
 
@@ -90,10 +90,10 @@ Note: This invitation will expire in 7 days. If you didn't expect this invitatio
 ---
 This email was sent by Wraps. If you have any questions, please contact us at support@wraps.dev`;
 
-	return sendEmail({
-		to,
-		subject: `You've been invited to join ${organizationName} on Wraps`,
-		html: htmlBody,
-		text: textBody,
-	});
+  return sendEmail({
+    to,
+    subject: `You've been invited to join ${organizationName} on Wraps`,
+    html: htmlBody,
+    text: textBody,
+  });
 }

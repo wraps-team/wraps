@@ -1,45 +1,45 @@
 {
-	"name": "wraps-monorepo",
-	"private": true,
-	"description": "Wraps - wrap your AWS account's SES, SNS, SQS, IoT, and more",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/wraps-team/wraps.git"
-	},
-	"license": "AGPL-3.0-or-later",
-	"scripts": {
-		"build": "turbo run build",
-		"dev": "turbo run dev",
-		"test": "turbo run test",
-		"test:coverage": "turbo run test:coverage --filter=@wraps.dev/cli",
-		"lint": "npx ultracite@latest check",
-		"lint:fix": "npx ultracite@latest fix",
-		"typecheck": "turbo run typecheck",
-		"check": "npx ultracite@latest check",
-		"check:errors": "npx ultracite@latest check --diagnostic-level=error",
-		"check:all": "pnpm check:errors && pnpm typecheck && pnpm build && pnpm test",
-		"fix": "npx ultracite@latest fix",
-		"clean": "turbo run clean && rm -rf node_modules",
-		"cli": "node packages/cli/dist/cli.js",
-		"db:push:test": "dotenv -e apps/web/.env.test -- pnpm --filter=@wraps/db db:push"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "2.3.4",
-		"@types/aws-lambda": "8.10.157",
-		"@types/node": "24.10.0",
-		"dotenv-cli": "11.0.0",
-		"turbo": "^2.2.3",
-		"ultracite": "6.3.2"
-	},
-	"engines": {
-		"node": ">=20",
-		"pnpm": ">=9"
-	},
-	"packageManager": "pnpm@9.0.0",
-	"pnpm": {
-		"overrides": {
-			"@types/react": "19.2.4",
-			"@types/react-dom": "19.2.3"
-		}
-	}
+  "name": "wraps-monorepo",
+  "private": true,
+  "description": "Wraps - wrap your AWS account's SES, SNS, SQS, IoT, and more",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wraps-team/wraps.git"
+  },
+  "license": "AGPL-3.0-or-later",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage --filter=@wraps.dev/cli",
+    "lint": "npx ultracite@latest check",
+    "lint:fix": "npx ultracite@latest fix",
+    "typecheck": "turbo run typecheck",
+    "check": "npx ultracite@latest check",
+    "check:errors": "npx ultracite@latest check --diagnostic-level=error",
+    "check:all": "pnpm check:errors && pnpm typecheck && pnpm build && pnpm test",
+    "fix": "npx ultracite@latest fix",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "cli": "node packages/cli/dist/cli.js",
+    "db:push:test": "dotenv -e apps/web/.env.test -- pnpm --filter=@wraps/db db:push"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.4",
+    "@types/aws-lambda": "8.10.157",
+    "@types/node": "24.10.0",
+    "dotenv-cli": "11.0.0",
+    "turbo": "^2.2.3",
+    "ultracite": "6.3.2"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "pnpm": {
+    "overrides": {
+      "@types/react": "19.2.4",
+      "@types/react-dom": "19.2.3"
+    }
+  }
 }

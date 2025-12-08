@@ -1,8 +1,8 @@
 import { render } from "@react-email/render";
-import { auth } from "@wraps/auth";
-import { db, template } from "@wraps/db";
-import { WrapsEmail } from "@wraps.dev/email";
 import type { JSONContent } from "@tiptap/core";
+import { auth } from "@wraps/auth";
+import { brandKit, db, template } from "@wraps/db";
+import { WrapsEmail } from "@wraps.dev/email";
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
@@ -48,12 +48,14 @@ export async function POST(request: Request, context: RouteContext) {
       testData = {},
       from,
       previewText,
+      brandKitId,
     } = body as {
       recipients: string[];
       subject: string;
       testData?: Record<string, unknown>;
       from?: string;
       previewText?: string;
+      brandKitId?: string;
     };
 
     // Validate required fields
@@ -73,7 +75,9 @@ export async function POST(request: Request, context: RouteContext) {
 
     // Validate email format for all recipients
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const invalidEmails = recipients.filter((email: string) => !emailRegex.test(email));
+    const invalidEmails = recipients.filter(
+      (email: string) => !emailRegex.test(email)
+    );
     if (invalidEmails.length > 0) {
       return NextResponse.json(
         { error: `Invalid email addresses: ${invalidEmails.join(", ")}` },
@@ -98,15 +102,47 @@ export async function POST(request: Request, context: RouteContext) {
 
     // Merge template's test data with provided test data
     const mergedTestData = {
-      ...(templateData.testData as Record<string, unknown> || {}),
+      ...((templateData.testData as Record<string, unknown>) || {}),
       ...testData,
     };
 
-    // Convert TipTap content to React Email component
+    // Fetch brand kit (use specified one or default for org)
+    let selectedBrandKit = null;
+    if (brandKitId) {
+      selectedBrandKit = await db.query.brandKit.findFirst({
+        where: and(
+          eq(brandKit.id, brandKitId),
+          eq(brandKit.organizationId, orgWithMembership.id)
+        ),
+      });
+    } else {
+      // Get default brand kit for org
+      selectedBrandKit = await db.query.brandKit.findFirst({
+        where: and(
+          eq(brandKit.organizationId, orgWithMembership.id),
+          eq(brandKit.isDefault, true)
+        ),
+      });
+    }
+
+    // Convert TipTap content to React Email component with brand kit
     const emailComponent = tiptapToReactEmail(
       templateData.content as JSONContent,
       mergedTestData,
-      { previewText }
+      {
+        previewText,
+        brandKit: selectedBrandKit
+          ? {
+              primaryColor: selectedBrandKit.primaryColor,
+              secondaryColor: selectedBrandKit.secondaryColor,
+              backgroundColor: selectedBrandKit.backgroundColor,
+              textColor: selectedBrandKit.textColor,
+              fontFamily: selectedBrandKit.fontFamily,
+              headingFontFamily: selectedBrandKit.headingFontFamily ?? undefined,
+              buttonRadius: selectedBrandKit.buttonRadius,
+            }
+          : undefined,
+      }
     );
 
     // Render to HTML
@@ -120,13 +156,15 @@ export async function POST(request: Request, context: RouteContext) {
       .replace(/\s+/g, " ")
       .trim();
 
-    // Initialize Wraps SDK
-    // The SDK will use the organization's AWS credentials configured in Wraps
-    const wraps = new WrapsEmail();
+    // Initialize Wraps SDK with proper configuration
+    const region = process.env.AWS_REGION || "us-east-1";
+    const wraps = new WrapsEmail({
+      region,
+      roleArn: process.env.WRAPS_EMAIL_ROLE_ARN,
+    });
 
-    // Determine sender address
-    // Use provided 'from' or default to organization's verified domain
-    const senderEmail = from || `test@${orgWithMembership.slug}.wraps.dev`;
+    // Determine sender address from environment or default
+    const senderEmail = from || process.env.EMAIL_FROM || "noreply@wraps.dev";
 
     // Send to each recipient
     const results = await Promise.allSettled(

@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Mail } from "lucide-react";
+import { BarChart3, FileText, Mail } from "lucide-react";
 import Link from "next/link";
 import type * as React from "react";
 import { Logo } from "@/components/logo";
@@ -32,6 +32,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               title: "Emails",
               url: `/${orgSlug}/emails`,
               icon: Mail,
+            },
+            {
+              title: "Templates",
+              url: `/${orgSlug}/templates`,
+              icon: FileText,
             },
             {
               title: "Analytics",

@@ -1,40 +1,40 @@
 import {
-	type ArchiveSearchCriteria,
-	getArchivedEmail,
+  type ArchiveSearchCriteria,
+  getArchivedEmail,
 } from "../../utils/archive.js";
 
 /**
  * Archived email with full content
  */
 export type ArchivedEmail = {
-	messageId: string;
-	from: string;
-	to: string;
-	subject: string;
-	html?: string;
-	text?: string;
-	attachments: Array<{
-		filename?: string;
-		contentType: string;
-		size: number;
-	}>;
-	headers: Record<string, string | string[] | undefined>;
-	timestamp: Date;
-	metadata?: {
-		senderIp?: string;
-		tlsProtocol?: string;
-		tlsCipherSuite?: string;
-		senderHostname?: string;
-	};
+  messageId: string;
+  from: string;
+  to: string;
+  subject: string;
+  html?: string;
+  text?: string;
+  attachments: Array<{
+    filename?: string;
+    contentType: string;
+    size: number;
+  }>;
+  headers: Record<string, string | string[] | undefined>;
+  timestamp: Date;
+  metadata?: {
+    senderIp?: string;
+    tlsProtocol?: string;
+    tlsCipherSuite?: string;
+    senderHostname?: string;
+  };
 };
 
 type FetchArchivedEmailOptions = {
-	region: string;
-	archiveArn: string;
-	from?: string;
-	to?: string;
-	subject?: string;
-	timestamp?: Date;
+  region: string;
+  archiveArn: string;
+  from?: string;
+  to?: string;
+  subject?: string;
+  timestamp?: Date;
 };
 
 /**
@@ -49,51 +49,51 @@ type FetchArchivedEmailOptions = {
  * @returns Archived email with full content, or null if not found
  */
 export async function fetchArchivedEmail(
-	messageId: string,
-	options: FetchArchivedEmailOptions,
+  messageId: string,
+  options: FetchArchivedEmailOptions
 ): Promise<ArchivedEmail | null> {
-	const { region, archiveArn, from, to, subject, timestamp } = options;
+  const { region, archiveArn, from, to, subject, timestamp } = options;
 
-	try {
-		console.log("Fetching archived email:", {
-			messageId,
-			archiveArn,
-			region,
-		});
+  try {
+    console.log("Fetching archived email:", {
+      messageId,
+      archiveArn,
+      region,
+    });
 
-		// Build search criteria from email metadata
-		const searchCriteria: ArchiveSearchCriteria = {
-			from,
-			to,
-			subject,
-			timestamp,
-		};
+    // Build search criteria from email metadata
+    const searchCriteria: ArchiveSearchCriteria = {
+      from,
+      to,
+      subject,
+      timestamp,
+    };
 
-		// Call the archive utility to get the email
-		const email = await getArchivedEmail(archiveArn, searchCriteria, region);
+    // Call the archive utility to get the email
+    const email = await getArchivedEmail(archiveArn, searchCriteria, region);
 
-		console.log("Archived email fetched successfully:", {
-			messageId: email.messageId,
-			hasHtml: !!email.html,
-			hasText: !!email.text,
-			attachmentCount: email.attachments.length,
-		});
+    console.log("Archived email fetched successfully:", {
+      messageId: email.messageId,
+      hasHtml: !!email.html,
+      hasText: !!email.text,
+      attachmentCount: email.attachments.length,
+    });
 
-		// Return the email data
-		return email;
-	} catch (error: unknown) {
-		// If the email is not found, return null instead of throwing
-		if (
-			error instanceof Error &&
-			(error.message.includes("not found") ||
-				error.message.includes("ResourceNotFoundException"))
-		) {
-			console.log("Archived email not found:", messageId);
-			return null;
-		}
+    // Return the email data
+    return email;
+  } catch (error: unknown) {
+    // If the email is not found, return null instead of throwing
+    if (
+      error instanceof Error &&
+      (error.message.includes("not found") ||
+        error.message.includes("ResourceNotFoundException"))
+    ) {
+      console.log("Archived email not found:", messageId);
+      return null;
+    }
 
-		// For other errors, log and rethrow
-		console.error("Error fetching archived email:", error);
-		throw error;
-	}
+    // For other errors, log and rethrow
+    console.error("Error fetching archived email:", error);
+    throw error;
+  }
 }

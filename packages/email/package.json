@@ -1,29 +1,29 @@
 {
-	"name": "@wraps/email",
-	"type": "module",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"default": "./src/index.ts"
-		},
-		"./*": {
-			"types": "./dist/*.d.ts",
-			"default": "./src/*.ts"
-		}
-	},
-	"scripts": {
-		"build": "tsdown"
-	},
-	"devDependencies": {
-		"tsdown": "catalog:"
-	},
-	"peerDependencies": {
-		"typescript": "catalog:"
-	},
-	"dependencies": {
-		"@aws-sdk/client-ses": "^3.490.0",
-		"@aws-sdk/client-sts": "^3.927.0",
-		"@vercel/oidc-aws-credentials-provider": "3.0.4",
-		"@wraps.dev/email": "^0.4.0"
-	}
+  "name": "@wraps/email",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:"
+  },
+  "peerDependencies": {
+    "typescript": "catalog:"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ses": "^3.490.0",
+    "@aws-sdk/client-sts": "^3.927.0",
+    "@vercel/oidc-aws-credentials-provider": "3.0.4",
+    "@wraps.dev/email": "^0.4.0"
+  }
 }

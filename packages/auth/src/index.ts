@@ -87,7 +87,10 @@ export const auth = betterAuth<BetterAuthOptions>({
                 }
 
                 // Optionally: restrict to owners/admins only
-                if (membership.role !== "owner" && membership.role !== "admin") {
+                if (
+                  membership.role !== "owner" &&
+                  membership.role !== "admin"
+                ) {
                   throw new Error(
                     "Unauthorized: Only organization owners and admins can manage subscriptions"
                   );
