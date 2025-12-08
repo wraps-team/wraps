@@ -43,6 +43,13 @@
 			"when": 1763593529286,
 			"tag": "0005_clear_terror",
 			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "7",
+			"when": 1765207875542,
+			"tag": "0006_soft_black_widow",
+			"breakpoints": true
 		}
 	]
 }
