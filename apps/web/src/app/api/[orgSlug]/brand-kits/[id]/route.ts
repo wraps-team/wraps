@@ -13,7 +13,7 @@ type RouteContext = {
 };
 
 // GET /api/[orgSlug]/brand-kits/[id] - Get single brand kit
-export async function GET(request: Request, context: RouteContext) {
+export async function GET(_request: Request, context: RouteContext) {
   try {
     const { orgSlug, id } = await context.params;
 
@@ -151,7 +151,7 @@ export async function PUT(request: Request, context: RouteContext) {
 }
 
 // DELETE /api/[orgSlug]/brand-kits/[id] - Delete brand kit
-export async function DELETE(request: Request, context: RouteContext) {
+export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { orgSlug, id } = await context.params;
 

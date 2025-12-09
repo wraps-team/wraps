@@ -66,10 +66,12 @@ const SuggestionList = forwardRef<SuggestionRef, SuggestionListProps>(
 
     useEffect(() => {
       setSelectedIndex(0);
-    }, [items]);
+    }, []);
 
     const rect = clientRect?.();
-    if (!rect) return null;
+    if (!rect) {
+      return null;
+    }
 
     return createPortal(
       <div

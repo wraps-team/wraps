@@ -32,7 +32,9 @@ export function useTemplate(orgSlug: string, templateId: string) {
     queryKey: templateKeys.detail(orgSlug, templateId),
     queryFn: async () => {
       const response = await fetch(`/api/${orgSlug}/templates/${templateId}`);
-      if (!response.ok) throw new Error("Failed to load template");
+      if (!response.ok) {
+        throw new Error("Failed to load template");
+      }
       return response.json() as Promise<Template>;
     },
   });
@@ -45,7 +47,9 @@ export function useTemplates(orgSlug: string, filters?: { status?: string }) {
     queryFn: async () => {
       const params = new URLSearchParams(filters as Record<string, string>);
       const response = await fetch(`/api/${orgSlug}/templates?${params}`);
-      if (!response.ok) throw new Error("Failed to load templates");
+      if (!response.ok) {
+        throw new Error("Failed to load templates");
+      }
       return response.json() as Promise<Template[]>;
     },
   });
@@ -68,7 +72,9 @@ export function useUpdateTemplate(orgSlug: string, templateId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!response.ok) throw new Error("Failed to update template");
+      if (!response.ok) {
+        throw new Error("Failed to update template");
+      }
       return response.json() as Promise<Template>;
     },
 
@@ -128,7 +134,9 @@ export function useCreateTemplate(orgSlug: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!response.ok) throw new Error("Failed to create template");
+      if (!response.ok) {
+        throw new Error("Failed to create template");
+      }
       return response.json() as Promise<Template>;
     },
 
@@ -150,7 +158,9 @@ export function useDeleteTemplate(orgSlug: string) {
       const response = await fetch(`/api/${orgSlug}/templates/${templateId}`, {
         method: "DELETE",
       });
-      if (!response.ok) throw new Error("Failed to delete template");
+      if (!response.ok) {
+        throw new Error("Failed to delete template");
+      }
       return response.json();
     },
 
@@ -174,7 +184,9 @@ export function useDuplicateTemplate(orgSlug: string) {
           method: "POST",
         }
       );
-      if (!response.ok) throw new Error("Failed to duplicate template");
+      if (!response.ok) {
+        throw new Error("Failed to duplicate template");
+      }
       return response.json() as Promise<Template>;
     },
 
@@ -196,7 +208,9 @@ export function useTemplateVersions(orgSlug: string, templateId: string) {
       const response = await fetch(
         `/api/${orgSlug}/templates/${templateId}/versions`
       );
-      if (!response.ok) throw new Error("Failed to load versions");
+      if (!response.ok) {
+        throw new Error("Failed to load versions");
+      }
       return response.json() as Promise<TemplateVersionWithUser[]>;
     },
   });
@@ -216,7 +230,9 @@ export function useCreateVersion(orgSlug: string, templateId: string) {
           body: JSON.stringify(data),
         }
       );
-      if (!response.ok) throw new Error("Failed to create version");
+      if (!response.ok) {
+        throw new Error("Failed to create version");
+      }
       return response.json() as Promise<TemplateVersion>;
     },
 
@@ -244,7 +260,9 @@ export function useRestoreVersion(orgSlug: string, templateId: string) {
           method: "POST",
         }
       );
-      if (!response.ok) throw new Error("Failed to restore version");
+      if (!response.ok) {
+        throw new Error("Failed to restore version");
+      }
       return response.json() as Promise<{
         success: boolean;
         template: Template;

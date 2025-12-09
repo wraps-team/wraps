@@ -43,17 +43,23 @@ function parseNode(
   if (node.nodeType === 3) {
     // Text node
     const text = node.text.trim();
-    if (!text) return [];
+    if (!text) {
+      return [];
+    }
     return [{ type: "text", text }];
   }
 
   // Handle element nodes
-  if (node.nodeType !== 1) return [];
+  if (node.nodeType !== 1) {
+    return [];
+  }
 
   const element = node as ReturnType<typeof parse>;
   const tagName = element.tagName?.toLowerCase();
 
-  if (!tagName) return [];
+  if (!tagName) {
+    return [];
+  }
 
   // Map HTML elements to TipTap nodes
   switch (tagName) {
@@ -448,7 +454,9 @@ function createListItem(element: ReturnType<typeof parse>): JSONContent {
 function parseInlineStyle(style: string): Record<string, string> {
   const result: Record<string, string> = {};
 
-  if (!style) return result;
+  if (!style) {
+    return result;
+  }
 
   const declarations = style.split(";");
   for (const declaration of declarations) {

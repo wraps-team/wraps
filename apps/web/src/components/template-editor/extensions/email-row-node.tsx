@@ -18,19 +18,19 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export interface EmailRowAttributes {
+export type EmailRowAttributes = {
   gap: string;
-}
+};
 
 declare module "@tiptap/core" {
-  interface Commands<ReturnType> {
+  type Commands<ReturnType> = {
     emailRow: {
       insertEmailRow: (
         attributes?: Partial<EmailRowAttributes>,
         columns?: number
       ) => ReturnType;
     };
-  }
+  };
 }
 
 const EmailRowNodeView = ({

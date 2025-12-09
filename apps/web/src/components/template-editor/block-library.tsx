@@ -37,10 +37,10 @@ import {
 } from "@/hooks/use-block-queries";
 import { cn } from "@/lib/utils";
 
-interface BlockLibraryProps {
+type BlockLibraryProps = {
   editor: Editor | null;
   orgSlug: string;
-}
+};
 
 const CATEGORIES = [
   { value: "all", label: "All Blocks" },
@@ -71,7 +71,9 @@ export function BlockLibrary({ editor, orgSlug }: BlockLibraryProps) {
   );
 
   const handleInsertBlock = (block: ReusableBlock) => {
-    if (!editor) return;
+    if (!editor) {
+      return;
+    }
 
     // Track usage
     trackUsage.mutate(block.id);
@@ -178,11 +180,11 @@ export function BlockLibrary({ editor, orgSlug }: BlockLibraryProps) {
   );
 }
 
-interface BlockCardProps {
+type BlockCardProps = {
   block: ReusableBlock;
   onInsert: () => void;
   onDelete: () => void;
-}
+};
 
 function BlockCard({ block, onInsert, onDelete }: BlockCardProps) {
   return (

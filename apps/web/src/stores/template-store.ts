@@ -1,15 +1,15 @@
 import type { JSONContent } from "@tiptap/core";
 import { create } from "zustand";
 
-interface User {
+type User = {
   id: string;
   name: string;
   avatar?: string;
-}
+};
 
 type EditorView = "edit" | "preview" | "code" | "usage";
 
-interface LocalState {
+type LocalState = {
   view: EditorView;
   selectedNodeId: string | null;
   testData: Record<string, unknown>;
@@ -18,29 +18,29 @@ interface LocalState {
   showAIPanel: boolean;
   showTestDataPanel: boolean;
   showVersionHistory: boolean;
-}
+};
 
-interface TemplateMetadata {
+type TemplateMetadata = {
   id: string;
   name: string;
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   updatedAt: string;
   aiGenerated?: boolean;
-}
+};
 
-interface CollaborationState {
+type CollaborationState = {
   isEnabled: boolean;
   users: User[];
   provider: unknown; // YPartyKitProvider when collaboration is enabled
-}
+};
 
-interface AIState {
+type AIState = {
   conversationId: string | null;
   lastGeneratedContent: JSONContent | null;
   isGenerating: boolean;
-}
+};
 
-interface TemplateStoreActions {
+type TemplateStoreActions = {
   // Document actions
   setDocument: (doc: JSONContent) => void;
 
@@ -67,9 +67,9 @@ interface TemplateStoreActions {
 
   // Reset
   reset: () => void;
-}
+};
 
-interface TemplateStore {
+type TemplateStore = {
   // Document state (will be synced via Yjs when collaboration is added)
   document: JSONContent | null;
 
@@ -87,7 +87,7 @@ interface TemplateStore {
 
   // Actions
   actions: TemplateStoreActions;
-}
+};
 
 const initialLocalState: LocalState = {
   view: "edit",

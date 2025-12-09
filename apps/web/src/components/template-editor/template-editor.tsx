@@ -28,11 +28,11 @@ import { TestDataPanel } from "./test-data-panel";
 import { UsagePanel } from "./usage-panel";
 import { VersionHistoryPanel } from "./version-history-panel";
 
-interface TemplateEditorProps {
+type TemplateEditorProps = {
   orgSlug: string;
   templateId: string;
   className?: string;
-}
+};
 
 /**
  * Wrapper component that handles data loading.
@@ -103,12 +103,12 @@ export function TemplateEditor({
   );
 }
 
-interface TemplateEditorContentProps {
+type TemplateEditorContentProps = {
   orgSlug: string;
   templateId: string;
   template: NonNullable<ReturnType<typeof useTemplate>["data"]>;
   className?: string;
-}
+};
 
 /**
  * Inner component that creates the editor.
@@ -175,7 +175,7 @@ function TemplateEditorContent({
     if (template.subject !== null && template.subject !== subject) {
       setSubject(template.subject);
     }
-  }, [template.subject]);
+  }, [template.subject, subject]);
 
   // Handle subject change - save after a delay
   const handleSubjectChange = useCallback(

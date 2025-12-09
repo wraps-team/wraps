@@ -23,9 +23,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface CodeViewProps {
+type CodeViewProps = {
   editor: Editor | null;
-}
+};
 
 type CodeFormat = "react-email" | "json" | "html";
 
@@ -36,7 +36,9 @@ type CodeFormat = "react-email" | "json" | "html";
 function generateReactEmailCode(content: JSONContent, indent = 0): string {
   const spaces = "  ".repeat(indent);
 
-  if (!content.type) return "";
+  if (!content.type) {
+    return "";
+  }
 
   switch (content.type) {
     case "doc": {
@@ -374,7 +376,9 @@ export function CodeView({ editor }: CodeViewProps) {
 
   // Generate raw code
   useEffect(() => {
-    if (!editor) return;
+    if (!editor) {
+      return;
+    }
 
     const content = editor.getJSON();
 

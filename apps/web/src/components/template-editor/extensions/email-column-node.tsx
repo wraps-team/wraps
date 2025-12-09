@@ -18,20 +18,20 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export interface EmailColumnAttributes {
+export type EmailColumnAttributes = {
   width: string;
   padding: string;
   verticalAlign: "top" | "middle" | "bottom";
-}
+};
 
 declare module "@tiptap/core" {
-  interface Commands<ReturnType> {
+  type Commands<ReturnType> = {
     emailColumn: {
       updateEmailColumn: (
         attributes: Partial<EmailColumnAttributes>
       ) => ReturnType;
     };
-  }
+  };
 }
 
 const EmailColumnNodeView = ({

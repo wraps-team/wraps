@@ -17,18 +17,18 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export interface EmailSpacerAttributes {
+export type EmailSpacerAttributes = {
   height: number;
-}
+};
 
 declare module "@tiptap/core" {
-  interface Commands<ReturnType> {
+  type Commands<ReturnType> = {
     emailSpacer: {
       insertEmailSpacer: (
         attributes?: Partial<EmailSpacerAttributes>
       ) => ReturnType;
     };
-  }
+  };
 }
 
 const EmailSpacerNodeView = ({

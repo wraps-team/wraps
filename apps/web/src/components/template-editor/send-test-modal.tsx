@@ -31,21 +31,20 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSession } from "@/lib/auth-client";
 
-interface SendTestModalProps {
+type SendTestModalProps = {
   editor: Editor | null;
   orgSlug: string;
   templateId: string;
   isOpen: boolean;
   onClose: () => void;
-}
+};
 
 // Extract variable names from template content (e.g., {{variableName}})
 function extractVariables(content: string): string[] {
   const regex = /\{\{(\w+)\}\}/g;
   const matches = new Set<string>();
-  let match: RegExpExecArray | null;
 
-  while ((match = regex.exec(content)) !== null) {
+  for (const match of content.matchAll(regex)) {
     matches.add(match[1]);
   }
 

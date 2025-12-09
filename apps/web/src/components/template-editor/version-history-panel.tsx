@@ -43,11 +43,11 @@ import {
 } from "@/hooks/use-template-queries";
 import { cn } from "@/lib/utils";
 
-interface VersionHistoryPanelProps {
+type VersionHistoryPanelProps = {
   editor: Editor | null;
   orgSlug: string;
   templateId: string;
-}
+};
 
 export function VersionHistoryPanel({
   editor,
@@ -85,7 +85,9 @@ export function VersionHistoryPanel({
   };
 
   const handleRestore = async () => {
-    if (!selectedVersion) return;
+    if (!selectedVersion) {
+      return;
+    }
     try {
       const result = await restoreVersion.mutateAsync(selectedVersion.id);
       toast.success(`Restored to version ${result.restoredFromVersion}`, {
@@ -272,13 +274,13 @@ export function VersionHistoryPanel({
   );
 }
 
-interface VersionItemProps {
+type VersionItemProps = {
   version: TemplateVersionWithUser;
   isSelected: boolean;
   isCurrent: boolean;
   onPreview: () => void;
   onRestore: () => void;
-}
+};
 
 function VersionItem({
   version,

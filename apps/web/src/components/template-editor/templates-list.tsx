@@ -42,9 +42,9 @@ import {
 } from "@/hooks/use-template-queries";
 import { cn } from "@/lib/utils";
 
-interface TemplatesListProps {
+type TemplatesListProps = {
   orgSlug: string;
-}
+};
 
 const statusColors: Record<string, string> = {
   DRAFT: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
@@ -75,7 +75,8 @@ export function TemplatesList({ orgSlug }: TemplatesListProps) {
   if (isLoading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {[...Array(6)].map((_, i) => (
+        {[...new Array(6)].map((_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: Static skeleton loading items
           <Card key={i}>
             <CardHeader>
               <Skeleton className="h-5 w-3/4" />
@@ -192,7 +193,7 @@ function TemplateCardWithPublish({
   );
 }
 
-interface TemplateCardProps {
+type TemplateCardProps = {
   template: Template;
   orgSlug: string;
   onDelete: () => void;
@@ -200,7 +201,7 @@ interface TemplateCardProps {
   onPublish: () => void;
   onUnpublish: () => void;
   isPublishing?: boolean;
-}
+};
 
 function TemplateCard({
   template,

@@ -13,7 +13,7 @@ type RouteContext = {
 };
 
 // GET /api/[orgSlug]/templates/[id]/versions - List all versions
-export async function GET(request: Request, context: RouteContext) {
+export async function GET(_request: Request, context: RouteContext) {
   try {
     const { orgSlug, id } = await context.params;
 

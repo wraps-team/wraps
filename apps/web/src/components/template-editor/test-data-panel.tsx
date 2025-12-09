@@ -23,7 +23,9 @@ type VariableInfo = {
 
 // Extract variables from TipTap document
 function extractVariablesFromDoc(editor: Editor | null): VariableInfo[] {
-  if (!editor) return [];
+  if (!editor) {
+    return [];
+  }
 
   const variables: VariableInfo[] = [];
   const seen = new Set<string>();
@@ -123,7 +125,7 @@ export function TestDataPanel({ editor, className }: TestDataPanelProps) {
   }, [setTestData]);
 
   // Get all keys (document variables + custom)
-  const allKeys = useMemo(() => {
+  const _allKeys = useMemo(() => {
     const docVarNames = documentVariables.map((v) => v.name);
     const customKeys = Object.keys(testData).filter(
       (k) => !docVarNames.includes(k)

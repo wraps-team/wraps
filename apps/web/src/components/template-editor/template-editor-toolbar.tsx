@@ -47,7 +47,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTemplateStore } from "@/stores/template-store";
 
-interface TemplateEditorToolbarProps {
+type TemplateEditorToolbarProps = {
   editor: Editor | null;
   isSaving?: boolean;
   isPublishing?: boolean;
@@ -60,7 +60,7 @@ interface TemplateEditorToolbarProps {
   onSubjectChange?: (subject: string) => void;
   onPublish?: () => void;
   onUnpublish?: () => void;
-}
+};
 
 type ViewMode = "edit" | "preview" | "code" | "usage";
 
@@ -469,11 +469,11 @@ export function TemplateEditorToolbar({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                {!subject
-                  ? "Add a subject line to publish"
-                  : status === "PUBLISHED"
+                {subject
+                  ? status === "PUBLISHED"
                     ? "Update template on AWS SES"
-                    : "Publish to AWS SES"}
+                    : "Publish to AWS SES"
+                  : "Add a subject line to publish"}
               </TooltipContent>
             </Tooltip>
 

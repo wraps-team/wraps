@@ -7,17 +7,17 @@ import { DefaultChatTransport } from "ai";
 import { useCallback, useMemo, useState } from "react";
 import { extractTipTapJson } from "@/lib/ai/validator";
 
-interface UseAIGenerationOptions {
+type UseAIGenerationOptions = {
   orgSlug: string;
   templateId?: string;
   editor: Editor | null;
   onGenerate?: (content: JSONContent) => void;
-}
+};
 
-interface QuickPrompt {
+type QuickPrompt = {
   label: string;
   prompt: string;
-}
+};
 
 export function useAIGeneration({
   orgSlug,
@@ -66,7 +66,9 @@ export function useAIGeneration({
 
   // Apply generated content to editor
   const applyToEditor = useCallback(() => {
-    if (!(lastGeneratedContent && editor)) return;
+    if (!(lastGeneratedContent && editor)) {
+      return;
+    }
 
     setIsApplying(true);
     try {
@@ -94,7 +96,9 @@ export function useAIGeneration({
   const handleSubmit = useCallback(
     (e?: React.FormEvent) => {
       e?.preventDefault();
-      if (!inputValue.trim()) return;
+      if (!inputValue.trim()) {
+        return;
+      }
       sendMessage({ text: inputValue });
       setInputValue("");
     },

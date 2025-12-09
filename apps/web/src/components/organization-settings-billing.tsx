@@ -139,7 +139,7 @@ export function OrganizationSettingsBilling({
     ? new Date(activeSubscription.trialEnd)
     : null;
 
-  const handleUpgrade = async () => {
+  const _handleUpgrade = async () => {
     if (!canManageBilling) {
       toast.error("Only organization owners and admins can manage billing");
       return;

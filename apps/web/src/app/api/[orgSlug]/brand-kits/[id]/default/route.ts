@@ -13,7 +13,7 @@ type RouteContext = {
 };
 
 // POST /api/[orgSlug]/brand-kits/[id]/default - Set brand kit as default
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(_request: Request, context: RouteContext) {
   try {
     const { orgSlug, id } = await context.params;
 

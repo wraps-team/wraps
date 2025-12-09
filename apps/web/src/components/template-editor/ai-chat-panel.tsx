@@ -36,12 +36,12 @@ import { extractTipTapJson } from "@/lib/ai/validator";
 import { cn } from "@/lib/utils";
 import { useTemplateStore } from "@/stores/template-store";
 
-interface AIChatPanelProps {
+type AIChatPanelProps = {
   editor: Editor | null;
   orgSlug: string;
   templateId: string;
   asSidePanel?: boolean;
-}
+};
 
 const QUICK_PROMPTS = [
   { label: "Welcome Email", prompt: "Create a welcome email for new users" },
@@ -86,7 +86,9 @@ export function AIChatPanel({
 
   // Get the selected brand kit or default
   const selectedBrandKit = useMemo(() => {
-    if (!brandKits?.length) return null;
+    if (!brandKits?.length) {
+      return null;
+    }
     if (selectedBrandKitId) {
       return brandKits.find((kit) => kit.id === selectedBrandKitId) ?? null;
     }
@@ -143,7 +145,7 @@ export function AIChatPanel({
 
   // Extract TipTap JSON from the latest assistant message
   useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
+    const lastMessage = messages.at(-1);
     if (lastMessage?.role === "assistant" && !isLoading) {
       // Get the text content from message parts
       const textContent = lastMessage.parts
@@ -171,10 +173,12 @@ export function AIChatPanel({
         scrollContainer.scrollTop = scrollContainer.scrollHeight;
       }
     }
-  }, [messages]);
+  }, []);
 
   const handleApplyContent = useCallback(() => {
-    if (!(editor && pendingContent)) return;
+    if (!(editor && pendingContent)) {
+      return;
+    }
 
     editor.commands.setContent(pendingContent);
     setPendingContent(null);
@@ -187,7 +191,9 @@ export function AIChatPanel({
 
   const handleSendMessage = useCallback(
     (text: string) => {
-      if (!text.trim() || isLoading) return;
+      if (!text.trim() || isLoading) {
+        return;
+      }
       sendMessageThrottler.maybeExecute(text.trim());
       setInput("");
     },
@@ -404,7 +410,7 @@ export function AIChatPanel({
                 </div>
               ))}
 
-              {isLoading && messages[messages.length - 1]?.role === "user" && (
+              {isLoading && messages.at(-1)?.role === "user" && (
                 <div className="flex gap-2">
                   <Avatar className="h-6 w-6 shrink-0">
                     <AvatarFallback className="bg-primary text-primary-foreground">

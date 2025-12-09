@@ -8,7 +8,7 @@
  * - Company name (from og:site_name or title)
  */
 
-export interface ExtractedBrandKit {
+export type ExtractedBrandKit = {
   logoUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
@@ -17,7 +17,7 @@ export interface ExtractedBrandKit {
   fontFamily: string;
   companyName: string | null;
   sourceDomain: string;
-}
+};
 
 const DEFAULT_BRAND_KIT: Omit<ExtractedBrandKit, "sourceDomain"> = {
   logoUrl: null,
@@ -80,7 +80,7 @@ export async function extractBrandKitFromDomain(
     }
 
     // Combine HTML and CSS for color extraction
-    const combinedContent = html + "\n" + cssContent;
+    const combinedContent = `${html}\n${cssContent}`;
 
     // All extraction is synchronous from here - just parsing strings
     const logoUrl = extractLogo(html, url);
@@ -114,19 +114,22 @@ async function fetchFirstStylesheet(
   baseUrl: string,
   signal: AbortSignal
 ): Promise<string> {
-  if (signal.aborted) return "";
+  if (signal.aborted) {
+    return "";
+  }
 
   try {
     // Find all stylesheet links
     const allLinks: string[] = [];
     const linkRegex =
       /<link[^>]+rel=["']stylesheet["'][^>]*href=["']([^"']+)["']/gi;
-    let linkMatch;
-    while ((linkMatch = linkRegex.exec(html)) !== null) {
+    for (const linkMatch of html.matchAll(linkRegex)) {
       allLinks.push(linkMatch[1]);
     }
 
-    if (allLinks.length === 0) return "";
+    if (allLinks.length === 0) {
+      return "";
+    }
 
     // Find first non-font stylesheet
     let targetUrl: string | null = null;
@@ -143,7 +146,9 @@ async function fetchFirstStylesheet(
       }
     }
 
-    if (!targetUrl) return "";
+    if (!targetUrl) {
+      return "";
+    }
 
     const response = await fetch(targetUrl, {
       headers: {
@@ -154,12 +159,15 @@ async function fetchFirstStylesheet(
       signal,
     });
 
-    if (!response.ok) return "";
+    if (!response.ok) {
+      return "";
+    }
 
     // Check content length - allow up to 300KB for bundled CSS
     const contentLength = response.headers.get("content-length");
-    if (contentLength && Number.parseInt(contentLength, 10) > 300_000)
+    if (contentLength && Number.parseInt(contentLength, 10) > 300_000) {
       return "";
+    }
 
     const css = await response.text();
 
@@ -220,7 +228,9 @@ function extractColors(html: string): {
   );
   if (themeColorMatch?.[1]) {
     const normalized = normalizeColor(themeColorMatch[1]);
-    if (normalized) primary = normalized;
+    if (normalized) {
+      primary = normalized;
+    }
   }
 
   // 2. Try msapplication-TileColor
@@ -230,7 +240,9 @@ function extractColors(html: string): {
     );
     if (tileColorMatch?.[1]) {
       const normalized = normalizeColor(tileColorMatch[1]);
-      if (normalized) primary = normalized;
+      if (normalized) {
+        primary = normalized;
+      }
     }
   }
 
@@ -347,11 +359,15 @@ function normalizeColor(color: string): string | null {
   const trimmed = color.trim().toLowerCase();
 
   // Skip CSS variable references
-  if (trimmed.startsWith("var(")) return null;
+  if (trimmed.startsWith("var(")) {
+    return null;
+  }
 
   // Already hex - ensure lowercase
   if (trimmed.startsWith("#")) {
-    if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed.toLowerCase();
+    if (/^#[0-9a-f]{6}$/i.test(trimmed)) {
+      return trimmed.toLowerCase();
+    }
     if (/^#[0-9a-f]{3}$/i.test(trimmed)) {
       return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`.toLowerCase();
     }
@@ -469,8 +485,12 @@ function oklabToHex(l: number, a: number, b: number): string {
 
   // Convert linear sRGB to sRGB (gamma correction)
   const toSrgb = (x: number) => {
-    if (x <= 0) return 0;
-    if (x >= 1) return 255;
+    if (x <= 0) {
+      return 0;
+    }
+    if (x >= 1) {
+      return 255;
+    }
     return Math.round(
       (x <= 0.003_130_8 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055) * 255
     );
@@ -504,12 +524,23 @@ function hslToHex(h: number, s: number, l: number): string {
   if (s === 0) {
     r = g = b = l;
   } else {
-    const hue2rgb = (p: number, q: number, t: number) => {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1 / 6) return p + (q - p) * 6 * t;
-      if (t < 1 / 2) return q;
-      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    const hue2rgb = (p: number, q: number, tInput: number) => {
+      let t = tInput;
+      if (t < 0) {
+        t += 1;
+      }
+      if (t > 1) {
+        t -= 1;
+      }
+      if (t < 1 / 6) {
+        return p + (q - p) * 6 * t;
+      }
+      if (t < 1 / 2) {
+        return q;
+      }
+      if (t < 2 / 3) {
+        return p + (q - p) * (2 / 3 - t) * 6;
+      }
       return p;
     };
 
@@ -607,9 +638,13 @@ function adjustColor(hex: string, percent: number): string {
   const num = Number.parseInt(fullHex.replace("#", ""), 16);
   const amt = Math.round(2.55 * percent);
 
+  // biome-ignore lint/suspicious/noBitwiseOperators: Standard RGB color manipulation
   const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+  // biome-ignore lint/suspicious/noBitwiseOperators: Standard RGB color manipulation
   const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00_ff) + amt));
+  // biome-ignore lint/suspicious/noBitwiseOperators: Standard RGB color manipulation
   const B = Math.max(0, Math.min(255, (num & 0x00_00_ff) + amt));
 
+  // biome-ignore lint/suspicious/noBitwiseOperators: Standard RGB color manipulation
   return `#${((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1)}`;
 }

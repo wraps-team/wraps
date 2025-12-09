@@ -16,19 +16,19 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export interface VariableAttributes {
+export type VariableAttributes = {
   name: string;
   label: string;
   fallback: string;
   format: string | null;
-}
+};
 
 declare module "@tiptap/core" {
-  interface Commands<ReturnType> {
+  type Commands<ReturnType> = {
     variable: {
       insertVariable: (attributes: Partial<VariableAttributes>) => ReturnType;
     };
-  }
+  };
 }
 
 const VariableNodeView = ({
@@ -106,11 +106,11 @@ const VariableNodeView = ({
 };
 
 // Suggestion items for autocomplete
-export interface VariableSuggestionItem {
+export type VariableSuggestionItem = {
   name: string;
   label: string;
   type: string;
-}
+};
 
 export const VariableNode = Node.create({
   name: "variable",

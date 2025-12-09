@@ -25,9 +25,9 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-interface NewTemplateFormProps {
+type NewTemplateFormProps = {
   orgSlug: string;
-}
+};
 
 export function NewTemplateForm({ orgSlug }: NewTemplateFormProps) {
   const router = useRouter();

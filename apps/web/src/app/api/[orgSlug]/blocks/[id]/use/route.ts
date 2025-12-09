@@ -13,7 +13,7 @@ type RouteContext = {
 };
 
 // POST /api/[orgSlug]/blocks/[id]/use - Track block usage
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(_request: Request, context: RouteContext) {
   try {
     const { orgSlug, id } = await context.params;
 

@@ -3,11 +3,11 @@
 import type { JSONContent } from "@tiptap/core";
 import { COMPONENT_SPECS, VALID_NODE_TYPES } from "./components-spec";
 
-export interface ValidationResult {
+export type ValidationResult = {
   valid: boolean;
   errors: string[];
   warnings: string[];
-}
+};
 
 export function validateTipTapJson(doc: JSONContent): ValidationResult {
   const errors: string[] = [];
@@ -141,8 +141,12 @@ export function extractTipTapJson(content: string): JSONContent | null {
       let depth = 0;
       let endIdx = startIdx;
       for (let i = startIdx; i < content.length; i++) {
-        if (content[i] === "{") depth++;
-        if (content[i] === "}") depth--;
+        if (content[i] === "{") {
+          depth++;
+        }
+        if (content[i] === "}") {
+          depth--;
+        }
         if (depth === 0) {
           endIdx = i + 1;
           break;

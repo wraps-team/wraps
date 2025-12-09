@@ -21,7 +21,9 @@ export function useBrandKits(orgSlug: string) {
     queryKey: brandKitKeys.list(orgSlug),
     queryFn: async () => {
       const response = await fetch(`/api/${orgSlug}/brand-kits`);
-      if (!response.ok) throw new Error("Failed to load brand kits");
+      if (!response.ok) {
+        throw new Error("Failed to load brand kits");
+      }
       return response.json() as Promise<BrandKit[]>;
     },
   });
@@ -33,7 +35,9 @@ export function useBrandKit(orgSlug: string, brandKitId: string) {
     queryKey: brandKitKeys.detail(orgSlug, brandKitId),
     queryFn: async () => {
       const response = await fetch(`/api/${orgSlug}/brand-kits/${brandKitId}`);
-      if (!response.ok) throw new Error("Failed to load brand kit");
+      if (!response.ok) {
+        throw new Error("Failed to load brand kit");
+      }
       return response.json() as Promise<BrandKit>;
     },
     enabled: !!brandKitId,
@@ -61,7 +65,9 @@ export function useCreateBrandKit(orgSlug: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!response.ok) throw new Error("Failed to create brand kit");
+      if (!response.ok) {
+        throw new Error("Failed to create brand kit");
+      }
       return response.json() as Promise<BrandKit>;
     },
 
@@ -84,7 +90,9 @@ export function useUpdateBrandKit(orgSlug: string, brandKitId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!response.ok) throw new Error("Failed to update brand kit");
+      if (!response.ok) {
+        throw new Error("Failed to update brand kit");
+      }
       return response.json() as Promise<BrandKit>;
     },
 
@@ -135,7 +143,9 @@ export function useSetDefaultBrandKit(orgSlug: string) {
           method: "POST",
         }
       );
-      if (!response.ok) throw new Error("Failed to set default brand kit");
+      if (!response.ok) {
+        throw new Error("Failed to set default brand kit");
+      }
       return response.json() as Promise<BrandKit>;
     },
 

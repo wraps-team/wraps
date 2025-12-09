@@ -34,14 +34,14 @@ export type ConditionalOperator =
   | "greaterThan"
   | "lessThan";
 
-export interface ConditionalAttributes {
+export type ConditionalAttributes = {
   variable: string;
   operator: ConditionalOperator;
   value: string;
-}
+};
 
 declare module "@tiptap/core" {
-  interface Commands<ReturnType> {
+  type Commands<ReturnType> = {
     conditional: {
       insertConditional: (
         attributes?: Partial<ConditionalAttributes>
@@ -50,7 +50,7 @@ declare module "@tiptap/core" {
         attributes: Partial<ConditionalAttributes>
       ) => ReturnType;
     };
-  }
+  };
 }
 
 const operatorLabels: Record<ConditionalOperator, string> = {

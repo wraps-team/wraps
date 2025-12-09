@@ -14,7 +14,7 @@ type RouteContext = {
 };
 
 // GET /api/[orgSlug]/templates/[id]/versions/[versionId] - Get single version
-export async function GET(request: Request, context: RouteContext) {
+export async function GET(_request: Request, context: RouteContext) {
   try {
     const { orgSlug, id, versionId } = await context.params;
 
@@ -85,7 +85,7 @@ export async function GET(request: Request, context: RouteContext) {
 }
 
 // POST /api/[orgSlug]/templates/[id]/versions/[versionId] - Restore to this version
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(_request: Request, context: RouteContext) {
   try {
     const { orgSlug, id, versionId } = await context.params;
 

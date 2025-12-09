@@ -36,9 +36,9 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { tiptapToReactEmail } from "@/lib/serializers/tiptap-to-react-email";
 import { useTemplateStore } from "@/stores/template-store";
 
-interface PreviewPanelProps {
+type PreviewPanelProps = {
   editor: Editor | null;
-}
+};
 
 type DeviceType = "desktop" | "tablet" | "mobile";
 
@@ -60,7 +60,9 @@ export function PreviewPanel({ editor }: PreviewPanelProps) {
   // Auto-adjust iframe height based on content
   const adjustIframeHeight = useCallback(() => {
     const iframe = iframeRef.current;
-    if (!iframe?.contentWindow?.document?.body) return;
+    if (!iframe?.contentWindow?.document?.body) {
+      return;
+    }
 
     // Get the content height
     const contentHeight = iframe.contentWindow.document.body.scrollHeight;
@@ -71,9 +73,11 @@ export function PreviewPanel({ editor }: PreviewPanelProps) {
 
   // Get current editor content as JSON string for debouncing
   const editorContentJson = useMemo(() => {
-    if (!editor) return "";
+    if (!editor) {
+      return "";
+    }
     return JSON.stringify(editor.getJSON());
-  }, [editor?.state.doc]);
+  }, [editor?.state.doc, editor]);
 
   // Debounce preview updates - wait 500ms after user stops typing
   const [debouncedContent] = useDebouncedValue(editorContentJson, {
@@ -82,7 +86,9 @@ export function PreviewPanel({ editor }: PreviewPanelProps) {
 
   // Extract variables from editor content
   const variables = useMemo(() => {
-    if (!editor) return [];
+    if (!editor) {
+      return [];
+    }
 
     const vars: string[] = [];
     editor.state.doc.descendants((node) => {
@@ -94,16 +100,18 @@ export function PreviewPanel({ editor }: PreviewPanelProps) {
       }
     });
     return vars;
-  }, [editor?.state.doc]);
+  }, [editor?.state.doc, editor]);
 
   // Generate preview HTML when debounced content or test data changes
   useEffect(() => {
-    if (!debouncedContent) return;
+    if (!debouncedContent) {
+      return;
+    }
 
     try {
       const content = JSON.parse(debouncedContent);
       // Serialize to React Email JSX string, then we'll render it
-      const reactEmailJsx = tiptapToReactEmail(content, testData);
+      const _reactEmailJsx = tiptapToReactEmail(content, testData);
       // For now, create a simple HTML preview
       // In production, you'd render the React Email component server-side
       setHtmlContent(generatePreviewHtml(content, testData, darkMode));
@@ -114,7 +122,9 @@ export function PreviewPanel({ editor }: PreviewPanelProps) {
 
   // Adjust iframe height when content changes
   useEffect(() => {
-    if (!htmlContent) return;
+    if (!htmlContent) {
+      return;
+    }
 
     // Wait for iframe to render content, then adjust height
     const timeouts = [
@@ -404,7 +414,9 @@ function generatePreviewHtml(
     content?: unknown[];
     text?: string;
   }): string => {
-    if (!node.type) return "";
+    if (!node.type) {
+      return "";
+    }
 
     switch (node.type) {
       case "doc":

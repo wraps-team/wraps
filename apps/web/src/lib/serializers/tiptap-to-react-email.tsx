@@ -25,7 +25,7 @@ import {
 import type { JSONContent } from "@tiptap/core";
 import type { ReactElement } from "react";
 
-interface BrandKitColors {
+type BrandKitColors = {
   primaryColor?: string;
   secondaryColor?: string;
   backgroundColor?: string;
@@ -38,12 +38,12 @@ interface BrandKitColors {
   darkSecondaryColor?: string;
   darkBackgroundColor?: string;
   darkTextColor?: string;
-}
+};
 
-interface SerializerOptions {
+type SerializerOptions = {
   previewText?: string;
   brandKit?: BrandKitColors;
-}
+};
 
 /**
  * Resolves a variable in the content with test data

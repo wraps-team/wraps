@@ -26,17 +26,17 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-interface BlockPaletteProps {
+type BlockPaletteProps = {
   editor: Editor | null;
-}
+};
 
-interface BlockItem {
+type BlockItem = {
   name: string;
   description: string;
   icon: React.ReactNode;
   action: (editor: Editor) => void;
   category: "email" | "text" | "layout" | "dynamic";
-}
+};
 
 const blocks: BlockItem[] = [
   // Email components
@@ -178,7 +178,9 @@ const categoryOrder: BlockItem["category"][] = [
 ];
 
 export function BlockPalette({ editor }: BlockPaletteProps) {
-  if (!editor) return null;
+  if (!editor) {
+    return null;
+  }
 
   const blocksByCategory = categoryOrder.map((category) => ({
     category,

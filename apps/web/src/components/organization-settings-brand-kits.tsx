@@ -121,7 +121,9 @@ export function OrganizationSettingsBrandKits({
   const canEdit = userRole === "owner" || userRole === "admin";
 
   const fetchBrandKits = useCallback(async () => {
-    if (!organization.slug) return;
+    if (!organization.slug) {
+      return;
+    }
 
     try {
       const response = await fetch(`/api/${organization.slug}/brand-kits`);
@@ -167,7 +169,9 @@ export function OrganizationSettingsBrandKits({
   };
 
   const handleSave = async () => {
-    if (!organization.slug) return;
+    if (!organization.slug) {
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -198,7 +202,9 @@ export function OrganizationSettingsBrandKits({
   };
 
   const handleSetDefault = async (kit: BrandKit) => {
-    if (!organization.slug) return;
+    if (!organization.slug) {
+      return;
+    }
 
     try {
       const response = await fetch(
@@ -220,7 +226,9 @@ export function OrganizationSettingsBrandKits({
   };
 
   const handleDelete = async (kit: BrandKit) => {
-    if (!organization.slug) return;
+    if (!organization.slug) {
+      return;
+    }
 
     // Confirm deletion
     const confirmed = window.confirm(
@@ -229,7 +237,9 @@ export function OrganizationSettingsBrandKits({
         : `Delete "${kit.name}"?`
     );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     try {
       const response = await fetch(
@@ -251,7 +261,9 @@ export function OrganizationSettingsBrandKits({
   };
 
   const handleExtractFromDomain = async () => {
-    if (!(organization.slug && extractDomain.trim())) return;
+    if (!(organization.slug && extractDomain.trim())) {
+      return;
+    }
 
     setIsExtracting(true);
     try {
@@ -270,10 +282,14 @@ export function OrganizationSettingsBrandKits({
 
         // Ensure colors are valid hex format for color picker (#rrggbb)
         const ensureHexColor = (color: string, fallback: string): string => {
-          if (!color) return fallback;
+          if (!color) {
+            return fallback;
+          }
           const hex = color.trim().toLowerCase();
           // Must be exactly #rrggbb format for color picker
-          if (/^#[0-9a-f]{6}$/.test(hex)) return hex;
+          if (/^#[0-9a-f]{6}$/.test(hex)) {
+            return hex;
+          }
           return fallback;
         };
 

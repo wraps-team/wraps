@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export interface EmailButtonAttributes {
+export type EmailButtonAttributes = {
   href: string;
   backgroundColor: string;
   color: string;
@@ -26,10 +26,10 @@ export interface EmailButtonAttributes {
   fontSize: string;
   fontWeight: string;
   align: "left" | "center" | "right";
-}
+};
 
 declare module "@tiptap/core" {
-  interface Commands<ReturnType> {
+  type Commands<ReturnType> = {
     emailButton: {
       insertEmailButton: (
         attributes?: Partial<EmailButtonAttributes>
@@ -38,7 +38,7 @@ declare module "@tiptap/core" {
         attributes: Partial<EmailButtonAttributes>
       ) => ReturnType;
     };
-  }
+  };
 }
 
 const EmailButtonNodeView = ({

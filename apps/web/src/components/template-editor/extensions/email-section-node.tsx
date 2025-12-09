@@ -18,15 +18,15 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export interface EmailSectionAttributes {
+export type EmailSectionAttributes = {
   backgroundColor: string;
   padding: string;
   maxWidth: string;
   borderRadius: string;
-}
+};
 
 declare module "@tiptap/core" {
-  interface Commands<ReturnType> {
+  type Commands<ReturnType> = {
     emailSection: {
       insertEmailSection: (
         attributes?: Partial<EmailSectionAttributes>
@@ -35,7 +35,7 @@ declare module "@tiptap/core" {
         attributes: Partial<EmailSectionAttributes>
       ) => ReturnType;
     };
-  }
+  };
 }
 
 const EmailSectionNodeView = ({

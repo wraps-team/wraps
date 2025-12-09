@@ -22,7 +22,7 @@ import {
   VariableSuggestion,
 } from "@/components/template-editor/extensions";
 
-interface UseTemplateEditorOptions {
+type UseTemplateEditorOptions = {
   templateId: string;
   initialContent?: JSONContent;
   onSave?: (content: JSONContent) => Promise<void>;
@@ -31,7 +31,7 @@ interface UseTemplateEditorOptions {
   collaborative?: boolean;
   /** Auto-save delay in milliseconds (default: 60000 = 1 minute) */
   autoSaveDelay?: number;
-}
+};
 
 export function useTemplateEditor({
   templateId,
@@ -154,7 +154,7 @@ export function useTemplateEditor({
     onSelectionUpdate: ({ editor }) => {
       // Could emit selected node info here for properties panel
       const { from, to } = editor.state.selection;
-      const node = editor.state.doc.nodeAt(from);
+      const _node = editor.state.doc.nodeAt(from);
       // Emit node info if needed
     },
   });
@@ -168,7 +168,9 @@ export function useTemplateEditor({
 
   // Manual save function - flushes any pending debounced save and saves immediately
   const saveNow = useCallback(async () => {
-    if (!(editor && onSave)) return;
+    if (!(editor && onSave)) {
+      return;
+    }
 
     // Cancel any pending debounced save
     saveDebouncer.cancel();
@@ -192,7 +194,9 @@ export function useTemplateEditor({
         | "variable",
       attrs?: Record<string, unknown>
     ) => {
-      if (!editor) return;
+      if (!editor) {
+        return;
+      }
 
       switch (type) {
         case "emailButton":

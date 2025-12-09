@@ -4,16 +4,16 @@ import { AlertTriangle, RefreshCw, RotateCcw } from "lucide-react";
 import { Component, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
-interface EditorErrorBoundaryProps {
+type EditorErrorBoundaryProps = {
   children: ReactNode;
   onReset?: () => void;
-}
+};
 
-interface EditorErrorBoundaryState {
+type EditorErrorBoundaryState = {
   hasError: boolean;
   error: Error | null;
   errorInfo: React.ErrorInfo | null;
-}
+};
 
 export class EditorErrorBoundary extends Component<
   EditorErrorBoundaryProps,

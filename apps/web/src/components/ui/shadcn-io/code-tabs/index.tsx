@@ -1,19 +1,18 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { useTheme } from 'next-themes';
-
-import { cn } from '@/lib/utils';
+import { useTheme } from "next-themes";
+import * as React from "react";
+import { CopyButton } from "@/components/ui/shadcn-io/copy-button";
 import {
   Tabs,
   TabsContent,
-  TabsList,
-  TabsTrigger,
   TabsContents,
-  useTabs,
+  TabsList,
   type TabsProps,
-} from '@/components/ui/shadcn-io/tabs';
-import { CopyButton } from '@/components/ui/shadcn-io/copy-button';
+  TabsTrigger,
+  useTabs,
+} from "@/components/ui/shadcn-io/tabs";
+import { cn } from "@/lib/utils";
 
 type CodeTabsProps = {
   codes: Record<string, string>;
@@ -24,15 +23,15 @@ type CodeTabsProps = {
   };
   copyButton?: boolean;
   /** Called when copy is attempted. Return false to prevent copy action. */
-  onCopy?: (content: string) => void | boolean;
-} & Omit<TabsProps, 'children'>;
+  onCopy?: (content: string) => undefined | boolean;
+} & Omit<TabsProps, "children">;
 
 function CodeTabsContent({
   codes,
-  lang = 'bash',
+  lang = "bash",
   themes = {
-    light: 'github-light',
-    dark: 'github-dark',
+    light: "github-light",
+    dark: "github-dark",
   },
   copyButton = true,
   onCopy,
@@ -41,20 +40,18 @@ function CodeTabsContent({
   lang?: string;
   themes?: { light: string; dark: string };
   copyButton?: boolean;
-  onCopy?: (content: string) => void | boolean;
+  onCopy?: (content: string) => undefined | boolean;
 }) {
   const { resolvedTheme } = useTheme();
   const { activeValue } = useTabs();
 
-  const [highlightedCodes, setHighlightedCodes] = React.useState<Record<
-    string,
-    string
-  >>(codes); // Start with raw codes for instant rendering
+  const [highlightedCodes, setHighlightedCodes] =
+    React.useState<Record<string, string>>(codes); // Start with raw codes for instant rendering
 
   React.useEffect(() => {
     async function loadHighlightedCode() {
       try {
-        const { codeToHtml } = await import('shiki');
+        const { codeToHtml } = await import("shiki");
         const newHighlightedCodes: Record<string, string> = {};
 
         for (const [command, val] of Object.entries(codes)) {
@@ -64,7 +61,7 @@ function CodeTabsContent({
               light: themes.light,
               dark: themes.dark,
             },
-            defaultColor: resolvedTheme === 'dark' ? 'dark' : 'light',
+            defaultColor: resolvedTheme === "dark" ? "dark" : "light",
           });
 
           newHighlightedCodes[command] = highlighted;
@@ -72,7 +69,7 @@ function CodeTabsContent({
 
         setHighlightedCodes(newHighlightedCodes);
       } catch (error) {
-        console.error('Error highlighting codes', error);
+        console.error("Error highlighting codes", error);
       }
     }
     loadHighlightedCode();
@@ -81,16 +78,16 @@ function CodeTabsContent({
   return (
     <>
       <TabsList
-        data-slot="install-tabs-list"
-        className="w-full relative justify-between rounded-none h-10 bg-muted border-b border-border/75 dark:border-border/50 text-current py-0 px-4"
         activeClassName="rounded-none shadow-none bg-transparent after:content-[''] after:absolute after:inset-x-0 after:h-0.5 after:bottom-0 dark:after:bg-white after:bg-black after:rounded-t-full"
+        className="relative h-10 w-full justify-between rounded-none border-border/75 border-b bg-muted px-4 py-0 text-current dark:border-border/50"
+        data-slot="install-tabs-list"
       >
-        <div className="flex gap-x-3 h-full">
+        <div className="flex h-full gap-x-3">
           {Object.keys(codes).map((code) => (
             <TabsTrigger
+              className="px-0 text-muted-foreground data-[state=active]:text-current"
               key={code}
               value={code}
-              className="text-muted-foreground data-[state=active]:text-current px-0"
             >
               {code}
             </TabsTrigger>
@@ -99,25 +96,27 @@ function CodeTabsContent({
 
         {copyButton && (
           <CopyButton
+            className="-me-2 bg-transparent hover:bg-black/5 dark:hover:bg-white/10"
             content={codes[activeValue]}
+            onCopy={onCopy}
             size="sm"
             variant="ghost"
-            className="-me-2 bg-transparent hover:bg-black/5 dark:hover:bg-white/10"
-            onCopy={onCopy}
           />
         )}
       </TabsList>
       <TabsContents data-slot="install-tabs-contents">
         {Object.entries(codes).map(([code, rawCode]) => (
           <TabsContent
+            className="flex w-full items-center overflow-auto p-4 text-sm"
             data-slot="install-tabs-content"
             key={code}
-            className="w-full text-sm flex items-center p-4 overflow-auto"
             value={code}
           >
-            <div className="w-full [&>pre]:m-0 [&>pre]:p-0 [&>pre]:bg-transparent! [&>pre]:border-none [&>pre]:text-[13px] [&>pre]:leading-relaxed [&_code]:text-[13px] [&_code]:leading-relaxed [&_code]:bg-transparent! [&_.shiki]:bg-transparent!">
+            <div className="w-full [&>pre]:m-0 [&>pre]:border-none [&>pre]:bg-transparent! [&>pre]:p-0 [&>pre]:text-[13px] [&>pre]:leading-relaxed [&_.shiki]:bg-transparent! [&_code]:bg-transparent! [&_code]:text-[13px] [&_code]:leading-relaxed">
               {highlightedCodes[code] !== rawCode ? (
-                <div dangerouslySetInnerHTML={{ __html: highlightedCodes[code] }} />
+                <div
+                  dangerouslySetInnerHTML={{ __html: highlightedCodes[code] }}
+                />
               ) : (
                 <pre>
                   <code>{rawCode}</code>
@@ -133,10 +132,10 @@ function CodeTabsContent({
 
 function CodeTabs({
   codes,
-  lang = 'bash',
+  lang = "bash",
   themes = {
-    light: 'github-light',
-    dark: 'github-dark',
+    light: "github-light",
+    dark: "github-dark",
   },
   className,
   defaultValue,
@@ -146,29 +145,30 @@ function CodeTabs({
   onCopy,
   ...props
 }: CodeTabsProps) {
-  const firstKey = React.useMemo(() => Object.keys(codes)[0] ?? '', [codes]);
+  const firstKey = React.useMemo(() => Object.keys(codes)[0] ?? "", [codes]);
 
   // Handle controlled vs uncontrolled properly
-  const tabsProps = value !== undefined 
-    ? { value, onValueChange } 
-    : { defaultValue: defaultValue ?? firstKey };
+  const tabsProps =
+    value !== undefined
+      ? { value, onValueChange }
+      : { defaultValue: defaultValue ?? firstKey };
 
   return (
     <Tabs
-      data-slot="install-tabs"
       className={cn(
-        'w-full gap-0 bg-muted/50 rounded-xl border overflow-hidden',
-        className,
+        "w-full gap-0 overflow-hidden rounded-xl border bg-muted/50",
+        className
       )}
+      data-slot="install-tabs"
       {...tabsProps}
       {...(props as any)}
     >
       <CodeTabsContent
         codes={codes}
-        lang={lang}
-        themes={themes}
         copyButton={copyButton}
+        lang={lang}
         onCopy={onCopy}
+        themes={themes}
       />
     </Tabs>
   );

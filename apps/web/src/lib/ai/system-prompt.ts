@@ -2,7 +2,7 @@
 
 import { COMPONENT_SPECS } from "./components-spec";
 
-interface BrandKit {
+type BrandKit = {
   primaryColor: string;
   secondaryColor: string;
   backgroundColor: string;
@@ -12,19 +12,19 @@ interface BrandKit {
   buttonRadius?: string;
   companyName?: string | null;
   logoUrl?: string | null;
-}
+};
 
-interface TemplateVariable {
+type TemplateVariable = {
   name: string;
   label: string;
   type: string;
-}
+};
 
-interface SystemPromptOptions {
+type SystemPromptOptions = {
   brandKit?: BrandKit;
   availableVariables?: TemplateVariable[];
   existingContent?: string; // Current TipTap JSON if editing
-}
+};
 
 export function buildSystemPrompt(options: SystemPromptOptions = {}): string {
   const { brandKit, availableVariables = [], existingContent } = options;

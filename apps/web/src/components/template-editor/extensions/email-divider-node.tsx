@@ -17,20 +17,20 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export interface EmailDividerAttributes {
+export type EmailDividerAttributes = {
   borderColor: string;
   borderWidth: string;
   margin: string;
-}
+};
 
 declare module "@tiptap/core" {
-  interface Commands<ReturnType> {
+  type Commands<ReturnType> = {
     emailDivider: {
       insertEmailDivider: (
         attributes?: Partial<EmailDividerAttributes>
       ) => ReturnType;
     };
-  }
+  };
 }
 
 const EmailDividerNodeView = ({

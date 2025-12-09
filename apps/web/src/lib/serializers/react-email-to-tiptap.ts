@@ -115,7 +115,9 @@ function parseJSXElement(
   const opening = element.openingElement;
   const componentName = getComponentName(opening.name);
 
-  if (!componentName) return null;
+  if (!componentName) {
+    return null;
+  }
 
   // Get props
   const props = getJSXProps(opening.attributes as JSXAttribute[]);
@@ -232,10 +234,14 @@ function getJSXProps(attributes: JSXAttribute[]): Record<string, unknown> {
   const props: Record<string, unknown> = {};
 
   for (const attr of attributes) {
-    if (!attr || attr.type !== "JSXAttribute") continue;
+    if (!attr || attr.type !== "JSXAttribute") {
+      continue;
+    }
 
     const name = attr.name.type === "JSXIdentifier" ? attr.name.name : null;
-    if (!name) continue;
+    if (!name) {
+      continue;
+    }
 
     if (!attr.value) {
       // Boolean prop like `disabled`
@@ -276,7 +282,9 @@ function parseObjectExpression(
             ? prop.key.value
             : null;
 
-      if (!key) continue;
+      if (!key) {
+        continue;
+      }
 
       if (prop.value.type === "StringLiteral") {
         result[key] = prop.value.value;
@@ -407,7 +415,7 @@ function createButton(
 }
 
 function createText(
-  props: Record<string, unknown>,
+  _props: Record<string, unknown>,
   children: JSONContent[]
 ): JSONContent {
   return {
@@ -423,7 +431,7 @@ function createHeading(
   const as = props.as as string;
   let level = 2;
 
-  if (as && as.match(/^h[1-6]$/)) {
+  if (as?.match(/^h[1-6]$/)) {
     level = Number.parseInt(as[1], 10);
   }
 

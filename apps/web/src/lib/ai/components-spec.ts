@@ -1,26 +1,26 @@
 // apps/web/src/lib/ai/components-spec.ts
 
-export interface ComponentSpec {
+export type ComponentSpec = {
   name: string;
   description: string;
   tiptapNodeType: string;
   props: PropSpec[];
   examples: Example[];
   emailClientNotes?: string;
-}
+};
 
-export interface PropSpec {
+export type PropSpec = {
   name: string;
   type: "string" | "number" | "boolean" | "object" | "array";
   required: boolean;
   default?: unknown;
   description: string;
-}
+};
 
-export interface Example {
+export type Example = {
   prompt: string;
   output: string; // TipTap JSON fragment
-}
+};
 
 // Complete component specifications
 export const COMPONENT_SPECS: ComponentSpec[] = [

@@ -17,16 +17,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export interface EmailImageAttributes {
+export type EmailImageAttributes = {
   src: string;
   alt: string;
   width: number | null;
   height: number | null;
   align: "left" | "center" | "right";
-}
+};
 
 declare module "@tiptap/core" {
-  interface Commands<ReturnType> {
+  type Commands<ReturnType> = {
     emailImage: {
       insertEmailImage: (
         attributes?: Partial<EmailImageAttributes>
@@ -35,7 +35,7 @@ declare module "@tiptap/core" {
         attributes: Partial<EmailImageAttributes>
       ) => ReturnType;
     };
-  }
+  };
 }
 
 const EmailImageNodeView = ({

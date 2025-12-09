@@ -17,7 +17,9 @@ export function useBlocks(orgSlug: string, category?: string) {
     queryFn: async () => {
       const params = category ? `?category=${category}` : "";
       const response = await fetch(`/api/${orgSlug}/blocks${params}`);
-      if (!response.ok) throw new Error("Failed to load blocks");
+      if (!response.ok) {
+        throw new Error("Failed to load blocks");
+      }
       return response.json() as Promise<ReusableBlock[]>;
     },
   });
@@ -38,7 +40,9 @@ export function useCreateBlock(orgSlug: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!response.ok) throw new Error("Failed to create block");
+      if (!response.ok) {
+        throw new Error("Failed to create block");
+      }
       return response.json() as Promise<ReusableBlock>;
     },
 
@@ -56,7 +60,9 @@ export function useDeleteBlock(orgSlug: string) {
       const response = await fetch(`/api/${orgSlug}/blocks/${blockId}`, {
         method: "DELETE",
       });
-      if (!response.ok) throw new Error("Failed to delete block");
+      if (!response.ok) {
+        throw new Error("Failed to delete block");
+      }
       return response.json();
     },
 
@@ -74,7 +80,9 @@ export function useTrackBlockUsage(orgSlug: string) {
       const response = await fetch(`/api/${orgSlug}/blocks/${blockId}/use`, {
         method: "POST",
       });
-      if (!response.ok) throw new Error("Failed to track usage");
+      if (!response.ok) {
+        throw new Error("Failed to track usage");
+      }
       return response.json();
     },
 

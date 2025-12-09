@@ -13,7 +13,7 @@ type RouteContext = {
 };
 
 // GET /api/[orgSlug]/templates/[id] - Get single template
-export async function GET(request: Request, context: RouteContext) {
+export async function GET(_request: Request, context: RouteContext) {
   try {
     const { orgSlug, id } = await context.params;
 
@@ -114,14 +114,27 @@ export async function PUT(request: Request, context: RouteContext) {
       lastEditedBy: session.user.id,
     };
 
-    if (content !== undefined) updateData.content = content;
-    if (name !== undefined) updateData.name = name.trim();
-    if (description !== undefined)
+    if (content !== undefined) {
+      updateData.content = content;
+    }
+    if (name !== undefined) {
+      updateData.name = name.trim();
+    }
+    if (description !== undefined) {
       updateData.description = description?.trim() || null;
-    if (subject !== undefined) updateData.subject = subject?.trim() || null;
-    if (status !== undefined) updateData.status = status;
-    if (variables !== undefined) updateData.variables = variables;
-    if (testData !== undefined) updateData.testData = testData;
+    }
+    if (subject !== undefined) {
+      updateData.subject = subject?.trim() || null;
+    }
+    if (status !== undefined) {
+      updateData.status = status;
+    }
+    if (variables !== undefined) {
+      updateData.variables = variables;
+    }
+    if (testData !== undefined) {
+      updateData.testData = testData;
+    }
 
     // Update template
     const [updated] = await db
@@ -187,7 +200,7 @@ export async function PUT(request: Request, context: RouteContext) {
 }
 
 // DELETE /api/[orgSlug]/templates/[id] - Delete template
-export async function DELETE(request: Request, context: RouteContext) {
+export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { orgSlug, id } = await context.params;
 

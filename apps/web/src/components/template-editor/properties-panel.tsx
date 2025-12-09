@@ -16,15 +16,15 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 
-interface PropertiesPanelProps {
+type PropertiesPanelProps = {
   editor: Editor | null;
-}
+};
 
-interface SelectedNodeInfo {
+type SelectedNodeInfo = {
   type: string;
   attrs: Record<string, unknown>;
   pos: number;
-}
+};
 
 export function PropertiesPanel({ editor }: PropertiesPanelProps) {
   const [selectedNode, setSelectedNode] = useState<SelectedNodeInfo | null>(
@@ -33,7 +33,9 @@ export function PropertiesPanel({ editor }: PropertiesPanelProps) {
 
   // Track selection changes
   useEffect(() => {
-    if (!editor) return;
+    if (!editor) {
+      return;
+    }
 
     const updateSelection = () => {
       const { from } = editor.state.selection;
@@ -85,7 +87,9 @@ export function PropertiesPanel({ editor }: PropertiesPanelProps) {
 
   const updateNodeAttr = useCallback(
     (key: string, value: unknown) => {
-      if (!editor || selectedNode === null) return;
+      if (!editor || selectedNode === null) {
+        return;
+      }
 
       const { pos, type } = selectedNode;
 
@@ -206,10 +210,10 @@ function formatNodeType(type: string): string {
 
 // Property Panels for each node type
 
-interface PropertyProps {
+type PropertyProps = {
   attrs: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
-}
+};
 
 function ButtonProperties({ attrs, onChange }: PropertyProps) {
   return (

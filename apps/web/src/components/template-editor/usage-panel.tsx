@@ -2,6 +2,7 @@
 
 import type { Template } from "@wraps/db";
 import { Check, Copy, ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,13 +20,12 @@ import {
 } from "@/components/ui/input-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CodeTabs } from "@/components/ui/shadcn-io/code-tabs";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-interface UsagePanelProps {
+type UsagePanelProps = {
   template: Template;
   className?: string;
-}
+};
 
 function extractVariables(content: unknown): string[] {
   const variables = new Set<string>();
@@ -47,12 +47,11 @@ export function UsagePanel({ template, className }: UsagePanelProps) {
   // Build template data example from actual variables
   const templateDataObj =
     variables.length > 0
-      ? variables.reduce(
-          (acc, v) => ({
-            ...acc,
-            [v]: v === "email" ? "user@example.com" : `Example ${v}`,
-          }),
-          {}
+      ? Object.fromEntries(
+          variables.map((v) => [
+            v,
+            v === "email" ? "user@example.com" : `Example ${v}`,
+          ])
         )
       : { firstName: "John", lastName: "Doe" };
 

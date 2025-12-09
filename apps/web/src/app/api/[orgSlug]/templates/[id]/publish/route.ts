@@ -199,7 +199,7 @@ export async function POST(request: Request, context: RouteContext) {
 }
 
 // DELETE /api/[orgSlug]/templates/[id]/publish - Unpublish template from SES
-export async function DELETE(request: Request, context: RouteContext) {
+export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { orgSlug, id } = await context.params;
 
