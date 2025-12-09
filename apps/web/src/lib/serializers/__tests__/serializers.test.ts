@@ -1476,9 +1476,7 @@ describe("Full Round-Trip Tests", () => {
     const reactEmailCode = generateReactEmailCode(originalDoc);
     const parsedDoc = parseReactEmailToTipTap(reactEmailCode);
 
-    const image = parsedDoc.content?.find(
-      (node) => node.type === "emailImage"
-    );
+    const image = parsedDoc.content?.find((node) => node.type === "emailImage");
     expect(image).toBeDefined();
     expect(image?.attrs?.src).toBe("https://example.com/hero.jpg");
     expect(image?.attrs?.alt).toBe("Hero image");
@@ -1639,17 +1637,13 @@ describe("Full Round-Trip Tests", () => {
     const parsedDoc = parseReactEmailToTipTap(reactEmailCode);
 
     // Verify all components are present
-    expect(
-      parsedDoc.content?.some((n) => n.type === "emailPreview")
-    ).toBe(true);
-    expect(
-      parsedDoc.content?.some((n) => n.type === "emailSection")
-    ).toBe(true);
-    expect(
-      parsedDoc.content?.some((n) => n.type === "emailSpacer")
-    ).toBe(true);
-    expect(
-      parsedDoc.content?.some((n) => n.type === "emailButton")
-    ).toBe(true);
+    expect(parsedDoc.content?.some((n) => n.type === "emailPreview")).toBe(
+      true
+    );
+    expect(parsedDoc.content?.some((n) => n.type === "emailSection")).toBe(
+      true
+    );
+    expect(parsedDoc.content?.some((n) => n.type === "emailSpacer")).toBe(true);
+    expect(parsedDoc.content?.some((n) => n.type === "emailButton")).toBe(true);
   });
 });
