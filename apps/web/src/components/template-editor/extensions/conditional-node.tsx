@@ -161,9 +161,7 @@ const ConditionalNodeView = ({
       </div>
 
       {/* Content area */}
-      <div
-        className="conditional-content rounded-b-lg border-amber-200 border-x border-b bg-amber-50/50 p-4 dark:border-amber-800 dark:bg-amber-950/50"
-      >
+      <div className="conditional-content rounded-b-lg border-amber-200 border-x border-b bg-amber-50/50 p-4 dark:border-amber-800 dark:bg-amber-950/50">
         <NodeViewContent />
       </div>
     </NodeViewWrapper>

@@ -1,9 +1,9 @@
 "use client";
 
+import { useDebouncer } from "@tanstack/react-pacer";
 import type { JSONContent } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEditor } from "@tiptap/react";
-import { useDebouncer } from "@tanstack/react-pacer";
 import StarterKit from "@tiptap/starter-kit";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
@@ -40,7 +40,7 @@ export function useTemplateEditor({
   onUpdate,
   onToggleBlockLibrary,
   collaborative = false,
-  autoSaveDelay = 60000, // 1 minute default
+  autoSaveDelay = 60_000, // 1 minute default
 }: UseTemplateEditorOptions) {
   const lastSavedContentRef = useRef<string>("");
 

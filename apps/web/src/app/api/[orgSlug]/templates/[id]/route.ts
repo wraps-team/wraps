@@ -105,7 +105,8 @@ export async function PUT(request: Request, context: RouteContext) {
     }
 
     const body = await request.json();
-    const { content, name, description, status, variables, testData } = body;
+    const { content, name, description, subject, status, variables, testData } =
+      body;
 
     // Build update object
     const updateData: Record<string, unknown> = {
@@ -117,6 +118,7 @@ export async function PUT(request: Request, context: RouteContext) {
     if (name !== undefined) updateData.name = name.trim();
     if (description !== undefined)
       updateData.description = description?.trim() || null;
+    if (subject !== undefined) updateData.subject = subject?.trim() || null;
     if (status !== undefined) updateData.status = status;
     if (variables !== undefined) updateData.variables = variables;
     if (testData !== undefined) updateData.testData = testData;

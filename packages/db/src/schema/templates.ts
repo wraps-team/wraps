@@ -42,6 +42,7 @@ export const template = pgTable(
 
     name: text("name").notNull(),
     description: text("description"),
+    subject: text("subject"), // Email subject line (supports variables like {{firstName}})
 
     // Single content field (Yjs-compatible structure)
     content: jsonb("content").$type<Record<string, unknown>>().notNull(),
@@ -63,6 +64,10 @@ export const template = pgTable(
     // AI generation metadata
     aiGenerated: boolean("ai_generated").default(false).notNull(),
     aiConversationId: text("ai_conversation_id"),
+
+    // SES publishing
+    sesTemplateName: text("ses_template_name"), // Name of template in AWS SES (e.g., "wraps-{id}")
+    publishedAt: timestamp("published_at"), // When last published to SES
 
     // Metadata
     status: templateStatusEnum("status").default("DRAFT").notNull(),

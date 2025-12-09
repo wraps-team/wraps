@@ -1,7 +1,7 @@
 "use client";
 
-import type { Editor } from "@tiptap/react";
 import { useDebouncedValue } from "@tanstack/react-pacer";
+import type { Editor } from "@tiptap/react";
 import {
   Check,
   Monitor,
@@ -165,13 +165,25 @@ export function PreviewPanel({ editor }: PreviewPanelProps) {
             value={device}
             variant="outline"
           >
-            <ToggleGroupItem aria-label="Desktop" className="h-8 w-8 p-0" value="desktop">
+            <ToggleGroupItem
+              aria-label="Desktop"
+              className="h-8 w-8 p-0"
+              value="desktop"
+            >
               <Monitor className="h-3.5 w-3.5" />
             </ToggleGroupItem>
-            <ToggleGroupItem aria-label="Tablet" className="h-8 w-8 p-0" value="tablet">
+            <ToggleGroupItem
+              aria-label="Tablet"
+              className="h-8 w-8 p-0"
+              value="tablet"
+            >
               <Tablet className="h-3.5 w-3.5" />
             </ToggleGroupItem>
-            <ToggleGroupItem aria-label="Mobile" className="h-8 w-8 p-0" value="mobile">
+            <ToggleGroupItem
+              aria-label="Mobile"
+              className="h-8 w-8 p-0"
+              value="mobile"
+            >
               <Smartphone className="h-3.5 w-3.5" />
             </ToggleGroupItem>
           </ToggleGroup>
@@ -184,7 +196,11 @@ export function PreviewPanel({ editor }: PreviewPanelProps) {
             title={darkMode ? "Light mode" : "Dark mode"}
             variant={darkMode ? "secondary" : "ghost"}
           >
-            {darkMode ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+            {darkMode ? (
+              <Moon className="h-3.5 w-3.5" />
+            ) : (
+              <Sun className="h-3.5 w-3.5" />
+            )}
           </Button>
 
           {/* Settings Dropdown - Combines device (mobile) + test data */}
@@ -196,7 +212,9 @@ export function PreviewPanel({ editor }: PreviewPanelProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               {/* Device selection for mobile */}
-              <DropdownMenuLabel className="sm:hidden">Device</DropdownMenuLabel>
+              <DropdownMenuLabel className="sm:hidden">
+                Device
+              </DropdownMenuLabel>
               <div className="sm:hidden">
                 {(["desktop", "tablet", "mobile"] as DeviceType[]).map((d) => (
                   <DropdownMenuItem key={d} onClick={() => setDevice(d)}>
@@ -314,7 +332,9 @@ export function PreviewPanel({ editor }: PreviewPanelProps) {
           {/* Email container with device-specific styling */}
           <div
             className={`rounded-lg shadow-2xl transition-all duration-200 ${
-              darkMode ? "bg-zinc-800 ring-1 ring-zinc-700" : "bg-white ring-1 ring-gray-200"
+              darkMode
+                ? "bg-zinc-800 ring-1 ring-zinc-700"
+                : "bg-white ring-1 ring-gray-200"
             }`}
             style={{
               width: deviceWidths[device],
@@ -337,7 +357,9 @@ export function PreviewPanel({ editor }: PreviewPanelProps) {
 
           {/* Device indicator */}
           <div className="mt-4 text-center">
-            <span className={`text-xs ${darkMode ? "text-zinc-500" : "text-muted-foreground"}`}>
+            <span
+              className={`text-xs ${darkMode ? "text-zinc-500" : "text-muted-foreground"}`}
+            >
               {device === "desktop" && "Desktop (600px)"}
               {device === "tablet" && "Tablet (480px)"}
               {device === "mobile" && "Mobile (375px)"}

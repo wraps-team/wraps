@@ -251,7 +251,7 @@ export function OrganizationSettingsBrandKits({
   };
 
   const handleExtractFromDomain = async () => {
-    if (!organization.slug || !extractDomain.trim()) return;
+    if (!(organization.slug && extractDomain.trim())) return;
 
     setIsExtracting(true);
     try {
@@ -480,7 +480,7 @@ export function OrganizationSettingsBrandKits({
                   </p>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <Globe className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Globe className="-translate-y-1/2 absolute top-1/2 left-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         className="pl-9"
                         disabled={isExtracting}

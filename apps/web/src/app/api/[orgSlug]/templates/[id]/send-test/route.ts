@@ -138,7 +138,8 @@ export async function POST(request: Request, context: RouteContext) {
               backgroundColor: selectedBrandKit.backgroundColor,
               textColor: selectedBrandKit.textColor,
               fontFamily: selectedBrandKit.fontFamily,
-              headingFontFamily: selectedBrandKit.headingFontFamily ?? undefined,
+              headingFontFamily:
+                selectedBrandKit.headingFontFamily ?? undefined,
               buttonRadius: selectedBrandKit.buttonRadius,
             }
           : undefined,

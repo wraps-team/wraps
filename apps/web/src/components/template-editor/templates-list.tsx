@@ -3,8 +3,11 @@
 import type { Template } from "@wraps/db";
 import { formatDistanceToNow } from "date-fns";
 import {
+  Cloud,
+  CloudOff,
   Copy,
   FileText,
+  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -12,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +36,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   useDeleteTemplate,
   useDuplicateTemplate,
+  usePublishTemplate,
   useTemplates,
+  useUnpublishTemplate,
 } from "@/hooks/use-template-queries";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +68,9 @@ export function TemplatesList({ orgSlug }: TemplatesListProps) {
     const result = await duplicateTemplate.mutateAsync(templateId);
     router.push(`/${orgSlug}/templates/${result.id}`);
   };
+
+  // Publish/unpublish hooks need to be created per template
+  // We'll use a wrapper component to handle this
 
   if (isLoading) {
     return (
@@ -116,7 +125,7 @@ export function TemplatesList({ orgSlug }: TemplatesListProps) {
       {/* Templates Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {templates.map((template) => (
-          <TemplateCard
+          <TemplateCardWithPublish
             key={template.id}
             onDelete={() => handleDelete(template.id)}
             onDuplicate={() => handleDuplicate(template.id)}
@@ -129,11 +138,68 @@ export function TemplatesList({ orgSlug }: TemplatesListProps) {
   );
 }
 
+// Wrapper component to handle publish/unpublish hooks per template
+function TemplateCardWithPublish({
+  template,
+  orgSlug,
+  onDelete,
+  onDuplicate,
+}: {
+  template: Template;
+  orgSlug: string;
+  onDelete: () => void;
+  onDuplicate: () => void;
+}) {
+  const publishMutation = usePublishTemplate(orgSlug, template.id);
+  const unpublishMutation = useUnpublishTemplate(orgSlug, template.id);
+
+  const handlePublish = async () => {
+    try {
+      const result = await publishMutation.mutateAsync({});
+      toast.success("Template published to AWS SES", {
+        description: result.message,
+      });
+    } catch (error) {
+      toast.error("Failed to publish template", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  };
+
+  const handleUnpublish = async () => {
+    try {
+      const result = await unpublishMutation.mutateAsync();
+      toast.success("Template unpublished", {
+        description: result.message,
+      });
+    } catch (error) {
+      toast.error("Failed to unpublish template", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  };
+
+  return (
+    <TemplateCard
+      isPublishing={publishMutation.isPending || unpublishMutation.isPending}
+      onDelete={onDelete}
+      onDuplicate={onDuplicate}
+      onPublish={handlePublish}
+      onUnpublish={handleUnpublish}
+      orgSlug={orgSlug}
+      template={template}
+    />
+  );
+}
+
 interface TemplateCardProps {
   template: Template;
   orgSlug: string;
   onDelete: () => void;
   onDuplicate: () => void;
+  onPublish: () => void;
+  onUnpublish: () => void;
+  isPublishing?: boolean;
 }
 
 function TemplateCard({
@@ -141,7 +207,13 @@ function TemplateCard({
   orgSlug,
   onDelete,
   onDuplicate,
+  onPublish,
+  onUnpublish,
+  isPublishing,
 }: TemplateCardProps) {
+  const hasSubject = !!template.subject;
+  const isPublished = template.status === "PUBLISHED";
+
   return (
     <Card className="group transition-shadow hover:shadow-md">
       <CardHeader className="pb-2">
@@ -169,7 +241,11 @@ function TemplateCard({
                 size="icon"
                 variant="ghost"
               >
-                <MoreHorizontal className="h-4 w-4" />
+                {isPublishing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="h-4 w-4" />
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -183,6 +259,26 @@ function TemplateCard({
                 <Copy className="mr-2 h-4 w-4" />
                 Duplicate
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {hasSubject ? (
+                <DropdownMenuItem disabled={isPublishing} onClick={onPublish}>
+                  <Cloud className="mr-2 h-4 w-4" />
+                  {isPublished ? "Update on SES" : "Publish to SES"}
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem disabled>
+                  <Cloud className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">
+                    Add subject to publish
+                  </span>
+                </DropdownMenuItem>
+              )}
+              {isPublished && (
+                <DropdownMenuItem disabled={isPublishing} onClick={onUnpublish}>
+                  <CloudOff className="mr-2 h-4 w-4" />
+                  Unpublish from SES
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={onDelete}>
                 <Trash2 className="mr-2 h-4 w-4" />

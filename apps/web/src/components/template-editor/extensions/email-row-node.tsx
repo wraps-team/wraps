@@ -45,10 +45,7 @@ const EmailRowNodeView = ({
     <NodeViewWrapper
       className={`email-row-wrapper group relative my-4 ${selected ? "rounded ring-2 ring-primary ring-offset-2" : ""}`}
     >
-      <div
-        className="email-row flex"
-        style={{ gap: attrs.gap }}
-      >
+      <div className="email-row flex" style={{ gap: attrs.gap }}>
         <NodeViewContent />
       </div>
 

@@ -60,6 +60,7 @@ export function useUpdateTemplate(orgSlug: string, templateId: string) {
       content?: JSONContent;
       name?: string;
       description?: string;
+      subject?: string;
       status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
     }) => {
       const response = await fetch(`/api/${orgSlug}/templates/${templateId}`, {
@@ -258,6 +259,78 @@ export function useRestoreVersion(orgSlug: string, templateId: string) {
       });
       queryClient.invalidateQueries({
         queryKey: templateKeys.versions(orgSlug, templateId),
+      });
+    },
+  });
+}
+
+// === Publishing Hooks ===
+
+// Publish template to AWS SES
+export function usePublishTemplate(orgSlug: string, templateId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data?: { brandKitId?: string }) => {
+      const response = await fetch(
+        `/api/${orgSlug}/templates/${templateId}/publish`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: data ? JSON.stringify(data) : undefined,
+        }
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to publish template");
+      }
+      return response.json() as Promise<{
+        success: boolean;
+        sesTemplateName: string;
+        publishedAt: string;
+        message: string;
+      }>;
+    },
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: templateKeys.detail(orgSlug, templateId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: templateKeys.lists(),
+      });
+    },
+  });
+}
+
+// Unpublish template from AWS SES
+export function useUnpublishTemplate(orgSlug: string, templateId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch(
+        `/api/${orgSlug}/templates/${templateId}/publish`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to unpublish template");
+      }
+      return response.json() as Promise<{
+        success: boolean;
+        message: string;
+      }>;
+    },
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: templateKeys.detail(orgSlug, templateId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: templateKeys.lists(),
       });
     },
   });

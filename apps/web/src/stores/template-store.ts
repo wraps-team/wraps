@@ -7,7 +7,7 @@ interface User {
   avatar?: string;
 }
 
-type EditorView = "edit" | "preview" | "code" | "chat";
+type EditorView = "edit" | "preview" | "code" | "usage";
 
 interface LocalState {
   view: EditorView;

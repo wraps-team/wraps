@@ -67,7 +67,7 @@ export async function extractBrandKitFromDomain(
 
     // Limit response size to 500KB to prevent memory issues
     const contentLength = response.headers.get("content-length");
-    if (contentLength && parseInt(contentLength, 10) > 500000) {
+    if (contentLength && Number.parseInt(contentLength, 10) > 500_000) {
       return { ...DEFAULT_BRAND_KIT, sourceDomain: normalizedDomain };
     }
 
@@ -133,8 +133,10 @@ async function fetchFirstStylesheet(
     for (const href of allLinks) {
       const absoluteUrl = new URL(href, baseUrl).href;
       if (
-        !absoluteUrl.includes("fonts.googleapis.com") &&
-        !absoluteUrl.includes("use.typekit.net")
+        !(
+          absoluteUrl.includes("fonts.googleapis.com") ||
+          absoluteUrl.includes("use.typekit.net")
+        )
       ) {
         targetUrl = absoluteUrl;
         break;
@@ -156,7 +158,8 @@ async function fetchFirstStylesheet(
 
     // Check content length - allow up to 300KB for bundled CSS
     const contentLength = response.headers.get("content-length");
-    if (contentLength && parseInt(contentLength, 10) > 300000) return "";
+    if (contentLength && Number.parseInt(contentLength, 10) > 300_000)
+      return "";
 
     const css = await response.text();
 
@@ -167,7 +170,7 @@ async function fetchFirstStylesheet(
     }
 
     // Fallback to first 100KB
-    return css.slice(0, 100000);
+    return css.slice(0, 100_000);
   } catch {
     return "";
   }
@@ -190,9 +193,7 @@ function extractLogo(html: string, baseUrl: string): string | null {
     if (match?.[1]) {
       try {
         return new URL(match[1], baseUrl).href;
-      } catch {
-        continue;
-      }
+      } catch {}
     }
   }
 
@@ -362,9 +363,9 @@ function normalizeColor(color: string): string | null {
     /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*[\d.]+)?\s*\)/
   );
   if (rgbMatch) {
-    const r = Math.min(255, parseInt(rgbMatch[1], 10));
-    const g = Math.min(255, parseInt(rgbMatch[2], 10));
-    const b = Math.min(255, parseInt(rgbMatch[3], 10));
+    const r = Math.min(255, Number.parseInt(rgbMatch[1], 10));
+    const g = Math.min(255, Number.parseInt(rgbMatch[2], 10));
+    const b = Math.min(255, Number.parseInt(rgbMatch[3], 10));
     return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
   }
 
@@ -374,9 +375,9 @@ function normalizeColor(color: string): string | null {
     /rgba?\(\s*(\d+)\s+(\d+)\s+(\d+)(?:\s*\/\s*[\d.]+%?)?\s*\)/
   );
   if (rgbModernMatch) {
-    const r = Math.min(255, parseInt(rgbModernMatch[1], 10));
-    const g = Math.min(255, parseInt(rgbModernMatch[2], 10));
-    const b = Math.min(255, parseInt(rgbModernMatch[3], 10));
+    const r = Math.min(255, Number.parseInt(rgbModernMatch[1], 10));
+    const g = Math.min(255, Number.parseInt(rgbModernMatch[2], 10));
+    const b = Math.min(255, Number.parseInt(rgbModernMatch[3], 10));
     return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
   }
 
@@ -385,9 +386,9 @@ function normalizeColor(color: string): string | null {
     /hsla?\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%(?:\s*,\s*[\d.]+)?\s*\)/
   );
   if (hslMatch) {
-    const h = parseFloat(hslMatch[1]) / 360;
-    const s = parseFloat(hslMatch[2]) / 100;
-    const l = parseFloat(hslMatch[3]) / 100;
+    const h = Number.parseFloat(hslMatch[1]) / 360;
+    const s = Number.parseFloat(hslMatch[2]) / 100;
+    const l = Number.parseFloat(hslMatch[3]) / 100;
     return hslToHex(h, s, l);
   }
 
@@ -397,9 +398,9 @@ function normalizeColor(color: string): string | null {
     /hsla?\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%(?:\s*\/\s*[\d.]+%?)?\s*\)/
   );
   if (hslModernMatch) {
-    const h = parseFloat(hslModernMatch[1]) / 360;
-    const s = parseFloat(hslModernMatch[2]) / 100;
-    const l = parseFloat(hslModernMatch[3]) / 100;
+    const h = Number.parseFloat(hslModernMatch[1]) / 360;
+    const s = Number.parseFloat(hslModernMatch[2]) / 100;
+    const l = Number.parseFloat(hslModernMatch[3]) / 100;
     return hslToHex(h, s, l);
   }
 
@@ -409,11 +410,11 @@ function normalizeColor(color: string): string | null {
     /oklch\(\s*([\d.]+)%?\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*[\d.]+%?)?\s*\)/
   );
   if (oklchMatch) {
-    const lRaw = parseFloat(oklchMatch[1]);
+    const lRaw = Number.parseFloat(oklchMatch[1]);
     // If lightness > 1, it's a percentage; otherwise it's already normalized
     const l = lRaw > 1 ? lRaw / 100 : lRaw;
-    const c = parseFloat(oklchMatch[2]);
-    const h = parseFloat(oklchMatch[3]);
+    const c = Number.parseFloat(oklchMatch[2]);
+    const h = Number.parseFloat(oklchMatch[3]);
     return oklchToHex(l, c, h);
   }
 
@@ -423,10 +424,10 @@ function normalizeColor(color: string): string | null {
     /oklab\(\s*([\d.]+)%?\s+([-\d.]+)\s+([-\d.]+)(?:\s*\/\s*[\d.]+%?)?\s*\)/
   );
   if (oklabMatch) {
-    const lRaw = parseFloat(oklabMatch[1]);
+    const lRaw = Number.parseFloat(oklabMatch[1]);
     const l = lRaw > 1 ? lRaw / 100 : lRaw;
-    const a = parseFloat(oklabMatch[2]);
-    const b = parseFloat(oklabMatch[3]);
+    const a = Number.parseFloat(oklabMatch[2]);
+    const b = Number.parseFloat(oklabMatch[3]);
     return oklabToHex(l, a, b);
   }
 
@@ -451,24 +452,27 @@ function normalizeColor(color: string): string | null {
  */
 function oklabToHex(l: number, a: number, b: number): string {
   // Convert OKLab to linear sRGB via LMS
-  const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
-  const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
-  const s_ = l - 0.0894841775 * a - 1.291485548 * b;
+  const l_ = l + 0.396_337_777_4 * a + 0.215_803_757_3 * b;
+  const m_ = l - 0.105_561_345_8 * a - 0.063_854_172_8 * b;
+  const s_ = l - 0.089_484_177_5 * a - 1.291_485_548 * b;
 
   const l3 = l_ * l_ * l_;
   const m3 = m_ * m_ * m_;
   const s3 = s_ * s_ * s_;
 
-  const rLinear = 4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
-  const gLinear = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
-  const bLinear = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3;
+  const rLinear =
+    4.076_741_662_1 * l3 - 3.307_711_591_3 * m3 + 0.230_969_929_2 * s3;
+  const gLinear =
+    -1.268_438_004_6 * l3 + 2.609_757_401_1 * m3 - 0.341_319_396_5 * s3;
+  const bLinear =
+    -0.004_196_086_3 * l3 - 0.703_418_614_7 * m3 + 1.707_614_701 * s3;
 
   // Convert linear sRGB to sRGB (gamma correction)
   const toSrgb = (x: number) => {
     if (x <= 0) return 0;
     if (x >= 1) return 255;
     return Math.round(
-      (x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055) * 255
+      (x <= 0.003_130_8 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055) * 255
     );
   };
 
@@ -600,12 +604,12 @@ function adjustColor(hex: string, percent: number): string {
       ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
       : hex;
 
-  const num = parseInt(fullHex.replace("#", ""), 16);
+  const num = Number.parseInt(fullHex.replace("#", ""), 16);
   const amt = Math.round(2.55 * percent);
 
   const R = Math.max(0, Math.min(255, (num >> 16) + amt));
-  const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00ff) + amt));
-  const B = Math.max(0, Math.min(255, (num & 0x0000ff) + amt));
+  const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00_ff) + amt));
+  const B = Math.max(0, Math.min(255, (num & 0x00_00_ff) + amt));
 
   return `#${((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1)}`;
 }

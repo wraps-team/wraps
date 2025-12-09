@@ -1,9 +1,9 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { useThrottler } from "@tanstack/react-pacer";
 import type { JSONContent } from "@tiptap/core";
 import type { Editor } from "@tiptap/react";
-import { useThrottler } from "@tanstack/react-pacer";
 import { DefaultChatTransport } from "ai";
 import {
   Bot,
@@ -226,7 +226,7 @@ export function AIChatPanel({
       <div className="flex items-center justify-between border-b bg-muted/30 px-3 py-2">
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
           <Sparkles className="h-4 w-4 text-primary" />
-          <span className="hidden sm:inline font-medium">AI Assistant</span>
+          <span className="hidden font-medium sm:inline">AI Assistant</span>
         </div>
         <div className="flex items-center gap-1">
           {/* Brand Kit Selector */}
@@ -305,7 +305,13 @@ export function AIChatPanel({
           </Popover>
 
           {isLoading && (
-            <Button className="h-8 w-8 p-0" onClick={stop} size="sm" title="Stop generating" variant="ghost">
+            <Button
+              className="h-8 w-8 p-0"
+              onClick={stop}
+              size="sm"
+              title="Stop generating"
+              variant="ghost"
+            >
               <Square className="h-3.5 w-3.5" />
             </Button>
           )}
@@ -376,7 +382,7 @@ export function AIChatPanel({
                   </Avatar>
                   <div
                     className={cn(
-                      "flex-1 min-w-0",
+                      "min-w-0 flex-1",
                       message.role === "user" && "text-right"
                     )}
                   >
@@ -437,7 +443,11 @@ export function AIChatPanel({
         <div className="border-t bg-muted/50 px-3 py-2">
           <p className="mb-1.5 font-medium text-xs">Apply generated content?</p>
           <div className="flex gap-1.5">
-            <Button className="h-7 flex-1 text-xs" onClick={handleApplyContent} size="sm">
+            <Button
+              className="h-7 flex-1 text-xs"
+              onClick={handleApplyContent}
+              size="sm"
+            >
               <Check className="mr-1 h-3 w-3" />
               Apply
             </Button>

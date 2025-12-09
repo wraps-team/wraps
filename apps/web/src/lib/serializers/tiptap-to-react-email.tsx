@@ -114,7 +114,7 @@ function nodeToReactEmail(
 
     case "paragraph":
       return (
-        <Text className="my-4 leading-relaxed text-inherit" key={key}>
+        <Text className="my-4 text-inherit leading-relaxed" key={key}>
           {node.content?.map((child, i) =>
             nodeToReactEmail(child, testData, i)
           )}
@@ -149,7 +149,7 @@ function nodeToReactEmail(
             case "link":
               return (
                 <Link
-                  className="text-brand-primary dark:text-brand-dark-primary underline"
+                  className="text-brand-primary underline dark:text-brand-dark-primary"
                   href={mark.attrs?.href}
                   key={key}
                 >
@@ -175,7 +175,11 @@ function nodeToReactEmail(
         h6: "text-sm font-semibold my-2",
       };
       return (
-        <Heading as={HeadingTag} className={headingClasses[HeadingTag]} key={key}>
+        <Heading
+          as={HeadingTag}
+          className={headingClasses[HeadingTag]}
+          key={key}
+        >
           {node.content?.map((child, i) =>
             nodeToReactEmail(child, testData, i)
           )}
@@ -207,7 +211,7 @@ function nodeToReactEmail(
       return (
         <div className={alignClass} key={key}>
           <Button
-            className={`bg-brand-primary dark:bg-brand-dark-primary text-white px-6 py-3 font-semibold no-underline inline-block ${roundedClass}`}
+            className={`inline-block bg-brand-primary px-6 py-3 font-semibold text-white no-underline dark:bg-brand-dark-primary ${roundedClass}`}
             href={node.attrs?.href || "#"}
           >
             {node.attrs?.text || "Click here"}
@@ -239,7 +243,7 @@ function nodeToReactEmail(
         <div className={alignClass} key={key}>
           <Img
             alt={node.attrs?.alt || ""}
-            className="max-w-full h-auto inline-block"
+            className="inline-block h-auto max-w-full"
             height={node.attrs?.height}
             src={node.attrs?.src || ""}
             width={node.attrs?.width}
@@ -251,10 +255,7 @@ function nodeToReactEmail(
     case "emailDivider":
     case "horizontalRule":
       return (
-        <Hr
-          className="border-gray-200 dark:border-gray-700 my-6"
-          key={key}
-        />
+        <Hr className="my-6 border-gray-200 dark:border-gray-700" key={key} />
       );
 
     case "emailSpacer": {
@@ -292,7 +293,7 @@ function nodeToReactEmail(
 
     case "bulletList":
       return (
-        <ul className="pl-5 my-4 list-disc" key={key}>
+        <ul className="my-4 list-disc pl-5" key={key}>
           {node.content?.map((child, i) =>
             nodeToReactEmail(child, testData, i)
           )}
@@ -301,7 +302,7 @@ function nodeToReactEmail(
 
     case "orderedList":
       return (
-        <ol className="pl-5 my-4 list-decimal" key={key}>
+        <ol className="my-4 list-decimal pl-5" key={key}>
           {node.content?.map((child, i) =>
             nodeToReactEmail(child, testData, i)
           )}
@@ -320,7 +321,7 @@ function nodeToReactEmail(
     case "blockquote":
       return (
         <blockquote
-          className="border-l-4 border-gray-200 dark:border-gray-600 pl-4 my-4 text-gray-600 dark:text-gray-400 italic"
+          className="my-4 border-gray-200 border-l-4 pl-4 text-gray-600 italic dark:border-gray-600 dark:text-gray-400"
           key={key}
         >
           {node.content?.map((child, i) =>
@@ -332,7 +333,7 @@ function nodeToReactEmail(
     case "codeBlock":
       return (
         <pre
-          className="bg-gray-100 dark:bg-gray-800 p-4 rounded overflow-auto font-mono text-sm"
+          className="overflow-auto rounded bg-gray-100 p-4 font-mono text-sm dark:bg-gray-800"
           key={key}
         >
           <code>
@@ -421,14 +422,14 @@ export function tiptapToReactEmail(
       <Tailwind config={tailwindConfig}>
         <Head>
           {/* Dark mode support meta tags */}
-          <meta name="color-scheme" content="light dark" />
-          <meta name="supported-color-schemes" content="light dark" />
+          <meta content="light dark" name="color-scheme" />
+          <meta content="light dark" name="supported-color-schemes" />
           {/* Required for Apple Mail dark mode support */}
           <style>{":root { color-scheme: light dark; }"}</style>
         </Head>
         {options.previewText && <Preview>{options.previewText}</Preview>}
-        <Body className="bg-gray-50 dark:bg-gray-900 font-sans text-brand-text dark:text-brand-dark-text">
-          <Container className="bg-brand-background dark:bg-brand-dark-background mx-auto p-5 max-w-[600px]">
+        <Body className="bg-gray-50 font-sans text-brand-text dark:bg-gray-900 dark:text-brand-dark-text">
+          <Container className="mx-auto max-w-[600px] bg-brand-background p-5 dark:bg-brand-dark-background">
             {emailContent}
           </Container>
         </Body>

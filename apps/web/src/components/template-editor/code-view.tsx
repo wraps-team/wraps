@@ -98,8 +98,14 @@ ${children}
         "8px": "rounded-lg",
         "9999px": "rounded-full",
       };
-      const roundedClass = radiusMap[attrs.borderRadius as string] || "rounded-md";
-      const alignClass = align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left";
+      const roundedClass =
+        radiusMap[attrs.borderRadius as string] || "rounded-md";
+      const alignClass =
+        align === "center"
+          ? "text-center"
+          : align === "right"
+            ? "text-right"
+            : "text-left";
       const btnText =
         (content.content || [])
           .map((c) => generateReactEmailCode(c, 0))
@@ -127,7 +133,12 @@ ${spaces}          </Section>`;
     case "emailImage": {
       const attrs = content.attrs || {};
       const align = attrs.align || "center";
-      const alignClass = align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left";
+      const alignClass =
+        align === "center"
+          ? "text-center"
+          : align === "right"
+            ? "text-right"
+            : "text-left";
       return `${spaces}          <div className="${alignClass}">
 ${spaces}            <Img
 ${spaces}              src="${attrs.src || ""}"
@@ -316,9 +327,7 @@ function prettifyHtml(html: string): string {
 
       // Increase indent after opening block tags (but not self-closing or void)
       if (
-        !isClosingTag &&
-        !isSelfClosing &&
-        !isVoidElement &&
+        !(isClosingTag || isSelfClosing || isVoidElement) &&
         blockTags.has(tagName)
       ) {
         indent++;
@@ -332,9 +341,7 @@ function prettifyHtml(html: string): string {
       // Regular text content
       const nextTag = normalized.indexOf("<", i);
       const text =
-        nextTag === -1
-          ? normalized.slice(i)
-          : normalized.slice(i, nextTag);
+        nextTag === -1 ? normalized.slice(i) : normalized.slice(i, nextTag);
 
       if (text.trim()) {
         formatted += text.trim();
@@ -548,9 +555,12 @@ export function CodeView({ editor }: CodeViewProps) {
       {/* Format Info - Compact */}
       <div className="border-t bg-muted/30 px-3 py-2">
         <p className="text-muted-foreground text-xs">
-          {format === "react-email" && "React Email components for use with Wraps SDK"}
-          {format === "json" && "TipTap JSON document - can be saved and reloaded"}
-          {format === "html" && "Raw HTML - may need email CSS for proper rendering"}
+          {format === "react-email" &&
+            "React Email components for use with Wraps SDK"}
+          {format === "json" &&
+            "TipTap JSON document - can be saved and reloaded"}
+          {format === "html" &&
+            "Raw HTML - may need email CSS for proper rendering"}
         </p>
       </div>
     </div>

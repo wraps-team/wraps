@@ -141,8 +141,8 @@ export function extractTipTapJson(content: string): JSONContent | null {
       let depth = 0;
       let endIdx = startIdx;
       for (let i = startIdx; i < content.length; i++) {
-        if (content[i] === '{') depth++;
-        if (content[i] === '}') depth--;
+        if (content[i] === "{") depth++;
+        if (content[i] === "}") depth--;
         if (depth === 0) {
           endIdx = i + 1;
           break;
