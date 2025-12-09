@@ -2,9 +2,17 @@
 
 import { Extension } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
-import { Braces } from "lucide-react";
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { Braces, X } from "lucide-react";
+import type React from "react";
+import {
+  createRef,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
+import { Button } from "@/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -30,10 +38,11 @@ type SuggestionListProps = {
   items: VariableItem[];
   command: (item: VariableItem) => void;
   clientRect: (() => DOMRect | null) | null;
+  onCloseRef: React.MutableRefObject<(() => void) | null>;
 };
 
 const SuggestionList = forwardRef<SuggestionRef, SuggestionListProps>(
-  ({ items, command, clientRect }, ref) => {
+  ({ items, command, clientRect, onCloseRef }, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
 
     const selectItem = (index: number) => {
@@ -41,6 +50,10 @@ const SuggestionList = forwardRef<SuggestionRef, SuggestionListProps>(
       if (item) {
         command(item);
       }
+    };
+
+    const handleClose = () => {
+      onCloseRef.current?.();
     };
 
     useImperativeHandle(ref, () => ({
@@ -83,11 +96,24 @@ const SuggestionList = forwardRef<SuggestionRef, SuggestionListProps>(
           minWidth: 280,
         }}
       >
+        <div className="flex items-center justify-between border-b px-3 py-2">
+          <span className="font-medium text-sm">Insert Variable</span>
+          <Button
+            className="h-6 w-6 p-0"
+            onClick={handleClose}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </Button>
+        </div>
         <Command>
           <CommandInput className="h-9" placeholder="Search variables..." />
           <CommandList>
             <CommandEmpty>No variables found.</CommandEmpty>
-            <CommandGroup heading="Variables">
+            <CommandGroup>
               {items.map((item, index) => (
                 <CommandItem
                   className={cn(
@@ -114,6 +140,12 @@ const SuggestionList = forwardRef<SuggestionRef, SuggestionListProps>(
             </CommandGroup>
           </CommandList>
         </Command>
+        <div className="border-t px-3 py-2">
+          <p className="text-muted-foreground text-xs">
+            Press <kbd className="rounded bg-muted px-1 font-mono">Esc</kbd> to
+            close
+          </p>
+        </div>
       </div>,
       document.body
     );
@@ -177,7 +209,25 @@ export const VariableSuggestion = Extension.create<VariableSuggestionOptions>({
 
         render: () => {
           let popup: HTMLDivElement | null = null;
+          let root: ReturnType<
+            typeof import("react-dom/client").createRoot
+          > | null = null;
           let componentRef: SuggestionRef | null = null;
+
+          // Use a ref object so the close function is always up-to-date
+          const onCloseRef = createRef<
+            (() => void) | null
+          >() as React.MutableRefObject<(() => void) | null>;
+
+          const closePopup = () => {
+            root?.unmount();
+            popup?.remove();
+            popup = null;
+            root = null;
+          };
+
+          // Keep the ref updated with the latest closePopup
+          onCloseRef.current = closePopup;
 
           return {
             onStart: (props) => {
@@ -185,12 +235,13 @@ export const VariableSuggestion = Extension.create<VariableSuggestionOptions>({
               document.body.appendChild(popup);
 
               import("react-dom/client").then(({ createRoot }) => {
-                const root = createRoot(popup!);
+                root = createRoot(popup!);
                 root.render(
                   <SuggestionList
                     clientRect={props.clientRect ?? null}
                     command={props.command}
                     items={props.items}
+                    onCloseRef={onCloseRef}
                     ref={(ref) => {
                       componentRef = ref;
                     }}
@@ -200,33 +251,31 @@ export const VariableSuggestion = Extension.create<VariableSuggestionOptions>({
             },
 
             onUpdate: (props) => {
-              if (popup) {
-                import("react-dom/client").then(({ createRoot }) => {
-                  const root = createRoot(popup!);
-                  root.render(
-                    <SuggestionList
-                      clientRect={props.clientRect ?? null}
-                      command={props.command}
-                      items={props.items}
-                      ref={(ref) => {
-                        componentRef = ref;
-                      }}
-                    />
-                  );
-                });
+              if (popup && root) {
+                root.render(
+                  <SuggestionList
+                    clientRect={props.clientRect ?? null}
+                    command={props.command}
+                    items={props.items}
+                    onCloseRef={onCloseRef}
+                    ref={(ref) => {
+                      componentRef = ref;
+                    }}
+                  />
+                );
               }
             },
 
             onKeyDown: (props) => {
               if (props.event.key === "Escape") {
-                popup?.remove();
+                closePopup();
                 return true;
               }
               return componentRef?.onKeyDown(props) ?? false;
             },
 
             onExit: () => {
-              popup?.remove();
+              closePopup();
             },
           };
         },

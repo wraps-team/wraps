@@ -145,13 +145,9 @@ const blocks: BlockItem[] = [
   // Dynamic
   {
     name: "Variable",
-    description: "Dynamic variable",
+    description: "Type {{ or press ⌘/",
     icon: <Braces className="h-5 w-5" />,
-    action: (editor) =>
-      editor.commands.insertVariable({
-        name: "variableName",
-        label: "Variable",
-      }),
+    action: (editor) => editor.commands.insertContent("{{"),
     category: "dynamic",
   },
   {

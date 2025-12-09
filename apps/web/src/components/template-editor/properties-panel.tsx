@@ -15,6 +15,15 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
+import {
+  borderRadiusPresets,
+  fontSizePresets,
+  fontWeightPresets,
+  gapPresets,
+  PresetSelector,
+  paddingPresets,
+  TailwindColorPicker,
+} from "@/components/ui/tailwind-color-picker";
 
 type PropertiesPanelProps = {
   editor: Editor | null;
@@ -189,6 +198,20 @@ export function PropertiesPanel({ editor }: PropertiesPanelProps) {
                   onChange={updateNodeAttr}
                 />
               )}
+
+              {selectedNode.type === "emailRow" && (
+                <RowProperties
+                  attrs={selectedNode.attrs}
+                  onChange={updateNodeAttr}
+                />
+              )}
+
+              {selectedNode.type === "emailColumn" && (
+                <ColumnProperties
+                  attrs={selectedNode.attrs}
+                  onChange={updateNodeAttr}
+                />
+              )}
             </div>
           ) : (
             <div className="py-8 text-center text-muted-foreground text-sm">
@@ -231,116 +254,75 @@ function ButtonProperties({ attrs, onChange }: PropertyProps) {
       </PropertySection>
 
       <PropertySection icon={<Palette className="h-4 w-4" />} title="Colors">
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-2">
-            <Label htmlFor="bgColor">Background</Label>
-            <div className="flex gap-2">
-              <Input
-                className="h-8 w-10 border-0 p-0"
-                id="bgColor"
-                onChange={(e) => onChange("backgroundColor", e.target.value)}
-                type="color"
-                value={(attrs.backgroundColor as string) || "#5046e5"}
-              />
-              <Input
-                className="flex-1"
-                onChange={(e) => onChange("backgroundColor", e.target.value)}
-                value={(attrs.backgroundColor as string) || "#5046e5"}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="textColor">Text</Label>
-            <div className="flex gap-2">
-              <Input
-                className="h-8 w-10 border-0 p-0"
-                id="textColor"
-                onChange={(e) => onChange("color", e.target.value)}
-                type="color"
-                value={(attrs.color as string) || "#ffffff"}
-              />
-              <Input
-                className="flex-1"
-                onChange={(e) => onChange("color", e.target.value)}
-                value={(attrs.color as string) || "#ffffff"}
-              />
-            </div>
-          </div>
+        <div className="space-y-3">
+          <TailwindColorPicker
+            label="Background"
+            onChange={(v) => onChange("backgroundColor", v)}
+            value={(attrs.backgroundColor as string) || "#5046e5"}
+          />
+          <TailwindColorPicker
+            label="Text"
+            onChange={(v) => onChange("color", v)}
+            value={(attrs.color as string) || "#ffffff"}
+          />
         </div>
       </PropertySection>
 
       <PropertySection icon={<Type className="h-4 w-4" />} title="Typography">
         <div className="space-y-3">
-          <div className="space-y-2">
-            <Label>Font Size</Label>
-            <Select
-              onValueChange={(v) => onChange("fontSize", v)}
-              value={(attrs.fontSize as string) || "14px"}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="12px">Small (12px)</SelectItem>
-                <SelectItem value="14px">Medium (14px)</SelectItem>
-                <SelectItem value="16px">Large (16px)</SelectItem>
-                <SelectItem value="18px">X-Large (18px)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Font Weight</Label>
-            <Select
-              onValueChange={(v) => onChange("fontWeight", v)}
-              value={(attrs.fontWeight as string) || "600"}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="400">Normal</SelectItem>
-                <SelectItem value="500">Medium</SelectItem>
-                <SelectItem value="600">Semi-bold</SelectItem>
-                <SelectItem value="700">Bold</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <PresetSelector
+            label="Font Size"
+            onChange={(v) => onChange("fontSize", v)}
+            presets={fontSizePresets}
+            value={(attrs.fontSize as string) || "14px"}
+          />
+          <PresetSelector
+            label="Font Weight"
+            onChange={(v) => onChange("fontWeight", v)}
+            presets={fontWeightPresets}
+            value={(attrs.fontWeight as string) || "600"}
+          />
         </div>
       </PropertySection>
 
       <PropertySection icon={<Layout className="h-4 w-4" />} title="Layout">
         <div className="space-y-3">
-          <div className="space-y-2">
-            <Label>Padding</Label>
-            <Input
-              onChange={(e) => onChange("padding", e.target.value)}
-              placeholder="12px 24px"
-              value={(attrs.padding as string) || "12px 24px"}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Border Radius</Label>
-            <Input
-              onChange={(e) => onChange("borderRadius", e.target.value)}
-              placeholder="6px"
-              value={(attrs.borderRadius as string) || "6px"}
-            />
-          </div>
+          <PresetSelector
+            label="Padding"
+            onChange={(v) => onChange("padding", v)}
+            presets={[
+              { label: "SM", value: "8px 16px" },
+              { label: "MD", value: "12px 24px" },
+              { label: "LG", value: "16px 32px" },
+              { label: "XL", value: "20px 40px" },
+            ]}
+            value={(attrs.padding as string) || "12px 24px"}
+          />
+          <PresetSelector
+            label="Border Radius"
+            onChange={(v) => onChange("borderRadius", v)}
+            presets={borderRadiusPresets}
+            value={(attrs.borderRadius as string) || "6px"}
+          />
           <div className="space-y-2">
             <Label>Alignment</Label>
-            <Select
-              onValueChange={(v) => onChange("align", v)}
-              value={(attrs.align as string) || "left"}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="left">Left</SelectItem>
-                <SelectItem value="center">Center</SelectItem>
-                <SelectItem value="right">Right</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-1">
+              {(["left", "center", "right"] as const).map((align) => (
+                <button
+                  className={`flex-1 rounded-md border px-3 py-1.5 text-xs transition-colors ${
+                    (attrs.align as string) === align ||
+                    (!attrs.align && align === "left")
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input bg-background hover:bg-accent"
+                  }`}
+                  key={align}
+                  onClick={() => onChange("align", align)}
+                  type="button"
+                >
+                  {align.charAt(0).toUpperCase() + align.slice(1)}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </PropertySection>
@@ -355,42 +337,27 @@ function SectionProperties({ attrs, onChange }: PropertyProps) {
         icon={<Palette className="h-4 w-4" />}
         title="Background"
       >
-        <div className="space-y-2">
-          <Label>Background Color</Label>
-          <div className="flex gap-2">
-            <Input
-              className="h-8 w-10 border-0 p-0"
-              onChange={(e) => onChange("backgroundColor", e.target.value)}
-              type="color"
-              value={(attrs.backgroundColor as string) || "#ffffff"}
-            />
-            <Input
-              className="flex-1"
-              onChange={(e) => onChange("backgroundColor", e.target.value)}
-              value={(attrs.backgroundColor as string) || "#ffffff"}
-            />
-          </div>
-        </div>
+        <TailwindColorPicker
+          label="Background Color"
+          onChange={(v) => onChange("backgroundColor", v)}
+          value={(attrs.backgroundColor as string) || "#ffffff"}
+        />
       </PropertySection>
 
       <PropertySection icon={<Layout className="h-4 w-4" />} title="Spacing">
         <div className="space-y-3">
-          <div className="space-y-2">
-            <Label>Padding</Label>
-            <Input
-              onChange={(e) => onChange("padding", e.target.value)}
-              placeholder="24px"
-              value={(attrs.padding as string) || "24px"}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Border Radius</Label>
-            <Input
-              onChange={(e) => onChange("borderRadius", e.target.value)}
-              placeholder="0"
-              value={(attrs.borderRadius as string) || "0"}
-            />
-          </div>
+          <PresetSelector
+            label="Padding"
+            onChange={(v) => onChange("padding", v)}
+            presets={paddingPresets}
+            value={(attrs.padding as string) || "24px"}
+          />
+          <PresetSelector
+            label="Border Radius"
+            onChange={(v) => onChange("borderRadius", v)}
+            presets={borderRadiusPresets}
+            value={(attrs.borderRadius as string) || "0"}
+          />
         </div>
       </PropertySection>
     </>
@@ -423,14 +390,18 @@ function ImageProperties({ attrs, onChange }: PropertyProps) {
 
       <PropertySection icon={<Layout className="h-4 w-4" />} title="Size">
         <div className="space-y-3">
-          <div className="space-y-2">
-            <Label>Width</Label>
-            <Input
-              onChange={(e) => onChange("width", e.target.value)}
-              placeholder="100%"
-              value={(attrs.width as string) || "100%"}
-            />
-          </div>
+          <PresetSelector
+            label="Width"
+            onChange={(v) => onChange("width", v)}
+            presets={[
+              { label: "Auto", value: "auto" },
+              { label: "Full", value: "100%" },
+              { label: "3/4", value: "75%" },
+              { label: "Half", value: "50%" },
+              { label: "1/4", value: "25%" },
+            ]}
+            value={(attrs.width as string) || "100%"}
+          />
           <div className="space-y-2">
             <Label>Height</Label>
             <Input
@@ -438,6 +409,26 @@ function ImageProperties({ attrs, onChange }: PropertyProps) {
               placeholder="auto"
               value={(attrs.height as string) || "auto"}
             />
+          </div>
+          <div className="space-y-2">
+            <Label>Alignment</Label>
+            <div className="flex gap-1">
+              {(["left", "center", "right"] as const).map((align) => (
+                <button
+                  className={`flex-1 rounded-md border px-3 py-1.5 text-xs transition-colors ${
+                    (attrs.align as string) === align ||
+                    (!attrs.align && align === "center")
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input bg-background hover:bg-accent"
+                  }`}
+                  key={align}
+                  onClick={() => onChange("align", align)}
+                  type="button"
+                >
+                  {align.charAt(0).toUpperCase() + align.slice(1)}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </PropertySection>
@@ -449,39 +440,84 @@ function DividerProperties({ attrs, onChange }: PropertyProps) {
   return (
     <PropertySection icon={<Layout className="h-4 w-4" />} title="Style">
       <div className="space-y-3">
+        <TailwindColorPicker
+          label="Color"
+          onChange={(v) => onChange("color", v)}
+          value={(attrs.color as string) || "#e5e7eb"}
+        />
+        <PresetSelector
+          label="Thickness"
+          onChange={(v) => onChange("thickness", v)}
+          presets={[
+            { label: "Thin", value: "1px" },
+            { label: "Medium", value: "2px" },
+            { label: "Thick", value: "4px" },
+          ]}
+          value={(attrs.thickness as string) || "1px"}
+        />
+        <PresetSelector
+          label="Margin"
+          onChange={(v) => onChange("margin", v)}
+          presets={paddingPresets}
+          value={(attrs.margin as string) || "24px"}
+        />
+      </div>
+    </PropertySection>
+  );
+}
+
+function RowProperties({ attrs, onChange }: PropertyProps) {
+  return (
+    <PropertySection icon={<Layout className="h-4 w-4" />} title="Layout">
+      <div className="space-y-3">
+        <PresetSelector
+          label="Gap"
+          onChange={(v) => onChange("gap", v)}
+          presets={gapPresets}
+          value={(attrs.gap as string) || "16px"}
+        />
         <div className="space-y-2">
-          <Label>Color</Label>
-          <div className="flex gap-2">
-            <Input
-              className="h-8 w-10 border-0 p-0"
-              onChange={(e) => onChange("color", e.target.value)}
-              type="color"
-              value={(attrs.color as string) || "#e5e7eb"}
-            />
-            <Input
-              className="flex-1"
-              onChange={(e) => onChange("color", e.target.value)}
-              value={(attrs.color as string) || "#e5e7eb"}
-            />
+          <Label>Vertical Alignment</Label>
+          <div className="flex gap-1">
+            {(["top", "middle", "bottom"] as const).map((align) => (
+              <button
+                className={`flex-1 rounded-md border px-3 py-1.5 text-xs transition-colors ${
+                  (attrs.align as string) === align ||
+                  (!attrs.align && align === "top")
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-input bg-background hover:bg-accent"
+                }`}
+                key={align}
+                onClick={() => onChange("align", align)}
+                type="button"
+              >
+                {align.charAt(0).toUpperCase() + align.slice(1)}
+              </button>
+            ))}
           </div>
         </div>
-        <div className="space-y-2">
-          <Label>Thickness</Label>
-          <Input
-            onChange={(e) => onChange("thickness", e.target.value)}
-            placeholder="1px"
-            value={(attrs.thickness as string) || "1px"}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Margin</Label>
-          <Input
-            onChange={(e) => onChange("margin", e.target.value)}
-            placeholder="24px"
-            value={(attrs.margin as string) || "24px"}
-          />
-        </div>
       </div>
+    </PropertySection>
+  );
+}
+
+function ColumnProperties({ attrs, onChange }: PropertyProps) {
+  return (
+    <PropertySection icon={<Layout className="h-4 w-4" />} title="Size">
+      <PresetSelector
+        label="Width"
+        onChange={(v) => onChange("width", v)}
+        presets={[
+          { label: "Auto", value: "auto" },
+          { label: "Full", value: "100%" },
+          { label: "3/4", value: "75%" },
+          { label: "2/3", value: "66.67%" },
+          { label: "Half", value: "50%" },
+          { label: "1/3", value: "33.33%" },
+          { label: "1/4", value: "25%" },
+        ]}
+        value={(attrs.width as string) || "auto"}
+      />
     </PropertySection>
   );
 }

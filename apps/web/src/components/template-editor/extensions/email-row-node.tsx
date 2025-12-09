@@ -10,27 +10,32 @@ import {
 import { Columns, Settings2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  gapPresets,
+  PresetSelector,
+} from "@/components/ui/tailwind-color-picker";
 
 export type EmailRowAttributes = {
   gap: string;
+  align?: "top" | "middle" | "bottom";
 };
 
 declare module "@tiptap/core" {
-  type Commands<ReturnType> = {
+  // biome-ignore lint/style/useConsistentTypeDefinitions: interface required for module augmentation
+  interface Commands<ReturnType> {
     emailRow: {
       insertEmailRow: (
         attributes?: Partial<EmailRowAttributes>,
         columns?: number
       ) => ReturnType;
     };
-  };
+  }
 }
 
 const EmailRowNodeView = ({
@@ -59,31 +64,36 @@ const EmailRowNodeView = ({
             <Settings2 className="h-3 w-3" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-64">
+        <PopoverContent align="end" className="w-72">
           <div className="space-y-4">
             <h4 className="font-medium">Row Settings</h4>
 
-            <div className="space-y-2">
-              <Label htmlFor="gap">Column Gap</Label>
-              <Input
-                id="gap"
-                onChange={(e) => updateAttributes({ gap: e.target.value })}
-                placeholder="16px"
-                value={attrs.gap}
-              />
-            </div>
+            <PresetSelector
+              label="Column Gap"
+              onChange={(v) => updateAttributes({ gap: v })}
+              presets={gapPresets}
+              value={attrs.gap}
+            />
 
-            <div className="flex gap-2">
-              {["8px", "16px", "24px", "32px"].map((g) => (
-                <Button
-                  key={g}
-                  onClick={() => updateAttributes({ gap: g })}
-                  size="sm"
-                  variant={attrs.gap === g ? "default" : "outline"}
-                >
-                  {g}
-                </Button>
-              ))}
+            <div className="space-y-2">
+              <Label>Vertical Alignment</Label>
+              <div className="flex gap-1">
+                {(["top", "middle", "bottom"] as const).map((align) => (
+                  <Button
+                    className="flex-1"
+                    key={align}
+                    onClick={() => updateAttributes({ align })}
+                    size="sm"
+                    variant={
+                      attrs.align === align || (!attrs.align && align === "top")
+                        ? "default"
+                        : "outline"
+                    }
+                  >
+                    {align.charAt(0).toUpperCase() + align.slice(1)}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         </PopoverContent>
@@ -109,6 +119,7 @@ export const EmailRowNode = Node.create({
   addAttributes() {
     return {
       gap: { default: "16px" },
+      align: { default: "top" },
     };
   },
 

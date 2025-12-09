@@ -22,13 +22,14 @@ export type EmailSpacerAttributes = {
 };
 
 declare module "@tiptap/core" {
-  type Commands<ReturnType> = {
+  // biome-ignore lint/style/useConsistentTypeDefinitions: interface required for module augmentation
+  interface Commands<ReturnType> {
     emailSpacer: {
       insertEmailSpacer: (
         attributes?: Partial<EmailSpacerAttributes>
       ) => ReturnType;
     };
-  };
+  }
 }
 
 const EmailSpacerNodeView = ({

@@ -9,13 +9,16 @@ import {
 import { Settings2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  PresetSelector,
+  paddingPresets,
+  TailwindColorPicker,
+} from "@/components/ui/tailwind-color-picker";
 
 export type EmailDividerAttributes = {
   borderColor: string;
@@ -24,13 +27,14 @@ export type EmailDividerAttributes = {
 };
 
 declare module "@tiptap/core" {
-  type Commands<ReturnType> = {
+  // biome-ignore lint/style/useConsistentTypeDefinitions: interface required for module augmentation
+  interface Commands<ReturnType> {
     emailDivider: {
       insertEmailDivider: (
         attributes?: Partial<EmailDividerAttributes>
       ) => ReturnType;
     };
-  };
+  }
 }
 
 const EmailDividerNodeView = ({
@@ -63,53 +67,33 @@ const EmailDividerNodeView = ({
             <Settings2 className="h-3 w-3" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-72">
+        <PopoverContent align="end" className="w-80">
           <div className="space-y-4">
             <h4 className="font-medium">Divider Settings</h4>
 
-            <div className="space-y-2">
-              <Label htmlFor="borderColor">Color</Label>
-              <div className="flex gap-2">
-                <Input
-                  className="h-10 w-10 cursor-pointer p-1"
-                  id="borderColor"
-                  onChange={(e) =>
-                    updateAttributes({ borderColor: e.target.value })
-                  }
-                  type="color"
-                  value={attrs.borderColor}
-                />
-                <Input
-                  className="flex-1"
-                  onChange={(e) =>
-                    updateAttributes({ borderColor: e.target.value })
-                  }
-                  value={attrs.borderColor}
-                />
-              </div>
-            </div>
+            <TailwindColorPicker
+              label="Color"
+              onChange={(v) => updateAttributes({ borderColor: v })}
+              value={attrs.borderColor}
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="borderWidth">Thickness</Label>
-              <Input
-                id="borderWidth"
-                onChange={(e) =>
-                  updateAttributes({ borderWidth: e.target.value })
-                }
-                placeholder="1px"
-                value={attrs.borderWidth}
-              />
-            </div>
+            <PresetSelector
+              label="Thickness"
+              onChange={(v) => updateAttributes({ borderWidth: v })}
+              presets={[
+                { label: "Thin", value: "1px" },
+                { label: "Medium", value: "2px" },
+                { label: "Thick", value: "4px" },
+              ]}
+              value={attrs.borderWidth}
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="margin">Margin</Label>
-              <Input
-                id="margin"
-                onChange={(e) => updateAttributes({ margin: e.target.value })}
-                placeholder="24px 0"
-                value={attrs.margin}
-              />
-            </div>
+            <PresetSelector
+              label="Margin"
+              onChange={(v) => updateAttributes({ margin: v })}
+              presets={paddingPresets}
+              value={attrs.margin}
+            />
           </div>
         </PopoverContent>
       </Popover>

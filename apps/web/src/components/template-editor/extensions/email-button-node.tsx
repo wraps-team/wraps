@@ -16,6 +16,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  borderRadiusPresets,
+  fontSizePresets,
+  fontWeightPresets,
+  PresetSelector,
+  TailwindColorPicker,
+} from "@/components/ui/tailwind-color-picker";
 
 export type EmailButtonAttributes = {
   href: string;
@@ -29,7 +36,8 @@ export type EmailButtonAttributes = {
 };
 
 declare module "@tiptap/core" {
-  type Commands<ReturnType> = {
+  // biome-ignore lint/style/useConsistentTypeDefinitions: interface required for module augmentation
+  interface Commands<ReturnType> {
     emailButton: {
       insertEmailButton: (
         attributes?: Partial<EmailButtonAttributes>
@@ -38,7 +46,7 @@ declare module "@tiptap/core" {
         attributes: Partial<EmailButtonAttributes>
       ) => ReturnType;
     };
-  };
+  }
 }
 
 const EmailButtonNodeView = ({
@@ -47,7 +55,25 @@ const EmailButtonNodeView = ({
   selected,
 }: NodeViewProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const attrs = node.attrs as EmailButtonAttributes & { text?: string };
+  const attrs = node.attrs as EmailButtonAttributes;
+
+  // Local state for form fields to prevent cursor jumping
+  const [localAttrs, setLocalAttrs] = useState<EmailButtonAttributes>(attrs);
+
+  // Sync local state when popover opens
+  const handleOpenChange = (open: boolean) => {
+    if (open) {
+      setLocalAttrs(attrs);
+    } else {
+      // Apply changes when closing
+      updateAttributes(localAttrs);
+    }
+    setIsEditing(open);
+  };
+
+  const updateLocal = (key: keyof EmailButtonAttributes, value: string) => {
+    setLocalAttrs((prev) => ({ ...prev, [key]: value }));
+  };
 
   const buttonText = node.textContent || "Click me";
 
@@ -73,7 +99,7 @@ const EmailButtonNodeView = ({
           {buttonText}
         </a>
 
-        <Popover onOpenChange={setIsEditing} open={isEditing}>
+        <Popover onOpenChange={handleOpenChange} open={isEditing}>
           <PopoverTrigger asChild>
             <Button
               className="-top-2 -right-2 absolute h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
@@ -91,69 +117,56 @@ const EmailButtonNodeView = ({
                 <Label htmlFor="href">URL</Label>
                 <Input
                   id="href"
-                  onChange={(e) => updateAttributes({ href: e.target.value })}
+                  onChange={(e) => updateLocal("href", e.target.value)}
                   placeholder="https://example.com"
-                  value={attrs.href}
+                  value={localAttrs.href}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="backgroundColor">Background</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      className="h-10 w-10 cursor-pointer p-1"
-                      id="backgroundColor"
-                      onChange={(e) =>
-                        updateAttributes({ backgroundColor: e.target.value })
-                      }
-                      type="color"
-                      value={attrs.backgroundColor}
-                    />
-                    <Input
-                      className="flex-1"
-                      onChange={(e) =>
-                        updateAttributes({ backgroundColor: e.target.value })
-                      }
-                      value={attrs.backgroundColor}
-                    />
-                  </div>
-                </div>
+              <TailwindColorPicker
+                label="Background"
+                onChange={(v) => updateLocal("backgroundColor", v)}
+                value={localAttrs.backgroundColor}
+              />
 
-                <div className="space-y-2">
-                  <Label htmlFor="color">Text Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      className="h-10 w-10 cursor-pointer p-1"
-                      id="color"
-                      onChange={(e) =>
-                        updateAttributes({ color: e.target.value })
-                      }
-                      type="color"
-                      value={attrs.color}
-                    />
-                    <Input
-                      className="flex-1"
-                      onChange={(e) =>
-                        updateAttributes({ color: e.target.value })
-                      }
-                      value={attrs.color}
-                    />
-                  </div>
-                </div>
-              </div>
+              <TailwindColorPicker
+                label="Text Color"
+                onChange={(v) => updateLocal("color", v)}
+                value={localAttrs.color}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="borderRadius">Border Radius</Label>
-                <Input
-                  id="borderRadius"
-                  onChange={(e) =>
-                    updateAttributes({ borderRadius: e.target.value })
-                  }
-                  placeholder="4px"
-                  value={attrs.borderRadius}
-                />
-              </div>
+              <PresetSelector
+                label="Font Size"
+                onChange={(v) => updateLocal("fontSize", v)}
+                presets={fontSizePresets}
+                value={localAttrs.fontSize}
+              />
+
+              <PresetSelector
+                label="Font Weight"
+                onChange={(v) => updateLocal("fontWeight", v)}
+                presets={fontWeightPresets}
+                value={localAttrs.fontWeight}
+              />
+
+              <PresetSelector
+                label="Padding"
+                onChange={(v) => updateLocal("padding", v)}
+                presets={[
+                  { label: "SM", value: "8px 16px" },
+                  { label: "MD", value: "12px 24px" },
+                  { label: "LG", value: "16px 32px" },
+                  { label: "XL", value: "20px 40px" },
+                ]}
+                value={localAttrs.padding}
+              />
+
+              <PresetSelector
+                label="Border Radius"
+                onChange={(v) => updateLocal("borderRadius", v)}
+                presets={borderRadiusPresets}
+                value={localAttrs.borderRadius}
+              />
 
               <div className="space-y-2">
                 <Label>Alignment</Label>
@@ -162,10 +175,10 @@ const EmailButtonNodeView = ({
                     <Button
                       className="flex-1 capitalize"
                       key={alignment}
-                      onClick={() => updateAttributes({ align: alignment })}
+                      onClick={() => updateLocal("align", alignment)}
                       size="sm"
                       variant={
-                        attrs.align === alignment ? "default" : "outline"
+                        localAttrs.align === alignment ? "default" : "outline"
                       }
                     >
                       {alignment}

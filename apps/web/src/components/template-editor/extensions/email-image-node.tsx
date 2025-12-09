@@ -26,7 +26,8 @@ export type EmailImageAttributes = {
 };
 
 declare module "@tiptap/core" {
-  type Commands<ReturnType> = {
+  // biome-ignore lint/style/useConsistentTypeDefinitions: interface required for module augmentation
+  interface Commands<ReturnType> {
     emailImage: {
       insertEmailImage: (
         attributes?: Partial<EmailImageAttributes>
@@ -35,7 +36,7 @@ declare module "@tiptap/core" {
         attributes: Partial<EmailImageAttributes>
       ) => ReturnType;
     };
-  };
+  }
 }
 
 const EmailImageNodeView = ({

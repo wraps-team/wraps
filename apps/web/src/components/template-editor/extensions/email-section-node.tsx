@@ -10,13 +10,17 @@ import {
 import { Settings2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  borderRadiusPresets,
+  PresetSelector,
+  paddingPresets,
+  TailwindColorPicker,
+} from "@/components/ui/tailwind-color-picker";
 
 export type EmailSectionAttributes = {
   backgroundColor: string;
@@ -26,7 +30,8 @@ export type EmailSectionAttributes = {
 };
 
 declare module "@tiptap/core" {
-  type Commands<ReturnType> = {
+  // biome-ignore lint/style/useConsistentTypeDefinitions: interface required for module augmentation
+  interface Commands<ReturnType> {
     emailSection: {
       insertEmailSection: (
         attributes?: Partial<EmailSectionAttributes>
@@ -35,7 +40,7 @@ declare module "@tiptap/core" {
         attributes: Partial<EmailSectionAttributes>
       ) => ReturnType;
     };
-  };
+  }
 }
 
 const EmailSectionNodeView = ({
@@ -77,59 +82,37 @@ const EmailSectionNodeView = ({
           <div className="space-y-4">
             <h4 className="font-medium">Section Settings</h4>
 
-            <div className="space-y-2">
-              <Label htmlFor="backgroundColor">Background Color</Label>
-              <div className="flex gap-2">
-                <Input
-                  className="h-10 w-10 cursor-pointer p-1"
-                  id="backgroundColor"
-                  onChange={(e) =>
-                    updateAttributes({ backgroundColor: e.target.value })
-                  }
-                  type="color"
-                  value={attrs.backgroundColor}
-                />
-                <Input
-                  className="flex-1"
-                  onChange={(e) =>
-                    updateAttributes({ backgroundColor: e.target.value })
-                  }
-                  value={attrs.backgroundColor}
-                />
-              </div>
-            </div>
+            <TailwindColorPicker
+              label="Background Color"
+              onChange={(v) => updateAttributes({ backgroundColor: v })}
+              value={attrs.backgroundColor}
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="padding">Padding</Label>
-              <Input
-                id="padding"
-                onChange={(e) => updateAttributes({ padding: e.target.value })}
-                placeholder="32px 24px"
-                value={attrs.padding}
-              />
-            </div>
+            <PresetSelector
+              label="Padding"
+              onChange={(v) => updateAttributes({ padding: v })}
+              presets={paddingPresets}
+              value={attrs.padding}
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="maxWidth">Max Width</Label>
-              <Input
-                id="maxWidth"
-                onChange={(e) => updateAttributes({ maxWidth: e.target.value })}
-                placeholder="600px"
-                value={attrs.maxWidth}
-              />
-            </div>
+            <PresetSelector
+              label="Max Width"
+              onChange={(v) => updateAttributes({ maxWidth: v })}
+              presets={[
+                { label: "SM", value: "480px" },
+                { label: "MD", value: "600px" },
+                { label: "LG", value: "720px" },
+                { label: "Full", value: "100%" },
+              ]}
+              value={attrs.maxWidth}
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="borderRadius">Border Radius</Label>
-              <Input
-                id="borderRadius"
-                onChange={(e) =>
-                  updateAttributes({ borderRadius: e.target.value })
-                }
-                placeholder="0px"
-                value={attrs.borderRadius}
-              />
-            </div>
+            <PresetSelector
+              label="Border Radius"
+              onChange={(v) => updateAttributes({ borderRadius: v })}
+              presets={borderRadiusPresets}
+              value={attrs.borderRadius}
+            />
           </div>
         </PopoverContent>
       </Popover>

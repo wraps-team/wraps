@@ -1,20 +1,25 @@
 "use client";
 
+import MonacoEditor from "@monaco-editor/react";
 import type { JSONContent } from "@tiptap/core";
-import type { Editor } from "@tiptap/react";
+import type { Editor as TiptapEditor } from "@tiptap/react";
 import {
+  AlertTriangle,
   Check,
   Copy,
   Download,
   FileCode2,
   FileJson,
   Loader2,
+  Pencil,
+  RotateCcw,
+  Save,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { codeToHtml } from "shiki";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -22,344 +27,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { parseHTMLToTipTap } from "@/lib/serializers/html-to-tiptap";
+import { parseReactEmailToTipTap } from "@/lib/serializers/react-email-to-tiptap";
+import {
+  generateReactEmailCode,
+  renderTipTapToHtml,
+} from "@/lib/serializers/tiptap-to-react-email";
 
 type CodeViewProps = {
-  editor: Editor | null;
+  editor: TiptapEditor | null;
 };
 
 type CodeFormat = "react-email" | "json" | "html";
 
-/**
- * Generates React Email code as a string from TipTap JSON content
- * Uses Tailwind CSS classes for styling
- */
-function generateReactEmailCode(content: JSONContent, indent = 0): string {
-  const spaces = "  ".repeat(indent);
-
-  if (!content.type) {
-    return "";
-  }
-
-  switch (content.type) {
-    case "doc": {
-      const children = (content.content || [])
-        .map((c) => generateReactEmailCode(c, indent))
-        .filter(Boolean)
-        .join("\n");
-      return `import { Html, Head, Body, Container, Text, Button, Section, Img, Hr, Heading, Link, Tailwind } from "@react-email/components";
-
-export default function EmailTemplate() {
-  return (
-    <Html>
-      <Tailwind>
-        <Head />
-        <Body className="bg-gray-100 font-sans">
-          <Container className="bg-white mx-auto p-5 max-w-[600px]">
-${children}
-          </Container>
-        </Body>
-      </Tailwind>
-    </Html>
-  );
-}`;
-    }
-
-    case "paragraph": {
-      const pContent = (content.content || [])
-        .map((c) => generateReactEmailCode(c, 0))
-        .join("");
-      return `${spaces}          <Text className="my-4 leading-relaxed">${pContent}</Text>`;
-    }
-
-    case "heading": {
-      const level = content.attrs?.level || 1;
-      const hContent = (content.content || [])
-        .map((c) => generateReactEmailCode(c, 0))
-        .join("");
-      const headingClasses: Record<number, string> = {
-        1: "text-3xl font-bold my-4",
-        2: "text-2xl font-bold my-4",
-        3: "text-xl font-semibold my-3",
-        4: "text-lg font-semibold my-3",
-        5: "text-base font-semibold my-2",
-        6: "text-sm font-semibold my-2",
-      };
-      return `${spaces}          <Heading as="h${level}" className="${headingClasses[level] || headingClasses[1]}">${hContent}</Heading>`;
-    }
-
-    case "text":
-      return content.text || "";
-
-    case "emailButton": {
-      const attrs = content.attrs || {};
-      const align = attrs.align || "left";
-      const radiusMap: Record<string, string> = {
-        "0px": "rounded-none",
-        "4px": "rounded",
-        "6px": "rounded-md",
-        "8px": "rounded-lg",
-        "9999px": "rounded-full",
-      };
-      const roundedClass =
-        radiusMap[attrs.borderRadius as string] || "rounded-md";
-      const alignClass =
-        align === "center"
-          ? "text-center"
-          : align === "right"
-            ? "text-right"
-            : "text-left";
-      const btnText =
-        (content.content || [])
-          .map((c) => generateReactEmailCode(c, 0))
-          .join("") || "Click here";
-      return `${spaces}          <div className="${alignClass}">
-${spaces}            <Button
-${spaces}              href="${attrs.href || "#"}"
-${spaces}              className="bg-indigo-600 text-white px-6 py-3 font-semibold no-underline inline-block ${roundedClass}"
-${spaces}            >
-${spaces}              ${btnText}
-${spaces}            </Button>
-${spaces}          </div>`;
-    }
-
-    case "emailSection": {
-      const sectionChildren = (content.content || [])
-        .map((c) => generateReactEmailCode(c, indent + 1))
-        .filter(Boolean)
-        .join("\n");
-      return `${spaces}          <Section className="p-6">
-${sectionChildren}
-${spaces}          </Section>`;
-    }
-
-    case "emailImage": {
-      const attrs = content.attrs || {};
-      const align = attrs.align || "center";
-      const alignClass =
-        align === "center"
-          ? "text-center"
-          : align === "right"
-            ? "text-right"
-            : "text-left";
-      return `${spaces}          <div className="${alignClass}">
-${spaces}            <Img
-${spaces}              src="${attrs.src || ""}"
-${spaces}              alt="${attrs.alt || ""}"
-${spaces}              width="${attrs.width || "100%"}"
-${spaces}              className="max-w-full h-auto inline-block"
-${spaces}            />
-${spaces}          </div>`;
-    }
-
-    case "emailDivider":
-      return `${spaces}          <Hr className="border-gray-200 my-6" />`;
-
-    case "emailSpacer": {
-      const height = content.attrs?.height || "24px";
-      return `${spaces}          <div className="w-full h-[${height}]" />`;
-    }
-
-    case "variable":
-      return `{props.${content.attrs?.name || "variable"}}`;
-
-    case "bulletList": {
-      const items = (content.content || [])
-        .map((c) => generateReactEmailCode(c, indent))
-        .join("\n");
-      return `${spaces}          <ul className="pl-5 my-4 list-disc">
-${items}
-${spaces}          </ul>`;
-    }
-
-    case "orderedList": {
-      const items = (content.content || [])
-        .map((c) => generateReactEmailCode(c, indent))
-        .join("\n");
-      return `${spaces}          <ol className="pl-5 my-4 list-decimal">
-${items}
-${spaces}          </ol>`;
-    }
-
-    case "listItem": {
-      const liContent = (content.content || [])
-        .map((c) => {
-          // For list items, render the paragraph content directly
-          if (c.type === "paragraph") {
-            return (c.content || [])
-              .map((t) => generateReactEmailCode(t, 0))
-              .join("");
-          }
-          return generateReactEmailCode(c, 0);
-        })
-        .join("");
-      return `${spaces}            <li className="my-1">${liContent}</li>`;
-    }
-
-    case "blockquote": {
-      const bqContent = (content.content || [])
-        .map((c) => generateReactEmailCode(c, indent + 1))
-        .join("\n");
-      return `${spaces}          <blockquote className="border-l-4 border-gray-200 pl-4 my-4 text-gray-500 italic">
-${bqContent}
-${spaces}          </blockquote>`;
-    }
-
-    case "conditional": {
-      const attrs = content.attrs || {};
-      const condContent = (content.content || [])
-        .map((c) => generateReactEmailCode(c, indent + 1))
-        .join("\n");
-      return `${spaces}          {props.${attrs.variable} ${getOperatorCode(attrs.operator as string)} ${JSON.stringify(attrs.value)} && (
-${condContent}
-${spaces}          )}`;
-    }
-
-    default:
-      if (content.content) {
-        return (content.content || [])
-          .map((c) => generateReactEmailCode(c, indent))
-          .filter(Boolean)
-          .join("\n");
-      }
-      return "";
-  }
-}
-
-function getOperatorCode(operator: string): string {
-  switch (operator) {
-    case "equals":
-      return "===";
-    case "notEquals":
-      return "!==";
-    case "greaterThan":
-      return ">";
-    case "lessThan":
-      return "<";
-    case "contains":
-      return ".includes";
-    default:
-      return "===";
-  }
-}
-
-/**
- * Simple HTML prettifier that adds proper indentation and line breaks
- */
-function prettifyHtml(html: string): string {
-  // Tags that should have their own line
-  const blockTags = new Set([
-    "html",
-    "head",
-    "body",
-    "div",
-    "p",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "ul",
-    "ol",
-    "li",
-    "table",
-    "thead",
-    "tbody",
-    "tr",
-    "td",
-    "th",
-    "section",
-    "article",
-    "header",
-    "footer",
-    "nav",
-    "aside",
-    "main",
-    "blockquote",
-    "pre",
-    "hr",
-    "br",
-    "img",
-    "a",
-    "button",
-  ]);
-
-  let formatted = "";
-  let indent = 0;
-  const indentStr = "  ";
-
-  // Normalize the HTML first
-  const normalized = html
-    .replace(/>\s+</g, "><") // Remove whitespace between tags
-    .replace(/\s+/g, " ") // Normalize whitespace
-    .trim();
-
-  // Process character by character
-  let i = 0;
-  while (i < normalized.length) {
-    // Check if we're at a tag
-    if (normalized[i] === "<") {
-      const tagEnd = normalized.indexOf(">", i);
-      if (tagEnd === -1) {
-        formatted += normalized[i];
-        i++;
-        continue;
-      }
-
-      const tag = normalized.slice(i, tagEnd + 1);
-      const tagName = tag.match(/<\/?([a-zA-Z0-9]+)/)?.[1]?.toLowerCase() || "";
-      const isClosingTag = tag.startsWith("</");
-      const isSelfClosing = tag.endsWith("/>") || tag.includes(" />");
-      const isVoidElement = /^(br|hr|img|input|meta|link)$/i.test(tagName);
-
-      // Decrease indent for closing tags
-      if (isClosingTag && blockTags.has(tagName)) {
-        indent = Math.max(0, indent - 1);
-      }
-
-      // Add newline and indent for block tags
-      if (blockTags.has(tagName)) {
-        if (formatted && !formatted.endsWith("\n")) {
-          formatted += "\n";
-        }
-        formatted += indentStr.repeat(indent);
-      }
-
-      formatted += tag;
-
-      // Increase indent after opening block tags (but not self-closing or void)
-      if (
-        !(isClosingTag || isSelfClosing || isVoidElement) &&
-        blockTags.has(tagName)
-      ) {
-        indent++;
-        formatted += "\n";
-      } else if (blockTags.has(tagName)) {
-        formatted += "\n";
-      }
-
-      i = tagEnd + 1;
-    } else {
-      // Regular text content
-      const nextTag = normalized.indexOf("<", i);
-      const text =
-        nextTag === -1 ? normalized.slice(i) : normalized.slice(i, nextTag);
-
-      if (text.trim()) {
-        formatted += text.trim();
-      }
-      i = nextTag === -1 ? normalized.length : nextTag;
-    }
-  }
-
-  return formatted.trim();
-}
-
-// Get Shiki language for format
-function getShikiLanguage(format: CodeFormat): "tsx" | "json" | "html" {
+// Get Monaco language for format
+function getMonacoLanguage(format: CodeFormat): "typescript" | "json" | "html" {
   switch (format) {
     case "react-email":
-      return "tsx";
+      return "typescript";
     case "json":
       return "json";
     case "html":
@@ -367,65 +57,149 @@ function getShikiLanguage(format: CodeFormat): "tsx" | "json" | "html" {
   }
 }
 
-export function CodeView({ editor }: CodeViewProps) {
+export function CodeView({ editor: tiptapEditor }: CodeViewProps) {
   const [format, setFormat] = useState<CodeFormat>("react-email");
-  const [code, setCode] = useState<string>("");
-  const [highlightedCode, setHighlightedCode] = useState<string>("");
-  const [isHighlighting, setIsHighlighting] = useState(false);
+  const [originalCode, setOriginalCode] = useState<string>("");
+  const [editedCode, setEditedCode] = useState<string>("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [isApplying, setIsApplying] = useState(false);
+  const [isGeneratingHtml, setIsGeneratingHtml] = useState(false);
 
-  // Generate raw code
-  useEffect(() => {
-    if (!editor) {
-      return;
+  // Generate code from TipTap content (sync for React Email and JSON)
+  const generateCodeSync = useCallback((): string | null => {
+    if (!tiptapEditor) {
+      return "";
     }
 
-    const content = editor.getJSON();
+    const content = tiptapEditor.getJSON();
 
     switch (format) {
       case "react-email":
-        setCode(generateReactEmailCode(content));
-        break;
+        return generateReactEmailCode(content);
       case "json":
-        setCode(JSON.stringify(content, null, 2));
-        break;
+        return JSON.stringify(content, null, 2);
       case "html":
-        setCode(prettifyHtml(editor.getHTML()));
-        break;
+        // HTML is generated asynchronously
+        return null;
     }
-  }, [editor?.state.doc, format, editor]);
+  }, [tiptapEditor, format]);
 
-  // Apply syntax highlighting
+  // Update code when editor content or format changes (sync formats)
   useEffect(() => {
-    if (!code) {
-      setHighlightedCode("");
+    if (format === "html") {
+      return; // HTML is handled separately
+    }
+    const code = generateCodeSync();
+    if (code !== null) {
+      setOriginalCode(code);
+      if (!isEditing) {
+        setEditedCode(code);
+      }
+    }
+  }, [tiptapEditor?.state.doc, format, generateCodeSync, isEditing]);
+
+  // Generate HTML asynchronously using @react-email/render
+  useEffect(() => {
+    if (format !== "html" || !tiptapEditor || isEditing) {
       return;
     }
 
-    const highlight = async () => {
-      setIsHighlighting(true);
+    let cancelled = false;
+    setIsGeneratingHtml(true);
+
+    const generateHtml = async () => {
       try {
-        const html = await codeToHtml(code, {
-          lang: getShikiLanguage(format),
-          theme: "github-dark",
-        });
-        setHighlightedCode(html);
-      } catch {
-        // Fallback to plain code on error
-        setHighlightedCode("");
-      } finally {
-        setIsHighlighting(false);
+        const content = tiptapEditor.getJSON();
+        const html = await renderTipTapToHtml(content);
+        if (!cancelled) {
+          setOriginalCode(html);
+          setEditedCode(html);
+          setIsGeneratingHtml(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to render HTML:", err);
+          setOriginalCode("<!-- Error rendering HTML -->");
+          setEditedCode("<!-- Error rendering HTML -->");
+          setIsGeneratingHtml(false);
+        }
       }
     };
 
-    // Debounce highlighting for performance
-    const timeoutId = setTimeout(highlight, 100);
-    return () => clearTimeout(timeoutId);
-  }, [code, format]);
+    generateHtml();
 
+    return () => {
+      cancelled = true;
+    };
+  }, [tiptapEditor?.state.doc, format, tiptapEditor, isEditing]);
+
+  // Track changes
+  useEffect(() => {
+    setHasChanges(editedCode !== originalCode);
+    setParseError(null);
+  }, [editedCode, originalCode]);
+
+  // Handle code changes in editor
+  const handleCodeChange = (value: string | undefined) => {
+    if (value !== undefined) {
+      setEditedCode(value);
+    }
+  };
+
+  // Apply changes to TipTap editor
+  const applyChanges = async () => {
+    if (!(tiptapEditor && hasChanges)) {
+      return;
+    }
+
+    setIsApplying(true);
+    setParseError(null);
+
+    try {
+      if (format === "json") {
+        // Parse JSON and set content directly
+        const parsed = JSON.parse(editedCode) as JSONContent;
+        tiptapEditor.commands.setContent(parsed);
+        toast.success("JSON changes applied to editor");
+      } else if (format === "html") {
+        // Parse HTML to TipTap JSON
+        const parsed = parseHTMLToTipTap(editedCode);
+        tiptapEditor.commands.setContent(parsed);
+        toast.success("HTML changes applied to editor");
+      } else if (format === "react-email") {
+        // Parse React Email JSX to TipTap JSON
+        const parsed = parseReactEmailToTipTap(editedCode);
+        tiptapEditor.commands.setContent(parsed);
+        toast.success("React Email changes applied to editor");
+      }
+
+      setIsEditing(false);
+      setOriginalCode(editedCode);
+      setHasChanges(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Invalid code";
+      setParseError(message);
+      toast.error(`Failed to apply changes: ${message}`);
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  // Discard changes
+  const discardChanges = () => {
+    setEditedCode(originalCode);
+    setIsEditing(false);
+    setHasChanges(false);
+    setParseError(null);
+  };
+
+  // Copy to clipboard
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(code);
+      await navigator.clipboard.writeText(editedCode);
       setCopied(true);
       toast.success("Code copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
@@ -434,8 +208,8 @@ export function CodeView({ editor }: CodeViewProps) {
     }
   };
 
+  // Download file
   const handleDownload = () => {
-    // Determine file extension based on format
     const extensions: Record<CodeFormat, string> = {
       "react-email": "tsx",
       json: "json",
@@ -443,7 +217,7 @@ export function CodeView({ editor }: CodeViewProps) {
     };
 
     const filename = `email-template.${extensions[format]}`;
-    const blob = new Blob([code], { type: "text/plain" });
+    const blob = new Blob([editedCode], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement("a");
@@ -457,11 +231,10 @@ export function CodeView({ editor }: CodeViewProps) {
     toast.success(`Downloaded ${filename}`);
   };
 
-  if (!editor) {
+  if (!tiptapEditor) {
     return null;
   }
 
-  // Format labels for display
   const formatLabels: Record<CodeFormat, string> = {
     "react-email": "React Email",
     json: "JSON",
@@ -470,21 +243,22 @@ export function CodeView({ editor }: CodeViewProps) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Controls - Compact Header */}
+      {/* Header Controls */}
       <div className="flex items-center justify-between border-b bg-muted/30 px-3 py-2">
-        {/* Left: Current format indicator */}
-        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          <FileCode2 className="h-4 w-4" />
-          <span className="hidden sm:inline">{formatLabels[format]}</span>
-        </div>
-
-        {/* Right: Controls */}
-        <div className="flex items-center gap-1">
+        {/* Left: Format selector and status */}
+        <div className="flex items-center gap-2">
           <Select
-            onValueChange={(v) => setFormat(v as CodeFormat)}
+            onValueChange={(v) => {
+              if (hasChanges) {
+                toast.error("Please apply or discard changes first");
+                return;
+              }
+              setFormat(v as CodeFormat);
+              setIsEditing(false);
+            }}
             value={format}
           >
-            <SelectTrigger className="h-8 w-[130px] text-xs">
+            <SelectTrigger className="h-8 w-[150px] text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -494,77 +268,166 @@ export function CodeView({ editor }: CodeViewProps) {
                   React Email
                 </div>
               </SelectItem>
-              <SelectItem value="json">
-                <div className="flex items-center gap-2">
-                  <FileJson className="h-3.5 w-3.5" />
-                  JSON
-                </div>
-              </SelectItem>
               <SelectItem value="html">
                 <div className="flex items-center gap-2">
                   <FileCode2 className="h-3.5 w-3.5" />
                   HTML
                 </div>
               </SelectItem>
+              <SelectItem value="json">
+                <div className="flex items-center gap-2">
+                  <FileJson className="h-3.5 w-3.5" />
+                  JSON
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
 
-          <Button
-            className="h-8 w-8 p-0"
-            onClick={handleCopy}
-            size="sm"
-            title={copied ? "Copied!" : "Copy to clipboard"}
-            variant={copied ? "secondary" : "ghost"}
-          >
-            {copied ? (
-              <Check className="h-3.5 w-3.5" />
-            ) : (
-              <Copy className="h-3.5 w-3.5" />
-            )}
-          </Button>
+          {hasChanges && (
+            <Badge className="text-xs" variant="default">
+              Modified
+            </Badge>
+          )}
+        </div>
 
-          <Button
-            className="h-8 w-8 p-0"
-            onClick={handleDownload}
-            size="sm"
-            title="Download file"
-            variant="ghost"
-          >
-            <Download className="h-3.5 w-3.5" />
-          </Button>
+        {/* Right: Action buttons */}
+        <div className="flex items-center gap-1">
+          {isEditing ? (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    className="h-8"
+                    disabled={!hasChanges || isApplying}
+                    onClick={applyChanges}
+                    size="sm"
+                    variant="default"
+                  >
+                    {isApplying ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Save className="mr-1 h-3.5 w-3.5" />
+                    )}
+                    Apply
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Apply changes to editor</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    className="h-8"
+                    onClick={discardChanges}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                    Discard
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Discard changes</TooltipContent>
+              </Tooltip>
+            </>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  className="h-8"
+                  onClick={() => setIsEditing(true)}
+                  size="sm"
+                  variant="outline"
+                >
+                  <Pencil className="mr-1 h-3.5 w-3.5" />
+                  Edit
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Edit {formatLabels[format]} code</TooltipContent>
+            </Tooltip>
+          )}
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                className="h-8 w-8 p-0"
+                onClick={handleCopy}
+                size="sm"
+                variant={copied ? "secondary" : "ghost"}
+              >
+                {copied ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {copied ? "Copied!" : "Copy to clipboard"}
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                className="h-8 w-8 p-0"
+                onClick={handleDownload}
+                size="sm"
+                variant="ghost"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Download file</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
-      {/* Code Display */}
-      <ScrollArea className="flex-1">
-        <div className="p-4">
-          {isHighlighting ? (
-            <div className="flex items-center justify-center rounded-lg bg-zinc-950 p-8">
-              <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
-            </div>
-          ) : highlightedCode ? (
-            <div
-              className="shiki-wrapper [&_pre]:!bg-zinc-950 overflow-x-auto rounded-lg [&_code]:font-mono [&_code]:text-sm [&_pre]:p-4"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: Shiki output is safe
-              dangerouslySetInnerHTML={{ __html: highlightedCode }}
-            />
-          ) : (
-            <pre className="overflow-x-auto rounded-lg bg-zinc-950 p-4 font-mono text-sm text-zinc-100">
-              <code>{code}</code>
-            </pre>
-          )}
-        </div>
-      </ScrollArea>
+      {/* Error Alert */}
+      {parseError && (
+        <Alert className="mx-3 mt-3" variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{parseError}</AlertDescription>
+        </Alert>
+      )}
 
-      {/* Format Info - Compact */}
+      {/* Monaco Editor */}
+      <div className="flex-1 overflow-hidden">
+        <MonacoEditor
+          defaultLanguage={getMonacoLanguage(format)}
+          height="100%"
+          language={getMonacoLanguage(format)}
+          onChange={handleCodeChange}
+          options={{
+            automaticLayout: true,
+            fontSize: 13,
+            fontFamily: "JetBrains Mono, Menlo, Monaco, monospace",
+            lineNumbers: "on",
+            minimap: { enabled: false },
+            padding: { top: 16, bottom: 16 },
+            readOnly: !isEditing,
+            scrollBeyondLastLine: false,
+            wordWrap: "on",
+            tabSize: 2,
+            renderLineHighlight: isEditing ? "all" : "none",
+            cursorStyle: isEditing ? "line" : "line-thin",
+            cursorBlinking: isEditing ? "blink" : "solid",
+          }}
+          theme="vs-dark"
+          value={editedCode}
+        />
+      </div>
+
+      {/* Footer Info */}
       <div className="border-t bg-muted/30 px-3 py-2">
         <p className="text-muted-foreground text-xs">
           {format === "react-email" &&
-            "React Email components for use with Wraps SDK"}
+            "React Email JSX - edit and apply to update the visual editor"}
           {format === "json" &&
-            "TipTap JSON document - can be saved and reloaded"}
+            "TipTap JSON document - edit and apply to update the visual editor"}
           {format === "html" &&
-            "Raw HTML - may need email CSS for proper rendering"}
+            (isGeneratingHtml
+              ? "Generating production-ready HTML..."
+              : "Production-ready email HTML - edit and apply to update the visual editor")}
         </p>
       </div>
     </div>

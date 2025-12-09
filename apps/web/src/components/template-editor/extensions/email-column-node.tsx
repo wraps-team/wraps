@@ -10,13 +10,16 @@ import {
 import { Settings2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  PresetSelector,
+  paddingPresets,
+} from "@/components/ui/tailwind-color-picker";
 
 export type EmailColumnAttributes = {
   width: string;
@@ -25,13 +28,14 @@ export type EmailColumnAttributes = {
 };
 
 declare module "@tiptap/core" {
-  type Commands<ReturnType> = {
+  // biome-ignore lint/style/useConsistentTypeDefinitions: interface required for module augmentation
+  interface Commands<ReturnType> {
     emailColumn: {
       updateEmailColumn: (
         attributes: Partial<EmailColumnAttributes>
       ) => ReturnType;
     };
-  };
+  }
 }
 
 const EmailColumnNodeView = ({
@@ -77,49 +81,38 @@ const EmailColumnNodeView = ({
             <Settings2 className="h-3 w-3" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-72">
+        <PopoverContent align="end" className="w-80">
           <div className="space-y-4">
             <h4 className="font-medium">Column Settings</h4>
 
-            <div className="space-y-2">
-              <Label htmlFor="width">Width</Label>
-              <Input
-                id="width"
-                onChange={(e) => updateAttributes({ width: e.target.value })}
-                placeholder="50%"
-                value={attrs.width}
-              />
-              <div className="mt-2 flex gap-2">
-                {["25%", "33%", "50%", "66%", "75%", "100%"].map((w) => (
-                  <Button
-                    className="px-2 text-xs"
-                    key={w}
-                    onClick={() => updateAttributes({ width: w })}
-                    size="sm"
-                    variant={attrs.width === w ? "default" : "outline"}
-                  >
-                    {w}
-                  </Button>
-                ))}
-              </div>
-            </div>
+            <PresetSelector
+              label="Width"
+              onChange={(v) => updateAttributes({ width: v })}
+              presets={[
+                { label: "Auto", value: "auto" },
+                { label: "1/4", value: "25%" },
+                { label: "1/3", value: "33.33%" },
+                { label: "1/2", value: "50%" },
+                { label: "2/3", value: "66.67%" },
+                { label: "3/4", value: "75%" },
+                { label: "Full", value: "100%" },
+              ]}
+              value={attrs.width}
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="padding">Padding</Label>
-              <Input
-                id="padding"
-                onChange={(e) => updateAttributes({ padding: e.target.value })}
-                placeholder="0px"
-                value={attrs.padding}
-              />
-            </div>
+            <PresetSelector
+              label="Padding"
+              onChange={(v) => updateAttributes({ padding: v })}
+              presets={paddingPresets}
+              value={attrs.padding}
+            />
 
             <div className="space-y-2">
               <Label>Vertical Align</Label>
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 {(["top", "middle", "bottom"] as const).map((align) => (
                   <Button
-                    className="flex-1 capitalize"
+                    className="flex-1"
                     key={align}
                     onClick={() => updateAttributes({ verticalAlign: align })}
                     size="sm"
@@ -127,7 +120,7 @@ const EmailColumnNodeView = ({
                       attrs.verticalAlign === align ? "default" : "outline"
                     }
                   >
-                    {align}
+                    {align.charAt(0).toUpperCase() + align.slice(1)}
                   </Button>
                 ))}
               </div>

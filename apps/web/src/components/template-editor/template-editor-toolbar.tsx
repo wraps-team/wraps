@@ -4,6 +4,7 @@ import type { Editor } from "@tiptap/react";
 import {
   Bold,
   BookOpen,
+  Braces,
   Cloud,
   CloudOff,
   Code2,
@@ -35,7 +36,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useTemplateStore } from "@/stores/template-store";
+import { VariableInput } from "./variable-input";
 
 type TemplateEditorToolbarProps = {
   editor: Editor | null;
@@ -114,11 +115,11 @@ export function TemplateEditorToolbar({
           >
             Subject:
           </label>
-          <Input
-            className="h-8 flex-1 bg-background"
+          <VariableInput
+            className="h-8 bg-background"
             id="subject"
-            onChange={(e) => onSubjectChange?.(e.target.value)}
-            placeholder="Enter email subject line (supports {{variables}})"
+            onChange={(value) => onSubjectChange?.(value)}
+            placeholder="Enter email subject line (type {{ for variables)"
             value={subject ?? ""}
           />
           <Badge
@@ -260,6 +261,22 @@ export function TemplateEditorToolbar({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Numbered List</TooltipContent>
+                </Tooltip>
+
+                <Separator className="mx-1 h-6" orientation="vertical" />
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      className="h-8 w-8 p-0"
+                      onClick={() => editor.commands.insertContent("{{")}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <Braces className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Insert Variable (⌘/)</TooltipContent>
                 </Tooltip>
               </div>
 

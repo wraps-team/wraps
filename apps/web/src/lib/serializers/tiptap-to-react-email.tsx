@@ -18,10 +18,12 @@ import {
   Img,
   Link,
   Preview,
+  pixelBasedPreset,
   Section,
   Tailwind,
   Text,
 } from "@react-email/components";
+import { pretty, render } from "@react-email/render";
 import type { JSONContent } from "@tiptap/core";
 import type { ReactElement } from "react";
 
@@ -360,7 +362,8 @@ function nodeToReactEmail(
 }
 
 /**
- * Creates the Tailwind config with brand kit colors (light and dark mode)
+ * Creates the Tailwind config with brand kit colors and pixelBasedPreset
+ * Uses pixel-based values for better email client compatibility
  */
 function createTailwindConfig(brandKit?: BrandKitColors) {
   // Default light mode colors
@@ -376,6 +379,7 @@ function createTailwindConfig(brandKit?: BrandKitColors) {
   const darkTextColor = brandKit?.darkTextColor || "#f9fafb"; // Almost white
 
   return {
+    presets: [pixelBasedPreset], // Use pixel-based units for email compatibility
     darkMode: "media" as const, // Use prefers-color-scheme media query
     theme: {
       extend: {
@@ -436,4 +440,396 @@ export function tiptapToReactEmail(
       </Tailwind>
     </Html>
   );
+}
+
+/**
+ * Renders TipTap JSON content to production-ready HTML email
+ * Uses @react-email/render to produce email-client-compatible HTML
+ * with proper MSO conditionals for Outlook support
+ */
+export async function renderTipTapToHtml(
+  content: JSONContent,
+  testData: Record<string, unknown> = {},
+  options: SerializerOptions = {}
+): Promise<string> {
+  const emailComponent = tiptapToReactEmail(content, testData, options);
+  const html = await render(emailComponent);
+  // Prettify the HTML output for better readability
+  const prettyHtml = await pretty(html);
+  return prettyHtml;
+}
+
+// ============================================================================
+// String Code Generation (for Code Editor)
+// ============================================================================
+
+/**
+ * Convert hex color to Tailwind background class
+ * Uses bracket syntax for custom colors, named classes only for black/white
+ */
+function hexToTailwindBg(hex: string): string {
+  const lowerHex = hex.toLowerCase();
+
+  // Use named classes for black and white
+  if (lowerHex === "#ffffff" || lowerHex === "#fff") {
+    return "bg-white";
+  }
+  if (lowerHex === "#000000" || lowerHex === "#000") {
+    return "bg-black";
+  }
+
+  // Use bracket syntax for all other colors (more predictable)
+  return `bg-[${hex}]`;
+}
+
+/**
+ * Convert hex color to Tailwind text class
+ * Uses bracket syntax for custom colors, named classes only for black/white
+ */
+function hexToTailwindText(hex: string): string {
+  const lowerHex = hex.toLowerCase();
+
+  // Use named classes for black and white
+  if (lowerHex === "#ffffff" || lowerHex === "#fff") {
+    return "text-white";
+  }
+  if (lowerHex === "#000000" || lowerHex === "#000") {
+    return "text-black";
+  }
+
+  // Use bracket syntax for all other colors (more predictable)
+  return `text-[${hex}]`;
+}
+
+/**
+ * Convert padding value to Tailwind class
+ * Always uses bracket syntax for pixel values (matches React Email pattern)
+ */
+function paddingToTailwind(padding: string): string {
+  // Handle 0 values
+  if (padding === "0" || padding === "0px") {
+    return "p-0";
+  }
+  // Use bracket syntax for all other values
+  return `p-[${padding}]`;
+}
+
+/**
+ * Convert border-radius value to Tailwind class
+ * Uses named classes for common values, bracket syntax otherwise
+ */
+function borderRadiusToTailwind(radius: string): string {
+  // Handle special cases
+  if (radius === "0" || radius === "0px") {
+    return "rounded-none";
+  }
+  if (radius === "9999px") {
+    return "rounded-full";
+  }
+  // Use bracket syntax for all other values
+  return `rounded-[${radius}]`;
+}
+
+function getOperatorCodeString(operator: string): string {
+  switch (operator) {
+    case "equals":
+      return "===";
+    case "notEquals":
+      return "!==";
+    case "greaterThan":
+      return ">";
+    case "lessThan":
+      return "<";
+    case "contains":
+      return ".includes";
+    default:
+      return "===";
+  }
+}
+
+/**
+ * Generates React Email code as a string from TipTap JSON content
+ * Uses Tailwind CSS classes for styling, preserving actual attribute values
+ */
+export function generateReactEmailCode(
+  content: JSONContent,
+  indent = 0
+): string {
+  const spaces = "  ".repeat(indent);
+
+  if (!content.type) {
+    return "";
+  }
+
+  switch (content.type) {
+    case "doc": {
+      const children = (content.content || [])
+        .map((c) => generateReactEmailCode(c, indent))
+        .filter(Boolean)
+        .join("\n");
+      return `import { Html, Head, Body, Container, Text, Button, Section, Img, Hr, Heading, Link, Tailwind, pixelBasedPreset } from "@react-email/components";
+
+export default function EmailTemplate() {
+  return (
+    <Html>
+      <Tailwind config={{ presets: [pixelBasedPreset] }}>
+        <Head />
+        <Body className="bg-gray-100 font-sans">
+          <Container className="bg-white mx-auto p-[20px] max-w-[600px]">
+${children}
+          </Container>
+        </Body>
+      </Tailwind>
+    </Html>
+  );
+}`;
+    }
+
+    case "paragraph": {
+      const pContent = (content.content || [])
+        .map((c) => generateReactEmailCode(c, 0))
+        .join("");
+      return `${spaces}          <Text className="my-4 leading-relaxed">${pContent}</Text>`;
+    }
+
+    case "heading": {
+      const level = content.attrs?.level || 1;
+      const hContent = (content.content || [])
+        .map((c) => generateReactEmailCode(c, 0))
+        .join("");
+      const headingClasses: Record<number, string> = {
+        1: "text-3xl font-bold my-4",
+        2: "text-2xl font-bold my-4",
+        3: "text-xl font-semibold my-3",
+        4: "text-lg font-semibold my-3",
+        5: "text-base font-semibold my-2",
+        6: "text-sm font-semibold my-2",
+      };
+      return `${spaces}          <Heading as="h${level}" className="${headingClasses[level] || headingClasses[1]}">${hContent}</Heading>`;
+    }
+
+    case "text":
+      return content.text || "";
+
+    case "emailButton": {
+      const attrs = content.attrs || {};
+      const align = (attrs.align as string) || "left";
+
+      // Use actual colors from attributes
+      const bgClass = hexToTailwindBg(
+        (attrs.backgroundColor as string) || "#5046e5"
+      );
+      const textClass = hexToTailwindText((attrs.color as string) || "#ffffff");
+      const roundedClass = borderRadiusToTailwind(
+        (attrs.borderRadius as string) || "6px"
+      );
+
+      // Parse padding
+      const padding = (attrs.padding as string) || "12px 24px";
+      const [py, px] = padding.split(" ").map((p) => p.trim());
+      const pyValue = py || "12px";
+      const pxValue = px || py || "24px";
+      const pyClass = paddingToTailwind(pyValue).replace("p-", "py-");
+      const pxClass = paddingToTailwind(pxValue).replace("p-", "px-");
+
+      // Font weight
+      const fontWeight = (attrs.fontWeight as string) || "600";
+      const fontWeightClass =
+        fontWeight === "600"
+          ? "font-semibold"
+          : fontWeight === "700"
+            ? "font-bold"
+            : fontWeight === "400"
+              ? "font-normal"
+              : "font-semibold";
+
+      const alignClass =
+        align === "center"
+          ? "text-center"
+          : align === "right"
+            ? "text-right"
+            : "text-left";
+
+      const btnText =
+        (content.content || [])
+          .map((c) => generateReactEmailCode(c, 0))
+          .join("") || "Click here";
+
+      return `${spaces}          <div className="${alignClass}">
+${spaces}            <Button
+${spaces}              href="${attrs.href || "#"}"
+${spaces}              className="${bgClass} ${textClass} ${pxClass} ${pyClass} ${fontWeightClass} no-underline inline-block ${roundedClass}"
+${spaces}            >
+${spaces}              ${btnText}
+${spaces}            </Button>
+${spaces}          </div>`;
+    }
+
+    case "emailSection": {
+      const attrs = content.attrs || {};
+      const bgClass = hexToTailwindBg(
+        (attrs.backgroundColor as string) || "#ffffff"
+      );
+      const paddingClass = paddingToTailwind(
+        (attrs.padding as string) || "24px"
+      );
+      const roundedClass = borderRadiusToTailwind(
+        (attrs.borderRadius as string) || "0"
+      );
+
+      const sectionChildren = (content.content || [])
+        .map((c) => generateReactEmailCode(c, indent + 1))
+        .filter(Boolean)
+        .join("\n");
+
+      return `${spaces}          <Section className="${bgClass} ${paddingClass} ${roundedClass}">
+${sectionChildren}
+${spaces}          </Section>`;
+    }
+
+    case "emailImage": {
+      const attrs = content.attrs || {};
+      const align = (attrs.align as string) || "center";
+      const alignClass =
+        align === "center"
+          ? "text-center"
+          : align === "right"
+            ? "text-right"
+            : "text-left";
+
+      const width = (attrs.width as string) || "100%";
+      const height = (attrs.height as string) || "auto";
+
+      // Build width/height classes
+      let dimensionClasses = "";
+      if (width === "100%") {
+        dimensionClasses += "w-full ";
+      } else if (width) {
+        dimensionClasses += `w-[${width}] `;
+      }
+      if (height && height !== "auto") {
+        dimensionClasses += `h-[${height}] `;
+      } else {
+        dimensionClasses += "h-auto ";
+      }
+
+      return `${spaces}          <div className="${alignClass}">
+${spaces}            <Img
+${spaces}              src="${attrs.src || ""}"
+${spaces}              alt="${attrs.alt || ""}"
+${spaces}              className="${dimensionClasses.trim()} max-w-full inline-block"
+${spaces}            />
+${spaces}          </div>`;
+    }
+
+    case "emailDivider": {
+      const attrs = content.attrs || {};
+      const color = (attrs.borderColor as string) || "#e5e7eb";
+      const borderClass =
+        color === "#e5e7eb" ? "border-gray-200" : `border-[${color}]`;
+      const margin = (attrs.margin as string) || "24px";
+      const marginClass = margin === "24px" ? "my-6" : `my-[${margin}]`;
+
+      return `${spaces}          <Hr className="${borderClass} ${marginClass}" />`;
+    }
+
+    case "emailSpacer": {
+      const height = (content.attrs?.height as string) || "24px";
+      return `${spaces}          <div className="w-full h-[${height}]" />`;
+    }
+
+    case "variable":
+      return `{props.${content.attrs?.name || "variable"}}`;
+
+    case "bulletList": {
+      const items = (content.content || [])
+        .map((c) => generateReactEmailCode(c, indent))
+        .join("\n");
+      return `${spaces}          <ul className="pl-5 my-4 list-disc">
+${items}
+${spaces}          </ul>`;
+    }
+
+    case "orderedList": {
+      const items = (content.content || [])
+        .map((c) => generateReactEmailCode(c, indent))
+        .join("\n");
+      return `${spaces}          <ol className="pl-5 my-4 list-decimal">
+${items}
+${spaces}          </ol>`;
+    }
+
+    case "listItem": {
+      const liContent = (content.content || [])
+        .map((c) => {
+          // For list items, render the paragraph content directly
+          if (c.type === "paragraph") {
+            return (c.content || [])
+              .map((t) => generateReactEmailCode(t, 0))
+              .join("");
+          }
+          return generateReactEmailCode(c, 0);
+        })
+        .join("");
+      return `${spaces}            <li className="my-1">${liContent}</li>`;
+    }
+
+    case "blockquote": {
+      const bqContent = (content.content || [])
+        .map((c) => generateReactEmailCode(c, indent + 1))
+        .join("\n");
+      return `${spaces}          <blockquote className="border-l-4 border-gray-200 pl-4 my-4 text-gray-500 italic">
+${bqContent}
+${spaces}          </blockquote>`;
+    }
+
+    case "conditional": {
+      const attrs = content.attrs || {};
+      const condContent = (content.content || [])
+        .map((c) => generateReactEmailCode(c, indent + 1))
+        .join("\n");
+      return `${spaces}          {props.${attrs.variable} ${getOperatorCodeString(attrs.operator as string)} ${JSON.stringify(attrs.value)} && (
+${condContent}
+${spaces}          )}`;
+    }
+
+    case "emailRow": {
+      const attrs = content.attrs || {};
+      const gap = (attrs.gap as string) || "16px";
+      const gapClass = gap === "16px" ? "gap-4" : `gap-[${gap}]`;
+
+      const rowChildren = (content.content || [])
+        .map((c) => generateReactEmailCode(c, indent + 1))
+        .filter(Boolean)
+        .join("\n");
+
+      return `${spaces}          <div className="flex ${gapClass}">
+${rowChildren}
+${spaces}          </div>`;
+    }
+
+    case "emailColumn": {
+      const attrs = content.attrs || {};
+      const width = (attrs.width as string) || "auto";
+      const widthClass = width === "auto" ? "flex-1" : `w-[${width}]`;
+
+      const colChildren = (content.content || [])
+        .map((c) => generateReactEmailCode(c, indent + 1))
+        .filter(Boolean)
+        .join("\n");
+
+      return `${spaces}            <div className="${widthClass}">
+${colChildren}
+${spaces}            </div>`;
+    }
+
+    default:
+      if (content.content) {
+        return (content.content || [])
+          .map((c) => generateReactEmailCode(c, indent))
+          .filter(Boolean)
+          .join("\n");
+      }
+      return "";
+  }
 }

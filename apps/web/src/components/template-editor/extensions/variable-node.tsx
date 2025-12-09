@@ -24,11 +24,12 @@ export type VariableAttributes = {
 };
 
 declare module "@tiptap/core" {
-  type Commands<ReturnType> = {
+  // biome-ignore lint/style/useConsistentTypeDefinitions: interface required for module augmentation
+  interface Commands<ReturnType> {
     variable: {
       insertVariable: (attributes: Partial<VariableAttributes>) => ReturnType;
     };
-  };
+  }
 }
 
 const VariableNodeView = ({

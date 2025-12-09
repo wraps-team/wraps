@@ -41,7 +41,8 @@ export type ConditionalAttributes = {
 };
 
 declare module "@tiptap/core" {
-  type Commands<ReturnType> = {
+  // biome-ignore lint/style/useConsistentTypeDefinitions: interface required for module augmentation
+  interface Commands<ReturnType> {
     conditional: {
       insertConditional: (
         attributes?: Partial<ConditionalAttributes>
@@ -50,7 +51,7 @@ declare module "@tiptap/core" {
         attributes: Partial<ConditionalAttributes>
       ) => ReturnType;
     };
-  };
+  }
 }
 
 const operatorLabels: Record<ConditionalOperator, string> = {
