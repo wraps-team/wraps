@@ -1428,4 +1428,228 @@ describe("Full Round-Trip Tests", () => {
     expect(section?.attrs?.padding).toBe("32px");
     expect(section?.attrs?.borderRadius).toBe("8px");
   });
+
+  it("should preserve preview text through full round-trip", () => {
+    const originalDoc: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "emailPreview",
+          attrs: {
+            text: "Check out our latest updates!",
+          },
+        },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Email body" }],
+        },
+      ],
+    };
+
+    const reactEmailCode = generateReactEmailCode(originalDoc);
+    const parsedDoc = parseReactEmailToTipTap(reactEmailCode);
+
+    const preview = parsedDoc.content?.find(
+      (node) => node.type === "emailPreview"
+    );
+    expect(preview).toBeDefined();
+    expect(preview?.attrs?.text).toBe("Check out our latest updates!");
+  });
+
+  it("should preserve image attributes through full round-trip", () => {
+    const originalDoc: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "emailImage",
+          attrs: {
+            src: "https://example.com/hero.jpg",
+            alt: "Hero image",
+            width: "600px",
+            height: "300px",
+            align: "center",
+          },
+        },
+      ],
+    };
+
+    const reactEmailCode = generateReactEmailCode(originalDoc);
+    const parsedDoc = parseReactEmailToTipTap(reactEmailCode);
+
+    const image = parsedDoc.content?.find(
+      (node) => node.type === "emailImage"
+    );
+    expect(image).toBeDefined();
+    expect(image?.attrs?.src).toBe("https://example.com/hero.jpg");
+    expect(image?.attrs?.alt).toBe("Hero image");
+  });
+
+  it("should preserve spacer through full round-trip", () => {
+    const originalDoc: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "emailSpacer",
+          attrs: {
+            height: 32,
+          },
+        },
+      ],
+    };
+
+    const reactEmailCode = generateReactEmailCode(originalDoc);
+    const parsedDoc = parseReactEmailToTipTap(reactEmailCode);
+
+    const spacer = parsedDoc.content?.find(
+      (node) => node.type === "emailSpacer"
+    );
+    expect(spacer).toBeDefined();
+    expect(spacer?.attrs?.height).toBe(32);
+  });
+
+  it("should preserve divider through full round-trip", () => {
+    const originalDoc: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "emailDivider",
+          attrs: {
+            color: "#e5e7eb",
+            margin: "24px 0",
+          },
+        },
+      ],
+    };
+
+    const reactEmailCode = generateReactEmailCode(originalDoc);
+    const parsedDoc = parseReactEmailToTipTap(reactEmailCode);
+
+    const divider = parsedDoc.content?.find(
+      (node) => node.type === "emailDivider"
+    );
+    expect(divider).toBeDefined();
+  });
+
+  it("should preserve conditional blocks through full round-trip", () => {
+    const originalDoc: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "conditional",
+          attrs: {
+            variable: "isPremium",
+            operator: "equals",
+            value: "true",
+          },
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Premium content" }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const reactEmailCode = generateReactEmailCode(originalDoc);
+    const parsedDoc = parseReactEmailToTipTap(reactEmailCode);
+
+    const conditional = parsedDoc.content?.find(
+      (node) => node.type === "conditional"
+    );
+    expect(conditional).toBeDefined();
+    expect(conditional?.attrs?.variable).toBe("isPremium");
+    expect(conditional?.attrs?.operator).toBe("equals");
+    expect(conditional?.attrs?.value).toBe("true");
+  });
+
+  it("should preserve variables through full round-trip", () => {
+    const originalDoc: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Hello, " },
+            {
+              type: "variable",
+              attrs: {
+                name: "firstName",
+                label: "firstName",
+                fallback: "there",
+              },
+            },
+            { type: "text", text: "!" },
+          ],
+        },
+      ],
+    };
+
+    const reactEmailCode = generateReactEmailCode(originalDoc);
+    const parsedDoc = parseReactEmailToTipTap(reactEmailCode);
+
+    const paragraph = parsedDoc.content?.find(
+      (node) => node.type === "paragraph"
+    );
+    expect(paragraph).toBeDefined();
+
+    const variable = paragraph?.content?.find(
+      (node) => node.type === "variable"
+    );
+    expect(variable).toBeDefined();
+    expect(variable?.attrs?.name).toBe("firstName");
+  });
+
+  it("should preserve complex document with multiple components", () => {
+    const originalDoc: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "emailPreview",
+          attrs: { text: "Weekly newsletter" },
+        },
+        {
+          type: "emailSection",
+          attrs: { backgroundColor: "#f3f4f6", padding: "24px" },
+          content: [
+            {
+              type: "heading",
+              attrs: { level: 1 },
+              content: [{ type: "text", text: "Welcome!" }],
+            },
+          ],
+        },
+        {
+          type: "emailSpacer",
+          attrs: { height: 24 },
+        },
+        {
+          type: "emailButton",
+          attrs: {
+            href: "https://example.com",
+            backgroundColor: "#3b82f6",
+            color: "#ffffff",
+          },
+          content: [{ type: "text", text: "Get Started" }],
+        },
+      ],
+    };
+
+    const reactEmailCode = generateReactEmailCode(originalDoc);
+    const parsedDoc = parseReactEmailToTipTap(reactEmailCode);
+
+    // Verify all components are present
+    expect(
+      parsedDoc.content?.some((n) => n.type === "emailPreview")
+    ).toBe(true);
+    expect(
+      parsedDoc.content?.some((n) => n.type === "emailSection")
+    ).toBe(true);
+    expect(
+      parsedDoc.content?.some((n) => n.type === "emailSpacer")
+    ).toBe(true);
+    expect(
+      parsedDoc.content?.some((n) => n.type === "emailButton")
+    ).toBe(true);
+  });
 });
