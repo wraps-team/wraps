@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { escape as escapeHTML } from "he";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -126,9 +127,10 @@ export function SendTestModal({
     // Replace variables
     for (const variable of variables) {
       const value = values[variable as keyof FormValues] ?? `{{${variable}}}`;
+      // Escape user-provided variable values
       html = html.replace(
         new RegExp(`\\{\\{${variable}\\}\\}`, "g"),
-        String(value)
+        escapeHTML(String(value))
       );
     }
 
