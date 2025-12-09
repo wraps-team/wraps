@@ -276,6 +276,7 @@ function TemplateEditorContent({
           onSendTest={() => setShowSendTestModal(true)}
           onSubjectChange={handleSubjectChange}
           onUnpublish={handleUnpublish}
+          orgSlug={orgSlug}
           status={template.status}
           subject={subject}
         />
@@ -284,7 +285,7 @@ function TemplateEditorContent({
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* Left Panel - Block Library */}
           {showBlockLibrary && view === "edit" && (
-            <BlockPalette editor={editor} />
+            <BlockPalette editor={editor} orgSlug={orgSlug} />
           )}
 
           {/* Center - Editor/Preview/Code/Usage */}

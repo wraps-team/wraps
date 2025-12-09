@@ -2,7 +2,15 @@
 
 import { useDebouncer } from "@tanstack/react-pacer";
 import type { JSONContent } from "@tiptap/core";
+import Blockquote from "@tiptap/extension-blockquote";
+import BulletList from "@tiptap/extension-bullet-list";
+import { Color } from "@tiptap/extension-color";
+import Heading from "@tiptap/extension-heading";
+import OrderedList from "@tiptap/extension-ordered-list";
+import Paragraph from "@tiptap/extension-paragraph";
 import Placeholder from "@tiptap/extension-placeholder";
+import TextAlign from "@tiptap/extension-text-align";
+import { TextStyle } from "@tiptap/extension-text-style";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -10,12 +18,17 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 // Import custom extensions
 import {
   ConditionalNode,
+  EmailAvatarNode,
   EmailButtonNode,
+  EmailCodeBlockNode,
+  EmailCodeInlineMark,
   EmailColumnNode,
   EmailDividerNode,
   EmailImageNode,
+  EmailPreviewNode,
   EmailRowNode,
   EmailSectionNode,
+  EmailSocialLinksNode,
   EmailSpacerNode,
   KeyboardShortcuts,
   VariableNode,
@@ -63,11 +76,17 @@ export function useTemplateEditor({
     wait: autoSaveDelay,
   });
 
-  // Default empty document structure
+  // Default empty document structure with Preview for inbox preview text
   const defaultContent: JSONContent = useMemo(
     () => ({
       type: "doc",
       content: [
+        {
+          type: "emailPreview",
+          attrs: {
+            text: "Preview text shown in inbox",
+          },
+        },
         {
           type: "paragraph",
           content: [{ type: "text", text: "Start typing or add blocks..." }],
@@ -83,17 +102,37 @@ export function useTemplateEditor({
 
     extensions: [
       StarterKit.configure({
-        // Disable some starter kit extensions we don't need
+        // Disable extensions we're replacing with draggable versions
+        paragraph: false,
+        heading: false,
+        blockquote: false,
+        bulletList: false,
+        orderedList: false,
+        // Disable code extensions we don't need
         codeBlock: false,
         code: false,
         // Note: history is handled by StarterKit by default
         // When collaboration is enabled, we'll need to add Yjs extensions separately
       }),
 
+      // Text blocks with draggable enabled
+      Paragraph.extend({ draggable: true }),
+      Heading.extend({ draggable: true }),
+      Blockquote.extend({ draggable: true }),
+      BulletList.extend({ draggable: true }),
+      OrderedList.extend({ draggable: true }),
+
       Placeholder.configure({
         placeholder:
           "Start typing or use the block palette to add email components...",
         showOnlyWhenEditable: true,
+      }),
+
+      // Text styling extensions (required for block examples with colors and alignment)
+      TextStyle,
+      Color,
+      TextAlign.configure({
+        types: ["heading", "paragraph"],
       }),
 
       // React Email nodes
@@ -104,6 +143,13 @@ export function useTemplateEditor({
       EmailSpacerNode,
       EmailRowNode,
       EmailColumnNode,
+      EmailPreviewNode,
+      EmailAvatarNode,
+      EmailCodeBlockNode,
+      EmailSocialLinksNode,
+
+      // Marks
+      EmailCodeInlineMark,
 
       // Dynamic content
       VariableNode,

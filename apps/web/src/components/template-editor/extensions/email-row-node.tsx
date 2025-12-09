@@ -20,6 +20,7 @@ import {
   gapPresets,
   PresetSelector,
 } from "@/components/ui/tailwind-color-picker";
+import { DragHandle } from "./drag-handle";
 
 export type EmailRowAttributes = {
   gap: string;
@@ -54,50 +55,51 @@ const EmailRowNodeView = ({
         <NodeViewContent />
       </div>
 
-      <Popover onOpenChange={setIsEditing} open={isEditing}>
-        <PopoverTrigger asChild>
-          <Button
-            className="-top-2 absolute right-2 z-10 h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
-            size="icon"
-            variant="secondary"
-          >
-            <Settings2 className="h-3 w-3" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-72">
-          <div className="space-y-4">
-            <h4 className="font-medium">Row Settings</h4>
+      {/* Drag handle and settings button */}
+      <div className="-top-2 absolute right-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <DragHandle />
+        <Popover onOpenChange={setIsEditing} open={isEditing}>
+          <PopoverTrigger asChild>
+            <Button className="h-6 w-6" size="icon" variant="secondary">
+              <Settings2 className="h-3 w-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-72">
+            <div className="space-y-4">
+              <h4 className="font-medium">Row Settings</h4>
 
-            <PresetSelector
-              label="Column Gap"
-              onChange={(v) => updateAttributes({ gap: v })}
-              presets={gapPresets}
-              value={attrs.gap}
-            />
+              <PresetSelector
+                label="Column Gap"
+                onChange={(v) => updateAttributes({ gap: v })}
+                presets={gapPresets}
+                value={attrs.gap}
+              />
 
-            <div className="space-y-2">
-              <Label>Vertical Alignment</Label>
-              <div className="flex gap-1">
-                {(["top", "middle", "bottom"] as const).map((align) => (
-                  <Button
-                    className="flex-1"
-                    key={align}
-                    onClick={() => updateAttributes({ align })}
-                    size="sm"
-                    variant={
-                      attrs.align === align || (!attrs.align && align === "top")
-                        ? "default"
-                        : "outline"
-                    }
-                  >
-                    {align.charAt(0).toUpperCase() + align.slice(1)}
-                  </Button>
-                ))}
+              <div className="space-y-2">
+                <Label>Vertical Alignment</Label>
+                <div className="flex gap-1">
+                  {(["top", "middle", "bottom"] as const).map((align) => (
+                    <Button
+                      className="flex-1"
+                      key={align}
+                      onClick={() => updateAttributes({ align })}
+                      size="sm"
+                      variant={
+                        attrs.align === align ||
+                        (!attrs.align && align === "top")
+                          ? "default"
+                          : "outline"
+                      }
+                    >
+                      {align.charAt(0).toUpperCase() + align.slice(1)}
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+          </PopoverContent>
+        </Popover>
+      </div>
 
       {/* Visual indicator for row */}
       <div className="-left-4 absolute top-0 bottom-0 flex items-center">

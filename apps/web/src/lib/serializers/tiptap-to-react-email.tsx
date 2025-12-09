@@ -26,6 +26,7 @@ import {
 import { pretty, render } from "@react-email/render";
 import type { JSONContent } from "@tiptap/core";
 import type { ReactElement } from "react";
+import { getImageWithPlaceholder } from "@/lib/brand-kit/placeholders";
 
 type BrandKitColors = {
   primaryColor?: string;
@@ -240,14 +241,16 @@ function nodeToReactEmail(
       };
       const align = node.attrs?.align || "center";
       const alignClass = alignMap[align] || "text-center";
+      // Use placeholder if src is empty or a variable
+      const imgSrc = getImageWithPlaceholder(node.attrs?.src, "generic");
 
       return (
         <div className={alignClass} key={key}>
           <Img
-            alt={node.attrs?.alt || ""}
+            alt={node.attrs?.alt || "Image"}
             className="inline-block h-auto max-w-full"
             height={node.attrs?.height}
-            src={node.attrs?.src || ""}
+            src={imgSrc}
             width={node.attrs?.width}
           />
         </div>
@@ -262,8 +265,139 @@ function nodeToReactEmail(
 
     case "emailSpacer": {
       // Use Tailwind arbitrary value for dynamic height
-      const height = node.attrs?.height || "20px";
-      return <div className={`w-full h-[${height}]`} key={key} />;
+      const height = node.attrs?.height || 24;
+      return (
+        <div className={"w-full"} key={key} style={{ height: `${height}px` }} />
+      );
+    }
+
+    case "emailPreview": {
+      // Preview text is handled at the top level, but if nested, render as hidden
+      const previewText = node.attrs?.text || "";
+      return (
+        <div
+          className="hidden max-h-0 max-w-0 overflow-hidden opacity-0"
+          key={key}
+          style={{ display: "none", msoHide: "all" } as React.CSSProperties}
+        >
+          {previewText}
+        </div>
+      );
+    }
+
+    case "emailAvatar": {
+      const size = node.attrs?.size || 64;
+      const shape = node.attrs?.shape || "circle";
+      const align = node.attrs?.align || "center";
+      // Use placeholder if src is empty or a variable
+      const avatarSrc = getImageWithPlaceholder(node.attrs?.src, "avatar");
+
+      const borderRadiusMap: Record<string, string> = {
+        circle: "9999px",
+        rounded: "8px",
+        square: "0",
+      };
+
+      const alignMap: Record<string, string> = {
+        left: "text-left",
+        center: "text-center",
+        right: "text-right",
+      };
+
+      return (
+        <div className={alignMap[align] || "text-center"} key={key}>
+          <Img
+            alt={node.attrs?.alt || "Avatar"}
+            className="inline-block"
+            height={size}
+            src={avatarSrc}
+            style={{
+              borderRadius: borderRadiusMap[shape] || "9999px",
+              objectFit: "cover",
+            }}
+            width={size}
+          />
+        </div>
+      );
+    }
+
+    case "emailCodeBlock": {
+      const code = node.attrs?.code || "";
+      const bgColor = node.attrs?.backgroundColor || "#1e1e1e";
+      const textColor = node.attrs?.textColor || "#d4d4d4";
+      const padding = node.attrs?.padding || "16px";
+      const borderRadius = node.attrs?.borderRadius || "8px";
+      const fontSize = node.attrs?.fontSize || "14px";
+      const fontFamily =
+        node.attrs?.fontFamily || "'Fira Code', 'Consolas', monospace";
+
+      return (
+        <pre
+          key={key}
+          style={{
+            backgroundColor: bgColor,
+            color: textColor,
+            padding,
+            borderRadius,
+            fontSize,
+            fontFamily,
+            overflow: "auto",
+            margin: "16px 0",
+          }}
+        >
+          <code>{code}</code>
+        </pre>
+      );
+    }
+
+    case "emailSocialLinks": {
+      const links = (node.attrs?.links || []) as Array<{
+        platform: string;
+        url: string;
+      }>;
+      const iconSize = node.attrs?.iconSize || 24;
+      const iconColor = node.attrs?.iconColor || "#6b7280";
+      const iconSpacing = node.attrs?.iconSpacing || "16px";
+      const align = node.attrs?.align || "center";
+
+      const alignMap: Record<string, string> = {
+        left: "text-left",
+        center: "text-center",
+        right: "text-right",
+      };
+
+      // Social platform icons as simple text links (email clients have limited SVG support)
+      const platformLabels: Record<string, string> = {
+        twitter: "Twitter",
+        linkedin: "LinkedIn",
+        instagram: "Instagram",
+        facebook: "Facebook",
+        youtube: "YouTube",
+        github: "GitHub",
+      };
+
+      if (links.length === 0) {
+        return null;
+      }
+
+      return (
+        <div className={`my-4 ${alignMap[align] || "text-center"}`} key={key}>
+          {links.map((link, i) => (
+            <Link
+              href={link.url || "#"}
+              key={link.platform}
+              style={{
+                color: iconColor,
+                fontSize: `${iconSize}px`,
+                marginRight: i < links.length - 1 ? iconSpacing : "0",
+                textDecoration: "none",
+              }}
+            >
+              {platformLabels[link.platform] || link.platform}
+            </Link>
+          ))}
+        </div>
+      );
     }
 
     case "variable":
@@ -563,17 +697,37 @@ export function generateReactEmailCode(
 
   switch (content.type) {
     case "doc": {
-      const children = (content.content || [])
+      // Extract preview nodes from content (they need special placement)
+      const contentNodes = content.content || [];
+      const previewNodes = contentNodes.filter(
+        (c) => c.type === "emailPreview"
+      );
+      const otherNodes = contentNodes.filter((c) => c.type !== "emailPreview");
+
+      // Generate preview text (combine all preview nodes)
+      const previewText = previewNodes
+        .map((p) => (p.attrs?.text as string) || "")
+        .filter(Boolean)
+        .join(" ");
+
+      // Generate children (excluding preview)
+      const children = otherNodes
         .map((c) => generateReactEmailCode(c, indent))
         .filter(Boolean)
         .join("\n");
-      return `import { Html, Head, Body, Container, Text, Button, Section, Img, Hr, Heading, Link, Tailwind, pixelBasedPreset } from "@react-email/components";
+
+      // Preview must be placed after Head but before Body in React Email
+      const previewLine = previewText
+        ? `\n        <Preview>${previewText}</Preview>`
+        : "";
+
+      return `import { Html, Head, Body, Container, Text, Button, Section, Img, Hr, Heading, Link, Preview, Tailwind, pixelBasedPreset } from "@react-email/components";
 
 export default function EmailTemplate() {
   return (
     <Html>
       <Tailwind config={{ presets: [pixelBasedPreset] }}>
-        <Head />
+        <Head />${previewLine}
         <Body className="bg-gray-100 font-sans">
           <Container className="bg-white mx-auto p-[20px] max-w-[600px]">
 ${children}
@@ -821,6 +975,128 @@ ${spaces}          </div>`;
       return `${spaces}            <div className="${widthClass}">
 ${colChildren}
 ${spaces}            </div>`;
+    }
+
+    case "emailPreview": {
+      // Preview is handled at the doc level to ensure correct placement
+      // (must be after <Head /> but before <Body> in React Email)
+      return "";
+    }
+
+    case "emailAvatar": {
+      const attrs = content.attrs || {};
+      const size = (attrs.size as number) || 64;
+      const shape = (attrs.shape as string) || "circle";
+      const align = (attrs.align as string) || "center";
+
+      const borderRadiusMap: Record<string, string> = {
+        circle: "9999px",
+        rounded: "8px",
+        square: "0",
+      };
+      const borderRadius = borderRadiusMap[shape] || "9999px";
+
+      const alignClass =
+        align === "center"
+          ? "text-center"
+          : align === "right"
+            ? "text-right"
+            : "text-left";
+
+      return `${spaces}          <div className="${alignClass}">
+${spaces}            <Img
+${spaces}              src="${attrs.src || ""}"
+${spaces}              alt="${attrs.alt || "Avatar"}"
+${spaces}              width={${size}}
+${spaces}              height={${size}}
+${spaces}              className="inline-block"
+${spaces}              style={{ borderRadius: "${borderRadius}", objectFit: "cover" }}
+${spaces}            />
+${spaces}          </div>`;
+    }
+
+    case "emailCodeBlock": {
+      const attrs = content.attrs || {};
+      const code = (attrs.code as string) || "";
+      const bgColor = (attrs.backgroundColor as string) || "#1e1e1e";
+      const textColor = (attrs.textColor as string) || "#d4d4d4";
+      const padding = (attrs.padding as string) || "16px";
+      const borderRadius = (attrs.borderRadius as string) || "8px";
+      const fontSize = (attrs.fontSize as string) || "14px";
+      const fontFamily =
+        (attrs.fontFamily as string) || "'Fira Code', 'Consolas', monospace";
+
+      // Escape code for safe rendering in template
+      const escapedCode = code.replace(/`/g, "\\`").replace(/\$/g, "\\$");
+
+      return `${spaces}          <pre
+${spaces}            style={{
+${spaces}              backgroundColor: "${bgColor}",
+${spaces}              color: "${textColor}",
+${spaces}              padding: "${padding}",
+${spaces}              borderRadius: "${borderRadius}",
+${spaces}              fontSize: "${fontSize}",
+${spaces}              fontFamily: "${fontFamily}",
+${spaces}              overflow: "auto",
+${spaces}              margin: "16px 0",
+${spaces}            }}
+${spaces}          >
+${spaces}            <code>{\`${escapedCode}\`}</code>
+${spaces}          </pre>`;
+    }
+
+    case "emailSocialLinks": {
+      const attrs = content.attrs || {};
+      const links = (attrs.links || []) as Array<{
+        platform: string;
+        url: string;
+      }>;
+      const iconColor = (attrs.iconColor as string) || "#6b7280";
+      const iconSize = (attrs.iconSize as number) || 24;
+      const iconSpacing = (attrs.iconSpacing as string) || "16px";
+      const align = (attrs.align as string) || "center";
+
+      const alignClass =
+        align === "center"
+          ? "text-center"
+          : align === "right"
+            ? "text-right"
+            : "text-left";
+
+      const platformLabels: Record<string, string> = {
+        twitter: "Twitter",
+        linkedin: "LinkedIn",
+        instagram: "Instagram",
+        facebook: "Facebook",
+        youtube: "YouTube",
+        github: "GitHub",
+      };
+
+      if (links.length === 0) {
+        return `${spaces}          {/* Social Links - No links configured */}`;
+      }
+
+      const linkComponents = links
+        .map((link, i) => {
+          const label = platformLabels[link.platform] || link.platform;
+          const marginRight = i < links.length - 1 ? iconSpacing : "0";
+          return `${spaces}            <Link
+${spaces}              href="${link.url || "#"}"
+${spaces}              style={{
+${spaces}                color: "${iconColor}",
+${spaces}                fontSize: "${iconSize}px",
+${spaces}                marginRight: "${marginRight}",
+${spaces}                textDecoration: "none",
+${spaces}              }}
+${spaces}            >
+${spaces}              ${label}
+${spaces}            </Link>`;
+        })
+        .join("\n");
+
+      return `${spaces}          <div className="${alignClass} my-4">
+${linkComponents}
+${spaces}          </div>`;
     }
 
     default:

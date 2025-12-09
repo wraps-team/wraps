@@ -16,6 +16,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { DragHandle } from "./drag-handle";
 
 export type EmailSpacerAttributes = {
   height: number;
@@ -55,48 +56,48 @@ const EmailSpacerNodeView = ({
         </div>
       </div>
 
-      <Popover onOpenChange={setIsEditing} open={isEditing}>
-        <PopoverTrigger asChild>
-          <Button
-            className="-translate-y-1/2 absolute top-1/2 right-2 h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
-            size="icon"
-            variant="secondary"
-          >
-            <MoveVertical className="h-3 w-3" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-64">
-          <div className="space-y-4">
-            <h4 className="font-medium">Spacer Settings</h4>
+      {/* Drag handle and settings button */}
+      <div className="-translate-y-1/2 absolute top-1/2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <DragHandle />
+        <Popover onOpenChange={setIsEditing} open={isEditing}>
+          <PopoverTrigger asChild>
+            <Button className="h-6 w-6" size="icon" variant="secondary">
+              <MoveVertical className="h-3 w-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64">
+            <div className="space-y-4">
+              <h4 className="font-medium">Spacer Settings</h4>
 
-            <div className="space-y-2">
-              <Label htmlFor="height">Height (px)</Label>
-              <Input
-                id="height"
-                min={1}
-                onChange={(e) =>
-                  updateAttributes({ height: Number(e.target.value) || 24 })
-                }
-                type="number"
-                value={attrs.height}
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="height">Height (px)</Label>
+                <Input
+                  id="height"
+                  min={1}
+                  onChange={(e) =>
+                    updateAttributes({ height: Number(e.target.value) || 24 })
+                  }
+                  type="number"
+                  value={attrs.height}
+                />
+              </div>
 
-            <div className="flex gap-2">
-              {[16, 24, 32, 48, 64].map((h) => (
-                <Button
-                  key={h}
-                  onClick={() => updateAttributes({ height: h })}
-                  size="sm"
-                  variant={attrs.height === h ? "default" : "outline"}
-                >
-                  {h}
-                </Button>
-              ))}
+              <div className="flex gap-2">
+                {[16, 24, 32, 48, 64].map((h) => (
+                  <Button
+                    key={h}
+                    onClick={() => updateAttributes({ height: h })}
+                    size="sm"
+                    variant={attrs.height === h ? "default" : "outline"}
+                  >
+                    {h}
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+          </PopoverContent>
+        </Popover>
+      </div>
     </NodeViewWrapper>
   );
 };

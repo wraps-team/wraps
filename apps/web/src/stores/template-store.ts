@@ -18,6 +18,7 @@ type LocalState = {
   showAIPanel: boolean;
   showTestDataPanel: boolean;
   showVersionHistory: boolean;
+  selectedBrandKitId: string | null;
 };
 
 type TemplateMetadata = {
@@ -55,6 +56,9 @@ type TemplateStoreActions = {
   toggleAIPanel: () => void;
   toggleTestDataPanel: () => void;
   toggleVersionHistory: () => void;
+
+  // Brand kit
+  setSelectedBrandKitId: (id: string | null) => void;
 
   // Template actions
   setTemplate: (template: TemplateMetadata | null) => void;
@@ -98,6 +102,7 @@ const initialLocalState: LocalState = {
   showAIPanel: false,
   showTestDataPanel: false,
   showVersionHistory: false,
+  selectedBrandKitId: null,
 };
 
 const initialCollaborationState: CollaborationState = {
@@ -177,6 +182,14 @@ export const useTemplateStore = create<TemplateStore>((set) => ({
         },
       })),
 
+    setSelectedBrandKitId: (id) =>
+      set((state) => ({
+        localState: {
+          ...state.localState,
+          selectedBrandKitId: id,
+        },
+      })),
+
     setTemplate: (template) => set({ template }),
 
     updateTemplate: (updates) =>
@@ -226,6 +239,8 @@ export const useShowTestDataPanel = () =>
   useTemplateStore((state) => state.localState.showTestDataPanel);
 export const useShowVersionHistory = () =>
   useTemplateStore((state) => state.localState.showVersionHistory);
+export const useSelectedBrandKitId = () =>
+  useTemplateStore((state) => state.localState.selectedBrandKitId);
 export const useTemplateMetadata = () =>
   useTemplateStore((state) => state.template);
 export const useAIState = () => useTemplateStore((state) => state.ai);

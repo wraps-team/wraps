@@ -1,6 +1,14 @@
 import { parse } from "@babel/parser";
 import traverse from "@babel/traverse";
-import type { JSXAttribute, JSXElement, ObjectExpression } from "@babel/types";
+import type {
+  BinaryExpression,
+  Expression,
+  JSXAttribute,
+  JSXElement,
+  LogicalExpression,
+  MemberExpression,
+  ObjectExpression,
+} from "@babel/types";
 import type { JSONContent } from "@tiptap/core";
 
 /**
@@ -809,6 +817,170 @@ function mergeStyles(
 }
 
 /**
+ * Parse a conditional expression from JSX like {props.x === "y" && (<Content />)}
+ * Returns the conditional node or null if not a conditional pattern
+ */
+function parseConditionalExpression(
+  expr: LogicalExpression
+): JSONContent | null {
+  // Must be && operator
+  if (expr.operator !== "&&") {
+    return null;
+  }
+
+  const left = expr.left;
+  const right = expr.right;
+
+  let variable = "";
+  let operator = "exists";
+  let value = "";
+
+  // Parse the left side (condition)
+  if (left.type === "BinaryExpression") {
+    // Pattern: props.variableName === "value"
+    const binExpr = left as BinaryExpression;
+
+    // Get variable name from left side of binary expression
+    if (binExpr.left.type === "MemberExpression") {
+      const memberExpr = binExpr.left as MemberExpression;
+      if (
+        memberExpr.object.type === "Identifier" &&
+        memberExpr.object.name === "props" &&
+        memberExpr.property.type === "Identifier"
+      ) {
+        variable = memberExpr.property.name;
+      }
+    }
+
+    // Map JS operators to our operator types
+    switch (binExpr.operator) {
+      case "===":
+      case "==":
+        operator = "equals";
+        break;
+      case "!==":
+      case "!=":
+        operator = "notEquals";
+        break;
+      case ">":
+        operator = "greaterThan";
+        break;
+      case "<":
+        operator = "lessThan";
+        break;
+    }
+
+    // Get comparison value
+    if (binExpr.right.type === "StringLiteral") {
+      value = binExpr.right.value;
+    } else if (binExpr.right.type === "NumericLiteral") {
+      value = String(binExpr.right.value);
+    } else if (binExpr.right.type === "BooleanLiteral") {
+      value = String(binExpr.right.value);
+    }
+  } else if (left.type === "MemberExpression") {
+    // Pattern: props.variableName && ... (exists check)
+    const memberExpr = left as MemberExpression;
+    if (
+      memberExpr.object.type === "Identifier" &&
+      memberExpr.object.name === "props" &&
+      memberExpr.property.type === "Identifier"
+    ) {
+      variable = memberExpr.property.name;
+      operator = "exists";
+    }
+  } else if (left.type === "UnaryExpression" && left.operator === "!") {
+    // Pattern: !props.variableName && ... (notExists check)
+    const arg = left.argument;
+    if (arg.type === "MemberExpression") {
+      const memberExpr = arg as MemberExpression;
+      if (
+        memberExpr.object.type === "Identifier" &&
+        memberExpr.object.name === "props" &&
+        memberExpr.property.type === "Identifier"
+      ) {
+        variable = memberExpr.property.name;
+        operator = "notExists";
+      }
+    }
+  } else if (
+    left.type === "CallExpression" &&
+    left.callee.type === "MemberExpression"
+  ) {
+    // Pattern: props.variableName.includes("value") (contains check)
+    const callee = left.callee as MemberExpression;
+    if (
+      callee.property.type === "Identifier" &&
+      callee.property.name === "includes" &&
+      callee.object.type === "MemberExpression"
+    ) {
+      const innerMember = callee.object as MemberExpression;
+      if (
+        innerMember.object.type === "Identifier" &&
+        innerMember.object.name === "props" &&
+        innerMember.property.type === "Identifier"
+      ) {
+        variable = innerMember.property.name;
+        operator = "contains";
+        // Get the argument to includes()
+        if (left.arguments[0]?.type === "StringLiteral") {
+          value = left.arguments[0].value;
+        }
+      }
+    }
+  }
+
+  if (!variable) {
+    return null;
+  }
+
+  // Parse the right side (content)
+  const content: JSONContent[] = [];
+
+  // The right side could be a JSXElement or wrapped in parentheses
+  const contentExpr =
+    right.type === "ParenthesizedExpression"
+      ? (right as unknown as { expression: Expression }).expression
+      : right;
+
+  if (contentExpr.type === "JSXElement") {
+    const parsed = parseJSXElement(contentExpr as unknown as JSXElement);
+    if (parsed) {
+      if (Array.isArray(parsed)) {
+        content.push(...parsed);
+      } else {
+        content.push(parsed);
+      }
+    }
+  } else if (contentExpr.type === "JSXFragment") {
+    // Handle fragments - iterate through children
+    const fragment = contentExpr as unknown as { children: unknown[] };
+    for (const child of fragment.children) {
+      if ((child as { type: string }).type === "JSXElement") {
+        const parsed = parseJSXElement(child as JSXElement);
+        if (parsed) {
+          if (Array.isArray(parsed)) {
+            content.push(...parsed);
+          } else {
+            content.push(parsed);
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    type: "conditional",
+    attrs: {
+      variable,
+      operator,
+      value,
+    },
+    content: content.length > 0 ? content : [{ type: "paragraph" }],
+  };
+}
+
+/**
  * Recursively mark JSX elements as processed to avoid duplicates
  */
 function markAsProcessed(
@@ -945,7 +1117,7 @@ function parseJSXElement(
         children.push({ type: "text", text });
       }
     } else if (child.type === "JSXExpressionContainer") {
-      // Handle {variable} expressions
+      // Handle {variable} expressions and conditionals
       const expr = child.expression;
       if (expr.type === "Identifier") {
         children.push({
@@ -959,6 +1131,32 @@ function parseJSXElement(
         });
       } else if (expr.type === "StringLiteral") {
         children.push({ type: "text", text: expr.value });
+      } else if (expr.type === "LogicalExpression") {
+        // Handle conditional expressions like {props.x === "y" && (<Content />)}
+        const conditional = parseConditionalExpression(
+          expr as LogicalExpression
+        );
+        if (conditional) {
+          children.push(conditional);
+        }
+      } else if (expr.type === "MemberExpression") {
+        // Handle {props.variableName} expressions
+        const memberExpr = expr as MemberExpression;
+        if (
+          memberExpr.object.type === "Identifier" &&
+          memberExpr.object.name === "props" &&
+          memberExpr.property.type === "Identifier"
+        ) {
+          children.push({
+            type: "variable",
+            attrs: {
+              name: memberExpr.property.name,
+              label: memberExpr.property.name,
+              fallback: "",
+              format: null,
+            },
+          });
+        }
       }
     }
   }
@@ -974,7 +1172,31 @@ function parseJSXElement(
 
     // div - often used as wrapper for alignment, extract block children directly
     case "div": {
+      const className = (props.className as string) || "";
+      const inlineStyle = (props.style as Record<string, string>) || {};
+
+      // Detect spacer pattern: <div className="w-full h-[Npx]" /> or style={{ height: "Npx" }}
       if (children.length === 0) {
+        const tailwindStyle = parseTailwindClasses(className);
+        const height = inlineStyle.height || tailwindStyle.height;
+
+        if (
+          height &&
+          (className.includes("w-full") || tailwindStyle.width === "100%")
+        ) {
+          // Parse height value (e.g., "24px" -> 24)
+          const heightMatch = height.match(/^(\d+)(?:px)?$/);
+          const heightValue = heightMatch
+            ? Number.parseInt(heightMatch[1], 10)
+            : 24;
+
+          return {
+            type: "emailSpacer",
+            attrs: {
+              height: heightValue,
+            },
+          };
+        }
         return null;
       }
 
@@ -1057,9 +1279,9 @@ function parseJSXElement(
     case "Link":
       return createLink(props, children);
 
-    // Preview text (skip)
+    // Preview text - convert to emailPreview node
     case "Preview":
-      return null;
+      return createPreview(children);
 
     // Tailwind component - extract children
     case "Tailwind":
@@ -1476,5 +1698,20 @@ function createLink(
         ],
       },
     ],
+  };
+}
+
+function createPreview(children: JSONContent[]): JSONContent {
+  // Extract text content from children
+  const previewText = children
+    .filter((c): c is JSONContent & { text: string } => c.type === "text")
+    .map((c) => c.text)
+    .join("");
+
+  return {
+    type: "emailPreview",
+    attrs: {
+      text: previewText || "Preview text",
+    },
   };
 }

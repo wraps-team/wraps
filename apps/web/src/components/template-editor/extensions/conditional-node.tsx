@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DragHandle } from "./drag-handle";
 
 export type ConditionalOperator =
   | "equals"
@@ -88,77 +89,81 @@ const ConditionalNodeView = ({
           If {conditionLabel}
         </span>
 
-        <Popover onOpenChange={setIsEditing} open={isEditing}>
-          <PopoverTrigger asChild>
-            <Button
-              className="ml-auto h-6 w-6 text-amber-600 hover:text-amber-800"
-              size="icon"
-              variant="ghost"
-            >
-              <Settings2 className="h-3 w-3" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-80">
-            <div className="space-y-4">
-              <h4 className="flex items-center gap-2 font-medium">
-                <GitBranch className="h-4 w-4" />
-                Conditional Settings
-              </h4>
+        {/* Drag handle and settings button */}
+        <div className="ml-auto flex gap-1">
+          <DragHandle className="text-amber-600 opacity-100 hover:bg-amber-100 dark:hover:bg-amber-900" />
+          <Popover onOpenChange={setIsEditing} open={isEditing}>
+            <PopoverTrigger asChild>
+              <Button
+                className="h-6 w-6 text-amber-600 hover:text-amber-800"
+                size="icon"
+                variant="ghost"
+              >
+                <Settings2 className="h-3 w-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80">
+              <div className="space-y-4">
+                <h4 className="flex items-center gap-2 font-medium">
+                  <GitBranch className="h-4 w-4" />
+                  Conditional Settings
+                </h4>
 
-              <div className="space-y-2">
-                <Label htmlFor="variable">Variable</Label>
-                <Input
-                  id="variable"
-                  onChange={(e) =>
-                    updateAttributes({ variable: e.target.value })
-                  }
-                  placeholder="isPremium"
-                  value={attrs.variable}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="operator">Condition</Label>
-                <Select
-                  onValueChange={(value: ConditionalOperator) =>
-                    updateAttributes({ operator: value })
-                  }
-                  value={attrs.operator}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(
-                      Object.entries(operatorLabels) as [
-                        ConditionalOperator,
-                        string,
-                      ][]
-                    ).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {needsValue && (
                 <div className="space-y-2">
-                  <Label htmlFor="value">Value</Label>
+                  <Label htmlFor="variable">Variable</Label>
                   <Input
-                    id="value"
+                    id="variable"
                     onChange={(e) =>
-                      updateAttributes({ value: e.target.value })
+                      updateAttributes({ variable: e.target.value })
                     }
-                    placeholder="true"
-                    value={attrs.value}
+                    placeholder="isPremium"
+                    value={attrs.variable}
                   />
                 </div>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
+
+                <div className="space-y-2">
+                  <Label htmlFor="operator">Condition</Label>
+                  <Select
+                    onValueChange={(value: ConditionalOperator) =>
+                      updateAttributes({ operator: value })
+                    }
+                    value={attrs.operator}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(
+                        Object.entries(operatorLabels) as [
+                          ConditionalOperator,
+                          string,
+                        ][]
+                      ).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {needsValue && (
+                  <div className="space-y-2">
+                    <Label htmlFor="value">Value</Label>
+                    <Input
+                      id="value"
+                      onChange={(e) =>
+                        updateAttributes({ value: e.target.value })
+                      }
+                      placeholder="true"
+                      value={attrs.value}
+                    />
+                  </div>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {/* Content area */}

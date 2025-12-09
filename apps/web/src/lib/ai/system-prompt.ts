@@ -1,5 +1,10 @@
 // apps/web/src/lib/ai/system-prompt.ts
 
+import {
+  ALL_BLOCK_EXAMPLES,
+  BLOCK_CATEGORY_LABELS,
+  type BlockCategory,
+} from "./block-examples";
 import { COMPONENT_SPECS } from "./components-spec";
 
 type BrandKit = {
@@ -25,6 +30,50 @@ type SystemPromptOptions = {
   availableVariables?: TemplateVariable[];
   existingContent?: string; // Current TipTap JSON if editing
 };
+
+// Build a curated selection of block examples for the AI
+function buildBlockExamplesSection(): string {
+  // Group examples by category and pick representative ones
+  const categoryExamples: Record<string, string[]> = {};
+
+  for (const example of ALL_BLOCK_EXAMPLES) {
+    if (!categoryExamples[example.category]) {
+      categoryExamples[example.category] = [];
+    }
+    // Limit to 2 examples per category to keep context manageable
+    if (categoryExamples[example.category].length < 2) {
+      categoryExamples[example.category].push(
+        `**${example.name}** (${example.id}): ${example.description}
+\`\`\`json
+${JSON.stringify(example.tiptapJson, null, 2)}
+\`\`\``
+      );
+    }
+  }
+
+  // Build the output, grouping by category
+  const sections: string[] = [];
+  const priorityCategories: BlockCategory[] = [
+    "header",
+    "footer",
+    "hero",
+    "feature",
+    "cta",
+    "product",
+    "testimonial",
+    "pricing",
+  ];
+
+  for (const category of priorityCategories) {
+    if (categoryExamples[category]) {
+      sections.push(
+        `#### ${BLOCK_CATEGORY_LABELS[category]}\n${categoryExamples[category].join("\n\n")}`
+      );
+    }
+  }
+
+  return sections.join("\n\n");
+}
 
 export function buildSystemPrompt(options: SystemPromptOptions = {}): string {
   const { brandKit, availableVariables = [], existingContent } = options;
@@ -62,6 +111,17 @@ After the JSON, provide a brief explanation of what you created and any suggesti
 You can ONLY use these node types. Any other node types will fail validation:
 
 ${JSON.stringify(componentDocs, null, 2)}
+
+## Block Examples Library
+Here are comprehensive examples of common email patterns you can use and adapt. Each example shows the complete TipTap JSON structure:
+
+### Available Block Categories:
+${Object.entries(BLOCK_CATEGORY_LABELS)
+  .map(([key, label]) => `- **${label}** (${key})`)
+  .join("\n")}
+
+### Example Blocks (use these as templates):
+${buildBlockExamplesSection()}
 
 ## Variable Syntax
 Use the "variable" node type for dynamic content:

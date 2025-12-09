@@ -19,6 +19,7 @@ import {
   paddingPresets,
   TailwindColorPicker,
 } from "@/components/ui/tailwind-color-picker";
+import { DragHandle } from "./drag-handle";
 
 export type EmailDividerAttributes = {
   borderColor: string;
@@ -57,46 +58,46 @@ const EmailDividerNodeView = ({
         }}
       />
 
-      <Popover onOpenChange={setIsEditing} open={isEditing}>
-        <PopoverTrigger asChild>
-          <Button
-            className="-translate-y-1/2 absolute top-1/2 right-2 h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
-            size="icon"
-            variant="secondary"
-          >
-            <Settings2 className="h-3 w-3" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-80">
-          <div className="space-y-4">
-            <h4 className="font-medium">Divider Settings</h4>
+      {/* Drag handle and settings button */}
+      <div className="-translate-y-1/2 absolute top-1/2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <DragHandle />
+        <Popover onOpenChange={setIsEditing} open={isEditing}>
+          <PopoverTrigger asChild>
+            <Button className="h-6 w-6" size="icon" variant="secondary">
+              <Settings2 className="h-3 w-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80">
+            <div className="space-y-4">
+              <h4 className="font-medium">Divider Settings</h4>
 
-            <TailwindColorPicker
-              label="Color"
-              onChange={(v) => updateAttributes({ borderColor: v })}
-              value={attrs.borderColor}
-            />
+              <TailwindColorPicker
+                label="Color"
+                onChange={(v) => updateAttributes({ borderColor: v })}
+                value={attrs.borderColor}
+              />
 
-            <PresetSelector
-              label="Thickness"
-              onChange={(v) => updateAttributes({ borderWidth: v })}
-              presets={[
-                { label: "Thin", value: "1px" },
-                { label: "Medium", value: "2px" },
-                { label: "Thick", value: "4px" },
-              ]}
-              value={attrs.borderWidth}
-            />
+              <PresetSelector
+                label="Thickness"
+                onChange={(v) => updateAttributes({ borderWidth: v })}
+                presets={[
+                  { label: "Thin", value: "1px" },
+                  { label: "Medium", value: "2px" },
+                  { label: "Thick", value: "4px" },
+                ]}
+                value={attrs.borderWidth}
+              />
 
-            <PresetSelector
-              label="Margin"
-              onChange={(v) => updateAttributes({ margin: v })}
-              presets={paddingPresets}
-              value={attrs.margin}
-            />
-          </div>
-        </PopoverContent>
-      </Popover>
+              <PresetSelector
+                label="Margin"
+                onChange={(v) => updateAttributes({ margin: v })}
+                presets={paddingPresets}
+                value={attrs.margin}
+              />
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
     </NodeViewWrapper>
   );
 };

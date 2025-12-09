@@ -2,6 +2,7 @@
 
 import { mergeAttributes, Node } from "@tiptap/core";
 import {
+  NodeViewContent,
   type NodeViewProps,
   NodeViewWrapper,
   ReactNodeViewRenderer,
@@ -23,6 +24,7 @@ import {
   PresetSelector,
   TailwindColorPicker,
 } from "@/components/ui/tailwind-color-picker";
+import { DragHandle } from "./drag-handle";
 
 export type EmailButtonAttributes = {
   href: string;
@@ -75,17 +77,14 @@ const EmailButtonNodeView = ({
     setLocalAttrs((prev) => ({ ...prev, [key]: value }));
   };
 
-  const buttonText = node.textContent || "Click me";
-
   return (
     <NodeViewWrapper
       className={`email-button-wrapper my-2 ${selected ? "ring-2 ring-primary ring-offset-2" : ""}`}
       style={{ textAlign: attrs.align }}
     >
       <div className="group relative inline-block">
-        <a
-          className="pointer-events-none inline-block no-underline"
-          href={attrs.href}
+        <NodeViewContent
+          className="inline-block cursor-text no-underline outline-none"
           style={{
             backgroundColor: attrs.backgroundColor,
             color: attrs.color,
@@ -94,101 +93,100 @@ const EmailButtonNodeView = ({
             fontSize: attrs.fontSize,
             fontWeight: attrs.fontWeight,
             textDecoration: "none",
+            display: "inline-block",
           }}
-        >
-          {buttonText}
-        </a>
+        />
 
-        <Popover onOpenChange={handleOpenChange} open={isEditing}>
-          <PopoverTrigger asChild>
-            <Button
-              className="-top-2 -right-2 absolute h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
-              size="icon"
-              variant="secondary"
-            >
-              <Pencil className="h-3 w-3" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-80">
-            <div className="space-y-4">
-              <h4 className="font-medium">Edit Button</h4>
+        {/* Drag handle and edit button */}
+        <div className="-top-2 -right-2 absolute flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <DragHandle />
+          <Popover onOpenChange={handleOpenChange} open={isEditing}>
+            <PopoverTrigger asChild>
+              <Button className="h-6 w-6" size="icon" variant="secondary">
+                <Pencil className="h-3 w-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80">
+              <div className="space-y-4">
+                <h4 className="font-medium">Edit Button</h4>
 
-              <div className="space-y-2">
-                <Label htmlFor="href">URL</Label>
-                <Input
-                  id="href"
-                  onChange={(e) => updateLocal("href", e.target.value)}
-                  placeholder="https://example.com"
-                  value={localAttrs.href}
+                <div className="space-y-2">
+                  <Label htmlFor="href">URL</Label>
+                  <Input
+                    id="href"
+                    onChange={(e) => updateLocal("href", e.target.value)}
+                    placeholder="https://example.com"
+                    value={localAttrs.href}
+                  />
+                </div>
+
+                <TailwindColorPicker
+                  label="Background"
+                  onChange={(v) => updateLocal("backgroundColor", v)}
+                  value={localAttrs.backgroundColor}
                 />
-              </div>
 
-              <TailwindColorPicker
-                label="Background"
-                onChange={(v) => updateLocal("backgroundColor", v)}
-                value={localAttrs.backgroundColor}
-              />
+                <TailwindColorPicker
+                  label="Text Color"
+                  onChange={(v) => updateLocal("color", v)}
+                  value={localAttrs.color}
+                />
 
-              <TailwindColorPicker
-                label="Text Color"
-                onChange={(v) => updateLocal("color", v)}
-                value={localAttrs.color}
-              />
+                <PresetSelector
+                  label="Font Size"
+                  onChange={(v) => updateLocal("fontSize", v)}
+                  presets={fontSizePresets}
+                  value={localAttrs.fontSize}
+                />
 
-              <PresetSelector
-                label="Font Size"
-                onChange={(v) => updateLocal("fontSize", v)}
-                presets={fontSizePresets}
-                value={localAttrs.fontSize}
-              />
+                <PresetSelector
+                  label="Font Weight"
+                  onChange={(v) => updateLocal("fontWeight", v)}
+                  presets={fontWeightPresets}
+                  value={localAttrs.fontWeight}
+                />
 
-              <PresetSelector
-                label="Font Weight"
-                onChange={(v) => updateLocal("fontWeight", v)}
-                presets={fontWeightPresets}
-                value={localAttrs.fontWeight}
-              />
+                <PresetSelector
+                  label="Padding"
+                  onChange={(v) => updateLocal("padding", v)}
+                  presets={[
+                    { label: "SM", value: "8px 16px" },
+                    { label: "MD", value: "12px 24px" },
+                    { label: "LG", value: "16px 32px" },
+                    { label: "XL", value: "20px 40px" },
+                  ]}
+                  value={localAttrs.padding}
+                />
 
-              <PresetSelector
-                label="Padding"
-                onChange={(v) => updateLocal("padding", v)}
-                presets={[
-                  { label: "SM", value: "8px 16px" },
-                  { label: "MD", value: "12px 24px" },
-                  { label: "LG", value: "16px 32px" },
-                  { label: "XL", value: "20px 40px" },
-                ]}
-                value={localAttrs.padding}
-              />
+                <PresetSelector
+                  label="Border Radius"
+                  onChange={(v) => updateLocal("borderRadius", v)}
+                  presets={borderRadiusPresets}
+                  value={localAttrs.borderRadius}
+                />
 
-              <PresetSelector
-                label="Border Radius"
-                onChange={(v) => updateLocal("borderRadius", v)}
-                presets={borderRadiusPresets}
-                value={localAttrs.borderRadius}
-              />
-
-              <div className="space-y-2">
-                <Label>Alignment</Label>
-                <div className="flex gap-2">
-                  {(["left", "center", "right"] as const).map((alignment) => (
-                    <Button
-                      className="flex-1 capitalize"
-                      key={alignment}
-                      onClick={() => updateLocal("align", alignment)}
-                      size="sm"
-                      variant={
-                        localAttrs.align === alignment ? "default" : "outline"
-                      }
-                    >
-                      {alignment}
-                    </Button>
-                  ))}
+                <div className="space-y-2">
+                  <Label>Alignment</Label>
+                  <div className="flex gap-2">
+                    {(["left", "center", "right"] as const).map((alignment) => (
+                      <Button
+                        className="flex-1 capitalize"
+                        key={alignment}
+                        onClick={() => updateLocal("align", alignment)}
+                        size="sm"
+                        variant={
+                          localAttrs.align === alignment ? "default" : "outline"
+                        }
+                      >
+                        {alignment}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
     </NodeViewWrapper>
   );

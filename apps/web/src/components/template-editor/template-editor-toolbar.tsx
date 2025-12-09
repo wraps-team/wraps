@@ -46,10 +46,12 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useTemplateStore } from "@/stores/template-store";
+import { BrandKitSelector } from "./brand-kit-selector";
 import { VariableInput } from "./variable-input";
 
 type TemplateEditorToolbarProps = {
   editor: Editor | null;
+  orgSlug: string;
   isSaving?: boolean;
   isPublishing?: boolean;
   subject?: string | null;
@@ -73,6 +75,7 @@ const statusColors: Record<string, string> = {
 
 export function TemplateEditorToolbar({
   editor,
+  orgSlug,
   isSaving,
   isPublishing,
   subject,
@@ -169,6 +172,11 @@ export function TemplateEditorToolbar({
               <BookOpen className="h-3.5 w-3.5" />
             </ToggleGroupItem>
           </ToggleGroup>
+
+          <Separator className="mx-1 h-6" orientation="vertical" />
+
+          {/* Brand Kit Selector */}
+          <BrandKitSelector orgSlug={orgSlug} />
 
           {/* Text Formatting (only in edit mode) */}
           {view === "edit" && (

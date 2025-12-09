@@ -8,9 +8,7 @@ import { DefaultChatTransport } from "ai";
 import {
   Bot,
   Check,
-  ExternalLink,
   Loader2,
-  Palette,
   RefreshCw,
   Send,
   Sparkles,
@@ -19,16 +17,10 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useBrandKits } from "@/hooks/use-brand-kit-queries";
@@ -70,21 +62,18 @@ export function AIChatPanel({
   const [pendingContent, setPendingContent] = useState<JSONContent | null>(
     null
   );
-  const [selectedBrandKitId, setSelectedBrandKitId] = useState<string | null>(
-    null
-  );
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const { selectedBrandKitId } = useTemplateStore((state) => state.localState);
   const { setIsGenerating, setLastGeneratedContent } = useTemplateStore(
     (state) => state.actions
   );
 
   // Fetch brand kits for this organization
-  const { data: brandKits, isLoading: isLoadingBrandKits } =
-    useBrandKits(orgSlug);
+  const { data: brandKits } = useBrandKits(orgSlug);
 
-  // Get the selected brand kit or default
+  // Get the selected brand kit from store
   const selectedBrandKit = useMemo(() => {
     if (!brandKits?.length) {
       return null;
@@ -92,18 +81,8 @@ export function AIChatPanel({
     if (selectedBrandKitId) {
       return brandKits.find((kit) => kit.id === selectedBrandKitId) ?? null;
     }
-    // Return default brand kit or first one
+    // Fallback to default brand kit or first one
     return brandKits.find((kit) => kit.isDefault) ?? brandKits[0];
-  }, [brandKits, selectedBrandKitId]);
-
-  // Auto-select default brand kit when loaded
-  useEffect(() => {
-    if (brandKits?.length && !selectedBrandKitId) {
-      const defaultKit = brandKits.find((kit) => kit.isDefault);
-      if (defaultKit) {
-        setSelectedBrandKitId(defaultKit.id);
-      }
-    }
   }, [brandKits, selectedBrandKitId]);
 
   // Use the Vercel AI SDK v5's useChat hook
@@ -232,96 +211,19 @@ export function AIChatPanel({
       <div className="flex items-center justify-between border-b bg-muted/30 px-3 py-2">
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
           <Sparkles className="h-4 w-4 text-primary" />
-          <span className="hidden font-medium sm:inline">AI Assistant</span>
+          <span className="font-medium">AI Assistant</span>
         </div>
-        <div className="flex items-center gap-1">
-          {/* Brand Kit Selector */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                className="h-8 gap-1.5 px-2"
-                disabled={isLoadingBrandKits}
-                size="sm"
-                variant="ghost"
-              >
-                {selectedBrandKit ? (
-                  <>
-                    <div
-                      className="h-3 w-3 rounded-full border"
-                      style={{ backgroundColor: selectedBrandKit.primaryColor }}
-                    />
-                    <span className="max-w-[60px] truncate text-xs">
-                      {selectedBrandKit.name}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Palette className="h-3.5 w-3.5" />
-                    <span className="text-xs">Brand</span>
-                  </>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-56 p-2">
-              <div className="mb-2 px-1">
-                <p className="font-medium text-xs">Brand Kit</p>
-                <p className="text-muted-foreground text-xs">
-                  Apply brand styles to AI output
-                </p>
-              </div>
-              <div className="space-y-1">
-                {brandKits?.map((kit) => (
-                  <button
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent",
-                      selectedBrandKitId === kit.id && "bg-accent"
-                    )}
-                    key={kit.id}
-                    onClick={() => setSelectedBrandKitId(kit.id)}
-                    type="button"
-                  >
-                    <div
-                      className="h-4 w-4 rounded-full border"
-                      style={{ backgroundColor: kit.primaryColor }}
-                    />
-                    <span className="flex-1 truncate">{kit.name}</span>
-                    {kit.isDefault && (
-                      <span className="text-muted-foreground text-xs">
-                        Default
-                      </span>
-                    )}
-                  </button>
-                ))}
-                {(!brandKits || brandKits.length === 0) && (
-                  <div className="px-2 py-1.5">
-                    <p className="mb-2 text-muted-foreground text-xs">
-                      No brand kits configured
-                    </p>
-                    <Link
-                      className="flex items-center gap-1 text-primary text-xs hover:underline"
-                      href={`/${orgSlug}/settings?tab=brand-kits`}
-                    >
-                      Create brand kit
-                      <ExternalLink className="h-3 w-3" />
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {isLoading && (
-            <Button
-              className="h-8 w-8 p-0"
-              onClick={stop}
-              size="sm"
-              title="Stop generating"
-              variant="ghost"
-            >
-              <Square className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
+        {isLoading && (
+          <Button
+            className="h-8 w-8 p-0"
+            onClick={stop}
+            size="sm"
+            title="Stop generating"
+            variant="ghost"
+          >
+            <Square className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </div>
 
       {/* Messages */}

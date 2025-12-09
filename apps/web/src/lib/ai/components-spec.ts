@@ -345,6 +345,217 @@ export const COMPONENT_SPECS: ComponentSpec[] = [
       },
     ],
   },
+  {
+    name: "Preview",
+    description:
+      "Preheader text that appears in email inbox preview before the email is opened. Should be placed at the very beginning of the email.",
+    tiptapNodeType: "emailPreview",
+    props: [
+      {
+        name: "text",
+        type: "string",
+        required: true,
+        description: "Preview text (max 150 characters recommended)",
+      },
+    ],
+    examples: [
+      {
+        prompt: "Add preview text for a welcome email",
+        output:
+          '{"type":"emailPreview","attrs":{"text":"Welcome! Your account is ready. Here\'s what you need to get started..."}}',
+      },
+    ],
+    emailClientNotes:
+      "Hidden from email body but visible in inbox preview. Place at document start.",
+  },
+  {
+    name: "Avatar",
+    description:
+      "A circular or rounded image perfect for profile pictures, testimonials, and team member photos.",
+    tiptapNodeType: "emailAvatar",
+    props: [
+      {
+        name: "src",
+        type: "string",
+        required: true,
+        description: "Image URL",
+      },
+      {
+        name: "alt",
+        type: "string",
+        required: true,
+        description: "Alt text for accessibility",
+      },
+      {
+        name: "size",
+        type: "number",
+        required: false,
+        default: 64,
+        description: "Avatar size in pixels (32, 48, 64, 80, 96)",
+      },
+      {
+        name: "shape",
+        type: "string",
+        required: false,
+        default: "circle",
+        description: "Shape: circle, rounded, or square",
+      },
+      {
+        name: "align",
+        type: "string",
+        required: false,
+        default: "center",
+        description: "Alignment: left, center, or right",
+      },
+    ],
+    examples: [
+      {
+        prompt: "Add a testimonial avatar",
+        output:
+          '{"type":"emailAvatar","attrs":{"src":"{{testimonialAvatarUrl}}","alt":"Customer photo","size":64,"shape":"circle","align":"center"}}',
+      },
+    ],
+  },
+  {
+    name: "CodeBlock",
+    description:
+      "A styled code block for displaying code snippets with optional line numbers. Great for technical emails, API documentation, etc.",
+    tiptapNodeType: "emailCodeBlock",
+    props: [
+      {
+        name: "code",
+        type: "string",
+        required: true,
+        description: "The code to display",
+      },
+      {
+        name: "language",
+        type: "string",
+        required: false,
+        default: "javascript",
+        description:
+          "Programming language (javascript, typescript, python, html, css, json, bash, sql, plaintext)",
+      },
+      {
+        name: "showLineNumbers",
+        type: "boolean",
+        required: false,
+        default: false,
+        description: "Whether to show line numbers",
+      },
+      {
+        name: "backgroundColor",
+        type: "string",
+        required: false,
+        default: "#1e1e1e",
+        description: "Background color of code block",
+      },
+      {
+        name: "textColor",
+        type: "string",
+        required: false,
+        default: "#d4d4d4",
+        description: "Text color",
+      },
+    ],
+    examples: [
+      {
+        prompt: "Add a code example",
+        output:
+          '{"type":"emailCodeBlock","attrs":{"code":"const wraps = new Wraps();\\nawait wraps.emails.send({ to: \'user@example.com\' });","language":"javascript","showLineNumbers":true}}',
+      },
+    ],
+    emailClientNotes:
+      "Uses monospace font with fallbacks for email client compatibility.",
+  },
+  {
+    name: "CodeInline",
+    description:
+      "Inline code styling for technical terms, variable names, or short code snippets within text.",
+    tiptapNodeType: "emailCodeInline",
+    props: [
+      {
+        name: "backgroundColor",
+        type: "string",
+        required: false,
+        default: "#f3f4f6",
+        description: "Background color",
+      },
+      {
+        name: "textColor",
+        type: "string",
+        required: false,
+        default: "#dc2626",
+        description: "Text color",
+      },
+    ],
+    examples: [
+      {
+        prompt: "Add inline code in a sentence",
+        output:
+          '{"type":"paragraph","content":[{"type":"text","text":"Use the "},{"type":"text","marks":[{"type":"emailCodeInline"}],"text":"sendEmail()"},{"type":"text","text":" function to send emails."}]}',
+      },
+    ],
+    emailClientNotes:
+      "This is a mark, not a node. Apply to text within paragraphs.",
+  },
+  {
+    name: "SocialLinks",
+    description:
+      "A row of social media links with icons. Supports Twitter, LinkedIn, Instagram, Facebook, YouTube, and GitHub.",
+    tiptapNodeType: "emailSocialLinks",
+    props: [
+      {
+        name: "links",
+        type: "array",
+        required: true,
+        description:
+          "Array of {platform, url} objects. Platforms: twitter, linkedin, instagram, facebook, youtube, github",
+      },
+      {
+        name: "iconSize",
+        type: "number",
+        required: false,
+        default: 24,
+        description: "Icon size in pixels",
+      },
+      {
+        name: "iconColor",
+        type: "string",
+        required: false,
+        default: "#6b7280",
+        description: "Icon color",
+      },
+      {
+        name: "iconSpacing",
+        type: "string",
+        required: false,
+        default: "16px",
+        description: "Space between icons",
+      },
+      {
+        name: "align",
+        type: "string",
+        required: false,
+        default: "center",
+        description: "Alignment: left, center, or right",
+      },
+      {
+        name: "style",
+        type: "string",
+        required: false,
+        default: "icons",
+        description: "Display style: icons, text, or both",
+      },
+    ],
+    examples: [
+      {
+        prompt: "Add social media links",
+        output:
+          '{"type":"emailSocialLinks","attrs":{"links":[{"platform":"twitter","url":"{{twitterUrl}}"},{"platform":"linkedin","url":"{{linkedinUrl}}"},{"platform":"instagram","url":"{{instagramUrl}}"}],"iconSize":24,"iconColor":"#6b7280","align":"center"}}',
+      },
+    ],
+  },
 ];
 
 // Helper to get valid node types for validation
