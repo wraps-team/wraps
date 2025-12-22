@@ -116,7 +116,7 @@ export default function UpgradePage() {
           </div>
 
           <ul className="space-y-3">
-            {starterPlan.features.map((feature) => (
+            {starterPlan.featureList.map((feature) => (
               <li className="flex items-start gap-3" key={feature}>
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
                 <span className="text-sm">{feature}</span>

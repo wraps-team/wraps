@@ -1,0 +1,37 @@
+{
+  "name": "@wraps/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/lambda.ts --outdir dist --target node",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.927.0",
+    "@aws-sdk/client-ses": "^3.927.0",
+    "@aws-sdk/client-sqs": "^3.927.0",
+    "@aws-sdk/client-sts": "^3.927.0",
+    "@elysiajs/cors": "^1.2.0",
+    "@elysiajs/swagger": "^1.2.0",
+    "@wraps/db": "workspace:*",
+    "drizzle-orm": "0.44.7",
+    "elysia": "^1.2.25",
+    "pg": "^8.16.2"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.157",
+    "@types/pg": "^8.15.4",
+    "typescript": "5.8.3",
+    "vitest": "4.0.8"
+  }
+}

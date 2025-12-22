@@ -252,7 +252,7 @@ export function OrganizationSettingsBilling({
           <div>
             <h3 className="mb-3 font-semibold">Plan Benefits</h3>
             <ul className="space-y-2">
-              {planConfig.features.map((feature) => (
+              {planConfig.featureList.map((feature) => (
                 <li className="flex items-start gap-2 text-sm" key={feature}>
                   <CheckCircle2Icon className="mt-0.5 size-4 flex-shrink-0 text-primary" />
                   <span>{feature}</span>
@@ -363,7 +363,7 @@ export function OrganizationSettingsBilling({
             </div>
 
             <ul className="space-y-2">
-              {PLANS.pro.features.map((feature) => (
+              {PLANS.pro.featureList.map((feature) => (
                 <li className="flex items-start gap-2 text-sm" key={feature}>
                   <CheckCircle2Icon className="mt-0.5 size-4 flex-shrink-0 text-primary" />
                   <span>{feature}</span>
@@ -410,7 +410,7 @@ export function OrganizationSettingsBilling({
             </div>
 
             <ul className="space-y-2">
-              {PLANS.growth.features.map((feature) => (
+              {PLANS.growth.featureList.map((feature) => (
                 <li className="flex items-start gap-2 text-sm" key={feature}>
                   <CheckCircle2Icon className="mt-0.5 size-4 flex-shrink-0 text-primary" />
                   <span>{feature}</span>

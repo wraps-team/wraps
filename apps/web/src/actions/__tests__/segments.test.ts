@@ -1,4 +1,4 @@
-import { contact, db, member, organization, segment, user } from "@wraps/db";
+import { contact, db, member, organization, organizationExtension, segment, user } from "@wraps/db";
 import { eq } from "drizzle-orm";
 import {
   afterAll,
@@ -97,6 +97,18 @@ beforeAll(async () => {
       set: { name: testOrganization.name },
     });
 
+  // Set up Pro plan for test organization (required for segments feature)
+  await db
+    .insert(organizationExtension)
+    .values({
+      organizationId: testOrganization.id,
+      plan: "pro",
+    })
+    .onConflictDoUpdate({
+      target: organizationExtension.organizationId,
+      set: { plan: "pro" },
+    });
+
   // Insert test member
   await db
     .insert(member)
@@ -126,6 +138,7 @@ afterAll(async () => {
     .delete(contact)
     .where(eq(contact.organizationId, testOrganization.id));
   await db.delete(member).where(eq(member.id, testMember.id));
+  await db.delete(organizationExtension).where(eq(organizationExtension.organizationId, testOrganization.id));
   await db.delete(organization).where(eq(organization.id, testOrganization.id));
   await db.delete(user).where(eq(user.id, testUser.id));
 });

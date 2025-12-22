@@ -15,6 +15,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createActionLogger, serializeError } from "@/lib/logger";
+import { checkFeatureAccess } from "@/lib/plan-limits";
 import {
   type CreateSegmentResult,
   type DeleteSegmentResult,
@@ -360,6 +361,15 @@ export async function createSegment(
       return {
         success: false,
         error: "Only owners and admins can create segments",
+      };
+    }
+
+    // Check if segments feature is available for this plan
+    const featureCheck = await checkFeatureAccess(organizationId, "segments");
+    if (!featureCheck.allowed) {
+      return {
+        success: false,
+        error: featureCheck.message ?? "Segments require a Pro plan or higher.",
       };
     }
 

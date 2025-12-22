@@ -21,13 +21,18 @@
     "fix": "npx ultracite@latest fix",
     "clean": "turbo run clean && rm -rf node_modules",
     "cli": "node packages/cli/dist/cli.js",
-    "db:push:test": "dotenv -e apps/web/.env.test -- pnpm --filter=@wraps/db db:push"
+    "db:push:test": "dotenv -e apps/web/.env.test -- pnpm --filter=@wraps/db db:push",
+    "sst:dev": "sst dev",
+    "sst:deploy": "sst deploy",
+    "sst:remove": "sst remove"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.4",
     "@types/aws-lambda": "8.10.157",
     "@types/node": "24.10.0",
+    "dotenv": "catalog:",
     "dotenv-cli": "11.0.0",
+    "sst": "3.17.25",
     "turbo": "^2.2.3",
     "ultracite": "6.3.2"
   },

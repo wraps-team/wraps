@@ -93,7 +93,7 @@ export function BillingStep({
             </div>
 
             <ul className="grid gap-2 sm:grid-cols-2">
-              {starterPlan.features.map((feature) => (
+              {starterPlan.featureList.map((feature) => (
                 <li className="flex items-start gap-2 text-sm" key={feature}>
                   <CheckIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
                   <span>{feature}</span>

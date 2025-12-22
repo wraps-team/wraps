@@ -123,3 +123,103 @@ export const aiUsageLogRelations = relations(aiUsageLog, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API USAGE TRACKING (for rate limiting)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * API Usage Daily Summary
+ *
+ * One row per organization per day for fast daily limit checks.
+ * Uses upsert pattern: increment count on each API request.
+ *
+ * The dateKey is formatted as "YYYY-MM-DD" (e.g., "2025-01-15")
+ */
+export const apiUsageDaily = pgTable(
+  "api_usage_daily",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+
+    organizationId: text("organization_id")
+      .references(() => organization.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // Date key formatted as "YYYY-MM-DD" for easy querying
+    dateKey: text("date_key").notNull(),
+
+    // Count of API requests this day
+    requestCount: integer("request_count").default(0).notNull(),
+
+    // Track when limits were last updated
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    // Fast lookup: org + date (most common query for limit checks)
+    uniqueIndex("api_usage_daily_org_date_idx").on(
+      table.organizationId,
+      table.dateKey
+    ),
+    // For admin: find usage by date
+    index("api_usage_daily_date_idx").on(table.dateKey),
+  ]
+);
+
+/**
+ * API Rate Limit Window
+ *
+ * Tracks requests per minute for sliding window rate limiting.
+ * Uses minute buckets that auto-expire for cleanup.
+ *
+ * The minuteKey is formatted as "YYYY-MM-DD-HH-MM" (e.g., "2025-01-15-14-30")
+ */
+export const apiRateLimitWindow = pgTable(
+  "api_rate_limit_window",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+
+    organizationId: text("organization_id")
+      .references(() => organization.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // Minute bucket key: "YYYY-MM-DD-HH-MM"
+    minuteKey: text("minute_key").notNull(),
+
+    // Count of API requests in this minute
+    requestCount: integer("request_count").default(0).notNull(),
+
+    // TTL for cleanup (auto-expire after 5 minutes)
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (table) => [
+    // Fast lookup: org + minute (for rate limit checks)
+    uniqueIndex("api_rate_limit_org_minute_idx").on(
+      table.organizationId,
+      table.minuteKey
+    ),
+    // For cleanup: find expired records
+    index("api_rate_limit_expires_idx").on(table.expiresAt),
+  ]
+);
+
+// Relations for API usage tables
+export const apiUsageDailyRelations = relations(apiUsageDaily, ({ one }) => ({
+  organization: one(organization, {
+    fields: [apiUsageDaily.organizationId],
+    references: [organization.id],
+  }),
+}));
+
+export const apiRateLimitWindowRelations = relations(
+  apiRateLimitWindow,
+  ({ one }) => ({
+    organization: one(organization, {
+      fields: [apiRateLimitWindow.organizationId],
+      references: [organization.id],
+    }),
+  })
+);

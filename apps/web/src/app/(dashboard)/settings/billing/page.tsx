@@ -173,7 +173,7 @@ export default function BillingSettings() {
             </div>
 
             <ul className="space-y-2">
-              {planConfig.features.map((feature) => (
+              {planConfig.featureList.map((feature) => (
                 <li className="flex items-start gap-2 text-sm" key={feature}>
                   <CheckCircle2Icon className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
                   <span>{feature}</span>
@@ -246,7 +246,7 @@ export default function BillingSettings() {
               </div>
 
               <ul className="space-y-2">
-                {PLANS.pro.features.map((feature) => (
+                {PLANS.pro.featureList.map((feature) => (
                   <li className="flex items-start gap-2 text-sm" key={feature}>
                     <CheckCircle2Icon className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
                     <span>{feature}</span>
@@ -276,7 +276,7 @@ export default function BillingSettings() {
               </div>
 
               <ul className="space-y-2">
-                {PLANS.growth.features.map((feature) => (
+                {PLANS.growth.featureList.map((feature) => (
                   <li className="flex items-start gap-2 text-sm" key={feature}>
                     <CheckCircle2Icon className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
                     <span>{feature}</span>

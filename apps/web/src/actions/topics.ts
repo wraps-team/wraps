@@ -6,6 +6,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createActionLogger, serializeError } from "@/lib/logger";
+import { checkFeatureAccess } from "@/lib/plan-limits";
 import {
   type CreateTopicResult,
   type DeleteTopicResult,
@@ -185,6 +186,15 @@ export async function createTopic(
       return {
         success: false,
         error: "Only owners and admins can create topics",
+      };
+    }
+
+    // Check if topics feature is available for this plan
+    const featureCheck = await checkFeatureAccess(organizationId, "topics");
+    if (!featureCheck.allowed) {
+      return {
+        success: false,
+        error: featureCheck.message ?? "Topics require a Pro plan or higher.",
       };
     }
 

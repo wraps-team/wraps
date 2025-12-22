@@ -15,6 +15,7 @@ import type {
   UpdateContactResult,
 } from "@/lib/contacts";
 import { createActionLogger, serializeError } from "@/lib/logger";
+import { checkContactLimit } from "@/lib/plan-limits";
 
 // Re-export types for convenience
 export type {
@@ -294,6 +295,15 @@ export async function createContact(
       return {
         success: false,
         error: "You don't have access to this organization",
+      };
+    }
+
+    // Check contact limit
+    const limitCheck = await checkContactLimit(organizationId);
+    if (!limitCheck.allowed) {
+      return {
+        success: false,
+        error: limitCheck.message ?? "You've reached your contact limit. Please upgrade your plan.",
       };
     }
 
