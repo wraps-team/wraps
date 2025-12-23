@@ -194,7 +194,9 @@ export async function emailDestroy(options: DestroyOptions): Promise<void> {
           }
 
           // Run preview with resource change capture
-          const result = await previewWithResourceChanges(stack, { diff: true });
+          const result = await previewWithResourceChanges(stack, {
+            diff: true,
+          });
           return result;
         }
       );

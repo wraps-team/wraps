@@ -1,7 +1,11 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
+import type {
+  EngineEvent,
+  PreviewResult,
+  Stack,
+} from "@pulumi/pulumi/automation/index.js";
 import * as automation from "@pulumi/pulumi/automation/index.js";
-import type { EngineEvent, Stack, PreviewResult } from "@pulumi/pulumi/automation/index.js";
 import { errors } from "./errors.js";
 import type { ResourceChange, ResourceOperation } from "./output.js";
 
@@ -108,7 +112,8 @@ export async function previewWithResourceChanges(
 
           // Extract resource name from URN (last segment after ::)
           const urnParts = metadata.urn?.split("::") || [];
-          const name = urnParts[urnParts.length - 1] || metadata.urn || "unknown";
+          const name =
+            urnParts[urnParts.length - 1] || metadata.urn || "unknown";
 
           // Collect property diffs for updates
           const diffs: string[] = [];

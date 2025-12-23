@@ -16,7 +16,13 @@ export type ProposedDNSRecord = {
   proposedValue: string;
   existingValue: string | null;
   status: "new" | "update" | "conflict" | "no_change";
-  category: "dkim" | "spf" | "dmarc" | "tracking" | "mailfrom_mx" | "mailfrom_spf";
+  category:
+    | "dkim"
+    | "spf"
+    | "dmarc"
+    | "tracking"
+    | "mailfrom_mx"
+    | "mailfrom_spf";
   conflictReason?: string;
 };
 
@@ -294,7 +300,11 @@ export async function previewDNSChanges(
   if (mailFromDomain) {
     // MX record
     const proposedMX = `10 feedback-smtp.${region}.amazonses.com`;
-    const existingMX = findExistingRecord(existingRecords, mailFromDomain, "MX");
+    const existingMX = findExistingRecord(
+      existingRecords,
+      mailFromDomain,
+      "MX"
+    );
     const existingMXValue = getRecordValue(existingMX);
 
     let mxStatus: ProposedDNSRecord["status"] = "new";
@@ -322,9 +332,7 @@ export async function previewDNSChanges(
     );
 
     let mailFromSpfStatus: ProposedDNSRecord["status"] = "new";
-    if (
-      existingMailFromTXT.spfValue?.includes("include:amazonses.com")
-    ) {
+    if (existingMailFromTXT.spfValue?.includes("include:amazonses.com")) {
       mailFromSpfStatus = "no_change";
     } else if (existingMailFromTXT.spfValue) {
       mailFromSpfStatus = "update";

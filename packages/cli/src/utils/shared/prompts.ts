@@ -815,8 +815,7 @@ function formatDNSRecord(record: {
   const lines: string[] = [];
   const statusSymbol =
     DNS_STATUS_SYMBOLS[record.status] || pc.dim(record.status);
-  const categoryLabel =
-    DNS_CATEGORY_LABELS[record.category] || record.category;
+  const categoryLabel = DNS_CATEGORY_LABELS[record.category] || record.category;
 
   lines.push(`  ${statusSymbol} ${pc.bold(categoryLabel)}`);
   lines.push(`     ${pc.dim("Name:")} ${record.name}`);
@@ -924,7 +923,10 @@ export async function promptDNSConfirmation(preview: {
     );
 
     // Group by category to avoid duplicate entries (e.g., multiple DKIM records)
-    const categories = new Map<string, { status: string; hasConflict: boolean }>();
+    const categories = new Map<
+      string,
+      { status: string; hasConflict: boolean }
+    >();
     for (const record of recordsToSelect) {
       const existing = categories.get(record.category);
       if (!existing || record.status === "conflict") {
@@ -935,25 +937,23 @@ export async function promptDNSConfirmation(preview: {
       }
     }
 
-    const options = Array.from(categories.entries()).map(
-      ([category, info]) => {
-        const label = DNS_CATEGORY_LABELS[category] || category;
-        let hint =
-          info.status === "new"
-            ? "New"
-            : info.status === "update"
-              ? "Will merge with existing"
-              : "Will replace existing";
-        if (info.hasConflict) {
-          hint = pc.red(hint + " ⚠");
-        }
-        return {
-          value: category,
-          label,
-          hint,
-        };
+    const options = Array.from(categories.entries()).map(([category, info]) => {
+      const label = DNS_CATEGORY_LABELS[category] || category;
+      let hint =
+        info.status === "new"
+          ? "New"
+          : info.status === "update"
+            ? "Will merge with existing"
+            : "Will replace existing";
+      if (info.hasConflict) {
+        hint = pc.red(hint + " ⚠");
       }
-    );
+      return {
+        value: category,
+        label,
+        hint,
+      };
+    });
 
     // Pre-select non-conflict records
     const initialValues = Array.from(categories.entries())

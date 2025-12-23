@@ -236,7 +236,9 @@ export async function init(options: InitOptions): Promise<void> {
           await stack.setConfig("aws:region", { value: region });
 
           // Run preview with resource change capture
-          const result = await previewWithResourceChanges(stack, { diff: true });
+          const result = await previewWithResourceChanges(stack, {
+            diff: true,
+          });
           return result;
         }
       );
@@ -401,11 +403,8 @@ export async function init(options: InitOptions): Promise<void> {
   // 10. Check if Route53 hosted zone exists and offer to create DNS records
   let dnsAutoCreated = false;
   if (outputs.domain && outputs.dkimTokens && outputs.dkimTokens.length > 0) {
-    const {
-      findHostedZone,
-      previewDNSChanges,
-      createSelectedDNSRecords,
-    } = await import("../../utils/route53.js");
+    const { findHostedZone, previewDNSChanges, createSelectedDNSRecords } =
+      await import("../../utils/route53.js");
     const { promptDNSManagement, promptDNSConfirmation } = await import(
       "../../utils/shared/prompts.js"
     );
@@ -449,7 +448,9 @@ export async function init(options: InitOptions): Promise<void> {
             );
             dnsAutoCreated = true;
           } else {
-            clack.log.info("Skipping DNS record creation. You can add them manually.");
+            clack.log.info(
+              "Skipping DNS record creation. You can add them manually."
+            );
           }
         } catch (error: any) {
           progress.stop();

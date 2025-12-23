@@ -874,7 +874,9 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           await stack.refresh({ onOutput: () => {} });
 
           // Run preview with resource change capture
-          const result = await previewWithResourceChanges(stack, { diff: true });
+          const result = await previewWithResourceChanges(stack, {
+            diff: true,
+          });
           return result;
         }
       );

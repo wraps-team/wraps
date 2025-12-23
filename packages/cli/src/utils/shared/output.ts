@@ -566,7 +566,8 @@ function formatResourceType(type: string): string {
   const typeMap: Record<string, string> = {
     "aws:iam/role:Role": "IAM Role",
     "aws:iam/policy:Policy": "IAM Policy",
-    "aws:iam/rolePolicyAttachment:RolePolicyAttachment": "IAM Policy Attachment",
+    "aws:iam/rolePolicyAttachment:RolePolicyAttachment":
+      "IAM Policy Attachment",
     "aws:iam/openIdConnectProvider:OpenIdConnectProvider": "OIDC Provider",
     "aws:ses/configurationSet:ConfigurationSet": "SES Configuration Set",
     "aws:ses/emailIdentity:EmailIdentity": "SES Email Identity",
@@ -679,7 +680,8 @@ export function displayPreview(outputs: PreviewOutputs): void {
           // Show diffs for updates
           if (r.diffs && r.diffs.length > 0 && operation === "update") {
             const diffStr = r.diffs.slice(0, 3).join(", ");
-            const more = r.diffs.length > 3 ? ` +${r.diffs.length - 3} more` : "";
+            const more =
+              r.diffs.length > 3 ? ` +${r.diffs.length - 3} more` : "";
             line += `\n      ${pc.dim(`changed: ${diffStr}${more}`)}`;
           }
 

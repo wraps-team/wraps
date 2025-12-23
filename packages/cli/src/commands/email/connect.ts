@@ -225,7 +225,9 @@ export async function connect(options: ConnectOptions): Promise<void> {
           await stack.setConfig("aws:region", { value: region });
 
           // Run preview with resource change capture
-          const result = await previewWithResourceChanges(stack, { diff: true });
+          const result = await previewWithResourceChanges(stack, {
+            diff: true,
+          });
           return result;
         }
       );
