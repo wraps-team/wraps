@@ -255,24 +255,21 @@ export function createWrapsClient(config: WrapsClientConfig) {
       /**
        * Create a new batch send to all contacts
        */
-      create: async (params: BatchCreateParams): Promise<BatchCreateResponse> => {
-        return request<BatchCreateResponse>("POST", "/v1/batch", params);
-      },
+      create: async (params: BatchCreateParams): Promise<BatchCreateResponse> =>
+        request<BatchCreateResponse>("POST", "/v1/batch", params),
 
       /**
        * Get the status of a batch send
        */
-      get: async (batchId: string): Promise<BatchGetResponse> => {
-        return request<BatchGetResponse>("GET", `/v1/batch/${batchId}`);
-      },
+      get: async (batchId: string): Promise<BatchGetResponse> =>
+        request<BatchGetResponse>("GET", `/v1/batch/${batchId}`),
     },
 
     /**
      * Health check
      */
-    health: async (): Promise<HealthResponse> => {
-      return request<HealthResponse>("GET", "/health");
-    },
+    health: async (): Promise<HealthResponse> =>
+      request<HealthResponse>("GET", "/health"),
   };
 }
 

@@ -12,8 +12,8 @@
  * - Plan-based feature gating
  */
 
-import { rateLimitTable } from "./tables";
 import { batchQueue } from "./queues";
+import { rateLimitTable } from "./tables";
 
 // API Gateway with Elysia Lambda handler
 export const api = new sst.aws.ApiGatewayV2("Api", {

@@ -11,7 +11,7 @@
 export const batchDlq = new sst.aws.Queue("BatchDlq", {
   transform: {
     queue: {
-      messageRetentionSeconds: 1209600, // 14 days
+      messageRetentionSeconds: 1_209_600, // 14 days
       tags: {
         ManagedBy: "sst",
         Service: "wraps-api",
@@ -29,7 +29,7 @@ export const batchQueue = new sst.aws.Queue("BatchQueue", {
   transform: {
     queue: {
       visibilityTimeoutSeconds: 300, // 5 minutes for processing
-      messageRetentionSeconds: 86400, // 1 day
+      messageRetentionSeconds: 86_400, // 1 day
       tags: {
         ManagedBy: "sst",
         Service: "wraps-api",
