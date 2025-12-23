@@ -4,7 +4,7 @@
  * Enqueues batch jobs for processing by the worker Lambda.
  */
 
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 
 const sqsClient = new SQSClient({});
 const QUEUE_URL = process.env.BATCH_QUEUE_URL;

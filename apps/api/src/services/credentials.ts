@@ -5,8 +5,8 @@
  * Reuses credential patterns from apps/web.
  */
 
-import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
-import { db, awsAccount, eq } from "@wraps/db";
+import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
+import { awsAccount, db, eq } from "@wraps/db";
 
 const stsClient = new STSClient({});
 

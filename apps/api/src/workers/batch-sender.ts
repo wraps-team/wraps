@@ -5,17 +5,10 @@
  * Sends emails/SMS in chunks of 100 contacts.
  */
 
-import type { SQSEvent, SQSHandler } from "aws-lambda";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import {
-  db,
-  batchSend,
-  messageSend,
-  contact,
-  template,
-  eq,
-} from "@wraps/db";
+import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
+import { batchSend, contact, db, eq, messageSend, template } from "@wraps/db";
+import type { SQSEvent, SQSHandler } from "aws-lambda";
 import { and, isNotNull, sql } from "drizzle-orm";
 
 import { getCredentials } from "../services/credentials";
@@ -195,19 +188,21 @@ async function getContactsChunk(
   channel: string,
   offset: number,
   limit: number
-): Promise<Array<{ id: string; email: string | null }>> {
+): Promise<Array<{ id: string; email: string | null; phone: string | null }>> {
   if (channel === "email") {
+    // Filter by active email status (null treated as active for backwards compat)
     return db
       .select({
         id: contact.id,
         email: contact.email,
+        phone: contact.phone,
       })
       .from(contact)
       .where(
         and(
           eq(contact.organizationId, organizationId),
-          isNotNull(contact.email)
-          // TODO: Add emailStatus = 'active' filter
+          isNotNull(contact.email),
+          sql`(${contact.emailStatus} = 'active' OR ${contact.emailStatus} IS NULL)`
         )
       )
       .orderBy(contact.createdAt)
@@ -215,7 +210,27 @@ async function getContactsChunk(
       .limit(limit);
   }
 
-  // SMS (Phase 3)
+  // SMS - filter by opted_in status
+  if (channel === "sms") {
+    return db
+      .select({
+        id: contact.id,
+        email: contact.email,
+        phone: contact.phone,
+      })
+      .from(contact)
+      .where(
+        and(
+          eq(contact.organizationId, organizationId),
+          isNotNull(contact.phone),
+          eq(contact.smsStatus, "opted_in")
+        )
+      )
+      .orderBy(contact.createdAt)
+      .offset(offset)
+      .limit(limit);
+  }
+
   return [];
 }
 

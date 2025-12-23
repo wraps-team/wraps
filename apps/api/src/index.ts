@@ -10,6 +10,7 @@ import { swagger } from "@elysiajs/swagger";
 import { Elysia } from "elysia";
 
 import { batchRoutes } from "./routes/batch";
+import { contactsRoutes } from "./routes/contacts";
 import { healthRoutes } from "./routes/health";
 
 export const app = new Elysia()
@@ -29,12 +30,14 @@ export const app = new Elysia()
         },
         tags: [
           { name: "health", description: "Health check endpoints" },
+          { name: "contacts", description: "Contact management" },
           { name: "batch", description: "Batch sending operations" },
         ],
       },
     })
   )
   .use(healthRoutes)
+  .use(contactsRoutes)
   .use(batchRoutes);
 
 // Export type for Eden Treaty client

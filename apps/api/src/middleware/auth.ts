@@ -5,9 +5,9 @@
  * API keys are stored with hash and prefix for lookup.
  */
 
-import { Elysia } from "elysia";
-import { db, apiKey, organizationExtension, subscription, eq } from "@wraps/db";
+import { apiKey, db, eq, organizationExtension, subscription } from "@wraps/db";
 import { createHash } from "crypto";
+import { Elysia } from "elysia";
 
 export interface AuthContext {
   apiKeyId: string;
@@ -35,7 +35,7 @@ export const authMiddleware = new Elysia({ name: "auth" }).derive(
       ? authHeader.slice(7)
       : authHeader;
 
-    if (!key || !key.startsWith("wraps_")) {
+    if (!(key && key.startsWith("wraps_"))) {
       set.status = 401;
       throw new Error("Invalid API key format");
     }

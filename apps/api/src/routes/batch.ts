@@ -5,12 +5,13 @@
  * GET /v1/batch/:id - Get batch send status
  */
 
+import { batchSend, contact, db, eq } from "@wraps/db";
+import { and, isNotNull, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import { db, batchSend, contact, eq } from "@wraps/db";
 
-import { authMiddleware, type AuthContext } from "../middleware/auth";
-import { rateLimitMiddleware } from "../middleware/rate-limit";
+import { type AuthContext, authMiddleware } from "../middleware/auth";
 import { planGateMiddleware } from "../middleware/plan-gate";
+import { rateLimitMiddleware } from "../middleware/rate-limit";
 import { enqueueJob } from "../services/queue";
 
 // Batch send request schema
@@ -174,16 +175,34 @@ async function getRecipientCount(
   channel: string
 ): Promise<number> {
   if (channel === "email") {
-    const result = await db
-      .select()
+    // Count contacts with active email status (null treated as active for backwards compat)
+    const [result] = await db
+      .select({ count: sql<number>`count(*)::int` })
       .from(contact)
-      .where(eq(contact.organizationId, organizationId));
-    // Filter for active email contacts
-    // TODO: Add emailStatus = 'active' filter when field exists
-    return result.length;
+      .where(
+        and(
+          eq(contact.organizationId, organizationId),
+          isNotNull(contact.email),
+          sql`(${contact.emailStatus} = 'active' OR ${contact.emailStatus} IS NULL)`
+        )
+      );
+    return result?.count ?? 0;
   }
 
-  // SMS (Phase 3)
-  // TODO: Filter for phone IS NOT NULL AND smsStatus = 'opted_in'
+  // SMS - count contacts with opted_in status
+  if (channel === "sms") {
+    const [result] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(contact)
+      .where(
+        and(
+          eq(contact.organizationId, organizationId),
+          isNotNull(contact.phone),
+          eq(contact.smsStatus, "opted_in")
+        )
+      );
+    return result?.count ?? 0;
+  }
+
   return 0;
 }

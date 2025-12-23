@@ -10,7 +10,7 @@
     }
   },
   "scripts": {
-    "dev": "bun run --watch src/index.ts",
+    "dev": "bun run --env-file=../web/.env.local --watch src/index.ts",
     "build": "bun build src/lambda.ts --outdir dist --target node",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -31,6 +31,8 @@
   "devDependencies": {
     "@types/aws-lambda": "^8.10.157",
     "@types/pg": "^8.15.4",
+    "@vitest/coverage-v8": "4.0.7",
+    "dotenv": "17.2.3",
     "typescript": "5.8.3",
     "vitest": "4.0.8"
   }

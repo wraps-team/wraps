@@ -33,31 +33,29 @@ const PLAN_HIERARCHY = {
 type PlanId = keyof typeof PLAN_HIERARCHY;
 
 export function planGateMiddleware(feature: Feature) {
-  return new Elysia({ name: `plan-gate:${feature}` }).derive(
-    async (ctx) => {
-      const authContext = (ctx as unknown as { auth: AuthContext }).auth;
-      const { set } = ctx;
+  return new Elysia({ name: `plan-gate:${feature}` }).derive(async (ctx) => {
+    const authContext = (ctx as unknown as { auth: AuthContext }).auth;
+    const { set } = ctx;
 
-      if (!authContext) {
-        set.status = 401;
-        throw new Error("Not authenticated");
-      }
-
-      const { planId } = authContext;
-      const requiredPlan = FEATURE_PLANS[feature];
-
-      const currentLevel = PLAN_HIERARCHY[planId as PlanId] ?? 0;
-      const requiredLevel = PLAN_HIERARCHY[requiredPlan as PlanId] ?? 0;
-
-      if (currentLevel < requiredLevel) {
-        set.status = 403;
-        throw new Error(
-          `Feature '${feature}' requires ${requiredPlan} plan or higher. ` +
-            `Current plan: ${planId}. Upgrade at https://wraps.dev/upgrade`
-        );
-      }
-
-      return {};
+    if (!authContext) {
+      set.status = 401;
+      throw new Error("Not authenticated");
     }
-  );
+
+    const { planId } = authContext;
+    const requiredPlan = FEATURE_PLANS[feature];
+
+    const currentLevel = PLAN_HIERARCHY[planId as PlanId] ?? 0;
+    const requiredLevel = PLAN_HIERARCHY[requiredPlan as PlanId] ?? 0;
+
+    if (currentLevel < requiredLevel) {
+      set.status = 403;
+      throw new Error(
+        `Feature '${feature}' requires ${requiredPlan} plan or higher. ` +
+          `Current plan: ${planId}. Upgrade at https://wraps.dev/upgrade`
+      );
+    }
+
+    return {};
+  });
 }

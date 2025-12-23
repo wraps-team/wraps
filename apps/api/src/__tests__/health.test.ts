@@ -1,14 +1,12 @@
-import { describe, expect, it } from "vitest";
 import { Elysia } from "elysia";
+import { describe, expect, it } from "vitest";
 import { healthRoutes } from "../routes/health";
 
 describe("Health endpoints", () => {
   const app = new Elysia().use(healthRoutes);
 
   it("GET /health returns ok status", async () => {
-    const response = await app.handle(
-      new Request("http://localhost/health")
-    );
+    const response = await app.handle(new Request("http://localhost/health"));
 
     expect(response.status).toBe(200);
 
@@ -19,9 +17,7 @@ describe("Health endpoints", () => {
   });
 
   it("GET / returns API info", async () => {
-    const response = await app.handle(
-      new Request("http://localhost/")
-    );
+    const response = await app.handle(new Request("http://localhost/"));
 
     expect(response.status).toBe(200);
 

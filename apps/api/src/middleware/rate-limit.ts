@@ -5,20 +5,16 @@
  * Enforces both per-minute and daily limits based on plan.
  */
 
+import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
 import { Elysia } from "elysia";
-import {
-  DynamoDBClient,
-  UpdateItemCommand,
-  GetItemCommand,
-} from "@aws-sdk/client-dynamodb";
 
 import type { AuthContext } from "./auth";
 
 // Plan rate limits (requests)
 const PLAN_LIMITS = {
   starter: { daily: 50_000, minute: 500 },
-  pro: { daily: 200_000, minute: 2_000 },
-  growth: { daily: 500_000, minute: 5_000 },
+  pro: { daily: 200_000, minute: 2000 },
+  growth: { daily: 500_000, minute: 5000 },
   scale: { daily: 1_000_000, minute: 10_000 },
 } as const;
 
@@ -38,7 +34,8 @@ export const rateLimitMiddleware = new Elysia({ name: "rate-limit" }).derive(
     const { set } = ctx;
 
     const { organizationId, planId } = authContext;
-    const limits = PLAN_LIMITS[planId as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.starter;
+    const limits =
+      PLAN_LIMITS[planId as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.starter;
 
     const now = new Date();
     const minuteKey = formatMinuteKey(now);
@@ -66,7 +63,7 @@ export const rateLimitMiddleware = new Elysia({ name: "rate-limit" }).derive(
       const dailyResult = await incrementCounter(
         organizationId,
         `daily:${dailyKey}`,
-        86400 // 24 hour TTL
+        86_400 // 24 hour TTL
       );
 
       if (dailyResult > limits.daily) {

@@ -24,9 +24,7 @@ export async function handler(
 
   const request = new Request(url.toString(), {
     method: event.requestContext.http.method,
-    headers: new Headers(
-      event.headers as Record<string, string> | undefined
-    ),
+    headers: new Headers(event.headers as Record<string, string> | undefined),
     body:
       event.body && event.requestContext.http.method !== "GET"
         ? event.isBase64Encoded
