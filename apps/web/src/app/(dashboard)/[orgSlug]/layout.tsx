@@ -74,8 +74,8 @@ export default async function OrganizationLayout({
     },
   });
 
-  // Get plan from subscription or extension
-  const rawPlanId = extension?.plan || activeSubscription?.plan || "starter";
+  // Get plan from subscription (source of truth)
+  const rawPlanId = activeSubscription.plan;
   const planId: PlanId = ["starter", "pro", "growth", "scale"].includes(
     rawPlanId
   )

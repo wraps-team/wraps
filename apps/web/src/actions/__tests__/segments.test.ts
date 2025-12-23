@@ -5,6 +5,7 @@ import {
   organization,
   organizationExtension,
   segment,
+  subscription,
   user,
 } from "@wraps/db";
 import { eq } from "drizzle-orm";
@@ -105,16 +106,31 @@ beforeAll(async () => {
       set: { name: testOrganization.name },
     });
 
-  // Set up Pro plan for test organization (required for segments feature)
+  // Set up organization extension for usage tracking
   await db
     .insert(organizationExtension)
     .values({
       organizationId: testOrganization.id,
-      plan: "pro",
     })
     .onConflictDoUpdate({
       target: organizationExtension.organizationId,
-      set: { plan: "pro" },
+      set: { updatedAt: new Date() },
+    });
+
+  // Set up Pro plan subscription (required for segments feature)
+  await db
+    .insert(subscription)
+    .values({
+      id: `sub_test_${testOrganization.id}`,
+      plan: "pro",
+      referenceId: testOrganization.id,
+      status: "active",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: subscription.id,
+      set: { plan: "pro", status: "active" },
     });
 
   // Insert test member

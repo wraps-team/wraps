@@ -11,16 +11,12 @@ import {
 import { member, organization, user } from "./auth";
 import { contact, topic } from "./contacts";
 
-// Organization billing/plan info
+// Organization extension for usage tracking and onboarding
+// Note: Subscription/plan info is in the `subscription` table (Better-Auth Stripe plugin)
 export const organizationExtension = pgTable("organization_extension", {
   organizationId: text("organization_id")
     .references(() => organization.id, { onDelete: "cascade" })
     .primaryKey(),
-
-  // Subscription
-  plan: text("plan").default("free").notNull(),
-  stripeCustomerId: text("stripe_customer_id"),
-  stripeSubscriptionId: text("stripe_subscription_id"),
 
   // Usage tracking
   awsAccountCount: integer("aws_account_count").default(0).notNull(),

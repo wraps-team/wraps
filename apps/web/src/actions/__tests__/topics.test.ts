@@ -5,6 +5,7 @@ import {
   member,
   organization,
   organizationExtension,
+  subscription,
   topic,
   user,
 } from "@wraps/db";
@@ -147,16 +148,31 @@ beforeAll(async () => {
       set: { name: testOrganization.name },
     });
 
-  // Set up Pro plan for test organization (required for topics feature)
+  // Set up organization extension for usage tracking
   await db
     .insert(organizationExtension)
     .values({
       organizationId: testOrganization.id,
-      plan: "pro",
     })
     .onConflictDoUpdate({
       target: organizationExtension.organizationId,
-      set: { plan: "pro" },
+      set: { updatedAt: new Date() },
+    });
+
+  // Set up Pro plan subscription (required for topics feature)
+  await db
+    .insert(subscription)
+    .values({
+      id: `sub_test_${testOrganization.id}`,
+      plan: "pro",
+      referenceId: testOrganization.id,
+      status: "active",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: subscription.id,
+      set: { plan: "pro", status: "active" },
     });
 
   // Insert test members

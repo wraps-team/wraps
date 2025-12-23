@@ -6,25 +6,16 @@
  * 2. Session Token - For web app internal calls (better-auth session token)
  */
 
-import {
-  and,
-  apiKey,
-  db,
-  eq,
-  member,
-  organizationExtension,
-  session,
-  subscription,
-} from "@wraps/db";
+import { and, apiKey, db, eq, member, session, subscription } from "@wraps/db";
 import { createHash } from "crypto";
 import { Elysia } from "elysia";
 
-export interface AuthContext {
+export type AuthContext = {
   apiKeyId: string | null;
   organizationId: string;
   userId: string | null;
-  planId: string;
-}
+  planId: string | null; // null if no valid subscription
+};
 
 // Hash function for API key verification
 function hashApiKey(key: string): string {
@@ -32,19 +23,9 @@ function hashApiKey(key: string): string {
 }
 
 // Get plan for an organization
-async function getPlanForOrg(organizationId: string): Promise<string> {
-  // Try organizationExtension first
-  const [ext] = await db
-    .select({ plan: organizationExtension.plan })
-    .from(organizationExtension)
-    .where(eq(organizationExtension.organizationId, organizationId))
-    .limit(1);
-
-  if (ext?.plan) {
-    return ext.plan;
-  }
-
-  // Fall back to subscription table
+// Source of truth: subscription table (managed by Better-Auth Stripe plugin)
+// Note: There is no free tier. Returns null if no valid subscription.
+async function getPlanForOrg(organizationId: string): Promise<string | null> {
   const [sub] = await db
     .select({ plan: subscription.plan, status: subscription.status })
     .from(subscription)
@@ -55,7 +36,8 @@ async function getPlanForOrg(organizationId: string): Promise<string> {
     return sub.plan;
   }
 
-  return "starter";
+  // No valid subscription - user needs to subscribe
+  return null;
 }
 
 // Validate API key and return auth context

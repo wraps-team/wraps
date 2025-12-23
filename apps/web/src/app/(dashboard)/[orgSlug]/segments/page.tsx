@@ -35,11 +35,17 @@ export default async function SegmentsPage({ params }: SegmentsPageProps) {
   }
 
   // Check if segments feature is available for this plan
-  const [featureCheck, currentPlanId] = await Promise.all([
+  const [featureCheck, planId] = await Promise.all([
     checkFeatureAccess(orgWithMembership.id, "segments"),
     getOrganizationPlan(orgWithMembership.id),
   ]);
 
+  // No subscription - redirect to upgrade (shouldn't happen due to layout guard)
+  if (!planId) {
+    redirect(`/${orgSlug}/upgrade`);
+  }
+
+  const currentPlanId = planId;
   const requiredPlan = getRequiredPlan("segments") || "pro";
 
   // If feature not allowed, show upgrade prompt

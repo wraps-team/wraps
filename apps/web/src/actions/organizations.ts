@@ -106,11 +106,11 @@ export async function createOrganizationAction(
       createdAt: new Date(),
     });
 
-    // 6.5. Create organization extension with default settings
+    // 6.5. Create organization extension for usage tracking
+    // Note: Subscription/plan is managed separately via Better-Auth Stripe plugin
     const { organizationExtension } = await import("@wraps/db/schema/app");
     await db.insert(organizationExtension).values({
       organizationId: newOrg.id,
-      plan: "free",
       awsAccountCount: 0,
       memberCount: 1,
       onboardingCompleted: false,

@@ -8,14 +8,7 @@
  * - AWS account limits
  */
 
-import {
-  awsAccount,
-  contact,
-  db,
-  eq,
-  organizationExtension,
-  subscription,
-} from "@wraps/db";
+import { awsAccount, contact, db, eq, subscription } from "@wraps/db";
 import {
   getRequiredPlan,
   hasFeature,
@@ -40,22 +33,14 @@ export interface FeatureCheckResult {
 
 /**
  * Get the current plan for an organization
+ * Source of truth: subscription table (managed by Better-Auth Stripe plugin)
+ *
+ * Note: There is no free tier. All users must have an active subscription.
+ * Returns null if no valid subscription exists.
  */
 export async function getOrganizationPlan(
   organizationId: string
-): Promise<PlanId> {
-  // Try organizationExtension first
-  const [ext] = await db
-    .select({ plan: organizationExtension.plan })
-    .from(organizationExtension)
-    .where(eq(organizationExtension.organizationId, organizationId))
-    .limit(1);
-
-  if (ext?.plan && isValidPlan(ext.plan)) {
-    return ext.plan as PlanId;
-  }
-
-  // Fall back to subscription table
+): Promise<PlanId | null> {
   const [sub] = await db
     .select({ plan: subscription.plan, status: subscription.status })
     .from(subscription)
@@ -70,7 +55,8 @@ export async function getOrganizationPlan(
     return sub.plan as PlanId;
   }
 
-  return "starter";
+  // No valid subscription - user needs to subscribe
+  return null;
 }
 
 function isValidPlan(plan: string): plan is PlanId {
@@ -84,6 +70,18 @@ export async function checkContactLimit(
   organizationId: string
 ): Promise<LimitCheckResult> {
   const planId = await getOrganizationPlan(organizationId);
+
+  // No valid subscription - user must subscribe
+  if (!planId) {
+    return {
+      allowed: false,
+      current: 0,
+      limit: 0,
+      message: "No active subscription. Please subscribe to continue.",
+      requiredPlan: "starter",
+    };
+  }
+
   const plan = PLANS[planId];
 
   const contactCount = await db
@@ -113,6 +111,18 @@ export async function checkAwsAccountLimit(
   organizationId: string
 ): Promise<LimitCheckResult> {
   const planId = await getOrganizationPlan(organizationId);
+
+  // No valid subscription - user must subscribe
+  if (!planId) {
+    return {
+      allowed: false,
+      current: 0,
+      limit: 0,
+      message: "No active subscription. Please subscribe to continue.",
+      requiredPlan: "starter",
+    };
+  }
+
   const plan = PLANS[planId];
 
   const accounts = await db
@@ -143,6 +153,16 @@ export async function checkFeatureAccess(
   feature: PlanFeature
 ): Promise<FeatureCheckResult> {
   const planId = await getOrganizationPlan(organizationId);
+
+  // No valid subscription - user must subscribe
+  if (!planId) {
+    return {
+      allowed: false,
+      requiredPlan: "starter",
+      message: "No active subscription. Please subscribe to continue.",
+    };
+  }
+
   const allowed = hasFeature(planId, feature);
   const requiredPlan = getRequiredPlan(feature);
 
@@ -186,6 +206,25 @@ function getNextPlan(currentPlan: PlanId): PlanId | undefined {
  */
 export async function getUsageSummary(organizationId: string) {
   const planId = await getOrganizationPlan(organizationId);
+
+  // No valid subscription - return empty summary
+  if (!planId) {
+    return {
+      planId: null as PlanId | null,
+      planName: "No Plan",
+      contacts: { current: 0, limit: 0, percentUsed: 0 },
+      awsAccounts: { current: 0, limit: 0, percentUsed: 0 },
+      features: {
+        batch: false,
+        topics: false,
+        segments: false,
+        campaigns: false,
+        workflows: false,
+        events: false,
+      },
+    };
+  }
+
   const plan = PLANS[planId];
 
   const [contactResult, awsAccountResult] = await Promise.all([

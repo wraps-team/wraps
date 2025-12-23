@@ -3,6 +3,7 @@ import {
   member,
   organization,
   organizationExtension,
+  subscription,
   user,
 } from "@wraps/db";
 import { eq } from "drizzle-orm";
@@ -82,12 +83,12 @@ describe("Signup Flow Integration Tests", () => {
     expect(newMember[0].role).toBe("owner");
     expect(newMember[0].userId).toBe(testSignupUserId);
 
-    // Step 4: Create organization extension with default values
+    // Step 4: Create organization extension for usage tracking
+    // Note: Subscription/plan is managed separately via Better-Auth Stripe plugin
     const newExtension = await db
       .insert(organizationExtension)
       .values({
         organizationId: testSignupOrgId,
-        plan: "free",
         awsAccountCount: 0,
         memberCount: 1,
         onboardingCompleted: false,
@@ -96,7 +97,6 @@ describe("Signup Flow Integration Tests", () => {
       })
       .returning();
 
-    expect(newExtension[0].plan).toBe("free");
     expect(newExtension[0].onboardingCompleted).toBe(false);
     expect(newExtension[0].memberCount).toBe(1);
 
@@ -204,7 +204,6 @@ describe("Signup Flow Integration Tests", () => {
       .insert(organizationExtension)
       .values({
         organizationId: testSignupOrgId,
-        plan: "free",
         awsAccountCount: 0,
         memberCount: 1,
         onboardingCompleted: false,
@@ -233,8 +232,9 @@ describe("Signup Flow Integration Tests", () => {
     expect(updated?.onboardingCompletedAt).toBeInstanceOf(Date);
   });
 
-  it("should support Stripe customer creation during signup", async () => {
+  it("should support Stripe subscription creation during signup", async () => {
     const stripeCustomerId = "cus_test_signup123";
+    const stripeSubscriptionId = "sub_test123";
 
     // Create user with Stripe customer ID
     const newUser = await db
@@ -260,24 +260,33 @@ describe("Signup Flow Integration Tests", () => {
       createdAt: new Date(),
     });
 
-    // Create extension with Stripe fields
-    const ext = await db
-      .insert(organizationExtension)
+    // Create extension for usage tracking (no Stripe fields - those are in subscription table)
+    await db.insert(organizationExtension).values({
+      organizationId: testSignupOrgId,
+      awsAccountCount: 0,
+      memberCount: 1,
+      onboardingCompleted: false,
+      updatedAt: new Date(),
+    });
+
+    // Create subscription (source of truth for plan/Stripe)
+    const sub = await db
+      .insert(subscription)
       .values({
-        organizationId: testSignupOrgId,
+        id: crypto.randomUUID(),
         plan: "pro",
+        referenceId: testSignupOrgId,
         stripeCustomerId,
-        stripeSubscriptionId: "sub_test123",
-        awsAccountCount: 0,
-        memberCount: 1,
-        onboardingCompleted: false,
+        stripeSubscriptionId,
+        status: "active",
+        createdAt: new Date(),
         updatedAt: new Date(),
       })
       .returning();
 
-    expect(ext[0].plan).toBe("pro");
-    expect(ext[0].stripeCustomerId).toBe(stripeCustomerId);
-    expect(ext[0].stripeSubscriptionId).toBe("sub_test123");
+    expect(sub[0].plan).toBe("pro");
+    expect(sub[0].stripeCustomerId).toBe(stripeCustomerId);
+    expect(sub[0].stripeSubscriptionId).toBe(stripeSubscriptionId);
   });
 
   it("should verify user can only be owner of their own organization", async () => {
