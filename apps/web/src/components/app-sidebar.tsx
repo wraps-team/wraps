@@ -5,10 +5,14 @@ import {
   Cloud,
   CreditCard,
   FileText,
+  Filter,
   Key,
   Mail,
   MessageSquare,
+  Send,
   Settings,
+  Tag,
+  UserSquare2,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -37,6 +41,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Check if products are enabled (hydrated from server, no flash)
   const isEmailEnabled = productsStatus?.emailEnabled ?? false;
   const isSMSEnabled = productsStatus?.smsEnabled ?? false;
+  const planFeatures = productsStatus?.planFeatures;
 
   // Email navigation - always shown with full nav if enabled, otherwise single link
   const emailNavGroup = orgSlug
@@ -49,11 +54,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 url: `/${orgSlug}/emails`,
                 icon: Mail,
               },
-              // {
-              //   title: "Send",
-              //   url: `/${orgSlug}/send`,
-              //   icon: Send,
-              // },
+              {
+                title: "Send",
+                url: `/${orgSlug}/send`,
+                icon: Send,
+              },
               {
                 title: "Templates",
                 url: `/${orgSlug}/emails/templates`,
@@ -102,6 +107,40 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       }
     : null;
 
+  // Audience navigation - Contacts always shown, Topics/Segments gated by plan
+  const audienceNavGroup = orgSlug
+    ? {
+        label: "Audience",
+        items: [
+          {
+            title: "Contacts",
+            url: `/${orgSlug}/contacts`,
+            icon: UserSquare2,
+          },
+          // Topics - requires Pro plan
+          ...(planFeatures?.topics
+            ? [
+                {
+                  title: "Topics",
+                  url: `/${orgSlug}/topics`,
+                  icon: Tag,
+                },
+              ]
+            : []),
+          // Segments - requires Pro plan
+          ...(planFeatures?.segments
+            ? [
+                {
+                  title: "Segments",
+                  url: `/${orgSlug}/segments`,
+                  icon: Filter,
+                },
+              ]
+            : []),
+        ],
+      }
+    : null;
+
   // Settings navigation
   const settingsNavGroup = orgSlug
     ? {
@@ -137,6 +176,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     : null;
 
   const orgScopedNavGroups = [
+    audienceNavGroup,
     emailNavGroup,
     smsNavGroup,
     settingsNavGroup,

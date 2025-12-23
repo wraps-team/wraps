@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { listContacts } from "@/actions/contacts";
 import { listTopics } from "@/actions/topics";
 import { getOrganizationWithMembership } from "@/lib/organization";
+import { checkFeatureAccess } from "@/lib/plan-limits";
 import { ContactsTable } from "./components/contacts-table";
 
 type ContactsPageProps = {
@@ -48,8 +49,8 @@ export default async function ContactsPage({
     redirect("/");
   }
 
-  // Fetch contacts and topics in parallel
-  const [contactsResult, topicsResult] = await Promise.all([
+  // Fetch contacts, topics, and feature access in parallel
+  const [contactsResult, topicsResult, topicsFeature] = await Promise.all([
     listContacts(orgWithMembership.id, {
       page: Number.parseInt(page, 10),
       pageSize: Number.parseInt(pageSize, 10),
@@ -64,11 +65,13 @@ export default async function ContactsPage({
       topicId,
     }),
     listTopics(orgWithMembership.id),
+    checkFeatureAccess(orgWithMembership.id, "topics"),
   ]);
 
   const contacts = contactsResult.success ? contactsResult.contacts : [];
   const total = contactsResult.success ? contactsResult.total : 0;
   const topics = topicsResult.success ? topicsResult.topics : [];
+  const proFeaturesEnabled = topicsFeature.allowed;
 
   return (
     <>
@@ -90,6 +93,7 @@ export default async function ContactsPage({
           orgSlug={orgSlug}
           page={Number.parseInt(page, 10)}
           pageSize={Number.parseInt(pageSize, 10)}
+          proFeaturesEnabled={proFeaturesEnabled}
           topics={topics}
           total={total}
           userRole={orgWithMembership.userRole}

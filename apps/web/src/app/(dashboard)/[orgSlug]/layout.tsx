@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { ProductsStatusHydrator } from "@/components/products-status-hydrator";
 import { getOrganizationWithMembership } from "@/lib/organization";
+import { type PlanId, PLANS } from "@/lib/plans";
 
 type OrganizationLayoutProps = {
   children: ReactNode;
@@ -73,12 +74,28 @@ export default async function OrganizationLayout({
     },
   });
 
+  // Get plan from subscription or extension
+  const rawPlanId = extension?.plan || activeSubscription?.plan || "starter";
+  const planId: PlanId = ["starter", "pro", "growth", "scale"].includes(rawPlanId)
+    ? (rawPlanId as PlanId)
+    : "starter";
+  const plan = PLANS[planId];
+
   const productsStatus = {
     emailEnabled: accounts.some(
       (a) => a.eventHistoryEnabled || a.eventTrackingEnabled
     ),
     smsEnabled: accounts.some((a) => a.smsEnabled),
     hasAwsAccounts: accounts.length > 0,
+    planId,
+    planFeatures: {
+      batch: plan.features.batch,
+      topics: plan.features.topics,
+      segments: plan.features.segments,
+      campaigns: plan.features.campaigns,
+      workflows: plan.features.workflows,
+      events: plan.features.events,
+    },
   };
 
   return (

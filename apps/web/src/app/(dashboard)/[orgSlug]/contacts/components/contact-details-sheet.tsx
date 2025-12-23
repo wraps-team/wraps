@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Lock, Plus, Trash2, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,8 @@ type ContactDetailsSheetProps = {
     topicIds?: string[];
   }) => void;
   open: boolean;
+  orgSlug: string;
+  proFeaturesEnabled?: boolean;
   topics: TopicWithMeta[];
   userRole: "owner" | "admin" | "member";
 };
@@ -64,6 +67,8 @@ export function ContactDetailsSheet({
   onClose,
   onSave,
   open,
+  orgSlug,
+  proFeaturesEnabled = true,
   topics,
   userRole,
 }: ContactDetailsSheetProps) {
@@ -212,35 +217,49 @@ export function ContactDetailsSheet({
 
   return (
     <Sheet onOpenChange={(isOpen) => !isOpen && onClose()} open={open}>
-      <SheetContent className="flex flex-col overflow-hidden p-0 sm:max-w-lg">
+      <SheetContent
+        className="flex flex-col overflow-hidden p-0 sm:max-w-lg"
+        hideCloseButton
+      >
         <SheetHeader className="border-b px-6 py-4">
           <div className="flex items-center justify-between">
             <SheetTitle className="text-lg font-semibold">
               Contact Details
             </SheetTitle>
-            {canEdit && !isEditing && (
-              <Button
-                onClick={() => setIsEditing(true)}
-                size="sm"
-                variant="outline"
-              >
-                Edit
-              </Button>
-            )}
-            {isEditing && (
-              <div className="flex gap-2">
-                <Button onClick={handleCancel} size="sm" variant="ghost">
-                  Cancel
-                </Button>
+            <div className="flex items-center gap-1">
+              {canEdit && !isEditing && (
                 <Button
-                  disabled={isPending || (!email && !phone)}
-                  onClick={handleSave}
+                  onClick={() => setIsEditing(true)}
                   size="sm"
+                  variant="outline"
                 >
-                  {isPending ? "Saving..." : "Save"}
+                  Edit
                 </Button>
-              </div>
-            )}
+              )}
+              {isEditing && (
+                <>
+                  <Button onClick={handleCancel} size="sm" variant="ghost">
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={isPending || (!email && !phone)}
+                    onClick={handleSave}
+                    size="sm"
+                  >
+                    {isPending ? "Saving..." : "Save"}
+                  </Button>
+                </>
+              )}
+              <Button
+                className="h-8 w-8"
+                onClick={onClose}
+                size="icon"
+                variant="ghost"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </Button>
+            </div>
           </div>
         </SheetHeader>
 
@@ -408,93 +427,115 @@ export function ContactDetailsSheet({
             )}
 
             {/* Topics */}
-            <div className="space-y-3">
-              <h3 className="font-medium text-sm">Topics</h3>
-              {isEditing ? (
-                topics.length > 0 ? (
-                  <div className="max-h-[150px] space-y-2 overflow-y-auto rounded-lg border p-3">
-                    {topics.map((topic) => (
-                      <div className="flex items-center space-x-2" key={topic.id}>
-                        <Checkbox
-                          checked={selectedTopicIds.includes(topic.id)}
-                          id={`topic-${topic.id}`}
-                          onCheckedChange={() => toggleTopic(topic.id)}
-                        />
-                        <Label
-                          className="cursor-pointer font-normal"
-                          htmlFor={`topic-${topic.id}`}
-                        >
-                          {topic.name}
-                        </Label>
-                      </div>
+            {proFeaturesEnabled ? (
+              <div className="space-y-3">
+                <h3 className="font-medium text-sm">Topics</h3>
+                {isEditing ? (
+                  topics.length > 0 ? (
+                    <div className="max-h-[150px] space-y-2 overflow-y-auto rounded-lg border p-3">
+                      {topics.map((topic) => (
+                        <div className="flex items-center space-x-2" key={topic.id}>
+                          <Checkbox
+                            checked={selectedTopicIds.includes(topic.id)}
+                            id={`topic-${topic.id}`}
+                            onCheckedChange={() => toggleTopic(topic.id)}
+                          />
+                          <Label
+                            className="cursor-pointer font-normal"
+                            htmlFor={`topic-${topic.id}`}
+                          >
+                            {topic.name}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">
+                      No topics available
+                    </p>
+                  )
+                ) : subscribedTopics.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {subscribedTopics.map((t) => (
+                      <Badge key={t.topicId} variant="outline">
+                        {t.topicName}
+                      </Badge>
                     ))}
                   </div>
                 ) : (
                   <p className="text-muted-foreground text-sm">
-                    No topics available
+                    No topic subscriptions
                   </p>
-                )
-              ) : subscribedTopics.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {subscribedTopics.map((t) => (
-                    <Badge key={t.topicId} variant="outline">
-                      {t.topicName}
-                    </Badge>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">
-                  No topic subscriptions
-                </p>
-              )}
-            </div>
-
-            {/* Properties */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium text-sm">Custom Properties</h3>
-                {isEditing && (
-                  <Button
-                    className="h-7 text-xs"
-                    onClick={addProperty}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    <Plus className="mr-1 h-3 w-3" />
-                    Add
-                  </Button>
                 )}
               </div>
-              {isEditing ? (
-                properties.length > 0 ? (
+            ) : null}
+
+            {/* Properties */}
+            {proFeaturesEnabled ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-sm">Custom Properties</h3>
+                  {isEditing && (
+                    <Button
+                      className="h-7 text-xs"
+                      onClick={addProperty}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <Plus className="mr-1 h-3 w-3" />
+                      Add
+                    </Button>
+                  )}
+                </div>
+                {isEditing ? (
+                  properties.length > 0 ? (
+                    <div className="space-y-2">
+                      {properties.map((prop, index) => (
+                        <div className="flex items-center gap-2" key={prop.id}>
+                          <Input
+                            className="h-8 flex-1"
+                            onChange={(e) =>
+                              updateProperty(index, "key", e.target.value)
+                            }
+                            placeholder="key"
+                            value={prop.key}
+                          />
+                          <Input
+                            className="h-8 flex-1"
+                            onChange={(e) =>
+                              updateProperty(index, "value", e.target.value)
+                            }
+                            placeholder="value"
+                            value={prop.value}
+                          />
+                          <Button
+                            className="h-8 w-8 shrink-0 p-0"
+                            onClick={() => removeProperty(index)}
+                            type="button"
+                            variant="ghost"
+                          >
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">
+                      No custom properties
+                    </p>
+                  )
+                ) : Object.keys(contact.properties).length > 0 ? (
                   <div className="space-y-2">
-                    {properties.map((prop, index) => (
-                      <div className="flex items-center gap-2" key={prop.id}>
-                        <Input
-                          className="h-8 flex-1"
-                          onChange={(e) =>
-                            updateProperty(index, "key", e.target.value)
-                          }
-                          placeholder="key"
-                          value={prop.key}
-                        />
-                        <Input
-                          className="h-8 flex-1"
-                          onChange={(e) =>
-                            updateProperty(index, "value", e.target.value)
-                          }
-                          placeholder="value"
-                          value={prop.value}
-                        />
-                        <Button
-                          className="h-8 w-8 shrink-0 p-0"
-                          onClick={() => removeProperty(index)}
-                          type="button"
-                          variant="ghost"
-                        >
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
-                        </Button>
+                    {Object.entries(contact.properties).map(([key, value]) => (
+                      <div
+                        className="flex items-center justify-between rounded-lg border px-3 py-2"
+                        key={key}
+                      >
+                        <span className="text-muted-foreground text-sm">
+                          {key}
+                        </span>
+                        <span className="text-sm">{String(value)}</span>
                       </div>
                     ))}
                   </div>
@@ -502,27 +543,22 @@ export function ContactDetailsSheet({
                   <p className="text-muted-foreground text-sm">
                     No custom properties
                   </p>
-                )
-              ) : Object.keys(contact.properties).length > 0 ? (
-                <div className="space-y-2">
-                  {Object.entries(contact.properties).map(([key, value]) => (
-                    <div
-                      className="flex items-center justify-between rounded-lg border px-3 py-2"
-                      key={key}
-                    >
-                      <span className="text-muted-foreground text-sm">
-                        {key}
-                      </span>
-                      <span className="text-sm">{String(value)}</span>
-                    </div>
-                  ))}
+                )}
+              </div>
+            ) : isEditing ? (
+              <div className="rounded-md border border-dashed p-3">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Lock className="h-4 w-4" />
+                  <span>Topics &amp; custom properties require</span>
+                  <Link
+                    className="font-medium text-primary hover:underline"
+                    href={`/${orgSlug}/settings/billing`}
+                  >
+                    Pro plan
+                  </Link>
                 </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">
-                  No custom properties
-                </p>
-              )}
-            </div>
+              </div>
+            ) : null}
 
             {/* Activity - only show in view mode */}
             {!isEditing && (

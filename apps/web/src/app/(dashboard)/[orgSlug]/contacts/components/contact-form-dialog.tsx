@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Lock, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -54,6 +55,8 @@ type ContactFormDialogProps = {
     topicIds?: string[];
   }) => void;
   open: boolean;
+  orgSlug: string;
+  proFeaturesEnabled?: boolean;
   topics: TopicWithMeta[];
 };
 
@@ -64,6 +67,8 @@ export function ContactFormDialog({
   onOpenChange,
   onSubmit,
   open,
+  orgSlug,
+  proFeaturesEnabled = true,
   topics,
 }: ContactFormDialogProps) {
   const [email, setEmail] = useState("");
@@ -287,7 +292,7 @@ export function ContactFormDialog({
             </div>
 
             {/* Topics */}
-            {topics.length > 0 && (
+            {proFeaturesEnabled && topics.length > 0 && (
               <div className="grid gap-2">
                 <Label>
                   {mode === "create"
@@ -320,58 +325,73 @@ export function ContactFormDialog({
             )}
 
             {/* Custom Properties */}
-            <div className="grid gap-2">
-              <div className="flex items-center justify-between">
-                <Label>Custom properties</Label>
-                <Button
-                  className="h-7 text-xs"
-                  onClick={addProperty}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  <Plus className="mr-1 h-3 w-3" />
-                  Add
-                </Button>
-              </div>
-              {properties.length > 0 ? (
-                <div className="max-h-[150px] space-y-2 overflow-y-auto rounded-md border p-3">
-                  {properties.map((prop, index) => (
-                    <div className="flex items-center gap-2" key={prop.id}>
-                      <Input
-                        className="h-8 flex-1"
-                        onChange={(e) =>
-                          updateProperty(index, "key", e.target.value)
-                        }
-                        placeholder="key"
-                        value={prop.key}
-                      />
-                      <Input
-                        className="h-8 flex-1"
-                        onChange={(e) =>
-                          updateProperty(index, "value", e.target.value)
-                        }
-                        placeholder="value"
-                        value={prop.value}
-                      />
-                      <Button
-                        className="h-8 w-8 shrink-0 p-0"
-                        onClick={() => removeProperty(index)}
-                        type="button"
-                        variant="ghost"
-                      >
-                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  ))}
+            {proFeaturesEnabled ? (
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label>Custom properties</Label>
+                  <Button
+                    className="h-7 text-xs"
+                    onClick={addProperty}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Plus className="mr-1 h-3 w-3" />
+                    Add
+                  </Button>
                 </div>
-              ) : (
-                <p className="text-muted-foreground text-xs">
-                  No custom properties. Add key-value pairs like firstName,
-                  company, plan, etc.
-                </p>
-              )}
-            </div>
+                {properties.length > 0 ? (
+                  <div className="max-h-[150px] space-y-2 overflow-y-auto rounded-md border p-3">
+                    {properties.map((prop, index) => (
+                      <div className="flex items-center gap-2" key={prop.id}>
+                        <Input
+                          className="h-8 flex-1"
+                          onChange={(e) =>
+                            updateProperty(index, "key", e.target.value)
+                          }
+                          placeholder="key"
+                          value={prop.key}
+                        />
+                        <Input
+                          className="h-8 flex-1"
+                          onChange={(e) =>
+                            updateProperty(index, "value", e.target.value)
+                          }
+                          placeholder="value"
+                          value={prop.value}
+                        />
+                        <Button
+                          className="h-8 w-8 shrink-0 p-0"
+                          onClick={() => removeProperty(index)}
+                          type="button"
+                          variant="ghost"
+                        >
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-xs">
+                    No custom properties. Add key-value pairs like firstName,
+                    company, plan, etc.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed p-3">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Lock className="h-4 w-4" />
+                  <span>Topics &amp; custom properties require</span>
+                  <Link
+                    className="font-medium text-primary hover:underline"
+                    href={`/${orgSlug}/settings/billing`}
+                  >
+                    Pro plan
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

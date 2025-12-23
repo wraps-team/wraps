@@ -1,9 +1,21 @@
 import { create } from "zustand";
+import type { PlanId } from "@/lib/plans";
+
+export type PlanFeatures = {
+  batch: boolean;
+  topics: boolean;
+  segments: boolean;
+  campaigns: boolean;
+  workflows: boolean;
+  events: boolean;
+};
 
 export type ProductsStatus = {
   emailEnabled: boolean;
   smsEnabled: boolean;
   hasAwsAccounts: boolean;
+  planId: PlanId;
+  planFeatures: PlanFeatures;
 };
 
 type ProductsStore = {

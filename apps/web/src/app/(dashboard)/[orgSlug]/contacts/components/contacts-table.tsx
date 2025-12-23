@@ -79,6 +79,7 @@ type ContactsTableProps = {
   organizationId: string;
   page: number;
   pageSize: number;
+  proFeaturesEnabled?: boolean;
   topics: TopicWithMeta[];
   total: number;
   userRole: "owner" | "admin" | "member";
@@ -90,6 +91,7 @@ export function ContactsTable({
   organizationId,
   page,
   pageSize,
+  proFeaturesEnabled = true,
   topics,
   total,
   userRole,
@@ -700,6 +702,8 @@ export function ContactsTable({
         onOpenChange={setCreateDialogOpen}
         onSubmit={handleCreateContact}
         open={createDialogOpen}
+        orgSlug={orgSlug}
+        proFeaturesEnabled={proFeaturesEnabled}
         topics={topics}
       />
 
@@ -714,6 +718,8 @@ export function ContactsTable({
         }}
         onSubmit={handleUpdateContact}
         open={editDialogOpen}
+        orgSlug={orgSlug}
+        proFeaturesEnabled={proFeaturesEnabled}
         topics={topics}
       />
 
@@ -758,6 +764,8 @@ export function ContactsTable({
         }}
         onSave={handleUpdateContact}
         open={detailsSheetOpen}
+        orgSlug={orgSlug}
+        proFeaturesEnabled={proFeaturesEnabled}
         topics={topics}
         userRole={userRole}
       />
