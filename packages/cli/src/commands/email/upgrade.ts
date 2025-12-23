@@ -31,7 +31,10 @@ import {
   displaySuccess,
 } from "../../utils/shared/output.js";
 import { promptVercelConfig } from "../../utils/shared/prompts.js";
-import { ensurePulumiInstalled } from "../../utils/shared/pulumi.js";
+import {
+  ensurePulumiInstalled,
+  previewWithResourceChanges,
+} from "../../utils/shared/pulumi.js";
 
 /**
  * Upgrade command - Enhance existing Wraps infrastructure
@@ -530,7 +533,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         );
 
         // Check if domain has Route53 hosted zone
-        const { findHostedZone } = await import("../../utils/email/route53.js");
+        const { findHostedZone } = await import("../../utils/route53.js");
         const hostedZone = await progress.execute(
           "Checking for Route53 hosted zone",
           async () =>
@@ -870,8 +873,8 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           // Refresh state to sync with AWS before previewing
           await stack.refresh({ onOutput: () => {} });
 
-          // Run preview instead of deployment
-          const result = await stack.preview({ diff: true });
+          // Run preview with resource change capture
+          const result = await previewWithResourceChanges(stack, { diff: true });
           return result;
         }
       );
@@ -887,9 +890,10 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
             : "Change: No cost difference",
       ].join("\n");
 
-      // Display preview results
+      // Display preview results with detailed resource changes
       displayPreview({
         changeSummary: previewResult.changeSummary,
+        resourceChanges: previewResult.resourceChanges,
         costEstimate: costComparison,
         commandName: "wraps email upgrade",
       });
@@ -1034,7 +1038,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   // 13. Create DNS records in Route53 (if hosted zone exists)
   if (outputs.domain && outputs.dkimTokens && outputs.dkimTokens.length > 0) {
     const { findHostedZone, createDNSRecords } = await import(
-      "../../utils/email/route53.js"
+      "../../utils/route53.js"
     );
     const hostedZone = await findHostedZone(outputs.domain, region);
 

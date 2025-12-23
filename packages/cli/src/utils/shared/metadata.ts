@@ -486,3 +486,25 @@ export function getConfiguredServices(
   }
   return services;
 }
+
+/**
+ * Find all connections for a specific AWS account
+ * Useful for auto-detecting region when user doesn't specify one
+ */
+export async function findConnectionsForAccount(
+  accountId: string
+): Promise<ConnectionMetadata[]> {
+  const allConnections = await listConnections();
+  return allConnections.filter((conn) => conn.accountId === accountId);
+}
+
+/**
+ * Find connections for an account that have a specific service configured
+ */
+export async function findConnectionsWithService(
+  accountId: string,
+  service: ServiceType
+): Promise<ConnectionMetadata[]> {
+  const accountConnections = await findConnectionsForAccount(accountId);
+  return accountConnections.filter((conn) => hasService(conn, service));
+}

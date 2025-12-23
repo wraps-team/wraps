@@ -98,7 +98,7 @@ describe("Telemetry Events", () => {
         preset: "production",
         provider: "vercel",
         features: ["tracking", "history"],
-        duration_ms: 45000,
+        duration_ms: 45_000,
       });
 
       expect(mockTrack).toHaveBeenCalledWith("service:init", {
@@ -107,7 +107,7 @@ describe("Telemetry Events", () => {
         preset: "production",
         provider: "vercel",
         features: ["tracking", "history"],
-        duration_ms: 45000,
+        duration_ms: 45_000,
       });
     });
 
@@ -132,14 +132,14 @@ describe("Telemetry Events", () => {
 
     it("should include metadata when provided", () => {
       trackServiceDeployed("email", {
-        duration_ms: 45000,
+        duration_ms: 45_000,
         features: ["tracking", "history"],
         preset: "production",
       });
 
       expect(mockTrack).toHaveBeenCalledWith("service:deployed", {
         service: "email",
-        duration_ms: 45000,
+        duration_ms: 45_000,
         features: ["tracking", "history"],
         preset: "production",
       });

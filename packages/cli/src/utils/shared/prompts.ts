@@ -777,3 +777,229 @@ export async function promptCustomConfig(existingConfig?: any): Promise<any> {
     sendingEnabled: true,
   };
 }
+
+/**
+ * DNS record category labels for display
+ */
+const DNS_CATEGORY_LABELS: Record<string, string> = {
+  dkim: "DKIM (Email Authentication)",
+  spf: "SPF (Sender Policy Framework)",
+  dmarc: "DMARC (Email Policy)",
+  tracking: "Tracking Domain",
+  mailfrom_mx: "MAIL FROM (MX Record)",
+  mailfrom_spf: "MAIL FROM (SPF Record)",
+};
+
+/**
+ * Status symbols for DNS records
+ */
+const DNS_STATUS_SYMBOLS: Record<string, string> = {
+  new: pc.green("+ NEW"),
+  update: pc.yellow("~ UPDATE"),
+  conflict: pc.red("! CONFLICT"),
+  no_change: pc.dim("✓ OK"),
+};
+
+/**
+ * Display a DNS record for review
+ */
+function formatDNSRecord(record: {
+  name: string;
+  type: string;
+  proposedValue: string;
+  existingValue: string | null;
+  status: string;
+  category: string;
+  conflictReason?: string;
+}): string {
+  const lines: string[] = [];
+  const statusSymbol =
+    DNS_STATUS_SYMBOLS[record.status] || pc.dim(record.status);
+  const categoryLabel =
+    DNS_CATEGORY_LABELS[record.category] || record.category;
+
+  lines.push(`  ${statusSymbol} ${pc.bold(categoryLabel)}`);
+  lines.push(`     ${pc.dim("Name:")} ${record.name}`);
+  lines.push(`     ${pc.dim("Type:")} ${record.type}`);
+
+  if (record.existingValue && record.status !== "no_change") {
+    lines.push(`     ${pc.dim("Current:")} ${pc.red(record.existingValue)}`);
+    lines.push(`     ${pc.dim("New:")}     ${pc.green(record.proposedValue)}`);
+  } else if (record.status === "new") {
+    lines.push(`     ${pc.dim("Value:")} ${pc.green(record.proposedValue)}`);
+  } else {
+    lines.push(`     ${pc.dim("Value:")} ${record.proposedValue}`);
+  }
+
+  if (record.conflictReason) {
+    lines.push(`     ${pc.red("⚠ " + record.conflictReason)}`);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Prompt for DNS record confirmation with conflict detection
+ * Shows all proposed records and lets user select which to create
+ */
+export async function promptDNSConfirmation(preview: {
+  records: Array<{
+    name: string;
+    type: string;
+    proposedValue: string;
+    existingValue: string | null;
+    status: string;
+    category: string;
+    conflictReason?: string;
+  }>;
+  hasConflicts: boolean;
+  conflictCount: number;
+  newCount: number;
+  updateCount: number;
+  noChangeCount: number;
+}): Promise<{
+  shouldCreate: boolean;
+  selectedCategories: Set<string>;
+}> {
+  console.log();
+  clack.log.info(pc.bold("DNS Record Review"));
+  console.log();
+
+  // Show summary
+  const summaryParts: string[] = [];
+  if (preview.newCount > 0) {
+    summaryParts.push(pc.green(`${preview.newCount} new`));
+  }
+  if (preview.updateCount > 0) {
+    summaryParts.push(pc.yellow(`${preview.updateCount} updates`));
+  }
+  if (preview.conflictCount > 0) {
+    summaryParts.push(pc.red(`${preview.conflictCount} conflicts`));
+  }
+  if (preview.noChangeCount > 0) {
+    summaryParts.push(pc.dim(`${preview.noChangeCount} unchanged`));
+  }
+  console.log(`  ${summaryParts.join(" | ")}\n`);
+
+  // Display all records
+  for (const record of preview.records) {
+    console.log(formatDNSRecord(record));
+    console.log();
+  }
+
+  // If there are conflicts, show a warning
+  if (preview.hasConflicts) {
+    clack.log.warn(
+      pc.yellow(
+        "Some records have conflicts. Creating them will overwrite existing values."
+      )
+    );
+    console.log();
+  }
+
+  // If everything is unchanged, skip the prompt
+  if (
+    preview.newCount === 0 &&
+    preview.updateCount === 0 &&
+    preview.conflictCount === 0
+  ) {
+    clack.log.success("All DNS records are already configured correctly.");
+    return { shouldCreate: false, selectedCategories: new Set() };
+  }
+
+  // Ask if user wants to create DNS records
+  const shouldCreate = await clack.confirm({
+    message: "Create DNS records in Route53?",
+    initialValue: !preview.hasConflicts, // Default to no if there are conflicts
+  });
+
+  if (clack.isCancel(shouldCreate) || !shouldCreate) {
+    return { shouldCreate: false, selectedCategories: new Set() };
+  }
+
+  // If there are conflicts or updates, let user select which records to create
+  if (preview.hasConflicts || preview.updateCount > 0) {
+    const recordsToSelect = preview.records.filter(
+      (r) => r.status !== "no_change"
+    );
+
+    // Group by category to avoid duplicate entries (e.g., multiple DKIM records)
+    const categories = new Map<string, { status: string; hasConflict: boolean }>();
+    for (const record of recordsToSelect) {
+      const existing = categories.get(record.category);
+      if (!existing || record.status === "conflict") {
+        categories.set(record.category, {
+          status: record.status,
+          hasConflict: record.status === "conflict",
+        });
+      }
+    }
+
+    const options = Array.from(categories.entries()).map(
+      ([category, info]) => {
+        const label = DNS_CATEGORY_LABELS[category] || category;
+        let hint =
+          info.status === "new"
+            ? "New"
+            : info.status === "update"
+              ? "Will merge with existing"
+              : "Will replace existing";
+        if (info.hasConflict) {
+          hint = pc.red(hint + " ⚠");
+        }
+        return {
+          value: category,
+          label,
+          hint,
+        };
+      }
+    );
+
+    // Pre-select non-conflict records
+    const initialValues = Array.from(categories.entries())
+      .filter(([_, info]) => !info.hasConflict)
+      .map(([category]) => category);
+
+    const selected = await clack.multiselect({
+      message: "Select which records to create:",
+      options,
+      initialValues,
+      required: false,
+    });
+
+    if (clack.isCancel(selected)) {
+      return { shouldCreate: false, selectedCategories: new Set() };
+    }
+
+    return {
+      shouldCreate: true,
+      selectedCategories: new Set(selected as string[]),
+    };
+  }
+
+  // No conflicts - select all new/update records
+  const allCategories = new Set(
+    preview.records
+      .filter((r) => r.status !== "no_change")
+      .map((r) => r.category)
+  );
+
+  return { shouldCreate: true, selectedCategories: allCategories };
+}
+
+/**
+ * Ask user if they want to manage DNS records via Route53
+ */
+export async function promptDNSManagement(domain: string): Promise<boolean> {
+  const manage = await clack.confirm({
+    message: `Manage DNS records for ${pc.cyan(domain)} via Route53?`,
+    initialValue: true,
+  });
+
+  if (clack.isCancel(manage)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  return manage;
+}

@@ -12,6 +12,7 @@ vi.mock("@pulumi/pulumi/automation", () => ({
   LocalWorkspace: {
     selectStack: vi.fn(),
   },
+  installPulumiCli: vi.fn(),
 }));
 vi.mock("@clack/prompts");
 vi.mock("../../utils/shared/aws.js");

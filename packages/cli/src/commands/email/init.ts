@@ -43,7 +43,10 @@ import {
   promptRegion,
   promptVercelConfig,
 } from "../../utils/shared/prompts.js";
-import { ensurePulumiInstalled } from "../../utils/shared/pulumi.js";
+import {
+  ensurePulumiInstalled,
+  previewWithResourceChanges,
+} from "../../utils/shared/pulumi.js";
 
 /**
  * Init command - Deploy new email infrastructure
@@ -232,15 +235,16 @@ export async function init(options: InitOptions): Promise<void> {
 
           await stack.setConfig("aws:region", { value: region });
 
-          // Run preview instead of deployment
-          const result = await stack.preview({ diff: true });
+          // Run preview with resource change capture
+          const result = await previewWithResourceChanges(stack, { diff: true });
           return result;
         }
       );
 
-      // Display preview results
+      // Display preview results with detailed resource changes
       displayPreview({
         changeSummary: previewResult.changeSummary,
+        resourceChanges: previewResult.resourceChanges,
         costEstimate: costSummary,
         commandName: "wraps email init",
       });
@@ -253,6 +257,7 @@ export async function init(options: InitOptions): Promise<void> {
       trackServiceInit("email", true, {
         preset,
         provider,
+        region,
         preview: true,
         duration_ms: Date.now() - startTime,
       });
@@ -359,6 +364,7 @@ export async function init(options: InitOptions): Promise<void> {
     trackServiceInit("email", false, {
       preset,
       provider,
+      region,
       duration_ms: Date.now() - startTime,
     });
 
@@ -392,30 +398,63 @@ export async function init(options: InitOptions): Promise<void> {
 
   progress.info("Connection metadata saved for upgrade and restore capability");
 
-  // 10. Check if Route53 hosted zone exists and create DNS records automatically
+  // 10. Check if Route53 hosted zone exists and offer to create DNS records
   let dnsAutoCreated = false;
   if (outputs.domain && outputs.dkimTokens && outputs.dkimTokens.length > 0) {
-    const { findHostedZone, createDNSRecords } = await import(
-      "../../utils/email/route53.js"
+    const {
+      findHostedZone,
+      previewDNSChanges,
+      createSelectedDNSRecords,
+    } = await import("../../utils/route53.js");
+    const { promptDNSManagement, promptDNSConfirmation } = await import(
+      "../../utils/shared/prompts.js"
     );
     const hostedZone = await findHostedZone(outputs.domain, region);
 
     if (hostedZone) {
-      try {
-        progress.start("Creating DNS records in Route53");
-        await createDNSRecords(
-          hostedZone.id,
-          outputs.domain,
-          outputs.dkimTokens,
-          region,
-          outputs.customTrackingDomain,
-          outputs.mailFromDomain
-        );
-        progress.succeed("DNS records created in Route53");
-        dnsAutoCreated = true;
-      } catch (error: any) {
-        progress.fail("Failed to create DNS records in Route53");
-        clack.log.warn(`Could not auto-create DNS records: ${error.message}`);
+      // Ask if user wants to manage DNS via Route53
+      const manageDNS = await promptDNSManagement(outputs.domain);
+
+      if (manageDNS) {
+        try {
+          // Preview DNS changes and show conflicts
+          progress.start("Checking existing DNS records");
+          const dnsPreview = await previewDNSChanges(
+            hostedZone.id,
+            outputs.domain,
+            outputs.dkimTokens,
+            region,
+            outputs.customTrackingDomain,
+            outputs.mailFromDomain
+          );
+          progress.stop();
+
+          // Show preview and get user confirmation
+          const { shouldCreate, selectedCategories } =
+            await promptDNSConfirmation(dnsPreview);
+
+          if (shouldCreate && selectedCategories.size > 0) {
+            progress.start("Creating selected DNS records in Route53");
+            await createSelectedDNSRecords(
+              hostedZone.id,
+              outputs.domain,
+              outputs.dkimTokens,
+              region,
+              selectedCategories as Set<any>,
+              outputs.customTrackingDomain,
+              outputs.mailFromDomain
+            );
+            progress.succeed(
+              `Created ${selectedCategories.size} DNS record group(s) in Route53`
+            );
+            dnsAutoCreated = true;
+          } else {
+            clack.log.info("Skipping DNS record creation. You can add them manually.");
+          }
+        } catch (error: any) {
+          progress.stop();
+          clack.log.warn(`Could not manage DNS records: ${error.message}`);
+        }
       }
     }
   }
@@ -467,12 +506,14 @@ export async function init(options: InitOptions): Promise<void> {
   trackServiceInit("email", true, {
     preset,
     provider,
+    region,
     features: enabledFeatures,
     duration_ms: duration,
   });
 
   trackServiceDeployed("email", {
     duration_ms: duration,
+    region,
     features: enabledFeatures,
     preset,
   });

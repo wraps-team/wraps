@@ -61,6 +61,7 @@ export type ConsoleOptions = {
  */
 export type DestroyOptions = {
   force?: boolean; // Destructive operation
+  region?: string;
   service?: ServiceType; // Destroy specific service or all
   preview?: boolean;
 };
@@ -70,6 +71,7 @@ export type DestroyOptions = {
  */
 export type StatusOptions = {
   account?: string;
+  region?: string;
   service?: ServiceType; // Show specific service or all
 };
 

@@ -27,7 +27,12 @@ async function roleExists(roleName: string): Promise<boolean> {
     await iam.send(new GetRoleCommand({ RoleName: roleName }));
     return true;
   } catch (error: any) {
-    if (error.name === "NoSuchEntityException") {
+    // AWS SDK v3 can return the error code in different places
+    if (
+      error.name === "NoSuchEntityException" ||
+      error.Code === "NoSuchEntity" ||
+      error.Error?.Code === "NoSuchEntity"
+    ) {
       return false;
     }
     console.error("Error checking for existing IAM role:", error);

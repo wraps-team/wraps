@@ -12,6 +12,7 @@ import {
   ensurePulumiWorkDir,
   getPulumiWorkDir,
 } from "../../utils/shared/fs.js";
+import { findConnectionsWithService } from "../../utils/shared/metadata.js";
 import {
   DeploymentProgress,
   displayStatus,
@@ -20,7 +21,7 @@ import {
 /**
  * Email Status command - Show current email infrastructure setup
  */
-export async function emailStatus(_options: StatusOptions): Promise<void> {
+export async function emailStatus(options: StatusOptions): Promise<void> {
   const startTime = Date.now();
   const progress = new DeploymentProgress();
 
@@ -32,8 +33,43 @@ export async function emailStatus(_options: StatusOptions): Promise<void> {
     async () => validateAWSCredentials()
   );
 
-  // 2. Get region
-  const region = await getAWSRegion();
+  // 2. Get region - check flag, then env, then metadata, then default
+  let region = options.region || (await getAWSRegion());
+
+  // If using default region (us-east-1), check if we have metadata for other regions
+  if (
+    !(
+      options.region ||
+      process.env.AWS_REGION ||
+      process.env.AWS_DEFAULT_REGION
+    )
+  ) {
+    const emailConnections = await findConnectionsWithService(
+      identity.accountId,
+      "email"
+    );
+
+    if (emailConnections.length === 1) {
+      // Auto-select the only available region
+      region = emailConnections[0].region;
+    } else if (emailConnections.length > 1) {
+      // Multiple regions found - prompt user to select
+      const selectedRegion = await clack.select({
+        message: "Multiple email deployments found. Which region?",
+        options: emailConnections.map((conn) => ({
+          value: conn.region,
+          label: conn.region,
+        })),
+      });
+
+      if (clack.isCancel(selectedRegion)) {
+        clack.cancel("Operation cancelled");
+        process.exit(0);
+      }
+
+      region = selectedRegion as string;
+    }
+  }
 
   // 3. Try to load Pulumi stack
   let stackOutputs: any = {};
@@ -123,6 +159,7 @@ export async function emailStatus(_options: StatusOptions): Promise<void> {
   // 7. Track status command
   trackCommand("email:status", {
     success: true,
+    region,
     domain_count: domainsWithTokens.length,
     integration_level: integrationLevel,
     duration_ms: Date.now() - startTime,

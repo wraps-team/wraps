@@ -25,7 +25,10 @@ import {
   displayPreview,
   displaySuccess,
 } from "../../utils/shared/output.js";
-import { ensurePulumiInstalled } from "../../utils/shared/pulumi.js";
+import {
+  ensurePulumiInstalled,
+  previewWithResourceChanges,
+} from "../../utils/shared/pulumi.js";
 
 /**
  * Config command - Redeploy infrastructure to apply CLI updates
@@ -216,15 +219,16 @@ export async function config(options: EmailConfigOptions): Promise<void> {
           // Refresh state to sync with AWS before previewing
           await stack.refresh({ onOutput: () => {} });
 
-          // Run preview instead of deployment
-          const result = await stack.preview({ diff: true });
+          // Run preview with resource change capture
+          const result = await previewWithResourceChanges(stack, { diff: true });
           return result;
         }
       );
 
-      // Display preview results
+      // Display preview results with detailed resource changes
       displayPreview({
         changeSummary: previewResult.changeSummary,
+        resourceChanges: previewResult.resourceChanges,
         commandName: "wraps email config",
       });
 

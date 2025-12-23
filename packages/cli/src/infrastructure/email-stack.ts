@@ -50,7 +50,7 @@ export async function deployEmailStack(
     emailConfig.tracking.httpsEnabled
   ) {
     // Check for Route53 hosted zone (for automatic DNS validation)
-    const { findHostedZone } = await import("../utils/email/route53.js");
+    const { findHostedZone } = await import("../utils/route53.js");
     const hostedZone = await findHostedZone(
       emailConfig.tracking.customRedirectDomain,
       config.region

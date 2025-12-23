@@ -22,7 +22,7 @@ vi.mock("../../utils/shared/aws.js");
 vi.mock("../../utils/shared/pulumi.js");
 vi.mock("../../utils/shared/fs.js");
 vi.mock("../../utils/shared/metadata.js");
-vi.mock("../../utils/email/route53.js");
+vi.mock("../../utils/route53.js");
 vi.mock("../../utils/shared/prompts.js");
 vi.mock("../../infrastructure/email-stack.js");
 
@@ -30,7 +30,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as prompts from "@clack/prompts";
 import { deployEmailStack } from "../../infrastructure/email-stack.js";
-import * as route53Utils from "../../utils/email/route53.js";
+import * as route53Utils from "../../utils/route53.js";
 import * as aws from "../../utils/shared/aws.js";
 import * as fsUtils from "../../utils/shared/fs.js";
 import * as metadata from "../../utils/shared/metadata.js";
@@ -111,7 +111,17 @@ describe("init command", () => {
 
     // Mock Route53 utilities
     vi.mocked(route53Utils.findHostedZone).mockResolvedValue(null);
-    vi.mocked(route53Utils.createDNSRecords).mockResolvedValue(undefined);
+    vi.mocked(route53Utils.previewDNSChanges).mockResolvedValue({
+      records: [],
+      hasConflicts: false,
+      conflictCount: 0,
+      newCount: 0,
+      updateCount: 0,
+      noChangeCount: 0,
+    });
+    vi.mocked(route53Utils.createSelectedDNSRecords).mockResolvedValue(
+      undefined
+    );
 
     // Mock prompt utilities
     vi.mocked(promptUtils.promptProvider).mockResolvedValue("vercel");
@@ -122,6 +132,11 @@ describe("init command", () => {
     vi.mocked(promptUtils.confirmDeploy).mockResolvedValue(true);
     vi.mocked(promptUtils.promptVercelConfig).mockResolvedValue({
       teamSlug: "my-team",
+    });
+    vi.mocked(promptUtils.promptDNSManagement).mockResolvedValue(true);
+    vi.mocked(promptUtils.promptDNSConfirmation).mockResolvedValue({
+      shouldCreate: true,
+      selectedCategories: new Set(["dkim", "spf", "dmarc"]),
     });
 
     // Mock deployEmailStack

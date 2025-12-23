@@ -16,6 +16,7 @@ import {
   DeploymentProgress,
   displayPreview,
 } from "../../utils/shared/output.js";
+import { previewWithResourceChanges } from "../../utils/shared/pulumi.js";
 
 /**
  * Restore command - Remove Wraps infrastructure (alias for destroy)
@@ -130,15 +131,16 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
               }
             );
 
-            // Run preview to see what would be destroyed
-            const result = await stack.preview({ diff: true });
+            // Run preview with resource change capture
+            const result = await previewWithResourceChanges(stack, { diff: true });
             return result;
           }
         );
 
-        // Display preview results
+        // Display preview results with detailed resource changes
         displayPreview({
           changeSummary: previewResult.changeSummary,
+          resourceChanges: previewResult.resourceChanges,
           costEstimate: "Monthly cost after removal: $0.00",
           commandName: "wraps email restore",
         });

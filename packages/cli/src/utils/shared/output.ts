@@ -523,6 +523,26 @@ export function displayStatus(status: StatusOutputs) {
 }
 
 /**
+ * Operation type for resource changes
+ */
+export type ResourceOperation =
+  | "create"
+  | "update"
+  | "delete"
+  | "replace"
+  | "same";
+
+/**
+ * Individual resource change information
+ */
+export type ResourceChange = {
+  name: string;
+  type: string;
+  operation: ResourceOperation;
+  diffs?: string[];
+};
+
+/**
  * Preview output configuration
  */
 export type PreviewOutputs = {
@@ -533,40 +553,175 @@ export type PreviewOutputs = {
     same?: number;
     replace?: number;
   };
+  resourceChanges?: ResourceChange[];
   costEstimate?: string;
   commandName: string;
 };
 
 /**
+ * Format AWS resource type to human-readable name
+ */
+function formatResourceType(type: string): string {
+  // Common AWS resource type mappings
+  const typeMap: Record<string, string> = {
+    "aws:iam/role:Role": "IAM Role",
+    "aws:iam/policy:Policy": "IAM Policy",
+    "aws:iam/rolePolicyAttachment:RolePolicyAttachment": "IAM Policy Attachment",
+    "aws:iam/openIdConnectProvider:OpenIdConnectProvider": "OIDC Provider",
+    "aws:ses/configurationSet:ConfigurationSet": "SES Configuration Set",
+    "aws:ses/emailIdentity:EmailIdentity": "SES Email Identity",
+    "aws:ses/eventDestination:EventDestination": "SES Event Destination",
+    "aws:sesv2/configurationSetEventDestination:ConfigurationSetEventDestination":
+      "SES Event Destination",
+    "aws:dynamodb/table:Table": "DynamoDB Table",
+    "aws:lambda/function:Function": "Lambda Function",
+    "aws:lambda/eventSourceMapping:EventSourceMapping": "Lambda Event Source",
+    "aws:sqs/queue:Queue": "SQS Queue",
+    "aws:cloudwatch/eventRule:EventRule": "EventBridge Rule",
+    "aws:cloudwatch/eventTarget:EventTarget": "EventBridge Target",
+    "aws:sns/topic:Topic": "SNS Topic",
+    "aws:sns/topicSubscription:TopicSubscription": "SNS Subscription",
+    "aws:s3/bucket:Bucket": "S3 Bucket",
+    "aws:s3/bucketPolicy:BucketPolicy": "S3 Bucket Policy",
+    "aws:cloudfront/distribution:Distribution": "CloudFront Distribution",
+    "aws:acm/certificate:Certificate": "ACM Certificate",
+    "aws:acm/certificateValidation:CertificateValidation": "ACM Validation",
+    "aws:route53/record:Record": "Route53 Record",
+    "pulumi:pulumi:Stack": "Pulumi Stack",
+  };
+
+  return typeMap[type] || type.split(":").pop() || type;
+}
+
+/**
+ * Get icon for operation type
+ */
+function getOperationIcon(operation: ResourceOperation): string {
+  switch (operation) {
+    case "create":
+      return pc.green("+");
+    case "update":
+      return pc.yellow("~");
+    case "delete":
+      return pc.red("-");
+    case "replace":
+      return pc.magenta("±");
+    case "same":
+      return pc.dim("=");
+    default:
+      return " ";
+  }
+}
+
+/**
+ * Get operation label with color
+ */
+function getOperationLabel(operation: ResourceOperation): string {
+  switch (operation) {
+    case "create":
+      return pc.green("CREATE");
+    case "update":
+      return pc.yellow("UPDATE");
+    case "delete":
+      return pc.red("DELETE");
+    case "replace":
+      return pc.magenta("REPLACE");
+    case "same":
+      return pc.dim("UNCHANGED");
+  }
+}
+
+/**
  * Display preview results with resource changes and cost estimate
  */
 export function displayPreview(outputs: PreviewOutputs): void {
-  console.log(pc.yellow("\n--- PREVIEW MODE (no changes will be made) ---\n"));
+  console.log(pc.yellow("\n━━━ PREVIEW MODE (no changes will be made) ━━━\n"));
 
-  // Display change summary
-  const changes = outputs.changeSummary;
-  const summaryLines: string[] = [];
+  // If we have detailed resource changes, show them grouped by operation
+  if (outputs.resourceChanges && outputs.resourceChanges.length > 0) {
+    // Group resources by operation
+    const grouped = new Map<ResourceOperation, ResourceChange[]>();
+    for (const resource of outputs.resourceChanges) {
+      const existing = grouped.get(resource.operation) || [];
+      existing.push(resource);
+      grouped.set(resource.operation, existing);
+    }
 
-  if (changes.create && changes.create > 0) {
-    summaryLines.push(`  ${pc.green("+")} ${changes.create} to create`);
-  }
-  if (changes.update && changes.update > 0) {
-    summaryLines.push(`  ${pc.yellow("~")} ${changes.update} to update`);
-  }
-  if (changes.delete && changes.delete > 0) {
-    summaryLines.push(`  ${pc.red("-")} ${changes.delete} to destroy`);
-  }
-  if (changes.same && changes.same > 0) {
-    summaryLines.push(`  ${pc.dim("=")} ${changes.same} unchanged`);
-  }
-  if (changes.replace && changes.replace > 0) {
-    summaryLines.push(`  ${pc.magenta("+-")} ${changes.replace} to replace`);
-  }
+    // Order: create, update, replace, delete, same
+    const operationOrder: ResourceOperation[] = [
+      "create",
+      "update",
+      "replace",
+      "delete",
+      "same",
+    ];
 
-  if (summaryLines.length > 0) {
-    clack.note(summaryLines.join("\n"), "Resource Changes");
+    const sections: string[] = [];
+
+    for (const operation of operationOrder) {
+      const resources = grouped.get(operation);
+      if (!resources || resources.length === 0) continue;
+
+      // Skip showing "same" resources unless there are few total changes
+      if (operation === "same" && outputs.resourceChanges.length > 10) {
+        sections.push(
+          `${getOperationLabel(operation)} ${pc.dim(`(${resources.length} resources)`)}`
+        );
+        continue;
+      }
+
+      const resourceLines = resources
+        .map((r) => {
+          const icon = getOperationIcon(operation);
+          const typeLabel = pc.dim(`(${formatResourceType(r.type)})`);
+          let line = `  ${icon} ${r.name} ${typeLabel}`;
+
+          // Show diffs for updates
+          if (r.diffs && r.diffs.length > 0 && operation === "update") {
+            const diffStr = r.diffs.slice(0, 3).join(", ");
+            const more = r.diffs.length > 3 ? ` +${r.diffs.length - 3} more` : "";
+            line += `\n      ${pc.dim(`changed: ${diffStr}${more}`)}`;
+          }
+
+          return line;
+        })
+        .join("\n");
+
+      sections.push(
+        `${getOperationLabel(operation)} ${pc.dim(`(${resources.length})`)}\n${resourceLines}`
+      );
+    }
+
+    if (sections.length > 0) {
+      console.log(sections.join("\n\n"));
+      console.log();
+    }
   } else {
-    clack.note("No changes detected", "Resource Changes");
+    // Fallback to summary-only view
+    const changes = outputs.changeSummary;
+    const summaryLines: string[] = [];
+
+    if (changes.create && changes.create > 0) {
+      summaryLines.push(`  ${pc.green("+")} ${changes.create} to create`);
+    }
+    if (changes.update && changes.update > 0) {
+      summaryLines.push(`  ${pc.yellow("~")} ${changes.update} to update`);
+    }
+    if (changes.delete && changes.delete > 0) {
+      summaryLines.push(`  ${pc.red("-")} ${changes.delete} to destroy`);
+    }
+    if (changes.same && changes.same > 0) {
+      summaryLines.push(`  ${pc.dim("=")} ${changes.same} unchanged`);
+    }
+    if (changes.replace && changes.replace > 0) {
+      summaryLines.push(`  ${pc.magenta("±")} ${changes.replace} to replace`);
+    }
+
+    if (summaryLines.length > 0) {
+      clack.note(summaryLines.join("\n"), "Resource Changes");
+    } else {
+      clack.note("No changes detected", "Resource Changes");
+    }
   }
 
   // Display cost estimate
@@ -574,5 +729,5 @@ export function displayPreview(outputs: PreviewOutputs): void {
     clack.note(outputs.costEstimate, "Estimated Monthly Cost");
   }
 
-  console.log(pc.yellow("\n--- END PREVIEW (no changes were made) ---\n"));
+  console.log(pc.yellow("━━━ END PREVIEW (no changes were made) ━━━\n"));
 }

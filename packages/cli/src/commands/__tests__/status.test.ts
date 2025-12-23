@@ -57,6 +57,13 @@ vi.mock("../../utils/shared/fs.js", () => ({
   ensurePulumiWorkDir: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Mock metadata module
+vi.mock("../../utils/shared/metadata.js", () => ({
+  findConnectionsWithService: vi.fn().mockResolvedValue([]),
+  loadConnectionMetadata: vi.fn().mockResolvedValue(null),
+  listConnections: vi.fn().mockResolvedValue([]),
+}));
+
 describe("email status command", () => {
   let exitSpy: any;
   let consoleLogSpy: any;

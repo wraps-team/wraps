@@ -390,6 +390,7 @@ async function run() {
         case "status":
           await emailStatus({
             account: flags.account,
+            region: flags.region,
           });
           break;
 
@@ -480,6 +481,7 @@ async function run() {
         case "destroy":
           await emailDestroy({
             force: flags.force,
+            region: flags.region,
             preview: flags.preview,
           });
           break;

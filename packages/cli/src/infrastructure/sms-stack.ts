@@ -19,11 +19,12 @@ async function roleExists(roleName: string): Promise<boolean> {
     });
     await iam.send(new GetRoleCommand({ RoleName: roleName }));
     return true;
-  } catch (error: unknown) {
+  } catch (error: any) {
+    // AWS SDK v3 can return the error code in different places
     if (
-      error instanceof Error &&
-      "name" in error &&
-      error.name === "NoSuchEntityException"
+      error.name === "NoSuchEntityException" ||
+      error.Code === "NoSuchEntity" ||
+      error.Error?.Code === "NoSuchEntity"
     ) {
       return false;
     }

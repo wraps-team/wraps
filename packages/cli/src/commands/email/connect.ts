@@ -36,7 +36,10 @@ import {
   promptSelectIdentities,
   promptVercelConfig,
 } from "../../utils/shared/prompts.js";
-import { ensurePulumiInstalled } from "../../utils/shared/pulumi.js";
+import {
+  ensurePulumiInstalled,
+  previewWithResourceChanges,
+} from "../../utils/shared/pulumi.js";
 import { scanAWSResources } from "../../utils/shared/scanner.js";
 
 /**
@@ -221,15 +224,16 @@ export async function connect(options: ConnectOptions): Promise<void> {
 
           await stack.setConfig("aws:region", { value: region });
 
-          // Run preview instead of deployment
-          const result = await stack.preview({ diff: true });
+          // Run preview with resource change capture
+          const result = await previewWithResourceChanges(stack, { diff: true });
           return result;
         }
       );
 
-      // Display preview results
+      // Display preview results with detailed resource changes
       displayPreview({
         changeSummary: previewResult.changeSummary,
+        resourceChanges: previewResult.resourceChanges,
         commandName: "wraps email connect",
       });
 
@@ -340,7 +344,7 @@ export async function connect(options: ConnectOptions): Promise<void> {
   // 12. Create DNS records in Route53 (if hosted zone exists)
   if (outputs.domain && outputs.dkimTokens && outputs.dkimTokens.length > 0) {
     const { findHostedZone, createDNSRecords } = await import(
-      "../../utils/email/route53.js"
+      "../../utils/route53.js"
     );
     const hostedZone = await findHostedZone(outputs.domain, region);
 

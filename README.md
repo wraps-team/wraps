@@ -1,8 +1,8 @@
 # Wraps
 
-**AWS wrappers with SaaS developer experience.**
+**SaaS developer experience. AWS economics. Your infrastructure.**
 
-Deploy production-ready email infrastructure to your AWS account in 30 seconds. No vendor lock-in, AWS pricing, Resend-like DX.
+Deploy production-ready email infrastructure to your AWS account in 30 seconds. Own your infrastructure, pay AWS directly, get SaaS-quality developer experience.
 
 ```bash
 npx @wraps.dev/cli email init
@@ -14,44 +14,54 @@ npx @wraps.dev/cli email init
 
 ---
 
-## Description
+## The Problem
 
-Wraps deploys communication infrastructure (starting with email) **to your AWS account** with zero stored credentials and a beautiful developer experience. You own the infrastructure, pay AWS directly (pennies vs. dollars), and get SaaS-quality tooling.
+AWS SES is powerful and cost-effective, but the developer experience is painful:
 
-**The Problem:** AWS services like SES are powerful and cost-effective but require significant setup time. We wanted the simplicity of modern email APIs with the flexibility of running in your own AWS account.
+- **Hours of configuration** — DKIM, SPF, DMARC, IAM roles, event tracking
+- **Opaque rejection criteria** — production access approval is frustrating
+- **Terrible console UX** — simple tasks buried in AWS complexity
+- **No unified dashboard** — metrics scattered across CloudWatch
 
-**The Solution:** One CLI command deploys production-ready infrastructure to your AWS account. Your infrastructure, your data, our tooling.
+Developers either pay 10-100x markup for email SaaS or struggle through AWS setup and give up.
+
+## The Solution
+
+Wraps deploys email infrastructure **to your AWS account** with SaaS-quality developer experience:
+
+- **You own it** — Infrastructure lives in your AWS account
+- **You control it** — Data never leaves your cloud
+- **You pay AWS** — $0.10 per 1,000 emails (no markup)
+- **No lock-in** — Infrastructure stays if you stop using Wraps
 
 ---
 
-## Philosophy
+## Why Wraps?
 
-### Bring Your Own Cloud Account Model
+### For Developers
+- **Simple API** — `await wraps.emails.send()` just works
+- **30-second setup** — vs. hours of AWS configuration
+- **Beautiful dashboard** — analytics, templates, team management
+- **TypeScript-first** — full type safety
 
-- **You own it** - Infrastructure lives in your AWS account
-- **You control it** - Data never leaves your cloud
-- **You pay AWS** - Transparent costs, no markup
-- **No lock-in** - Infrastructure stays if you churn
-- **Exit built-in** - Stop paying us, everything keeps working
+### For Startup CTOs
+- **Full ownership** — audit trail in your AWS account
+- **Compliance simplified** — data never leaves your cloud
+- **Transparent costs** — AWS bill separate from our fee
+- **Exit-friendly** — infrastructure keeps working if you stop paying
 
-### Why This Matters
+### Cost at Scale
 
-**Great Developer Experience:**
-- ✅ Simple, intuitive TypeScript SDK
-- ✅ Beautiful dashboards and analytics
-- ✅ 30-second setup with one command
-- ✅ Real-time event tracking out of the box
+**CLI + SDK are free.** You only pay AWS directly.
 
-**Full Control & Ownership:**
-- ✅ Infrastructure lives in your AWS account
-- ✅ No vendor lock-in
-- ✅ Data residency control
-- ✅ Compliance simplified (data stays in your account)
+| Volume | AWS Cost |
+|--------|----------|
+| 50K emails/mo | **~$8/mo** |
+| 200K emails/mo | **~$23/mo** |
+| 500K emails/mo | **~$54/mo** |
+| 1M emails/mo | **~$106/mo** |
 
-**Cost-Effective at Scale:**
-- ✅ Pay AWS directly ($0.10 per 1,000 emails)
-- ✅ Transparent pricing with no markup
-- ✅ Scale without worrying about tier limits
+Add our [hosted platform](#pricing) for templates, contact management, and campaigns.
 
 ---
 
@@ -95,26 +105,43 @@ All resources use the `wraps-email-*` namespace prefix.
 
 ---
 
+## Pricing
+
+**CLI + SDK are free and open source.** Deploy to your AWS account and send emails with zero platform fees.
+
+**Hosted platform** adds visual tools on top of your infrastructure:
+
+| Tier | Price | Contacts | Features |
+|------|-------|----------|----------|
+| **Starter** | $19/mo | 5K | Template editor, dashboard, analytics, batch sending |
+| **Pro** | $49/mo | 25K | + Topics, Segments, Campaigns |
+| **Growth** | $149/mo | 100K | + Workflows, Event tracking, Advanced segments |
+| **Scale** | $299/mo | 500K | + Custom retention, Priority SLA |
+
+**All tiers include:** Unlimited team members, unlimited templates, AI generation.
+
+**Plus AWS costs:** ~$0.10 per 1,000 emails + minimal Lambda/DynamoDB (~$2-5/mo).
+
+---
+
 ## Features
 
-### Current (v0.3 - Multi-Service Architecture)
+### What's Built
 
-- ✅ **Multi-service CLI** - Organized commands: `wraps email init`, `wraps sms init` (coming soon)
-- ✅ **One-command deployment** - `wraps email init` sets up everything
-- ✅ **Domain verification** - Guided DNS setup with Route53 auto-configuration
-- ✅ **Event tracking** - Capture bounces, complaints, opens, clicks
-- ✅ **OIDC support** - Vercel integration (no AWS credentials in production)
-- ✅ **Non-destructive** - Never modifies existing AWS resources
-- ✅ **Beautiful CLI** - Spinners, colors, clear error messages
-- ✅ **Infrastructure as Code** - Pulumi-powered deployments
+- ✅ **CLI** — One-command deployment to your AWS account
+- ✅ **TypeScript SDK** — [`@wraps.dev/email`](https://github.com/wraps-team/wraps-js) for sending emails
+- ✅ **Dashboard** — Analytics, email history, team management
+- ✅ **Templates** — Drag-n-drop, raw code, and AI generation
+- ✅ **Domain verification** — Guided DNS setup with Route53 auto-config
+- ✅ **Event tracking** — Bounces, complaints, opens, clicks
+- ✅ **OIDC support** — Vercel integration (no AWS credentials in production)
 
-### Roadmap
+### Coming Soon
 
-- ✅ **Email SDK** - [`@wraps.dev/email`](https://github.com/wraps-team/wraps-js) TypeScript SDK for AWS SES
-- 🚧 **Hosted Dashboard** - Analytics, logs, team management
-- 📋 **SMS** - AWS SNS wrapper (`@wraps.dev/sms`)
-- 📋 **MQTT** - AWS IoT Core wrapper (`@wraps.dev/iot`)
-- 📋 **Workflows** - SQS + Lambda orchestration (`@wraps.dev/queue`)
+- 🚧 **Contact management** — Import, segment, and manage your audience
+- 🚧 **Campaigns** — Scheduled, targeted email sends
+- 🚧 **SMS** — AWS End User Messaging wrapper (`@wraps.dev/sms`)
+- 📋 **Workflows** — Visual automation builder
 
 ---
 
