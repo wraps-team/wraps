@@ -9,8 +9,8 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { organization, user } from "./auth";
 import { awsAccount } from "./app";
+import { organization, user } from "./auth";
 import { contact } from "./contacts";
 import { template } from "./templates";
 
@@ -82,8 +82,9 @@ export const batchSend = pgTable(
       .references(() => organization.id, { onDelete: "cascade" })
       .notNull(),
 
-    awsAccountId: text("aws_account_id")
-      .references(() => awsAccount.id, { onDelete: "set null" }),
+    awsAccountId: text("aws_account_id").references(() => awsAccount.id, {
+      onDelete: "set null",
+    }),
 
     name: text("name"),
 
