@@ -223,7 +223,7 @@ export function ContactDetailsSheet({
       >
         <SheetHeader className="border-b px-6 py-4">
           <div className="flex items-center justify-between">
-            <SheetTitle className="text-lg font-semibold">
+            <SheetTitle className="font-semibold text-lg">
               Contact Details
             </SheetTitle>
             <div className="flex items-center gap-1">
@@ -242,7 +242,7 @@ export function ContactDetailsSheet({
                     Cancel
                   </Button>
                   <Button
-                    disabled={isPending || (!email && !phone)}
+                    disabled={isPending || !(email || phone)}
                     onClick={handleSave}
                     size="sm"
                   >
@@ -434,7 +434,10 @@ export function ContactDetailsSheet({
                   topics.length > 0 ? (
                     <div className="max-h-[150px] space-y-2 overflow-y-auto rounded-lg border p-3">
                       {topics.map((topic) => (
-                        <div className="flex items-center space-x-2" key={topic.id}>
+                        <div
+                          className="flex items-center space-x-2"
+                          key={topic.id}
+                        >
                           <Checkbox
                             checked={selectedTopicIds.includes(topic.id)}
                             id={`topic-${topic.id}`}

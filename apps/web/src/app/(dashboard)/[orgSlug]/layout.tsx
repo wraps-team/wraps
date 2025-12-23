@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { ProductsStatusHydrator } from "@/components/products-status-hydrator";
 import { getOrganizationWithMembership } from "@/lib/organization";
-import { type PlanId, PLANS } from "@/lib/plans";
+import { PLANS, type PlanId } from "@/lib/plans";
 
 type OrganizationLayoutProps = {
   children: ReactNode;
@@ -76,7 +76,9 @@ export default async function OrganizationLayout({
 
   // Get plan from subscription or extension
   const rawPlanId = extension?.plan || activeSubscription?.plan || "starter";
-  const planId: PlanId = ["starter", "pro", "growth", "scale"].includes(rawPlanId)
+  const planId: PlanId = ["starter", "pro", "growth", "scale"].includes(
+    rawPlanId
+  )
     ? (rawPlanId as PlanId)
     : "starter";
   const plan = PLANS[planId];

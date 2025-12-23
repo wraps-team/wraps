@@ -87,7 +87,7 @@ export function BatchTable({
     startTransition(async () => {
       const result = await cancelBatchSend(batchId, organizationId);
       if (result.success) {
-        toast.success("Batch send cancelled");
+        toast.success("Broadcast cancelled");
         router.refresh();
       } else {
         toast.error(result.error);
@@ -340,7 +340,7 @@ export function BatchTable({
             <Input
               className="pl-9"
               onChange={(event) => handleSearch(event.target.value)}
-              placeholder="Search batch sends..."
+              placeholder="Search broadcasts..."
               value={globalFilter}
             />
           </div>
@@ -350,7 +350,7 @@ export function BatchTable({
             <Button asChild size="sm">
               <Link href={`/${orgSlug}/send/new`}>
                 <Plus className="mr-2 h-4 w-4" />
-                New Batch Send
+                New Broadcast
               </Link>
             </Button>
           )}
@@ -404,12 +404,12 @@ export function BatchTable({
                 >
                   <div className="flex flex-col items-center gap-2">
                     <Mail className="h-8 w-8 text-muted-foreground" />
-                    <p className="text-muted-foreground">No batch sends yet</p>
+                    <p className="text-muted-foreground">No broadcasts yet</p>
                     {canManage && (
                       <Button asChild size="sm" variant="outline">
                         <Link href={`/${orgSlug}/send/new`}>
                           <Plus className="mr-2 h-4 w-4" />
-                          Create your first batch send
+                          Create your first broadcast
                         </Link>
                       </Button>
                     )}
@@ -425,7 +425,7 @@ export function BatchTable({
       {batches.length > 0 && (
         <div className="flex items-center justify-end space-x-2 py-4">
           <div className="flex-1 text-muted-foreground text-sm">
-            {table.getFilteredRowModel().rows.length} batch send(s)
+            {table.getFilteredRowModel().rows.length} broadcast(s)
           </div>
           <div className="flex items-center space-x-2">
             <Button

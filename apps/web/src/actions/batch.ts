@@ -1,8 +1,17 @@
 "use server";
 
 import { auth } from "@wraps/auth";
-import { batchSend, contact, db, template } from "@wraps/db";
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { batchSend, contact, contactTopic, db, template } from "@wraps/db";
+import {
+  and,
+  desc,
+  eq,
+  exists,
+  isNotNull,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import type {
@@ -13,17 +22,22 @@ import type {
   CreateBatchResult,
   GetBatchResult,
   ListBatchesResult,
+  RecipientFilter,
 } from "@/lib/batch";
 import { createActionLogger, serializeError } from "@/lib/logger";
 import { checkFeatureAccess } from "@/lib/plan-limits";
+import type { FilterCondition, SegmentFilter } from "@/lib/segments";
 
 // Re-export types for convenience
 export type {
+  AudienceType,
   BatchSendWithMeta,
   CancelBatchResult,
+  ContentType,
   CreateBatchResult,
   GetBatchResult,
   ListBatchesResult,
+  RecipientFilter,
 } from "@/lib/batch";
 
 /**
@@ -257,7 +271,7 @@ export async function getBatchSend(
 }
 
 /**
- * Create a new batch send
+ * Create a new batch send by calling the API
  */
 export async function createBatchSend(
   organizationId: string,
@@ -313,10 +327,11 @@ export async function createBatchSend(
       }
     }
 
-    // Count eligible recipients
+    // Count eligible recipients based on filter
     const recipientCount = await countRecipients(
       organizationId,
-      data.channel ?? "email"
+      data.channel ?? "email",
+      data.recipientFilter
     );
 
     if (recipientCount === 0) {
@@ -329,45 +344,77 @@ export async function createBatchSend(
       };
     }
 
-    // Create batch send
-    const [newBatch] = await db
-      .insert(batchSend)
-      .values({
-        organizationId,
-        awsAccountId: data.awsAccountId,
+    // Get session from Better Auth
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session) {
+      return { success: false, error: "Session not found" };
+    }
+
+    console.log(
+      "[batch] Session token:",
+      session.session.token
+        ? `${session.session.token.slice(0, 10)}...`
+        : "undefined"
+    );
+    console.log("[batch] Session keys:", Object.keys(session.session));
+
+    // Call the API to create batch and enqueue
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) {
+      return { success: false, error: "API URL not configured" };
+    }
+
+    const response = await fetch(`${apiUrl}/v1/batch`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.session.token}`,
+        "X-Organization-Id": organizationId,
+      },
+      body: JSON.stringify({
         channel: data.channel ?? "email",
-        name: data.name ?? `Batch Send ${new Date().toLocaleDateString()}`,
-        status: "queued",
-        // Email fields
+        name: data.name ?? `Broadcast ${new Date().toLocaleDateString()}`,
         subject: data.subject,
         previewText: data.previewText,
         from: data.from,
         fromName: data.fromName,
         replyTo: data.replyTo,
-        emailTemplateId: data.templateId,
-        // SMS fields
+        templateId: data.templateId,
+        htmlContent: data.htmlContent,
         body: data.body,
         senderId: data.senderId,
-        // Timing
-        scheduledFor: data.scheduledFor,
-        // Recipients
+        scheduledFor: data.scheduledFor?.toISOString(),
+        awsAccountId: data.awsAccountId,
         totalRecipients: recipientCount,
-        // Audit
-        createdBy: access.userId,
-      })
-      .returning();
+      }),
+    });
 
-    if (!newBatch) {
-      return { success: false, error: "Failed to create batch send" };
+    if (!response.ok) {
+      // Read body as text first, then try to parse as JSON
+      const errorText = await response.text();
+      console.error("Failed to create batch via API:", errorText);
+      try {
+        const errorData = JSON.parse(errorText) as {
+          error?: string;
+          debug?: unknown;
+        };
+        return {
+          success: false,
+          error: `${errorData.error} | debug: ${JSON.stringify(errorData.debug)}`,
+        };
+      } catch {
+        return { success: false, error: errorText || "Unknown error" };
+      }
     }
 
-    // TODO: Enqueue job to SQS for processing
-    // This would typically call an API endpoint or SQS directly
-    // For now, we'll leave it in queued status for the worker to pick up
+    const result = (await response.json()) as { id: string };
 
     revalidatePath("/[orgSlug]/send", "page");
 
-    return await getBatchSend(newBatch.id, organizationId);
+    return await getBatchSend(result.id, organizationId);
   } catch (error) {
     const log = createActionLogger("createBatchSend", {
       orgSlug: organizationId,
@@ -449,39 +496,203 @@ export async function cancelBatchSend(
   }
 }
 
+// Map of field names to SQL column references for segment filtering
+const COLUMN_MAP: Record<string, string> = {
+  status: "status",
+  email: "email",
+  lastActivityAt: "last_activity_at",
+  lastEmailSentAt: "last_email_sent_at",
+  lastEmailOpenedAt: "last_email_opened_at",
+  lastEmailClickedAt: "last_email_clicked_at",
+  emailsSent: "emails_sent",
+  emailsOpened: "emails_opened",
+  emailsClicked: "emails_clicked",
+  createdAt: "created_at",
+  confirmedAt: "confirmed_at",
+};
+
+/**
+ * Build SQL condition from a single segment filter
+ */
+function buildFilterSQL(filter: SegmentFilter): SQL | null {
+  const { field, operator, value, unit } = filter;
+
+  // Handle topic-based filters
+  if (field === "topics") {
+    const topicId = value as string;
+    const subquery = db
+      .select({ contactId: contactTopic.contactId })
+      .from(contactTopic)
+      .where(
+        and(
+          eq(contactTopic.contactId, contact.id),
+          eq(contactTopic.topicId, topicId),
+          eq(contactTopic.status, "subscribed")
+        )
+      );
+
+    if (operator === "hasTopic") {
+      return exists(subquery);
+    }
+    if (operator === "notHasTopic") {
+      // Use sql to build NOT EXISTS
+      return sql`NOT EXISTS (${subquery})`;
+    }
+    return null;
+  }
+
+  // Handle custom properties
+  if (field.startsWith("properties.")) {
+    const propertyKey = field.replace("properties.", "");
+
+    switch (operator) {
+      case "equals":
+        return sql`properties->>${propertyKey} = ${String(value)}`;
+      case "notEquals":
+        return sql`properties->>${propertyKey} != ${String(value)}`;
+      case "contains":
+        return sql`properties->>${propertyKey} ILIKE ${`%${String(value)}%`}`;
+      case "exists":
+        return sql`properties ? ${propertyKey}`;
+      case "notExists":
+        return sql`NOT (properties ? ${propertyKey})`;
+      default:
+        return null;
+    }
+  }
+
+  // Handle standard contact fields
+  const columnName = COLUMN_MAP[field];
+  if (!columnName) {
+    return null;
+  }
+
+  const col = sql.raw(`"${columnName}"`);
+
+  switch (operator) {
+    case "equals":
+      return sql`${col} = ${value}`;
+    case "notEquals":
+      return sql`${col} != ${value}`;
+    case "contains":
+      return sql`${col} ILIKE ${`%${String(value)}%`}`;
+    case "greaterThan":
+      return sql`${col} > ${value}`;
+    case "lessThan":
+      return sql`${col} < ${value}`;
+    case "exists":
+      return sql`${col} IS NOT NULL`;
+    case "notExists":
+      return sql`${col} IS NULL`;
+    case "within": {
+      const timeValue = value as number;
+      const interval =
+        unit === "hours"
+          ? `${timeValue} hours`
+          : unit === "minutes"
+            ? `${timeValue} minutes`
+            : `${timeValue} days`;
+      return sql`${col} > NOW() - INTERVAL ${interval}`;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * Build SQL condition from FilterCondition recursively
+ */
+function buildConditionSQL(condition: FilterCondition): SQL | null {
+  const groupConditions: SQL[] = [];
+
+  for (const group of condition.groups) {
+    const filterConditions: SQL[] = [];
+
+    for (const filter of group.filters) {
+      const filterSQL = buildFilterSQL(filter);
+      if (filterSQL) {
+        filterConditions.push(filterSQL);
+      }
+    }
+
+    if (group.nested) {
+      const nestedSQL = buildConditionSQL(group.nested);
+      if (nestedSQL) {
+        filterConditions.push(nestedSQL);
+      }
+    }
+
+    if (filterConditions.length > 0) {
+      groupConditions.push(and(...filterConditions)!);
+    }
+  }
+
+  if (groupConditions.length === 0) {
+    return null;
+  }
+
+  if (condition.logic === "OR") {
+    return or(...groupConditions) ?? null;
+  }
+  return and(...groupConditions) ?? null;
+}
+
 /**
  * Count eligible recipients for a batch send
  */
 async function countRecipients(
   organizationId: string,
-  channel: Channel
+  channel: Channel,
+  filter?: RecipientFilter
 ): Promise<number> {
+  // Base conditions for channel
+  const baseConditions: SQL[] = [eq(contact.organizationId, organizationId)];
+
   if (channel === "email") {
-    // Count contacts with active email status (null treated as active for backwards compat)
-    const [result] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(contact)
-      .where(
-        and(
-          eq(contact.organizationId, organizationId),
-          isNotNull(contact.email),
-          sql`(${contact.emailStatus} = 'active' OR ${contact.emailStatus} IS NULL)`
-        )
-      );
-    return result?.count ?? 0;
+    baseConditions.push(isNotNull(contact.email));
+    baseConditions.push(
+      sql`(${contact.emailStatus} = 'active' OR ${contact.emailStatus} IS NULL)`
+    );
+  } else {
+    // SMS
+    baseConditions.push(isNotNull(contact.phone));
+    baseConditions.push(eq(contact.smsStatus, "opted_in"));
   }
 
-  // SMS - count contacts with opted_in SMS status
+  // Apply recipient filter
+  if (filter?.audienceType === "topic" && filter.topicId) {
+    // Filter by topic subscription
+    const topicSubquery = db
+      .select({ contactId: contactTopic.contactId })
+      .from(contactTopic)
+      .where(
+        and(
+          eq(contactTopic.contactId, contact.id),
+          eq(contactTopic.topicId, filter.topicId),
+          eq(contactTopic.status, "subscribed")
+        )
+      );
+    baseConditions.push(exists(topicSubquery));
+  } else if (filter?.audienceType === "segment" && filter.segmentId) {
+    // Fetch segment and apply its condition
+    const seg = await db.query.segment.findFirst({
+      where: (s, { and, eq }) =>
+        and(eq(s.id, filter.segmentId!), eq(s.organizationId, organizationId)),
+    });
+
+    if (seg?.condition) {
+      const segmentSQL = buildConditionSQL(seg.condition);
+      if (segmentSQL) {
+        baseConditions.push(segmentSQL);
+      }
+    }
+  }
+
   const [result] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(contact)
-    .where(
-      and(
-        eq(contact.organizationId, organizationId),
-        isNotNull(contact.phone),
-        eq(contact.smsStatus, "opted_in")
-      )
-    );
+    .where(and(...baseConditions));
+
   return result?.count ?? 0;
 }
 
@@ -490,7 +701,8 @@ async function countRecipients(
  */
 export async function getRecipientCount(
   organizationId: string,
-  channel: Channel = "email"
+  channel: Channel = "email",
+  filter?: RecipientFilter
 ): Promise<
   { success: true; count: number } | { success: false; error: string }
 > {
@@ -503,7 +715,7 @@ export async function getRecipientCount(
       };
     }
 
-    const count = await countRecipients(organizationId, channel);
+    const count = await countRecipients(organizationId, channel, filter);
     return { success: true, count };
   } catch (error) {
     const log = createActionLogger("getRecipientCount", {
@@ -554,5 +766,97 @@ export async function listTemplatesForBatch(organizationId: string): Promise<
     });
     log.error({ err: serializeError(error) }, "Failed to list templates");
     return { success: false, error: "Failed to fetch templates" };
+  }
+}
+
+/**
+ * List topics for batch send recipient selection
+ */
+export async function listTopicsForBatch(organizationId: string): Promise<
+  | {
+      success: true;
+      topics: Array<{ id: string; name: string; subscriberCount: number }>;
+    }
+  | { success: false; error: string }
+> {
+  try {
+    const access = await verifyOrgAccess(organizationId);
+    if (!access) {
+      return {
+        success: false,
+        error: "You don't have access to this organization",
+      };
+    }
+
+    const topics = await db.query.topic.findMany({
+      where: (t, { eq }) => eq(t.organizationId, organizationId),
+      columns: {
+        id: true,
+        name: true,
+        subscriberCount: true,
+      },
+      orderBy: (t, { desc }) => [desc(t.subscriberCount)],
+    });
+
+    return {
+      success: true,
+      topics: topics.map((t) => ({
+        id: t.id,
+        name: t.name,
+        subscriberCount: t.subscriberCount,
+      })),
+    };
+  } catch (error) {
+    const log = createActionLogger("listTopicsForBatch", {
+      orgSlug: organizationId,
+    });
+    log.error({ err: serializeError(error) }, "Failed to list topics");
+    return { success: false, error: "Failed to fetch topics" };
+  }
+}
+
+/**
+ * List segments for batch send recipient selection
+ */
+export async function listSegmentsForBatch(organizationId: string): Promise<
+  | {
+      success: true;
+      segments: Array<{ id: string; name: string; memberCount: number }>;
+    }
+  | { success: false; error: string }
+> {
+  try {
+    const access = await verifyOrgAccess(organizationId);
+    if (!access) {
+      return {
+        success: false,
+        error: "You don't have access to this organization",
+      };
+    }
+
+    const segments = await db.query.segment.findMany({
+      where: (s, { eq }) => eq(s.organizationId, organizationId),
+      columns: {
+        id: true,
+        name: true,
+        memberCount: true,
+      },
+      orderBy: (s, { desc }) => [desc(s.memberCount)],
+    });
+
+    return {
+      success: true,
+      segments: segments.map((s) => ({
+        id: s.id,
+        name: s.name,
+        memberCount: s.memberCount,
+      })),
+    };
+  } catch (error) {
+    const log = createActionLogger("listSegmentsForBatch", {
+      orgSlug: organizationId,
+    });
+    log.error({ err: serializeError(error) }, "Failed to list segments");
+    return { success: false, error: "Failed to fetch segments" };
   }
 }

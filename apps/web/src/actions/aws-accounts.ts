@@ -683,3 +683,178 @@ export async function deleteAWSAccount(
     };
   }
 }
+
+export type SaveWebhookSecretResult =
+  | { success: true; message: string }
+  | { success: false; error: string };
+
+/**
+ * Save webhook secret for an AWS account
+ * This enables SES events to be sent to the Wraps dashboard
+ */
+export async function saveWebhookSecretAction(
+  awsAccountId: string,
+  webhookSecret: string
+): Promise<SaveWebhookSecretResult> {
+  const log = createActionLogger("saveWebhookSecret", {
+    accountId: awsAccountId,
+  });
+
+  try {
+    // Get current user session
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return {
+        success: false,
+        error: "You must be logged in to update webhook settings",
+      };
+    }
+
+    // Get the AWS account to check organization
+    const account = await db.query.awsAccount.findFirst({
+      where: (a, { eq: eqOp }) => eqOp(a.id, awsAccountId),
+    });
+
+    if (!account) {
+      return {
+        success: false,
+        error: "AWS account not found",
+      };
+    }
+
+    // Check if user is owner/admin of the organization
+    const membership = await db.query.member.findFirst({
+      where: (m, { and: andOp, eq: eqOp }) =>
+        andOp(
+          eqOp(m.userId, session.user.id),
+          eqOp(m.organizationId, account.organizationId)
+        ),
+    });
+
+    if (!(membership && ["owner", "admin"].includes(membership.role))) {
+      return {
+        success: false,
+        error: "You don't have permission to manage this AWS account",
+      };
+    }
+
+    // Validate webhook secret format (should be 64 hex characters)
+    if (!/^[a-f0-9]{64}$/i.test(webhookSecret)) {
+      return {
+        success: false,
+        error:
+          "Invalid webhook secret format. It should be a 64-character hex string.",
+      };
+    }
+
+    // Update the webhook secret
+    await db
+      .update(awsAccount)
+      .set({
+        webhookSecret,
+        updatedAt: new Date(),
+      })
+      .where(eq(awsAccount.id, awsAccountId));
+
+    // Revalidate the page
+    revalidatePath(`/settings/aws-accounts/${awsAccountId}`);
+
+    log.info("Webhook secret saved");
+    return {
+      success: true,
+      message: "Webhook secret saved successfully",
+    };
+  } catch (error) {
+    log.error({ err: serializeError(error) }, "Failed to save webhook secret");
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "An unexpected error occurred",
+    };
+  }
+}
+
+/**
+ * Remove webhook secret from an AWS account
+ * This stops SES events from being sent to the Wraps dashboard
+ */
+export async function removeWebhookSecretAction(
+  awsAccountId: string
+): Promise<SaveWebhookSecretResult> {
+  const log = createActionLogger("removeWebhookSecret", {
+    accountId: awsAccountId,
+  });
+
+  try {
+    // Get current user session
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return {
+        success: false,
+        error: "You must be logged in to update webhook settings",
+      };
+    }
+
+    // Get the AWS account to check organization
+    const account = await db.query.awsAccount.findFirst({
+      where: (a, { eq: eqOp }) => eqOp(a.id, awsAccountId),
+    });
+
+    if (!account) {
+      return {
+        success: false,
+        error: "AWS account not found",
+      };
+    }
+
+    // Check if user is owner/admin of the organization
+    const membership = await db.query.member.findFirst({
+      where: (m, { and: andOp, eq: eqOp }) =>
+        andOp(
+          eqOp(m.userId, session.user.id),
+          eqOp(m.organizationId, account.organizationId)
+        ),
+    });
+
+    if (!(membership && ["owner", "admin"].includes(membership.role))) {
+      return {
+        success: false,
+        error: "You don't have permission to manage this AWS account",
+      };
+    }
+
+    // Remove the webhook secret
+    await db
+      .update(awsAccount)
+      .set({
+        webhookSecret: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(awsAccount.id, awsAccountId));
+
+    // Revalidate the page
+    revalidatePath(`/settings/aws-accounts/${awsAccountId}`);
+
+    log.info("Webhook secret removed");
+    return {
+      success: true,
+      message: "Webhook disconnected successfully",
+    };
+  } catch (error) {
+    log.error(
+      { err: serializeError(error) },
+      "Failed to remove webhook secret"
+    );
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "An unexpected error occurred",
+    };
+  }
+}

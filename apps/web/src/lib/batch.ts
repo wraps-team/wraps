@@ -88,10 +88,26 @@ export type BatchSendWithMeta = {
   } | null;
 };
 
+// Recipient filter types
+export type AudienceType = "all" | "topic" | "segment";
+
+export type RecipientFilter = {
+  audienceType: AudienceType;
+  topicId?: string;
+  segmentId?: string;
+};
+
+// Content type for email
+export type ContentType = "template" | "html";
+
 // Create batch input
 export type CreateBatchInput = {
   name?: string;
   channel?: Channel;
+  // Recipient targeting
+  recipientFilter?: RecipientFilter;
+  // Content type
+  contentType?: ContentType;
   // Email-specific
   subject?: string;
   previewText?: string;
@@ -99,6 +115,7 @@ export type CreateBatchInput = {
   fromName?: string;
   replyTo?: string;
   templateId?: string;
+  htmlContent?: string;
   // SMS-specific (Phase 3)
   body?: string;
   senderId?: string;

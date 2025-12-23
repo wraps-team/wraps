@@ -21,6 +21,7 @@ import {
 } from "../../utils/shared/fs.js";
 import {
   applyConfigUpdates,
+  generateWebhookSecret,
   loadConnectionMetadata,
   saveConnectionMetadata,
   updateEmailConfig,
@@ -220,6 +221,15 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         value: "custom",
         label: "Custom configuration",
         hint: "Modify multiple settings at once",
+      },
+      {
+        value: "wraps-dashboard",
+        label: metadata.services.email?.webhookSecret
+          ? "Manage Wraps Dashboard connection"
+          : "Connect to Wraps Dashboard",
+        hint: metadata.services.email?.webhookSecret
+          ? "Regenerate secret or disconnect"
+          : "Send events to dashboard for analytics",
       },
     ],
   });
@@ -770,6 +780,152 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       newPreset = undefined;
       break;
     }
+
+    case "wraps-dashboard": {
+      // Check if event tracking is enabled (required for webhook)
+      if (!config.eventTracking?.enabled) {
+        clack.log.warn(
+          "Event tracking must be enabled to connect to Wraps Dashboard."
+        );
+        clack.log.info(
+          "Enabling event tracking will allow SES events to be sent to the dashboard."
+        );
+
+        const enableEventTracking = await clack.confirm({
+          message: "Enable event tracking now?",
+          initialValue: true,
+        });
+
+        if (clack.isCancel(enableEventTracking) || !enableEventTracking) {
+          clack.cancel("Dashboard connection cancelled.");
+          process.exit(0);
+        }
+
+        // Enable event tracking
+        updatedConfig = {
+          ...config,
+          eventTracking: {
+            enabled: true,
+            eventBridge: true,
+            events: [
+              "SEND",
+              "DELIVERY",
+              "OPEN",
+              "CLICK",
+              "BOUNCE",
+              "COMPLAINT",
+            ],
+            dynamoDBHistory: config.eventTracking?.dynamoDBHistory ?? false,
+            archiveRetention:
+              config.eventTracking?.archiveRetention ?? "90days",
+          },
+        };
+      }
+
+      // Check if already connected
+      const existingSecret = metadata.services.email?.webhookSecret;
+
+      if (existingSecret) {
+        clack.log.info(
+          `Currently connected to Wraps Dashboard (AWS Account: ${pc.cyan(metadata.accountId)})`
+        );
+
+        const action = await clack.select({
+          message: "What would you like to do?",
+          options: [
+            {
+              value: "regenerate",
+              label: "Regenerate webhook secret",
+              hint: "Create new secret (requires update in dashboard)",
+            },
+            {
+              value: "disconnect",
+              label: "Disconnect from dashboard",
+              hint: "Stop sending events to Wraps",
+            },
+            {
+              value: "cancel",
+              label: "Cancel",
+              hint: "Keep current settings",
+            },
+          ],
+        });
+
+        if (clack.isCancel(action) || action === "cancel") {
+          clack.log.info("No changes made.");
+          process.exit(0);
+        }
+
+        if (action === "disconnect") {
+          const confirmDisconnect = await clack.confirm({
+            message:
+              "Are you sure? Events will no longer be sent to the Wraps Dashboard.",
+            initialValue: false,
+          });
+
+          if (clack.isCancel(confirmDisconnect) || !confirmDisconnect) {
+            clack.log.info("Disconnect cancelled.");
+            process.exit(0);
+          }
+
+          // Clear webhook config in metadata
+          if (metadata.services.email) {
+            metadata.services.email.webhookSecret = undefined;
+          }
+
+          // Note: The EventBridge API Destination resources will be cleaned up
+          // by Pulumi since we won't pass webhook config to deployEmailStack
+          updatedConfig = { ...config };
+          newPreset = undefined;
+          break;
+        }
+
+        // Regenerating secret - fall through to generate new secret
+      }
+
+      // Generate webhook secret
+      const webhookSecret = generateWebhookSecret();
+
+      clack.log.info(`\n${pc.bold("Webhook Configuration:")}`);
+      clack.log.info(
+        pc.dim("A secure webhook secret has been generated for authentication.")
+      );
+      clack.log.info(
+        pc.dim(
+          "After deployment, you'll need to register this secret in the dashboard.\n"
+        )
+      );
+
+      // Store in metadata for later (AWS account number is already in metadata.accountId)
+      if (metadata.services.email) {
+        metadata.services.email.webhookSecret = webhookSecret;
+      }
+
+      // Ensure event tracking is in the updated config
+      if (updatedConfig.eventTracking?.enabled) {
+        updatedConfig = { ...config };
+      } else {
+        updatedConfig = {
+          ...config,
+          eventTracking: {
+            ...config.eventTracking,
+            enabled: true,
+            eventBridge: true,
+            events: config.eventTracking?.events || [
+              "SEND",
+              "DELIVERY",
+              "OPEN",
+              "CLICK",
+              "BOUNCE",
+              "COMPLAINT",
+            ],
+          },
+        };
+      }
+
+      newPreset = undefined;
+      break;
+    }
   }
 
   // 8. Show cost comparison
@@ -819,6 +975,13 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     region,
     vercel: vercelConfig,
     emailConfig: updatedConfig,
+    // Include webhook config if Wraps Dashboard is connected
+    webhook: metadata.services.email?.webhookSecret
+      ? {
+          awsAccountNumber: metadata.accountId, // User's 12-digit AWS account ID
+          webhookSecret: metadata.services.email.webhookSecret,
+        }
+      : undefined,
   };
 
   // 12. Preview or Update Pulumi stack
@@ -1170,6 +1333,33 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       pc.green("✓") +
         " " +
         pc.bold("HTTPS tracking is fully configured and ready to use!\n")
+    );
+  }
+
+  // Show Wraps Dashboard connection details if configured
+  if (
+    upgradeAction === "wraps-dashboard" &&
+    metadata.services.email?.webhookSecret
+  ) {
+    console.log(pc.bold("🔗 Wraps Dashboard Connection\n"));
+    console.log(`  ${pc.green("✓")} EventBridge API Destination created`);
+    console.log(
+      `  ${pc.green("✓")} Events will be sent to: ${pc.cyan("api.wraps.dev")}\n`
+    );
+
+    console.log(pc.bold("  Next Step: Register webhook secret in dashboard\n"));
+    console.log(
+      `  1. Go to ${pc.cyan("https://dashboard.wraps.dev/settings/aws")}`
+    );
+    console.log(`  2. Find your AWS account: ${pc.cyan(metadata.accountId)}`);
+    console.log(`  3. Click "Add Webhook Secret" and paste this value:\n`);
+    console.log(
+      `     ${pc.bgBlack(pc.white(` ${metadata.services.email.webhookSecret} `))}\n`
+    );
+    console.log(
+      pc.dim(
+        "  Note: Keep this secret safe! It authenticates your webhook requests.\n"
+      )
     );
   }
 

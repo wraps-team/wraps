@@ -9,7 +9,7 @@ import {
   Key,
   Mail,
   MessageSquare,
-  Send,
+  Radio,
   Settings,
   Tag,
   UserSquare2,
@@ -55,9 +55,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 icon: Mail,
               },
               {
-                title: "Send",
+                title: "Broadcast",
                 url: `/${orgSlug}/send`,
-                icon: Send,
+                icon: Radio,
               },
               {
                 title: "Templates",

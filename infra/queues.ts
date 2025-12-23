@@ -51,6 +51,13 @@ batchQueue.subscribe(
     nodejs: {
       install: ["pg"], // PostgreSQL driver for Drizzle
     },
+    permissions: [
+      // Allow assuming cross-account roles for sending via customer's SES
+      {
+        actions: ["sts:AssumeRole"],
+        resources: ["arn:aws:iam::*:role/wraps-*"],
+      },
+    ],
   },
   {
     batch: {

@@ -139,6 +139,8 @@ export async function deployEmailStack(
       eventBusArn: sesResources.eventBus.arn,
       queueArn: sqsResources.queue.arn,
       queueUrl: sqsResources.queue.url,
+      // Include webhook config if provided (for Wraps platform integration)
+      webhook: config.webhook,
     });
   }
 

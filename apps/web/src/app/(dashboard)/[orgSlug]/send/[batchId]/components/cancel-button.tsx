@@ -35,7 +35,7 @@ export function CancelBatchButton({
     startTransition(async () => {
       const result = await cancelBatchSend(batchId, organizationId);
       if (result.success) {
-        toast.success("Batch send cancelled");
+        toast.success("Broadcast cancelled");
         setOpen(false);
         router.refresh();
       } else {
@@ -49,15 +49,15 @@ export function CancelBatchButton({
       <AlertDialogTrigger asChild>
         <Button variant="destructive">
           <XCircle className="mr-2 h-4 w-4" />
-          Cancel Send
+          Cancel Broadcast
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Cancel Batch Send?</AlertDialogTitle>
+          <AlertDialogTitle>Cancel Broadcast?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will stop the batch send. Any emails that have already been
-            sent cannot be recalled. Are you sure you want to continue?
+            This will stop the broadcast. Any emails that have already been sent
+            cannot be recalled. Are you sure you want to continue?
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -67,7 +67,7 @@ export function CancelBatchButton({
             disabled={isPending}
             onClick={handleCancel}
           >
-            {isPending ? "Cancelling..." : "Cancel Send"}
+            {isPending ? "Cancelling..." : "Cancel Broadcast"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

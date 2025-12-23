@@ -3,10 +3,7 @@ import { redirect } from "next/navigation";
 import { listTopics } from "@/actions/topics";
 import { FeatureGate } from "@/components/feature-gate";
 import { getOrganizationWithMembership } from "@/lib/organization";
-import {
-  checkFeatureAccess,
-  getOrganizationPlan,
-} from "@/lib/plan-limits";
+import { checkFeatureAccess, getOrganizationPlan } from "@/lib/plan-limits";
 import { getRequiredPlan, type PlanId } from "@/lib/plans";
 import { TopicsTable } from "./components/topics-table";
 

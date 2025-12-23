@@ -23,6 +23,7 @@
     "@aws-sdk/client-sts": "^3.927.0",
     "@elysiajs/cors": "^1.2.0",
     "@elysiajs/swagger": "^1.2.0",
+    "@wraps/auth": "workspace:*",
     "@wraps/db": "workspace:*",
     "drizzle-orm": "0.44.7",
     "elysia": "^1.2.25",

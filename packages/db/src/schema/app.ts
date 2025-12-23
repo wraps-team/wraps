@@ -53,6 +53,9 @@ export const awsAccount = pgTable(
     roleArn: text("role_arn").notNull(),
     externalId: text("external_id").notNull().unique(),
 
+    // Webhook for SES event delivery
+    webhookSecret: text("webhook_secret"), // API key for webhook validation
+
     // Verification
     isVerified: boolean("is_verified").default(false).notNull(),
     lastVerifiedAt: timestamp("last_verified_at"),

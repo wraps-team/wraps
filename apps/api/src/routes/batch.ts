@@ -9,7 +9,11 @@ import { batchSend, contact, db, eq } from "@wraps/db";
 import { and, isNotNull, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import { type AuthContext, authMiddleware } from "../middleware/auth";
+import {
+  type AuthContext,
+  authenticate,
+  authMiddleware,
+} from "../middleware/auth";
 import { planGateMiddleware } from "../middleware/plan-gate";
 import { rateLimitMiddleware } from "../middleware/rate-limit";
 import { enqueueJob } from "../services/queue";
@@ -25,6 +29,7 @@ const createBatchSchema = t.Object({
   fromName: t.Optional(t.String()),
   replyTo: t.Optional(t.String()),
   templateId: t.Optional(t.String()),
+  htmlContent: t.Optional(t.String()),
   // SMS-specific fields (Phase 3)
   body: t.Optional(t.String()),
   senderId: t.Optional(t.String()),
@@ -32,6 +37,8 @@ const createBatchSchema = t.Object({
   scheduledFor: t.Optional(t.String()),
   // AWS account to use
   awsAccountId: t.String(),
+  // Pre-counted recipients (from web action validation)
+  totalRecipients: t.Optional(t.Number()),
 });
 
 // Batch send response schema
@@ -50,8 +57,34 @@ export const batchRoutes = new Elysia({ prefix: "/v1/batch" })
   .post(
     "/",
     async (ctx) => {
-      const { body } = ctx;
-      const authContext = (ctx as unknown as { auth: AuthContext }).auth;
+      const { body, set, request } = ctx;
+
+      // Try middleware auth first, fall back to direct authenticate
+      let authContext = (ctx as unknown as { auth?: AuthContext }).auth;
+
+      if (!authContext) {
+        // Middleware didn't set auth, call authenticate directly
+        const authResult = await authenticate(request);
+        if ("error" in authResult) {
+          set.status = 401;
+          throw new Error(authResult.error);
+        }
+        authContext = authResult.auth;
+      }
+
+      if (!authContext?.organizationId) {
+        set.status = 401;
+        throw new Error("Auth failed: no organization ID");
+      }
+
+      // Use pre-counted recipients if provided, otherwise count here
+      let recipientCount = body.totalRecipients;
+      if (!recipientCount) {
+        recipientCount = await getRecipientCount(
+          authContext.organizationId,
+          body.channel ?? "email"
+        );
+      }
 
       // Create batch send record
       const [batch] = await db
@@ -69,6 +102,7 @@ export const batchRoutes = new Elysia({ prefix: "/v1/batch" })
           fromName: body.fromName,
           replyTo: body.replyTo,
           emailTemplateId: body.templateId,
+          htmlContent: body.htmlContent,
           // SMS fields (Phase 3)
           body: body.body,
           senderId: body.senderId,
@@ -76,23 +110,12 @@ export const batchRoutes = new Elysia({ prefix: "/v1/batch" })
           scheduledFor: body.scheduledFor
             ? new Date(body.scheduledFor)
             : undefined,
+          // Recipients
+          totalRecipients: recipientCount,
           // Tracking
           createdBy: authContext.userId,
         })
         .returning();
-
-      // Count recipients (contacts in the org for this channel)
-      // TODO: Apply segment filters if provided
-      const recipientCount = await getRecipientCount(
-        authContext.organizationId,
-        batch.channel
-      );
-
-      // Update total recipients
-      await db
-        .update(batchSend)
-        .set({ totalRecipients: recipientCount })
-        .where(eq(batchSend.id, batch.id));
 
       // Enqueue job to SQS
       await enqueueJob({
@@ -125,8 +148,19 @@ export const batchRoutes = new Elysia({ prefix: "/v1/batch" })
   .get(
     "/:id",
     async (ctx) => {
-      const { params } = ctx;
-      const authContext = (ctx as unknown as { auth: AuthContext }).auth;
+      const { params, request, set } = ctx;
+
+      // Try middleware auth first, fall back to direct authenticate
+      let authContext = (ctx as unknown as { auth?: AuthContext }).auth;
+
+      if (!authContext) {
+        const authResult = await authenticate(request);
+        if ("error" in authResult) {
+          set.status = 401;
+          throw new Error(authResult.error);
+        }
+        authContext = authResult.auth;
+      }
 
       const [batch] = await db
         .select()

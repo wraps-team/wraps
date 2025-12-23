@@ -264,6 +264,8 @@ async function sendEmail(
         },
       },
       ReplyToAddresses: params.replyTo ? [params.replyTo] : undefined,
+      // Use Wraps tracking configuration set for delivery/open/click events
+      ConfigurationSetName: "wraps-email-tracking",
     })
   );
 
@@ -280,8 +282,6 @@ async function enqueueNextChunk(job: BatchJob): Promise<void> {
     new SendMessageCommand({
       QueueUrl: QUEUE_URL,
       MessageBody: JSON.stringify(job),
-      MessageGroupId: job.batchId,
-      MessageDeduplicationId: `${job.batchId}-${job.chunkIndex}`,
     })
   );
 }

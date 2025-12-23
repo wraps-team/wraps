@@ -1,19 +1,8 @@
 import { auth } from "@wraps/auth";
-import {
-  ArrowLeft,
-  CheckCircle,
-  Clock,
-  Loader2,
-  Mail,
-  MessageSquare,
-  MousePointer,
-  Send,
-  XCircle,
-} from "lucide-react";
+import { ArrowLeft, Mail, MessageSquare, XCircle } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getBatchSend } from "@/actions/batch";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,18 +11,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import {
-  BATCH_STATUS_COLORS,
-  BATCH_STATUS_LABELS,
-  calculateClickRate,
-  calculateDeliveryRate,
-  calculateOpenRate,
-  calculateProgress,
-  formatDuration,
-} from "@/lib/batch";
 import { getOrganizationWithMembership } from "@/lib/organization";
+import { BatchStats } from "./components/batch-stats";
 import { CancelBatchButton } from "./components/cancel-button";
 
 type BatchDetailPageProps = {
@@ -73,10 +53,6 @@ export default async function BatchDetailPage({
   }
 
   const batch = result.batch;
-  const progress = calculateProgress(batch);
-  const deliveryRate = calculateDeliveryRate(batch);
-  const openRate = calculateOpenRate(batch);
-  const clickRate = calculateClickRate(batch);
   const canCancel =
     (batch.status === "queued" || batch.status === "processing") &&
     ["owner", "admin"].includes(orgWithMembership.userRole);
@@ -92,37 +68,17 @@ export default async function BatchDetailPage({
             </Link>
           </Button>
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="font-bold text-2xl tracking-tight">
-                {batch.name || "Untitled Batch"}
-              </h1>
-              <Badge
-                className={BATCH_STATUS_COLORS[batch.status]}
-                variant="secondary"
-              >
-                {batch.status === "processing" && (
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                )}
-                {batch.status === "completed" && (
-                  <CheckCircle className="mr-1 h-3 w-3" />
-                )}
-                {batch.status === "failed" && (
-                  <XCircle className="mr-1 h-3 w-3" />
-                )}
-                {batch.status === "queued" && (
-                  <Clock className="mr-1 h-3 w-3" />
-                )}
-                {BATCH_STATUS_LABELS[batch.status]}
-              </Badge>
-            </div>
+            <h1 className="font-bold text-2xl tracking-tight">
+              {batch.name || "Untitled Batch"}
+            </h1>
             <p className="text-muted-foreground">
               {batch.channel === "email" ? (
                 <span className="flex items-center gap-1">
-                  <Mail className="h-3 w-3" /> Email batch send
+                  <Mail className="h-3 w-3" /> Email broadcast
                 </span>
               ) : (
                 <span className="flex items-center gap-1">
-                  <MessageSquare className="h-3 w-3" /> SMS batch send
+                  <MessageSquare className="h-3 w-3" /> SMS broadcast
                 </span>
               )}
             </p>
@@ -136,96 +92,26 @@ export default async function BatchDetailPage({
         )}
       </div>
 
-      {/* Progress */}
-      {batch.status !== "draft" && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Progress</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>
-                  {batch.processedRecipients} of {batch.totalRecipients}{" "}
-                  processed
-                </span>
-                <span>{progress}%</span>
-              </div>
-              <Progress className="h-3" value={progress} />
-            </div>
-            <div className="flex justify-between text-muted-foreground text-sm">
-              <span>
-                Started:{" "}
-                {batch.startedAt
-                  ? new Date(batch.startedAt).toLocaleString()
-                  : "Not started"}
-              </span>
-              <span>
-                Duration: {formatDuration(batch.startedAt, batch.completedAt)}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Sent */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="font-medium text-sm">Sent</CardTitle>
-            <Send className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="font-bold text-2xl">{batch.sent}</div>
-            <p className="text-muted-foreground text-xs">
-              {batch.failed > 0 && (
-                <span className="text-destructive">{batch.failed} failed</span>
-              )}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Delivered */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="font-medium text-sm">Delivered</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="font-bold text-2xl">{batch.delivered}</div>
-            <p className="text-muted-foreground text-xs">
-              {deliveryRate}% rate
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Opened (email only) */}
-        {batch.channel === "email" && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="font-medium text-sm">Opened</CardTitle>
-              <Mail className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="font-bold text-2xl">{batch.opened}</div>
-              <p className="text-muted-foreground text-xs">{openRate}% rate</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Clicked */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="font-medium text-sm">Clicked</CardTitle>
-            <MousePointer className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="font-bold text-2xl">{batch.clicked}</div>
-            <p className="text-muted-foreground text-xs">{clickRate}% rate</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Stats with auto-refresh */}
+      <BatchStats
+        batch={{
+          id: batch.id,
+          status: batch.status,
+          channel: batch.channel,
+          totalRecipients: batch.totalRecipients,
+          processedRecipients: batch.processedRecipients,
+          sent: batch.sent,
+          delivered: batch.delivered,
+          opened: batch.opened,
+          clicked: batch.clicked,
+          bounced: batch.bounced,
+          complained: batch.complained,
+          failed: batch.failed,
+          startedAt: batch.startedAt,
+          completedAt: batch.completedAt,
+        }}
+        organizationId={orgWithMembership.id}
+      />
 
       {/* Email Details */}
       {batch.channel === "email" && (

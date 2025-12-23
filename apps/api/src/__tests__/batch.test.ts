@@ -53,7 +53,27 @@ const mockAuthContext = {
 };
 
 // Mock batch data
-const mockBatch = {
+const mockBatch: {
+  id: string;
+  organizationId: string;
+  awsAccountId: string;
+  channel: string;
+  name: string;
+  status: string;
+  subject: string;
+  previewText: string;
+  from: string;
+  fromName: string;
+  replyTo: string | null;
+  emailTemplateId: string | null;
+  totalRecipients: number;
+  processedRecipients: number;
+  sent: number;
+  failed: number;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  createdAt: Date;
+} = {
   id: "batch-123",
   organizationId: "org-123",
   awsAccountId: "aws-123",

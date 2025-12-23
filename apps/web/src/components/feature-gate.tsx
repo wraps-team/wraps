@@ -38,7 +38,9 @@ export function FeatureGate({
         <Lock className="h-6 w-6 text-muted-foreground" />
       </div>
       <h2 className="mb-2 font-semibold text-xl">{feature}</h2>
-      <p className="mb-6 max-w-md text-muted-foreground">{featureDescription}</p>
+      <p className="mb-6 max-w-md text-muted-foreground">
+        {featureDescription}
+      </p>
       <div className="mb-6 rounded-lg bg-muted/50 px-4 py-3">
         <p className="text-sm">
           <span className="text-muted-foreground">Your plan:</span>{" "}

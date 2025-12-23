@@ -106,6 +106,12 @@ export type EmailStackConfig = {
     projectName: string;
   };
   emailConfig: WrapsEmailConfig;
+  // Webhook configuration for Wraps platform integration
+  webhook?: {
+    awsAccountNumber: string; // The user's 12-digit AWS account ID
+    webhookSecret: string; // API key for webhook authentication
+    webhookUrl?: string; // Override webhook URL (defaults to api.wraps.dev)
+  };
 };
 
 /**

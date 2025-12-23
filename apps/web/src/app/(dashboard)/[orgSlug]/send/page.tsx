@@ -53,10 +53,8 @@ export default async function SendPage({
       {/* Page Title and Description */}
       <div className="px-4 lg:px-6">
         <div className="flex flex-col gap-2">
-          <h1 className="font-bold text-2xl tracking-tight">Batch Sends</h1>
-          <p className="text-muted-foreground">
-            Send emails to all your contacts at once
-          </p>
+          <h1 className="font-bold text-2xl tracking-tight">Broadcasts</h1>
+          <p className="text-muted-foreground">Send emails to your contacts</p>
         </div>
       </div>
 

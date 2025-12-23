@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -19,6 +20,8 @@ export type ServiceConfig<TConfig, TPreset> = {
   config: TConfig;
   pulumiStackName?: string;
   deployedAt: string;
+  // Webhook configuration for Wraps platform integration
+  webhookSecret?: string; // API key for webhook authentication (uses metadata.accountId as AWS account number)
 };
 
 /**
@@ -507,4 +510,13 @@ export async function findConnectionsWithService(
 ): Promise<ConnectionMetadata[]> {
   const accountConnections = await findConnectionsForAccount(accountId);
   return accountConnections.filter((conn) => hasService(conn, service));
+}
+
+/**
+ * Generate a secure webhook secret for EventBridge API Destination
+ * Uses 32 bytes (256 bits) of cryptographically secure random data
+ * @returns hex-encoded 64 character string
+ */
+export function generateWebhookSecret(): string {
+  return randomBytes(32).toString("hex");
 }

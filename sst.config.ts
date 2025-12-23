@@ -1,11 +1,5 @@
 /// <reference path="./.sst/platform/config.d.ts" />
 
-import { config } from "dotenv";
-import { resolve } from "path";
-
-// Load environment variables from apps/web/.env.local
-config({ path: resolve(__dirname, "apps/web/.env.local") });
-
 /**
  * SST v3 (Ion) Configuration for Wraps Platform
  *
@@ -30,6 +24,11 @@ export default $config({
     };
   },
   async run() {
+    // Load environment variables from apps/web/.env.local
+    const { config } = await import("dotenv");
+    const { resolve } = await import("path");
+    config({ path: resolve(process.cwd(), "apps/web/.env.local") });
+
     // Import infrastructure modules
     const { rateLimitTable } = await import("./infra/tables");
     const { batchQueue, batchDlq } = await import("./infra/queues");

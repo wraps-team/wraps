@@ -26,8 +26,6 @@ export async function enqueueJob(job: BatchJob): Promise<void> {
     new SendMessageCommand({
       QueueUrl: QUEUE_URL,
       MessageBody: JSON.stringify(job),
-      MessageGroupId: job.batchId, // FIFO ordering by batch
-      MessageDeduplicationId: `${job.batchId}-${job.chunkIndex}`,
     })
   );
 }
