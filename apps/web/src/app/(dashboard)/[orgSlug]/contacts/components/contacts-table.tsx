@@ -12,11 +12,12 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { Plus, Search, Tags, Upload } from "lucide-react";
+import { Plus, Search, Tags, Trash2, Upload } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
+  bulkDeleteContacts,
   bulkSubscribeContactsToTopics,
   bulkUnsubscribeContactsFromTopics,
   createContact,
@@ -39,6 +40,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -63,6 +65,8 @@ import {
   CONTACT_STATUSES,
   type ContactStatus,
   type ContactWithMeta,
+  type EmailStatus,
+  type SmsStatus,
 } from "@/lib/contacts";
 import type { TopicWithMeta } from "@/lib/topics";
 import { createColumns } from "./columns";
@@ -113,6 +117,7 @@ export function ContactsTable({
   const [bulkSubscribeDialogOpen, setBulkSubscribeDialogOpen] = useState(false);
   const [bulkUnsubscribeDialogOpen, setBulkUnsubscribeDialogOpen] =
     useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [selectedTopicId, setSelectedTopicId] = useState<string>("");
   const [selectedContact, setSelectedContact] =
     useState<ContactWithMeta | null>(null);
@@ -277,6 +282,9 @@ export function ContactsTable({
 
   const handleUpdateContact = async (data: {
     email?: string;
+    phone?: string;
+    emailStatus?: EmailStatus;
+    smsStatus?: SmsStatus;
     status?: ContactStatus;
     properties?: Record<string, unknown>;
     topicIds?: string[];
@@ -284,10 +292,13 @@ export function ContactsTable({
     if (!selectedContact) return;
 
     startTransition(async () => {
-      // Update contact fields (email, status, properties)
+      // Update contact fields (email, phone, status, properties)
       const { topicIds, ...contactData } = data;
       const hasContactChanges =
         contactData.email !== undefined ||
+        contactData.phone !== undefined ||
+        contactData.emailStatus !== undefined ||
+        contactData.smsStatus !== undefined ||
         contactData.status !== undefined ||
         contactData.properties !== undefined;
 
@@ -349,6 +360,7 @@ export function ContactsTable({
         description: "The contact has been updated.",
       });
       setEditDialogOpen(false);
+      setDetailsSheetOpen(false);
       setSelectedContact(null);
       router.refresh();
     });
@@ -413,6 +425,27 @@ export function ContactsTable({
         });
         setBulkUnsubscribeDialogOpen(false);
         setSelectedTopicId("");
+        setRowSelection({});
+        router.refresh();
+      } else {
+        toast.error("Error", { description: result.error });
+      }
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedContactIds.length === 0) return;
+
+    startTransition(async () => {
+      const result = await bulkDeleteContacts(
+        organizationId,
+        selectedContactIds
+      );
+      if (result.success) {
+        toast.success("Contacts deleted", {
+          description: `${result.count} contact${result.count === 1 ? "" : "s"} deleted.`,
+        });
+        setBulkDeleteDialogOpen(false);
         setRowSelection({});
         router.refresh();
       } else {
@@ -490,7 +523,7 @@ export function ContactsTable({
           )}
 
           {/* Bulk Actions - shown when contacts are selected */}
-          {canEdit && selectedContactIds.length > 0 && topics.length > 0 && (
+          {canEdit && selectedContactIds.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline">
@@ -499,15 +532,27 @@ export function ContactsTable({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {topics.length > 0 && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => setBulkSubscribeDialogOpen(true)}
+                    >
+                      Subscribe to topic
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setBulkUnsubscribeDialogOpen(true)}
+                    >
+                      Unsubscribe from topic
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem
-                  onClick={() => setBulkSubscribeDialogOpen(true)}
+                  className="text-destructive"
+                  onClick={() => setBulkDeleteDialogOpen(true)}
                 >
-                  Subscribe to topic
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setBulkUnsubscribeDialogOpen(true)}
-                >
-                  Unsubscribe from topic
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete contacts
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -678,8 +723,11 @@ export function ContactsTable({
           <DialogHeader>
             <DialogTitle>Delete Contact</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {selectedContact?.email}? This
-              action cannot be undone.
+              Are you sure you want to delete{" "}
+              {selectedContact?.email ||
+                selectedContact?.phone ||
+                "this contact"}
+              ? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -703,15 +751,14 @@ export function ContactsTable({
       {/* Details Sheet */}
       <ContactDetailsSheet
         contact={selectedContact}
+        isPending={isPending}
         onClose={() => {
           setDetailsSheetOpen(false);
           setSelectedContact(null);
         }}
-        onEdit={() => {
-          setDetailsSheetOpen(false);
-          setEditDialogOpen(true);
-        }}
+        onSave={handleUpdateContact}
         open={detailsSheetOpen}
+        topics={topics}
         userRole={userRole}
       />
 
@@ -813,6 +860,38 @@ export function ContactsTable({
               variant="destructive"
             >
               {isPending ? "Unsubscribing..." : "Unsubscribe"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Dialog */}
+      <Dialog
+        onOpenChange={setBulkDeleteDialogOpen}
+        open={bulkDeleteDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Contacts</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedContactIds.length}{" "}
+              contact{selectedContactIds.length === 1 ? "" : "s"}? This action
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => setBulkDeleteDialogOpen(false)}
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={isPending}
+              onClick={handleBulkDelete}
+              variant="destructive"
+            >
+              {isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

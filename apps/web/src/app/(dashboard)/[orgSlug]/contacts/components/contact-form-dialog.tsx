@@ -22,10 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  CONTACT_STATUS_LABELS,
-  CONTACT_STATUSES,
   type ContactStatus,
   type ContactWithMeta,
+  EMAIL_STATUS_LABELS,
+  EMAIL_STATUSES,
+  type EmailStatus,
+  SMS_STATUS_LABELS,
+  SMS_STATUSES,
+  type SmsStatus,
 } from "@/lib/contacts";
 import type { TopicWithMeta } from "@/lib/topics";
 
@@ -42,6 +46,9 @@ type ContactFormDialogProps = {
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: {
     email?: string;
+    phone?: string;
+    emailStatus?: EmailStatus;
+    smsStatus?: SmsStatus;
     status?: ContactStatus;
     properties?: Record<string, unknown>;
     topicIds?: string[];
@@ -60,7 +67,9 @@ export function ContactFormDialog({
   topics,
 }: ContactFormDialogProps) {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<ContactStatus>("active");
+  const [phone, setPhone] = useState("");
+  const [emailStatus, setEmailStatus] = useState<EmailStatus>("active");
+  const [smsStatus, setSmsStatus] = useState<SmsStatus>("pending_consent");
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);
   const [properties, setProperties] = useState<PropertyEntry[]>([]);
 
@@ -68,8 +77,10 @@ export function ContactFormDialog({
   useEffect(() => {
     if (open) {
       if (mode === "edit" && contact) {
-        setEmail(contact.email);
-        setStatus(contact.status);
+        setEmail(contact.email || "");
+        setPhone(contact.phone || "");
+        setEmailStatus(contact.emailStatus || "active");
+        setSmsStatus(contact.smsStatus || "pending_consent");
         setSelectedTopicIds(
           contact.topics
             ?.filter((t) => t.status === "subscribed")
@@ -85,7 +96,9 @@ export function ContactFormDialog({
         );
       } else {
         setEmail("");
-        setStatus("active");
+        setPhone("");
+        setEmailStatus("active");
+        setSmsStatus("pending_consent");
         setSelectedTopicIds([]);
         setProperties([]);
       }
@@ -108,8 +121,10 @@ export function ContactFormDialog({
 
     if (mode === "create") {
       onSubmit({
-        email,
-        status,
+        email: email || undefined,
+        phone: phone || undefined,
+        emailStatus: email ? emailStatus : undefined,
+        smsStatus: phone ? smsStatus : undefined,
         properties:
           Object.keys(propertiesObj).length > 0 ? propertiesObj : undefined,
         topicIds: selectedTopicIds,
@@ -132,8 +147,11 @@ export function ContactFormDialog({
         [...currentTopicIds].some((id) => !newTopicIds.has(id));
 
       onSubmit({
-        email: email !== contact?.email ? email : undefined,
-        status: status !== contact?.status ? status : undefined,
+        email: email !== (contact?.email || "") ? email : undefined,
+        phone: phone !== (contact?.phone || "") ? phone : undefined,
+        emailStatus:
+          emailStatus !== contact?.emailStatus ? emailStatus : undefined,
+        smsStatus: smsStatus !== contact?.smsStatus ? smsStatus : undefined,
         properties: propertiesChanged ? propertiesObj : undefined,
         topicIds: topicsChanged ? selectedTopicIds : undefined,
       });
@@ -171,6 +189,8 @@ export function ContactFormDialog({
     );
   };
 
+  const isValid = email || phone;
+
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="sm:max-w-[500px]">
@@ -181,7 +201,7 @@ export function ContactFormDialog({
             </DialogTitle>
             <DialogDescription>
               {mode === "create"
-                ? "Add a new contact to your audience."
+                ? "Add a new contact to your audience. Email or phone is required."
                 : "Update the contact's information."}
             </DialogDescription>
           </DialogHeader>
@@ -194,30 +214,76 @@ export function ContactFormDialog({
                 id="email"
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="contact@example.com"
-                required
                 type="email"
                 value={email}
               />
+              {email && (
+                <div className="flex items-center gap-2">
+                  <Label
+                    className="text-muted-foreground text-xs"
+                    htmlFor="emailStatus"
+                  >
+                    Email status:
+                  </Label>
+                  <Select
+                    onValueChange={(value) =>
+                      setEmailStatus(value as EmailStatus)
+                    }
+                    value={emailStatus}
+                  >
+                    <SelectTrigger className="h-7 w-[140px]" id="emailStatus">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EMAIL_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {EMAIL_STATUS_LABELS[s]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
-            {/* Status */}
+            {/* Phone */}
             <div className="grid gap-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                onValueChange={(value) => setStatus(value as ContactStatus)}
-                value={status}
-              >
-                <SelectTrigger id="status">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CONTACT_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {CONTACT_STATUS_LABELS[s]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="phone">Phone number</Label>
+              <Input
+                id="phone"
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+1 555 123 4567"
+                type="tel"
+                value={phone}
+              />
+              {phone && (
+                <div className="flex items-center gap-2">
+                  <Label
+                    className="text-muted-foreground text-xs"
+                    htmlFor="smsStatus"
+                  >
+                    SMS status:
+                  </Label>
+                  <Select
+                    onValueChange={(value) => setSmsStatus(value as SmsStatus)}
+                    value={smsStatus}
+                  >
+                    <SelectTrigger className="h-7 w-[160px]" id="smsStatus">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SMS_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {SMS_STATUS_LABELS[s]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <p className="text-muted-foreground text-xs">
+                Use E.164 format (e.g., +15551234567)
+              </p>
             </div>
 
             {/* Topics */}
@@ -316,7 +382,7 @@ export function ContactFormDialog({
             >
               Cancel
             </Button>
-            <Button disabled={isPending || !email} type="submit">
+            <Button disabled={isPending || !isValid} type="submit">
               {isPending
                 ? mode === "create"
                   ? "Creating..."

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown, Mail, MoreHorizontal, Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,10 +12,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  CONTACT_STATUS_COLORS,
-  CONTACT_STATUS_LABELS,
-  type ContactStatus,
   type ContactWithMeta,
+  EMAIL_STATUS_COLORS,
+  EMAIL_STATUS_LABELS,
+  SMS_STATUS_COLORS,
+  SMS_STATUS_LABELS,
 } from "@/lib/contacts";
 
 type ColumnActions = {
@@ -36,27 +37,49 @@ export function createColumns(
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           variant="ghost"
         >
-          Email
+          Contact
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("email")}</div>
-      ),
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
       cell: ({ row }) => {
-        const status = row.getValue("status") as ContactStatus;
+        const email = row.original.email;
+        const phone = row.original.phone;
+        const emailStatus = row.original.emailStatus;
+        const smsStatus = row.original.smsStatus;
+
         return (
-          <Badge className={CONTACT_STATUS_COLORS[status]} variant="secondary">
-            {CONTACT_STATUS_LABELS[status]}
-          </Badge>
+          <div className="space-y-1">
+            {email && (
+              <div className="flex items-center gap-2">
+                <Mail className="h-3 w-3 text-muted-foreground" />
+                <span className="font-medium">{email}</span>
+                {emailStatus && (
+                  <Badge
+                    className={`${EMAIL_STATUS_COLORS[emailStatus]} px-1.5 py-0 text-[10px]`}
+                    variant="secondary"
+                  >
+                    {EMAIL_STATUS_LABELS[emailStatus]}
+                  </Badge>
+                )}
+              </div>
+            )}
+            {phone && (
+              <div className="flex items-center gap-2">
+                <Phone className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground text-sm">{phone}</span>
+                {smsStatus && (
+                  <Badge
+                    className={`${SMS_STATUS_COLORS[smsStatus]} px-1.5 py-0 text-[10px]`}
+                    variant="secondary"
+                  >
+                    {SMS_STATUS_LABELS[smsStatus]}
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
         );
       },
-      filterFn: (row, _id, value: string[]) =>
-        value.includes(row.getValue("status")),
     },
     {
       accessorKey: "topics",
@@ -93,40 +116,51 @@ export function createColumns(
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           variant="ghost"
         >
-          Sent
+          Emails
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="text-center">{row.getValue("emailsSent")}</div>
-      ),
-    },
-    {
-      accessorKey: "emailsOpened",
-      header: "Opens",
       cell: ({ row }) => {
         const sent = row.original.emailsSent;
-        const opened = row.getValue("emailsOpened") as number;
-        const rate = sent > 0 ? ((opened / sent) * 100).toFixed(1) : "0";
+        const opened = row.original.emailsOpened;
+        const clicked = row.original.emailsClicked;
+
+        if (sent === 0) {
+          return <span className="text-muted-foreground">-</span>;
+        }
+
+        const openRate = ((opened / sent) * 100).toFixed(0);
+        const clickRate = ((clicked / sent) * 100).toFixed(0);
+
         return (
-          <div className="text-center">
-            {opened}{" "}
-            <span className="text-muted-foreground text-xs">({rate}%)</span>
+          <div className="text-sm">
+            <div>{sent} sent</div>
+            <div className="text-muted-foreground text-xs">
+              {openRate}% open, {clickRate}% click
+            </div>
           </div>
         );
       },
     },
     {
-      accessorKey: "emailsClicked",
-      header: "Clicks",
+      accessorKey: "smsSent",
+      header: "SMS",
       cell: ({ row }) => {
-        const sent = row.original.emailsSent;
-        const clicked = row.getValue("emailsClicked") as number;
-        const rate = sent > 0 ? ((clicked / sent) * 100).toFixed(1) : "0";
+        const sent = row.original.smsSent;
+        const clicked = row.original.smsClicked;
+
+        if (sent === 0) {
+          return <span className="text-muted-foreground">-</span>;
+        }
+
+        const clickRate = ((clicked / sent) * 100).toFixed(0);
+
         return (
-          <div className="text-center">
-            {clicked}{" "}
-            <span className="text-muted-foreground text-xs">({rate}%)</span>
+          <div className="text-sm">
+            <div>{sent} sent</div>
+            <div className="text-muted-foreground text-xs">
+              {clickRate}% click
+            </div>
           </div>
         );
       },
@@ -159,23 +193,36 @@ export function createColumns(
 
         return (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button className="h-8 w-8 p-0" variant="ghost">
                 <span className="sr-only">Open menu</span>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => actions.onViewDetails(contact)}>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  actions.onViewDetails(contact);
+                }}
+              >
                 View details
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => actions.onEdit(contact)}>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  actions.onEdit(contact);
+                }}
+              >
                 Edit contact
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive"
-                onClick={() => actions.onDelete(contact)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  actions.onDelete(contact);
+                }}
               >
                 Delete contact
               </DropdownMenuItem>

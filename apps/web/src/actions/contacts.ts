@@ -3,15 +3,17 @@
 import crypto from "node:crypto";
 import { auth } from "@wraps/auth";
 import { contact, contactTopic, db, topic } from "@wraps/db";
-import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import type {
   ContactStatus,
   CreateContactResult,
   DeleteContactResult,
+  EmailStatus,
   GetContactResult,
   ListContactsResult,
+  SmsStatus,
   UpdateContactResult,
 } from "@/lib/contacts";
 import { createActionLogger, serializeError } from "@/lib/logger";
@@ -23,8 +25,10 @@ export type {
   ContactWithMeta,
   CreateContactResult,
   DeleteContactResult,
+  EmailStatus,
   GetContactResult,
   ListContactsResult,
+  SmsStatus,
   UpdateContactResult,
 } from "@/lib/contacts";
 
@@ -36,6 +40,15 @@ function hashEmail(email: string): string {
     .createHash("sha256")
     .update(email.toLowerCase().trim())
     .digest("hex");
+}
+
+/**
+ * Hash phone for deduplication
+ */
+function hashPhone(phone: string): string {
+  // Normalize phone to E.164 format for consistent hashing
+  const normalized = phone.replace(/\D/g, "");
+  return crypto.createHash("sha256").update(normalized).digest("hex");
 }
 
 /**
@@ -156,22 +169,34 @@ export async function listContacts(
       success: true,
       contacts: contacts.map((c) => ({
         id: c.id,
+        // Email channel
         email: c.email,
-        status: c.status as ContactStatus,
-        properties: (c.properties as Record<string, unknown>) || {},
-        lastActivityAt: c.lastActivityAt,
+        emailStatus: c.emailStatus as EmailStatus | null,
+        emailVerifiedAt: c.emailVerifiedAt,
+        emailUnsubscribedAt: c.emailUnsubscribedAt,
+        emailBouncedAt: c.emailBouncedAt,
+        emailComplainedAt: c.emailComplainedAt,
         lastEmailSentAt: c.lastEmailSentAt,
         lastEmailOpenedAt: c.lastEmailOpenedAt,
         lastEmailClickedAt: c.lastEmailClickedAt,
         emailsSent: c.emailsSent,
         emailsOpened: c.emailsOpened,
         emailsClicked: c.emailsClicked,
+        // SMS channel
+        phone: c.phone,
+        smsStatus: c.smsStatus as SmsStatus | null,
+        smsConsentedAt: c.smsConsentedAt,
+        smsOptedOutAt: c.smsOptedOutAt,
+        smsInvalidAt: c.smsInvalidAt,
+        lastSmsSentAt: c.lastSmsSentAt,
+        lastSmsClickedAt: c.lastSmsClickedAt,
+        smsSent: c.smsSent,
+        smsClicked: c.smsClicked,
+        // Shared
+        properties: (c.properties as Record<string, unknown>) || {},
+        lastActivityAt: c.lastActivityAt,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
-        confirmedAt: c.confirmedAt,
-        unsubscribedAt: c.unsubscribedAt,
-        bouncedAt: c.bouncedAt,
-        complainedAt: c.complainedAt,
         createdBy: c.createdByUser,
         topics: c.topics.map((ct) => ({
           topicId: ct.topic.id,
@@ -179,6 +204,12 @@ export async function listContacts(
           status: ct.status,
           subscribedAt: ct.subscribedAt,
         })),
+        // Deprecated fields (backwards compatibility)
+        status: c.status as ContactStatus,
+        confirmedAt: c.confirmedAt,
+        unsubscribedAt: c.unsubscribedAt,
+        bouncedAt: c.bouncedAt,
+        complainedAt: c.complainedAt,
       })),
       total,
       page,
@@ -242,22 +273,34 @@ export async function getContact(
       success: true,
       contact: {
         id: c.id,
+        // Email channel
         email: c.email,
-        status: c.status as ContactStatus,
-        properties: (c.properties as Record<string, unknown>) || {},
-        lastActivityAt: c.lastActivityAt,
+        emailStatus: c.emailStatus as EmailStatus | null,
+        emailVerifiedAt: c.emailVerifiedAt,
+        emailUnsubscribedAt: c.emailUnsubscribedAt,
+        emailBouncedAt: c.emailBouncedAt,
+        emailComplainedAt: c.emailComplainedAt,
         lastEmailSentAt: c.lastEmailSentAt,
         lastEmailOpenedAt: c.lastEmailOpenedAt,
         lastEmailClickedAt: c.lastEmailClickedAt,
         emailsSent: c.emailsSent,
         emailsOpened: c.emailsOpened,
         emailsClicked: c.emailsClicked,
+        // SMS channel
+        phone: c.phone,
+        smsStatus: c.smsStatus as SmsStatus | null,
+        smsConsentedAt: c.smsConsentedAt,
+        smsOptedOutAt: c.smsOptedOutAt,
+        smsInvalidAt: c.smsInvalidAt,
+        lastSmsSentAt: c.lastSmsSentAt,
+        lastSmsClickedAt: c.lastSmsClickedAt,
+        smsSent: c.smsSent,
+        smsClicked: c.smsClicked,
+        // Shared
+        properties: (c.properties as Record<string, unknown>) || {},
+        lastActivityAt: c.lastActivityAt,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
-        confirmedAt: c.confirmedAt,
-        unsubscribedAt: c.unsubscribedAt,
-        bouncedAt: c.bouncedAt,
-        complainedAt: c.complainedAt,
         createdBy: c.createdByUser,
         topics: c.topics.map((ct) => ({
           topicId: ct.topic.id,
@@ -265,6 +308,12 @@ export async function getContact(
           status: ct.status,
           subscribedAt: ct.subscribedAt,
         })),
+        // Deprecated fields (backwards compatibility)
+        status: c.status as ContactStatus,
+        confirmedAt: c.confirmedAt,
+        unsubscribedAt: c.unsubscribedAt,
+        bouncedAt: c.bouncedAt,
+        complainedAt: c.complainedAt,
       },
     };
   } catch (error) {
@@ -283,10 +332,14 @@ export async function getContact(
 export async function createContact(
   organizationId: string,
   data: {
-    email: string;
-    status?: ContactStatus;
+    email?: string;
+    phone?: string;
+    emailStatus?: EmailStatus;
+    smsStatus?: SmsStatus;
     properties?: Record<string, unknown>;
     topicIds?: string[];
+    /** @deprecated Use emailStatus instead */
+    status?: ContactStatus;
   }
 ): Promise<CreateContactResult> {
   try {
@@ -303,42 +356,101 @@ export async function createContact(
     if (!limitCheck.allowed) {
       return {
         success: false,
-        error: limitCheck.message ?? "You've reached your contact limit. Please upgrade your plan.",
+        error:
+          limitCheck.message ??
+          "You've reached your contact limit. Please upgrade your plan.",
       };
     }
 
-    // Validate email
-    const email = data.email.toLowerCase().trim();
-    if (!email?.includes("@")) {
+    // Validate that at least email or phone is provided
+    const email = data.email?.toLowerCase().trim();
+    const phone = data.phone?.replace(/\s/g, "").trim();
+
+    if (!(email || phone)) {
+      return { success: false, error: "Either email or phone is required" };
+    }
+
+    // Validate email if provided
+    if (email && !email.includes("@")) {
       return { success: false, error: "Invalid email address" };
     }
 
-    const emailHash = hashEmail(email);
-
-    // Check for duplicate
-    const existing = await db.query.contact.findFirst({
-      where: (c, { and, eq }) =>
-        and(eq(c.organizationId, organizationId), eq(c.emailHash, emailHash)),
-    });
-
-    if (existing) {
+    // Validate phone if provided (basic E.164 check)
+    if (phone && !phone.match(/^\+?[1-9]\d{6,14}$/)) {
       return {
         success: false,
-        error: "A contact with this email already exists",
+        error: "Invalid phone number. Use E.164 format (e.g., +15551234567)",
       };
     }
+
+    const emailHashValue = email ? hashEmail(email) : null;
+    const phoneHashValue = phone ? hashPhone(phone) : null;
+
+    // Check for duplicate by email
+    if (emailHashValue) {
+      const existingByEmail = await db.query.contact.findFirst({
+        where: (c, { and, eq }) =>
+          and(
+            eq(c.organizationId, organizationId),
+            eq(c.emailHash, emailHashValue)
+          ),
+      });
+
+      if (existingByEmail) {
+        return {
+          success: false,
+          error: "A contact with this email already exists",
+        };
+      }
+    }
+
+    // Check for duplicate by phone
+    if (phoneHashValue) {
+      const existingByPhone = await db.query.contact.findFirst({
+        where: (c, { and, eq }) =>
+          and(
+            eq(c.organizationId, organizationId),
+            eq(c.phoneHash, phoneHashValue)
+          ),
+      });
+
+      if (existingByPhone) {
+        return {
+          success: false,
+          error: "A contact with this phone number already exists",
+        };
+      }
+    }
+
+    // Determine statuses
+    const emailStatus = data.emailStatus || (email ? "active" : null);
+    const smsStatus = data.smsStatus || (phone ? "pending_consent" : null);
+    // Legacy status for backwards compatibility
+    const legacyStatus =
+      data.status ||
+      (emailStatus === "active" ? "active" : "pending_confirmation");
 
     // Create contact
     const [newContact] = await db
       .insert(contact)
       .values({
         organizationId,
-        email,
-        emailHash,
-        status: data.status || "active",
+        // Email fields
+        email: email || null,
+        emailHash: emailHashValue,
+        emailStatus,
+        emailVerifiedAt: emailStatus === "active" ? new Date() : null,
+        // Phone fields
+        phone: phone || null,
+        phoneHash: phoneHashValue,
+        smsStatus,
+        smsConsentedAt: smsStatus === "opted_in" ? new Date() : null,
+        // Shared
         properties: data.properties || {},
         createdBy: access.userId,
-        confirmedAt: data.status === "active" ? new Date() : null,
+        // Legacy fields
+        status: legacyStatus,
+        confirmedAt: legacyStatus === "active" ? new Date() : null,
       })
       .returning();
 
@@ -389,8 +501,12 @@ export async function updateContact(
   organizationId: string,
   data: {
     email?: string;
-    status?: ContactStatus;
+    phone?: string;
+    emailStatus?: EmailStatus;
+    smsStatus?: SmsStatus;
     properties?: Record<string, unknown>;
+    /** @deprecated Use emailStatus instead */
+    status?: ContactStatus;
   }
 ): Promise<UpdateContactResult> {
   try {
@@ -417,39 +533,125 @@ export async function updateContact(
       updatedAt: new Date(),
     };
 
+    // Handle email update
     if (data.email !== undefined) {
       const email = data.email.toLowerCase().trim();
-      if (!email?.includes("@")) {
+      if (email && !email.includes("@")) {
         return { success: false, error: "Invalid email address" };
       }
 
-      const emailHash = hashEmail(email);
+      if (email) {
+        const emailHashValue = hashEmail(email);
 
-      // Check for duplicate (excluding current contact)
-      const duplicate = await db.query.contact.findFirst({
-        where: (c, { and, eq, ne }) =>
-          and(
-            eq(c.organizationId, organizationId),
-            eq(c.emailHash, emailHash),
-            ne(c.id, contactId)
-          ),
-      });
+        // Check for duplicate (excluding current contact)
+        const duplicate = await db.query.contact.findFirst({
+          where: (c, { and, eq, ne }) =>
+            and(
+              eq(c.organizationId, organizationId),
+              eq(c.emailHash, emailHashValue),
+              ne(c.id, contactId)
+            ),
+        });
 
-      if (duplicate) {
-        return {
-          success: false,
-          error: "A contact with this email already exists",
-        };
+        if (duplicate) {
+          return {
+            success: false,
+            error: "A contact with this email already exists",
+          };
+        }
+
+        updateData.email = email;
+        updateData.emailHash = emailHashValue;
+      } else {
+        // Clearing email
+        updateData.email = null;
+        updateData.emailHash = null;
+        updateData.emailStatus = null;
       }
-
-      updateData.email = email;
-      updateData.emailHash = emailHash;
     }
 
+    // Handle phone update
+    if (data.phone !== undefined) {
+      const phone = data.phone?.replace(/\s/g, "").trim();
+
+      if (phone) {
+        // Validate phone format
+        if (!phone.match(/^\+?[1-9]\d{6,14}$/)) {
+          return {
+            success: false,
+            error:
+              "Invalid phone number. Use E.164 format (e.g., +15551234567)",
+          };
+        }
+
+        const phoneHashValue = hashPhone(phone);
+
+        // Check for duplicate (excluding current contact)
+        const duplicate = await db.query.contact.findFirst({
+          where: (c, { and, eq, ne }) =>
+            and(
+              eq(c.organizationId, organizationId),
+              eq(c.phoneHash, phoneHashValue),
+              ne(c.id, contactId)
+            ),
+        });
+
+        if (duplicate) {
+          return {
+            success: false,
+            error: "A contact with this phone number already exists",
+          };
+        }
+
+        updateData.phone = phone;
+        updateData.phoneHash = phoneHashValue;
+        // Set default SMS status if phone is being added
+        if (!existing.phone) {
+          updateData.smsStatus = data.smsStatus || "pending_consent";
+        }
+      } else {
+        // Clearing phone
+        updateData.phone = null;
+        updateData.phoneHash = null;
+        updateData.smsStatus = null;
+      }
+    }
+
+    // Handle email status update
+    if (data.emailStatus !== undefined) {
+      updateData.emailStatus = data.emailStatus;
+
+      // Update timestamps based on status
+      if (data.emailStatus === "active" && existing.emailStatus !== "active") {
+        updateData.emailVerifiedAt = new Date();
+      } else if (data.emailStatus === "unsubscribed") {
+        updateData.emailUnsubscribedAt = new Date();
+      } else if (data.emailStatus === "bounced") {
+        updateData.emailBouncedAt = new Date();
+      } else if (data.emailStatus === "complained") {
+        updateData.emailComplainedAt = new Date();
+      }
+    }
+
+    // Handle SMS status update
+    if (data.smsStatus !== undefined) {
+      updateData.smsStatus = data.smsStatus;
+
+      // Update timestamps based on status
+      if (data.smsStatus === "opted_in" && existing.smsStatus !== "opted_in") {
+        updateData.smsConsentedAt = new Date();
+      } else if (data.smsStatus === "opted_out") {
+        updateData.smsOptedOutAt = new Date();
+      } else if (data.smsStatus === "invalid") {
+        updateData.smsInvalidAt = new Date();
+      }
+    }
+
+    // Handle legacy status update (backwards compatibility)
     if (data.status !== undefined) {
       updateData.status = data.status;
 
-      // Update status timestamps
+      // Update legacy timestamps
       if (data.status === "active" && existing.status !== "active") {
         updateData.confirmedAt = new Date();
       } else if (data.status === "unsubscribed") {
@@ -463,6 +665,16 @@ export async function updateContact(
 
     if (data.properties !== undefined) {
       updateData.properties = data.properties;
+    }
+
+    // Validate that contact still has at least email or phone
+    const finalEmail = data.email !== undefined ? data.email : existing.email;
+    const finalPhone = data.phone !== undefined ? data.phone : existing.phone;
+    if (!(finalEmail || finalPhone)) {
+      return {
+        success: false,
+        error: "Contact must have either email or phone",
+      };
     }
 
     // Update contact
@@ -931,5 +1143,61 @@ export async function unsubscribeContactFromTopics(
       "Failed to unsubscribe contact from topics"
     );
     return { success: false, error: "Failed to unsubscribe from topics" };
+  }
+}
+
+/**
+ * Bulk delete contacts
+ */
+export async function bulkDeleteContacts(
+  organizationId: string,
+  contactIds: string[]
+): Promise<
+  { success: true; count: number } | { success: false; error: string }
+> {
+  try {
+    const access = await verifyOrgAccess(organizationId);
+    if (!access) {
+      return {
+        success: false,
+        error: "You don't have access to this organization",
+      };
+    }
+
+    // Only owners and admins can bulk delete
+    if (!["owner", "admin"].includes(access.role)) {
+      return {
+        success: false,
+        error: "Only owners and admins can delete contacts",
+      };
+    }
+
+    if (contactIds.length === 0) {
+      return { success: false, error: "No contacts selected" };
+    }
+
+    // Delete contacts (cascades to contact_topic)
+    const result = await db
+      .delete(contact)
+      .where(
+        and(
+          eq(contact.organizationId, organizationId),
+          inArray(contact.id, contactIds)
+        )
+      );
+
+    // Revalidate
+    revalidatePath("/[orgSlug]/contacts", "page");
+
+    return { success: true, count: contactIds.length };
+  } catch (error) {
+    const log = createActionLogger("bulkDeleteContacts", {
+      orgSlug: organizationId,
+    });
+    log.error(
+      { err: serializeError(error), count: contactIds.length },
+      "Failed to bulk delete contacts"
+    );
+    return { success: false, error: "Failed to delete contacts" };
   }
 }
