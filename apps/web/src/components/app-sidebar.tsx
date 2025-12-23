@@ -49,6 +49,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 url: `/${orgSlug}/emails`,
                 icon: Mail,
               },
+              // {
+              //   title: "Send",
+              //   url: `/${orgSlug}/send`,
+              //   icon: Send,
+              // },
               {
                 title: "Templates",
                 url: `/${orgSlug}/emails/templates`,

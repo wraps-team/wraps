@@ -75,7 +75,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     dashboardAccess: true,
 
     // Resource Limits
-    maxContacts: 5_000,
+    maxContacts: 5000,
     maxMembers: -1, // Unlimited
     maxAwsAccounts: 1,
     aiMessages: 50,
@@ -124,7 +124,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     maxMembers: -1, // Unlimited
     maxAwsAccounts: 3,
     aiMessages: 250,
-    bulkBatchSize: 1_000,
+    bulkBatchSize: 1000,
 
     // Feature Access
     features: {
@@ -142,7 +142,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     // Rate Limits
     rateLimits: {
       dailyRequests: 200_000,
-      minuteRequests: 2_000,
+      minuteRequests: 2000,
     },
 
     // Display
@@ -171,7 +171,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     maxContacts: 100_000,
     maxMembers: -1, // Unlimited
     maxAwsAccounts: -1, // Unlimited
-    aiMessages: 1_000,
+    aiMessages: 1000,
     bulkBatchSize: 10_000,
 
     // Feature Access
@@ -190,7 +190,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     // Rate Limits
     rateLimits: {
       dailyRequests: 500_000,
-      minuteRequests: 5_000,
+      minuteRequests: 5000,
     },
 
     // Display
@@ -221,7 +221,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     maxContacts: 500_000,
     maxMembers: -1, // Unlimited
     maxAwsAccounts: -1, // Unlimited
-    aiMessages: 1_000,
+    aiMessages: 1000,
     bulkBatchSize: 50_000,
 
     // Feature Access
@@ -306,7 +306,7 @@ export function formatPrice(plan: PlanConfig): string {
  */
 export function getContactLimit(planId: PlanId | string): number {
   const plan = PLANS[planId as PlanId];
-  return plan?.maxContacts ?? 5_000; // Default to Starter limit
+  return plan?.maxContacts ?? 5000; // Default to Starter limit
 }
 
 /**
@@ -430,7 +430,7 @@ export function getFeatureGateMessage(
   const currentPlan = PLANS[planId as PlanId];
   const requiredPlan = getRequiredPlan(feature);
 
-  if (!currentPlan || !requiredPlan) {
+  if (!(currentPlan && requiredPlan)) {
     return `${featureDisplayName} is not available on your current plan.`;
   }
 

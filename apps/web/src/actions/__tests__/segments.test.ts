@@ -1,4 +1,12 @@
-import { contact, db, member, organization, organizationExtension, segment, user } from "@wraps/db";
+import {
+  contact,
+  db,
+  member,
+  organization,
+  organizationExtension,
+  segment,
+  user,
+} from "@wraps/db";
 import { eq } from "drizzle-orm";
 import {
   afterAll,
@@ -138,7 +146,9 @@ afterAll(async () => {
     .delete(contact)
     .where(eq(contact.organizationId, testOrganization.id));
   await db.delete(member).where(eq(member.id, testMember.id));
-  await db.delete(organizationExtension).where(eq(organizationExtension.organizationId, testOrganization.id));
+  await db
+    .delete(organizationExtension)
+    .where(eq(organizationExtension.organizationId, testOrganization.id));
   await db.delete(organization).where(eq(organization.id, testOrganization.id));
   await db.delete(user).where(eq(user.id, testUser.id));
 });

@@ -8,8 +8,21 @@
  * - AWS account limits
  */
 
-import { db, contact, awsAccount, eq, subscription, organizationExtension } from "@wraps/db";
-import { PLANS, type PlanId, type PlanFeature, hasFeature, getRequiredPlan } from "../plans";
+import {
+  awsAccount,
+  contact,
+  db,
+  eq,
+  organizationExtension,
+  subscription,
+} from "@wraps/db";
+import {
+  getRequiredPlan,
+  hasFeature,
+  PLANS,
+  type PlanFeature,
+  type PlanId,
+} from "../plans";
 
 export interface LimitCheckResult {
   allowed: boolean;
@@ -28,7 +41,9 @@ export interface FeatureCheckResult {
 /**
  * Get the current plan for an organization
  */
-export async function getOrganizationPlan(organizationId: string): Promise<PlanId> {
+export async function getOrganizationPlan(
+  organizationId: string
+): Promise<PlanId> {
   // Try organizationExtension first
   const [ext] = await db
     .select({ plan: organizationExtension.plan })
@@ -47,7 +62,11 @@ export async function getOrganizationPlan(organizationId: string): Promise<PlanI
     .where(eq(subscription.referenceId, organizationId))
     .limit(1);
 
-  if (sub && (sub.status === "active" || sub.status === "trialing") && isValidPlan(sub.plan)) {
+  if (
+    sub &&
+    (sub.status === "active" || sub.status === "trialing") &&
+    isValidPlan(sub.plan)
+  ) {
     return sub.plan as PlanId;
   }
 
@@ -61,7 +80,9 @@ function isValidPlan(plan: string): plan is PlanId {
 /**
  * Check if an organization can add more contacts based on their plan
  */
-export async function checkContactLimit(organizationId: string): Promise<LimitCheckResult> {
+export async function checkContactLimit(
+  organizationId: string
+): Promise<LimitCheckResult> {
   const planId = await getOrganizationPlan(organizationId);
   const plan = PLANS[planId];
 
@@ -88,7 +109,9 @@ export async function checkContactLimit(organizationId: string): Promise<LimitCh
 /**
  * Check if an organization can add more AWS accounts based on their plan
  */
-export async function checkAwsAccountLimit(organizationId: string): Promise<LimitCheckResult> {
+export async function checkAwsAccountLimit(
+  organizationId: string
+): Promise<LimitCheckResult> {
   const planId = await getOrganizationPlan(organizationId);
   const plan = PLANS[planId];
 
@@ -152,7 +175,7 @@ function getNextPlan(currentPlan: PlanId): PlanId | undefined {
   const currentIndex = planOrder.indexOf(currentPlan);
 
   if (currentIndex === -1 || currentIndex >= planOrder.length - 1) {
-    return undefined;
+    return;
   }
 
   return planOrder[currentIndex + 1];
@@ -187,7 +210,9 @@ export async function getUsageSummary(organizationId: string) {
       percentUsed:
         awsAccountResult.limit === -1
           ? 0
-          : Math.round((awsAccountResult.current / awsAccountResult.limit) * 100),
+          : Math.round(
+              (awsAccountResult.current / awsAccountResult.limit) * 100
+            ),
     },
     aiMessages: {
       limit: plan.aiMessages,

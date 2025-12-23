@@ -501,7 +501,7 @@ export async function getTopicSubscribers(
       success: true,
       subscribers: subscribers.map((s) => ({
         contactId: s.contact.id,
-        email: s.contact.email,
+        email: s.contact.email || "",
         status: s.status,
         subscribedAt: s.subscribedAt,
         unsubscribedAt: s.unsubscribedAt,

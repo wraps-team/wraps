@@ -654,7 +654,9 @@ export async function previewSegment(
     return {
       success: true,
       count,
-      sampleEmails: samples.map((s) => s.email),
+      sampleEmails: samples
+        .map((s) => s.email)
+        .filter((e): e is string => e !== null),
     };
   } catch (error) {
     const log = createActionLogger("previewSegment", {

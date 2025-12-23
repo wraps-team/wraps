@@ -194,7 +194,9 @@ afterAll(async () => {
   await db.delete(topic).where(eq(topic.organizationId, testOrganization.id));
   await db.delete(member).where(eq(member.id, testOwnerMember.id));
   await db.delete(member).where(eq(member.id, testRegularMember.id));
-  await db.delete(organizationExtension).where(eq(organizationExtension.organizationId, testOrganization.id));
+  await db
+    .delete(organizationExtension)
+    .where(eq(organizationExtension.organizationId, testOrganization.id));
   await db.delete(organization).where(eq(organization.id, testOrganization.id));
   await db.delete(user).where(eq(user.id, testUser.id));
   await db.delete(user).where(eq(user.id, testMemberUser.id));
