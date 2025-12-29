@@ -16,6 +16,8 @@ interface PreferencesFormProps {
   organizationId: string;
   topics: Topic[];
   isGloballyUnsubscribed: boolean;
+  brandColor: string;
+  orgName?: string;
 }
 
 export function PreferencesForm({
@@ -24,6 +26,8 @@ export function PreferencesForm({
   organizationId,
   topics,
   isGloballyUnsubscribed: initiallyUnsubscribed,
+  brandColor,
+  orgName,
 }: PreferencesFormProps) {
   const [isPending, startTransition] = useTransition();
   const [subscriptions, setSubscriptions] = useState<Record<string, boolean>>(
@@ -59,12 +63,12 @@ export function PreferencesForm({
       if (result.success) {
         setMessage({
           type: "success",
-          text: "Preferences saved successfully!",
+          text: "Your preferences have been saved.",
         });
       } else {
         setMessage({
           type: "error",
-          text: result.error || "Failed to save preferences",
+          text: result.error || "Something went wrong. Please try again.",
         });
       }
     });
@@ -82,12 +86,12 @@ export function PreferencesForm({
         setIsGloballyUnsubscribed(true);
         setMessage({
           type: "success",
-          text: "You have been unsubscribed from all emails.",
+          text: "You've been unsubscribed from all emails.",
         });
       } else {
         setMessage({
           type: "error",
-          text: result.error || "Failed to unsubscribe",
+          text: result.error || "Something went wrong. Please try again.",
         });
       }
     });
@@ -95,11 +99,28 @@ export function PreferencesForm({
 
   if (isGloballyUnsubscribed) {
     return (
-      <div className="rounded-lg border bg-gray-50 p-6 text-center">
-        <div className="mb-4 text-4xl">📭</div>
-        <h2 className="mb-2 font-semibold text-lg">You're Unsubscribed</h2>
-        <p className="text-gray-600">
-          You have been unsubscribed from all email communications.
+      <div className="py-8 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+          <svg
+            className="h-8 w-8 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+            />
+          </svg>
+        </div>
+        <h2 className="mb-2 font-semibold text-gray-900 text-lg">
+          You're Unsubscribed
+        </h2>
+        <p className="text-gray-500 text-sm">
+          You won't receive any more emails
+          {orgName ? ` from ${orgName}` : ""}.
         </p>
       </div>
     );
@@ -107,44 +128,96 @@ export function PreferencesForm({
 
   return (
     <div className="space-y-6">
+      {/* Status message */}
       {message && (
         <div
-          className={`rounded-lg p-4 ${
+          className={`flex items-center gap-3 rounded-xl p-4 ${
             message.type === "success"
               ? "bg-green-50 text-green-800"
               : "bg-red-50 text-red-800"
           }`}
         >
-          {message.text}
+          {message.type === "success" ? (
+            <svg
+              className="h-5 w-5 shrink-0 text-green-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+              />
+            </svg>
+          ) : (
+            <svg
+              className="h-5 w-5 shrink-0 text-red-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+              />
+            </svg>
+          )}
+          <span className="text-sm">{message.text}</span>
         </div>
       )}
 
+      {/* Topics list */}
       {topics.length > 0 ? (
-        <div className="rounded-lg border">
-          <div className="border-b bg-gray-50 px-4 py-3">
-            <h2 className="font-semibold">Email Topics</h2>
-            <p className="text-gray-600 text-sm">
-              Choose which types of emails you'd like to receive
-            </p>
-          </div>
-          <div className="divide-y">
+        <div className="space-y-1">
+          <h2 className="mb-3 font-medium text-gray-900 text-sm">
+            Email Topics
+          </h2>
+          <div className="divide-y divide-gray-100 rounded-xl border border-gray-200">
             {topics.map((topic) => (
               <label
-                className="flex cursor-pointer items-start gap-4 px-4 py-4 hover:bg-gray-50"
+                className="flex cursor-pointer items-start gap-4 p-4 transition-colors hover:bg-gray-50"
                 key={topic.id}
               >
-                <input
-                  checked={subscriptions[topic.id] ?? false}
-                  className="mt-1 h-4 w-4 rounded border-gray-300"
-                  onChange={(e) =>
-                    handleTopicChange(topic.id, e.target.checked)
-                  }
-                  type="checkbox"
-                />
-                <div>
-                  <div className="font-medium">{topic.name}</div>
+                <div className="relative flex h-5 items-center">
+                  <input
+                    checked={subscriptions[topic.id] ?? false}
+                    className="peer h-4 w-4 cursor-pointer appearance-none rounded border-2 border-gray-300 transition-all checked:border-transparent focus:outline-none focus:ring-2 focus:ring-offset-2"
+                    onChange={(e) =>
+                      handleTopicChange(topic.id, e.target.checked)
+                    }
+                    style={{
+                      backgroundColor: subscriptions[topic.id]
+                        ? brandColor
+                        : undefined,
+                    }}
+                    type="checkbox"
+                  />
+                  {subscriptions[topic.id] && (
+                    <svg
+                      className="pointer-events-none absolute left-0 h-4 w-4 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M5 13l4 4L19 7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 text-sm">
+                    {topic.name}
+                  </div>
                   {topic.description && (
-                    <div className="text-gray-600 text-sm">
+                    <div className="mt-0.5 text-gray-500 text-sm">
                       {topic.description}
                     </div>
                   )}
@@ -154,17 +227,19 @@ export function PreferencesForm({
           </div>
         </div>
       ) : (
-        <div className="rounded-lg border bg-gray-50 p-6 text-center">
-          <p className="text-gray-600">No email topics available.</p>
+        <div className="py-8 text-center">
+          <p className="text-gray-500 text-sm">No email topics available.</p>
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
+      {/* Actions */}
+      <div className="space-y-3 pt-2">
         {topics.length > 0 && (
           <button
-            className="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="w-full rounded-xl px-4 py-3 font-medium text-sm text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50"
             disabled={isPending}
             onClick={handleSave}
+            style={{ backgroundColor: brandColor }}
             type="button"
           >
             {isPending ? "Saving..." : "Save Preferences"}
@@ -172,19 +247,14 @@ export function PreferencesForm({
         )}
 
         <button
-          className="w-full rounded-lg border border-red-300 px-4 py-2 font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 font-medium text-gray-600 text-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2 disabled:opacity-50"
           disabled={isPending}
           onClick={handleUnsubscribeAll}
           type="button"
         >
-          Unsubscribe from All Emails
+          Unsubscribe from All
         </button>
       </div>
-
-      <p className="text-center text-gray-500 text-xs">
-        You can update your preferences at any time using the link in our
-        emails.
-      </p>
     </div>
   );
 }

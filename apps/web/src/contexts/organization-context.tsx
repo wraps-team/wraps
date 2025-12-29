@@ -41,6 +41,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           name: item.name,
           slug: item.slug || null,
           logo: item.logo || null,
+          brandColor: item.brandColor || null,
           metadata: item.metadata || null,
           createdAt: new Date(item.createdAt),
         }));
@@ -71,6 +72,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           name: orgData.name,
           slug: orgData.slug || null,
           logo: orgData.logo || null,
+          brandColor: orgData.brandColor || null,
           metadata: orgData.metadata || null,
           createdAt: orgData.createdAt
             ? new Date(orgData.createdAt)

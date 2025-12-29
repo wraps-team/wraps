@@ -95,6 +95,7 @@ export const organization = pgTable("organization", {
   name: text("name").notNull(),
   slug: text("slug").unique(),
   logo: text("logo"),
+  brandColor: text("brand_color"), // Hex color for branding (e.g., "#3b82f6")
   metadata: text("metadata"),
   createdAt: timestamp("created_at").notNull(),
 });
