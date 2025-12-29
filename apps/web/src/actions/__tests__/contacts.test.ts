@@ -1,4 +1,12 @@
-import { contact, db, member, organization, topic, user } from "@wraps/db";
+import {
+  contact,
+  db,
+  member,
+  organization,
+  subscription,
+  topic,
+  user,
+} from "@wraps/db";
 import { eq } from "drizzle-orm";
 import {
   afterAll,
@@ -79,6 +87,15 @@ const testTopic2 = {
   createdBy: testUser.id,
 };
 
+const testSubscription = {
+  id: "test-contacts-subscription-1",
+  plan: "starter",
+  referenceId: testOrganization.id,
+  status: "active",
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
 // Mock next/headers
 vi.mock("next/headers", () => ({
   headers: () => new Headers(),
@@ -136,6 +153,12 @@ beforeAll(async () => {
       target: member.id,
       set: { role: testMember.role },
     });
+
+  // Insert test subscription (required for plan limits)
+  await db
+    .delete(subscription)
+    .where(eq(subscription.referenceId, testOrganization.id));
+  await db.insert(subscription).values(testSubscription);
 
   // Insert test topics
   await db

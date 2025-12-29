@@ -5,12 +5,13 @@
  * Sends emails/SMS in chunks of 100 contacts.
  */
 
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import { SESClient, SendRawEmailCommand } from "@aws-sdk/client-ses";
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { batchSend, contact, db, eq, messageSend, template } from "@wraps/db";
 import type { SQSEvent, SQSHandler } from "aws-lambda";
 import { and, isNotNull, sql } from "drizzle-orm";
 
+import { generateUnsubscribeToken } from "../lib/unsubscribe-token";
 import { getCredentials } from "../services/credentials";
 import type { BatchJob } from "../services/queue";
 
@@ -107,8 +108,11 @@ async function processJob(job: BatchJob): Promise<void> {
           fromName: batch.fromName,
           to: recipient.email,
           subject: batch.subject ?? "Message from Wraps",
-          html: templateHtml ?? batch.body ?? "<p>Hello from Wraps!</p>",
+          html: templateHtml ?? batch.htmlContent ?? "<p>Hello from Wraps!</p>",
           replyTo: batch.replyTo,
+          // For unsubscribe link generation
+          contactId: recipient.id,
+          organizationId,
         });
 
         // Record successful send
@@ -241,6 +245,10 @@ interface EmailParams {
   subject: string;
   html: string;
   replyTo?: string | null;
+  // Unsubscribe link params
+  contactId: string;
+  organizationId: string;
+  topicId?: string;
 }
 
 async function sendEmail(
@@ -251,25 +259,106 @@ async function sendEmail(
     ? `${params.fromName} <${params.from}>`
     : params.from;
 
+  // Generate unsubscribe token for RFC 8058 compliance
+  const unsubscribeToken = await generateUnsubscribeToken(
+    params.contactId,
+    params.organizationId,
+    params.topicId
+  );
+
+  const apiBaseUrl = process.env.API_BASE_URL || "https://api.wraps.dev";
+  const appBaseUrl = process.env.APP_BASE_URL || "https://wraps.dev";
+  const unsubscribeUrl = `${apiBaseUrl}/unsubscribe/${unsubscribeToken}`;
+  const preferencesUrl = `${appBaseUrl}/preferences/${unsubscribeToken}`;
+
+  // Add unsubscribe footer to HTML
+  const htmlWithFooter = addUnsubscribeFooter(
+    params.html,
+    unsubscribeUrl,
+    preferencesUrl
+  );
+
+  // Build raw email with List-Unsubscribe headers (RFC 8058)
+  const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+
+  const rawEmail = [
+    `From: ${source}`,
+    `To: ${params.to}`,
+    `Subject: ${params.subject}`,
+    params.replyTo ? `Reply-To: ${params.replyTo}` : null,
+    // RFC 8058 one-click unsubscribe headers
+    `List-Unsubscribe: <${unsubscribeUrl}>`,
+    "List-Unsubscribe-Post: List-Unsubscribe=One-Click",
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: quoted-printable",
+    "",
+    stripHtml(htmlWithFooter),
+    "",
+    `--${boundary}`,
+    "Content-Type: text/html; charset=UTF-8",
+    "Content-Transfer-Encoding: quoted-printable",
+    "",
+    htmlWithFooter,
+    "",
+    `--${boundary}--`,
+  ]
+    .filter((line) => line !== null)
+    .join("\r\n");
+
   const result = await client.send(
-    new SendEmailCommand({
-      Source: source,
-      Destination: {
-        ToAddresses: [params.to],
+    new SendRawEmailCommand({
+      RawMessage: {
+        Data: new TextEncoder().encode(rawEmail),
       },
-      Message: {
-        Subject: { Data: params.subject },
-        Body: {
-          Html: { Data: params.html },
-        },
-      },
-      ReplyToAddresses: params.replyTo ? [params.replyTo] : undefined,
-      // Use Wraps tracking configuration set for delivery/open/click events
       ConfigurationSetName: "wraps-email-tracking",
     })
   );
 
   return result.MessageId ?? "";
+}
+
+/**
+ * Add unsubscribe footer to HTML email
+ */
+function addUnsubscribeFooter(
+  html: string,
+  unsubscribeUrl: string,
+  preferencesUrl: string
+): string {
+  const footer = `
+<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #6b7280;">
+  <p>
+    <a href="${preferencesUrl}" style="color: #6b7280; text-decoration: underline;">Manage preferences</a>
+    &nbsp;|&nbsp;
+    <a href="${unsubscribeUrl}" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a>
+  </p>
+</div>`;
+
+  // Insert before </body> if exists, otherwise append
+  if (html.includes("</body>")) {
+    return html.replace("</body>", `${footer}</body>`);
+  }
+  return html + footer;
+}
+
+/**
+ * Strip HTML tags for plain text version
+ */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 async function enqueueNextChunk(job: BatchJob): Promise<void> {

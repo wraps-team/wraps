@@ -27,6 +27,7 @@
     "@wraps/db": "workspace:*",
     "drizzle-orm": "0.44.7",
     "elysia": "^1.2.25",
+    "jose": "6.1.3",
     "pg": "^8.16.2"
   },
   "devDependencies": {

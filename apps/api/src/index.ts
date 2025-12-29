@@ -12,6 +12,7 @@ import { Elysia } from "elysia";
 import { batchRoutes } from "./routes/batch";
 import { contactsRoutes } from "./routes/contacts";
 import { healthRoutes } from "./routes/health";
+import { unsubscribeRoutes } from "./routes/unsubscribe";
 import { webhooksRoutes } from "./routes/webhooks";
 
 export const app = new Elysia()
@@ -42,6 +43,10 @@ export const app = new Elysia()
             name: "webhooks",
             description: "Webhook endpoints for event processing",
           },
+          {
+            name: "unsubscribe",
+            description: "Email unsubscribe endpoints (RFC 8058 compliant)",
+          },
         ],
       },
     })
@@ -49,7 +54,8 @@ export const app = new Elysia()
   .use(healthRoutes)
   .use(contactsRoutes)
   .use(batchRoutes)
-  .use(webhooksRoutes);
+  .use(webhooksRoutes)
+  .use(unsubscribeRoutes);
 
 // Export type for Eden Treaty client
 export type App = typeof app;
