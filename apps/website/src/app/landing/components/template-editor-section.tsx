@@ -177,9 +177,9 @@ export function TemplateEditorSection() {
       </div>
 
       {/* Two-column: AI Panel + Blocks Palette */}
-      <div className="mb-16 grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
+      <div className="mb-16 grid gap-12 lg:grid-cols-2 lg:gap-16">
         {/* AI Panel */}
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex aspect-square size-10 items-center justify-center rounded-full border-2 border-orange-500 bg-orange-500/5">
@@ -209,6 +209,7 @@ export function TemplateEditorSection() {
           </div>
           <ImageWithFallback
             alt="AI Assistant Panel"
+            className="mt-auto"
             darkSrc="template-editor-ai-dark.webp"
             direction="left"
             lightSrc="template-editor-ai-light.webp"
@@ -216,7 +217,7 @@ export function TemplateEditorSection() {
         </div>
 
         {/* Blocks Palette */}
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex aspect-square size-10 items-center justify-center rounded-full border-2 border-orange-500 bg-orange-500/5">
@@ -246,6 +247,7 @@ export function TemplateEditorSection() {
           </div>
           <ImageWithFallback
             alt="Block Palette"
+            className="mt-auto"
             darkSrc="template-editor-blocks-dark.webp"
             direction="right"
             lightSrc="template-editor-blocks-light.webp"

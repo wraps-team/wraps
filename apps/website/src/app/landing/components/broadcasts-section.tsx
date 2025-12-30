@@ -10,7 +10,9 @@ import {
   Tag,
   Users,
 } from "lucide-react";
+import { Image3D } from "@/components/image-3d";
 import { Button } from "@/components/ui/button";
+import { assetUrl } from "@/lib/utils";
 import { SectionWrapper } from "./section-card";
 
 const features = [
@@ -92,8 +94,33 @@ export function BroadcastsSection() {
           <div className="absolute top-2 left-1/2 mx-auto h-16 w-[70%] -translate-x-1/2 transform rounded-full bg-orange-500/10 blur-2xl lg:-top-4 lg:h-32" />
 
           <div className="relative overflow-hidden rounded-2xl border-2 bg-card shadow-2xl">
-            {/* Placeholder for broadcast list screenshot */}
-            <PlaceholderImage alt="Broadcast Dashboard" icon={Mail} />
+            {/* Light mode image */}
+            <img
+              alt="Broadcast Dashboard - Light Mode"
+              className="block w-full rounded-xl object-cover dark:hidden"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                e.currentTarget.nextElementSibling?.classList.remove("hidden");
+              }}
+              src={assetUrl("broadcasts-list-light.webp")}
+            />
+            <div className="hidden dark:hidden">
+              <PlaceholderImage alt="Broadcast Dashboard" icon={Mail} />
+            </div>
+
+            {/* Dark mode image */}
+            <img
+              alt="Broadcast Dashboard - Dark Mode"
+              className="hidden w-full rounded-xl object-cover dark:block"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                e.currentTarget.nextElementSibling?.classList.remove("!hidden");
+              }}
+              src={assetUrl("broadcasts-list-dark.webp")}
+            />
+            <div className="!hidden dark:!hidden">
+              <PlaceholderImage alt="Broadcast Dashboard" icon={Mail} />
+            </div>
 
             {/* Bottom fade effect */}
             <div className="absolute bottom-0 left-0 h-32 w-full rounded-b-xl bg-linear-to-b from-background/0 via-background/70 to-background md:h-40" />
@@ -133,9 +160,9 @@ export function BroadcastsSection() {
       </div>
 
       {/* Two-column: Compose + Schedule */}
-      <div className="mb-16 grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
+      <div className="mb-16 grid gap-12 lg:grid-cols-2 lg:gap-16">
         {/* Compose Broadcast */}
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex aspect-square size-10 items-center justify-center rounded-full border-2 border-orange-500 bg-orange-500/5">
@@ -162,11 +189,17 @@ export function BroadcastsSection() {
               </li>
             </ul>
           </div>
-          <PlaceholderImage alt="Compose Broadcast" icon={Send} />
+          <Image3D
+            alt="Compose Broadcast"
+            className="mt-auto"
+            darkSrc="broadcasts-compose-dark.webp"
+            direction="left"
+            lightSrc="broadcasts-compose-light.webp"
+          />
         </div>
 
         {/* Schedule */}
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex aspect-square size-10 items-center justify-center rounded-full border-2 border-orange-500 bg-orange-500/5">
@@ -198,7 +231,13 @@ export function BroadcastsSection() {
               </li>
             </ul>
           </div>
-          <PlaceholderImage alt="Schedule Broadcast" icon={Calendar} />
+          <Image3D
+            alt="Schedule Broadcast"
+            className="mt-auto"
+            darkSrc="broadcasts-schedule-dark.webp"
+            direction="right"
+            lightSrc="broadcasts-schedule-light.webp"
+          />
         </div>
       </div>
 
