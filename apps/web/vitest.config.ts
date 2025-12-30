@@ -16,7 +16,11 @@ export default defineConfig(({ mode }) => {
       coverage: {
         provider: "v8",
         reporter: ["text", "json", "html"],
-        include: ["src/lib/permissions/**/*.ts"],
+        include: [
+          "src/lib/permissions/**/*.ts",
+          "src/actions/**/*.ts",
+          "src/lib/**/*.ts",
+        ],
         exclude: ["**/__tests__/**", "**/*.test.ts", "**/types.ts"],
       },
       // Load environment variables from .env.test
