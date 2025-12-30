@@ -131,17 +131,25 @@ All resources use the `wraps-email-*` namespace prefix.
 - ✅ **CLI** — One-command deployment to your AWS account
 - ✅ **TypeScript SDK** — [`@wraps.dev/email`](https://github.com/wraps-team/wraps-js) for sending emails
 - ✅ **Dashboard** — Analytics, email history, team management
-- ✅ **Templates** — Drag-n-drop, raw code, and AI generation
+- ✅ **Templates** — Rich WYSIWYG editor, reusable blocks, AI generation
+- ✅ **Contact management** — Multi-channel contacts, custom properties, bulk operations
+- ✅ **Topics** — Subscription management with double opt-in support
+- ✅ **Segments** — Advanced targeting with nested filter groups (Pro+)
+- ✅ **Broadcasts** — Batch sending to contacts, topics, or segments
+- ✅ **Scheduled sends** — EventBridge-powered scheduling (Pro+)
+- ✅ **Preference center** — Branded self-service unsubscribe pages
+- ✅ **Brand kits** — Logos, colors, fonts for consistent emails
 - ✅ **Domain verification** — Guided DNS setup with Route53 auto-config
-- ✅ **Event tracking** — Bounces, complaints, opens, clicks
+- ✅ **Event tracking** — Bounces, complaints, opens, clicks via EventBridge
+- ✅ **Multi-AWS accounts** — Connect multiple AWS accounts per org
 - ✅ **OIDC support** — Vercel integration (no AWS credentials in production)
+- ✅ **API keys** — Programmatic access with scoped permissions
 
 ### Coming Soon
 
-- 🚧 **Contact management** — Import, segment, and manage your audience
-- 🚧 **Campaigns** — Scheduled, targeted email sends
 - 🚧 **SMS** — AWS End User Messaging wrapper (`@wraps.dev/sms`)
 - 📋 **Workflows** — Visual automation builder
+- 📋 **Event tracking** — Behavioral events for advanced segmentation
 
 ---
 
@@ -367,7 +375,7 @@ We'd love your help! Wraps is open source and community-driven.
 
 ### Getting Help
 
-- **Documentation** - [docs.wraps.dev](https://docs.wraps.dev) (coming soon)
+- **Documentation** - [wraps.dev/docs](https://wraps.dev/docs)
 - **GitHub Issues** - [github.com/wraps-team/wraps/issues](https://github.com/wraps-team/wraps/issues)
 - **Discussions** - [github.com/wraps-team/wraps/discussions](https://github.com/wraps-team/wraps/discussions)
 
