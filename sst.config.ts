@@ -7,6 +7,7 @@
  * - API Gateway + Lambda for Elysia API
  * - SQS queues for batch processing
  * - DynamoDB for rate limiting
+ * - EventBridge Scheduler for scheduled broadcasts
  */
 
 export default $config({
@@ -32,6 +33,7 @@ export default $config({
     // Import infrastructure modules
     const { rateLimitTable } = await import("./infra/tables");
     const { batchQueue, batchDlq } = await import("./infra/queues");
+    const { schedulerGroup, schedulerRole } = await import("./infra/scheduler");
     const { api } = await import("./infra/api");
 
     return {
@@ -39,6 +41,8 @@ export default $config({
       batchQueueUrl: batchQueue.url,
       batchDlqUrl: batchDlq.url,
       rateLimitTableName: rateLimitTable.name,
+      schedulerGroupName: schedulerGroup.name,
+      schedulerRoleArn: schedulerRole.arn,
     };
   },
 });

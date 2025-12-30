@@ -28,6 +28,7 @@ export type Channel = "email" | "sms";
  */
 export const batchSendStatusEnum = pgEnum("batch_send_status", [
   "draft",
+  "scheduled", // Waiting for scheduled time (EventBridge Scheduler)
   "queued",
   "processing",
   "completed",

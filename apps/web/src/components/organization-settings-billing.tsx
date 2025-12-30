@@ -389,8 +389,55 @@ export function OrganizationSettingsBilling({
         </Card>
       )}
 
-      {/* Upgrade Option - Pro/Starter to Growth */}
-      {(currentPlan === "starter" || currentPlan === "pro") && !isCancelled && (
+      {/* Upgrade Option - Pro to Growth */}
+      {currentPlan === "pro" && !isCancelled && (
+        <Card className="border-primary">
+          <CardHeader>
+            <div className="flex items-start gap-3">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+                <ArrowUpIcon className="size-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <CardTitle>Upgrade to Growth</CardTitle>
+                <CardDescription>{PLANS.growth.description}</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-baseline gap-1">
+              <span className="font-bold text-3xl">${PLANS.growth.price}</span>
+              <span className="text-muted-foreground">{PLANS.growth.period}</span>
+            </div>
+
+            <ul className="space-y-2">
+              {PLANS.growth.featureList.slice(0, 6).map((feature) => (
+                <li className="flex items-start gap-2 text-sm" key={feature}>
+                  <CheckCircle2Icon className="mt-0.5 size-4 flex-shrink-0 text-primary" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+
+            <Button
+              className="w-full"
+              disabled={!canManageBilling || upgradeMutation.isPending}
+              onClick={() => handleUpgrade("growth")}
+              size="lg"
+            >
+              {upgradeMutation.isPending ? "Upgrading..." : "Upgrade to Growth"}
+            </Button>
+
+            {!canManageBilling && (
+              <p className="text-center text-muted-foreground text-xs">
+                Only organization owners and admins can manage billing
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Growth Option for Starter users */}
+      {currentPlan === "starter" && !isCancelled && (
         <Card className="border-muted">
           <CardHeader>
             <div className="flex items-start gap-3">
@@ -405,32 +452,27 @@ export function OrganizationSettingsBilling({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-baseline gap-1">
-              <span className="font-bold text-3xl">Custom</span>
-              <span className="text-muted-foreground">pricing</span>
+              <span className="font-bold text-3xl">${PLANS.growth.price}</span>
+              <span className="text-muted-foreground">{PLANS.growth.period}</span>
             </div>
 
             <ul className="space-y-2">
-              {PLANS.growth.featureList.map((feature) => (
+              {PLANS.growth.featureList.slice(0, 4).map((feature) => (
                 <li className="flex items-start gap-2 text-sm" key={feature}>
-                  <CheckCircle2Icon className="mt-0.5 size-4 flex-shrink-0 text-primary" />
-                  <span>{feature}</span>
+                  <CheckCircle2Icon className="mt-0.5 size-4 flex-shrink-0 text-muted-foreground" />
+                  <span className="text-muted-foreground">{feature}</span>
                 </li>
               ))}
             </ul>
 
             <Button
               className="w-full"
-              disabled={!canManageBilling}
-              onClick={() =>
-                window.open(
-                  "mailto:sales@wraps.dev?subject=Growth Plan Inquiry",
-                  "_blank"
-                )
-              }
+              disabled={!canManageBilling || upgradeMutation.isPending}
+              onClick={() => handleUpgrade("growth")}
               size="lg"
               variant="outline"
             >
-              Contact Sales
+              {upgradeMutation.isPending ? "Upgrading..." : "Upgrade to Growth"}
             </Button>
           </CardContent>
         </Card>

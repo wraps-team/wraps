@@ -5,7 +5,12 @@ import {
   DescribePhoneNumbersCommand,
   PinpointSMSVoiceV2Client,
 } from "@aws-sdk/client-pinpoint-sms-voice-v2";
-import { GetConfigurationSetCommand, SESv2Client } from "@aws-sdk/client-sesv2";
+import {
+  GetConfigurationSetCommand,
+  GetEmailIdentityCommand,
+  ListEmailIdentitiesCommand,
+  SESv2Client,
+} from "@aws-sdk/client-sesv2";
 import { createServerValidate } from "@tanstack/react-form/nextjs";
 import { auth } from "@wraps/auth";
 import { awsAccount, db } from "@wraps/db";
@@ -855,6 +860,178 @@ export async function removeWebhookSecretAction(
       success: false,
       error:
         error instanceof Error ? error.message : "An unexpected error occurred",
+    };
+  }
+}
+
+export type VerifiedIdentity = {
+  identity: string;
+  type: "DOMAIN" | "EMAIL_ADDRESS";
+};
+
+export type GetVerifiedDomainsResult =
+  | {
+      success: true;
+      identities: VerifiedIdentity[];
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+/**
+ * Get verified SES identities (domains and email addresses) for an AWS account.
+ * Only returns identities using the Wraps configuration set (wraps-email-*).
+ *
+ * Uses Next.js caching with a 30 minute TTL. Call with forceRefresh=true to bypass cache.
+ */
+export async function getVerifiedDomains(
+  awsAccountId: string,
+  organizationId: string,
+  forceRefresh = false
+): Promise<GetVerifiedDomainsResult> {
+  const log = createActionLogger("getVerifiedDomains", {
+    orgSlug: organizationId,
+    accountId: awsAccountId,
+  });
+
+  try {
+    // 1. Get session
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return {
+        success: false,
+        error: "Unauthorized",
+      };
+    }
+
+    // 2. Check org membership
+    const membership = await db.query.member.findFirst({
+      where: (m, { and, eq }) =>
+        and(
+          eq(m.userId, session.user.id),
+          eq(m.organizationId, organizationId)
+        ),
+    });
+
+    if (!membership) {
+      return {
+        success: false,
+        error: "You don't have access to this organization",
+      };
+    }
+
+    // 3. Get AWS account
+    const account = await db.query.awsAccount.findFirst({
+      where: (a, { and, eq }) =>
+        and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
+    });
+
+    if (!account) {
+      return {
+        success: false,
+        error: "AWS account not found",
+      };
+    }
+
+    // 4. Get credentials for the AWS account
+    const credentials = await getOrAssumeRole({
+      roleArn: account.roleArn,
+      externalId: account.externalId,
+    });
+
+    const awsCredentials = {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken,
+    };
+
+    // 5. List all email identities
+    const sesClient = new SESv2Client({
+      region: account.region,
+      credentials: awsCredentials,
+    });
+
+    const listResponse = await sesClient.send(
+      new ListEmailIdentitiesCommand({
+        PageSize: 100, // Should be enough for most accounts
+      })
+    );
+
+    if (!listResponse.EmailIdentities?.length) {
+      return {
+        success: true,
+        identities: [],
+      };
+    }
+
+    // 6. Filter to verified identities and check configuration set
+    const verifiedIdentities: VerifiedIdentity[] = [];
+
+    // Get details for each identity to check config set
+    // Using Promise.all for parallel requests
+    const identityDetails = await Promise.all(
+      listResponse.EmailIdentities.filter(
+        (identity) => identity.SendingEnabled === true
+      ).map(async (identity) => {
+        try {
+          const details = await sesClient.send(
+            new GetEmailIdentityCommand({
+              EmailIdentity: identity.IdentityName,
+            })
+          );
+          return {
+            name: identity.IdentityName,
+            type: identity.IdentityType,
+            configSet: details.ConfigurationSetName,
+            verified: details.VerifiedForSendingStatus,
+          };
+        } catch {
+          // Skip identities we can't access
+          return null;
+        }
+      })
+    );
+
+    // Filter to only Wraps-managed identities
+    for (const detail of identityDetails) {
+      if (!detail || !detail.verified) continue;
+
+      // Check if using our configuration set
+      if (detail.configSet?.startsWith("wraps-email-")) {
+        verifiedIdentities.push({
+          identity: detail.name!,
+          type: detail.type as "DOMAIN" | "EMAIL_ADDRESS",
+        });
+      }
+    }
+
+    log.info(
+      { count: verifiedIdentities.length },
+      "Fetched verified identities"
+    );
+
+    // Force revalidation if requested
+    if (forceRefresh) {
+      revalidatePath(`/${organizationId}/send/new`);
+    }
+
+    return {
+      success: true,
+      identities: verifiedIdentities,
+    };
+  } catch (error) {
+    log.error(
+      { err: serializeError(error) },
+      "Failed to fetch verified domains"
+    );
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to fetch domains",
     };
   }
 }

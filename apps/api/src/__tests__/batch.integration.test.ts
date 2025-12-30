@@ -32,6 +32,12 @@ vi.mock("../services/queue", () => ({
   enqueueJob: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Mock the scheduler service (we don't want to actually create EventBridge schedules in tests)
+vi.mock("../services/scheduler", () => ({
+  createBroadcastSchedule: vi.fn().mockResolvedValue("mock-schedule-name"),
+  deleteBroadcastSchedule: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Test data IDs (unique to avoid conflicts with other tests)
 const TEST_PREFIX = "api-batch-int";
 const testUser = {

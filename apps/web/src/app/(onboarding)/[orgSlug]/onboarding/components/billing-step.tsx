@@ -1,9 +1,10 @@
 "use client";
 
-import { CheckIcon, CreditCardIcon, ZapIcon } from "lucide-react";
-import { useParams } from "next/navigation";
+import { CreditCardIcon, ZapIcon } from "lucide-react";
+import { useParams, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { PlanSelector } from "@/components/plan-selector";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,7 +15,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { authClient } from "@/lib/auth-client";
-import { PLANS } from "@/lib/plans";
+import {
+  getDisplayPrice,
+  hasEarlyAdopterPricing,
+  PLANS,
+  type PlanId,
+} from "@/lib/plans";
 
 type BillingStepProps = {
   onNext: () => void;
@@ -28,10 +34,20 @@ export function BillingStep({
   organizationId,
 }: BillingStepProps) {
   const params = useParams();
+  const searchParams = useSearchParams();
   const orgSlug = params.orgSlug as string;
+
+  // Get plan from URL param, default to starter
+  const planParam = searchParams.get("plan") as PlanId | null;
+  const initialPlan: PlanId =
+    planParam && ["starter", "pro", "growth", "scale"].includes(planParam)
+      ? planParam
+      : "starter";
+
+  const [selectedPlan, setSelectedPlan] = useState<PlanId>(initialPlan);
   const [isLoading, setIsLoading] = useState(false);
 
-  const starterPlan = PLANS.starter;
+  const plan = PLANS[selectedPlan];
 
   const handleSubscribe = async () => {
     setIsLoading(true);
@@ -42,12 +58,12 @@ export function BillingStep({
         method: "POST",
       });
 
-      // Start Stripe checkout for starter plan
+      // Start Stripe checkout for selected plan
       const result = await authClient.subscription.upgrade({
-        plan: "starter",
+        plan: selectedPlan,
         referenceId: organizationId,
         successUrl: `${window.location.origin}/${orgSlug}/emails?subscribed=true`,
-        cancelUrl: `${window.location.origin}/${orgSlug}/onboarding?step=5`,
+        cancelUrl: `${window.location.origin}/${orgSlug}/onboarding?step=5&plan=${selectedPlan}`,
       });
 
       if (result.error) {
@@ -69,38 +85,43 @@ export function BillingStep({
         <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
           <CreditCardIcon className="h-5 w-5 text-primary" />
         </div>
-        <CardTitle>Subscribe to Wraps</CardTitle>
+        <CardTitle>Choose Your Plan</CardTitle>
         <CardDescription>
           Get full access to the Wraps hosted dashboard.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Starter Plan Card */}
-        <div className="rounded-lg border-2 border-primary bg-primary/5 p-6">
-          <div className="space-y-4">
-            <div className="text-center">
-              <h3 className="font-semibold text-xl">{starterPlan.name}</h3>
-              <div className="mt-2 flex items-baseline justify-center gap-1">
-                <span className="font-bold text-4xl">${starterPlan.price}</span>
-                <span className="text-muted-foreground">
-                  {starterPlan.period}
-                </span>
-              </div>
-              <p className="mt-1 text-muted-foreground text-sm">
-                {starterPlan.description}
-              </p>
-            </div>
+        {/* Plan Selector */}
+        <PlanSelector
+          onSelectPlan={setSelectedPlan}
+          selectedPlan={selectedPlan}
+        />
 
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {starterPlan.featureList.map((feature) => (
-                <li className="flex items-start gap-2 text-sm" key={feature}>
-                  <CheckIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
+        {/* Selected Plan Summary */}
+        <div className="rounded-lg border-2 border-primary bg-primary/5 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold">{plan.name} Plan</h3>
+              <p className="text-muted-foreground text-sm">{plan.description}</p>
+            </div>
+            <div className="text-right">
+              <span className="font-bold text-2xl">
+                ${getDisplayPrice(plan)}
+              </span>
+              {hasEarlyAdopterPricing(plan) && (
+                <span className="ml-1 text-muted-foreground line-through">
+                  ${plan.price}
+                </span>
+              )}
+              <span className="text-muted-foreground">{plan.period}</span>
+            </div>
           </div>
+          {hasEarlyAdopterPricing(plan) && (
+            <p className="mt-2 text-green-600 text-xs">
+              Early adopter pricing - your rate stays locked forever
+            </p>
+          )}
         </div>
 
         {/* AWS Costs Note */}
@@ -138,7 +159,7 @@ export function BillingStep({
           Back
         </Button>
         <Button loading={isLoading} onClick={handleSubscribe} size="lg">
-          Subscribe Now
+          Subscribe to {plan.name}
         </Button>
       </CardFooter>
     </Card>

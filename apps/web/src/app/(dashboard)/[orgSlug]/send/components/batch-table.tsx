@@ -11,8 +11,10 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
+import { formatDistanceToNow } from "date-fns";
 import {
   ArrowUpDown,
+  CalendarClock,
   CheckCircle,
   Clock,
   Loader2,
@@ -164,19 +166,32 @@ export function BatchTable({
         accessorKey: "status",
         header: "Status",
         cell: ({ row }: { row: { original: BatchSendWithMeta } }) => {
-          const status = row.original.status;
+          const batch = row.original;
+          const status = batch.status;
           return (
-            <Badge className={BATCH_STATUS_COLORS[status]} variant="secondary">
-              {status === "processing" && (
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            <div className="space-y-1">
+              <Badge className={BATCH_STATUS_COLORS[status]} variant="secondary">
+                {status === "processing" && (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                )}
+                {status === "completed" && (
+                  <CheckCircle className="mr-1 h-3 w-3" />
+                )}
+                {status === "failed" && <XCircle className="mr-1 h-3 w-3" />}
+                {status === "queued" && <Clock className="mr-1 h-3 w-3" />}
+                {status === "scheduled" && (
+                  <CalendarClock className="mr-1 h-3 w-3" />
+                )}
+                {BATCH_STATUS_LABELS[status]}
+              </Badge>
+              {status === "scheduled" && batch.scheduledFor && (
+                <p className="text-muted-foreground text-xs">
+                  {formatDistanceToNow(new Date(batch.scheduledFor), {
+                    addSuffix: true,
+                  })}
+                </p>
               )}
-              {status === "completed" && (
-                <CheckCircle className="mr-1 h-3 w-3" />
-              )}
-              {status === "failed" && <XCircle className="mr-1 h-3 w-3" />}
-              {status === "queued" && <Clock className="mr-1 h-3 w-3" />}
-              {BATCH_STATUS_LABELS[status]}
-            </Badge>
+            </div>
           );
         },
       },
@@ -187,7 +202,7 @@ export function BatchTable({
           const batch = row.original;
           const progress = calculateProgress(batch);
 
-          if (batch.status === "draft") {
+          if (batch.status === "draft" || batch.status === "scheduled") {
             return <span className="text-muted-foreground">-</span>;
           }
 
@@ -274,7 +289,9 @@ export function BatchTable({
           const batch = row.original;
           const canCancel =
             canManage &&
-            (batch.status === "queued" || batch.status === "processing");
+            (batch.status === "scheduled" ||
+              batch.status === "queued" ||
+              batch.status === "processing");
 
           return (
             <DropdownMenu>

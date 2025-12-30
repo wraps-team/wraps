@@ -1,4 +1,5 @@
 import { ArchitectureSection } from "./components/architecture-section";
+import { BroadcastsSection } from "./components/broadcasts-section";
 import { CTASection } from "./components/cta-section";
 import { ExistingSesSection } from "./components/existing-ses-section";
 import { FaqSection } from "./components/faq-section";
@@ -42,6 +43,7 @@ export default function LandingPage() {
         {/* Premium Tier - Hosted Dashboard (continues the premium background) */}
         <div className={premiumBgClass}>
           <TemplateEditorSection />
+          <BroadcastsSection />
           <PricingSection />
           <FaqSection />
           <CTASection />

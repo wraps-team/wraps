@@ -5,6 +5,7 @@
 // Status types matching the database enum
 export const BATCH_STATUSES = [
   "draft",
+  "scheduled",
   "queued",
   "processing",
   "completed",
@@ -20,6 +21,7 @@ export type Channel = (typeof CHANNELS)[number];
 // Status display labels
 export const BATCH_STATUS_LABELS: Record<BatchStatus, string> = {
   draft: "Draft",
+  scheduled: "Scheduled",
   queued: "Queued",
   processing: "Sending",
   completed: "Completed",
@@ -30,6 +32,7 @@ export const BATCH_STATUS_LABELS: Record<BatchStatus, string> = {
 // Status colors for badges
 export const BATCH_STATUS_COLORS: Record<BatchStatus, string> = {
   draft: "bg-gray-100 text-gray-700",
+  scheduled: "bg-purple-100 text-purple-700",
   queued: "bg-blue-100 text-blue-700",
   processing: "bg-yellow-100 text-yellow-700",
   completed: "bg-green-100 text-green-700",

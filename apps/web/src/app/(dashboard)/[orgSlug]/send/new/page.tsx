@@ -1,6 +1,6 @@
 import { auth } from "@wraps/auth";
 import { redirect } from "next/navigation";
-import { listAWSAccounts } from "@/actions/aws-accounts";
+import { getVerifiedDomains, listAWSAccounts } from "@/actions/aws-accounts";
 import {
   listSegmentsForBatch,
   listTemplatesForBatch,
@@ -49,6 +49,7 @@ export default async function NewBatchPage({ params }: NewBatchPageProps) {
     segmentsResult,
     topicsFeature,
     segmentsFeature,
+    campaignsFeature,
   ] = await Promise.all([
     listAWSAccounts(orgWithMembership.id),
     listTemplatesForBatch(orgWithMembership.id),
@@ -56,6 +57,7 @@ export default async function NewBatchPage({ params }: NewBatchPageProps) {
     listSegmentsForBatch(orgWithMembership.id),
     checkFeatureAccess(orgWithMembership.id, "topics"),
     checkFeatureAccess(orgWithMembership.id, "segments"),
+    checkFeatureAccess(orgWithMembership.id, "campaigns"),
   ]);
 
   const awsAccounts = awsAccountsResult.success
@@ -70,12 +72,26 @@ export default async function NewBatchPage({ params }: NewBatchPageProps) {
   const topics = topicsResult.success ? topicsResult.topics : [];
   const segments = segmentsResult.success ? segmentsResult.segments : [];
 
+  // Fetch verified domains for the first AWS account
+  let initialVerifiedDomains: { identity: string; type: "DOMAIN" | "EMAIL_ADDRESS" }[] = [];
+  if (awsAccounts.length > 0) {
+    const domainsResult = await getVerifiedDomains(
+      awsAccounts[0].id,
+      orgWithMembership.id
+    );
+    if (domainsResult.success) {
+      initialVerifiedDomains = domainsResult.identities;
+    }
+  }
+
   return (
     <div className="px-4 lg:px-6">
       <BatchForm
         awsAccounts={awsAccounts}
+        initialVerifiedDomains={initialVerifiedDomains}
         organizationId={orgWithMembership.id}
         orgSlug={orgSlug}
+        schedulingEnabled={campaignsFeature.allowed}
         segments={segments}
         segmentsEnabled={segmentsFeature.allowed}
         templates={templates}

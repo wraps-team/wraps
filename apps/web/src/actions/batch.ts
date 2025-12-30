@@ -305,6 +305,17 @@ export async function createBatchSend(
       };
     }
 
+    // Check if scheduling is available (requires campaigns feature - Pro+)
+    if (data.scheduledFor) {
+      const schedulingCheck = await checkFeatureAccess(organizationId, "campaigns");
+      if (!schedulingCheck.allowed) {
+        return {
+          success: false,
+          error: "Scheduling broadcasts requires a Pro plan or higher.",
+        };
+      }
+    }
+
     // Validate AWS account exists and belongs to org
     const awsAccount = await db.query.awsAccount.findFirst({
       where: (a, { and, eq }) =>
@@ -426,6 +437,12 @@ export async function createBatchSend(
 
 /**
  * Cancel a batch send
+ *
+ * Calls the API DELETE endpoint which handles:
+ * - Verifying batch exists and ownership
+ * - Checking if batch can be cancelled (only scheduled/queued)
+ * - Deleting EventBridge schedule if status is "scheduled"
+ * - Updating status to "cancelled"
  */
 export async function cancelBatchSend(
   batchId: string,
@@ -448,37 +465,41 @@ export async function cancelBatchSend(
       };
     }
 
-    // Verify batch exists and can be cancelled
-    const existing = await db.query.batchSend.findFirst({
-      where: (b, { and, eq }) =>
-        and(eq(b.id, batchId), eq(b.organizationId, organizationId)),
+    // Get session for API auth
+    const session = await auth.api.getSession({
+      headers: await headers(),
     });
 
-    if (!existing) {
-      return { success: false, error: "Batch send not found" };
+    if (!session) {
+      return { success: false, error: "Session not found" };
     }
 
-    if (existing.status === "completed") {
-      return { success: false, error: "Cannot cancel a completed batch send" };
+    // Call the API to cancel batch (handles EventBridge schedule deletion)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) {
+      return { success: false, error: "API URL not configured" };
     }
 
-    if (existing.status === "cancelled") {
-      return { success: false, error: "Batch send is already cancelled" };
-    }
+    const response = await fetch(`${apiUrl}/v1/batch/${batchId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${session.session.token}`,
+        "X-Organization-Id": organizationId,
+      },
+    });
 
-    // Cancel the batch
-    await db
-      .update(batchSend)
-      .set({
-        status: "cancelled",
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(batchSend.id, batchId),
-          eq(batchSend.organizationId, organizationId)
-        )
-      );
+    if (!response.ok) {
+      const errorText = await response.text();
+      try {
+        const errorData = JSON.parse(errorText) as { error?: string };
+        return {
+          success: false,
+          error: errorData.error || "Failed to cancel batch send",
+        };
+      } catch {
+        return { success: false, error: errorText || "Failed to cancel batch send" };
+      }
+    }
 
     revalidatePath("/[orgSlug]/send", "page");
     revalidatePath(`/[orgSlug]/send/${batchId}`, "page");

@@ -1,13 +1,17 @@
 "use client";
 
+import { format } from "date-fns";
 import {
   ArrowLeft,
+  CalendarIcon,
   Check,
+  Clock,
   Code,
   ExternalLink,
   FileText,
   Filter,
   Lock,
+  RefreshCw,
   Send,
   Tag,
   Users,
@@ -17,6 +21,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
+  getVerifiedDomains,
+  type VerifiedIdentity,
+} from "@/actions/aws-accounts";
+import {
   type AudienceType,
   type ContentType,
   createBatchSend,
@@ -24,6 +32,7 @@ import {
   type RecipientFilter,
 } from "@/actions/batch";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Card,
   CardContent,
@@ -33,6 +42,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -42,6 +56,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 type Template = {
   id: string;
@@ -69,8 +84,10 @@ type Segment = {
 
 type BatchFormProps = {
   awsAccounts: AwsAccount[];
+  initialVerifiedDomains: VerifiedIdentity[];
   organizationId: string;
   orgSlug: string;
+  schedulingEnabled: boolean;
   segments: Segment[];
   segmentsEnabled: boolean;
   templates: Template[];
@@ -80,11 +97,14 @@ type BatchFormProps = {
 
 type Step = "setup" | "content" | "audience" | "review";
 
+type ScheduleType = "now" | "later";
+
 interface CampaignData {
   name: string;
   subject: string;
   previewText: string;
-  from: string;
+  fromPrefix: string;
+  fromDomain: string;
   fromName: string;
   replyTo: string;
   awsAccountId: string;
@@ -96,12 +116,18 @@ interface CampaignData {
   audienceType: AudienceType;
   topicId: string;
   segmentId: string;
+  // Scheduling
+  scheduleType: ScheduleType;
+  scheduledDate: Date | undefined;
+  scheduledTime: string;
 }
 
 export function BatchForm({
   awsAccounts,
+  initialVerifiedDomains,
   organizationId,
   orgSlug,
+  schedulingEnabled,
   segments,
   segmentsEnabled,
   templates,
@@ -114,22 +140,96 @@ export function BatchForm({
   // Step state
   const [currentStep, setCurrentStep] = useState<Step>("setup");
 
+  // Verified domains state
+  const [verifiedDomains, setVerifiedDomains] = useState<VerifiedIdentity[]>(
+    initialVerifiedDomains
+  );
+  const [domainsLoading, setDomainsLoading] = useState(false);
+
   // Form data
-  const [campaignData, setCampaignData] = useState<CampaignData>({
-    name: "",
-    subject: "",
-    previewText: "",
-    from: "",
-    fromName: "",
-    replyTo: "",
-    awsAccountId: awsAccounts[0]?.id || "",
-    contentType: "template",
-    templateId: "",
-    htmlContent: "",
-    audienceType: "all",
-    topicId: "",
-    segmentId: "",
+  const [campaignData, setCampaignData] = useState<CampaignData>(() => {
+    // Extract domain from first verified domain if available
+    const firstDomain = initialVerifiedDomains.find(
+      (d) => d.type === "DOMAIN"
+    );
+    return {
+      name: "",
+      subject: "",
+      previewText: "",
+      fromPrefix: "",
+      fromDomain: firstDomain?.identity || "",
+      fromName: "",
+      replyTo: "",
+      awsAccountId: awsAccounts[0]?.id || "",
+      contentType: "template",
+      templateId: "",
+      htmlContent: "",
+      audienceType: "all",
+      topicId: "",
+      segmentId: "",
+      scheduleType: "now",
+      scheduledDate: undefined,
+      scheduledTime: "09:00",
+    };
   });
+
+  // Fetch domains when AWS account changes
+  const fetchDomainsForAccount = useCallback(
+    async (awsAccountId: string, forceRefresh = false) => {
+      if (!awsAccountId) {
+        setVerifiedDomains([]);
+        return;
+      }
+
+      setDomainsLoading(true);
+      const result = await getVerifiedDomains(
+        awsAccountId,
+        organizationId,
+        forceRefresh
+      );
+      setDomainsLoading(false);
+
+      if (result.success) {
+        setVerifiedDomains(result.identities);
+        // Auto-select first domain if current is not in the list
+        const currentDomainValid = result.identities.some(
+          (d) => d.identity === campaignData.fromDomain
+        );
+        if (!currentDomainValid && result.identities.length > 0) {
+          const firstDomain = result.identities.find(
+            (d) => d.type === "DOMAIN"
+          );
+          if (firstDomain) {
+            setCampaignData((prev) => ({
+              ...prev,
+              fromDomain: firstDomain.identity,
+            }));
+          }
+        }
+      } else {
+        toast.error("Failed to load domains", {
+          description: result.error,
+        });
+      }
+    },
+    [organizationId, campaignData.fromDomain]
+  );
+
+  // Refresh domains when AWS account changes
+  useEffect(() => {
+    // Only fetch if account changed from initial
+    if (campaignData.awsAccountId !== awsAccounts[0]?.id) {
+      fetchDomainsForAccount(campaignData.awsAccountId);
+    }
+  }, [campaignData.awsAccountId, awsAccounts, fetchDomainsForAccount]);
+
+  // Compute full from address
+  const getFromAddress = useCallback(() => {
+    if (!campaignData.fromPrefix || !campaignData.fromDomain) {
+      return "";
+    }
+    return `${campaignData.fromPrefix}@${campaignData.fromDomain}`;
+  }, [campaignData.fromPrefix, campaignData.fromDomain]);
 
   // Recipient count
   const [recipientCount, setRecipientCount] = useState<number | null>(null);
@@ -193,7 +293,8 @@ export function BatchForm({
       return;
     }
 
-    if (!campaignData.from) {
+    const fromAddress = getFromAddress();
+    if (!fromAddress) {
       toast.error("Please enter a from address");
       return;
     }
@@ -208,12 +309,37 @@ export function BatchForm({
       return;
     }
 
+    // Validate scheduling
+    if (campaignData.scheduleType === "later") {
+      if (!campaignData.scheduledDate) {
+        toast.error("Please select a date for scheduling");
+        return;
+      }
+      // Combine date and time
+      const [hours, minutes] = campaignData.scheduledTime.split(":").map(Number);
+      const scheduledFor = new Date(campaignData.scheduledDate);
+      scheduledFor.setHours(hours, minutes, 0, 0);
+
+      if (scheduledFor <= new Date()) {
+        toast.error("Scheduled time must be in the future");
+        return;
+      }
+    }
+
     startTransition(async () => {
+      // Calculate scheduledFor if scheduling
+      let scheduledFor: Date | undefined;
+      if (campaignData.scheduleType === "later" && campaignData.scheduledDate) {
+        const [hours, minutes] = campaignData.scheduledTime.split(":").map(Number);
+        scheduledFor = new Date(campaignData.scheduledDate);
+        scheduledFor.setHours(hours, minutes, 0, 0);
+      }
+
       const result = await createBatchSend(organizationId, {
         name: campaignData.name || undefined,
         subject: campaignData.subject || undefined,
         previewText: campaignData.previewText || undefined,
-        from: campaignData.from,
+        from: fromAddress,
         fromName: campaignData.fromName || undefined,
         replyTo: campaignData.replyTo || undefined,
         contentType: campaignData.contentType,
@@ -227,11 +353,15 @@ export function BatchForm({
             : undefined,
         awsAccountId: campaignData.awsAccountId,
         recipientFilter: getCurrentFilter(),
+        scheduledFor,
       });
 
       if (result.success) {
-        toast.success("Broadcast created", {
-          description: `Sending to ${result.batch.totalRecipients} recipients`,
+        const isScheduled = result.batch.status === "scheduled";
+        toast.success(isScheduled ? "Broadcast scheduled" : "Broadcast created", {
+          description: isScheduled
+            ? `Will send to ${result.batch.totalRecipients} recipients at ${format(scheduledFor!, "PPp")}`
+            : `Sending to ${result.batch.totalRecipients} recipients`,
         });
         router.push(`/${orgSlug}/send/${result.batch.id}`);
       } else {
@@ -243,7 +373,10 @@ export function BatchForm({
   };
 
   const isSetupValid =
-    campaignData.awsAccountId && campaignData.from && campaignData.subject;
+    campaignData.awsAccountId &&
+    campaignData.fromPrefix &&
+    campaignData.fromDomain &&
+    campaignData.subject;
 
   const isContentValid =
     (campaignData.contentType === "template" && campaignData.templateId) ||
@@ -319,8 +452,13 @@ export function BatchForm({
             <SetupStep
               awsAccounts={awsAccounts}
               data={campaignData}
+              domainsLoading={domainsLoading}
               onChange={updateData}
+              onRefreshDomains={() =>
+                fetchDomainsForAccount(campaignData.awsAccountId, true)
+              }
               orgSlug={orgSlug}
+              verifiedDomains={verifiedDomains}
             />
           )}
           {currentStep === "content" && (
@@ -349,8 +487,10 @@ export function BatchForm({
               data={campaignData}
               isPending={isPending}
               loadingCount={loadingCount}
+              onChange={updateData}
               onSend={handleSend}
               recipientCount={recipientCount}
+              schedulingEnabled={schedulingEnabled}
               segments={segments}
               templates={templates}
               topics={topics}
@@ -391,14 +531,22 @@ export function BatchForm({
 function SetupStep({
   awsAccounts,
   data,
+  domainsLoading,
   onChange,
+  onRefreshDomains,
   orgSlug,
+  verifiedDomains,
 }: {
   awsAccounts: AwsAccount[];
   data: CampaignData;
+  domainsLoading: boolean;
   onChange: (updates: Partial<CampaignData>) => void;
+  onRefreshDomains: () => void;
   orgSlug: string;
+  verifiedDomains: VerifiedIdentity[];
 }) {
+  // Get available domains for the dropdown (domains only, not email addresses)
+  const domainOptions = verifiedDomains.filter((d) => d.type === "DOMAIN");
   return (
     <div className="space-y-6">
       <Card>
@@ -453,26 +601,78 @@ function SetupStep({
           <CardDescription>Configure who this email is from</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="fromName">From Name</Label>
-              <Input
-                id="fromName"
-                onChange={(e) => onChange({ fromName: e.target.value })}
-                placeholder="Your Company"
-                value={data.fromName}
-              />
+          <div className="space-y-2">
+            <Label htmlFor="fromName">From Name</Label>
+            <Input
+              id="fromName"
+              onChange={(e) => onChange({ fromName: e.target.value })}
+              placeholder="Your Company"
+              value={data.fromName}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="fromPrefix">From Email *</Label>
+              <Button
+                className="h-6 w-6"
+                disabled={domainsLoading}
+                onClick={onRefreshDomains}
+                size="icon"
+                title="Refresh domains"
+                type="button"
+                variant="ghost"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${domainsLoading ? "animate-spin" : ""}`}
+                />
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="from">From Email *</Label>
-              <Input
-                id="from"
-                onChange={(e) => onChange({ from: e.target.value })}
-                placeholder="hello@yourcompany.com"
-                type="email"
-                value={data.from}
-              />
-            </div>
+            {domainOptions.length > 0 ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  className="flex-1"
+                  id="fromPrefix"
+                  onChange={(e) => onChange({ fromPrefix: e.target.value })}
+                  placeholder="hello"
+                  value={data.fromPrefix}
+                />
+                <span className="text-muted-foreground">@</span>
+                <Select
+                  onValueChange={(value) => onChange({ fromDomain: value })}
+                  value={data.fromDomain}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Select domain" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {domainOptions.map((domain) => (
+                      <SelectItem key={domain.identity} value={domain.identity}>
+                        {domain.identity}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed p-4 text-center">
+                <p className="text-muted-foreground text-sm">
+                  {domainsLoading
+                    ? "Loading domains..."
+                    : "No verified domains found"}
+                </p>
+                <p className="mt-1 text-muted-foreground text-xs">
+                  Add a domain using the{" "}
+                  <code className="rounded bg-muted px-1">
+                    wraps email domains add
+                  </code>{" "}
+                  CLI command
+                </p>
+              </div>
+            )}
+            <p className="text-muted-foreground text-xs">
+              Only verified domains with Wraps configuration are shown
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -869,8 +1069,10 @@ function ReviewStep({
   data,
   isPending,
   loadingCount,
+  onChange,
   onSend,
   recipientCount,
+  schedulingEnabled,
   segments,
   templates,
   topics,
@@ -878,8 +1080,10 @@ function ReviewStep({
   data: CampaignData;
   isPending: boolean;
   loadingCount: boolean;
+  onChange: (updates: Partial<CampaignData>) => void;
   onSend: () => void;
   recipientCount: number | null;
+  schedulingEnabled: boolean;
   segments: Segment[];
   templates: Template[];
   topics: Topic[];
@@ -905,6 +1109,27 @@ function ReviewStep({
     return "Custom HTML";
   };
 
+  // Generate time options in 30-minute increments
+  const timeOptions = [];
+  for (let hour = 0; hour < 24; hour++) {
+    for (const minute of [0, 30]) {
+      const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+      const displayTime = format(new Date().setHours(hour, minute), "h:mm a");
+      timeOptions.push({ value: time, label: displayTime });
+    }
+  }
+
+  // Calculate the scheduled datetime for display
+  const getScheduledDateTime = () => {
+    if (!data.scheduledDate) return null;
+    const [hours, minutes] = data.scheduledTime.split(":").map(Number);
+    const scheduled = new Date(data.scheduledDate);
+    scheduled.setHours(hours, minutes, 0, 0);
+    return scheduled;
+  };
+
+  const scheduledDateTime = getScheduledDateTime();
+
   return (
     <div className="space-y-6">
       <Card>
@@ -925,7 +1150,9 @@ function ReviewStep({
             <div>
               <Label className="text-muted-foreground">From</Label>
               <p className="font-medium">
-                {data.fromName ? `${data.fromName} <${data.from}>` : data.from}
+                {data.fromName
+                  ? `${data.fromName} <${data.fromPrefix}@${data.fromDomain}>`
+                  : `${data.fromPrefix}@${data.fromDomain}`}
               </p>
             </div>
             <div>
@@ -965,14 +1192,152 @@ function ReviewStep({
         </CardContent>
       </Card>
 
+      {/* Scheduling Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>When to Send</CardTitle>
+          <CardDescription>
+            Send now or schedule for later
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RadioGroup
+            onValueChange={(v) => onChange({ scheduleType: v as ScheduleType })}
+            value={data.scheduleType}
+          >
+            {/* Send Now */}
+            <div className="flex items-start space-x-3 rounded-lg border p-4">
+              <RadioGroupItem id="now" value="now" />
+              <div className="flex-1">
+                <label
+                  className="cursor-pointer font-medium text-sm"
+                  htmlFor="now"
+                >
+                  <Send className="mr-1 inline h-4 w-4" />
+                  Send immediately
+                </label>
+                <p className="mt-1 text-muted-foreground text-xs">
+                  Start sending to recipients right away
+                </p>
+              </div>
+            </div>
+
+            {/* Schedule for Later */}
+            <div
+              className={cn(
+                "flex items-start space-x-3 rounded-lg border p-4",
+                !schedulingEnabled && "cursor-not-allowed opacity-60"
+              )}
+            >
+              <RadioGroupItem
+                disabled={!schedulingEnabled}
+                id="later"
+                value="later"
+              />
+              <div className="flex-1 space-y-3">
+                <div>
+                  <label
+                    className={cn(
+                      "font-medium text-sm",
+                      schedulingEnabled ? "cursor-pointer" : "cursor-not-allowed"
+                    )}
+                    htmlFor="later"
+                  >
+                    {schedulingEnabled ? (
+                      <Clock className="mr-1 inline h-4 w-4" />
+                    ) : (
+                      <Lock className="mr-1 inline h-4 w-4" />
+                    )}
+                    Schedule for later
+                    {!schedulingEnabled && (
+                      <span className="ml-2 text-muted-foreground text-xs">
+                        (Pro plan)
+                      </span>
+                    )}
+                  </label>
+                  <p className="mt-1 text-muted-foreground text-xs">
+                    {schedulingEnabled
+                      ? "Choose a specific date and time to send"
+                      : "Upgrade to Pro to schedule broadcasts for later"}
+                  </p>
+                </div>
+                {data.scheduleType === "later" && (
+                  <div className="flex flex-wrap gap-3">
+                    {/* Date Picker */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          className={cn(
+                            "w-[180px] justify-start text-left font-normal",
+                            !data.scheduledDate && "text-muted-foreground"
+                          )}
+                          variant="outline"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {data.scheduledDate ? (
+                            format(data.scheduledDate, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-auto p-0">
+                        <Calendar
+                          disabled={(date) => date < new Date()}
+                          mode="single"
+                          onSelect={(date) => onChange({ scheduledDate: date })}
+                          selected={data.scheduledDate}
+                        />
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* Time Picker */}
+                    <Select
+                      onValueChange={(v) => onChange({ scheduledTime: v })}
+                      value={data.scheduledTime}
+                    >
+                      <SelectTrigger className="w-[130px]">
+                        <Clock className="mr-2 h-4 w-4" />
+                        <SelectValue placeholder="Time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {data.scheduleType === "later" && scheduledDateTime && (
+                  <p className="text-muted-foreground text-xs">
+                    Scheduled for {format(scheduledDateTime, "PPPP 'at' p")}
+                  </p>
+                )}
+              </div>
+            </div>
+          </RadioGroup>
+        </CardContent>
+      </Card>
+
       <div className="flex justify-end pt-4">
         <Button
-          disabled={isPending || recipientCount === 0}
+          disabled={
+            isPending ||
+            recipientCount === 0 ||
+            (data.scheduleType === "later" && !data.scheduledDate)
+          }
           onClick={onSend}
           size="lg"
         >
           {isPending ? (
-            "Sending..."
+            data.scheduleType === "later" ? "Scheduling..." : "Sending..."
+          ) : data.scheduleType === "later" ? (
+            <>
+              <Clock className="mr-2 h-4 w-4" />
+              Schedule for {recipientCount?.toLocaleString() ?? 0} contacts
+            </>
           ) : (
             <>
               <Send className="mr-2 h-4 w-4" />

@@ -54,7 +54,9 @@ export default async function BatchDetailPage({
 
   const batch = result.batch;
   const canCancel =
-    (batch.status === "queued" || batch.status === "processing") &&
+    (batch.status === "scheduled" ||
+      batch.status === "queued" ||
+      batch.status === "processing") &&
     ["owner", "admin"].includes(orgWithMembership.userRole);
 
   return (
@@ -252,6 +254,22 @@ export default async function BatchDetailPage({
                 <div>
                   {batch.awsAccount.name} ({batch.awsAccount.region})
                 </div>
+              </div>
+            )}
+            {batch.scheduledFor && (
+              <div>
+                <div className="font-medium text-muted-foreground">
+                  Scheduled For
+                </div>
+                <div>{new Date(batch.scheduledFor).toLocaleString()}</div>
+              </div>
+            )}
+            {batch.startedAt && (
+              <div>
+                <div className="font-medium text-muted-foreground">
+                  Started
+                </div>
+                <div>{new Date(batch.startedAt).toLocaleString()}</div>
               </div>
             )}
             {batch.completedAt && (

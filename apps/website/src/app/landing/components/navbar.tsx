@@ -28,11 +28,30 @@ import { useTheme } from "@/hooks/use-theme";
 
 const navigationItems = [
   { name: "Home", href: "/" },
-  { name: "Features", href: "#features" },
-  { name: "Docs", href: "/docs", hasSubmenu: true },
+  { name: "Features", href: "#features", hasSubmenu: true, submenuType: "features" },
+  { name: "Docs", href: "/docs", hasSubmenu: true, submenuType: "docs" },
   { name: "Pricing", href: "#pricing" },
   { name: "FAQ", href: "#faq" },
   { name: "SMS", href: "/sms", badge: "Soon" },
+];
+
+// Features menu items
+const featuresItems = [
+  {
+    name: "CLI & SDK",
+    href: "#quickstart",
+    description: "Deploy infrastructure and send emails with code",
+  },
+  {
+    name: "Templates",
+    href: "#template-editor",
+    description: "Drag-and-drop email builder with AI",
+  },
+  {
+    name: "Broadcasts",
+    href: "#broadcasts",
+    description: "Send to audiences with scheduling",
+  },
 ];
 
 // Docs menu items for mobile
@@ -66,6 +85,7 @@ const smoothScrollTo = (targetId: string) => {
 export function LandingNavbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
+  const [featuresOpen, setFeaturesOpen] = useState(false);
   const { setTheme, theme } = useTheme();
 
   return (
@@ -88,45 +108,71 @@ export function LandingNavbar() {
                     <NavigationMenuTrigger
                       className="cursor-pointer bg-transparent px-4 py-2 font-medium text-sm transition-colors hover:bg-transparent hover:text-primary focus:bg-transparent focus:text-primary data-[state=open]:bg-transparent data-active:bg-transparent"
                       onClick={() => {
-                        window.location.href = item.href;
+                        if (item.submenuType === "docs") {
+                          window.location.href = item.href;
+                        }
                       }}
                     >
                       {item.name}
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
-                      <div className="grid w-[400px] gap-3 p-4">
-                        {docsItems.map((docItem) =>
-                          docItem.title ? (
-                            <div
-                              className="px-2 py-1 font-semibold text-muted-foreground text-xs uppercase tracking-wider"
-                              key={`title-${docItem.title}`}
-                            >
-                              {docItem.title}
-                            </div>
-                          ) : (
-                            <NavigationMenuLink asChild key={docItem.name}>
+                      {item.submenuType === "features" ? (
+                        <div className="grid w-[320px] gap-2 p-4">
+                          {featuresItems.map((featureItem) => (
+                            <NavigationMenuLink asChild key={featureItem.name}>
                               <a
-                                className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                                href={docItem.href || "#"}
-                                rel={
-                                  docItem.href?.startsWith("http")
-                                    ? "noopener noreferrer"
-                                    : undefined
-                                }
-                                target={
-                                  docItem.href?.startsWith("http")
-                                    ? "_blank"
-                                    : undefined
-                                }
+                                className="block cursor-pointer select-none rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                                href={featureItem.href}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  smoothScrollTo(featureItem.href);
+                                }}
                               >
-                                <div className="font-medium text-sm leading-none">
-                                  {docItem.name}
+                                <div className="mb-1 font-medium text-sm leading-none">
+                                  {featureItem.name}
                                 </div>
+                                <p className="text-muted-foreground text-xs leading-snug">
+                                  {featureItem.description}
+                                </p>
                               </a>
                             </NavigationMenuLink>
-                          )
-                        )}
-                      </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="grid w-[400px] gap-3 p-4">
+                          {docsItems.map((docItem) =>
+                            docItem.title ? (
+                              <div
+                                className="px-2 py-1 font-semibold text-muted-foreground text-xs uppercase tracking-wider"
+                                key={`title-${docItem.title}`}
+                              >
+                                {docItem.title}
+                              </div>
+                            ) : (
+                              <NavigationMenuLink asChild key={docItem.name}>
+                                <a
+                                  className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                                  href={docItem.href || "#"}
+                                  rel={
+                                    docItem.href?.startsWith("http")
+                                      ? "noopener noreferrer"
+                                      : undefined
+                                  }
+                                  target={
+                                    docItem.href?.startsWith("http")
+                                      ? "_blank"
+                                      : undefined
+                                  }
+                                >
+                                  <div className="font-medium text-sm leading-none">
+                                    {docItem.name}
+                                  </div>
+                                </a>
+                              </NavigationMenuLink>
+                            )
+                          )}
+                        </div>
+                      )}
                     </NavigationMenuContent>
                   </>
                 ) : (
@@ -253,47 +299,85 @@ export function LandingNavbar() {
                   {navigationItems.map((item) => (
                     <div key={item.name}>
                       {item.hasSubmenu ? (
-                        <Collapsible onOpenChange={setDocsOpen} open={docsOpen}>
-                          <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between rounded-lg px-4 py-3 font-medium text-base transition-colors hover:bg-accent hover:text-accent-foreground">
-                            {item.name}
-                            <ChevronDown
-                              className={`h-4 w-4 transition-transform ${docsOpen ? "rotate-180" : ""}`}
-                            />
-                          </CollapsibleTrigger>
-                          <CollapsibleContent className="space-y-1 pl-4">
-                            {docsItems.map((docItem) =>
-                              docItem.title ? (
-                                <div
-                                  className="mt-5 px-4 py-2 font-semibold text-muted-foreground/50 text-xs uppercase tracking-wider"
-                                  key={`title-${docItem.title}`}
-                                >
-                                  {docItem.title}
-                                </div>
-                              ) : (
+                        item.submenuType === "features" ? (
+                          <Collapsible
+                            onOpenChange={setFeaturesOpen}
+                            open={featuresOpen}
+                          >
+                            <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between rounded-lg px-4 py-3 font-medium text-base transition-colors hover:bg-accent hover:text-accent-foreground">
+                              {item.name}
+                              <ChevronDown
+                                className={`h-4 w-4 transition-transform ${featuresOpen ? "rotate-180" : ""}`}
+                              />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="space-y-1 pl-4">
+                              {featuresItems.map((featureItem) => (
                                 <a
-                                  className="flex cursor-pointer items-center rounded-lg px-4 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-                                  href={docItem.href || "#"}
-                                  key={docItem.name}
-                                  onClick={() => {
+                                  className="flex cursor-pointer flex-col rounded-lg px-4 py-2 transition-colors hover:bg-accent hover:text-accent-foreground"
+                                  href={featureItem.href}
+                                  key={featureItem.name}
+                                  onClick={(e) => {
+                                    e.preventDefault();
                                     setIsOpen(false);
+                                    setTimeout(
+                                      () => smoothScrollTo(featureItem.href),
+                                      100
+                                    );
                                   }}
-                                  rel={
-                                    docItem.href?.startsWith("http")
-                                      ? "noopener noreferrer"
-                                      : undefined
-                                  }
-                                  target={
-                                    docItem.href?.startsWith("http")
-                                      ? "_blank"
-                                      : undefined
-                                  }
                                 >
-                                  {docItem.name}
+                                  <span className="font-medium text-sm">
+                                    {featureItem.name}
+                                  </span>
+                                  <span className="text-muted-foreground text-xs">
+                                    {featureItem.description}
+                                  </span>
                                 </a>
-                              )
-                            )}
-                          </CollapsibleContent>
-                        </Collapsible>
+                              ))}
+                            </CollapsibleContent>
+                          </Collapsible>
+                        ) : (
+                          <Collapsible onOpenChange={setDocsOpen} open={docsOpen}>
+                            <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between rounded-lg px-4 py-3 font-medium text-base transition-colors hover:bg-accent hover:text-accent-foreground">
+                              {item.name}
+                              <ChevronDown
+                                className={`h-4 w-4 transition-transform ${docsOpen ? "rotate-180" : ""}`}
+                              />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="space-y-1 pl-4">
+                              {docsItems.map((docItem) =>
+                                docItem.title ? (
+                                  <div
+                                    className="mt-5 px-4 py-2 font-semibold text-muted-foreground/50 text-xs uppercase tracking-wider"
+                                    key={`title-${docItem.title}`}
+                                  >
+                                    {docItem.title}
+                                  </div>
+                                ) : (
+                                  <a
+                                    className="flex cursor-pointer items-center rounded-lg px-4 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                                    href={docItem.href || "#"}
+                                    key={docItem.name}
+                                    onClick={() => {
+                                      setIsOpen(false);
+                                    }}
+                                    rel={
+                                      docItem.href?.startsWith("http")
+                                        ? "noopener noreferrer"
+                                        : undefined
+                                    }
+                                    target={
+                                      docItem.href?.startsWith("http")
+                                        ? "_blank"
+                                        : undefined
+                                    }
+                                  >
+                                    {docItem.name}
+                                  </a>
+                                )
+                              )}
+                            </CollapsibleContent>
+                          </Collapsible>
+                        )
                       ) : (
                         <a
                           className="flex cursor-pointer items-center gap-2 rounded-lg px-4 py-3 font-medium text-base transition-colors hover:bg-accent hover:text-accent-foreground"

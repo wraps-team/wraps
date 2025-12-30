@@ -17,6 +17,10 @@ import {
 import { planGateMiddleware } from "../middleware/plan-gate";
 import { rateLimitMiddleware } from "../middleware/rate-limit";
 import { enqueueJob } from "../services/queue";
+import {
+  createBroadcastSchedule,
+  deleteBroadcastSchedule,
+} from "../services/scheduler";
 
 // Batch send request schema
 const createBatchSchema = t.Object({
@@ -86,6 +90,12 @@ export const batchRoutes = new Elysia({ prefix: "/v1/batch" })
         );
       }
 
+      // Determine if this is a scheduled send
+      const scheduledFor = body.scheduledFor
+        ? new Date(body.scheduledFor)
+        : undefined;
+      const isScheduled = scheduledFor && scheduledFor > new Date();
+
       // Create batch send record
       const [batch] = await db
         .insert(batchSend)
@@ -94,7 +104,7 @@ export const batchRoutes = new Elysia({ prefix: "/v1/batch" })
           awsAccountId: body.awsAccountId,
           channel: body.channel ?? "email",
           name: body.name ?? `Batch ${new Date().toISOString()}`,
-          status: "queued",
+          status: isScheduled ? "scheduled" : "queued",
           // Email fields
           subject: body.subject,
           previewText: body.previewText,
@@ -107,9 +117,7 @@ export const batchRoutes = new Elysia({ prefix: "/v1/batch" })
           body: body.body,
           senderId: body.senderId,
           // Scheduling
-          scheduledFor: body.scheduledFor
-            ? new Date(body.scheduledFor)
-            : undefined,
+          scheduledFor,
           // Recipients
           totalRecipients: recipientCount,
           // Tracking
@@ -117,14 +125,25 @@ export const batchRoutes = new Elysia({ prefix: "/v1/batch" })
         })
         .returning();
 
-      // Enqueue job to SQS
-      await enqueueJob({
-        batchId: batch.id,
-        organizationId: authContext.organizationId,
-        awsAccountId: body.awsAccountId,
-        channel: batch.channel,
-        chunkIndex: 0,
-      });
+      if (isScheduled && scheduledFor) {
+        // Create EventBridge schedule for future execution
+        await createBroadcastSchedule({
+          batchId: batch.id,
+          organizationId: authContext.organizationId,
+          awsAccountId: body.awsAccountId,
+          scheduledFor,
+          channel: (body.channel ?? "email") as "email" | "sms",
+        });
+      } else {
+        // Send immediately - enqueue to SQS
+        await enqueueJob({
+          batchId: batch.id,
+          organizationId: authContext.organizationId,
+          awsAccountId: body.awsAccountId,
+          channel: batch.channel,
+          chunkIndex: 0,
+        });
+      }
 
       return {
         id: batch.id,
@@ -199,6 +218,82 @@ export const batchRoutes = new Elysia({ prefix: "/v1/batch" })
         tags: ["batch"],
         summary: "Get batch status",
         description: "Returns the current status of a batch send job",
+      },
+    }
+  )
+  .delete(
+    "/:id",
+    async (ctx) => {
+      const { params, request, set } = ctx;
+
+      // Try middleware auth first, fall back to direct authenticate
+      let authContext = (ctx as unknown as { auth?: AuthContext }).auth;
+
+      if (!authContext) {
+        const authResult = await authenticate(request);
+        if ("error" in authResult) {
+          set.status = 401;
+          throw new Error(authResult.error);
+        }
+        authContext = authResult.auth;
+      }
+
+      // Find the batch
+      const [batch] = await db
+        .select()
+        .from(batchSend)
+        .where(eq(batchSend.id, params.id))
+        .limit(1);
+
+      if (!batch) {
+        set.status = 404;
+        throw new Error("Batch not found");
+      }
+
+      // Verify ownership
+      if (batch.organizationId !== authContext.organizationId) {
+        set.status = 403;
+        throw new Error("Not authorized");
+      }
+
+      // Can only cancel scheduled or queued batches
+      if (!["scheduled", "queued"].includes(batch.status)) {
+        set.status = 400;
+        throw new Error(
+          `Cannot cancel batch in '${batch.status}' status. Only scheduled or queued batches can be cancelled.`
+        );
+      }
+
+      // If scheduled, delete the EventBridge schedule
+      if (batch.status === "scheduled") {
+        await deleteBroadcastSchedule(batch.id);
+      }
+
+      // Update status to cancelled
+      await db
+        .update(batchSend)
+        .set({
+          status: "cancelled",
+          updatedAt: new Date(),
+        })
+        .where(eq(batchSend.id, params.id));
+
+      return { success: true, id: batch.id, status: "cancelled" };
+    },
+    {
+      params: t.Object({
+        id: t.String(),
+      }),
+      response: t.Object({
+        success: t.Boolean(),
+        id: t.String(),
+        status: t.String(),
+      }),
+      detail: {
+        tags: ["batch"],
+        summary: "Cancel batch send",
+        description:
+          "Cancels a scheduled or queued batch send. If scheduled, also deletes the EventBridge schedule.",
       },
     }
   );

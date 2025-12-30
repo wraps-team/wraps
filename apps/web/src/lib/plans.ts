@@ -40,6 +40,7 @@ export interface RateLimits {
 export interface PlanConfig {
   name: string;
   price: number;
+  earlyAdopterPrice?: number; // Discounted price for first 50 customers
   period: string;
   description: string;
   dashboardAccess: boolean;
@@ -62,6 +63,10 @@ export interface PlanConfig {
   cta: string;
 }
 
+// Early adopter pricing is active until we reach 50 customers
+// After that, prices return to normal (and SMS features will be added)
+export const EARLY_ADOPTER_ACTIVE = true;
+
 // ═══════════════════════════════════════════════════════════════════════════
 // PLAN DEFINITIONS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -70,6 +75,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
   starter: {
     name: "Starter",
     price: 19,
+    earlyAdopterPrice: 10,
     period: "/month",
     description: "Transactional email + simple broadcasts",
     dashboardAccess: true,
@@ -115,6 +121,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
   pro: {
     name: "Pro",
     price: 49,
+    earlyAdopterPrice: 30,
     period: "/month",
     description: "Add audience management",
     dashboardAccess: true,
@@ -294,6 +301,23 @@ export function getDisplayPlans(): { id: PlanId; plan: PlanConfig }[] {
  */
 export function formatPrice(plan: PlanConfig): string {
   return `$${plan.price}`;
+}
+
+/**
+ * Get the current display price (early adopter or regular)
+ */
+export function getDisplayPrice(plan: PlanConfig): number {
+  if (EARLY_ADOPTER_ACTIVE && plan.earlyAdopterPrice) {
+    return plan.earlyAdopterPrice;
+  }
+  return plan.price;
+}
+
+/**
+ * Check if a plan has early adopter pricing active
+ */
+export function hasEarlyAdopterPricing(plan: PlanConfig): boolean {
+  return EARLY_ADOPTER_ACTIVE && plan.earlyAdopterPrice !== undefined;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
