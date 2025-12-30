@@ -19,12 +19,14 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "seed:demo": "tsx scripts/seed-demo-batches.ts"
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.2",
     "@types/ws": "^8.18.1",
-    "tsdown": "catalog:"
+    "tsdown": "catalog:",
+    "tsx": "^4.20.6"
   },
   "peerDependencies": {
     "typescript": "catalog:"
