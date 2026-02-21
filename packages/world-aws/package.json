@@ -1,0 +1,76 @@
+{
+  "name": "@wraps.dev/world-aws",
+  "version": "0.1.0",
+  "description": "AWS World implementation for Vercel Workflow DevKit (DynamoDB + SQS)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./lambda": {
+      "import": "./dist/lambda/sqs-handler.js",
+      "types": "./dist/lambda/sqs-handler.d.ts"
+    }
+  },
+  "bin": {
+    "world-aws-setup": "./bin/setup.ts"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wraps-team/wraps.git",
+    "directory": "packages/world-aws"
+  },
+  "homepage": "https://wraps.dev",
+  "bugs": {
+    "url": "https://github.com/wraps-team/wraps/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "aws",
+    "dynamodb",
+    "sqs",
+    "workflow",
+    "world"
+  ],
+  "author": "Wraps",
+  "license": "AGPL-3.0-or-later",
+  "peerDependencies": {
+    "@workflow/world": "^4.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "3.933.0",
+    "@aws-sdk/client-sqs": "3.933.0",
+    "@aws-sdk/lib-dynamodb": "3.933.0",
+    "ulid": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^20.11.0",
+    "@workflow/world": "^4.1.0-beta.6",
+    "tsup": "^8.5.1",
+    "tsx": "^4.20.6",
+    "typescript": "catalog:",
+    "vitest": "^4.0.7",
+    "zod": "catalog:"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
