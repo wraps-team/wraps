@@ -6,6 +6,7 @@ import {
   type KeySchemaElement,
   type AttributeDefinition,
   type GlobalSecondaryIndex,
+  type StreamSpecification,
 } from "@aws-sdk/client-dynamodb";
 import {
   CreateQueueCommand,
@@ -22,6 +23,7 @@ interface TableDef {
   keys: KeySchemaElement[];
   attributes: AttributeDefinition[];
   gsis?: GlobalSecondaryIndex[];
+  streamSpecification?: StreamSpecification;
 }
 
 function buildTableDefs(prefix: string): TableDef[] {
@@ -158,6 +160,10 @@ function buildTableDefs(prefix: string): TableDef[] {
           Projection: { ProjectionType: "ALL" },
         },
       ],
+      streamSpecification: {
+        StreamEnabled: true,
+        StreamViewType: "NEW_IMAGE",
+      },
     },
   ];
 }
@@ -187,6 +193,7 @@ async function createTable(client: DynamoDBClient, def: TableDef): Promise<void>
       AttributeDefinitions: def.attributes,
       BillingMode: "PAY_PER_REQUEST",
       ...(def.gsis?.length ? { GlobalSecondaryIndexes: def.gsis } : {}),
+      ...(def.streamSpecification ? { StreamSpecification: def.streamSpecification } : {}),
     }),
   );
 

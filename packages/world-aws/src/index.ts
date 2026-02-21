@@ -1,3 +1,4 @@
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import type { AWSWorldConfig } from "./config.js";
 import { resolveConfig } from "./config.js";
 import { createDynamoDBClient } from "./dynamodb/client.js";
@@ -6,6 +7,7 @@ import { createStorage } from "./storage/index.js";
 import { createQueue } from "./queue/index.js";
 import { createSQSClient } from "./queue/sqs-client.js";
 import { createStreamer } from "./streamer/index.js";
+import { createStreamsClient } from "./dynamodb/streams-client.js";
 
 export type { AWSWorldConfig } from "./config.js";
 export { resolveConfig } from "./config.js";
@@ -16,10 +18,15 @@ export function createWorld(config?: AWSWorldConfig) {
   const tables = getTableNames(resolved.tablePrefix);
   const docClient = createDynamoDBClient(resolved);
   const sqsClient = createSQSClient(resolved);
+  const ddbClient = new DynamoDBClient({
+    region: resolved.region,
+    ...(resolved.endpoint ? { endpoint: resolved.endpoint } : {}),
+  });
+  const streamsClient = createStreamsClient(resolved);
 
   const storage = createStorage(docClient, tables);
   const queue = createQueue(sqsClient, resolved);
-  const streamer = createStreamer(docClient, tables);
+  const streamer = createStreamer(docClient, tables, ddbClient, streamsClient);
 
   return {
     ...storage,
@@ -33,6 +40,8 @@ export function createWorld(config?: AWSWorldConfig) {
     async close() {
       docClient.destroy();
       sqsClient.destroy();
+      ddbClient.destroy();
+      streamsClient.destroy();
     },
   };
 }

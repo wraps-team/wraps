@@ -1,4 +1,11 @@
 import { PutCommand, QueryCommand, BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
+import { DescribeTableCommand, type DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  DescribeStreamCommand,
+  GetShardIteratorCommand,
+  GetRecordsCommand,
+  type DynamoDBStreamsClient,
+} from "@aws-sdk/client-dynamodb-streams";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
@@ -13,8 +20,14 @@ function toBytes(chunk: string | Uint8Array): Uint8Array {
   return typeof chunk === "string" ? encoder.encode(chunk) : chunk;
 }
 
-export function createStreamer(docClient: DynamoDBDocumentClient, tables: TableNames) {
+export function createStreamer(
+  docClient: DynamoDBDocumentClient,
+  tables: TableNames,
+  ddbClient: DynamoDBClient,
+  streamsClient: DynamoDBStreamsClient,
+) {
   const tableName = tables.streams;
+  let cachedStreamArn: string | undefined;
 
   async function writeToStream(name: string, runId: string, chunk: string | Uint8Array): Promise<void> {
     await docClient.send(
@@ -75,14 +88,65 @@ export function createStreamer(docClient: DynamoDBDocumentClient, tables: TableN
     );
   }
 
+  async function getStreamArn(): Promise<string> {
+    if (cachedStreamArn) return cachedStreamArn;
+    const result = await ddbClient.send(
+      new DescribeTableCommand({ TableName: tableName }),
+    );
+    const arn = result.Table?.LatestStreamArn;
+    if (!arn) throw new Error(`No stream ARN found for table ${tableName}`);
+    cachedStreamArn = arn;
+    return arn;
+  }
+
+  async function getShardIterators(streamArn: string): Promise<string[]> {
+    const shards: Array<{ ShardId?: string; SequenceNumberRange?: { EndingSequenceNumber?: string } }> = [];
+    let exclusiveStartShardId: string | undefined;
+
+    do {
+      const result = await streamsClient.send(
+        new DescribeStreamCommand({
+          StreamArn: streamArn,
+          ...(exclusiveStartShardId ? { ExclusiveStartShardId: exclusiveStartShardId } : {}),
+        }),
+      );
+      shards.push(...(result.StreamDescription?.Shards ?? []));
+      exclusiveStartShardId = result.StreamDescription?.LastEvaluatedShardId ?? undefined;
+    } while (exclusiveStartShardId);
+
+    // Active shards have no EndingSequenceNumber
+    const activeShards = shards.filter(
+      (s) => !s.SequenceNumberRange?.EndingSequenceNumber,
+    );
+
+    const iterators: string[] = [];
+    for (const shard of activeShards) {
+      const result = await streamsClient.send(
+        new GetShardIteratorCommand({
+          StreamArn: streamArn,
+          ShardId: shard.ShardId!,
+          ShardIteratorType: "LATEST",
+        }),
+      );
+      if (result.ShardIterator) {
+        iterators.push(result.ShardIterator);
+      }
+    }
+
+    return iterators;
+  }
+
   async function readFromStream(name: string, startIndex?: number): Promise<ReadableStream<Uint8Array>> {
-    // Poll-based approach: query chunks, poll for new ones until EOF.
-    // Future optimization: use DynamoDB Streams + WebSocket for true push.
     let lastChunkId: string | undefined;
     let chunksSeen = 0;
 
+    // Acquire shard iterators BEFORE catch-up to avoid missing records in the gap
+    const streamArn = await getStreamArn();
+    let shardIterators = await getShardIterators(streamArn);
+
     return new ReadableStream<Uint8Array>({
       async pull(controller) {
+        // Phase 1: Catch up from existing table data
         // eslint-disable-next-line no-constant-condition
         while (true) {
           const result = await docClient.send(
@@ -96,6 +160,7 @@ export function createStreamer(docClient: DynamoDBDocumentClient, tables: TableN
                 ...(lastChunkId ? { ":last": lastChunkId } : {}),
               },
               ScanIndexForward: true,
+              ConsistentRead: true,
             }),
           );
 
@@ -120,12 +185,67 @@ export function createStreamer(docClient: DynamoDBDocumentClient, tables: TableN
             }
           }
 
-          if (items.length > 0) {
-            // Got some data but no EOF, check if there's more immediately
-            continue;
+          if (items.length === 0) break; // Caught up with existing data
+        }
+
+        // Phase 2: Consume new records from DynamoDB Streams
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          for (let i = 0; i < shardIterators.length; i++) {
+            const iterator = shardIterators[i];
+            if (!iterator) continue;
+
+            try {
+              const response = await streamsClient.send(
+                new GetRecordsCommand({ ShardIterator: iterator }),
+              );
+
+              shardIterators[i] = response.NextShardIterator ?? "";
+
+              for (const record of response.Records ?? []) {
+                if (record.eventName !== "INSERT") continue;
+                const image = record.dynamodb?.NewImage;
+                if (!image) continue;
+
+                const recordStreamId = image.streamId?.S;
+                if (recordStreamId !== name) continue;
+
+                const recordChunkId = image.chunkId?.S;
+                // Skip chunks already seen during catch-up
+                if (lastChunkId && recordChunkId && recordChunkId <= lastChunkId) continue;
+
+                if (recordChunkId) lastChunkId = recordChunkId;
+
+                if (image.eof?.BOOL) {
+                  controller.close();
+                  return;
+                }
+
+                chunksSeen++;
+                if (startIndex !== undefined && chunksSeen <= startIndex) continue;
+
+                const data = image.data?.B;
+                if (data && data.length > 0) {
+                  controller.enqueue(new Uint8Array(data));
+                }
+              }
+            } catch (e) {
+              if (e instanceof Error && e.name === "ExpiredIteratorException") {
+                shardIterators = await getShardIterators(streamArn);
+                break; // Restart the shard polling loop
+              }
+              throw e;
+            }
           }
 
-          // No new items — wait and poll again
+          // Remove exhausted shards (empty iterator string)
+          shardIterators = shardIterators.filter(Boolean);
+
+          if (shardIterators.length === 0) {
+            // All shards exhausted — re-discover
+            shardIterators = await getShardIterators(streamArn);
+          }
+
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
         }
       },
