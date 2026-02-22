@@ -123,6 +123,167 @@ Set it via environment variable or config:
 WORKFLOW_AWS_ENCRYPTION_KEY=<your-base64-key>
 ```
 
+## Architecture
+
+### How It Works
+
+```
+Your App                    AWS
+───────                    ───
+  │
+  ├─ start(workflow) ──► SQS (workflows queue)
+  │                           │
+  │                     Lambda (SQS trigger)
+  │                           │
+  │                     ├─ Read/write run state ──► DynamoDB (runs)
+  │                     ├─ Execute step ──────────► DynamoDB (steps, events)
+  │                     ├─ Queue next step ───────► SQS (steps queue)
+  │                     └─ Write output ──────────► DynamoDB (streams)
+  │                                                     │
+  └─ readFromStream() ◄──── DynamoDB Streams ◄──────────┘
+```
+
+1. **Your app** starts a workflow by sending a message to the SQS workflows queue
+2. **Lambda** picks up the message, reads/writes run state in DynamoDB, and executes the first step
+3. **Each step** queues the next step via SQS, creating a durable execution chain
+4. **Streaming output** is written to the streams table, which has DynamoDB Streams enabled for real-time reads
+5. **Failed messages** return to the queue (up to 3 retries) before moving to the dead letter queue
+
+### DynamoDB Tables
+
+| Table | PK | SK | GSIs |
+|-------|----|----|------|
+| `{prefix}-runs` | `runId` | — | `gsi-workflow-name`, `gsi-status` |
+| `{prefix}-steps` | `stepId` | — | `gsi-run` |
+| `{prefix}-events` | `runId` | `eventId` | `gsi-correlation` |
+| `{prefix}-hooks` | `hookId` | — | `gsi-run`, `gsi-token` |
+| `{prefix}-waits` | `waitId` | — | `gsi-run` |
+| `{prefix}-streams` | `streamId` | `chunkId` | `gsi-run` + DynamoDB Streams |
+
+All tables use on-demand billing (PAY_PER_REQUEST).
+
+### SQS Queues
+
+| Queue | DLQ | Visibility Timeout | Max Receives |
+|-------|-----|--------------------|-------------|
+| `{prefix}-workflows` | `{prefix}-workflows-dlq` | 900s (15 min) | 3 |
+| `{prefix}-steps` | `{prefix}-steps-dlq` | 900s (15 min) | 3 |
+
+Standard queues (not FIFO). Failed messages retry up to 3 times before moving to the dead letter queue.
+
+### Streaming
+
+The streams table uses a two-phase read for real-time output:
+
+1. **Catch-up phase** — reads existing chunks from the table in order
+2. **Stream phase** — polls DynamoDB Streams for new inserts (200ms interval)
+
+This ensures no data is missed between table reads and stream polling.
+
+## Local Development
+
+Use [LocalStack](https://localstack.cloud/) or [DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html) for local development. Set the `endpoint` option to point at your local service.
+
+### Using LocalStack
+
+Start LocalStack:
+
+```bash
+localstack start
+```
+
+Create infrastructure against it:
+
+```bash
+npx world-aws-setup --endpoint http://localhost:4566
+```
+
+Configure your app:
+
+```bash
+WORKFLOW_AWS_ENDPOINT=http://localhost:4566
+```
+
+Or programmatically:
+
+```typescript
+const world = createWorld({
+  endpoint: "http://localhost:4566",
+});
+```
+
+### Using DynamoDB Local
+
+DynamoDB Local only covers table storage — you'll still need LocalStack or [ElasticMQ](https://github.com/softwaremill/elasticmq) for SQS queues.
+
+```bash
+docker run -p 8000:8000 amazon/dynamodb-local
+npx world-aws-setup --endpoint http://localhost:8000
+```
+
+```bash
+WORKFLOW_AWS_ENDPOINT=http://localhost:8000
+```
+
+### Running Tests
+
+The test suite uses mocked AWS SDK clients (no running services required):
+
+```bash
+pnpm test    # 135 tests
+```
+
+## Migrating from Vercel World
+
+`@wraps.dev/world-aws` implements the same `World` interface as Vercel's built-in world. Switching requires three steps:
+
+### 1. Install the package
+
+```bash
+pnpm add @wraps.dev/world-aws
+```
+
+### 2. Create AWS infrastructure
+
+```bash
+npx world-aws-setup --region us-east-1
+```
+
+### 3. Set the environment variable
+
+```bash
+WORKFLOW_TARGET_WORLD=@wraps.dev/world-aws
+```
+
+Your workflow code (`"use workflow"`, `"use step"`, `step()`) stays exactly the same — no code changes required.
+
+### Key Differences
+
+| | Vercel World | AWS World |
+|---|---|---|
+| **Storage** | Vercel-managed | DynamoDB (your account) |
+| **Queues** | Vercel-managed | SQS (your account) |
+| **Execution** | Vercel Edge/Serverless | Lambda (SQS trigger) |
+| **Streaming** | Vercel infrastructure | DynamoDB Streams |
+| **Encryption** | — | Opt-in HKDF-SHA256 |
+| **Billing** | Vercel pricing | AWS pay-per-use |
+| **Data ownership** | Vercel | You |
+
+### Lambda Handler
+
+The main difference is that AWS World needs a Lambda function to consume SQS messages. Create a handler file:
+
+```typescript
+import { createWorld } from "@wraps.dev/world-aws";
+import { createSQSHandler } from "@wraps.dev/world-aws/lambda";
+import { serve } from "workflow";
+
+const world = createWorld();
+export const handler = createSQSHandler(serve(world));
+```
+
+Deploy this as a Lambda with SQS event source mappings for the `{prefix}-workflows` and `{prefix}-steps` queues.
+
 ## Requirements
 
 - AWS account with DynamoDB and SQS access
