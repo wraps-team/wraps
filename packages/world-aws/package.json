@@ -16,11 +16,10 @@
     }
   },
   "bin": {
-    "world-aws-setup": "./bin/setup.ts"
+    "world-aws-setup": "./dist/setup.js"
   },
   "files": [
-    "dist",
-    "bin"
+    "dist"
   ],
   "repository": {
     "type": "git",

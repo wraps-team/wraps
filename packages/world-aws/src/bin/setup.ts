@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 import {
   type AttributeDefinition,
   CreateTableCommand,
@@ -15,8 +14,8 @@ import {
   SQSClient,
   type SQSClient as SQSClientType,
 } from "@aws-sdk/client-sqs";
-import { type AWSWorldConfig, resolveConfig } from "../src/config.js";
-import { GSI, getTableNames } from "../src/dynamodb/tables.js";
+import { type AWSWorldConfig, resolveConfig } from "../config.js";
+import { GSI, getTableNames } from "../dynamodb/tables.js";
 
 type TableDef = {
   name: string;
