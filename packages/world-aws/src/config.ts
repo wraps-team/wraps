@@ -4,6 +4,7 @@ export type AWSWorldConfig = {
   queuePrefix?: string;
   endpoint?: string;
   deploymentId?: string;
+  encryptionKey?: string;
 };
 
 export type ResolvedConfig = {
@@ -12,6 +13,7 @@ export type ResolvedConfig = {
   queuePrefix: string;
   endpoint: string | undefined;
   deploymentId: string;
+  encryptionKey: string | undefined;
 };
 
 export function resolveConfig(config?: AWSWorldConfig): ResolvedConfig {
@@ -30,6 +32,15 @@ export function resolveConfig(config?: AWSWorldConfig): ResolvedConfig {
     config?.deploymentId ??
     process.env.WORKFLOW_AWS_DEPLOYMENT_ID ??
     `aws-${region}`;
+  const encryptionKey =
+    config?.encryptionKey ?? process.env.WORKFLOW_AWS_ENCRYPTION_KEY;
 
-  return { region, tablePrefix, queuePrefix, endpoint, deploymentId };
+  return {
+    region,
+    tablePrefix,
+    queuePrefix,
+    endpoint,
+    deploymentId,
+    encryptionKey,
+  };
 }

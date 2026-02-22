@@ -12,6 +12,7 @@ describe("resolveConfig", () => {
     process.env.WORKFLOW_AWS_QUEUE_PREFIX = undefined;
     process.env.WORKFLOW_AWS_ENDPOINT = undefined;
     process.env.WORKFLOW_AWS_DEPLOYMENT_ID = undefined;
+    process.env.WORKFLOW_AWS_ENCRYPTION_KEY = undefined;
   });
 
   afterEach(() => {
@@ -85,5 +86,33 @@ describe("resolveConfig", () => {
 
     expect(config.region).toBe("us-east-1");
     expect(config.tablePrefix).toBe("workflow");
+  });
+
+  it("reads encryptionKey from config", () => {
+    const config = resolveConfig({ encryptionKey: "my-key" });
+
+    expect(config.encryptionKey).toBe("my-key");
+  });
+
+  it("reads encryptionKey from env var", () => {
+    process.env.WORKFLOW_AWS_ENCRYPTION_KEY = "env-key";
+
+    const config = resolveConfig();
+
+    expect(config.encryptionKey).toBe("env-key");
+  });
+
+  it("config encryptionKey takes precedence over env var", () => {
+    process.env.WORKFLOW_AWS_ENCRYPTION_KEY = "env-key";
+
+    const config = resolveConfig({ encryptionKey: "config-key" });
+
+    expect(config.encryptionKey).toBe("config-key");
+  });
+
+  it("encryptionKey is undefined when not set", () => {
+    const config = resolveConfig();
+
+    expect(config.encryptionKey).toBeUndefined();
   });
 });
