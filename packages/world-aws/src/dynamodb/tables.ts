@@ -30,6 +30,11 @@ export const GSI = {
   },
 } as const;
 
+/**
+ * Returns DynamoDB table names for all entity types using the given prefix.
+ *
+ * Naming convention: `"{prefix}-{entity}"` — e.g. `"workflow-runs"`, `"workflow-events"`.
+ */
 export function getTableNames(prefix: string): TableNames {
   return {
     runs: `${prefix}-runs`,

@@ -2,6 +2,7 @@ import type { SQSClient } from "@aws-sdk/client-sqs";
 import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import { ulid } from "ulid";
 import type { ResolvedConfig } from "../config.js";
+import { wrapAWSError } from "../errors.js";
 
 export function createQueue(sqsClient: SQSClient, config: ResolvedConfig) {
   function getQueueUrl(sqsQueueName: string): string {
@@ -49,24 +50,28 @@ export function createQueue(sqsClient: SQSClient, config: ResolvedConfig) {
         attempt: 1,
       });
 
-      await sqsClient.send(
-        new SendMessageCommand({
-          QueueUrl: queueUrl,
-          MessageBody: body,
-          DelaySeconds: opts?.delaySeconds,
-          MessageAttributes: {
-            ...(opts?.idempotencyKey
-              ? {
-                  IdempotencyKey: {
-                    DataType: "String",
-                    StringValue: opts.idempotencyKey,
-                  },
-                }
-              : {}),
-            QueueName: { DataType: "String", StringValue: queueName },
-          },
-        })
-      );
+      try {
+        await sqsClient.send(
+          new SendMessageCommand({
+            QueueUrl: queueUrl,
+            MessageBody: body,
+            DelaySeconds: opts?.delaySeconds,
+            MessageAttributes: {
+              ...(opts?.idempotencyKey
+                ? {
+                    IdempotencyKey: {
+                      DataType: "String",
+                      StringValue: opts.idempotencyKey,
+                    },
+                  }
+                : {}),
+              QueueName: { DataType: "String", StringValue: queueName },
+            },
+          })
+        );
+      } catch (e) {
+        wrapAWSError(e, "queue.send");
+      }
 
       return { messageId: messageId as string };
     },

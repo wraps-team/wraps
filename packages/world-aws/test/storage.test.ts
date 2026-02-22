@@ -15,6 +15,7 @@ import { createEventsStorage } from "../src/storage/events.js";
 import { createHooksStorage } from "../src/storage/hooks.js";
 import { createRunsStorage } from "../src/storage/runs.js";
 import { createStepsStorage } from "../src/storage/steps.js";
+import { createWaitsStorage } from "../src/storage/waits.js";
 
 const tables = getTableNames("test");
 
@@ -126,6 +127,80 @@ describe("RunsStorage", () => {
     const calls = docMock.commandCalls(QueryCommand);
     expect(calls[0].args[0].input.IndexName).toBe("gsi-status");
   });
+
+  it("list() returns empty results correctly", async () => {
+    docMock.on(ScanCommand).resolves({ Items: [] });
+
+    const runs = createRunsStorage(docClient, tables);
+    const result = await runs.list();
+
+    expect(result.data).toEqual([]);
+    expect(result.cursor).toBeNull();
+    expect(result.hasMore).toBe(false);
+  });
+
+  it("list() single item without LastEvaluatedKey has hasMore false", async () => {
+    docMock.on(ScanCommand).resolves({
+      Items: [
+        {
+          runId: "run-1",
+          status: "pending",
+          deploymentId: "dep-1",
+          workflowName: "wf",
+          input: new Uint8Array(),
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+
+    const runs = createRunsStorage(docClient, tables);
+    const result = await runs.list();
+
+    expect(result.data).toHaveLength(1);
+    expect(result.hasMore).toBe(false);
+    expect(result.cursor).toBeNull();
+  });
+
+  it("list() caps limit at 1000", async () => {
+    docMock.on(ScanCommand).resolves({ Items: [] });
+
+    const runs = createRunsStorage(docClient, tables);
+    await runs.list({ pagination: { limit: 5000 } });
+
+    const calls = docMock.commandCalls(ScanCommand);
+    expect(calls[0].args[0].input.Limit).toBe(1000);
+  });
+
+  it("list() cursor round-trip passes ExclusiveStartKey", async () => {
+    const cursorKey = { runId: "run-1" };
+    const cursor = Buffer.from(JSON.stringify(cursorKey))
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    docMock.on(ScanCommand).resolves({ Items: [] });
+
+    const runs = createRunsStorage(docClient, tables);
+    await runs.list({ pagination: { cursor } });
+
+    const calls = docMock.commandCalls(ScanCommand);
+    expect(calls[0].args[0].input.ExclusiveStartKey).toEqual(cursorKey);
+  });
+
+  it("list() sortOrder desc sets ScanIndexForward false", async () => {
+    docMock.on(QueryCommand).resolves({ Items: [] });
+
+    const runs = createRunsStorage(docClient, tables);
+    await runs.list({
+      workflowName: "wf",
+      pagination: { sortOrder: "desc" },
+    });
+
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.ScanIndexForward).toBe(false);
+  });
 });
 
 describe("StepsStorage", () => {
@@ -161,6 +236,37 @@ describe("StepsStorage", () => {
 
     const calls = docMock.commandCalls(QueryCommand);
     expect(calls[0].args[0].input.IndexName).toBe("gsi-run");
+  });
+
+  it("list() returns empty results correctly", async () => {
+    docMock.on(QueryCommand).resolves({ Items: [] });
+
+    const steps = createStepsStorage(docClient, tables);
+    const result = await steps.list({ runId: "run-1" });
+
+    expect(result.data).toEqual([]);
+    expect(result.cursor).toBeNull();
+    expect(result.hasMore).toBe(false);
+  });
+
+  it("list() caps limit at 1000", async () => {
+    docMock.on(QueryCommand).resolves({ Items: [] });
+
+    const steps = createStepsStorage(docClient, tables);
+    await steps.list({ runId: "run-1", pagination: { limit: 9999 } });
+
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.Limit).toBe(1000);
+  });
+
+  it("list() sortOrder desc sets ScanIndexForward false", async () => {
+    docMock.on(QueryCommand).resolves({ Items: [] });
+
+    const steps = createStepsStorage(docClient, tables);
+    await steps.list({ runId: "run-1", pagination: { sortOrder: "desc" } });
+
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.ScanIndexForward).toBe(false);
   });
 });
 
@@ -214,6 +320,37 @@ describe("HooksStorage", () => {
     await expect(hooks.getByToken("missing")).rejects.toThrow(
       "Hook not found for token"
     );
+  });
+
+  it("list() returns empty results correctly", async () => {
+    docMock.on(ScanCommand).resolves({ Items: [] });
+
+    const hooks = createHooksStorage(docClient, tables);
+    const result = await hooks.list({});
+
+    expect(result.data).toEqual([]);
+    expect(result.cursor).toBeNull();
+    expect(result.hasMore).toBe(false);
+  });
+
+  it("list() caps limit at 1000", async () => {
+    docMock.on(ScanCommand).resolves({ Items: [] });
+
+    const hooks = createHooksStorage(docClient, tables);
+    await hooks.list({ pagination: { limit: 2000 } });
+
+    const calls = docMock.commandCalls(ScanCommand);
+    expect(calls[0].args[0].input.Limit).toBe(1000);
+  });
+
+  it("list() sortOrder desc sets ScanIndexForward false", async () => {
+    docMock.on(QueryCommand).resolves({ Items: [] });
+
+    const hooks = createHooksStorage(docClient, tables);
+    await hooks.list({ runId: "run-1", pagination: { sortOrder: "desc" } });
+
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.ScanIndexForward).toBe(false);
   });
 });
 
@@ -363,6 +500,47 @@ describe("EventsStorage", () => {
 
     const calls = docMock.commandCalls(QueryCommand);
     expect(calls[0].args[0].input.IndexName).toBe("gsi-correlation");
+  });
+
+  it("list() returns empty results correctly", async () => {
+    docMock.on(QueryCommand).resolves({ Items: [] });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.list({ runId: "run-1" });
+
+    expect(result.data).toEqual([]);
+    expect(result.cursor).toBeNull();
+    expect(result.hasMore).toBe(false);
+  });
+
+  it("list() sortOrder desc sets ScanIndexForward false", async () => {
+    docMock.on(QueryCommand).resolves({ Items: [] });
+
+    const events = createEventsStorage(docClient, tables);
+    await events.list({
+      runId: "run-1",
+      pagination: { sortOrder: "desc" },
+    });
+
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.ScanIndexForward).toBe(false);
+  });
+
+  it("list() cursor round-trip passes ExclusiveStartKey", async () => {
+    const cursorKey = { runId: "run-1", eventId: "evt-1" };
+    const cursor = Buffer.from(JSON.stringify(cursorKey))
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    docMock.on(QueryCommand).resolves({ Items: [] });
+
+    const events = createEventsStorage(docClient, tables);
+    await events.list({ runId: "run-1", pagination: { cursor } });
+
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.ExclusiveStartKey).toEqual(cursorKey);
   });
 
   it("create() run_completed sets output and cleans up hooks/waits", async () => {
@@ -877,5 +1055,96 @@ describe("EventsStorage", () => {
     });
 
     expect(result.step!.status).toBe("failed");
+  });
+});
+
+describe("WaitsStorage", () => {
+  it("get() returns a wait by ID", async () => {
+    docMock.on(GetCommand).resolves({
+      Item: {
+        waitId: "wait-1",
+        runId: "run-1",
+        status: "waiting",
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+
+    const waits = createWaitsStorage(docClient, tables);
+    const wait = await waits.get("wait-1");
+
+    expect(wait.waitId).toBe("wait-1");
+    expect(wait.status).toBe("waiting");
+    expect(wait.createdAt).toBeInstanceOf(Date);
+  });
+
+  it("get() throws when wait not found", async () => {
+    docMock.on(GetCommand).resolves({ Item: undefined });
+
+    const waits = createWaitsStorage(docClient, tables);
+    await expect(waits.get("nonexistent")).rejects.toThrow("Wait not found");
+  });
+
+  it("list() returns paginated waits", async () => {
+    docMock.on(ScanCommand).resolves({
+      Items: [
+        {
+          waitId: "wait-1",
+          runId: "run-1",
+          status: "waiting",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      LastEvaluatedKey: { waitId: "wait-1" },
+    });
+
+    const waits = createWaitsStorage(docClient, tables);
+    const result = await waits.list();
+
+    expect(result.data).toHaveLength(1);
+    expect(result.hasMore).toBe(true);
+    expect(result.cursor).toBeTruthy();
+  });
+
+  it("list() filters by runId using GSI", async () => {
+    docMock.on(QueryCommand).resolves({ Items: [] });
+
+    const waits = createWaitsStorage(docClient, tables);
+    await waits.list({ runId: "run-1" });
+
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.IndexName).toBe("gsi-run");
+  });
+
+  it("list() returns empty results correctly", async () => {
+    docMock.on(ScanCommand).resolves({ Items: [] });
+
+    const waits = createWaitsStorage(docClient, tables);
+    const result = await waits.list();
+
+    expect(result.data).toEqual([]);
+    expect(result.cursor).toBeNull();
+    expect(result.hasMore).toBe(false);
+  });
+
+  it("list() caps limit at 1000", async () => {
+    docMock.on(ScanCommand).resolves({ Items: [] });
+
+    const waits = createWaitsStorage(docClient, tables);
+    await waits.list({ pagination: { limit: 3000 } });
+
+    const calls = docMock.commandCalls(ScanCommand);
+    expect(calls[0].args[0].input.Limit).toBe(1000);
+  });
+
+  it("list() sortOrder desc sets ScanIndexForward false", async () => {
+    docMock.on(QueryCommand).resolves({ Items: [] });
+
+    const waits = createWaitsStorage(docClient, tables);
+    await waits.list({ runId: "run-1", pagination: { sortOrder: "desc" } });
+
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.ScanIndexForward).toBe(false);
   });
 });

@@ -10,6 +10,7 @@ import { ulid } from "ulid";
 import { decodeCursor, encodeCursor } from "../dynamodb/pagination.js";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
+import { wrapAWSError } from "../errors.js";
 import { toISO } from "../util.js";
 import {
   marshalEvent,
@@ -914,7 +915,11 @@ export function createEventsStorage(
 
     // run_created handles null runId internally (generates one via ulid)
     // All other event types require a runId
-    return handler(runId, data, params);
+    try {
+      return await handler(runId, data, params);
+    } catch (e) {
+      wrapAWSError(e, `events.create(${eventType})`);
+    }
   }
 
   async function list(params: {

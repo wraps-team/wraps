@@ -4,6 +4,7 @@ import type { Storage } from "@workflow/world";
 import { decodeCursor, encodeCursor } from "../dynamodb/pagination.js";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
+import { wrapAWSError } from "../errors.js";
 import { marshalStep } from "./marshal.js";
 
 function stripData(step: Record<string, unknown>) {
@@ -37,7 +38,12 @@ export function createStepsStorage(
         : {}),
     });
 
-    const result = await docClient.send(command);
+    let result;
+    try {
+      result = await docClient.send(command);
+    } catch (e) {
+      wrapAWSError(e, "steps.get");
+    }
     if (!result.Item) {
       throw new Error(`Step not found: ${stepId}`);
     }
@@ -72,23 +78,30 @@ export function createStepsStorage(
       ? { "#s": "status", "#err": "error" }
       : undefined;
 
-    const result = await docClient.send(
-      new QueryCommand({
-        TableName: tableName,
-        IndexName: GSI.steps.run,
-        KeyConditionExpression: "runId = :rid",
-        ExpressionAttributeValues: { ":rid": params.runId },
-        Limit: limit,
-        ScanIndexForward: scanForward,
-        ...(exclusiveStartKey ? { ExclusiveStartKey: exclusiveStartKey } : {}),
-        ...(projectionExpression
-          ? {
-              ProjectionExpression: projectionExpression,
-              ExpressionAttributeNames: expressionAttributeNames,
-            }
-          : {}),
-      })
-    );
+    let result;
+    try {
+      result = await docClient.send(
+        new QueryCommand({
+          TableName: tableName,
+          IndexName: GSI.steps.run,
+          KeyConditionExpression: "runId = :rid",
+          ExpressionAttributeValues: { ":rid": params.runId },
+          Limit: limit,
+          ScanIndexForward: scanForward,
+          ...(exclusiveStartKey
+            ? { ExclusiveStartKey: exclusiveStartKey }
+            : {}),
+          ...(projectionExpression
+            ? {
+                ProjectionExpression: projectionExpression,
+                ExpressionAttributeNames: expressionAttributeNames,
+              }
+            : {}),
+        })
+      );
+    } catch (e) {
+      wrapAWSError(e, "steps.list");
+    }
 
     const items = (result.Items ?? []).map((item) => {
       const step = marshalStep(item);

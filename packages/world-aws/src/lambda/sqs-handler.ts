@@ -4,6 +4,16 @@ export type { Context, SQSEvent, SQSRecord } from "aws-lambda";
 
 type QueueHandlerFn = (req: Request) => Promise<Response>;
 
+/**
+ * Creates an AWS Lambda handler that processes SQS events via a queue handler.
+ *
+ * Each SQS record is converted into a `Request` object and passed to the
+ * provided `queueHandler`. Failed records are reported as partial batch
+ * failures so SQS can retry only the failed messages.
+ *
+ * @param queueHandler - A function that accepts a `Request` and returns a `Response`.
+ * @returns Lambda handler compatible with SQS event source mappings.
+ */
 export function createSQSHandler(queueHandler: QueueHandlerFn) {
   return async function handler(event: SQSEvent, _context: Context) {
     const results: { recordId: string; success: boolean; error?: string }[] =

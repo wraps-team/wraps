@@ -89,30 +89,67 @@ describe("resolveConfig", () => {
   });
 
   it("reads encryptionKey from config", () => {
-    const config = resolveConfig({ encryptionKey: "my-key" });
+    const validKey = Buffer.alloc(32, 0xaa).toString("base64");
+    const config = resolveConfig({ encryptionKey: validKey });
 
-    expect(config.encryptionKey).toBe("my-key");
+    expect(config.encryptionKey).toBe(validKey);
   });
 
   it("reads encryptionKey from env var", () => {
-    process.env.WORKFLOW_AWS_ENCRYPTION_KEY = "env-key";
+    const validKey = Buffer.alloc(32, 0xbb).toString("base64");
+    process.env.WORKFLOW_AWS_ENCRYPTION_KEY = validKey;
 
     const config = resolveConfig();
 
-    expect(config.encryptionKey).toBe("env-key");
+    expect(config.encryptionKey).toBe(validKey);
   });
 
   it("config encryptionKey takes precedence over env var", () => {
-    process.env.WORKFLOW_AWS_ENCRYPTION_KEY = "env-key";
+    const envKey = Buffer.alloc(32, 0xcc).toString("base64");
+    const configKey = Buffer.alloc(32, 0xdd).toString("base64");
+    process.env.WORKFLOW_AWS_ENCRYPTION_KEY = envKey;
 
-    const config = resolveConfig({ encryptionKey: "config-key" });
+    const config = resolveConfig({ encryptionKey: configKey });
 
-    expect(config.encryptionKey).toBe("config-key");
+    expect(config.encryptionKey).toBe(configKey);
   });
 
   it("encryptionKey is undefined when not set", () => {
     const config = resolveConfig();
 
     expect(config.encryptionKey).toBeUndefined();
+  });
+
+  it("validates encryptionKey is valid base64 of 32 bytes", () => {
+    // Valid 32-byte key (base64-encoded)
+    const validKey = Buffer.from(
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "hex"
+    ).toString("base64");
+
+    const config = resolveConfig({ encryptionKey: validKey });
+    expect(config.encryptionKey).toBe(validKey);
+  });
+
+  it("rejects encryptionKey that decodes to wrong length", () => {
+    // 16 bytes instead of 32
+    const shortKey = Buffer.from("0123456789abcdef", "hex").toString("base64");
+
+    expect(() => resolveConfig({ encryptionKey: shortKey })).toThrow(
+      "must decode to 32 bytes"
+    );
+  });
+
+  it("rejects encryptionKey that is not valid base64", () => {
+    expect(() => resolveConfig({ encryptionKey: "!!!not-base64!!!" })).toThrow(
+      "not valid base64"
+    );
+  });
+
+  it("validates encryptionKey from env var", () => {
+    const shortKey = Buffer.from("0123456789abcdef", "hex").toString("base64");
+    process.env.WORKFLOW_AWS_ENCRYPTION_KEY = shortKey;
+
+    expect(() => resolveConfig()).toThrow("must decode to 32 bytes");
   });
 });

@@ -70,4 +70,28 @@ describe("getEncryptionKeyForRun integration", () => {
     expect(key).toEqual(keyFromObject);
     world.close();
   });
+
+  it("different runIds produce different keys", async () => {
+    const world = createWorld({ encryptionKey: TEST_KEY });
+    const key1 = await world.getEncryptionKeyForRun!("run-aaa", {
+      deploymentId: "deploy-1",
+    });
+    const key2 = await world.getEncryptionKeyForRun!("run-bbb", {
+      deploymentId: "deploy-1",
+    });
+    expect(key1).not.toEqual(key2);
+    world.close();
+  });
+
+  it("same inputs produce same output (determinism)", async () => {
+    const world = createWorld({ encryptionKey: TEST_KEY });
+    const key1 = await world.getEncryptionKeyForRun!("run-det", {
+      deploymentId: "deploy-det",
+    });
+    const key2 = await world.getEncryptionKeyForRun!("run-det", {
+      deploymentId: "deploy-det",
+    });
+    expect(key1).toEqual(key2);
+    world.close();
+  });
 });

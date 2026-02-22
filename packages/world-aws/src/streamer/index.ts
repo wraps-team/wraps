@@ -31,7 +31,8 @@ export function createStreamer(
   docClient: DynamoDBDocumentClient,
   tables: TableNames,
   ddbClient: DynamoDBClient,
-  streamsClient: DynamoDBStreamsClient
+  streamsClient: DynamoDBStreamsClient,
+  parentSignal?: AbortSignal
 ) {
   const tableName = tables.streams;
   let cachedStreamArn: string | undefined;
@@ -158,6 +159,16 @@ export function createStreamer(
     startIndex?: number,
     signal?: AbortSignal
   ): Promise<ReadableStream<Uint8Array>> {
+    // Combine caller signal with parent shutdown signal
+    const combinedController = new AbortController();
+    const onAbort = () => combinedController.abort();
+    signal?.addEventListener("abort", onAbort, { once: true });
+    parentSignal?.addEventListener("abort", onAbort, { once: true });
+    const effectiveSignal = combinedController.signal;
+    const cleanup = () => {
+      signal?.removeEventListener("abort", onAbort);
+      parentSignal?.removeEventListener("abort", onAbort);
+    };
     let lastChunkId: string | undefined;
     let chunksSeen = 0;
 
@@ -170,6 +181,11 @@ export function createStreamer(
         // Phase 1: Catch up from existing table data
         // eslint-disable-next-line no-constant-condition
         while (true) {
+          if (effectiveSignal.aborted) {
+            cleanup();
+            controller.close();
+            return;
+          }
           const result = await docClient.send(
             new QueryCommand({
               TableName: tableName,
@@ -191,6 +207,7 @@ export function createStreamer(
             lastChunkId = item.chunkId as string;
 
             if (item.eof) {
+              cleanup();
               controller.close();
               return;
             }
@@ -212,7 +229,8 @@ export function createStreamer(
         // Phase 2: Consume new records from DynamoDB Streams
         // eslint-disable-next-line no-constant-condition
         while (true) {
-          if (signal?.aborted) {
+          if (effectiveSignal.aborted) {
+            cleanup();
             controller.close();
             return;
           }
@@ -247,6 +265,7 @@ export function createStreamer(
                 if (recordChunkId) lastChunkId = recordChunkId;
 
                 if (image.eof?.BOOL) {
+                  cleanup();
                   controller.close();
                   return;
                 }

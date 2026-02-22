@@ -1,5 +1,17 @@
 const SALT = new Uint8Array(32);
 
+/**
+ * Derives a per-run 32-byte encryption key from a base key using HKDF-SHA256.
+ *
+ * The info string is `"${deploymentId}|${runId}"`, ensuring each run gets a
+ * unique derived key while remaining deterministic for the same inputs.
+ *
+ * @param baseKeyBase64 - Base64-encoded 32-byte master key.
+ * @param deploymentId  - Deployment identifier (scopes keys per deployment).
+ * @param runId         - Workflow run identifier.
+ * @returns 32-byte derived key as `Uint8Array`.
+ * @throws If the base key does not decode to exactly 32 bytes.
+ */
 export async function deriveKeyForRun(
   baseKeyBase64: string,
   deploymentId: string,

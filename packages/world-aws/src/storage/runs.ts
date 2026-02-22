@@ -4,6 +4,7 @@ import type { Storage } from "@workflow/world";
 import { decodeCursor, encodeCursor } from "../dynamodb/pagination.js";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
+import { wrapAWSError } from "../errors.js";
 import { marshalRun } from "./marshal.js";
 
 function stripData(run: Record<string, unknown>) {
@@ -33,7 +34,12 @@ export function createRunsStorage(
         : {}),
     });
 
-    const result = await docClient.send(command);
+    let result;
+    try {
+      result = await docClient.send(command);
+    } catch (e) {
+      wrapAWSError(e, "runs.get");
+    }
     if (!result.Item) {
       throw new Error(`Run not found: ${id}`);
     }
@@ -71,63 +77,67 @@ export function createRunsStorage(
 
     let result;
 
-    if (params?.workflowName) {
-      result = await docClient.send(
-        new QueryCommand({
-          TableName: tableName,
-          IndexName: GSI.runs.workflowName,
-          KeyConditionExpression: "workflowName = :wn",
-          ExpressionAttributeValues: { ":wn": params.workflowName },
-          Limit: limit,
-          ScanIndexForward: scanForward,
-          ...(exclusiveStartKey
-            ? { ExclusiveStartKey: exclusiveStartKey }
-            : {}),
-          ...(projectionExpression
-            ? {
-                ProjectionExpression: projectionExpression,
-                ExpressionAttributeNames: expressionAttributeNames,
-              }
-            : {}),
-        })
-      );
-    } else if (params?.status) {
-      result = await docClient.send(
-        new QueryCommand({
-          TableName: tableName,
-          IndexName: GSI.runs.status,
-          KeyConditionExpression: "#s = :st",
-          ExpressionAttributeValues: { ":st": params.status },
-          ExpressionAttributeNames: {
-            "#s": "status",
-            ...(resolveNone ? { "#err": "error" } : {}),
-          },
-          Limit: limit,
-          ScanIndexForward: scanForward,
-          ...(exclusiveStartKey
-            ? { ExclusiveStartKey: exclusiveStartKey }
-            : {}),
-          ...(projectionExpression
-            ? { ProjectionExpression: projectionExpression }
-            : {}),
-        })
-      );
-    } else {
-      result = await docClient.send(
-        new ScanCommand({
-          TableName: tableName,
-          Limit: limit,
-          ...(exclusiveStartKey
-            ? { ExclusiveStartKey: exclusiveStartKey }
-            : {}),
-          ...(projectionExpression
-            ? {
-                ProjectionExpression: projectionExpression,
-                ExpressionAttributeNames: expressionAttributeNames,
-              }
-            : {}),
-        })
-      );
+    try {
+      if (params?.workflowName) {
+        result = await docClient.send(
+          new QueryCommand({
+            TableName: tableName,
+            IndexName: GSI.runs.workflowName,
+            KeyConditionExpression: "workflowName = :wn",
+            ExpressionAttributeValues: { ":wn": params.workflowName },
+            Limit: limit,
+            ScanIndexForward: scanForward,
+            ...(exclusiveStartKey
+              ? { ExclusiveStartKey: exclusiveStartKey }
+              : {}),
+            ...(projectionExpression
+              ? {
+                  ProjectionExpression: projectionExpression,
+                  ExpressionAttributeNames: expressionAttributeNames,
+                }
+              : {}),
+          })
+        );
+      } else if (params?.status) {
+        result = await docClient.send(
+          new QueryCommand({
+            TableName: tableName,
+            IndexName: GSI.runs.status,
+            KeyConditionExpression: "#s = :st",
+            ExpressionAttributeValues: { ":st": params.status },
+            ExpressionAttributeNames: {
+              "#s": "status",
+              ...(resolveNone ? { "#err": "error" } : {}),
+            },
+            Limit: limit,
+            ScanIndexForward: scanForward,
+            ...(exclusiveStartKey
+              ? { ExclusiveStartKey: exclusiveStartKey }
+              : {}),
+            ...(projectionExpression
+              ? { ProjectionExpression: projectionExpression }
+              : {}),
+          })
+        );
+      } else {
+        result = await docClient.send(
+          new ScanCommand({
+            TableName: tableName,
+            Limit: limit,
+            ...(exclusiveStartKey
+              ? { ExclusiveStartKey: exclusiveStartKey }
+              : {}),
+            ...(projectionExpression
+              ? {
+                  ProjectionExpression: projectionExpression,
+                  ExpressionAttributeNames: expressionAttributeNames,
+                }
+              : {}),
+          })
+        );
+      }
+    } catch (e) {
+      wrapAWSError(e, "runs.list");
     }
 
     const items = (result.Items ?? []).map((item) => {

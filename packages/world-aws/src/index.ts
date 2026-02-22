@@ -13,7 +13,25 @@ import { createStreamer } from "./streamer/index.js";
 export type { AWSWorldConfig } from "./config.js";
 export { resolveConfig } from "./config.js";
 export { getTableNames } from "./dynamodb/tables.js";
+export { isCredentialError, isThrottlingError, WorldError } from "./errors.js";
+export { createSQSHandler } from "./lambda/sqs-handler.js";
 
+/**
+ * Creates an AWS-backed World for Vercel Workflow DevKit.
+ *
+ * Returns an object conforming to the `@workflow/world` interface backed by
+ * DynamoDB (storage + streams) and SQS (queue). Call `close()` when done to
+ * destroy SDK clients and abort any active stream reads.
+ *
+ * @param config - Optional configuration overrides; falls back to env vars then defaults.
+ *
+ * @example
+ * ```ts
+ * const world = createWorld({ region: "us-east-1" });
+ * // ... use world.runs, world.events, world.queue, etc.
+ * await world.close();
+ * ```
+ */
 export function createWorld(config?: AWSWorldConfig) {
   const resolved = resolveConfig(config);
   const tables = getTableNames(resolved.tablePrefix);
@@ -25,9 +43,17 @@ export function createWorld(config?: AWSWorldConfig) {
   });
   const streamsClient = createStreamsClient(resolved);
 
+  const shutdownController = new AbortController();
+
   const storage = createStorage(docClient, tables);
   const queue = createQueue(sqsClient, resolved);
-  const streamer = createStreamer(docClient, tables, ddbClient, streamsClient);
+  const streamer = createStreamer(
+    docClient,
+    tables,
+    ddbClient,
+    streamsClient,
+    shutdownController.signal
+  );
 
   return {
     ...storage,
@@ -39,6 +65,7 @@ export function createWorld(config?: AWSWorldConfig) {
     },
 
     async close() {
+      shutdownController.abort();
       docClient.destroy();
       sqsClient.destroy();
       ddbClient.destroy();

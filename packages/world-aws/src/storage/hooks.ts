@@ -4,6 +4,7 @@ import type { Storage } from "@workflow/world";
 import { decodeCursor, encodeCursor } from "../dynamodb/pagination.js";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
+import { wrapAWSError } from "../errors.js";
 import { marshalHook } from "./marshal.js";
 
 function stripData(hook: Record<string, unknown>) {
@@ -37,7 +38,12 @@ export function createHooksStorage(
         : {}),
     });
 
-    const result = await docClient.send(command);
+    let result;
+    try {
+      result = await docClient.send(command);
+    } catch (e) {
+      wrapAWSError(e, "hooks.get");
+    }
     if (!result.Item) {
       throw new Error(`Hook not found: ${hookId}`);
     }
@@ -52,22 +58,27 @@ export function createHooksStorage(
   ) {
     const resolveNone = params?.resolveData === "none";
 
-    const result = await docClient.send(
-      new QueryCommand({
-        TableName: tableName,
-        IndexName: GSI.hooks.token,
-        KeyConditionExpression: "#tok = :t",
-        ExpressionAttributeNames: { "#tok": "token" },
-        ExpressionAttributeValues: { ":t": token },
-        Limit: 1,
-        ...(resolveNone
-          ? {
-              ProjectionExpression:
-                "hookId, runId, #tok, ownerId, projectId, environment, createdAt, specVersion",
-            }
-          : {}),
-      })
-    );
+    let result;
+    try {
+      result = await docClient.send(
+        new QueryCommand({
+          TableName: tableName,
+          IndexName: GSI.hooks.token,
+          KeyConditionExpression: "#tok = :t",
+          ExpressionAttributeNames: { "#tok": "token" },
+          ExpressionAttributeValues: { ":t": token },
+          Limit: 1,
+          ...(resolveNone
+            ? {
+                ProjectionExpression:
+                  "hookId, runId, #tok, ownerId, projectId, environment, createdAt, specVersion",
+              }
+            : {}),
+        })
+      );
+    } catch (e) {
+      wrapAWSError(e, "hooks.getByToken");
+    }
 
     const item = result.Items?.[0];
     if (!item) {
@@ -100,42 +111,46 @@ export function createHooksStorage(
 
     let result;
 
-    if (params.runId) {
-      result = await docClient.send(
-        new QueryCommand({
-          TableName: tableName,
-          IndexName: GSI.hooks.run,
-          KeyConditionExpression: "runId = :rid",
-          ExpressionAttributeValues: { ":rid": params.runId },
-          Limit: limit,
-          ScanIndexForward: scanForward,
-          ...(exclusiveStartKey
-            ? { ExclusiveStartKey: exclusiveStartKey }
-            : {}),
-          ...(projectionExpression
-            ? {
-                ProjectionExpression: projectionExpression,
-                ExpressionAttributeNames: { "#tok": "token" },
-              }
-            : {}),
-        })
-      );
-    } else {
-      result = await docClient.send(
-        new ScanCommand({
-          TableName: tableName,
-          Limit: limit,
-          ...(exclusiveStartKey
-            ? { ExclusiveStartKey: exclusiveStartKey }
-            : {}),
-          ...(projectionExpression
-            ? {
-                ProjectionExpression: projectionExpression,
-                ExpressionAttributeNames: { "#tok": "token" },
-              }
-            : {}),
-        })
-      );
+    try {
+      if (params.runId) {
+        result = await docClient.send(
+          new QueryCommand({
+            TableName: tableName,
+            IndexName: GSI.hooks.run,
+            KeyConditionExpression: "runId = :rid",
+            ExpressionAttributeValues: { ":rid": params.runId },
+            Limit: limit,
+            ScanIndexForward: scanForward,
+            ...(exclusiveStartKey
+              ? { ExclusiveStartKey: exclusiveStartKey }
+              : {}),
+            ...(projectionExpression
+              ? {
+                  ProjectionExpression: projectionExpression,
+                  ExpressionAttributeNames: { "#tok": "token" },
+                }
+              : {}),
+          })
+        );
+      } else {
+        result = await docClient.send(
+          new ScanCommand({
+            TableName: tableName,
+            Limit: limit,
+            ...(exclusiveStartKey
+              ? { ExclusiveStartKey: exclusiveStartKey }
+              : {}),
+            ...(projectionExpression
+              ? {
+                  ProjectionExpression: projectionExpression,
+                  ExpressionAttributeNames: { "#tok": "token" },
+                }
+              : {}),
+          })
+        );
+      }
+    } catch (e) {
+      wrapAWSError(e, "hooks.list");
     }
 
     const items = (result.Items ?? []).map((item) => {
