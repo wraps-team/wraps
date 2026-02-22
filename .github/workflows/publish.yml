@@ -41,11 +41,11 @@ jobs:
           # cdk-v1.0.0, cdk-v1.0.0-beta.1
           # pulumi-v1.0.0, pulumi-v1.0.0-beta.1
           # core-v1.0.0, core-v1.0.0-beta.1
+          # world-aws-v0.1.0, world-aws-v0.1.0-beta.1
 
-          # Extract package name (everything before -v)
-          if [[ "$TAG" =~ ^([a-z]+)-v ]]; then
-            PACKAGE="${BASH_REMATCH[1]}"
-          else
+          # Extract package name (everything before last -v<number>)
+          PACKAGE="${TAG%-v*}"
+          if [[ "$PACKAGE" == "$TAG" || -z "$PACKAGE" ]]; then
             echo "Error: Tag must be in format <package>-v<version> (e.g., cli-v1.0.0)"
             exit 1
           fi
@@ -68,8 +68,12 @@ jobs:
               NPM_PACKAGE="@wraps/core"
               FILTER="@wraps/core"
               ;;
+            world-aws)
+              NPM_PACKAGE="@wraps.dev/world-aws"
+              FILTER="@wraps.dev/world-aws"
+              ;;
             *)
-              echo "Error: Unknown package '$PACKAGE'. Must be one of: cli, cdk, pulumi, core"
+              echo "Error: Unknown package '$PACKAGE'. Must be one of: cli, cdk, pulumi, core, world-aws"
               exit 1
               ;;
           esac
