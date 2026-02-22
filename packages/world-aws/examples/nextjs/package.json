@@ -1,0 +1,19 @@
+{
+  "name": "world-aws-nextjs-example",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@wraps.dev/world-aws": "latest",
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "workflow": "latest"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

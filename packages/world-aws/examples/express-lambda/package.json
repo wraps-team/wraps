@@ -1,0 +1,21 @@
+{
+  "name": "world-aws-express-lambda-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/app.ts",
+    "build": "tsup src/app.ts src/lambda.ts --format esm"
+  },
+  "dependencies": {
+    "@wraps.dev/world-aws": "latest",
+    "express": "^5.0.0",
+    "workflow": "latest"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/express": "^5.0.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.7.0"
+  }
+}
