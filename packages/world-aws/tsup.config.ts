@@ -6,5 +6,11 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   clean: true,
-  external: ["@workflow/world", "@aws-sdk/client-dynamodb", "@aws-sdk/client-dynamodb-streams", "@aws-sdk/lib-dynamodb", "@aws-sdk/client-sqs"],
+  external: [
+    "@workflow/world",
+    "@aws-sdk/client-dynamodb",
+    "@aws-sdk/client-dynamodb-streams",
+    "@aws-sdk/lib-dynamodb",
+    "@aws-sdk/client-sqs",
+  ],
 });

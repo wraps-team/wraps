@@ -1,23 +1,10 @@
-import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import type { Storage } from "@workflow/world";
+import { decodeCursor, encodeCursor } from "../dynamodb/pagination.js";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
-import { encodeCursor, decodeCursor } from "../dynamodb/pagination.js";
-import { toDateOrUndefined, toBinaryOrUndefined } from "../util.js";
-import type { Storage } from "@workflow/world";
-
-function marshalStep(item: Record<string, unknown>) {
-  return {
-    ...item,
-    input: item.input as Uint8Array,
-    output: toBinaryOrUndefined(item.output as Uint8Array | undefined),
-    createdAt: new Date(item.createdAt as string),
-    updatedAt: new Date(item.updatedAt as string),
-    startedAt: toDateOrUndefined(item.startedAt as string | undefined),
-    completedAt: toDateOrUndefined(item.completedAt as string | undefined),
-    retryAfter: toDateOrUndefined(item.retryAfter as string | undefined),
-  };
-}
+import { marshalStep } from "./marshal.js";
 
 function stripData(step: Record<string, unknown>) {
   return {
@@ -29,14 +16,14 @@ function stripData(step: Record<string, unknown>) {
 
 export function createStepsStorage(
   docClient: DynamoDBDocumentClient,
-  tables: TableNames,
+  tables: TableNames
 ): Storage["steps"] {
   const tableName = tables.steps;
 
   async function get(
     _runId: string | undefined,
     stepId: string,
-    params?: { resolveData?: "none" | "all" },
+    params?: { resolveData?: "none" | "all" }
   ) {
     const command = new GetCommand({
       TableName: tableName,
@@ -64,7 +51,11 @@ export function createStepsStorage(
 
   async function list(params: {
     runId: string;
-    pagination?: { limit?: number; cursor?: string; sortOrder?: "asc" | "desc" };
+    pagination?: {
+      limit?: number;
+      cursor?: string;
+      sortOrder?: "asc" | "desc";
+    };
     resolveData?: "none" | "all";
   }) {
     const limit = Math.min(params.pagination?.limit ?? 100, 1000);
@@ -91,9 +82,12 @@ export function createStepsStorage(
         ScanIndexForward: scanForward,
         ...(exclusiveStartKey ? { ExclusiveStartKey: exclusiveStartKey } : {}),
         ...(projectionExpression
-          ? { ProjectionExpression: projectionExpression, ExpressionAttributeNames: expressionAttributeNames }
+          ? {
+              ProjectionExpression: projectionExpression,
+              ExpressionAttributeNames: expressionAttributeNames,
+            }
           : {}),
-      }),
+      })
     );
 
     const items = (result.Items ?? []).map((item) => {
@@ -103,7 +97,9 @@ export function createStepsStorage(
 
     return {
       data: items,
-      cursor: result.LastEvaluatedKey ? encodeCursor(result.LastEvaluatedKey) : null,
+      cursor: result.LastEvaluatedKey
+        ? encodeCursor(result.LastEvaluatedKey)
+        : null,
       hasMore: !!result.LastEvaluatedKey,
     } as any;
   }

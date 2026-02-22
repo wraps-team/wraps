@@ -1,15 +1,22 @@
-import { PutCommand, QueryCommand, BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { DescribeTableCommand, type DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  DescribeTableCommand,
+  type DynamoDBClient,
+} from "@aws-sdk/client-dynamodb";
 import {
   DescribeStreamCommand,
-  GetShardIteratorCommand,
-  GetRecordsCommand,
   type DynamoDBStreamsClient,
+  GetRecordsCommand,
+  GetShardIteratorCommand,
 } from "@aws-sdk/client-dynamodb-streams";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import {
+  BatchWriteCommand,
+  PutCommand,
+  QueryCommand,
+} from "@aws-sdk/lib-dynamodb";
+import { monotonicFactory } from "ulid";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
-import { monotonicFactory } from "ulid";
 
 const generateId = monotonicFactory();
 const encoder = new TextEncoder();
@@ -24,12 +31,16 @@ export function createStreamer(
   docClient: DynamoDBDocumentClient,
   tables: TableNames,
   ddbClient: DynamoDBClient,
-  streamsClient: DynamoDBStreamsClient,
+  streamsClient: DynamoDBStreamsClient
 ) {
   const tableName = tables.streams;
   let cachedStreamArn: string | undefined;
 
-  async function writeToStream(name: string, runId: string, chunk: string | Uint8Array): Promise<void> {
+  async function writeToStream(
+    name: string,
+    runId: string,
+    chunk: string | Uint8Array
+  ): Promise<void> {
     await docClient.send(
       new PutCommand({
         TableName: tableName,
@@ -40,14 +51,14 @@ export function createStreamer(
           data: toBytes(chunk),
           eof: false,
         },
-      }),
+      })
     );
   }
 
   async function writeToStreamMulti(
     name: string,
     runId: string,
-    chunks: (string | Uint8Array)[],
+    chunks: (string | Uint8Array)[]
   ): Promise<void> {
     // Pre-generate all ULIDs to preserve ordering
     const items = chunks.map((chunk) => ({
@@ -68,7 +79,7 @@ export function createStreamer(
               PutRequest: { Item: item },
             })),
           },
-        }),
+        })
       );
     }
   }
@@ -84,14 +95,14 @@ export function createStreamer(
           data: new Uint8Array(0),
           eof: true,
         },
-      }),
+      })
     );
   }
 
   async function getStreamArn(): Promise<string> {
     if (cachedStreamArn) return cachedStreamArn;
     const result = await ddbClient.send(
-      new DescribeTableCommand({ TableName: tableName }),
+      new DescribeTableCommand({ TableName: tableName })
     );
     const arn = result.Table?.LatestStreamArn;
     if (!arn) throw new Error(`No stream ARN found for table ${tableName}`);
@@ -100,23 +111,29 @@ export function createStreamer(
   }
 
   async function getShardIterators(streamArn: string): Promise<string[]> {
-    const shards: Array<{ ShardId?: string; SequenceNumberRange?: { EndingSequenceNumber?: string } }> = [];
+    const shards: Array<{
+      ShardId?: string;
+      SequenceNumberRange?: { EndingSequenceNumber?: string };
+    }> = [];
     let exclusiveStartShardId: string | undefined;
 
     do {
       const result = await streamsClient.send(
         new DescribeStreamCommand({
           StreamArn: streamArn,
-          ...(exclusiveStartShardId ? { ExclusiveStartShardId: exclusiveStartShardId } : {}),
-        }),
+          ...(exclusiveStartShardId
+            ? { ExclusiveStartShardId: exclusiveStartShardId }
+            : {}),
+        })
       );
       shards.push(...(result.StreamDescription?.Shards ?? []));
-      exclusiveStartShardId = result.StreamDescription?.LastEvaluatedShardId ?? undefined;
+      exclusiveStartShardId =
+        result.StreamDescription?.LastEvaluatedShardId ?? undefined;
     } while (exclusiveStartShardId);
 
     // Active shards have no EndingSequenceNumber
     const activeShards = shards.filter(
-      (s) => !s.SequenceNumberRange?.EndingSequenceNumber,
+      (s) => !s.SequenceNumberRange?.EndingSequenceNumber
     );
 
     const iterators: string[] = [];
@@ -126,7 +143,7 @@ export function createStreamer(
           StreamArn: streamArn,
           ShardId: shard.ShardId!,
           ShardIteratorType: "LATEST",
-        }),
+        })
       );
       if (result.ShardIterator) {
         iterators.push(result.ShardIterator);
@@ -136,7 +153,11 @@ export function createStreamer(
     return iterators;
   }
 
-  async function readFromStream(name: string, startIndex?: number): Promise<ReadableStream<Uint8Array>> {
+  async function readFromStream(
+    name: string,
+    startIndex?: number,
+    signal?: AbortSignal
+  ): Promise<ReadableStream<Uint8Array>> {
     let lastChunkId: string | undefined;
     let chunksSeen = 0;
 
@@ -161,7 +182,7 @@ export function createStreamer(
               },
               ScanIndexForward: true,
               ConsistentRead: true,
-            }),
+            })
           );
 
           const items = result.Items ?? [];
@@ -191,13 +212,17 @@ export function createStreamer(
         // Phase 2: Consume new records from DynamoDB Streams
         // eslint-disable-next-line no-constant-condition
         while (true) {
+          if (signal?.aborted) {
+            controller.close();
+            return;
+          }
           for (let i = 0; i < shardIterators.length; i++) {
             const iterator = shardIterators[i];
             if (!iterator) continue;
 
             try {
               const response = await streamsClient.send(
-                new GetRecordsCommand({ ShardIterator: iterator }),
+                new GetRecordsCommand({ ShardIterator: iterator })
               );
 
               shardIterators[i] = response.NextShardIterator ?? "";
@@ -212,7 +237,12 @@ export function createStreamer(
 
                 const recordChunkId = image.chunkId?.S;
                 // Skip chunks already seen during catch-up
-                if (lastChunkId && recordChunkId && recordChunkId <= lastChunkId) continue;
+                if (
+                  lastChunkId &&
+                  recordChunkId &&
+                  recordChunkId <= lastChunkId
+                )
+                  continue;
 
                 if (recordChunkId) lastChunkId = recordChunkId;
 
@@ -222,7 +252,8 @@ export function createStreamer(
                 }
 
                 chunksSeen++;
-                if (startIndex !== undefined && chunksSeen <= startIndex) continue;
+                if (startIndex !== undefined && chunksSeen <= startIndex)
+                  continue;
 
                 const data = image.data?.B;
                 if (data && data.length > 0) {
@@ -264,15 +295,19 @@ export function createStreamer(
           KeyConditionExpression: "runId = :rid",
           ExpressionAttributeValues: { ":rid": runId },
           ProjectionExpression: "streamId",
-          ...(exclusiveStartKey ? { ExclusiveStartKey: exclusiveStartKey } : {}),
-        }),
+          ...(exclusiveStartKey
+            ? { ExclusiveStartKey: exclusiveStartKey }
+            : {}),
+        })
       );
 
       for (const item of result.Items ?? []) {
         seen.add(item.streamId as string);
       }
 
-      exclusiveStartKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
+      exclusiveStartKey = result.LastEvaluatedKey as
+        | Record<string, unknown>
+        | undefined;
     } while (exclusiveStartKey);
 
     return [...seen];

@@ -1,20 +1,26 @@
-import type { SQSEvent, SQSRecord, Context } from "aws-lambda";
+import type { Context, SQSEvent, SQSRecord } from "aws-lambda";
 
-interface QueueHandlerFn {
-  (req: Request): Promise<Response>;
-}
+export type { Context, SQSEvent, SQSRecord } from "aws-lambda";
+
+type QueueHandlerFn = (req: Request) => Promise<Response>;
 
 export function createSQSHandler(queueHandler: QueueHandlerFn) {
   return async function handler(event: SQSEvent, _context: Context) {
-    const results: { recordId: string; success: boolean; error?: string }[] = [];
+    const results: { recordId: string; success: boolean; error?: string }[] =
+      [];
 
     for (const record of event.Records) {
       try {
         await processRecord(record, queueHandler);
         results.push({ recordId: record.messageId, success: true });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        results.push({ recordId: record.messageId, success: false, error: message });
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        results.push({
+          recordId: record.messageId,
+          success: false,
+          error: message,
+        });
       }
     }
 
@@ -29,11 +35,16 @@ export function createSQSHandler(queueHandler: QueueHandlerFn) {
   };
 }
 
-async function processRecord(record: SQSRecord, queueHandler: QueueHandlerFn): Promise<void> {
+async function processRecord(
+  record: SQSRecord,
+  queueHandler: QueueHandlerFn
+): Promise<void> {
   const body = JSON.parse(record.body);
 
   // Increment attempt count from SQS attributes
-  const approximateReceiveCount = Number(record.attributes?.ApproximateReceiveCount ?? 1);
+  const approximateReceiveCount = Number(
+    record.attributes?.ApproximateReceiveCount ?? 1
+  );
   if (body.attempt !== undefined) {
     body.attempt = approximateReceiveCount;
   }
@@ -51,5 +62,3 @@ async function processRecord(record: SQSRecord, queueHandler: QueueHandlerFn): P
     throw new Error(`Queue handler returned ${response.status}: ${text}`);
   }
 }
-
-export type { SQSEvent, SQSRecord, Context };

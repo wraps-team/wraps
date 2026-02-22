@@ -1,20 +1,22 @@
-import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import type { SQSClient } from "@aws-sdk/client-sqs";
-import type { ResolvedConfig } from "../config.js";
+import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import { ulid } from "ulid";
+import type { ResolvedConfig } from "../config.js";
 
 export function createQueue(sqsClient: SQSClient, config: ResolvedConfig) {
   function getQueueUrl(sqsQueueName: string): string {
     if (config.endpoint) {
       return `${config.endpoint}/000000000000/${sqsQueueName}`;
     }
-    return `https://sqs.${config.region}.amazonaws.com/${process.env.AWS_ACCOUNT_ID}/${sqsQueueName}`;
+    const accountId = process.env.AWS_ACCOUNT_ID;
+    if (!accountId) {
+      throw new Error(
+        "AWS_ACCOUNT_ID environment variable is required for SQS queue URL construction. " +
+          "Set AWS_ACCOUNT_ID or use WORKFLOW_AWS_WORKFLOWS_QUEUE_URL / WORKFLOW_AWS_STEPS_QUEUE_URL directly."
+      );
+    }
+    return `https://sqs.${config.region}.amazonaws.com/${accountId}/${sqsQueueName}`;
   }
-
-  const workflowsQueueUrl =
-    process.env.WORKFLOW_AWS_WORKFLOWS_QUEUE_URL ?? getQueueUrl(`${config.queuePrefix}-workflows`);
-  const stepsQueueUrl =
-    process.env.WORKFLOW_AWS_STEPS_QUEUE_URL ?? getQueueUrl(`${config.queuePrefix}-steps`);
 
   return {
     async getDeploymentId(): Promise<string> {
@@ -29,10 +31,14 @@ export function createQueue(sqsClient: SQSClient, config: ResolvedConfig) {
         idempotencyKey?: string;
         headers?: Record<string, string>;
         delaySeconds?: number;
-      },
+      }
     ): Promise<{ messageId: string }> {
       const isStep = queueName.startsWith("__wkf_step_");
-      const queueUrl = isStep ? stepsQueueUrl : workflowsQueueUrl;
+      const queueUrl = isStep
+        ? (process.env.WORKFLOW_AWS_STEPS_QUEUE_URL ??
+          getQueueUrl(`${config.queuePrefix}-steps`))
+        : (process.env.WORKFLOW_AWS_WORKFLOWS_QUEUE_URL ??
+          getQueueUrl(`${config.queuePrefix}-workflows`));
 
       const messageId = ulid();
       const body = JSON.stringify({
@@ -51,12 +57,15 @@ export function createQueue(sqsClient: SQSClient, config: ResolvedConfig) {
           MessageAttributes: {
             ...(opts?.idempotencyKey
               ? {
-                  IdempotencyKey: { DataType: "String", StringValue: opts.idempotencyKey },
+                  IdempotencyKey: {
+                    DataType: "String",
+                    StringValue: opts.idempotencyKey,
+                  },
                 }
               : {}),
             QueueName: { DataType: "String", StringValue: queueName },
           },
-        }),
+        })
       );
 
       return { messageId: messageId as string };
@@ -66,8 +75,8 @@ export function createQueue(sqsClient: SQSClient, config: ResolvedConfig) {
       queueNamePrefix: string,
       handler: (
         message: unknown,
-        meta: { attempt: number; queueName: string; messageId: string },
-      ) => Promise<void | { timeoutSeconds: number }>,
+        meta: { attempt: number; queueName: string; messageId: string }
+      ) => Promise<undefined | { timeoutSeconds: number }>
     ): (req: Request) => Promise<Response> {
       return async (req: Request): Promise<Response> => {
         try {
@@ -83,7 +92,11 @@ export function createQueue(sqsClient: SQSClient, config: ResolvedConfig) {
             return new Response("Queue name mismatch", { status: 400 });
           }
 
-          const result = await handler(message, { attempt, queueName, messageId });
+          const result = await handler(message, {
+            attempt,
+            queueName,
+            messageId,
+          });
 
           return new Response(JSON.stringify(result ?? {}), {
             status: 200,

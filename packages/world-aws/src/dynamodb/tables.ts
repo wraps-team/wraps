@@ -1,11 +1,11 @@
-export interface TableNames {
+export type TableNames = {
   runs: string;
   steps: string;
   events: string;
   hooks: string;
   waits: string;
   streams: string;
-}
+};
 
 export const GSI = {
   runs: {

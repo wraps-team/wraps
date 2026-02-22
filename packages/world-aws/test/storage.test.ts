@@ -1,48 +1,56 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  BatchWriteCommand,
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  ScanCommand,
+  TransactWriteCommand,
+} from "@aws-sdk/lib-dynamodb";
+import { mockClient } from "aws-sdk-client-mock";
+import { beforeEach, describe, expect, it } from "vitest";
+import { getTableNames } from "../src/dynamodb/tables.js";
+import { createEventsStorage } from "../src/storage/events.js";
+import { createHooksStorage } from "../src/storage/hooks.js";
 import { createRunsStorage } from "../src/storage/runs.js";
 import { createStepsStorage } from "../src/storage/steps.js";
-import { createHooksStorage } from "../src/storage/hooks.js";
-import { createEventsStorage } from "../src/storage/events.js";
-import { getTableNames } from "../src/dynamodb/tables.js";
-import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
 const tables = getTableNames("test");
 
-function mockDocClient(responses: Record<string, unknown> = {}): DynamoDBDocumentClient {
-  return {
-    send: vi.fn().mockImplementation((command) => {
-      const commandName = command.constructor.name;
-      if (responses[commandName]) {
-        return Promise.resolve(responses[commandName]);
-      }
-      return Promise.resolve({ Items: [], Item: null });
-    }),
-    destroy: vi.fn(),
-  } as unknown as DynamoDBDocumentClient;
-}
+const ddbMock = mockClient(DynamoDBClient);
+const docMock = mockClient(DynamoDBDocumentClient);
+
+const docClient = DynamoDBDocumentClient.from(
+  new DynamoDBClient({ region: "us-east-1" })
+);
+
+beforeEach(() => {
+  ddbMock.reset();
+  docMock.reset();
+});
+
+const now = new Date().toISOString();
 
 describe("RunsStorage", () => {
   it("get() throws when run not found", async () => {
-    const docClient = mockDocClient({ GetCommand: { Item: null } });
+    docMock.on(GetCommand).resolves({ Item: undefined });
     const runs = createRunsStorage(docClient, tables);
 
     await expect(runs.get("nonexistent")).rejects.toThrow("Run not found");
   });
 
   it("get() returns marshalled run with Date fields", async () => {
-    const now = new Date().toISOString();
-    const docClient = mockDocClient({
-      GetCommand: {
-        Item: {
-          runId: "run-1",
-          status: "running",
-          deploymentId: "dep-1",
-          workflowName: "test-workflow",
-          input: new Uint8Array([1, 2, 3]),
-          createdAt: now,
-          updatedAt: now,
-          startedAt: now,
-        },
+    docMock.on(GetCommand).resolves({
+      Item: {
+        runId: "run-1",
+        status: "running",
+        deploymentId: "dep-1",
+        workflowName: "test-workflow",
+        input: new Uint8Array([1, 2, 3]),
+        createdAt: now,
+        updatedAt: now,
+        startedAt: now,
       },
     });
 
@@ -57,17 +65,14 @@ describe("RunsStorage", () => {
   });
 
   it("get() with resolveData none strips input/output", async () => {
-    const now = new Date().toISOString();
-    const docClient = mockDocClient({
-      GetCommand: {
-        Item: {
-          runId: "run-1",
-          status: "pending",
-          deploymentId: "dep-1",
-          workflowName: "test-workflow",
-          createdAt: now,
-          updatedAt: now,
-        },
+    docMock.on(GetCommand).resolves({
+      Item: {
+        runId: "run-1",
+        status: "pending",
+        deploymentId: "dep-1",
+        workflowName: "test-workflow",
+        createdAt: now,
+        updatedAt: now,
       },
     });
 
@@ -79,14 +84,19 @@ describe("RunsStorage", () => {
   });
 
   it("list() returns paginated response", async () => {
-    const now = new Date().toISOString();
-    const docClient = mockDocClient({
-      ScanCommand: {
-        Items: [
-          { runId: "run-1", status: "pending", deploymentId: "dep-1", workflowName: "wf", input: new Uint8Array(), createdAt: now, updatedAt: now },
-        ],
-        LastEvaluatedKey: { runId: "run-1" },
-      },
+    docMock.on(ScanCommand).resolves({
+      Items: [
+        {
+          runId: "run-1",
+          status: "pending",
+          deploymentId: "dep-1",
+          workflowName: "wf",
+          input: new Uint8Array(),
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      LastEvaluatedKey: { runId: "run-1" },
     });
 
     const runs = createRunsStorage(docClient, tables);
@@ -98,47 +108,40 @@ describe("RunsStorage", () => {
   });
 
   it("list() filters by workflowName using GSI", async () => {
-    const docClient = mockDocClient({
-      QueryCommand: { Items: [], LastEvaluatedKey: undefined },
-    });
+    docMock.on(QueryCommand).resolves({ Items: [] });
 
     const runs = createRunsStorage(docClient, tables);
     await runs.list({ workflowName: "test-workflow" });
 
-    const call = (docClient.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.input.IndexName).toBe("gsi-workflow-name");
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.IndexName).toBe("gsi-workflow-name");
   });
 
   it("list() filters by status using GSI", async () => {
-    const docClient = mockDocClient({
-      QueryCommand: { Items: [], LastEvaluatedKey: undefined },
-    });
+    docMock.on(QueryCommand).resolves({ Items: [] });
 
     const runs = createRunsStorage(docClient, tables);
     await runs.list({ status: "running" });
 
-    const call = (docClient.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.input.IndexName).toBe("gsi-status");
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.IndexName).toBe("gsi-status");
   });
 });
 
 describe("StepsStorage", () => {
   it("get() returns marshalled step", async () => {
-    const now = new Date().toISOString();
-    const docClient = mockDocClient({
-      GetCommand: {
-        Item: {
-          stepId: "step-1",
-          runId: "run-1",
-          stepName: "process",
-          status: "completed",
-          input: new Uint8Array([1]),
-          output: new Uint8Array([2]),
-          attempt: 1,
-          createdAt: now,
-          updatedAt: now,
-          completedAt: now,
-        },
+    docMock.on(GetCommand).resolves({
+      Item: {
+        stepId: "step-1",
+        runId: "run-1",
+        stepName: "process",
+        status: "completed",
+        input: new Uint8Array([1]),
+        output: new Uint8Array([2]),
+        attempt: 1,
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
       },
     });
 
@@ -151,31 +154,26 @@ describe("StepsStorage", () => {
   });
 
   it("list() queries by runId via GSI", async () => {
-    const docClient = mockDocClient({
-      QueryCommand: { Items: [], LastEvaluatedKey: undefined },
-    });
+    docMock.on(QueryCommand).resolves({ Items: [] });
 
     const steps = createStepsStorage(docClient, tables);
     await steps.list({ runId: "run-1" });
 
-    const call = (docClient.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.input.IndexName).toBe("gsi-run");
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.IndexName).toBe("gsi-run");
   });
 });
 
 describe("HooksStorage", () => {
   it("get() returns marshalled hook", async () => {
-    const now = new Date().toISOString();
-    const docClient = mockDocClient({
-      GetCommand: {
-        Item: {
-          hookId: "hook-1",
-          runId: "run-1",
-          token: "secret-token",
-          ownerId: "",
-          projectId: "",
-          createdAt: now,
-        },
+    docMock.on(GetCommand).resolves({
+      Item: {
+        hookId: "hook-1",
+        runId: "run-1",
+        token: "secret-token",
+        ownerId: "",
+        projectId: "",
+        createdAt: now,
       },
     });
 
@@ -188,37 +186,40 @@ describe("HooksStorage", () => {
   });
 
   it("getByToken() queries GSI", async () => {
-    const now = new Date().toISOString();
-    const docClient = mockDocClient({
-      QueryCommand: {
-        Items: [
-          { hookId: "hook-1", runId: "run-1", token: "tok", ownerId: "", projectId: "", createdAt: now },
-        ],
-      },
+    docMock.on(QueryCommand).resolves({
+      Items: [
+        {
+          hookId: "hook-1",
+          runId: "run-1",
+          token: "tok",
+          ownerId: "",
+          projectId: "",
+          createdAt: now,
+        },
+      ],
     });
 
     const hooks = createHooksStorage(docClient, tables);
     const hook = await hooks.getByToken("tok");
 
     expect(hook.hookId).toBe("hook-1");
-    const call = (docClient.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.input.IndexName).toBe("gsi-token");
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.IndexName).toBe("gsi-token");
   });
 
   it("getByToken() throws when not found", async () => {
-    const docClient = mockDocClient({
-      QueryCommand: { Items: [] },
-    });
+    docMock.on(QueryCommand).resolves({ Items: [] });
 
     const hooks = createHooksStorage(docClient, tables);
-    await expect(hooks.getByToken("missing")).rejects.toThrow("Hook not found for token");
+    await expect(hooks.getByToken("missing")).rejects.toThrow(
+      "Hook not found for token"
+    );
   });
 });
 
 describe("EventsStorage", () => {
   it("create() run_created generates IDs and creates run", async () => {
-    const sendMock = vi.fn().mockResolvedValue({});
-    const docClient = { send: sendMock, destroy: vi.fn() } as unknown as DynamoDBDocumentClient;
+    docMock.on(TransactWriteCommand).resolves({});
 
     const events = createEventsStorage(docClient, tables);
     const result = await events.create(null, {
@@ -236,27 +237,24 @@ describe("EventsStorage", () => {
     expect(result.run).toBeDefined();
     expect(result.run!.status).toBe("pending");
 
-    // Should have used TransactWriteCommand
-    const transactCall = sendMock.mock.calls[0][0];
-    expect(transactCall.constructor.name).toBe("TransactWriteCommand");
+    const calls = docMock.commandCalls(TransactWriteCommand);
+    expect(calls).toHaveLength(1);
   });
 
   it("create() run_started updates run status", async () => {
-    const sendMock = vi.fn()
-      .mockResolvedValueOnce({}) // TransactWrite
-      .mockResolvedValueOnce({ // GetCommand for run
-        Item: {
-          runId: "run-1",
-          status: "running",
-          deploymentId: "dep-1",
-          workflowName: "wf",
-          input: new Uint8Array(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          startedAt: new Date().toISOString(),
-        },
-      });
-    const docClient = { send: sendMock, destroy: vi.fn() } as unknown as DynamoDBDocumentClient;
+    docMock.on(TransactWriteCommand).resolves({});
+    docMock.on(GetCommand).resolves({
+      Item: {
+        runId: "run-1",
+        status: "running",
+        deploymentId: "dep-1",
+        workflowName: "wf",
+        input: new Uint8Array(),
+        createdAt: now,
+        updatedAt: now,
+        startedAt: now,
+      },
+    });
 
     const events = createEventsStorage(docClient, tables);
     const result = await events.create("run-1", { eventType: "run_started" });
@@ -266,8 +264,7 @@ describe("EventsStorage", () => {
   });
 
   it("create() step_created creates step entity", async () => {
-    const sendMock = vi.fn().mockResolvedValue({});
-    const docClient = { send: sendMock, destroy: vi.fn() } as unknown as DynamoDBDocumentClient;
+    docMock.on(TransactWriteCommand).resolves({});
 
     const events = createEventsStorage(docClient, tables);
     const result = await events.create("run-1", {
@@ -286,10 +283,14 @@ describe("EventsStorage", () => {
   });
 
   it("create() hook_created with token conflict creates hook_conflict event", async () => {
-    const sendMock = vi.fn()
-      .mockRejectedValueOnce(Object.assign(new Error("Conflict"), { name: "ConditionalCheckFailedException" }))
-      .mockResolvedValueOnce({}); // PutCommand for conflict event
-    const docClient = { send: sendMock, destroy: vi.fn() } as unknown as DynamoDBDocumentClient;
+    docMock
+      .on(PutCommand)
+      .rejectsOnce(
+        Object.assign(new Error("Conflict"), {
+          name: "ConditionalCheckFailedException",
+        })
+      )
+      .resolves({});
 
     const events = createEventsStorage(docClient, tables);
     const result = await events.create("run-1", {
@@ -303,21 +304,28 @@ describe("EventsStorage", () => {
   });
 
   it("create() throws on unknown event type", async () => {
-    const docClient = mockDocClient();
     const events = createEventsStorage(docClient, tables);
-
-    await expect(events.create("run-1", { eventType: "unknown_event" })).rejects.toThrow("Unknown event type");
+    await expect(
+      events.create("run-1", { eventType: "unknown_event" })
+    ).rejects.toThrow("Unknown event type");
   });
 
   it("list() queries events by runId", async () => {
-    const now = new Date().toISOString();
-    const docClient = mockDocClient({
-      QueryCommand: {
-        Items: [
-          { runId: "run-1", eventId: "evt-1", eventType: "run_created", createdAt: now },
-          { runId: "run-1", eventId: "evt-2", eventType: "run_started", createdAt: now },
-        ],
-      },
+    docMock.on(QueryCommand).resolves({
+      Items: [
+        {
+          runId: "run-1",
+          eventId: "evt-1",
+          eventType: "run_created",
+          createdAt: now,
+        },
+        {
+          runId: "run-1",
+          eventId: "evt-2",
+          eventType: "run_started",
+          createdAt: now,
+        },
+      ],
     });
 
     const events = createEventsStorage(docClient, tables);
@@ -329,13 +337,16 @@ describe("EventsStorage", () => {
   });
 
   it("list() with resolveData none strips eventData", async () => {
-    const now = new Date().toISOString();
-    const docClient = mockDocClient({
-      QueryCommand: {
-        Items: [
-          { runId: "run-1", eventId: "evt-1", eventType: "run_created", eventData: { some: "data" }, createdAt: now },
-        ],
-      },
+    docMock.on(QueryCommand).resolves({
+      Items: [
+        {
+          runId: "run-1",
+          eventId: "evt-1",
+          eventType: "run_created",
+          eventData: { some: "data" },
+          createdAt: now,
+        },
+      ],
     });
 
     const events = createEventsStorage(docClient, tables);
@@ -345,14 +356,526 @@ describe("EventsStorage", () => {
   });
 
   it("listByCorrelationId() queries GSI", async () => {
-    const docClient = mockDocClient({
-      QueryCommand: { Items: [], LastEvaluatedKey: undefined },
-    });
+    docMock.on(QueryCommand).resolves({ Items: [] });
 
     const events = createEventsStorage(docClient, tables);
     await events.listByCorrelationId({ correlationId: "step-1" });
 
-    const call = (docClient.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.input.IndexName).toBe("gsi-correlation");
+    const calls = docMock.commandCalls(QueryCommand);
+    expect(calls[0].args[0].input.IndexName).toBe("gsi-correlation");
+  });
+
+  it("create() run_completed sets output and cleans up hooks/waits", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+    docMock
+      .on(QueryCommand)
+      .resolvesOnce({ Items: [] }) // hooks query
+      .resolvesOnce({ Items: [] }); // waits query
+    docMock.on(GetCommand).resolves({
+      Item: {
+        runId: "run-1",
+        status: "completed",
+        deploymentId: "dep-1",
+        workflowName: "wf",
+        output: new Uint8Array([42]),
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "run_completed",
+      eventData: { output: new Uint8Array([42]) },
+    });
+
+    expect(result.event!.eventType).toBe("run_completed");
+    expect(result.run!.status).toBe("completed");
+
+    // Verify TransactWrite includes condition expression
+    const txCalls = docMock.commandCalls(TransactWriteCommand);
+    const updateItem = txCalls[0].args[0].input.TransactItems![1].Update;
+    expect(updateItem!.ConditionExpression).toContain("NOT #status IN");
+  });
+
+  it("create() run_completed on already-terminal run returns existing state", async () => {
+    docMock.on(TransactWriteCommand).rejects(
+      Object.assign(new Error("Transaction cancelled"), {
+        name: "TransactionCanceledException",
+      })
+    );
+    docMock.on(GetCommand).resolves({
+      Item: {
+        runId: "run-1",
+        status: "failed",
+        deploymentId: "dep-1",
+        workflowName: "wf",
+        error: { message: "something broke" },
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "run_completed",
+      eventData: { output: new Uint8Array() },
+    });
+
+    expect(result.run!.status).toBe("failed");
+  });
+
+  it("create() run_failed sets error and cleans up hooks/waits", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+    docMock
+      .on(QueryCommand)
+      .resolvesOnce({ Items: [{ hookId: "h1" }] }) // hooks query
+      .resolvesOnce({ Items: [] }); // waits query
+    docMock.on(BatchWriteCommand).resolves({});
+    docMock.on(GetCommand).resolves({
+      Item: {
+        runId: "run-1",
+        status: "failed",
+        deploymentId: "dep-1",
+        workflowName: "wf",
+        error: { message: "crash" },
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "run_failed",
+      eventData: { error: { message: "crash" } },
+    });
+
+    expect(result.event!.eventType).toBe("run_failed");
+    expect(result.run!.status).toBe("failed");
+
+    // Verify hooks cleanup query was made
+    const queryCalls = docMock.commandCalls(QueryCommand);
+    expect(queryCalls[0].args[0].input.TableName).toBe(tables.hooks);
+  });
+
+  it("create() run_cancelled sets status and cleans up", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+    docMock
+      .on(QueryCommand)
+      .resolvesOnce({ Items: [] }) // hooks
+      .resolvesOnce({ Items: [] }); // waits
+    docMock.on(GetCommand).resolves({
+      Item: {
+        runId: "run-1",
+        status: "cancelled",
+        deploymentId: "dep-1",
+        workflowName: "wf",
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", { eventType: "run_cancelled" });
+
+    expect(result.event!.eventType).toBe("run_cancelled");
+    expect(result.run!.status).toBe("cancelled");
+  });
+
+  it("create() run_cancelled is idempotent when already cancelled", async () => {
+    docMock.on(TransactWriteCommand).rejects(
+      Object.assign(new Error("Transaction cancelled"), {
+        name: "TransactionCanceledException",
+      })
+    );
+    docMock.on(GetCommand).resolves({
+      Item: {
+        runId: "run-1",
+        status: "cancelled",
+        deploymentId: "dep-1",
+        workflowName: "wf",
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", { eventType: "run_cancelled" });
+
+    expect(result.run!.status).toBe("cancelled");
+  });
+
+  it("create() step_started increments attempt and sets running", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+    docMock.on(GetCommand).resolves({
+      Item: {
+        stepId: "step-1",
+        runId: "run-1",
+        stepName: "send-email",
+        status: "running",
+        attempt: 1,
+        createdAt: now,
+        updatedAt: now,
+        startedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "step_started",
+      correlationId: "step-1",
+    });
+
+    expect(result.event!.eventType).toBe("step_started");
+    expect(result.step!.status).toBe("running");
+
+    const txCalls = docMock.commandCalls(TransactWriteCommand);
+    const update = txCalls[0].args[0].input.TransactItems![1].Update;
+    expect(update!.UpdateExpression).toContain("attempt + :one");
+    expect(update!.ConditionExpression).toContain("NOT #status IN");
+  });
+
+  it("create() step_completed sets output", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+    docMock.on(GetCommand).resolves({
+      Item: {
+        stepId: "step-1",
+        runId: "run-1",
+        stepName: "process",
+        status: "completed",
+        output: new Uint8Array([99]),
+        attempt: 1,
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "step_completed",
+      correlationId: "step-1",
+      eventData: { result: new Uint8Array([99]) },
+    });
+
+    expect(result.event!.eventType).toBe("step_completed");
+    expect(result.step!.status).toBe("completed");
+
+    const txCalls = docMock.commandCalls(TransactWriteCommand);
+    const update = txCalls[0].args[0].input.TransactItems![1].Update;
+    expect(update!.UpdateExpression).toContain("output = :output");
+  });
+
+  it("create() step_failed sets error with stack trace", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+    docMock.on(GetCommand).resolves({
+      Item: {
+        stepId: "step-1",
+        runId: "run-1",
+        stepName: "process",
+        status: "failed",
+        error: { message: "timeout", stack: "Error: timeout\n  at ..." },
+        attempt: 2,
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "step_failed",
+      correlationId: "step-1",
+      eventData: { error: "timeout", stack: "Error: timeout\n  at ..." },
+    });
+
+    expect(result.event!.eventType).toBe("step_failed");
+    expect(result.step!.status).toBe("failed");
+
+    const txCalls = docMock.commandCalls(TransactWriteCommand);
+    const update = txCalls[0].args[0].input.TransactItems![1].Update;
+    expect(update!.ExpressionAttributeValues![":error"]).toEqual({
+      message: "timeout",
+      stack: "Error: timeout\n  at ...",
+    });
+  });
+
+  it("create() step_retrying resets to pending with retryAfter", async () => {
+    const retryAt = new Date(Date.now() + 30_000).toISOString();
+    docMock.on(TransactWriteCommand).resolves({});
+    docMock.on(GetCommand).resolves({
+      Item: {
+        stepId: "step-1",
+        runId: "run-1",
+        stepName: "process",
+        status: "pending",
+        error: { message: "rate limit" },
+        attempt: 2,
+        retryAfter: retryAt,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "step_retrying",
+      correlationId: "step-1",
+      eventData: { error: "rate limit", retryAfter: retryAt },
+    });
+
+    expect(result.event!.eventType).toBe("step_retrying");
+    expect(result.step!.status).toBe("pending");
+
+    const txCalls = docMock.commandCalls(TransactWriteCommand);
+    const update = txCalls[0].args[0].input.TransactItems![1].Update;
+    expect(update!.ExpressionAttributeValues![":status"]).toBe("pending");
+    expect(update!.ExpressionAttributeValues![":retryAfter"]).toBeTruthy();
+  });
+
+  it("create() hook_created succeeds and returns hook", async () => {
+    docMock.on(PutCommand).resolves({});
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "hook_created",
+      correlationId: "hook-1",
+      eventData: { token: "my-token" },
+    });
+
+    expect(result.event!.eventType).toBe("hook_created");
+    expect(result.hook).toBeDefined();
+    expect(result.hook!.token).toBe("my-token");
+    expect(result.hook!.hookId).toBe("hook-1");
+
+    // First PutCommand should have condition
+    const putCalls = docMock.commandCalls(PutCommand);
+    expect(putCalls[0].args[0].input.ConditionExpression).toBe(
+      "attribute_not_exists(hookId)"
+    );
+  });
+
+  it("create() hook_received writes event only", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "hook_received",
+      correlationId: "hook-1",
+      eventData: { payload: { foo: "bar" } },
+    });
+
+    expect(result.event!.eventType).toBe("hook_received");
+    expect(result.hook).toBeUndefined();
+    expect(result.run).toBeUndefined();
+
+    const txCalls = docMock.commandCalls(TransactWriteCommand);
+    expect(txCalls[0].args[0].input.TransactItems).toHaveLength(1);
+  });
+
+  it("create() hook_disposed deletes hook", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "hook_disposed",
+      correlationId: "hook-1",
+    });
+
+    expect(result.event!.eventType).toBe("hook_disposed");
+
+    const txCalls = docMock.commandCalls(TransactWriteCommand);
+    expect(txCalls[0].args[0].input.TransactItems).toHaveLength(2);
+    const deleteItem = txCalls[0].args[0].input.TransactItems![1].Delete;
+    expect(deleteItem!.TableName).toBe(tables.hooks);
+    expect(deleteItem!.Key).toEqual({ hookId: "hook-1" });
+  });
+
+  it("create() wait_created creates wait entity", async () => {
+    const resumeAt = new Date(Date.now() + 60_000).toISOString();
+    docMock.on(TransactWriteCommand).resolves({});
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "wait_created",
+      correlationId: "wait-1",
+      eventData: { resumeAt },
+    });
+
+    expect(result.event!.eventType).toBe("wait_created");
+    expect(result.wait).toBeDefined();
+    expect(result.wait!.waitId).toBe("wait-1");
+    expect(result.wait!.status).toBe("waiting");
+
+    const txCalls = docMock.commandCalls(TransactWriteCommand);
+    expect(txCalls[0].args[0].input.TransactItems).toHaveLength(2);
+    const waitPut = txCalls[0].args[0].input.TransactItems![1].Put;
+    expect(waitPut!.TableName).toBe(tables.waits);
+    expect(waitPut!.Item!.status).toBe("waiting");
+  });
+
+  it("create() wait_completed updates wait status with condition", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+    docMock.on(GetCommand).resolves({
+      Item: {
+        waitId: "wait-1",
+        runId: "run-1",
+        status: "completed",
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "wait_completed",
+      correlationId: "wait-1",
+    });
+
+    expect(result.event!.eventType).toBe("wait_completed");
+    expect(result.wait).toBeDefined();
+    expect(result.wait!.status).toBe("completed");
+
+    const txCalls = docMock.commandCalls(TransactWriteCommand);
+    const update = txCalls[0].args[0].input.TransactItems![1].Update;
+    expect(update!.ConditionExpression).toBe("#status = :waiting");
+  });
+
+  it("create() run_completed deletes hooks across multiple pages", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+    docMock
+      .on(QueryCommand)
+      // hooks page 1 — has more
+      .resolvesOnce({
+        Items: [{ hookId: "h1" }, { hookId: "h2" }],
+        LastEvaluatedKey: { hookId: "h2" },
+      })
+      // hooks page 2 — last page
+      .resolvesOnce({
+        Items: [{ hookId: "h3" }],
+      })
+      // waits page 1 — empty
+      .resolvesOnce({ Items: [] });
+    docMock.on(BatchWriteCommand).resolves({});
+    docMock.on(GetCommand).resolves({
+      Item: {
+        runId: "run-1",
+        status: "completed",
+        deploymentId: "dep-1",
+        workflowName: "wf",
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    await events.create("run-1", {
+      eventType: "run_completed",
+      eventData: { output: null },
+    });
+
+    const batchCalls = docMock.commandCalls(BatchWriteCommand);
+    expect(batchCalls).toHaveLength(2);
+    expect(
+      batchCalls[0].args[0].input.RequestItems![tables.hooks]
+    ).toHaveLength(2);
+    expect(
+      batchCalls[1].args[0].input.RequestItems![tables.hooks]
+    ).toHaveLength(1);
+  });
+
+  it("create() step_started returns existing step on TransactionCanceledException", async () => {
+    docMock.on(TransactWriteCommand).rejects(
+      Object.assign(new Error("Transaction cancelled"), {
+        name: "TransactionCanceledException",
+      })
+    );
+    docMock.on(GetCommand).resolves({
+      Item: {
+        stepId: "step-1",
+        runId: "run-1",
+        stepName: "process",
+        status: "completed",
+        attempt: 1,
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "step_started",
+      correlationId: "step-1",
+    });
+
+    expect(result.step!.status).toBe("completed");
+  });
+
+  it("create() step_completed returns existing step on TransactionCanceledException", async () => {
+    docMock.on(TransactWriteCommand).rejects(
+      Object.assign(new Error("Transaction cancelled"), {
+        name: "TransactionCanceledException",
+      })
+    );
+    docMock.on(GetCommand).resolves({
+      Item: {
+        stepId: "step-1",
+        runId: "run-1",
+        stepName: "process",
+        status: "completed",
+        output: new Uint8Array([99]),
+        attempt: 1,
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "step_completed",
+      correlationId: "step-1",
+      eventData: { result: new Uint8Array([99]) },
+    });
+
+    expect(result.step!.status).toBe("completed");
+  });
+
+  it("create() step_failed returns existing step on TransactionCanceledException", async () => {
+    docMock.on(TransactWriteCommand).rejects(
+      Object.assign(new Error("Transaction cancelled"), {
+        name: "TransactionCanceledException",
+      })
+    );
+    docMock.on(GetCommand).resolves({
+      Item: {
+        stepId: "step-1",
+        runId: "run-1",
+        stepName: "process",
+        status: "failed",
+        error: { message: "crash" },
+        attempt: 2,
+        createdAt: now,
+        updatedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "step_failed",
+      correlationId: "step-1",
+      eventData: { error: "crash" },
+    });
+
+    expect(result.step!.status).toBe("failed");
   });
 });

@@ -18,10 +18,14 @@ export function fromISO(iso: string): Date {
   return new Date(iso);
 }
 
-export function toDateOrUndefined(value: string | undefined | null): Date | undefined {
+export function toDateOrUndefined(
+  value: string | undefined | null
+): Date | undefined {
   return value ? new Date(value) : undefined;
 }
 
-export function toBinaryOrUndefined(value: Uint8Array | undefined | null): Uint8Array | undefined {
+export function toBinaryOrUndefined(
+  value: Uint8Array | undefined | null
+): Uint8Array | undefined {
   return value ?? undefined;
 }

@@ -1,101 +1,31 @@
-import {
-  TransactWriteCommand,
-  GetCommand,
-  QueryCommand,
-  BatchWriteCommand,
-  PutCommand,
-} from "@aws-sdk/lib-dynamodb";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import {
+  BatchWriteCommand,
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  TransactWriteCommand,
+} from "@aws-sdk/lib-dynamodb";
+import { ulid } from "ulid";
+import { decodeCursor, encodeCursor } from "../dynamodb/pagination.js";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
-import { encodeCursor, decodeCursor } from "../dynamodb/pagination.js";
-import { toISO, fromISO, toDateOrUndefined } from "../util.js";
-import { ulid } from "ulid";
+import { toISO } from "../util.js";
+import {
+  marshalEvent,
+  marshalHook,
+  marshalRun,
+  marshalStep,
+  marshalWait,
+} from "./marshal.js";
 
 const TERMINAL_STATUSES = ["completed", "failed", "cancelled"];
-
-function marshalEvent(item: Record<string, unknown>) {
-  return {
-    runId: item.runId as string,
-    eventId: item.eventId as string,
-    eventType: item.eventType as string,
-    correlationId: item.correlationId as string | undefined,
-    eventData: item.eventData as Record<string, unknown> | undefined,
-    createdAt: fromISO(item.createdAt as string),
-    specVersion: item.specVersion as number | undefined,
-  };
-}
-
-function marshalRun(item: Record<string, unknown>) {
-  return {
-    runId: item.runId as string,
-    status: item.status as string,
-    deploymentId: item.deploymentId as string,
-    workflowName: item.workflowName as string,
-    input: item.input,
-    output: item.output,
-    error: item.error as { message: string; stack?: string; code?: string } | undefined,
-    executionContext: item.executionContext as Record<string, unknown> | undefined,
-    specVersion: item.specVersion as number | undefined,
-    startedAt: toDateOrUndefined(item.startedAt as string | undefined),
-    completedAt: toDateOrUndefined(item.completedAt as string | undefined),
-    createdAt: fromISO(item.createdAt as string),
-    updatedAt: fromISO(item.updatedAt as string),
-    expiredAt: toDateOrUndefined(item.expiredAt as string | undefined),
-  };
-}
-
-function marshalStep(item: Record<string, unknown>) {
-  return {
-    runId: item.runId as string,
-    stepId: item.stepId as string,
-    stepName: item.stepName as string,
-    status: item.status as string,
-    input: item.input,
-    output: item.output,
-    error: item.error as { message: string; stack?: string; code?: string } | undefined,
-    attempt: (item.attempt as number) ?? 0,
-    retryAfter: toDateOrUndefined(item.retryAfter as string | undefined),
-    startedAt: toDateOrUndefined(item.startedAt as string | undefined),
-    completedAt: toDateOrUndefined(item.completedAt as string | undefined),
-    createdAt: fromISO(item.createdAt as string),
-    updatedAt: fromISO(item.updatedAt as string),
-    specVersion: item.specVersion as number | undefined,
-  };
-}
-
-function marshalHook(item: Record<string, unknown>) {
-  return {
-    runId: item.runId as string,
-    hookId: item.hookId as string,
-    token: item.token as string,
-    ownerId: item.ownerId as string,
-    projectId: item.projectId as string,
-    environment: item.environment as string,
-    metadata: item.metadata,
-    createdAt: fromISO(item.createdAt as string),
-    specVersion: item.specVersion as number | undefined,
-  };
-}
-
-function marshalWait(item: Record<string, unknown>) {
-  return {
-    waitId: item.waitId as string,
-    runId: item.runId as string,
-    status: item.status as string,
-    resumeAt: toDateOrUndefined(item.resumeAt as string | undefined),
-    completedAt: toDateOrUndefined(item.completedAt as string | undefined),
-    createdAt: fromISO(item.createdAt as string),
-    updatedAt: fromISO(item.updatedAt as string),
-    specVersion: item.specVersion as number | undefined,
-  };
-}
 
 function buildEventItem(
   runId: string,
   eventId: string,
   data: Record<string, unknown>,
-  now: string,
+  now: string
 ) {
   return {
     runId,
@@ -104,72 +34,90 @@ function buildEventItem(
     ...(data.correlationId ? { correlationId: data.correlationId } : {}),
     ...(data.eventData !== undefined ? { eventData: data.eventData } : {}),
     createdAt: now,
-    ...(data.specVersion !== undefined ? { specVersion: data.specVersion } : {}),
+    ...(data.specVersion !== undefined
+      ? { specVersion: data.specVersion }
+      : {}),
   };
 }
 
 export function createEventsStorage(
   docClient: DynamoDBDocumentClient,
-  tables: TableNames,
+  tables: TableNames
 ) {
   async function deleteHooksAndWaitsForRun(runId: string): Promise<void> {
-    // Delete all hooks for this run
-    const hooksResult = await docClient.send(
-      new QueryCommand({
-        TableName: tables.hooks,
-        IndexName: GSI.hooks.run,
-        KeyConditionExpression: "runId = :runId",
-        ExpressionAttributeValues: { ":runId": runId },
-        ProjectionExpression: "hookId",
-      }),
-    );
+    // Delete all hooks for this run (paginated)
+    let startKey: Record<string, unknown> | undefined;
+    do {
+      const hooksResult = await docClient.send(
+        new QueryCommand({
+          TableName: tables.hooks,
+          IndexName: GSI.hooks.run,
+          KeyConditionExpression: "runId = :runId",
+          ExpressionAttributeValues: { ":runId": runId },
+          ProjectionExpression: "hookId",
+          ...(startKey ? { ExclusiveStartKey: startKey } : {}),
+        })
+      );
 
-    if (hooksResult.Items && hooksResult.Items.length > 0) {
-      const batches = [];
-      for (let i = 0; i < hooksResult.Items.length; i += 25) {
-        batches.push(hooksResult.Items.slice(i, i + 25));
+      if (hooksResult.Items && hooksResult.Items.length > 0) {
+        const batches = [];
+        for (let i = 0; i < hooksResult.Items.length; i += 25) {
+          batches.push(hooksResult.Items.slice(i, i + 25));
+        }
+        for (const batch of batches) {
+          await docClient.send(
+            new BatchWriteCommand({
+              RequestItems: {
+                [tables.hooks]: batch.map((item) => ({
+                  DeleteRequest: { Key: { hookId: item.hookId } },
+                })),
+              },
+            })
+          );
+        }
       }
-      for (const batch of batches) {
-        await docClient.send(
-          new BatchWriteCommand({
-            RequestItems: {
-              [tables.hooks]: batch.map((item) => ({
-                DeleteRequest: { Key: { hookId: item.hookId } },
-              })),
-            },
-          }),
-        );
-      }
-    }
 
-    // Delete all waits for this run
-    const waitsResult = await docClient.send(
-      new QueryCommand({
-        TableName: tables.waits,
-        IndexName: GSI.waits.run,
-        KeyConditionExpression: "runId = :runId",
-        ExpressionAttributeValues: { ":runId": runId },
-        ProjectionExpression: "waitId",
-      }),
-    );
+      startKey = hooksResult.LastEvaluatedKey as
+        | Record<string, unknown>
+        | undefined;
+    } while (startKey);
 
-    if (waitsResult.Items && waitsResult.Items.length > 0) {
-      const batches = [];
-      for (let i = 0; i < waitsResult.Items.length; i += 25) {
-        batches.push(waitsResult.Items.slice(i, i + 25));
+    // Delete all waits for this run (paginated)
+    startKey = undefined;
+    do {
+      const waitsResult = await docClient.send(
+        new QueryCommand({
+          TableName: tables.waits,
+          IndexName: GSI.waits.run,
+          KeyConditionExpression: "runId = :runId",
+          ExpressionAttributeValues: { ":runId": runId },
+          ProjectionExpression: "waitId",
+          ...(startKey ? { ExclusiveStartKey: startKey } : {}),
+        })
+      );
+
+      if (waitsResult.Items && waitsResult.Items.length > 0) {
+        const batches = [];
+        for (let i = 0; i < waitsResult.Items.length; i += 25) {
+          batches.push(waitsResult.Items.slice(i, i + 25));
+        }
+        for (const batch of batches) {
+          await docClient.send(
+            new BatchWriteCommand({
+              RequestItems: {
+                [tables.waits]: batch.map((item) => ({
+                  DeleteRequest: { Key: { waitId: item.waitId } },
+                })),
+              },
+            })
+          );
+        }
       }
-      for (const batch of batches) {
-        await docClient.send(
-          new BatchWriteCommand({
-            RequestItems: {
-              [tables.waits]: batch.map((item) => ({
-                DeleteRequest: { Key: { waitId: item.waitId } },
-              })),
-            },
-          }),
-        );
-      }
-    }
+
+      startKey = waitsResult.LastEvaluatedKey as
+        | Record<string, unknown>
+        | undefined;
+    } while (startKey);
   }
 
   async function getRun(runId: string) {
@@ -177,7 +125,7 @@ export function createEventsStorage(
       new GetCommand({
         TableName: tables.runs,
         Key: { runId },
-      }),
+      })
     );
     return result.Item ? marshalRun(result.Item) : null;
   }
@@ -185,7 +133,7 @@ export function createEventsStorage(
   async function handleRunCreated(
     runId: string | null,
     data: Record<string, unknown>,
-    _params?: Record<string, unknown>,
+    _params?: Record<string, unknown>
   ) {
     const actualRunId = runId ?? ulid();
     const eventId = ulid();
@@ -200,8 +148,12 @@ export function createEventsStorage(
       deploymentId: eventData.deploymentId,
       workflowName: eventData.workflowName,
       input: eventData.input,
-      ...(eventData.executionContext ? { executionContext: eventData.executionContext } : {}),
-      ...(data.specVersion !== undefined ? { specVersion: data.specVersion } : {}),
+      ...(eventData.executionContext
+        ? { executionContext: eventData.executionContext }
+        : {}),
+      ...(data.specVersion !== undefined
+        ? { specVersion: data.specVersion }
+        : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -212,7 +164,7 @@ export function createEventsStorage(
           { Put: { TableName: tables.events, Item: eventItem } },
           { Put: { TableName: tables.runs, Item: runItem } },
         ],
-      }),
+      })
     );
 
     return {
@@ -223,7 +175,7 @@ export function createEventsStorage(
 
   async function handleRunStarted(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -238,8 +190,10 @@ export function createEventsStorage(
               Update: {
                 TableName: tables.runs,
                 Key: { runId },
-                UpdateExpression: "SET #status = :status, startedAt = :now, updatedAt = :now",
-                ConditionExpression: "NOT #status IN (:completed, :failed, :cancelled)",
+                UpdateExpression:
+                  "SET #status = :status, startedAt = :now, updatedAt = :now",
+                ConditionExpression:
+                  "NOT #status IN (:completed, :failed, :cancelled)",
                 ExpressionAttributeNames: { "#status": "status" },
                 ExpressionAttributeValues: {
                   ":status": "running",
@@ -251,7 +205,7 @@ export function createEventsStorage(
               },
             },
           ],
-        }),
+        })
       );
     } catch (e) {
       if (e instanceof Error && e.name === "TransactionCanceledException") {
@@ -269,7 +223,7 @@ export function createEventsStorage(
 
   async function handleRunCompleted(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -287,7 +241,8 @@ export function createEventsStorage(
                 Key: { runId },
                 UpdateExpression:
                   "SET #status = :status, output = :output, completedAt = :now, updatedAt = :now",
-                ConditionExpression: "NOT #status IN (:completed, :failed, :cancelled)",
+                ConditionExpression:
+                  "NOT #status IN (:completed, :failed, :cancelled)",
                 ExpressionAttributeNames: { "#status": "status" },
                 ExpressionAttributeValues: {
                   ":status": "completed",
@@ -300,7 +255,7 @@ export function createEventsStorage(
               },
             },
           ],
-        }),
+        })
       );
     } catch (e) {
       if (e instanceof Error && e.name === "TransactionCanceledException") {
@@ -317,10 +272,7 @@ export function createEventsStorage(
     return { event: marshalEvent(eventItem), run: run! };
   }
 
-  async function handleRunFailed(
-    runId: string,
-    data: Record<string, unknown>,
-  ) {
+  async function handleRunFailed(runId: string, data: Record<string, unknown>) {
     const eventId = ulid();
     const now = toISO(new Date());
     const eventData = data.eventData as Record<string, unknown>;
@@ -337,8 +289,12 @@ export function createEventsStorage(
                 Key: { runId },
                 UpdateExpression:
                   "SET #status = :status, #error = :error, completedAt = :now, updatedAt = :now",
-                ConditionExpression: "NOT #status IN (:completed, :failed, :cancelled)",
-                ExpressionAttributeNames: { "#status": "status", "#error": "error" },
+                ConditionExpression:
+                  "NOT #status IN (:completed, :failed, :cancelled)",
+                ExpressionAttributeNames: {
+                  "#status": "status",
+                  "#error": "error",
+                },
                 ExpressionAttributeValues: {
                   ":status": "failed",
                   ":error": eventData.error,
@@ -350,7 +306,7 @@ export function createEventsStorage(
               },
             },
           ],
-        }),
+        })
       );
     } catch (e) {
       if (e instanceof Error && e.name === "TransactionCanceledException") {
@@ -369,7 +325,7 @@ export function createEventsStorage(
 
   async function handleRunCancelled(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -384,7 +340,8 @@ export function createEventsStorage(
               Update: {
                 TableName: tables.runs,
                 Key: { runId },
-                UpdateExpression: "SET #status = :status, completedAt = :now, updatedAt = :now",
+                UpdateExpression:
+                  "SET #status = :status, completedAt = :now, updatedAt = :now",
                 ConditionExpression: "NOT #status IN (:completed, :failed)",
                 ExpressionAttributeNames: { "#status": "status" },
                 ExpressionAttributeValues: {
@@ -396,7 +353,7 @@ export function createEventsStorage(
               },
             },
           ],
-        }),
+        })
       );
     } catch (e) {
       if (e instanceof Error && e.name === "TransactionCanceledException") {
@@ -421,7 +378,7 @@ export function createEventsStorage(
 
   async function handleStepCreated(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -436,7 +393,9 @@ export function createEventsStorage(
       status: "pending",
       input: eventData.input,
       attempt: 0,
-      ...(data.specVersion !== undefined ? { specVersion: data.specVersion } : {}),
+      ...(data.specVersion !== undefined
+        ? { specVersion: data.specVersion }
+        : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -447,7 +406,7 @@ export function createEventsStorage(
           { Put: { TableName: tables.events, Item: eventItem } },
           { Put: { TableName: tables.steps, Item: stepItem } },
         ],
-      }),
+      })
     );
 
     return {
@@ -458,7 +417,7 @@ export function createEventsStorage(
 
   async function handleStepStarted(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -490,11 +449,22 @@ export function createEventsStorage(
               },
             },
           ],
-        }),
+        })
       );
     } catch (e) {
       if (e instanceof Error && e.name === "TransactionCanceledException") {
-        throw e;
+        const stepResult = await docClient.send(
+          new GetCommand({
+            TableName: tables.steps,
+            Key: { stepId: correlationId },
+          })
+        );
+        if (stepResult.Item) {
+          const step = marshalStep(stepResult.Item);
+          if (TERMINAL_STATUSES.includes(step.status)) {
+            return { event: marshalEvent(eventItem), step };
+          }
+        }
       }
       throw e;
     }
@@ -503,7 +473,7 @@ export function createEventsStorage(
       new GetCommand({
         TableName: tables.steps,
         Key: { stepId: correlationId },
-      }),
+      })
     );
 
     return {
@@ -514,7 +484,7 @@ export function createEventsStorage(
 
   async function handleStepCompleted(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -545,11 +515,22 @@ export function createEventsStorage(
               },
             },
           ],
-        }),
+        })
       );
     } catch (e) {
       if (e instanceof Error && e.name === "TransactionCanceledException") {
-        throw e;
+        const stepResult = await docClient.send(
+          new GetCommand({
+            TableName: tables.steps,
+            Key: { stepId: correlationId },
+          })
+        );
+        if (stepResult.Item) {
+          const step = marshalStep(stepResult.Item);
+          if (TERMINAL_STATUSES.includes(step.status)) {
+            return { event: marshalEvent(eventItem), step };
+          }
+        }
       }
       throw e;
     }
@@ -558,7 +539,7 @@ export function createEventsStorage(
       new GetCommand({
         TableName: tables.steps,
         Key: { stepId: correlationId },
-      }),
+      })
     );
 
     return {
@@ -569,7 +550,7 @@ export function createEventsStorage(
 
   async function handleStepFailed(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -589,7 +570,10 @@ export function createEventsStorage(
                 UpdateExpression:
                   "SET #status = :status, #error = :error, completedAt = :now, updatedAt = :now",
                 ConditionExpression: "NOT #status IN (:completed, :failed)",
-                ExpressionAttributeNames: { "#status": "status", "#error": "error" },
+                ExpressionAttributeNames: {
+                  "#status": "status",
+                  "#error": "error",
+                },
                 ExpressionAttributeValues: {
                   ":status": "failed",
                   ":error": {
@@ -603,11 +587,22 @@ export function createEventsStorage(
               },
             },
           ],
-        }),
+        })
       );
     } catch (e) {
       if (e instanceof Error && e.name === "TransactionCanceledException") {
-        throw e;
+        const stepResult = await docClient.send(
+          new GetCommand({
+            TableName: tables.steps,
+            Key: { stepId: correlationId },
+          })
+        );
+        if (stepResult.Item) {
+          const step = marshalStep(stepResult.Item);
+          if (TERMINAL_STATUSES.includes(step.status)) {
+            return { event: marshalEvent(eventItem), step };
+          }
+        }
       }
       throw e;
     }
@@ -616,7 +611,7 @@ export function createEventsStorage(
       new GetCommand({
         TableName: tables.steps,
         Key: { stepId: correlationId },
-      }),
+      })
     );
 
     return {
@@ -627,7 +622,7 @@ export function createEventsStorage(
 
   async function handleStepRetrying(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -649,7 +644,10 @@ export function createEventsStorage(
               Key: { stepId: correlationId },
               UpdateExpression:
                 "SET #status = :status, #error = :error, retryAfter = :retryAfter, updatedAt = :now",
-              ExpressionAttributeNames: { "#status": "status", "#error": "error" },
+              ExpressionAttributeNames: {
+                "#status": "status",
+                "#error": "error",
+              },
               ExpressionAttributeValues: {
                 ":status": "pending",
                 ":error": {
@@ -662,14 +660,14 @@ export function createEventsStorage(
             },
           },
         ],
-      }),
+      })
     );
 
     const stepResult = await docClient.send(
       new GetCommand({
         TableName: tables.steps,
         Key: { stepId: correlationId },
-      }),
+      })
     );
 
     return {
@@ -680,7 +678,7 @@ export function createEventsStorage(
 
   async function handleHookCreated(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -695,8 +693,12 @@ export function createEventsStorage(
       ownerId: "",
       projectId: "",
       environment: "",
-      ...(eventData.metadata !== undefined ? { metadata: eventData.metadata } : {}),
-      ...(data.specVersion !== undefined ? { specVersion: data.specVersion } : {}),
+      ...(eventData.metadata !== undefined
+        ? { metadata: eventData.metadata }
+        : {}),
+      ...(data.specVersion !== undefined
+        ? { specVersion: data.specVersion }
+        : {}),
       createdAt: now,
     };
 
@@ -706,7 +708,7 @@ export function createEventsStorage(
           TableName: tables.hooks,
           Item: hookItem,
           ConditionExpression: "attribute_not_exists(hookId)",
-        }),
+        })
       );
     } catch (e) {
       if (e instanceof Error && e.name === "ConditionalCheckFailedException") {
@@ -718,14 +720,16 @@ export function createEventsStorage(
           correlationId,
           eventData: { token: eventData.token },
           createdAt: now,
-          ...(data.specVersion !== undefined ? { specVersion: data.specVersion } : {}),
+          ...(data.specVersion !== undefined
+            ? { specVersion: data.specVersion }
+            : {}),
         };
 
         await docClient.send(
           new PutCommand({
             TableName: tables.events,
             Item: conflictEventItem,
-          }),
+          })
         );
 
         return { event: marshalEvent(conflictEventItem) };
@@ -740,7 +744,7 @@ export function createEventsStorage(
       new PutCommand({
         TableName: tables.events,
         Item: eventItem,
-      }),
+      })
     );
 
     return {
@@ -751,7 +755,7 @@ export function createEventsStorage(
 
   async function handleHookReceived(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -760,7 +764,7 @@ export function createEventsStorage(
     await docClient.send(
       new TransactWriteCommand({
         TransactItems: [{ Put: { TableName: tables.events, Item: eventItem } }],
-      }),
+      })
     );
 
     return { event: marshalEvent(eventItem) };
@@ -768,7 +772,7 @@ export function createEventsStorage(
 
   async function handleHookDisposed(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -786,7 +790,7 @@ export function createEventsStorage(
             },
           },
         ],
-      }),
+      })
     );
 
     return { event: marshalEvent(eventItem) };
@@ -794,7 +798,7 @@ export function createEventsStorage(
 
   async function handleWaitCreated(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -811,7 +815,9 @@ export function createEventsStorage(
       runId,
       status: "waiting",
       ...(resumeAtValue ? { resumeAt: resumeAtValue } : {}),
-      ...(data.specVersion !== undefined ? { specVersion: data.specVersion } : {}),
+      ...(data.specVersion !== undefined
+        ? { specVersion: data.specVersion }
+        : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -822,7 +828,7 @@ export function createEventsStorage(
           { Put: { TableName: tables.events, Item: eventItem } },
           { Put: { TableName: tables.waits, Item: waitItem } },
         ],
-      }),
+      })
     );
 
     return {
@@ -833,7 +839,7 @@ export function createEventsStorage(
 
   async function handleWaitCompleted(
     runId: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown>
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
@@ -860,14 +866,14 @@ export function createEventsStorage(
             },
           },
         ],
-      }),
+      })
     );
 
     const waitResult = await docClient.send(
       new GetCommand({
         TableName: tables.waits,
         Key: { waitId: correlationId },
-      }),
+      })
     );
 
     return {
@@ -898,7 +904,7 @@ export function createEventsStorage(
   async function create(
     runId: string | null,
     data: Record<string, unknown>,
-    params?: Record<string, unknown>,
+    params?: Record<string, unknown>
   ) {
     const eventType = data.eventType as string;
     const handler = eventHandlers[eventType];
@@ -913,7 +919,11 @@ export function createEventsStorage(
 
   async function list(params: {
     runId: string;
-    pagination?: { limit?: number; cursor?: string; sortOrder?: "asc" | "desc" };
+    pagination?: {
+      limit?: number;
+      cursor?: string;
+      sortOrder?: "asc" | "desc";
+    };
     resolveData?: "none" | "all";
   }) {
     const { runId, pagination, resolveData } = params;
@@ -929,11 +939,15 @@ export function createEventsStorage(
     };
 
     if (pagination?.cursor) {
-      (queryParams as Record<string, unknown>).ExclusiveStartKey = decodeCursor(pagination.cursor);
+      (queryParams as Record<string, unknown>).ExclusiveStartKey = decodeCursor(
+        pagination.cursor
+      );
     }
 
     const result = await docClient.send(
-      new QueryCommand(queryParams as ConstructorParameters<typeof QueryCommand>[0]),
+      new QueryCommand(
+        queryParams as ConstructorParameters<typeof QueryCommand>[0]
+      )
     );
 
     const events = (result.Items ?? []).map((item) => {
@@ -947,14 +961,20 @@ export function createEventsStorage(
 
     return {
       data: events,
-      cursor: result.LastEvaluatedKey ? encodeCursor(result.LastEvaluatedKey) : null,
+      cursor: result.LastEvaluatedKey
+        ? encodeCursor(result.LastEvaluatedKey)
+        : null,
       hasMore: !!result.LastEvaluatedKey,
     };
   }
 
   async function listByCorrelationId(params: {
     correlationId: string;
-    pagination?: { limit?: number; cursor?: string; sortOrder?: "asc" | "desc" };
+    pagination?: {
+      limit?: number;
+      cursor?: string;
+      sortOrder?: "asc" | "desc";
+    };
     resolveData?: "none" | "all";
   }) {
     const { correlationId, pagination, resolveData } = params;
@@ -971,11 +991,15 @@ export function createEventsStorage(
     };
 
     if (pagination?.cursor) {
-      (queryParams as Record<string, unknown>).ExclusiveStartKey = decodeCursor(pagination.cursor);
+      (queryParams as Record<string, unknown>).ExclusiveStartKey = decodeCursor(
+        pagination.cursor
+      );
     }
 
     const result = await docClient.send(
-      new QueryCommand(queryParams as ConstructorParameters<typeof QueryCommand>[0]),
+      new QueryCommand(
+        queryParams as ConstructorParameters<typeof QueryCommand>[0]
+      )
     );
 
     const events = (result.Items ?? []).map((item) => {
@@ -989,7 +1013,9 @@ export function createEventsStorage(
 
     return {
       data: events,
-      cursor: result.LastEvaluatedKey ? encodeCursor(result.LastEvaluatedKey) : null,
+      cursor: result.LastEvaluatedKey
+        ? encodeCursor(result.LastEvaluatedKey)
+        : null,
       hasMore: !!result.LastEvaluatedKey,
     };
   }

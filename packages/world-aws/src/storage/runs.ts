@@ -1,23 +1,10 @@
-import { GetCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import type { Storage } from "@workflow/world";
+import { decodeCursor, encodeCursor } from "../dynamodb/pagination.js";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
-import { encodeCursor, decodeCursor } from "../dynamodb/pagination.js";
-import { toDateOrUndefined, toBinaryOrUndefined } from "../util.js";
-import type { Storage } from "@workflow/world";
-
-function marshalRun(item: Record<string, unknown>) {
-  return {
-    ...item,
-    input: item.input as Uint8Array,
-    output: toBinaryOrUndefined(item.output as Uint8Array | undefined),
-    createdAt: new Date(item.createdAt as string),
-    updatedAt: new Date(item.updatedAt as string),
-    startedAt: toDateOrUndefined(item.startedAt as string | undefined),
-    completedAt: toDateOrUndefined(item.completedAt as string | undefined),
-    expiredAt: toDateOrUndefined(item.expiredAt as string | undefined),
-  };
-}
+import { marshalRun } from "./marshal.js";
 
 function stripData(run: Record<string, unknown>) {
   return {
@@ -29,7 +16,7 @@ function stripData(run: Record<string, unknown>) {
 
 export function createRunsStorage(
   docClient: DynamoDBDocumentClient,
-  tables: TableNames,
+  tables: TableNames
 ): Storage["runs"] {
   const tableName = tables.runs;
 
@@ -61,7 +48,11 @@ export function createRunsStorage(
   async function list(params?: {
     workflowName?: string;
     status?: string;
-    pagination?: { limit?: number; cursor?: string; sortOrder?: "asc" | "desc" };
+    pagination?: {
+      limit?: number;
+      cursor?: string;
+      sortOrder?: "asc" | "desc";
+    };
     resolveData?: "none" | "all";
   }) {
     const limit = Math.min(params?.pagination?.limit ?? 100, 1000);
@@ -89,11 +80,16 @@ export function createRunsStorage(
           ExpressionAttributeValues: { ":wn": params.workflowName },
           Limit: limit,
           ScanIndexForward: scanForward,
-          ...(exclusiveStartKey ? { ExclusiveStartKey: exclusiveStartKey } : {}),
-          ...(projectionExpression
-            ? { ProjectionExpression: projectionExpression, ExpressionAttributeNames: expressionAttributeNames }
+          ...(exclusiveStartKey
+            ? { ExclusiveStartKey: exclusiveStartKey }
             : {}),
-        }),
+          ...(projectionExpression
+            ? {
+                ProjectionExpression: projectionExpression,
+                ExpressionAttributeNames: expressionAttributeNames,
+              }
+            : {}),
+        })
       );
     } else if (params?.status) {
       result = await docClient.send(
@@ -108,20 +104,29 @@ export function createRunsStorage(
           },
           Limit: limit,
           ScanIndexForward: scanForward,
-          ...(exclusiveStartKey ? { ExclusiveStartKey: exclusiveStartKey } : {}),
-          ...(projectionExpression ? { ProjectionExpression: projectionExpression } : {}),
-        }),
+          ...(exclusiveStartKey
+            ? { ExclusiveStartKey: exclusiveStartKey }
+            : {}),
+          ...(projectionExpression
+            ? { ProjectionExpression: projectionExpression }
+            : {}),
+        })
       );
     } else {
       result = await docClient.send(
         new ScanCommand({
           TableName: tableName,
           Limit: limit,
-          ...(exclusiveStartKey ? { ExclusiveStartKey: exclusiveStartKey } : {}),
-          ...(projectionExpression
-            ? { ProjectionExpression: projectionExpression, ExpressionAttributeNames: expressionAttributeNames }
+          ...(exclusiveStartKey
+            ? { ExclusiveStartKey: exclusiveStartKey }
             : {}),
-        }),
+          ...(projectionExpression
+            ? {
+                ProjectionExpression: projectionExpression,
+                ExpressionAttributeNames: expressionAttributeNames,
+              }
+            : {}),
+        })
       );
     }
 
@@ -132,7 +137,9 @@ export function createRunsStorage(
 
     return {
       data: items,
-      cursor: result.LastEvaluatedKey ? encodeCursor(result.LastEvaluatedKey) : null,
+      cursor: result.LastEvaluatedKey
+        ? encodeCursor(result.LastEvaluatedKey)
+        : null,
       hasMore: !!result.LastEvaluatedKey,
     } as any;
   }

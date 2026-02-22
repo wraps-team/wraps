@@ -1,30 +1,30 @@
 #!/usr/bin/env tsx
 import {
+  type AttributeDefinition,
   CreateTableCommand,
+  DynamoDBClient as DDBClient,
   DescribeTableCommand,
   type DynamoDBClient,
-  type KeySchemaElement,
-  type AttributeDefinition,
   type GlobalSecondaryIndex,
+  type KeySchemaElement,
   type StreamSpecification,
 } from "@aws-sdk/client-dynamodb";
 import {
   CreateQueueCommand,
   GetQueueUrlCommand,
+  SQSClient,
   type SQSClient as SQSClientType,
 } from "@aws-sdk/client-sqs";
-import { resolveConfig, type AWSWorldConfig } from "../src/config.js";
-import { getTableNames, GSI } from "../src/dynamodb/tables.js";
-import { DynamoDBClient as DDBClient } from "@aws-sdk/client-dynamodb";
-import { SQSClient } from "@aws-sdk/client-sqs";
+import { type AWSWorldConfig, resolveConfig } from "../src/config.js";
+import { GSI, getTableNames } from "../src/dynamodb/tables.js";
 
-interface TableDef {
+type TableDef = {
   name: string;
   keys: KeySchemaElement[];
   attributes: AttributeDefinition[];
   gsis?: GlobalSecondaryIndex[];
   streamSpecification?: StreamSpecification;
-}
+};
 
 function buildTableDefs(prefix: string): TableDef[] {
   const tables = getTableNames(prefix);
@@ -168,7 +168,10 @@ function buildTableDefs(prefix: string): TableDef[] {
   ];
 }
 
-async function tableExists(client: DynamoDBClient, tableName: string): Promise<boolean> {
+async function tableExists(
+  client: DynamoDBClient,
+  tableName: string
+): Promise<boolean> {
   try {
     await client.send(new DescribeTableCommand({ TableName: tableName }));
     return true;
@@ -180,7 +183,10 @@ async function tableExists(client: DynamoDBClient, tableName: string): Promise<b
   }
 }
 
-async function createTable(client: DynamoDBClient, def: TableDef): Promise<void> {
+async function createTable(
+  client: DynamoDBClient,
+  def: TableDef
+): Promise<void> {
   if (await tableExists(client, def.name)) {
     console.log(`  Table ${def.name} already exists, skipping`);
     return;
@@ -193,14 +199,19 @@ async function createTable(client: DynamoDBClient, def: TableDef): Promise<void>
       AttributeDefinitions: def.attributes,
       BillingMode: "PAY_PER_REQUEST",
       ...(def.gsis?.length ? { GlobalSecondaryIndexes: def.gsis } : {}),
-      ...(def.streamSpecification ? { StreamSpecification: def.streamSpecification } : {}),
-    }),
+      ...(def.streamSpecification
+        ? { StreamSpecification: def.streamSpecification }
+        : {}),
+    })
   );
 
   console.log(`  Created table ${def.name}`);
 }
 
-async function queueExists(client: SQSClientType, queueName: string): Promise<boolean> {
+async function queueExists(
+  client: SQSClientType,
+  queueName: string
+): Promise<boolean> {
   try {
     await client.send(new GetQueueUrlCommand({ QueueName: queueName }));
     return true;
@@ -215,11 +226,13 @@ async function queueExists(client: SQSClientType, queueName: string): Promise<bo
 async function createSQSQueue(
   client: SQSClientType,
   queueName: string,
-  dlqArn?: string,
+  dlqArn?: string
 ): Promise<string> {
   if (await queueExists(client, queueName)) {
     console.log(`  Queue ${queueName} already exists, skipping`);
-    const result = await client.send(new GetQueueUrlCommand({ QueueName: queueName }));
+    const result = await client.send(
+      new GetQueueUrlCommand({ QueueName: queueName })
+    );
     return result.QueueUrl!;
   }
 
@@ -238,7 +251,7 @@ async function createSQSQueue(
     new CreateQueueCommand({
       QueueName: queueName,
       Attributes: attributes,
-    }),
+    })
   );
 
   console.log(`  Created queue ${queueName}`);
@@ -262,7 +275,7 @@ async function main() {
   }
 
   const config = resolveConfig(configOverride);
-  console.log(`Setting up AWS World infrastructure...`);
+  console.log("Setting up AWS World infrastructure...");
   console.log(`  Region: ${config.region}`);
   console.log(`  Table prefix: ${config.tablePrefix}`);
   console.log(`  Queue prefix: ${config.queuePrefix}`);
@@ -292,11 +305,11 @@ async function main() {
 
   const workflowsDlqUrl = await createSQSQueue(
     sqsClient,
-    `${config.queuePrefix}-workflows-dlq`,
+    `${config.queuePrefix}-workflows-dlq`
   );
   const stepsDlqUrl = await createSQSQueue(
     sqsClient,
-    `${config.queuePrefix}-steps-dlq`,
+    `${config.queuePrefix}-steps-dlq`
   );
 
   // Extract DLQ ARN from URL for RedrivePolicy
@@ -305,12 +318,16 @@ async function main() {
   const workflowsDlqArn = `arn:aws:sqs:${config.region}:${accountId}:${config.queuePrefix}-workflows-dlq`;
   const stepsDlqArn = `arn:aws:sqs:${config.region}:${accountId}:${config.queuePrefix}-steps-dlq`;
 
-  await createSQSQueue(sqsClient, `${config.queuePrefix}-workflows`, workflowsDlqArn);
+  await createSQSQueue(
+    sqsClient,
+    `${config.queuePrefix}-workflows`,
+    workflowsDlqArn
+  );
   await createSQSQueue(sqsClient, `${config.queuePrefix}-steps`, stepsDlqArn);
 
   console.log("\nSetup complete!");
-  console.log(`\nTo use this world, set:`);
-  console.log(`  WORKFLOW_TARGET_WORLD=@wraps.dev/world-aws`);
+  console.log("\nTo use this world, set:");
+  console.log("  WORKFLOW_TARGET_WORLD=@wraps.dev/world-aws");
 
   ddbClient.destroy();
   sqsClient.destroy();

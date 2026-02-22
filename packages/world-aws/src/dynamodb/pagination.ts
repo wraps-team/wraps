@@ -1,4 +1,6 @@
-export function encodeCursor(lastEvaluatedKey: Record<string, unknown>): string {
+export function encodeCursor(
+  lastEvaluatedKey: Record<string, unknown>
+): string {
   return Buffer.from(JSON.stringify(lastEvaluatedKey)).toString("base64url");
 }
 

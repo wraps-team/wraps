@@ -65,6 +65,7 @@
     "@types/aws-lambda": "^8.10.145",
     "@types/node": "^20.11.0",
     "@workflow/world": "^4.1.0-beta.6",
+    "aws-sdk-client-mock": "4.1.0",
     "tsup": "^8.5.1",
     "tsx": "^4.20.6",
     "typescript": "catalog:",
