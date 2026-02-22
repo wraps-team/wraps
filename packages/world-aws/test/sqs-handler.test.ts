@@ -1,6 +1,10 @@
+import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import type { Context, SQSEvent } from "aws-lambda";
-import { describe, expect, it, vi } from "vitest";
+import { mockClient } from "aws-sdk-client-mock";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSQSHandler } from "../src/lambda/sqs-handler.js";
+
+const sqsMock = mockClient(SQSClient);
 
 function makeSQSRecord(
   messageId: string,
@@ -31,11 +35,20 @@ function makeEvent(records: ReturnType<typeof makeSQSRecord>[]): SQSEvent {
 
 const mockContext = {} as Context;
 
+beforeEach(() => {
+  sqsMock.reset();
+  sqsMock.on(SendMessageCommand).resolves({ MessageId: "re-queued-1" });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("createSQSHandler", () => {
   it("processes all records successfully", async () => {
     const handlerFn = vi
       .fn()
-      .mockResolvedValue(new Response("ok", { status: 200 }));
+      .mockImplementation(() => new Response("ok", { status: 200 }));
     const handler = createSQSHandler(handlerFn);
 
     const event = makeEvent([
@@ -142,7 +155,7 @@ describe("createSQSHandler", () => {
   it("returns empty failures when all succeed", async () => {
     const handlerFn = vi
       .fn()
-      .mockResolvedValue(new Response("ok", { status: 200 }));
+      .mockImplementation(() => new Response("ok", { status: 200 }));
     const handler = createSQSHandler(handlerFn);
 
     const event = makeEvent([
@@ -200,5 +213,184 @@ describe("createSQSHandler", () => {
     expect(receivedReq!.method).toBe("POST");
     expect(new URL(receivedReq!.url).pathname).toBe("/queue");
     expect(receivedReq!.headers.get("Content-Type")).toBe("application/json");
+  });
+
+  it("calls onTimeout when handler returns timeoutSeconds", async () => {
+    const onTimeout = vi.fn().mockResolvedValue(undefined);
+    const handlerFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ timeoutSeconds: 60 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    const handler = createSQSHandler(handlerFn, { onTimeout });
+    const record = makeSQSRecord("msg-1", {
+      queueName: "__wkf_step_test",
+      message: {},
+      messageId: "m1",
+    });
+    const event = makeEvent([record]);
+
+    const result = await handler(event, mockContext);
+
+    expect(result.batchItemFailures).toHaveLength(0);
+    expect(onTimeout).toHaveBeenCalledOnce();
+    expect(onTimeout).toHaveBeenCalledWith({
+      record,
+      timeoutSeconds: 60,
+    });
+  });
+
+  it("re-queues via SQS when no onTimeout and timeoutSeconds <= 900", async () => {
+    const handlerFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ timeoutSeconds: 300 }), { status: 200 })
+    );
+
+    const handler = createSQSHandler(handlerFn);
+    const body = {
+      queueName: "__wkf_step_test",
+      message: {},
+      messageId: "m1",
+    };
+    const event = makeEvent([makeSQSRecord("msg-1", body)]);
+
+    const result = await handler(event, mockContext);
+
+    expect(result.batchItemFailures).toHaveLength(0);
+    const calls = sqsMock.commandCalls(SendMessageCommand);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].args[0].input).toEqual({
+      QueueUrl: "https://sqs.us-east-1.amazonaws.com/123/test-queue",
+      MessageBody: JSON.stringify(body),
+      DelaySeconds: 300,
+    });
+  });
+
+  it("caps delay at 900s and warns for long sleeps", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const handlerFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ timeoutSeconds: 3600 }), { status: 200 })
+    );
+
+    const handler = createSQSHandler(handlerFn);
+    const event = makeEvent([
+      makeSQSRecord("msg-1", {
+        queueName: "__wkf_step_test",
+        message: {},
+        messageId: "m1",
+      }),
+    ]);
+
+    const result = await handler(event, mockContext);
+
+    expect(result.batchItemFailures).toHaveLength(0);
+    const calls = sqsMock.commandCalls(SendMessageCommand);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].args[0].input.DelaySeconds).toBe(900);
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy.mock.calls[0][0]).toContain("3600s exceeds SQS max delay");
+  });
+
+  it("does not re-queue when timeoutSeconds is 0", async () => {
+    const onTimeout = vi.fn();
+    const handlerFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ timeoutSeconds: 0 }), { status: 200 })
+    );
+
+    const handler = createSQSHandler(handlerFn, { onTimeout });
+    const event = makeEvent([
+      makeSQSRecord("msg-1", { message: {}, messageId: "m1" }),
+    ]);
+
+    const result = await handler(event, mockContext);
+
+    expect(result.batchItemFailures).toHaveLength(0);
+    expect(onTimeout).not.toHaveBeenCalled();
+    expect(sqsMock.commandCalls(SendMessageCommand)).toHaveLength(0);
+  });
+
+  it("reports onTimeout errors as batch failures", async () => {
+    const onTimeout = vi
+      .fn()
+      .mockRejectedValue(new Error("Scheduler failed"));
+    const handlerFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ timeoutSeconds: 60 }), { status: 200 })
+    );
+
+    const handler = createSQSHandler(handlerFn, { onTimeout });
+    const event = makeEvent([
+      makeSQSRecord("msg-1", { message: {}, messageId: "m1" }),
+    ]);
+
+    const result = await handler(event, mockContext);
+
+    expect(result.batchItemFailures).toHaveLength(1);
+    expect(result.batchItemFailures[0].itemIdentifier).toBe("msg-1");
+  });
+
+  it("reports SQS re-queue failure as batch failure", async () => {
+    sqsMock.on(SendMessageCommand).rejects(new Error("SQS unavailable"));
+    const handlerFn = vi.fn().mockImplementation(
+      () =>
+        new Response(JSON.stringify({ timeoutSeconds: 60 }), { status: 200 })
+    );
+
+    const handler = createSQSHandler(handlerFn);
+    const event = makeEvent([
+      makeSQSRecord("msg-1", { message: {}, messageId: "m1" }),
+    ]);
+
+    const result = await handler(event, mockContext);
+
+    expect(result.batchItemFailures).toHaveLength(1);
+    expect(result.batchItemFailures[0].itemIdentifier).toBe("msg-1");
+  });
+
+  it("does not re-queue when timeoutSeconds is negative", async () => {
+    const onTimeout = vi.fn();
+    const handlerFn = vi.fn().mockImplementation(
+      () =>
+        new Response(JSON.stringify({ timeoutSeconds: -1 }), { status: 200 })
+    );
+
+    const handler = createSQSHandler(handlerFn, { onTimeout });
+    const event = makeEvent([
+      makeSQSRecord("msg-1", { message: {}, messageId: "m1" }),
+    ]);
+
+    const result = await handler(event, mockContext);
+
+    expect(result.batchItemFailures).toHaveLength(0);
+    expect(onTimeout).not.toHaveBeenCalled();
+    expect(sqsMock.commandCalls(SendMessageCommand)).toHaveLength(0);
+  });
+
+  it("handles mixed batch: timeout and normal records independently", async () => {
+    let callCount = 0;
+    const handlerFn = vi.fn().mockImplementation(() => {
+      callCount++;
+      if (callCount === 2) {
+        return new Response(JSON.stringify({ timeoutSeconds: 120 }), {
+          status: 200,
+        });
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+
+    const handler = createSQSHandler(handlerFn);
+    const event = makeEvent([
+      makeSQSRecord("msg-1", { message: {}, messageId: "m1" }),
+      makeSQSRecord("msg-2", { message: {}, messageId: "m2" }),
+      makeSQSRecord("msg-3", { message: {}, messageId: "m3" }),
+    ]);
+
+    const result = await handler(event, mockContext);
+
+    expect(result.batchItemFailures).toHaveLength(0);
+    expect(handlerFn).toHaveBeenCalledTimes(3);
+    const calls = sqsMock.commandCalls(SendMessageCommand);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].args[0].input.DelaySeconds).toBe(120);
   });
 });
