@@ -8,6 +8,8 @@ export function createDynamoDBClient(
   const client = new DynamoDBClient({
     region: config.region,
     ...(config.endpoint ? { endpoint: config.endpoint } : {}),
+    maxAttempts: 5,
+    requestHandler: { connectionTimeout: 5_000, requestTimeout: 10_000 },
   });
 
   return DynamoDBDocumentClient.from(client, {

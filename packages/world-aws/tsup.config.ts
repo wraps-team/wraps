@@ -1,12 +1,11 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/lambda/sqs-handler.ts", "src/bin/setup.ts"],
-  format: ["esm"],
+  entry: ["src/index.ts", "src/lambda/sqs-handler.ts", "src/bin/setup.ts", "src/bin/poll.ts"],
+  format: ["esm", "cjs"],
   dts: { entry: ["src/index.ts", "src/lambda/sqs-handler.ts"] },
   sourcemap: true,
   clean: true,
-  banner: { js: "#!/usr/bin/env node" },
   external: [
     "@workflow/world",
     "@aws-sdk/client-dynamodb",

@@ -23,6 +23,18 @@ import {
 
 const TERMINAL_STATUSES = ["completed", "failed", "cancelled"];
 
+function serializeEventData(
+  eventData: Record<string, unknown>
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(eventData)) {
+    // DynamoDB DocumentClient marshals Date objects as empty Maps.
+    // Convert to ISO strings so they survive the round-trip.
+    result[key] = value instanceof Date ? value.toISOString() : value;
+  }
+  return result;
+}
+
 function buildEventItem(
   runId: string,
   eventId: string,
@@ -31,12 +43,15 @@ function buildEventItem(
   ttlSeconds?: number
 ) {
   const ttl = computeTTL(ttlSeconds, now);
+  const eventData = data.eventData as Record<string, unknown> | undefined;
   return {
     runId,
     eventId,
     eventType: data.eventType,
     ...(data.correlationId ? { correlationId: data.correlationId } : {}),
-    ...(data.eventData !== undefined ? { eventData: data.eventData } : {}),
+    ...(eventData !== undefined
+      ? { eventData: serializeEventData(eventData) }
+      : {}),
     createdAt: now,
     ...(data.specVersion !== undefined
       ? { specVersion: data.specVersion }
@@ -254,10 +269,10 @@ export function createEventsStorage(
                 TableName: tables.runs,
                 Key: { runId },
                 UpdateExpression:
-                  "SET #status = :status, output = :output, completedAt = :now, updatedAt = :now",
+                  "SET #status = :status, #output = :output, completedAt = :now, updatedAt = :now",
                 ConditionExpression:
                   "NOT #status IN (:completed, :failed, :cancelled)",
-                ExpressionAttributeNames: { "#status": "status" },
+                ExpressionAttributeNames: { "#status": "status", "#output": "output" },
                 ExpressionAttributeValues: {
                   ":status": "completed",
                   ":output": eventData?.output ?? null,
@@ -518,9 +533,9 @@ export function createEventsStorage(
                 TableName: tables.steps,
                 Key: { stepId: correlationId },
                 UpdateExpression:
-                  "SET #status = :status, output = :output, completedAt = :now, updatedAt = :now",
+                  "SET #status = :status, #output = :output, completedAt = :now, updatedAt = :now",
                 ConditionExpression: "NOT #status IN (:completed, :failed)",
-                ExpressionAttributeNames: { "#status": "status" },
+                ExpressionAttributeNames: { "#status": "status", "#output": "output" },
                 ExpressionAttributeValues: {
                   ":status": "completed",
                   ":output": eventData.result,

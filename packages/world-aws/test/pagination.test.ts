@@ -41,4 +41,13 @@ describe("Pagination", () => {
 
     expect(decoded).toEqual(key);
   });
+
+  it("throws on malformed cursor", () => {
+    expect(() => decodeCursor("not-valid-base64!!!")).toThrow("Invalid cursor");
+  });
+
+  it("throws on non-JSON base64 cursor", () => {
+    const cursor = Buffer.from("not json").toString("base64url");
+    expect(() => decodeCursor(cursor)).toThrow("Invalid cursor");
+  });
 });

@@ -1,12 +1,18 @@
 import { fromISO, toBinaryOrUndefined, toDateOrUndefined } from "../util.js";
 
 export function marshalEvent(item: Record<string, unknown>) {
+  const eventData = item.eventData as Record<string, unknown> | undefined;
+  // The workflow core expects eventData.resumeAt to be a Date object,
+  // but DynamoDB stores it as an ISO string. Convert it back.
+  if (eventData?.resumeAt && typeof eventData.resumeAt === "string") {
+    eventData.resumeAt = new Date(eventData.resumeAt);
+  }
   return {
     runId: item.runId as string,
     eventId: item.eventId as string,
     eventType: item.eventType as string,
     correlationId: item.correlationId as string | undefined,
-    eventData: item.eventData as Record<string, unknown> | undefined,
+    eventData,
     createdAt: fromISO(item.createdAt as string),
     specVersion: item.specVersion as number | undefined,
   };

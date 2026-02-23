@@ -5,5 +5,9 @@ export function encodeCursor(
 }
 
 export function decodeCursor(cursor: string): Record<string, unknown> {
-  return JSON.parse(Buffer.from(cursor, "base64url").toString("utf-8"));
+  try {
+    return JSON.parse(Buffer.from(cursor, "base64url").toString("utf-8"));
+  } catch {
+    throw new Error("Invalid cursor");
+  }
 }

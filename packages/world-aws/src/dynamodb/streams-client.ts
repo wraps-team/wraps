@@ -7,5 +7,7 @@ export function createStreamsClient(
   return new DynamoDBStreamsClient({
     region: config.region,
     ...(config.endpoint ? { endpoint: config.endpoint } : {}),
+    maxAttempts: 5,
+    requestHandler: { connectionTimeout: 5_000, requestTimeout: 10_000 },
   });
 }

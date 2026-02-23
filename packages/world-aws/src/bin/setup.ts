@@ -240,7 +240,11 @@ async function queueExists(
     await client.send(new GetQueueUrlCommand({ QueueName: queueName }));
     return true;
   } catch (e) {
-    if (e instanceof Error && e.name === "QueueDoesNotExist") {
+    if (
+      e instanceof Error &&
+      (e.name === "QueueDoesNotExist" ||
+        e.name === "AWS.SimpleQueueService.NonExistentQueue")
+    ) {
       return false;
     }
     throw e;

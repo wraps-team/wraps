@@ -12,7 +12,11 @@ const sqsClients = new Map<string, SQSClient>();
 function getSQSClient(region: string): SQSClient {
   let client = sqsClients.get(region);
   if (!client) {
-    client = new SQSClient({ region });
+    client = new SQSClient({
+      region,
+      maxAttempts: 5,
+      requestHandler: { connectionTimeout: 5_000, requestTimeout: 10_000 },
+    });
     sqsClients.set(region, client);
   }
   return client;

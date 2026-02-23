@@ -1,22 +1,26 @@
 {
   "name": "@wraps.dev/world-aws",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "AWS World implementation for Vercel Workflow DevKit (DynamoDB + SQS)",
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     },
     "./lambda": {
+      "types": "./dist/lambda/sqs-handler.d.ts",
       "import": "./dist/lambda/sqs-handler.js",
-      "types": "./dist/lambda/sqs-handler.d.ts"
+      "require": "./dist/lambda/sqs-handler.cjs"
     }
   },
   "bin": {
-    "world-aws-setup": "bin/world-aws-setup.js"
+    "world-aws-setup": "bin/world-aws-setup.js",
+    "world-aws-poll": "bin/world-aws-poll.js"
   },
   "files": [
     "dist",
