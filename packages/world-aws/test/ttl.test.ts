@@ -9,7 +9,7 @@ describe("computeTTL", () => {
   it("returns correct epoch when ttlSeconds is set", () => {
     const now = "2024-01-01T00:00:00.000Z";
     const nowEpoch = Math.floor(new Date(now).getTime() / 1000);
-    const ttlSeconds = 86400; // 1 day
+    const ttlSeconds = 86_400; // 1 day
 
     const result = computeTTL(ttlSeconds, now);
 
@@ -26,7 +26,7 @@ describe("computeTTL", () => {
   it("handles large ttlSeconds (90 days)", () => {
     const now = "2024-01-01T00:00:00.000Z";
     const nowEpoch = Math.floor(new Date(now).getTime() / 1000);
-    const ninetyDays = 90 * 86400;
+    const ninetyDays = 90 * 86_400;
 
     expect(computeTTL(ninetyDays, now)).toBe(nowEpoch + ninetyDays);
   });

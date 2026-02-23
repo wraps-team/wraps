@@ -224,7 +224,11 @@ async function enableTTL(
     );
     console.log(`  Enabled TTL on ${tableName}`);
   } catch (e) {
-    if (e instanceof Error && e.name === "ValidationException" && e.message.includes("already enabled")) {
+    if (
+      e instanceof Error &&
+      e.name === "ValidationException" &&
+      e.message.includes("already enabled")
+    ) {
       console.log(`  TTL already enabled on ${tableName}, skipping`);
       return;
     }

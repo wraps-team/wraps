@@ -9,7 +9,7 @@ export function createDynamoDBClient(
     region: config.region,
     ...(config.endpoint ? { endpoint: config.endpoint } : {}),
     maxAttempts: 5,
-    requestHandler: { connectionTimeout: 5_000, requestTimeout: 10_000 },
+    requestHandler: { connectionTimeout: 5000, requestTimeout: 10_000 },
   });
 
   return DynamoDBDocumentClient.from(client, {

@@ -167,6 +167,53 @@ describe("Queue", () => {
     }
   });
 
+  it("createQueueHandler() supports header-based protocol", async () => {
+    const queue = createQueue(sqsClient, config);
+
+    const handler = queue.createQueueHandler(
+      "__wkf_workflow_",
+      async (message, meta) => {
+        expect(meta.queueName).toBe("__wkf_workflow_test");
+        expect(meta.messageId).toBe("msg-h1");
+        expect(meta.attempt).toBe(2);
+        expect(message).toEqual({ runId: "run-1" });
+      }
+    );
+
+    const req = new Request("https://localhost/queue", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-vqs-queue-name": "__wkf_workflow_test",
+        "x-vqs-message-id": "msg-h1",
+        "x-vqs-message-attempt": "2",
+      },
+      body: JSON.stringify({ runId: "run-1" }),
+    });
+
+    const res = await handler(req);
+    expect(res.status).toBe(200);
+  });
+
+  it("createQueueHandler() header protocol rejects mismatched prefix", async () => {
+    const queue = createQueue(sqsClient, config);
+    const handler = queue.createQueueHandler("__wkf_step_", async () => {});
+
+    const req = new Request("https://localhost/queue", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-vqs-queue-name": "__wkf_workflow_test",
+        "x-vqs-message-id": "msg-h1",
+        "x-vqs-message-attempt": "1",
+      },
+      body: JSON.stringify({}),
+    });
+
+    const res = await handler(req);
+    expect(res.status).toBe(400);
+  });
+
   it("createQueueHandler() returns 500 on handler error", async () => {
     const queue = createQueue(sqsClient, config);
 

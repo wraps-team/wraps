@@ -15,14 +15,14 @@ function getSQSClient(region: string): SQSClient {
     client = new SQSClient({
       region,
       maxAttempts: 5,
-      requestHandler: { connectionTimeout: 5_000, requestTimeout: 10_000 },
+      requestHandler: { connectionTimeout: 5000, requestTimeout: 10_000 },
     });
     sqsClients.set(region, client);
   }
   return client;
 }
 
-export interface SQSHandlerOptions {
+export type SQSHandlerOptions = {
   /**
    * Called when the queue handler returns { timeoutSeconds }.
    * Re-queue the message for delayed re-delivery.
@@ -36,7 +36,7 @@ export interface SQSHandlerOptions {
     record: SQSRecord;
     timeoutSeconds: number;
   }) => Promise<void>;
-}
+};
 
 /**
  * Creates an AWS Lambda handler that processes SQS events via a queue handler.
@@ -66,9 +66,7 @@ export function createSQSHandler(
           ? { itemIdentifier: event.Records[i].messageId }
           : null
       )
-      .filter(
-        (f): f is { itemIdentifier: string } => f !== null
-      );
+      .filter((f): f is { itemIdentifier: string } => f !== null);
 
     return { batchItemFailures };
   };
@@ -135,7 +133,7 @@ async function processRecord(
     console.warn(
       `[world-aws] sleep of ${timeoutSeconds}s exceeds SQS max delay (${SQS_MAX_DELAY_SECONDS}s). ` +
         `Using ${SQS_MAX_DELAY_SECONDS}s delay; the runtime will re-check and re-sleep on next delivery. ` +
-        `For longer sleeps, provide an onTimeout callback (e.g. EventBridge Scheduler).`
+        "For longer sleeps, provide an onTimeout callback (e.g. EventBridge Scheduler)."
     );
   }
 

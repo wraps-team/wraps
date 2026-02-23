@@ -161,7 +161,13 @@ export function createEventsStorage(
     const now = toISO(new Date());
     const eventData = data.eventData as Record<string, unknown>;
 
-    const eventItem = buildEventItem(actualRunId, eventId, data, now, ttlSeconds);
+    const eventItem = buildEventItem(
+      actualRunId,
+      eventId,
+      data,
+      now,
+      ttlSeconds
+    );
     const ttl = computeTTL(ttlSeconds, now);
 
     const runItem = {
@@ -272,7 +278,10 @@ export function createEventsStorage(
                   "SET #status = :status, #output = :output, completedAt = :now, updatedAt = :now",
                 ConditionExpression:
                   "NOT #status IN (:completed, :failed, :cancelled)",
-                ExpressionAttributeNames: { "#status": "status", "#output": "output" },
+                ExpressionAttributeNames: {
+                  "#status": "status",
+                  "#output": "output",
+                },
                 ExpressionAttributeValues: {
                   ":status": "completed",
                   ":output": eventData?.output ?? null,
@@ -535,7 +544,10 @@ export function createEventsStorage(
                 UpdateExpression:
                   "SET #status = :status, #output = :output, completedAt = :now, updatedAt = :now",
                 ConditionExpression: "NOT #status IN (:completed, :failed)",
-                ExpressionAttributeNames: { "#status": "status", "#output": "output" },
+                ExpressionAttributeNames: {
+                  "#status": "status",
+                  "#output": "output",
+                },
                 ExpressionAttributeValues: {
                   ":status": "completed",
                   ":output": eventData.result,
@@ -778,7 +790,9 @@ export function createEventsStorage(
         const txError = e as Error & {
           CancellationReasons?: Array<{ Code?: string }>;
         };
-        if (txError.CancellationReasons?.[0]?.Code === "ConditionalCheckFailed") {
+        if (
+          txError.CancellationReasons?.[0]?.Code === "ConditionalCheckFailed"
+        ) {
           const conflictTtl = computeTTL(ttlSeconds, now);
           const conflictEventItem = {
             runId,

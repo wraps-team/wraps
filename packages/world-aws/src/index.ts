@@ -1,4 +1,10 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  ChangeMessageVisibilityCommand,
+  DeleteMessageCommand,
+  ReceiveMessageCommand,
+  SendMessageCommand,
+} from "@aws-sdk/client-sqs";
 import type { AWSWorldConfig } from "./config.js";
 import { resolveConfig } from "./config.js";
 import { createDynamoDBClient } from "./dynamodb/client.js";
@@ -63,7 +69,139 @@ export function createWorld(config?: AWSWorldConfig) {
     ...streamer,
 
     async start() {
-      // No-op: SQS is consumed by Lambda event source mapping, not polling
+      // When PORT is set we're inside a local dev/test server — poll SQS and
+      // forward messages to the local HTTP endpoints so workflows make progress.
+      // In production, SQS is consumed by Lambda event source mappings.
+      const baseUrl =
+        process.env.WORKFLOW_LOCAL_BASE_URL ??
+        (process.env.PORT ? `http://localhost:${process.env.PORT}` : undefined);
+      if (!baseUrl) return;
+
+      const signal = shutdownController.signal;
+      const accountId = process.env.AWS_ACCOUNT_ID ?? "000000000000";
+
+      function getQueueUrl(queueName: string): string {
+        if (resolved.endpoint) {
+          return `${resolved.endpoint}/000000000000/${queueName}`;
+        }
+        return `https://sqs.${resolved.region}.amazonaws.com/${accountId}/${queueName}`;
+      }
+
+      const workflowsUrl =
+        process.env.WORKFLOW_AWS_WORKFLOWS_QUEUE_URL ??
+        getQueueUrl(`${resolved.queuePrefix}-workflows`);
+      const stepsUrl =
+        process.env.WORKFLOW_AWS_STEPS_QUEUE_URL ??
+        getQueueUrl(`${resolved.queuePrefix}-steps`);
+
+      async function processMessage(
+        queueUrl: string,
+        receiptHandle: string,
+        body: string
+      ): Promise<void> {
+        const parsed = JSON.parse(body);
+        const { queueName, headers: msgHeaders } = parsed;
+
+        const isStep = queueName?.startsWith("__wkf_step_");
+        const pathname = isStep ? "step" : "flow";
+        const url = `${baseUrl}/.well-known/workflow/v1/${pathname}`;
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            ...(msgHeaders ?? {}),
+          },
+          body: JSON.stringify(parsed),
+        });
+
+        if (response.ok) {
+          const text = await response.text();
+          if (text) {
+            try {
+              const result = JSON.parse(text);
+              if (result.timeoutSeconds > 0) {
+                const delay = Math.min(result.timeoutSeconds, 900);
+                await sqsClient.send(
+                  new SendMessageCommand({
+                    QueueUrl: queueUrl,
+                    MessageBody: body,
+                    DelaySeconds: delay,
+                  })
+                );
+              }
+            } catch {}
+          }
+          await sqsClient.send(
+            new DeleteMessageCommand({
+              QueueUrl: queueUrl,
+              ReceiptHandle: receiptHandle,
+            })
+          );
+          return;
+        }
+
+        const errorText = await response.text();
+        if (response.status === 503) {
+          try {
+            const result = JSON.parse(errorText);
+            if (result.timeoutSeconds) {
+              const delay = Math.min(result.timeoutSeconds, 900);
+              await sqsClient.send(
+                new SendMessageCommand({
+                  QueueUrl: queueUrl,
+                  MessageBody: body,
+                  DelaySeconds: delay,
+                })
+              );
+              await sqsClient.send(
+                new DeleteMessageCommand({
+                  QueueUrl: queueUrl,
+                  ReceiptHandle: receiptHandle,
+                })
+              );
+              return;
+            }
+          } catch {}
+        }
+
+        await sqsClient.send(
+          new ChangeMessageVisibilityCommand({
+            QueueUrl: queueUrl,
+            ReceiptHandle: receiptHandle,
+            VisibilityTimeout: 1,
+          })
+        );
+      }
+
+      async function poll(queueUrl: string): Promise<void> {
+        while (!signal.aborted) {
+          try {
+            const res = await sqsClient.send(
+              new ReceiveMessageCommand({
+                QueueUrl: queueUrl,
+                MaxNumberOfMessages: 10,
+                WaitTimeSeconds: 1,
+                VisibilityTimeout: 30,
+              })
+            );
+            if (!res.Messages?.length) continue;
+            await Promise.allSettled(
+              res.Messages.map(async (msg) => {
+                if (!(msg.Body && msg.ReceiptHandle)) return;
+                await processMessage(queueUrl, msg.ReceiptHandle, msg.Body);
+              })
+            );
+          } catch (e) {
+            if (signal.aborted) break;
+            await new Promise((r) => setTimeout(r, 500));
+          }
+        }
+      }
+
+      // Fire-and-forget: poll both queues in parallel
+      poll(workflowsUrl).catch(() => {});
+      poll(stepsUrl).catch(() => {});
     },
 
     async close() {

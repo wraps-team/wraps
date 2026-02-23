@@ -13,8 +13,8 @@ import {
   ChangeMessageVisibilityCommand,
   DeleteMessageCommand,
   ReceiveMessageCommand,
-  SQSClient,
   SendMessageCommand,
+  SQSClient,
 } from "@aws-sdk/client-sqs";
 import { type AWSWorldConfig, resolveConfig } from "../config.js";
 
@@ -38,17 +38,14 @@ async function processMessage(
   receiptHandle: string,
   body: string,
   baseUrl: string,
-  region: string
+  _region: string
 ): Promise<void> {
   const parsed = JSON.parse(body);
-  const { queueName, message, headers: msgHeaders } = parsed;
+  const { queueName, headers: msgHeaders } = parsed;
 
   const isStep = queueName?.startsWith("__wkf_step_");
   const pathname = isStep ? "step" : "flow";
   const url = `${baseUrl}/.well-known/workflow/v1/${pathname}`;
-
-  const attempt = parsed.attempt ?? 1;
-  const messageId = parsed.messageId ?? "unknown";
 
   // Send the full wrapped body that our createQueueHandler expects:
   // { queueName, message, messageId, attempt }
@@ -174,7 +171,7 @@ async function pollQueue(
 
       await Promise.allSettled(
         response.Messages.map(async (msg) => {
-          if (!msg.Body || !msg.ReceiptHandle) return;
+          if (!(msg.Body && msg.ReceiptHandle)) return;
           try {
             const parsed = JSON.parse(msg.Body);
             console.log(
@@ -210,8 +207,7 @@ async function pollQueue(
 
 async function main() {
   const configOverride: AWSWorldConfig = {};
-  let baseUrl =
-    process.env.WORKFLOW_LOCAL_BASE_URL ?? "http://localhost:3000";
+  let baseUrl = process.env.WORKFLOW_LOCAL_BASE_URL ?? "http://localhost:3000";
 
   const args = process.argv.slice(2);
   for (let i = 0; i < args.length; i++) {
@@ -229,10 +225,8 @@ async function main() {
 
   const config = resolveConfig(configOverride);
   const accountId = process.env.AWS_ACCOUNT_ID;
-  if (!accountId && !config.endpoint) {
-    console.error(
-      "AWS_ACCOUNT_ID is required for SQS queue URL construction"
-    );
+  if (!(accountId || config.endpoint)) {
+    console.error("AWS_ACCOUNT_ID is required for SQS queue URL construction");
     process.exit(1);
   }
 

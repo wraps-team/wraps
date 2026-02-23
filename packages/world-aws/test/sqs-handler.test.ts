@@ -242,9 +242,11 @@ describe("createSQSHandler", () => {
   });
 
   it("re-queues via SQS when no onTimeout and timeoutSeconds <= 900", async () => {
-    const handlerFn = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ timeoutSeconds: 300 }), { status: 200 })
-    );
+    const handlerFn = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ timeoutSeconds: 300 }), { status: 200 })
+      );
 
     const handler = createSQSHandler(handlerFn);
     const body = {
@@ -268,9 +270,11 @@ describe("createSQSHandler", () => {
 
   it("caps delay at 900s and warns for long sleeps", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const handlerFn = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ timeoutSeconds: 3600 }), { status: 200 })
-    );
+    const handlerFn = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ timeoutSeconds: 3600 }), { status: 200 })
+      );
 
     const handler = createSQSHandler(handlerFn);
     const event = makeEvent([
@@ -293,9 +297,11 @@ describe("createSQSHandler", () => {
 
   it("does not re-queue when timeoutSeconds is 0", async () => {
     const onTimeout = vi.fn();
-    const handlerFn = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ timeoutSeconds: 0 }), { status: 200 })
-    );
+    const handlerFn = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ timeoutSeconds: 0 }), { status: 200 })
+      );
 
     const handler = createSQSHandler(handlerFn, { onTimeout });
     const event = makeEvent([
@@ -310,12 +316,12 @@ describe("createSQSHandler", () => {
   });
 
   it("reports onTimeout errors as batch failures", async () => {
-    const onTimeout = vi
+    const onTimeout = vi.fn().mockRejectedValue(new Error("Scheduler failed"));
+    const handlerFn = vi
       .fn()
-      .mockRejectedValue(new Error("Scheduler failed"));
-    const handlerFn = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ timeoutSeconds: 60 }), { status: 200 })
-    );
+      .mockResolvedValue(
+        new Response(JSON.stringify({ timeoutSeconds: 60 }), { status: 200 })
+      );
 
     const handler = createSQSHandler(handlerFn, { onTimeout });
     const event = makeEvent([
@@ -330,10 +336,12 @@ describe("createSQSHandler", () => {
 
   it("reports SQS re-queue failure as batch failure", async () => {
     sqsMock.on(SendMessageCommand).rejects(new Error("SQS unavailable"));
-    const handlerFn = vi.fn().mockImplementation(
-      () =>
-        new Response(JSON.stringify({ timeoutSeconds: 60 }), { status: 200 })
-    );
+    const handlerFn = vi
+      .fn()
+      .mockImplementation(
+        () =>
+          new Response(JSON.stringify({ timeoutSeconds: 60 }), { status: 200 })
+      );
 
     const handler = createSQSHandler(handlerFn);
     const event = makeEvent([
@@ -348,10 +356,12 @@ describe("createSQSHandler", () => {
 
   it("does not re-queue when timeoutSeconds is negative", async () => {
     const onTimeout = vi.fn();
-    const handlerFn = vi.fn().mockImplementation(
-      () =>
-        new Response(JSON.stringify({ timeoutSeconds: -1 }), { status: 200 })
-    );
+    const handlerFn = vi
+      .fn()
+      .mockImplementation(
+        () =>
+          new Response(JSON.stringify({ timeoutSeconds: -1 }), { status: 200 })
+      );
 
     const handler = createSQSHandler(handlerFn, { onTimeout });
     const event = makeEvent([

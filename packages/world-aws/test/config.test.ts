@@ -165,7 +165,7 @@ describe("resolveConfig", () => {
 
     const config = resolveConfig();
 
-    expect(config.ttlSeconds).toBe(86400);
+    expect(config.ttlSeconds).toBe(86_400);
   });
 
   it("explicit ttl config takes precedence over env var", () => {

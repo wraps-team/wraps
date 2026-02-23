@@ -10,8 +10,8 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
 import { beforeEach, describe, expect, it } from "vitest";
-import { WorldError } from "../src/errors.js";
 import { getTableNames } from "../src/dynamodb/tables.js";
+import { WorldError } from "../src/errors.js";
 import { createEventsStorage } from "../src/storage/events.js";
 import { createHooksStorage } from "../src/storage/hooks.js";
 import { createRunsStorage } from "../src/storage/runs.js";
@@ -424,17 +424,15 @@ describe("EventsStorage", () => {
   });
 
   it("create() hook_created with token conflict creates hook_conflict event", async () => {
-    docMock
-      .on(TransactWriteCommand)
-      .rejectsOnce(
-        Object.assign(new Error("Transaction cancelled"), {
-          name: "TransactionCanceledException",
-          CancellationReasons: [
-            { Code: "ConditionalCheckFailed" },
-            { Code: "None" },
-          ],
-        })
-      );
+    docMock.on(TransactWriteCommand).rejectsOnce(
+      Object.assign(new Error("Transaction cancelled"), {
+        name: "TransactionCanceledException",
+        CancellationReasons: [
+          { Code: "ConditionalCheckFailed" },
+          { Code: "None" },
+        ],
+      })
+    );
     docMock.on(PutCommand).resolves({});
 
     const events = createEventsStorage(docClient, tables);
@@ -452,10 +450,7 @@ describe("EventsStorage", () => {
     docMock.on(TransactWriteCommand).rejectsOnce(
       Object.assign(new Error("Transaction cancelled"), {
         name: "TransactionCanceledException",
-        CancellationReasons: [
-          { Code: "None" },
-          { Code: "ValidationError" },
-        ],
+        CancellationReasons: [{ Code: "None" }, { Code: "ValidationError" }],
       })
     );
 
@@ -1110,7 +1105,7 @@ describe("EventsStorage", () => {
   it("create() run_created includes ttl attribute when ttlSeconds configured", async () => {
     docMock.on(TransactWriteCommand).resolves({});
 
-    const events = createEventsStorage(docClient, tables, 86400);
+    const events = createEventsStorage(docClient, tables, 86_400);
     const result = await events.create(null, {
       eventType: "run_created",
       eventData: {
@@ -1193,7 +1188,7 @@ describe("EventsStorage", () => {
   it("create() wait_created includes ttl on both event and wait items", async () => {
     docMock.on(TransactWriteCommand).resolves({});
 
-    const events = createEventsStorage(docClient, tables, 86400);
+    const events = createEventsStorage(docClient, tables, 86_400);
     await events.create("run-1", {
       eventType: "wait_created",
       correlationId: "wait-1",

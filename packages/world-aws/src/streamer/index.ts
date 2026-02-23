@@ -10,11 +10,11 @@ import {
 } from "@aws-sdk/client-dynamodb-streams";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { batchWriteWithRetry } from "../dynamodb/batch-write.js";
-import { computeTTL } from "../dynamodb/ttl.js";
 import { monotonicFactory } from "ulid";
+import { batchWriteWithRetry } from "../dynamodb/batch-write.js";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
+import { computeTTL } from "../dynamodb/ttl.js";
 
 const generateId = monotonicFactory();
 const encoder = new TextEncoder();

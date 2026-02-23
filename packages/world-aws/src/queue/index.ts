@@ -85,13 +85,33 @@ export function createQueue(sqsClient: SQSClient, config: ResolvedConfig) {
     ): (req: Request) => Promise<Response> {
       return async (req: Request): Promise<Response> => {
         try {
-          const body = (await req.json()) as {
-            queueName: string;
-            message: unknown;
-            messageId: string;
-            attempt?: number;
-          };
-          const { queueName, message, messageId, attempt = 1 } = body;
+          // Detect protocol: header-based (local world dispatch) vs body envelope (SQS Lambda)
+          const headerQueueName = req.headers.get("x-vqs-queue-name");
+
+          let queueName: string;
+          let message: unknown;
+          let messageId: string;
+          let attempt: number;
+
+          if (headerQueueName) {
+            // Header-based protocol: metadata in headers, raw message in body
+            queueName = headerQueueName;
+            messageId = req.headers.get("x-vqs-message-id") ?? "unknown";
+            attempt = Number(req.headers.get("x-vqs-message-attempt") ?? "1");
+            message = await req.json();
+          } else {
+            // Body envelope protocol: everything in JSON body
+            const body = (await req.json()) as {
+              queueName: string;
+              message: unknown;
+              messageId: string;
+              attempt?: number;
+            };
+            queueName = body.queueName;
+            message = body.message;
+            messageId = body.messageId;
+            attempt = body.attempt ?? 1;
+          }
 
           if (!queueName?.startsWith(queueNamePrefix)) {
             return new Response("Queue name mismatch", { status: 400 });
@@ -103,16 +123,17 @@ export function createQueue(sqsClient: SQSClient, config: ResolvedConfig) {
             messageId,
           });
 
-          return new Response(JSON.stringify(result ?? {}), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
+          if (result?.timeoutSeconds) {
+            return Response.json(
+              { timeoutSeconds: result.timeoutSeconds },
+              { status: 503 }
+            );
+          }
+
+          return Response.json({ ok: true });
         } catch (error) {
           const msg = error instanceof Error ? error.message : "Unknown error";
-          return new Response(JSON.stringify({ error: msg }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          });
+          return Response.json({ error: msg }, { status: 500 });
         }
       };
     },
