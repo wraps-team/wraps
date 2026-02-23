@@ -13,6 +13,7 @@ describe("resolveConfig", () => {
     process.env.WORKFLOW_AWS_ENDPOINT = undefined;
     process.env.WORKFLOW_AWS_DEPLOYMENT_ID = undefined;
     process.env.WORKFLOW_AWS_ENCRYPTION_KEY = undefined;
+    process.env.WORKFLOW_AWS_TTL = undefined;
   });
 
   afterEach(() => {
@@ -151,5 +152,33 @@ describe("resolveConfig", () => {
     process.env.WORKFLOW_AWS_ENCRYPTION_KEY = shortKey;
 
     expect(() => resolveConfig()).toThrow("must decode to 32 bytes");
+  });
+
+  it("ttlSeconds defaults to undefined", () => {
+    const config = resolveConfig();
+
+    expect(config.ttlSeconds).toBeUndefined();
+  });
+
+  it("ttlSeconds reads from WORKFLOW_AWS_TTL env var", () => {
+    process.env.WORKFLOW_AWS_TTL = "86400";
+
+    const config = resolveConfig();
+
+    expect(config.ttlSeconds).toBe(86400);
+  });
+
+  it("explicit ttl config takes precedence over env var", () => {
+    process.env.WORKFLOW_AWS_TTL = "86400";
+
+    const config = resolveConfig({ ttl: { seconds: 3600 } });
+
+    expect(config.ttlSeconds).toBe(3600);
+  });
+
+  it("ttlSeconds from Duration helper", () => {
+    const config = resolveConfig({ ttl: { seconds: 7_776_000 } });
+
+    expect(config.ttlSeconds).toBe(7_776_000);
   });
 });

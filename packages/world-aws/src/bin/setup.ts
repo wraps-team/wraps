@@ -7,6 +7,7 @@ import {
   type GlobalSecondaryIndex,
   type KeySchemaElement,
   type StreamSpecification,
+  UpdateTimeToLiveCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
   CreateQueueCommand,
@@ -207,6 +208,30 @@ async function createTable(
   console.log(`  Created table ${def.name}`);
 }
 
+async function enableTTL(
+  client: DynamoDBClient,
+  tableName: string
+): Promise<void> {
+  try {
+    await client.send(
+      new UpdateTimeToLiveCommand({
+        TableName: tableName,
+        TimeToLiveSpecification: {
+          Enabled: true,
+          AttributeName: "ttl",
+        },
+      })
+    );
+    console.log(`  Enabled TTL on ${tableName}`);
+  } catch (e) {
+    if (e instanceof Error && e.name === "ValidationException" && e.message.includes("already enabled")) {
+      console.log(`  TTL already enabled on ${tableName}, skipping`);
+      return;
+    }
+    throw e;
+  }
+}
+
 async function queueExists(
   client: SQSClientType,
   queueName: string
@@ -297,6 +322,13 @@ async function main() {
   const tableDefs = buildTableDefs(config.tablePrefix);
   for (const def of tableDefs) {
     await createTable(ddbClient, def);
+  }
+
+  // Enable TTL on all tables
+  console.log("\nEnabling TTL on tables...");
+  const tables = getTableNames(config.tablePrefix);
+  for (const tableName of Object.values(tables)) {
+    await enableTTL(ddbClient, tableName);
   }
 
   // Create SQS queues (DLQs first, then main queues)

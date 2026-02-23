@@ -377,6 +377,9 @@ describe("EventsStorage", () => {
 
     const calls = docMock.commandCalls(TransactWriteCommand);
     expect(calls).toHaveLength(1);
+
+    const runPut = calls[0].args[0].input.TransactItems![1].Put;
+    expect(runPut!.ConditionExpression).toBe("attribute_not_exists(runId)");
   });
 
   it("create() run_started updates run status", async () => {
@@ -840,6 +843,38 @@ describe("EventsStorage", () => {
     const update = txCalls[0].args[0].input.TransactItems![1].Update;
     expect(update!.ExpressionAttributeValues![":status"]).toBe("pending");
     expect(update!.ExpressionAttributeValues![":retryAfter"]).toBeTruthy();
+    expect(update!.ConditionExpression).toBe(
+      "NOT #status IN (:completed, :failed)"
+    );
+  });
+
+  it("create() step_retrying returns existing step if already terminal", async () => {
+    docMock.on(TransactWriteCommand).rejectsOnce(
+      Object.assign(new Error("Transaction cancelled"), {
+        name: "TransactionCanceledException",
+      })
+    );
+    docMock.on(GetCommand).resolves({
+      Item: {
+        stepId: "step-1",
+        runId: "run-1",
+        stepName: "process",
+        status: "completed",
+        attempt: 2,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+
+    const events = createEventsStorage(docClient, tables);
+    const result = await events.create("run-1", {
+      eventType: "step_retrying",
+      correlationId: "step-1",
+      eventData: { error: "rate limit" },
+    });
+
+    expect(result.event!.eventType).toBe("step_retrying");
+    expect(result.step!.status).toBe("completed");
   });
 
   it("create() hook_created succeeds and returns hook", async () => {
@@ -1070,6 +1105,107 @@ describe("EventsStorage", () => {
     });
 
     expect(result.step!.status).toBe("completed");
+  });
+
+  it("create() run_created includes ttl attribute when ttlSeconds configured", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+
+    const events = createEventsStorage(docClient, tables, 86400);
+    const result = await events.create(null, {
+      eventType: "run_created",
+      eventData: {
+        deploymentId: "dep-1",
+        workflowName: "test-workflow",
+        input: new Uint8Array([1, 2]),
+      },
+    });
+
+    expect(result.event).toBeDefined();
+
+    const calls = docMock.commandCalls(TransactWriteCommand);
+    const eventPut = calls[0].args[0].input.TransactItems![0].Put;
+    const runPut = calls[0].args[0].input.TransactItems![1].Put;
+
+    expect(eventPut!.Item!.ttl).toBeTypeOf("number");
+    expect(runPut!.Item!.ttl).toBeTypeOf("number");
+  });
+
+  it("create() run_created omits ttl attribute when ttlSeconds undefined", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+
+    const events = createEventsStorage(docClient, tables);
+    await events.create(null, {
+      eventType: "run_created",
+      eventData: {
+        deploymentId: "dep-1",
+        workflowName: "test-workflow",
+        input: new Uint8Array([1, 2]),
+      },
+    });
+
+    const calls = docMock.commandCalls(TransactWriteCommand);
+    const eventPut = calls[0].args[0].input.TransactItems![0].Put;
+    const runPut = calls[0].args[0].input.TransactItems![1].Put;
+
+    expect(eventPut!.Item!.ttl).toBeUndefined();
+    expect(runPut!.Item!.ttl).toBeUndefined();
+  });
+
+  it("create() step_created includes ttl on both event and step items", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+
+    const events = createEventsStorage(docClient, tables, 3600);
+    await events.create("run-1", {
+      eventType: "step_created",
+      correlationId: "step-1",
+      eventData: {
+        stepName: "process-data",
+        input: new Uint8Array([1]),
+      },
+    });
+
+    const calls = docMock.commandCalls(TransactWriteCommand);
+    const eventPut = calls[0].args[0].input.TransactItems![0].Put;
+    const stepPut = calls[0].args[0].input.TransactItems![1].Put;
+
+    expect(eventPut!.Item!.ttl).toBeTypeOf("number");
+    expect(stepPut!.Item!.ttl).toBeTypeOf("number");
+  });
+
+  it("create() hook_created includes ttl on both event and hook items", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+
+    const events = createEventsStorage(docClient, tables, 7200);
+    await events.create("run-1", {
+      eventType: "hook_created",
+      correlationId: "hook-1",
+      eventData: { token: "my-token" },
+    });
+
+    const calls = docMock.commandCalls(TransactWriteCommand);
+    const hookPut = calls[0].args[0].input.TransactItems![0].Put;
+    const eventPut = calls[0].args[0].input.TransactItems![1].Put;
+
+    expect(hookPut!.Item!.ttl).toBeTypeOf("number");
+    expect(eventPut!.Item!.ttl).toBeTypeOf("number");
+  });
+
+  it("create() wait_created includes ttl on both event and wait items", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+
+    const events = createEventsStorage(docClient, tables, 86400);
+    await events.create("run-1", {
+      eventType: "wait_created",
+      correlationId: "wait-1",
+      eventData: {},
+    });
+
+    const calls = docMock.commandCalls(TransactWriteCommand);
+    const eventPut = calls[0].args[0].input.TransactItems![0].Put;
+    const waitPut = calls[0].args[0].input.TransactItems![1].Put;
+
+    expect(eventPut!.Item!.ttl).toBeTypeOf("number");
+    expect(waitPut!.Item!.ttl).toBeTypeOf("number");
   });
 
   it("create() step_failed returns existing step on TransactionCanceledException", async () => {

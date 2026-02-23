@@ -12,6 +12,7 @@ import { createStreamer } from "./streamer/index.js";
 
 export type { AWSWorldConfig } from "./config.js";
 export { resolveConfig } from "./config.js";
+export { Duration } from "./duration.js";
 export { getTableNames } from "./dynamodb/tables.js";
 export { isCredentialError, isThrottlingError, WorldError } from "./errors.js";
 export { createSQSHandler } from "./lambda/sqs-handler.js";
@@ -45,14 +46,15 @@ export function createWorld(config?: AWSWorldConfig) {
 
   const shutdownController = new AbortController();
 
-  const storage = createStorage(docClient, tables);
+  const storage = createStorage(docClient, tables, resolved.ttlSeconds);
   const queue = createQueue(sqsClient, resolved);
   const streamer = createStreamer(
     docClient,
     tables,
     ddbClient,
     streamsClient,
-    shutdownController.signal
+    shutdownController.signal,
+    resolved.ttlSeconds
   );
 
   return {

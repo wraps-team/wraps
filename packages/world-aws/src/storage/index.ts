@@ -8,13 +8,14 @@ import { createWaitsStorage } from "./waits.js";
 
 export function createStorage(
   docClient: DynamoDBDocumentClient,
-  tables: TableNames
+  tables: TableNames,
+  ttlSeconds?: number
 ) {
   return {
     runs: createRunsStorage(docClient, tables),
     steps: createStepsStorage(docClient, tables),
     hooks: createHooksStorage(docClient, tables),
-    events: createEventsStorage(docClient, tables),
+    events: createEventsStorage(docClient, tables, ttlSeconds),
     waits: createWaitsStorage(docClient, tables),
   };
 }

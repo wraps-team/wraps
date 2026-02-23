@@ -11,6 +11,7 @@ import {
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { batchWriteWithRetry } from "../dynamodb/batch-write.js";
+import { computeTTL } from "../dynamodb/ttl.js";
 import { monotonicFactory } from "ulid";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
@@ -29,7 +30,8 @@ export function createStreamer(
   tables: TableNames,
   ddbClient: DynamoDBClient,
   streamsClient: DynamoDBStreamsClient,
-  parentSignal?: AbortSignal
+  parentSignal?: AbortSignal,
+  ttlSeconds?: number
 ) {
   const tableName = tables.streams;
   let cachedStreamArn: string | undefined;
@@ -39,6 +41,8 @@ export function createStreamer(
     runId: string,
     chunk: string | Uint8Array
   ): Promise<void> {
+    const now = new Date().toISOString();
+    const ttl = computeTTL(ttlSeconds, now);
     await docClient.send(
       new PutCommand({
         TableName: tableName,
@@ -48,6 +52,7 @@ export function createStreamer(
           runId,
           data: toBytes(chunk),
           eof: false,
+          ...(ttl !== undefined ? { ttl } : {}),
         },
       })
     );
@@ -58,6 +63,8 @@ export function createStreamer(
     runId: string,
     chunks: (string | Uint8Array)[]
   ): Promise<void> {
+    const now = new Date().toISOString();
+    const ttl = computeTTL(ttlSeconds, now);
     // Pre-generate all ULIDs to preserve ordering
     const items = chunks.map((chunk) => ({
       streamId: name,
@@ -65,6 +72,7 @@ export function createStreamer(
       runId,
       data: toBytes(chunk),
       eof: false,
+      ...(ttl !== undefined ? { ttl } : {}),
     }));
 
     // BatchWrite in groups of 25 (DynamoDB limit)
@@ -79,6 +87,8 @@ export function createStreamer(
   }
 
   async function closeStream(name: string, runId: string): Promise<void> {
+    const now = new Date().toISOString();
+    const ttl = computeTTL(ttlSeconds, now);
     await docClient.send(
       new PutCommand({
         TableName: tableName,
@@ -88,6 +98,7 @@ export function createStreamer(
           runId,
           data: new Uint8Array(0),
           eof: true,
+          ...(ttl !== undefined ? { ttl } : {}),
         },
       })
     );

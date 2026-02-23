@@ -1,3 +1,5 @@
+import type { Duration } from "./duration.js";
+
 /**
  * Configuration options for the AWS World implementation.
  *
@@ -12,6 +14,7 @@
  * | `endpoint`      | `WORKFLOW_AWS_ENDPOINT`            | —                |
  * | `deploymentId`  | `WORKFLOW_AWS_DEPLOYMENT_ID`       | `"aws-{region}"` |
  * | `encryptionKey` | `WORKFLOW_AWS_ENCRYPTION_KEY`      | —                |
+ * | `ttl`           | `WORKFLOW_AWS_TTL` (seconds)       | — (no expiry)    |
  */
 export type AWSWorldConfig = {
   /** AWS region for DynamoDB and SQS. */
@@ -26,6 +29,8 @@ export type AWSWorldConfig = {
   deploymentId?: string;
   /** Base64-encoded 32-byte key for per-run encryption via HKDF-SHA256. */
   encryptionKey?: string;
+  /** TTL for all DynamoDB items. When set, items expire after this duration from creation. */
+  ttl?: Duration;
 };
 
 /** @internal Fully-resolved configuration with all defaults applied. */
@@ -36,6 +41,7 @@ export type ResolvedConfig = {
   endpoint: string | undefined;
   deploymentId: string;
   encryptionKey: string | undefined;
+  ttlSeconds: number | undefined;
 };
 
 /**
@@ -62,6 +68,11 @@ export function resolveConfig(config?: AWSWorldConfig): ResolvedConfig {
     `aws-${region}`;
   const encryptionKey =
     config?.encryptionKey ?? process.env.WORKFLOW_AWS_ENCRYPTION_KEY;
+  const ttlSeconds =
+    config?.ttl?.seconds ??
+    (process.env.WORKFLOW_AWS_TTL
+      ? Number(process.env.WORKFLOW_AWS_TTL)
+      : undefined);
 
   if (encryptionKey) {
     try {
@@ -88,5 +99,6 @@ export function resolveConfig(config?: AWSWorldConfig): ResolvedConfig {
     endpoint,
     deploymentId,
     encryptionKey,
+    ttlSeconds,
   };
 }

@@ -10,6 +10,7 @@ import { batchWriteWithRetry } from "../dynamodb/batch-write.js";
 import { decodeCursor, encodeCursor } from "../dynamodb/pagination.js";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
+import { computeTTL } from "../dynamodb/ttl.js";
 import { wrapAWSError } from "../errors.js";
 import { toISO } from "../util.js";
 import {
@@ -26,8 +27,10 @@ function buildEventItem(
   runId: string,
   eventId: string,
   data: Record<string, unknown>,
-  now: string
+  now: string,
+  ttlSeconds?: number
 ) {
+  const ttl = computeTTL(ttlSeconds, now);
   return {
     runId,
     eventId,
@@ -38,12 +41,14 @@ function buildEventItem(
     ...(data.specVersion !== undefined
       ? { specVersion: data.specVersion }
       : {}),
+    ...(ttl !== undefined ? { ttl } : {}),
   };
 }
 
 export function createEventsStorage(
   docClient: DynamoDBDocumentClient,
-  tables: TableNames
+  tables: TableNames,
+  ttlSeconds?: number
 ) {
   async function deleteHooksAndWaitsForRun(runId: string): Promise<void> {
     try {
@@ -141,7 +146,8 @@ export function createEventsStorage(
     const now = toISO(new Date());
     const eventData = data.eventData as Record<string, unknown>;
 
-    const eventItem = buildEventItem(actualRunId, eventId, data, now);
+    const eventItem = buildEventItem(actualRunId, eventId, data, now, ttlSeconds);
+    const ttl = computeTTL(ttlSeconds, now);
 
     const runItem = {
       runId: actualRunId,
@@ -157,13 +163,20 @@ export function createEventsStorage(
         : {}),
       createdAt: now,
       updatedAt: now,
+      ...(ttl !== undefined ? { ttl } : {}),
     };
 
     await docClient.send(
       new TransactWriteCommand({
         TransactItems: [
           { Put: { TableName: tables.events, Item: eventItem } },
-          { Put: { TableName: tables.runs, Item: runItem } },
+          {
+            Put: {
+              TableName: tables.runs,
+              Item: runItem,
+              ConditionExpression: "attribute_not_exists(runId)",
+            },
+          },
         ],
       })
     );
@@ -180,7 +193,7 @@ export function createEventsStorage(
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
 
     try {
       await docClient.send(
@@ -229,7 +242,7 @@ export function createEventsStorage(
     const eventId = ulid();
     const now = toISO(new Date());
     const eventData = data.eventData as Record<string, unknown> | undefined;
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
 
     try {
       await docClient.send(
@@ -277,7 +290,7 @@ export function createEventsStorage(
     const eventId = ulid();
     const now = toISO(new Date());
     const eventData = data.eventData as Record<string, unknown>;
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
 
     try {
       await docClient.send(
@@ -330,7 +343,7 @@ export function createEventsStorage(
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
 
     try {
       await docClient.send(
@@ -385,7 +398,8 @@ export function createEventsStorage(
     const now = toISO(new Date());
     const eventData = data.eventData as Record<string, unknown>;
     const correlationId = data.correlationId as string;
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
+    const ttl = computeTTL(ttlSeconds, now);
 
     const stepItem = {
       runId,
@@ -399,6 +413,7 @@ export function createEventsStorage(
         : {}),
       createdAt: now,
       updatedAt: now,
+      ...(ttl !== undefined ? { ttl } : {}),
     };
 
     await docClient.send(
@@ -423,7 +438,7 @@ export function createEventsStorage(
     const eventId = ulid();
     const now = toISO(new Date());
     const correlationId = data.correlationId as string;
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
 
     try {
       await docClient.send(
@@ -491,7 +506,7 @@ export function createEventsStorage(
     const now = toISO(new Date());
     const eventData = data.eventData as Record<string, unknown>;
     const correlationId = data.correlationId as string;
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
 
     try {
       await docClient.send(
@@ -557,7 +572,7 @@ export function createEventsStorage(
     const now = toISO(new Date());
     const eventData = data.eventData as Record<string, unknown>;
     const correlationId = data.correlationId as string;
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
 
     try {
       await docClient.send(
@@ -629,40 +644,61 @@ export function createEventsStorage(
     const now = toISO(new Date());
     const eventData = data.eventData as Record<string, unknown>;
     const correlationId = data.correlationId as string;
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
 
     const retryAfterValue = eventData.retryAfter
       ? toISO(new Date(eventData.retryAfter as string | number))
       : null;
 
-    await docClient.send(
-      new TransactWriteCommand({
-        TransactItems: [
-          { Put: { TableName: tables.events, Item: eventItem } },
-          {
-            Update: {
-              TableName: tables.steps,
-              Key: { stepId: correlationId },
-              UpdateExpression:
-                "SET #status = :status, #error = :error, retryAfter = :retryAfter, updatedAt = :now",
-              ExpressionAttributeNames: {
-                "#status": "status",
-                "#error": "error",
-              },
-              ExpressionAttributeValues: {
-                ":status": "pending",
-                ":error": {
-                  message: eventData.error,
-                  ...(eventData.stack ? { stack: eventData.stack } : {}),
+    try {
+      await docClient.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            { Put: { TableName: tables.events, Item: eventItem } },
+            {
+              Update: {
+                TableName: tables.steps,
+                Key: { stepId: correlationId },
+                UpdateExpression:
+                  "SET #status = :status, #error = :error, retryAfter = :retryAfter, updatedAt = :now",
+                ConditionExpression: "NOT #status IN (:completed, :failed)",
+                ExpressionAttributeNames: {
+                  "#status": "status",
+                  "#error": "error",
                 },
-                ":retryAfter": retryAfterValue,
-                ":now": now,
+                ExpressionAttributeValues: {
+                  ":status": "pending",
+                  ":error": {
+                    message: eventData.error,
+                    ...(eventData.stack ? { stack: eventData.stack } : {}),
+                  },
+                  ":retryAfter": retryAfterValue,
+                  ":now": now,
+                  ":completed": "completed",
+                  ":failed": "failed",
+                },
               },
             },
-          },
-        ],
-      })
-    );
+          ],
+        })
+      );
+    } catch (e) {
+      if (e instanceof Error && e.name === "TransactionCanceledException") {
+        const stepResult = await docClient.send(
+          new GetCommand({
+            TableName: tables.steps,
+            Key: { stepId: correlationId },
+          })
+        );
+        if (stepResult.Item) {
+          const step = marshalStep(stepResult.Item);
+          if (TERMINAL_STATUSES.includes(step.status)) {
+            return { event: marshalEvent(eventItem), step };
+          }
+        }
+      }
+      throw e;
+    }
 
     const stepResult = await docClient.send(
       new GetCommand({
@@ -686,6 +722,8 @@ export function createEventsStorage(
     const eventData = data.eventData as Record<string, unknown>;
     const correlationId = data.correlationId as string;
 
+    const ttl = computeTTL(ttlSeconds, now);
+
     const hookItem = {
       hookId: correlationId,
       runId,
@@ -700,9 +738,10 @@ export function createEventsStorage(
         ? { specVersion: data.specVersion }
         : {}),
       createdAt: now,
+      ...(ttl !== undefined ? { ttl } : {}),
     };
 
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
 
     try {
       await docClient.send(
@@ -725,6 +764,7 @@ export function createEventsStorage(
           CancellationReasons?: Array<{ Code?: string }>;
         };
         if (txError.CancellationReasons?.[0]?.Code === "ConditionalCheckFailed") {
+          const conflictTtl = computeTTL(ttlSeconds, now);
           const conflictEventItem = {
             runId,
             eventId,
@@ -735,6 +775,7 @@ export function createEventsStorage(
             ...(data.specVersion !== undefined
               ? { specVersion: data.specVersion }
               : {}),
+            ...(conflictTtl !== undefined ? { ttl: conflictTtl } : {}),
           };
 
           await docClient.send(
@@ -762,7 +803,7 @@ export function createEventsStorage(
   ) {
     const eventId = ulid();
     const now = toISO(new Date());
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
 
     await docClient.send(
       new TransactWriteCommand({
@@ -780,7 +821,7 @@ export function createEventsStorage(
     const eventId = ulid();
     const now = toISO(new Date());
     const correlationId = data.correlationId as string;
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
 
     await docClient.send(
       new TransactWriteCommand({
@@ -807,7 +848,8 @@ export function createEventsStorage(
     const now = toISO(new Date());
     const eventData = data.eventData as Record<string, unknown>;
     const correlationId = data.correlationId as string;
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
+    const ttl = computeTTL(ttlSeconds, now);
 
     const resumeAtValue = eventData.resumeAt
       ? toISO(new Date(eventData.resumeAt as string | number))
@@ -823,6 +865,7 @@ export function createEventsStorage(
         : {}),
       createdAt: now,
       updatedAt: now,
+      ...(ttl !== undefined ? { ttl } : {}),
     };
 
     await docClient.send(
@@ -847,7 +890,7 @@ export function createEventsStorage(
     const eventId = ulid();
     const now = toISO(new Date());
     const correlationId = data.correlationId as string;
-    const eventItem = buildEventItem(runId, eventId, data, now);
+    const eventItem = buildEventItem(runId, eventId, data, now, ttlSeconds);
 
     await docClient.send(
       new TransactWriteCommand({
