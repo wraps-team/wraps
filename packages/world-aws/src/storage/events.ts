@@ -1,12 +1,12 @@
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import {
-  BatchWriteCommand,
   GetCommand,
   PutCommand,
   QueryCommand,
   TransactWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
+import { batchWriteWithRetry } from "../dynamodb/batch-write.js";
 import { decodeCursor, encodeCursor } from "../dynamodb/pagination.js";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
@@ -46,79 +46,79 @@ export function createEventsStorage(
   tables: TableNames
 ) {
   async function deleteHooksAndWaitsForRun(runId: string): Promise<void> {
-    // Delete all hooks for this run (paginated)
-    let startKey: Record<string, unknown> | undefined;
-    do {
-      const hooksResult = await docClient.send(
-        new QueryCommand({
-          TableName: tables.hooks,
-          IndexName: GSI.hooks.run,
-          KeyConditionExpression: "runId = :runId",
-          ExpressionAttributeValues: { ":runId": runId },
-          ProjectionExpression: "hookId",
-          ...(startKey ? { ExclusiveStartKey: startKey } : {}),
-        })
-      );
+    try {
+      // Delete all hooks for this run (paginated)
+      let startKey: Record<string, unknown> | undefined;
+      do {
+        const hooksResult = await docClient.send(
+          new QueryCommand({
+            TableName: tables.hooks,
+            IndexName: GSI.hooks.run,
+            KeyConditionExpression: "runId = :runId",
+            ExpressionAttributeValues: { ":runId": runId },
+            ProjectionExpression: "hookId",
+            ...(startKey ? { ExclusiveStartKey: startKey } : {}),
+          })
+        );
 
-      if (hooksResult.Items && hooksResult.Items.length > 0) {
-        const batches = [];
-        for (let i = 0; i < hooksResult.Items.length; i += 25) {
-          batches.push(hooksResult.Items.slice(i, i + 25));
-        }
-        for (const batch of batches) {
-          await docClient.send(
-            new BatchWriteCommand({
-              RequestItems: {
+        if (hooksResult.Items && hooksResult.Items.length > 0) {
+          const batches = [];
+          for (let i = 0; i < hooksResult.Items.length; i += 25) {
+            batches.push(hooksResult.Items.slice(i, i + 25));
+          }
+          await Promise.all(
+            batches.map((batch) =>
+              batchWriteWithRetry(docClient, {
                 [tables.hooks]: batch.map((item) => ({
                   DeleteRequest: { Key: { hookId: item.hookId } },
                 })),
-              },
-            })
+              })
+            )
           );
         }
-      }
 
-      startKey = hooksResult.LastEvaluatedKey as
-        | Record<string, unknown>
-        | undefined;
-    } while (startKey);
+        startKey = hooksResult.LastEvaluatedKey as
+          | Record<string, unknown>
+          | undefined;
+      } while (startKey);
 
-    // Delete all waits for this run (paginated)
-    startKey = undefined;
-    do {
-      const waitsResult = await docClient.send(
-        new QueryCommand({
-          TableName: tables.waits,
-          IndexName: GSI.waits.run,
-          KeyConditionExpression: "runId = :runId",
-          ExpressionAttributeValues: { ":runId": runId },
-          ProjectionExpression: "waitId",
-          ...(startKey ? { ExclusiveStartKey: startKey } : {}),
-        })
-      );
+      // Delete all waits for this run (paginated)
+      startKey = undefined;
+      do {
+        const waitsResult = await docClient.send(
+          new QueryCommand({
+            TableName: tables.waits,
+            IndexName: GSI.waits.run,
+            KeyConditionExpression: "runId = :runId",
+            ExpressionAttributeValues: { ":runId": runId },
+            ProjectionExpression: "waitId",
+            ...(startKey ? { ExclusiveStartKey: startKey } : {}),
+          })
+        );
 
-      if (waitsResult.Items && waitsResult.Items.length > 0) {
-        const batches = [];
-        for (let i = 0; i < waitsResult.Items.length; i += 25) {
-          batches.push(waitsResult.Items.slice(i, i + 25));
-        }
-        for (const batch of batches) {
-          await docClient.send(
-            new BatchWriteCommand({
-              RequestItems: {
+        if (waitsResult.Items && waitsResult.Items.length > 0) {
+          const batches = [];
+          for (let i = 0; i < waitsResult.Items.length; i += 25) {
+            batches.push(waitsResult.Items.slice(i, i + 25));
+          }
+          await Promise.all(
+            batches.map((batch) =>
+              batchWriteWithRetry(docClient, {
                 [tables.waits]: batch.map((item) => ({
                   DeleteRequest: { Key: { waitId: item.waitId } },
                 })),
-              },
-            })
+              })
+            )
           );
         }
-      }
 
-      startKey = waitsResult.LastEvaluatedKey as
-        | Record<string, unknown>
-        | undefined;
-    } while (startKey);
+        startKey = waitsResult.LastEvaluatedKey as
+          | Record<string, unknown>
+          | undefined;
+      } while (startKey);
+    } catch (e) {
+      wrapAWSError(e, "deleteHooksAndWaitsForRun");
+    }
   }
 
   async function getRun(runId: string) {
@@ -686,7 +686,6 @@ export function createEventsStorage(
     const eventData = data.eventData as Record<string, unknown>;
     const correlationId = data.correlationId as string;
 
-    // Try to create the hook first — check for token conflict
     const hookItem = {
       hookId: correlationId,
       runId,
@@ -703,50 +702,53 @@ export function createEventsStorage(
       createdAt: now,
     };
 
+    const eventItem = buildEventItem(runId, eventId, data, now);
+
     try {
       await docClient.send(
-        new PutCommand({
-          TableName: tables.hooks,
-          Item: hookItem,
-          ConditionExpression: "attribute_not_exists(hookId)",
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              Put: {
+                TableName: tables.hooks,
+                Item: hookItem,
+                ConditionExpression: "attribute_not_exists(hookId)",
+              },
+            },
+            { Put: { TableName: tables.events, Item: eventItem } },
+          ],
         })
       );
     } catch (e) {
-      if (e instanceof Error && e.name === "ConditionalCheckFailedException") {
-        // Token conflict — create a hook_conflict event instead
-        const conflictEventItem = {
-          runId,
-          eventId,
-          eventType: "hook_conflict",
-          correlationId,
-          eventData: { token: eventData.token },
-          createdAt: now,
-          ...(data.specVersion !== undefined
-            ? { specVersion: data.specVersion }
-            : {}),
+      if (e instanceof Error && e.name === "TransactionCanceledException") {
+        const txError = e as Error & {
+          CancellationReasons?: Array<{ Code?: string }>;
         };
+        if (txError.CancellationReasons?.[0]?.Code === "ConditionalCheckFailed") {
+          const conflictEventItem = {
+            runId,
+            eventId,
+            eventType: "hook_conflict",
+            correlationId,
+            eventData: { token: eventData.token },
+            createdAt: now,
+            ...(data.specVersion !== undefined
+              ? { specVersion: data.specVersion }
+              : {}),
+          };
 
-        await docClient.send(
-          new PutCommand({
-            TableName: tables.events,
-            Item: conflictEventItem,
-          })
-        );
+          await docClient.send(
+            new PutCommand({
+              TableName: tables.events,
+              Item: conflictEventItem,
+            })
+          );
 
-        return { event: marshalEvent(conflictEventItem) };
+          return { event: marshalEvent(conflictEventItem) };
+        }
       }
       throw e;
     }
-
-    // Hook created successfully — now create the event
-    const eventItem = buildEventItem(runId, eventId, data, now);
-
-    await docClient.send(
-      new PutCommand({
-        TableName: tables.events,
-        Item: eventItem,
-      })
-    );
 
     return {
       event: marshalEvent(eventItem),
@@ -935,42 +937,39 @@ export function createEventsStorage(
     const limit = pagination?.limit ?? 50;
     const sortOrder = pagination?.sortOrder ?? "asc";
 
-    const queryParams: Record<string, unknown> = {
-      TableName: tables.events,
-      KeyConditionExpression: "runId = :runId",
-      ExpressionAttributeValues: { ":runId": runId },
-      Limit: limit,
-      ScanIndexForward: sortOrder === "asc",
-    };
-
-    if (pagination?.cursor) {
-      (queryParams as Record<string, unknown>).ExclusiveStartKey = decodeCursor(
-        pagination.cursor
+    try {
+      const result = await docClient.send(
+        new QueryCommand({
+          TableName: tables.events,
+          KeyConditionExpression: "runId = :runId",
+          ExpressionAttributeValues: { ":runId": runId },
+          Limit: limit,
+          ScanIndexForward: sortOrder === "asc",
+          ...(pagination?.cursor
+            ? { ExclusiveStartKey: decodeCursor(pagination.cursor) }
+            : {}),
+        })
       );
+
+      const events = (result.Items ?? []).map((item) => {
+        const event = marshalEvent(item);
+        if (resolveData === "none") {
+          const { eventData: _, ...rest } = event;
+          return rest;
+        }
+        return event;
+      });
+
+      return {
+        data: events,
+        cursor: result.LastEvaluatedKey
+          ? encodeCursor(result.LastEvaluatedKey)
+          : null,
+        hasMore: !!result.LastEvaluatedKey,
+      };
+    } catch (e) {
+      wrapAWSError(e, "events.list");
     }
-
-    const result = await docClient.send(
-      new QueryCommand(
-        queryParams as ConstructorParameters<typeof QueryCommand>[0]
-      )
-    );
-
-    const events = (result.Items ?? []).map((item) => {
-      const event = marshalEvent(item);
-      if (resolveData === "none") {
-        const { eventData: _, ...rest } = event;
-        return rest;
-      }
-      return event;
-    });
-
-    return {
-      data: events,
-      cursor: result.LastEvaluatedKey
-        ? encodeCursor(result.LastEvaluatedKey)
-        : null,
-      hasMore: !!result.LastEvaluatedKey,
-    };
   }
 
   async function listByCorrelationId(params: {
@@ -986,43 +985,40 @@ export function createEventsStorage(
     const limit = pagination?.limit ?? 50;
     const sortOrder = pagination?.sortOrder ?? "asc";
 
-    const queryParams: Record<string, unknown> = {
-      TableName: tables.events,
-      IndexName: GSI.events.correlation,
-      KeyConditionExpression: "correlationId = :correlationId",
-      ExpressionAttributeValues: { ":correlationId": correlationId },
-      Limit: limit,
-      ScanIndexForward: sortOrder === "asc",
-    };
-
-    if (pagination?.cursor) {
-      (queryParams as Record<string, unknown>).ExclusiveStartKey = decodeCursor(
-        pagination.cursor
+    try {
+      const result = await docClient.send(
+        new QueryCommand({
+          TableName: tables.events,
+          IndexName: GSI.events.correlation,
+          KeyConditionExpression: "correlationId = :correlationId",
+          ExpressionAttributeValues: { ":correlationId": correlationId },
+          Limit: limit,
+          ScanIndexForward: sortOrder === "asc",
+          ...(pagination?.cursor
+            ? { ExclusiveStartKey: decodeCursor(pagination.cursor) }
+            : {}),
+        })
       );
+
+      const events = (result.Items ?? []).map((item) => {
+        const event = marshalEvent(item);
+        if (resolveData === "none") {
+          const { eventData: _, ...rest } = event;
+          return rest;
+        }
+        return event;
+      });
+
+      return {
+        data: events,
+        cursor: result.LastEvaluatedKey
+          ? encodeCursor(result.LastEvaluatedKey)
+          : null,
+        hasMore: !!result.LastEvaluatedKey,
+      };
+    } catch (e) {
+      wrapAWSError(e, "events.listByCorrelationId");
     }
-
-    const result = await docClient.send(
-      new QueryCommand(
-        queryParams as ConstructorParameters<typeof QueryCommand>[0]
-      )
-    );
-
-    const events = (result.Items ?? []).map((item) => {
-      const event = marshalEvent(item);
-      if (resolveData === "none") {
-        const { eventData: _, ...rest } = event;
-        return rest;
-      }
-      return event;
-    });
-
-    return {
-      data: events,
-      cursor: result.LastEvaluatedKey
-        ? encodeCursor(result.LastEvaluatedKey)
-        : null,
-      hasMore: !!result.LastEvaluatedKey,
-    };
   }
 
   return { create, list, listByCorrelationId };

@@ -71,10 +71,9 @@ describe("createSQSHandler", () => {
   });
 
   it("reports partial batch failures", async () => {
-    let callCount = 0;
-    const handlerFn = vi.fn().mockImplementation(() => {
-      callCount++;
-      if (callCount === 2) {
+    const handlerFn = vi.fn().mockImplementation(async (req: Request) => {
+      const body = await req.json();
+      if (body.queueName === "__wkf_step_b") {
         return new Response("error", { status: 500 });
       }
       return new Response("ok", { status: 200 });
@@ -367,10 +366,9 @@ describe("createSQSHandler", () => {
   });
 
   it("handles mixed batch: timeout and normal records independently", async () => {
-    let callCount = 0;
-    const handlerFn = vi.fn().mockImplementation(() => {
-      callCount++;
-      if (callCount === 2) {
+    const handlerFn = vi.fn().mockImplementation(async (req: Request) => {
+      const body = await req.json();
+      if (body.messageId === "m2") {
         return new Response(JSON.stringify({ timeoutSeconds: 120 }), {
           status: 200,
         });

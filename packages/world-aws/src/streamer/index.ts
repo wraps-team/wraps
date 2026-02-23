@@ -9,11 +9,8 @@ import {
   GetShardIteratorCommand,
 } from "@aws-sdk/client-dynamodb-streams";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import {
-  BatchWriteCommand,
-  PutCommand,
-  QueryCommand,
-} from "@aws-sdk/lib-dynamodb";
+import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { batchWriteWithRetry } from "../dynamodb/batch-write.js";
 import { monotonicFactory } from "ulid";
 import type { TableNames } from "../dynamodb/tables.js";
 import { GSI } from "../dynamodb/tables.js";
@@ -73,15 +70,11 @@ export function createStreamer(
     // BatchWrite in groups of 25 (DynamoDB limit)
     for (let i = 0; i < items.length; i += BATCH_WRITE_LIMIT) {
       const batch = items.slice(i, i + BATCH_WRITE_LIMIT);
-      await docClient.send(
-        new BatchWriteCommand({
-          RequestItems: {
-            [tableName]: batch.map((item) => ({
-              PutRequest: { Item: item },
-            })),
-          },
-        })
-      );
+      await batchWriteWithRetry(docClient, {
+        [tableName]: batch.map((item) => ({
+          PutRequest: { Item: item },
+        })),
+      });
     }
   }
 

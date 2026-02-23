@@ -302,14 +302,8 @@ async function main() {
   // Create SQS queues (DLQs first, then main queues)
   console.log("\nCreating SQS queues...");
 
-  const workflowsDlqUrl = await createSQSQueue(
-    sqsClient,
-    `${config.queuePrefix}-workflows-dlq`
-  );
-  const stepsDlqUrl = await createSQSQueue(
-    sqsClient,
-    `${config.queuePrefix}-steps-dlq`
-  );
+  await createSQSQueue(sqsClient, `${config.queuePrefix}-workflows-dlq`);
+  await createSQSQueue(sqsClient, `${config.queuePrefix}-steps-dlq`);
 
   // Extract DLQ ARN from URL for RedrivePolicy
   // For local development with endpoint, use a placeholder ARN

@@ -50,32 +50,23 @@ export function createSQSHandler(
   options?: SQSHandlerOptions
 ) {
   return async function handler(event: SQSEvent, _context: Context) {
-    const results: { recordId: string; success: boolean; error?: string }[] =
-      [];
+    const settled = await Promise.allSettled(
+      event.Records.map((record) =>
+        processRecord(record, queueHandler, options)
+      )
+    );
 
-    for (const record of event.Records) {
-      try {
-        await processRecord(record, queueHandler, options);
-        results.push({ recordId: record.messageId, success: true });
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
-        results.push({
-          recordId: record.messageId,
-          success: false,
-          error: message,
-        });
-      }
-    }
+    const batchItemFailures = settled
+      .map((result, i) =>
+        result.status === "rejected"
+          ? { itemIdentifier: event.Records[i].messageId }
+          : null
+      )
+      .filter(
+        (f): f is { itemIdentifier: string } => f !== null
+      );
 
-    // Return failed message IDs for SQS partial batch failure reporting
-    const failedIds = results
-      .filter((r) => !r.success)
-      .map((r) => ({ itemIdentifier: r.recordId }));
-
-    return {
-      batchItemFailures: failedIds,
-    };
+    return { batchItemFailures };
   };
 }
 

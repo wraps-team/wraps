@@ -10,6 +10,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
 import { beforeEach, describe, expect, it } from "vitest";
+import { WorldError } from "../src/errors.js";
 import { getTableNames } from "../src/dynamodb/tables.js";
 import { createEventsStorage } from "../src/storage/events.js";
 import { createHooksStorage } from "../src/storage/hooks.js";
@@ -421,13 +422,17 @@ describe("EventsStorage", () => {
 
   it("create() hook_created with token conflict creates hook_conflict event", async () => {
     docMock
-      .on(PutCommand)
+      .on(TransactWriteCommand)
       .rejectsOnce(
-        Object.assign(new Error("Conflict"), {
-          name: "ConditionalCheckFailedException",
+        Object.assign(new Error("Transaction cancelled"), {
+          name: "TransactionCanceledException",
+          CancellationReasons: [
+            { Code: "ConditionalCheckFailed" },
+            { Code: "None" },
+          ],
         })
-      )
-      .resolves({});
+      );
+    docMock.on(PutCommand).resolves({});
 
     const events = createEventsStorage(docClient, tables);
     const result = await events.create("run-1", {
@@ -438,6 +443,27 @@ describe("EventsStorage", () => {
 
     expect(result.event!.eventType).toBe("hook_conflict");
     expect(result.hook).toBeUndefined();
+  });
+
+  it("create() hook_created re-throws non-conflict TransactionCanceledException", async () => {
+    docMock.on(TransactWriteCommand).rejectsOnce(
+      Object.assign(new Error("Transaction cancelled"), {
+        name: "TransactionCanceledException",
+        CancellationReasons: [
+          { Code: "None" },
+          { Code: "ValidationError" },
+        ],
+      })
+    );
+
+    const events = createEventsStorage(docClient, tables);
+    await expect(
+      events.create("run-1", {
+        eventType: "hook_created",
+        correlationId: "hook-1",
+        eventData: { token: "tok" },
+      })
+    ).rejects.toThrow("Transaction cancelled");
   });
 
   it("create() throws on unknown event type", async () => {
@@ -817,7 +843,7 @@ describe("EventsStorage", () => {
   });
 
   it("create() hook_created succeeds and returns hook", async () => {
-    docMock.on(PutCommand).resolves({});
+    docMock.on(TransactWriteCommand).resolves({});
 
     const events = createEventsStorage(docClient, tables);
     const result = await events.create("run-1", {
@@ -831,11 +857,10 @@ describe("EventsStorage", () => {
     expect(result.hook!.token).toBe("my-token");
     expect(result.hook!.hookId).toBe("hook-1");
 
-    // First PutCommand should have condition
-    const putCalls = docMock.commandCalls(PutCommand);
-    expect(putCalls[0].args[0].input.ConditionExpression).toBe(
-      "attribute_not_exists(hookId)"
-    );
+    // TransactWrite should include condition on the hook Put
+    const txCalls = docMock.commandCalls(TransactWriteCommand);
+    const hookPut = txCalls[0].args[0].input.TransactItems![0].Put;
+    expect(hookPut!.ConditionExpression).toBe("attribute_not_exists(hookId)");
   });
 
   it("create() hook_received writes event only", async () => {
@@ -967,6 +992,26 @@ describe("EventsStorage", () => {
     expect(
       batchCalls[1].args[0].input.RequestItems![tables.hooks]
     ).toHaveLength(1);
+  });
+
+  it("create() run_completed wraps throttling error during cleanup as WorldError", async () => {
+    docMock.on(TransactWriteCommand).resolves({});
+    docMock.on(QueryCommand).resolvesOnce({
+      Items: [{ hookId: "h1" }],
+    });
+    docMock.on(BatchWriteCommand).rejectsOnce(
+      Object.assign(new Error("Rate exceeded"), {
+        name: "ThrottlingException",
+      })
+    );
+
+    const events = createEventsStorage(docClient, tables);
+    await expect(
+      events.create("run-1", {
+        eventType: "run_completed",
+        eventData: { output: null },
+      })
+    ).rejects.toThrow(WorldError);
   });
 
   it("create() step_started returns existing step on TransactionCanceledException", async () => {
