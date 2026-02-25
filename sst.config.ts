@@ -40,6 +40,13 @@ export default $config({
     const { api } = await import("./infra/api");
     const { alertsTopic } = await import("./infra/alarms");
 
+    // World-AWS dev: Lambda + SQS event source mappings for local testing
+    // Requires existing tables/queues from `world-aws-setup`
+    const worldAwsDev =
+      $app.stage !== "production"
+        ? await import("./infra/world-aws-dev")
+        : undefined;
+
     return {
       apiUrl: api.url,
       batchQueueUrl: batchQueue.url,
@@ -50,6 +57,9 @@ export default $config({
       schedulerGroupName: schedulerGroup.name,
       schedulerRoleArn: schedulerRole.arn,
       alertsTopicArn: alertsTopic.arn,
+      ...(worldAwsDev && {
+        worldAwsHandlerName: worldAwsDev.worldAwsHandler.name,
+      }),
     };
   },
 });
