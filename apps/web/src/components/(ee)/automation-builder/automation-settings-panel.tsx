@@ -5,13 +5,13 @@ import { Loader2, RefreshCw, Settings, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { updateAutomation } from "@/actions/automations";
 import {
   getSMSPhoneNumbers,
   getVerifiedDomains,
   type PhoneNumber,
   type VerifiedIdentity,
 } from "@/actions/aws-accounts";
-import { updateAutomation } from "@/actions/automations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

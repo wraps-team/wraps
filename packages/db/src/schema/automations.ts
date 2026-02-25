@@ -280,7 +280,9 @@ export const automation = pgTable(
     // AUTOMATION DEFINITION
     // ═══════════════════════════════════════════════════════════════════════
     steps: jsonb("steps").$type<AutomationStep[]>().default([]),
-    transitions: jsonb("transitions").$type<AutomationTransition[]>().default([]),
+    transitions: jsonb("transitions")
+      .$type<AutomationTransition[]>()
+      .default([]),
 
     /** Monotonically increasing version counter, bumped on every definition edit */
     version: integer("version").default(1).notNull(),

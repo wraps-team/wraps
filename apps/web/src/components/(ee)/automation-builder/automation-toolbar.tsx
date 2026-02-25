@@ -35,7 +35,6 @@ import {
 } from "@/components/ui/tooltip";
 import { EnableReadinessDialog } from "./enable-readiness-dialog";
 import { UnsavedChangesGuard } from "./unsaved-changes-guard";
-import { useBeforeUnload } from "./use-before-unload";
 import {
   useCanRedo,
   useCanUndo,
@@ -46,6 +45,7 @@ import {
   useValidationResult,
   useWorkflowStore,
 } from "./use-automation-store";
+import { useBeforeUnload } from "./use-before-unload";
 
 type WorkflowToolbarProps = {
   workflow: Workflow;

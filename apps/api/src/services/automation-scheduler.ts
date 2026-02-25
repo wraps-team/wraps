@@ -13,12 +13,15 @@ import {
   GetScheduleCommand,
   SchedulerClient,
 } from "@aws-sdk/client-scheduler";
-import { db, eq, type TriggerConfig, automation } from "@wraps/db";
+import { automation, db, eq, type TriggerConfig } from "@wraps/db";
 import { Cron } from "croner";
 import { and } from "drizzle-orm";
 
 import { log } from "../lib/logger";
-import { formatScheduleExpression, type AutomationJob } from "./automation-queue";
+import {
+  type AutomationJob,
+  formatScheduleExpression,
+} from "./automation-queue";
 
 const scheduler = new SchedulerClient({});
 

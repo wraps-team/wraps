@@ -569,7 +569,9 @@ describe("Workflows Server Actions", () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.automation.triggerType).toBe("segment_entry");
-        expect(result.automation.triggerConfig).toEqual({ segmentId: "seg-123" });
+        expect(result.automation.triggerConfig).toEqual({
+          segmentId: "seg-123",
+        });
       }
     });
 
@@ -1115,9 +1117,9 @@ describe("Workflows Server Actions", () => {
         const originalStepIds = (
           createResult.automation.steps as WorkflowStep[]
         ).map((s) => s.id);
-        const duplicateStepIds = (result.automation.steps as WorkflowStep[]).map(
-          (s) => s.id
-        );
+        const duplicateStepIds = (
+          result.automation.steps as WorkflowStep[]
+        ).map((s) => s.id);
         expect(
           originalStepIds.some((id) => duplicateStepIds.includes(id))
         ).toBe(false);

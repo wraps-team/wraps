@@ -2,16 +2,16 @@
 
 import { auth } from "@wraps/auth";
 import {
-  type CanvasViewport,
-  db,
-  type TriggerConfig,
-  template,
   type Automation,
   type AutomationStep,
   type AutomationTransition,
   type AutomationTriggerType,
   automation,
   automationExecution,
+  type CanvasViewport,
+  db,
+  type TriggerConfig,
+  template,
 } from "@wraps/db";
 import { and, count, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -340,7 +340,9 @@ export async function getAutomation(
 
     return { success: true, automation: a as AutomationWithMeta };
   } catch (error) {
-    const log = createActionLogger("getAutomation", { orgSlug: organizationId });
+    const log = createActionLogger("getAutomation", {
+      orgSlug: organizationId,
+    });
     log.error(
       { err: serializeError(error), automationId },
       "Failed to get automation"
@@ -371,7 +373,10 @@ export async function createAutomation(
     }
 
     // Check if automations feature is available for this plan
-    const featureCheck = await checkFeatureAccess(organizationId, "automations");
+    const featureCheck = await checkFeatureAccess(
+      organizationId,
+      "automations"
+    );
     if (!featureCheck.allowed) {
       return {
         success: false,
@@ -492,7 +497,10 @@ export async function updateAutomation(
     }
 
     // Check if automations feature is available for this plan
-    const featureCheck = await checkFeatureAccess(organizationId, "automations");
+    const featureCheck = await checkFeatureAccess(
+      organizationId,
+      "automations"
+    );
     if (!featureCheck.allowed) {
       return {
         success: false,
@@ -632,7 +640,11 @@ export async function updateAutomation(
 
       // TriggerType changed FROM schedule → delete old schedule
       if (oldTriggerType === "schedule" && newTriggerType !== "schedule") {
-        await callAutomationScheduleApi(automationId, organizationId, "disable");
+        await callAutomationScheduleApi(
+          automationId,
+          organizationId,
+          "disable"
+        );
       }
 
       // TriggerType changed TO schedule → create new schedule
@@ -641,10 +653,15 @@ export async function updateAutomation(
         newTriggerType === "schedule" &&
         newConfig.schedule
       ) {
-        await callAutomationScheduleApi(automationId, organizationId, "enable", {
-          cronExpression: newConfig.schedule,
-          timezone: newConfig.timezone,
-        });
+        await callAutomationScheduleApi(
+          automationId,
+          organizationId,
+          "enable",
+          {
+            cronExpression: newConfig.schedule,
+            timezone: newConfig.timezone,
+          }
+        );
       }
 
       // TriggerType stayed schedule but cron/timezone changed → reschedule
@@ -656,10 +673,15 @@ export async function updateAutomation(
         (oldConfig.schedule !== newConfig.schedule ||
           oldConfig.timezone !== newConfig.timezone)
       ) {
-        await callAutomationScheduleApi(automationId, organizationId, "update", {
-          cronExpression: newConfig.schedule,
-          timezone: newConfig.timezone,
-        });
+        await callAutomationScheduleApi(
+          automationId,
+          organizationId,
+          "update",
+          {
+            cronExpression: newConfig.schedule,
+            timezone: newConfig.timezone,
+          }
+        );
       }
     }
 
@@ -697,7 +719,10 @@ export async function deleteAutomation(
     }
 
     // Check if automations feature is available for this plan
-    const featureCheck = await checkFeatureAccess(organizationId, "automations");
+    const featureCheck = await checkFeatureAccess(
+      organizationId,
+      "automations"
+    );
     if (!featureCheck.allowed) {
       return {
         success: false,
@@ -789,7 +814,10 @@ export async function enableAutomation(
     }
 
     // Check if automations feature is available for this plan
-    const featureCheck = await checkFeatureAccess(organizationId, "automations");
+    const featureCheck = await checkFeatureAccess(
+      organizationId,
+      "automations"
+    );
     if (!featureCheck.allowed) {
       return {
         success: false,
@@ -1013,7 +1041,10 @@ export async function disableAutomation(
     }
 
     // Check if automations feature is available for this plan
-    const featureCheck = await checkFeatureAccess(organizationId, "automations");
+    const featureCheck = await checkFeatureAccess(
+      organizationId,
+      "automations"
+    );
     if (!featureCheck.allowed) {
       return {
         success: false,
@@ -1088,7 +1119,10 @@ export async function duplicateAutomation(
     }
 
     // Check if automations feature is available for this plan
-    const featureCheck = await checkFeatureAccess(organizationId, "automations");
+    const featureCheck = await checkFeatureAccess(
+      organizationId,
+      "automations"
+    );
     if (!featureCheck.allowed) {
       return {
         success: false,

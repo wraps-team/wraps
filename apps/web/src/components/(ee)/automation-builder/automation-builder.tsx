@@ -4,12 +4,12 @@ import type { Workflow, WorkflowStep, WorkflowTransition } from "@wraps/db";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useRef } from "react";
 import { AIDesignPanel } from "./ai-design-panel";
-import { useSettingsPanelOpen, useWorkflowStore } from "./use-automation-store";
 import { WorkflowCanvas } from "./automation-canvas";
 import { WorkflowDataProvider } from "./automation-data-context";
 import { WorkflowPropertiesPanel } from "./automation-properties-panel";
 import { WorkflowSettingsPanel } from "./automation-settings-panel";
 import { WorkflowToolbar } from "./automation-toolbar";
+import { useSettingsPanelOpen, useWorkflowStore } from "./use-automation-store";
 
 type Topic = {
   id: string;

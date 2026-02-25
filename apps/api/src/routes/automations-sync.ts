@@ -9,16 +9,16 @@
  */
 
 import {
+  type AutomationStep,
+  type AutomationTransition,
+  type AutomationTriggerType,
   and,
+  automation,
   awsAccount,
   db,
   eq,
   type TriggerConfig,
   template,
-  type AutomationStep,
-  type AutomationTransition,
-  type AutomationTriggerType,
-  automation,
 } from "@wraps/db";
 import { inArray, sql } from "drizzle-orm";
 import { t } from "elysia";
@@ -33,7 +33,9 @@ type DbOrTx =
 // ROUTES
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const automationsSyncRoutes = createAuthenticatedRoutes("/v1/automations")
+export const automationsSyncRoutes = createAuthenticatedRoutes(
+  "/v1/automations"
+)
   // POST /push — Upsert a single automation from CLI
   .post(
     "/push",
@@ -129,20 +131,17 @@ export const automationsSyncRoutes = createAuthenticatedRoutes("/v1/automations"
         ),
         cliProjectPath: t.Optional(
           t.String({
-            description:
-              "Path in project (e.g. automations/onboarding.ts)",
+            description: "Path in project (e.g. automations/onboarding.ts)",
           })
         ),
         force: t.Optional(
           t.Boolean({
-            description:
-              "Force overwrite even if edited on dashboard",
+            description: "Force overwrite even if edited on dashboard",
           })
         ),
         draft: t.Optional(
           t.Boolean({
-            description:
-              "Push as draft without enabling the automation",
+            description: "Push as draft without enabling the automation",
           })
         ),
       }),
@@ -280,8 +279,7 @@ export const automationsSyncRoutes = createAuthenticatedRoutes("/v1/automations"
       detail: {
         tags: ["automations"],
         summary: "Push multiple automations from CLI",
-        description:
-          "Batch upsert automations parsed from TypeScript source.",
+        description: "Batch upsert automations parsed from TypeScript source.",
       },
     }
   )

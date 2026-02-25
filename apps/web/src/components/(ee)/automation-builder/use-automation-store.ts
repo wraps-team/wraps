@@ -29,8 +29,8 @@ import { create, useStore } from "zustand";
 import {
   type ValidationError,
   type ValidationResult,
-  validateCascadeChannels,
   validateAutomation,
+  validateCascadeChannels,
 } from "@/lib/automation-validation";
 import type { NodePaletteType } from "./node-palette";
 

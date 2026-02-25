@@ -17,9 +17,9 @@ import {
 } from "../../middleware/auth";
 import { rateLimitMiddleware } from "../../middleware/rate-limit";
 import {
+  type AutomationJob,
   enqueueAutomationStep,
   enqueueAutomationStepBatch,
-  type AutomationJob,
 } from "../../services/automation-queue";
 
 // Common response schemas
@@ -347,8 +347,7 @@ export const automationsRoutes = createAuthenticatedRoutes("/v1/automations")
             data: t.Optional(t.Object({}, { additionalProperties: true })),
           }),
           {
-            description:
-              "List of contacts to trigger the automation for",
+            description: "List of contacts to trigger the automation for",
           }
         ),
         data: t.Optional(
@@ -356,8 +355,7 @@ export const automationsRoutes = createAuthenticatedRoutes("/v1/automations")
             {},
             {
               additionalProperties: true,
-              description:
-                "Common data to pass to all automation triggers",
+              description: "Common data to pass to all automation triggers",
             }
           )
         ),

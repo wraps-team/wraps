@@ -1,8 +1,8 @@
 import type {
-  CascadeChannelConfig,
   AutomationStep,
   AutomationStepConfig,
   AutomationTransition,
+  CascadeChannelConfig,
 } from "@wraps/db";
 
 // ═══════════════════════════════════════════════════════════════════════════

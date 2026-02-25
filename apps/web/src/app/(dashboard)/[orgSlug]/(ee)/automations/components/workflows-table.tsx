@@ -37,11 +37,11 @@ import {
 } from "react";
 import { toast } from "sonner";
 import {
+  type AutomationWithMeta,
   deleteAutomation,
   disableAutomation,
   duplicateAutomation,
   enableAutomation,
-  type AutomationWithMeta,
 } from "@/actions/automations";
 import {
   AlertDialog,
@@ -73,10 +73,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  getStepCount,
-  getTriggerDescription,
   AUTOMATION_STATUS_COLORS,
   AUTOMATION_STATUS_LABELS,
+  getStepCount,
+  getTriggerDescription,
 } from "@/lib/automations";
 import { CreateWorkflowDialog } from "./create-workflow-dialog";
 
@@ -174,7 +174,10 @@ export function WorkflowsTable({
     }
 
     startTransition(async () => {
-      const result = await deleteAutomation(workflowToDelete.id, organizationId);
+      const result = await deleteAutomation(
+        workflowToDelete.id,
+        organizationId
+      );
       if (result.success) {
         toast.success("Workflow deleted");
         setDeleteDialogOpen(false);

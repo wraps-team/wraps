@@ -45,8 +45,6 @@ import Handlebars from "handlebars";
 import { trackFirstEmailSent } from "../../lib/activation-tracking";
 import { log } from "../../lib/logger";
 import { generateUnsubscribeToken } from "../../lib/unsubscribe-token";
-
-import { getCredentials } from "../../services/credentials";
 import {
   deleteScheduledStep,
   enqueueWorkflowStep,
@@ -56,6 +54,7 @@ import {
   type WorkflowJob,
 } from "../../services/automation-queue";
 import { createNextWorkflowSchedule } from "../../services/automation-scheduler";
+import { getCredentials } from "../../services/credentials";
 
 export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   const results = await Promise.allSettled(

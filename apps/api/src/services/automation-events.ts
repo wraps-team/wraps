@@ -6,22 +6,22 @@
  */
 
 import {
+  automation,
+  automationExecution,
   contactEvent,
   contactMatchesCondition,
   db,
   eq,
   getSegmentsByIds,
-  automation,
-  automationExecution,
 } from "@wraps/db";
 import { and, inArray, sql } from "drizzle-orm";
 
 import { log } from "../lib/logger";
 import {
+  type AutomationJob,
   deleteScheduledStep,
   enqueueAutomationStep,
   enqueueAutomationStepBatch,
-  type AutomationJob,
 } from "./automation-queue";
 
 /**

@@ -1,9 +1,9 @@
 "use client";
 
 import { Bell } from "lucide-react";
+import { useWorkflowData } from "../automation-data-context";
 import type { WorkflowNodeData } from "../use-automation-store";
 import { useNodeValidation } from "../use-automation-store";
-import { useWorkflowData } from "../automation-data-context";
 import { BaseNode } from "./base-node";
 
 type TopicNodeProps = {

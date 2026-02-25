@@ -10,6 +10,8 @@ import { swagger } from "@elysiajs/swagger";
 import { Elysia } from "elysia";
 import { automationsRoutes } from "./(ee)/routes/automations";
 import { getPostHogClient } from "./lib/posthog";
+import { automationScheduleRoutes } from "./routes/automation-schedules";
+import { automationsSyncRoutes } from "./routes/automations-sync";
 import { batchRoutes } from "./routes/batch";
 import { connectionsRoutes } from "./routes/connections";
 import { contactsRoutes } from "./routes/contacts";
@@ -20,8 +22,6 @@ import { templatesSyncRoutes } from "./routes/templates-sync";
 import { toolsRoutes } from "./routes/tools";
 import { unsubscribeRoutes } from "./routes/unsubscribe";
 import { webhooksRoutes } from "./routes/webhooks";
-import { automationScheduleRoutes } from "./routes/automation-schedules";
-import { automationsSyncRoutes } from "./routes/automations-sync";
 
 /**
  * OpenAPI documentation configuration

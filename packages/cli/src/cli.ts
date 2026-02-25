@@ -19,6 +19,11 @@ import { cdnStatus } from "./commands/cdn/status.js";
 import { cdnSync } from "./commands/cdn/sync.js";
 import { cdnUpgrade } from "./commands/cdn/upgrade.js";
 import { cdnVerify } from "./commands/cdn/verify.js";
+// Automations commands (new canonical name; "workflows" is legacy alias)
+import { automationsGenerate } from "./commands/email/automations/generate.js";
+import { automationsInit } from "./commands/email/automations/init.js";
+import { automationsPush } from "./commands/email/automations/push.js";
+import { automationsValidate } from "./commands/email/automations/validate.js";
 import { check } from "./commands/email/check.js";
 import { config } from "./commands/email/config.js";
 import { connect } from "./commands/email/connect.js";
@@ -46,11 +51,6 @@ import { templatesPreview } from "./commands/email/templates/preview.js";
 import { templatesPush } from "./commands/email/templates/push.js";
 import { emailTest } from "./commands/email/test.js";
 import { upgrade } from "./commands/email/upgrade.js";
-// Automations commands (new canonical name; "workflows" is legacy alias)
-import { automationsGenerate } from "./commands/email/automations/generate.js";
-import { automationsInit } from "./commands/email/automations/init.js";
-import { automationsPush } from "./commands/email/automations/push.js";
-import { automationsValidate } from "./commands/email/automations/validate.js";
 // Info commands
 import { news } from "./commands/news.js";
 import { permissions } from "./commands/permissions.js";
