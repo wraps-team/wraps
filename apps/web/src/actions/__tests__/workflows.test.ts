@@ -300,13 +300,13 @@ describe("Workflows Server Actions", () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflow.name).toBe("Welcome Flow");
-        expect(result.workflow.description).toBe("Sends welcome emails");
-        expect(result.workflow.status).toBe("draft");
-        expect(result.workflow.triggerType).toBe("event");
-        expect(result.workflow.steps).toBeDefined();
-        expect((result.workflow.steps as WorkflowStep[]).length).toBe(1);
-        expect((result.workflow.steps as WorkflowStep[])[0].type).toBe(
+        expect(result.automation.name).toBe("Welcome Flow");
+        expect(result.automation.description).toBe("Sends welcome emails");
+        expect(result.automation.status).toBe("draft");
+        expect(result.automation.triggerType).toBe("event");
+        expect(result.automation.steps).toBeDefined();
+        expect((result.automation.steps as WorkflowStep[]).length).toBe(1);
+        expect((result.automation.steps as WorkflowStep[])[0].type).toBe(
           "trigger"
         );
       }
@@ -342,8 +342,8 @@ describe("Workflows Server Actions", () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflow.name).toBe("Trimmed Name");
-        expect(result.workflow.description).toBe("Trimmed description");
+        expect(result.automation.name).toBe("Trimmed Name");
+        expect(result.automation.description).toBe("Trimmed description");
       }
     });
 
@@ -377,7 +377,7 @@ describe("Workflows Server Actions", () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflows).toHaveLength(3);
+        expect(result.automations).toHaveLength(3);
         expect(result.total).toBe(3);
       }
     });
@@ -390,7 +390,7 @@ describe("Workflows Server Actions", () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflows).toHaveLength(2);
+        expect(result.automations).toHaveLength(2);
         expect(result.total).toBe(3);
         expect(result.page).toBe(1);
         expect(result.pageSize).toBe(2);
@@ -404,8 +404,8 @@ describe("Workflows Server Actions", () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflows).toHaveLength(1);
-        expect(result.workflows[0].name).toBe("Workflow A");
+        expect(result.automations).toHaveLength(1);
+        expect(result.automations[0].name).toBe("Workflow A");
       }
     });
 
@@ -417,7 +417,7 @@ describe("Workflows Server Actions", () => {
       }
 
       // Add action step, awsAccountId, defaultFrom, and enable
-      const wf = listResult.workflows[0];
+      const wf = listResult.automations[0];
       await updateWorkflow(wf.id, testOrganization.id, {
         awsAccountId: testAwsAccount.id,
         defaultFrom: "test@example.com",
@@ -449,8 +449,8 @@ describe("Workflows Server Actions", () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflows).toHaveLength(1);
-        expect(result.workflows[0].status).toBe("enabled");
+        expect(result.automations).toHaveLength(1);
+        expect(result.automations[0].status).toBe("enabled");
       }
     });
 
@@ -461,7 +461,7 @@ describe("Workflows Server Actions", () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflows).toHaveLength(3);
+        expect(result.automations).toHaveLength(3);
       }
     });
   });
@@ -481,13 +481,13 @@ describe("Workflows Server Actions", () => {
       }
 
       const result = await getWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflow.name).toBe("Get Test Workflow");
+        expect(result.automation.name).toBe("Get Test Workflow");
       }
     });
 
@@ -510,14 +510,14 @@ describe("Workflows Server Actions", () => {
       }
 
       const result = await getWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflow.createdByUser).toBeDefined();
-        expect(result.workflow.createdByUser?.email).toBe(testUser.email);
+        expect(result.automation.createdByUser).toBeDefined();
+        expect(result.automation.createdByUser?.email).toBe(testUser.email);
       }
     });
   });
@@ -537,14 +537,14 @@ describe("Workflows Server Actions", () => {
       }
 
       const result = await updateWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id,
         { name: "New Name" }
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflow.name).toBe("New Name");
+        expect(result.automation.name).toBe("New Name");
       }
     });
 
@@ -558,7 +558,7 @@ describe("Workflows Server Actions", () => {
       }
 
       const result = await updateWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id,
         {
           triggerType: "segment_entry",
@@ -568,8 +568,8 @@ describe("Workflows Server Actions", () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflow.triggerType).toBe("segment_entry");
-        expect(result.workflow.triggerConfig).toEqual({ segmentId: "seg-123" });
+        expect(result.automation.triggerType).toBe("segment_entry");
+        expect(result.automation.triggerConfig).toEqual({ segmentId: "seg-123" });
       }
     });
 
@@ -608,16 +608,16 @@ describe("Workflows Server Actions", () => {
       ];
 
       const result = await updateWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id,
         { steps: newSteps, transitions: newTransitions }
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect((result.workflow.steps as WorkflowStep[]).length).toBe(2);
+        expect((result.automation.steps as WorkflowStep[]).length).toBe(2);
         expect(
-          (result.workflow.transitions as WorkflowTransition[]).length
+          (result.automation.transitions as WorkflowTransition[]).length
         ).toBe(1);
       }
     });
@@ -632,7 +632,7 @@ describe("Workflows Server Actions", () => {
       }
 
       const result = await updateWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id,
         { name: "" }
       );
@@ -664,7 +664,7 @@ describe("Workflows Server Actions", () => {
       ];
 
       const result = await updateWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id,
         { steps: invalidSteps }
       );
@@ -703,7 +703,7 @@ describe("Workflows Server Actions", () => {
       ];
 
       const result = await updateWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id,
         { steps, transitions: invalidTransitions }
       );
@@ -743,12 +743,12 @@ describe("Workflows Server Actions", () => {
       }
 
       // Add required config including awsAccountId, defaultFrom, and real template
-      await updateWorkflow(createResult.workflow.id, testOrganization.id, {
+      await updateWorkflow(createResult.automation.id, testOrganization.id, {
         triggerConfig: { eventName: "signup" },
         awsAccountId: testAwsAccount.id,
         defaultFrom: "test@example.com",
         steps: [
-          ...(createResult.workflow.steps as WorkflowStep[]),
+          ...(createResult.automation.steps as WorkflowStep[]),
           {
             id: "action-1",
             type: "send_email",
@@ -760,20 +760,20 @@ describe("Workflows Server Actions", () => {
         transitions: [
           {
             id: "trans-1",
-            fromStepId: (createResult.workflow.steps as WorkflowStep[])[0].id,
+            fromStepId: (createResult.automation.steps as WorkflowStep[])[0].id,
             toStepId: "action-1",
           },
         ],
       });
 
       const result = await enableWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflow.status).toBe("enabled");
+        expect(result.automation.status).toBe("enabled");
       }
     });
 
@@ -788,7 +788,7 @@ describe("Workflows Server Actions", () => {
 
       // Try to enable without awsAccountId
       const result = await enableWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
@@ -808,12 +808,12 @@ describe("Workflows Server Actions", () => {
       }
 
       // Set AWS account but no eventName or action step
-      await updateWorkflow(createResult.workflow.id, testOrganization.id, {
+      await updateWorkflow(createResult.automation.id, testOrganization.id, {
         awsAccountId: testAwsAccount.id,
       });
 
       const result = await enableWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
@@ -833,13 +833,13 @@ describe("Workflows Server Actions", () => {
       }
 
       // Add awsAccountId and event name but no action step
-      await updateWorkflow(createResult.workflow.id, testOrganization.id, {
+      await updateWorkflow(createResult.automation.id, testOrganization.id, {
         awsAccountId: testAwsAccount.id,
         triggerConfig: { eventName: "signup" },
       });
 
       const result = await enableWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
@@ -859,10 +859,10 @@ describe("Workflows Server Actions", () => {
       }
 
       // Add awsAccountId and action step but no eventName
-      await updateWorkflow(createResult.workflow.id, testOrganization.id, {
+      await updateWorkflow(createResult.automation.id, testOrganization.id, {
         awsAccountId: testAwsAccount.id,
         steps: [
-          ...(createResult.workflow.steps as WorkflowStep[]),
+          ...(createResult.automation.steps as WorkflowStep[]),
           {
             id: "action-1",
             type: "send_email",
@@ -874,14 +874,14 @@ describe("Workflows Server Actions", () => {
         transitions: [
           {
             id: "trans-1",
-            fromStepId: (createResult.workflow.steps as WorkflowStep[])[0].id,
+            fromStepId: (createResult.automation.steps as WorkflowStep[])[0].id,
             toStepId: "action-1",
           },
         ],
       });
 
       const result = await enableWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
@@ -919,11 +919,11 @@ describe("Workflows Server Actions", () => {
       }
 
       // Set up and enable with awsAccountId
-      await updateWorkflow(createResult.workflow.id, testOrganization.id, {
+      await updateWorkflow(createResult.automation.id, testOrganization.id, {
         awsAccountId: testAwsAccount.id,
         triggerConfig: { eventName: "signup" },
         steps: [
-          ...(createResult.workflow.steps as WorkflowStep[]),
+          ...(createResult.automation.steps as WorkflowStep[]),
           {
             id: "action-1",
             type: "send_email",
@@ -935,22 +935,22 @@ describe("Workflows Server Actions", () => {
         transitions: [
           {
             id: "trans-1",
-            fromStepId: (createResult.workflow.steps as WorkflowStep[])[0].id,
+            fromStepId: (createResult.automation.steps as WorkflowStep[])[0].id,
             toStepId: "action-1",
           },
         ],
       });
-      await enableWorkflow(createResult.workflow.id, testOrganization.id);
+      await enableWorkflow(createResult.automation.id, testOrganization.id);
 
       // Disable
       const result = await disableWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflow.status).toBe("paused");
+        expect(result.automation.status).toBe("paused");
       }
     });
 
@@ -982,7 +982,7 @@ describe("Workflows Server Actions", () => {
       }
 
       const result = await deleteWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
@@ -990,7 +990,7 @@ describe("Workflows Server Actions", () => {
 
       // Verify deleted
       const getResult = await getWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
       expect(getResult.success).toBe(false);
@@ -1024,7 +1024,7 @@ describe("Workflows Server Actions", () => {
       // Create an active execution
       await db.insert(workflowExecution).values({
         id: "test-execution-1",
-        workflowId: createResult.workflow.id,
+        workflowId: createResult.automation.id,
         organizationId: testOrganization.id,
         contactId: testContactId,
         status: "active",
@@ -1034,7 +1034,7 @@ describe("Workflows Server Actions", () => {
       });
 
       const result = await deleteWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
@@ -1079,10 +1079,10 @@ describe("Workflows Server Actions", () => {
       }
 
       // Add some steps
-      await updateWorkflow(createResult.workflow.id, testOrganization.id, {
+      await updateWorkflow(createResult.automation.id, testOrganization.id, {
         triggerConfig: { eventName: "signup" },
         steps: [
-          ...(createResult.workflow.steps as WorkflowStep[]),
+          ...(createResult.automation.steps as WorkflowStep[]),
           {
             id: "delay-1",
             type: "delay",
@@ -1094,28 +1094,28 @@ describe("Workflows Server Actions", () => {
         transitions: [
           {
             id: "trans-1",
-            fromStepId: (createResult.workflow.steps as WorkflowStep[])[0].id,
+            fromStepId: (createResult.automation.steps as WorkflowStep[])[0].id,
             toStepId: "delay-1",
           },
         ],
       });
 
       const result = await duplicateWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflow.name).toBe("Original Workflow (copy)");
-        expect(result.workflow.description).toBe("Original description");
-        expect(result.workflow.status).toBe("draft");
-        expect(result.workflow.id).not.toBe(createResult.workflow.id);
+        expect(result.automation.name).toBe("Original Workflow (copy)");
+        expect(result.automation.description).toBe("Original description");
+        expect(result.automation.status).toBe("draft");
+        expect(result.automation.id).not.toBe(createResult.automation.id);
         // Steps should have new IDs
         const originalStepIds = (
-          createResult.workflow.steps as WorkflowStep[]
+          createResult.automation.steps as WorkflowStep[]
         ).map((s) => s.id);
-        const duplicateStepIds = (result.workflow.steps as WorkflowStep[]).map(
+        const duplicateStepIds = (result.automation.steps as WorkflowStep[]).map(
           (s) => s.id
         );
         expect(
@@ -1146,11 +1146,11 @@ describe("Workflows Server Actions", () => {
       }
 
       // Enable the original with awsAccountId
-      await updateWorkflow(createResult.workflow.id, testOrganization.id, {
+      await updateWorkflow(createResult.automation.id, testOrganization.id, {
         awsAccountId: testAwsAccount.id,
         triggerConfig: { eventName: "signup" },
         steps: [
-          ...(createResult.workflow.steps as WorkflowStep[]),
+          ...(createResult.automation.steps as WorkflowStep[]),
           {
             id: "action-1",
             type: "send_email",
@@ -1162,21 +1162,21 @@ describe("Workflows Server Actions", () => {
         transitions: [
           {
             id: "trans-1",
-            fromStepId: (createResult.workflow.steps as WorkflowStep[])[0].id,
+            fromStepId: (createResult.automation.steps as WorkflowStep[])[0].id,
             toStepId: "action-1",
           },
         ],
       });
-      await enableWorkflow(createResult.workflow.id, testOrganization.id);
+      await enableWorkflow(createResult.automation.id, testOrganization.id);
 
       const result = await duplicateWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflow.status).toBe("draft");
+        expect(result.automation.status).toBe("draft");
       }
     });
   });
@@ -1196,7 +1196,7 @@ describe("Workflows Server Actions", () => {
       }
 
       const result = await getWorkflowStats(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
@@ -1252,7 +1252,7 @@ describe("Workflows Server Actions", () => {
       currentMockUserId = testMemberUser.id;
 
       const result = await getWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id
       );
 
@@ -1281,14 +1281,14 @@ describe("Workflows Server Actions", () => {
       currentMockUserId = testMemberUser.id;
 
       const result = await updateWorkflow(
-        createResult.workflow.id,
+        createResult.automation.id,
         testOrganization.id,
         { name: "Updated by Member" }
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.workflow.name).toBe("Updated by Member");
+        expect(result.automation.name).toBe("Updated by Member");
       }
     });
   });

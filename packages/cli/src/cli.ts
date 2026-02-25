@@ -46,10 +46,11 @@ import { templatesPreview } from "./commands/email/templates/preview.js";
 import { templatesPush } from "./commands/email/templates/push.js";
 import { emailTest } from "./commands/email/test.js";
 import { upgrade } from "./commands/email/upgrade.js";
-import { workflowsGenerate } from "./commands/email/workflows/generate.js";
-import { workflowsInit } from "./commands/email/workflows/init.js";
-import { workflowsPush } from "./commands/email/workflows/push.js";
-import { workflowsValidate } from "./commands/email/workflows/validate.js";
+// Automations commands (new canonical name; "workflows" is legacy alias)
+import { automationsGenerate } from "./commands/email/automations/generate.js";
+import { automationsInit } from "./commands/email/automations/init.js";
+import { automationsPush } from "./commands/email/automations/push.js";
+import { automationsValidate } from "./commands/email/automations/validate.js";
 // Info commands
 import { news } from "./commands/news.js";
 import { permissions } from "./commands/permissions.js";
@@ -188,18 +189,18 @@ function showHelp() {
   console.log(
     `  ${pc.cyan("push")}                  ${pc.dim("(alias for email templates push)")}\n`
   );
-  console.log("Workflow Commands:");
+  console.log("Automation Commands:");
   console.log(
-    `  ${pc.cyan("email workflows init")}      Initialize workflows-as-code`
+    `  ${pc.cyan("email automations init")}      Initialize automations-as-code`
   );
   console.log(
-    `  ${pc.cyan("email workflows validate")}  Validate workflow files`
+    `  ${pc.cyan("email automations validate")}  Validate automation files`
   );
   console.log(
-    `  ${pc.cyan("email workflows push")}      Push workflows to dashboard`
+    `  ${pc.cyan("email automations push")}      Push automations to dashboard`
   );
   console.log(
-    `  ${pc.cyan("email workflows generate")} Generate workflow from template\n`
+    `  ${pc.cyan("email automations generate")} Generate automation from template\n`
   );
   console.log("SMS Commands:");
   console.log(`  ${pc.cyan("sms init")}             Deploy SMS infrastructure`);
@@ -996,12 +997,13 @@ async function run() {
           break;
         }
 
+        case "automations":
         case "workflows": {
-          const workflowsSubCommand = args.sub[2];
+          const automationsSubCommand = args.sub[2];
 
-          switch (workflowsSubCommand) {
+          switch (automationsSubCommand) {
             case "init":
-              await workflowsInit({
+              await automationsInit({
                 noExample: flags.noExample,
                 noClaude: flags.noClaude,
                 force: flags.force,
@@ -1011,14 +1013,14 @@ async function run() {
               break;
 
             case "validate":
-              await workflowsValidate({
+              await automationsValidate({
                 workflow: flags.workflow,
                 json: flags.json,
               });
               break;
 
             case "push":
-              await workflowsPush({
+              await automationsPush({
                 workflow: flags.workflow,
                 dryRun: flags.dryRun,
                 draft: flags.draft,
@@ -1030,7 +1032,7 @@ async function run() {
               break;
 
             case "generate":
-              await workflowsGenerate({
+              await automationsGenerate({
                 template: flags.template,
                 name: flags.name,
                 force: flags.force,
@@ -1040,13 +1042,13 @@ async function run() {
 
             default:
               clack.log.error(
-                `Unknown workflows command: ${workflowsSubCommand || "(none)"}`
+                `Unknown automations command: ${automationsSubCommand || "(none)"}`
               );
               console.log(
                 `\nAvailable commands: ${pc.cyan("init")}, ${pc.cyan("validate")}, ${pc.cyan("push")}, ${pc.cyan("generate")}\n`
               );
               throw new Error(
-                `Unknown workflows command: ${workflowsSubCommand || "(none)"}`
+                `Unknown automations command: ${automationsSubCommand || "(none)"}`
               );
           }
           break;

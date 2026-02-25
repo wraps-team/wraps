@@ -26,12 +26,12 @@ export const CASCADE_ENGAGEMENT_FIELD = "engagement.status" as const;
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Workflow step types available in the builder
+ * Automation step types available in the builder
  * Slice 1: trigger, send_email, send_sms, delay, exit
  * Slice 2: condition, webhook, update_contact
  * Slice 3: wait_for_event, subscribe_topic, unsubscribe_topic
  */
-export type WorkflowStepType =
+export type AutomationStepType =
   | "trigger"
   | "send_email"
   | "send_sms"
@@ -48,11 +48,11 @@ export type WorkflowStepType =
   | "unsubscribe_topic";
 
 /**
- * Trigger types for workflow entry points
+ * Trigger types for automation entry points
  * Slice 1: event only
  * Slice 3: segment_entry, segment_exit, schedule, api
  */
-export type WorkflowTriggerType =
+export type AutomationTriggerType =
   | "event"
   | "contact_created"
   | "contact_updated"
@@ -84,8 +84,8 @@ export type TriggerConfig = {
 /**
  * Configuration for each step type
  */
-export type WorkflowStepConfig =
-  | ({ type: "trigger"; triggerType: WorkflowTriggerType } & TriggerConfig)
+export type AutomationStepConfig =
+  | ({ type: "trigger"; triggerType: AutomationTriggerType } & TriggerConfig)
   | {
       type: "send_email";
       templateId: string;
@@ -137,14 +137,14 @@ export type CascadeChannelConfig = {
 };
 
 /**
- * A step in the workflow (node on the canvas)
+ * A step in the automation (node on the canvas)
  */
-export type WorkflowStep = {
+export type AutomationStep = {
   id: string;
-  type: WorkflowStepType;
+  type: AutomationStepType;
   name: string;
   position: { x: number; y: number };
-  config: WorkflowStepConfig;
+  config: AutomationStepConfig;
   /** If this step belongs to a cascade group, the group's ID */
   cascadeGroupId?: string;
   /** Cascade reconstruction metadata - only set on first step of cascade group */
@@ -154,7 +154,7 @@ export type WorkflowStep = {
 /**
  * A transition between steps (edge on the canvas)
  */
-export type WorkflowTransition = {
+export type AutomationTransition = {
   id: string;
   fromStepId: string;
   toStepId: string;
@@ -171,12 +171,12 @@ export type WorkflowTransition = {
 };
 
 /**
- * Snapshot of workflow definition at execution creation time.
+ * Snapshot of automation definition at execution creation time.
  * Ensures in-flight executions are not corrupted by subsequent edits.
  */
-export type WorkflowDefinitionSnapshot = {
-  steps: WorkflowStep[];
-  transitions: WorkflowTransition[];
+export type AutomationDefinitionSnapshot = {
+  steps: AutomationStep[];
+  transitions: AutomationTransition[];
   workflowVersion: number;
 };
 
@@ -194,7 +194,7 @@ export type CanvasViewport = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Workflow status
+ * Automation status
  */
 export const workflowStatusEnum = pgEnum("workflow_status", [
   "draft",
@@ -204,7 +204,7 @@ export const workflowStatusEnum = pgEnum("workflow_status", [
 ]);
 
 /**
- * Workflow execution status
+ * Automation execution status
  */
 export const workflowExecutionStatusEnum = pgEnum("workflow_execution_status", [
   "pending",
@@ -225,16 +225,17 @@ export const workflowStepExecutionStatusEnum = pgEnum(
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
-// WORKFLOW TABLE
+// AUTOMATION TABLE
+// SQL table name stays "workflow" — alias at Drizzle level only
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Workflow
+ * Automation
  *
- * Defines an automation workflow with trigger, steps, and transitions.
- * The workflow definition (steps/transitions) is stored as JSONB for flexibility.
+ * Defines a no-code automation with trigger, steps, and transitions.
+ * The automation definition (steps/transitions) is stored as JSONB for flexibility.
  */
-export const workflow = pgTable(
+export const automation = pgTable(
   "workflow",
   {
     id: text("id")
@@ -252,7 +253,7 @@ export const workflow = pgTable(
     name: text("name").notNull(),
     description: text("description"),
 
-    // Optional: associate workflow with a topic for subscription checks
+    // Optional: associate automation with a topic for subscription checks
     topicId: text("topic_id").references(() => topic.id, {
       onDelete: "set null",
     }),
@@ -272,14 +273,14 @@ export const workflow = pgTable(
     // ═══════════════════════════════════════════════════════════════════════
     // TRIGGER CONFIGURATION
     // ═══════════════════════════════════════════════════════════════════════
-    triggerType: text("trigger_type").$type<WorkflowTriggerType>(),
+    triggerType: text("trigger_type").$type<AutomationTriggerType>(),
     triggerConfig: jsonb("trigger_config").$type<TriggerConfig>().default({}),
 
     // ═══════════════════════════════════════════════════════════════════════
-    // WORKFLOW DEFINITION
+    // AUTOMATION DEFINITION
     // ═══════════════════════════════════════════════════════════════════════
-    steps: jsonb("steps").$type<WorkflowStep[]>().default([]),
-    transitions: jsonb("transitions").$type<WorkflowTransition[]>().default([]),
+    steps: jsonb("steps").$type<AutomationStep[]>().default([]),
+    transitions: jsonb("transitions").$type<AutomationTransition[]>().default([]),
 
     /** Monotonically increasing version counter, bumped on every definition edit */
     version: integer("version").default(1).notNull(),
@@ -308,7 +309,7 @@ export const workflow = pgTable(
     aiPrompt: text("ai_prompt"),
 
     // ═══════════════════════════════════════════════════════════════════════
-    // CLI SYNC (workflows-as-code)
+    // CLI SYNC (automations-as-code)
     // ═══════════════════════════════════════════════════════════════════════
     /** Kebab-case identifier derived from filename (e.g., "onboarding" from onboarding.ts) */
     slug: text("slug"),
@@ -316,13 +317,13 @@ export const workflow = pgTable(
     sourceTs: text("source_ts"),
     /** SHA256 hash of source for change detection */
     sourceHash: text("source_hash"),
-    /** Whether this workflow was pushed from CLI */
+    /** Whether this automation was pushed from CLI */
     pushedFromCli: boolean("pushed_from_cli").default(false),
-    /** When the workflow was last pushed from CLI */
+    /** When the automation was last pushed from CLI */
     lastPushedAt: timestamp("last_pushed_at"),
-    /** Path to the workflow file in the project (e.g., "workflows/onboarding.ts") */
+    /** Path to the automation file in the project (e.g., "automations/onboarding.ts") */
     cliProjectPath: text("cli_project_path"),
-    /** Where the workflow was last edited: "cli" | "dashboard" | null */
+    /** Where the automation was last edited: "cli" | "dashboard" | null */
     lastEditedFrom: text("last_edited_from").$type<
       "cli" | "dashboard" | null
     >(),
@@ -359,16 +360,17 @@ export const workflow = pgTable(
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
-// WORKFLOW EXECUTION TABLE
+// AUTOMATION EXECUTION TABLE
+// SQL table name stays "workflow_execution"
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Workflow Execution
+ * Automation Execution
  *
- * Tracks a single execution of a workflow for a contact.
- * Each time a workflow is triggered for a contact, a new execution is created.
+ * Tracks a single execution of an automation for a contact.
+ * Each time an automation is triggered for a contact, a new execution is created.
  */
-export const workflowExecution = pgTable(
+export const automationExecution = pgTable(
   "workflow_execution",
   {
     id: text("id")
@@ -376,7 +378,7 @@ export const workflowExecution = pgTable(
       .$defaultFn(() => crypto.randomUUID()),
 
     workflowId: text("workflow_id")
-      .references(() => workflow.id, { onDelete: "cascade" })
+      .references(() => automation.id, { onDelete: "cascade" })
       .notNull(),
 
     contactId: text("contact_id")
@@ -387,7 +389,7 @@ export const workflowExecution = pgTable(
       .references(() => organization.id, { onDelete: "cascade" })
       .notNull(),
 
-    // Denormalized from workflow for partial unique index constraint
+    // Denormalized from automation for partial unique index constraint
     // This enables atomic INSERT with ON CONFLICT to prevent race conditions
     allowReentry: boolean("allow_reentry").default(false).notNull(),
 
@@ -397,10 +399,10 @@ export const workflowExecution = pgTable(
     status: workflowExecutionStatusEnum("status").default("pending").notNull(),
     currentStepId: text("current_step_id"),
 
-    /** Frozen copy of workflow steps + transitions at execution creation time */
+    /** Frozen copy of automation steps + transitions at execution creation time */
     definitionSnapshot: jsonb(
       "definition_snapshot"
-    ).$type<WorkflowDefinitionSnapshot>(),
+    ).$type<AutomationDefinitionSnapshot>(),
 
     // Context data (persisted between steps)
     context: jsonb("context").$type<Record<string, unknown>>().default({}),
@@ -468,16 +470,17 @@ export const workflowExecution = pgTable(
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
-// WORKFLOW STEP EXECUTION TABLE
+// AUTOMATION STEP EXECUTION TABLE
+// SQL table name stays "workflow_step_execution"
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Workflow Step Execution
+ * Automation Step Execution
  *
- * Tracks the execution of each step within a workflow execution.
+ * Tracks the execution of each step within an automation execution.
  * Used for idempotency (prevent duplicate sends on retry) and audit trail.
  */
-export const workflowStepExecution = pgTable(
+export const automationStepExecution = pgTable(
   "workflow_step_execution",
   {
     id: text("id")
@@ -485,11 +488,11 @@ export const workflowStepExecution = pgTable(
       .$defaultFn(() => crypto.randomUUID()),
 
     executionId: text("execution_id")
-      .references(() => workflowExecution.id, { onDelete: "cascade" })
+      .references(() => automationExecution.id, { onDelete: "cascade" })
       .notNull(),
 
     stepId: text("step_id").notNull(),
-    stepType: text("step_type").$type<WorkflowStepType>().notNull(),
+    stepType: text("step_type").$type<AutomationStepType>().notNull(),
 
     // ═══════════════════════════════════════════════════════════════════════
     // STATUS
@@ -528,51 +531,51 @@ export const workflowStepExecution = pgTable(
 // RELATIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const workflowRelations = relations(workflow, ({ one, many }) => ({
+export const automationRelations = relations(automation, ({ one, many }) => ({
   organization: one(organization, {
-    fields: [workflow.organizationId],
+    fields: [automation.organizationId],
     references: [organization.id],
   }),
   awsAccount: one(awsAccount, {
-    fields: [workflow.awsAccountId],
+    fields: [automation.awsAccountId],
     references: [awsAccount.id],
   }),
   topic: one(topic, {
-    fields: [workflow.topicId],
+    fields: [automation.topicId],
     references: [topic.id],
   }),
   createdByUser: one(user, {
-    fields: [workflow.createdBy],
+    fields: [automation.createdBy],
     references: [user.id],
   }),
-  executions: many(workflowExecution),
+  executions: many(automationExecution),
 }));
 
-export const workflowExecutionRelations = relations(
-  workflowExecution,
+export const automationExecutionRelations = relations(
+  automationExecution,
   ({ one, many }) => ({
-    workflow: one(workflow, {
-      fields: [workflowExecution.workflowId],
-      references: [workflow.id],
+    automation: one(automation, {
+      fields: [automationExecution.workflowId],
+      references: [automation.id],
     }),
     contact: one(contact, {
-      fields: [workflowExecution.contactId],
+      fields: [automationExecution.contactId],
       references: [contact.id],
     }),
     organization: one(organization, {
-      fields: [workflowExecution.organizationId],
+      fields: [automationExecution.organizationId],
       references: [organization.id],
     }),
-    stepExecutions: many(workflowStepExecution),
+    stepExecutions: many(automationStepExecution),
   })
 );
 
-export const workflowStepExecutionRelations = relations(
-  workflowStepExecution,
+export const automationStepExecutionRelations = relations(
+  automationStepExecution,
   ({ one }) => ({
-    execution: one(workflowExecution, {
-      fields: [workflowStepExecution.executionId],
-      references: [workflowExecution.id],
+    execution: one(automationExecution, {
+      fields: [automationStepExecution.executionId],
+      references: [automationExecution.id],
     }),
   })
 );
@@ -581,16 +584,61 @@ export const workflowStepExecutionRelations = relations(
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type Workflow = typeof workflow.$inferSelect;
-export type NewWorkflow = typeof workflow.$inferInsert;
-export type WorkflowStatus = Workflow["status"];
+export type Automation = typeof automation.$inferSelect;
+export type NewAutomation = typeof automation.$inferInsert;
+export type AutomationStatus = Automation["status"];
 
-export type WorkflowExecution = typeof workflowExecution.$inferSelect;
-export type NewWorkflowExecution = typeof workflowExecution.$inferInsert;
-export type WorkflowExecutionStatus = WorkflowExecution["status"];
+export type AutomationExecution = typeof automationExecution.$inferSelect;
+export type NewAutomationExecution = typeof automationExecution.$inferInsert;
+export type AutomationExecutionStatus = AutomationExecution["status"];
 
-export type WorkflowStepExecutionRecord =
-  typeof workflowStepExecution.$inferSelect;
-export type NewWorkflowStepExecution =
-  typeof workflowStepExecution.$inferInsert;
-export type WorkflowStepExecutionStatus = WorkflowStepExecutionRecord["status"];
+export type AutomationStepExecutionRecord =
+  typeof automationStepExecution.$inferSelect;
+export type NewAutomationStepExecution =
+  typeof automationStepExecution.$inferInsert;
+export type AutomationStepExecutionStatus =
+  AutomationStepExecutionRecord["status"];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BACKWARD-COMPAT ALIASES
+// These allow existing code to keep compiling while the rename propagates.
+// Remove once all call sites are updated.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** @deprecated Use `automation` instead */
+export const workflow = automation;
+/** @deprecated Use `automationExecution` instead */
+export const workflowExecution = automationExecution;
+/** @deprecated Use `automationStepExecution` instead */
+export const workflowStepExecution = automationStepExecution;
+
+/** @deprecated Use `AutomationStepType` instead */
+export type WorkflowStepType = AutomationStepType;
+/** @deprecated Use `AutomationTriggerType` instead */
+export type WorkflowTriggerType = AutomationTriggerType;
+/** @deprecated Use `AutomationStepConfig` instead */
+export type WorkflowStepConfig = AutomationStepConfig;
+/** @deprecated Use `AutomationStep` instead */
+export type WorkflowStep = AutomationStep;
+/** @deprecated Use `AutomationTransition` instead */
+export type WorkflowTransition = AutomationTransition;
+/** @deprecated Use `AutomationDefinitionSnapshot` instead */
+export type WorkflowDefinitionSnapshot = AutomationDefinitionSnapshot;
+/** @deprecated Use `Automation` instead */
+export type Workflow = Automation;
+/** @deprecated Use `NewAutomation` instead */
+export type NewWorkflow = NewAutomation;
+/** @deprecated Use `AutomationStatus` instead */
+export type WorkflowStatus = AutomationStatus;
+/** @deprecated Use `AutomationExecution` instead */
+export type WorkflowExecution = AutomationExecution;
+/** @deprecated Use `NewAutomationExecution` instead */
+export type NewWorkflowExecution = NewAutomationExecution;
+/** @deprecated Use `AutomationExecutionStatus` instead */
+export type WorkflowExecutionStatus = AutomationExecutionStatus;
+/** @deprecated Use `AutomationStepExecutionRecord` instead */
+export type WorkflowStepExecutionRecord = AutomationStepExecutionRecord;
+/** @deprecated Use `NewAutomationStepExecution` instead */
+export type NewWorkflowStepExecution = NewAutomationStepExecution;
+/** @deprecated Use `AutomationStepExecutionStatus` instead */
+export type WorkflowStepExecutionStatus = AutomationStepExecutionStatus;

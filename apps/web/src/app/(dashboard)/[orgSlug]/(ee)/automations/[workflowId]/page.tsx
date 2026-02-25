@@ -8,8 +8,8 @@ import {
 } from "@wraps/db";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { getWorkflow } from "@/actions/workflows";
-import { WorkflowBuilder } from "@/components/(ee)/workflow-builder/workflow-builder";
+import { getAutomation } from "@/actions/automations";
+import { AutomationBuilder } from "@/components/(ee)/automation-builder/automation-builder";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
 type WorkflowBuilderPageProps = {
@@ -41,8 +41,8 @@ export default async function WorkflowBuilderPage({
     redirect("/");
   }
 
-  // Fetch workflow
-  const workflowResult = await getWorkflow(workflowId, orgWithMembership.id);
+  // Fetch automation
+  const workflowResult = await getAutomation(workflowId, orgWithMembership.id);
 
   if (!workflowResult.success) {
     redirect(`/${orgSlug}/automations`);
@@ -90,7 +90,7 @@ export default async function WorkflowBuilderPage({
   // Negative margins cancel out the dashboard layout padding
   return (
     <div className="-my-4 flex h-[calc(100dvh-var(--header-height)-1rem)] flex-col md:-my-6 md:h-[calc(100dvh-var(--header-height)-1.5rem)]">
-      <WorkflowBuilder
+      <AutomationBuilder
         awsAccounts={awsAccounts}
         organizationId={orgWithMembership.id}
         orgDefaults={orgDefaults ?? null}
@@ -98,7 +98,7 @@ export default async function WorkflowBuilderPage({
         segments={segments}
         topics={topics}
         userRole={orgWithMembership.userRole}
-        workflow={workflowResult.workflow}
+        workflow={workflowResult.automation}
       />
     </div>
   );

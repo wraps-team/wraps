@@ -254,10 +254,10 @@ describe("Plan Limits", () => {
         updatedAt: new Date(),
       });
 
-      const result = await checkFeatureAccess(testOrgId, "workflows");
+      const result = await checkFeatureAccess(testOrgId, "automations");
 
       expect(result.allowed).toBe(true);
-      expect(result.requiredPlan).toBe("free"); // Workflows available on free tier
+      expect(result.requiredPlan).toBe("free"); // Automations available on free tier
     });
   });
 });

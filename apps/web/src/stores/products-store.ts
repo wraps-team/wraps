@@ -6,7 +6,7 @@ export type PlanFeatures = {
   topics: boolean;
   segments: boolean;
   campaigns: boolean;
-  workflows: boolean;
+  automations: boolean;
   events: boolean;
 };
 

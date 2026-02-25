@@ -1,6 +1,6 @@
 import { auth } from "@wraps/auth";
 import { redirect } from "next/navigation";
-import { listWorkflows } from "@/actions/workflows";
+import { listAutomations } from "@/actions/automations";
 import { FeatureGate } from "@/components/feature-gate";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkFeatureAccess, getOrganizationPlan } from "@/lib/plan-limits";
@@ -45,7 +45,7 @@ export default async function AutomationsPage({
 
   // Check if workflows feature is available for this plan
   const [featureCheck, planId] = await Promise.all([
-    checkFeatureAccess(orgWithMembership.id, "workflows"),
+    checkFeatureAccess(orgWithMembership.id, "automations"),
     getOrganizationPlan(orgWithMembership.id),
   ]);
 
@@ -55,7 +55,7 @@ export default async function AutomationsPage({
   }
 
   const currentPlanId = planId;
-  const requiredPlan = getRequiredPlan("workflows") || "free";
+  const requiredPlan = getRequiredPlan("automations") || "free";
 
   // If feature not allowed, show upgrade prompt
   if (!featureCheck.allowed) {
@@ -85,15 +85,15 @@ export default async function AutomationsPage({
     );
   }
 
-  // Fetch workflows
-  const workflowsResult = await listWorkflows(orgWithMembership.id, {
+  // Fetch automations
+  const workflowsResult = await listAutomations(orgWithMembership.id, {
     page: Number.parseInt(page, 10),
     pageSize: Number.parseInt(pageSize, 10),
     search: search || undefined,
     status: status as "draft" | "enabled" | "paused" | "archived" | undefined,
   });
 
-  const workflows = workflowsResult.success ? workflowsResult.workflows : [];
+  const workflows = workflowsResult.success ? workflowsResult.automations : [];
   const total = workflowsResult.success ? workflowsResult.total : 0;
 
   return (

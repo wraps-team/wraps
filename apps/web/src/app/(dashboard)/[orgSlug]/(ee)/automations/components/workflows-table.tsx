@@ -37,12 +37,12 @@ import {
 } from "react";
 import { toast } from "sonner";
 import {
-  deleteWorkflow,
-  disableWorkflow,
-  duplicateWorkflow,
-  enableWorkflow,
-  type WorkflowWithMeta,
-} from "@/actions/workflows";
+  deleteAutomation,
+  disableAutomation,
+  duplicateAutomation,
+  enableAutomation,
+  type AutomationWithMeta,
+} from "@/actions/automations";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -75,13 +75,13 @@ import {
 import {
   getStepCount,
   getTriggerDescription,
-  WORKFLOW_STATUS_COLORS,
-  WORKFLOW_STATUS_LABELS,
-} from "@/lib/workflows";
+  AUTOMATION_STATUS_COLORS,
+  AUTOMATION_STATUS_LABELS,
+} from "@/lib/automations";
 import { CreateWorkflowDialog } from "./create-workflow-dialog";
 
 type WorkflowsTableProps = {
-  workflows: WorkflowWithMeta[];
+  workflows: AutomationWithMeta[];
   total: number;
   organizationId: string;
   orgSlug: string;
@@ -128,13 +128,13 @@ export function WorkflowsTable({
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [workflowToDelete, setWorkflowToDelete] =
-    useState<WorkflowWithMeta | null>(null);
+    useState<AutomationWithMeta | null>(null);
 
   const canManage = userRole === "owner" || userRole === "admin";
 
   const handleEnable = async (workflowId: string) => {
     startTransition(async () => {
-      const result = await enableWorkflow(workflowId, organizationId);
+      const result = await enableAutomation(workflowId, organizationId);
       if (result.success) {
         toast.success("Workflow enabled");
         router.refresh();
@@ -146,7 +146,7 @@ export function WorkflowsTable({
 
   const handleDisable = async (workflowId: string) => {
     startTransition(async () => {
-      const result = await disableWorkflow(workflowId, organizationId);
+      const result = await disableAutomation(workflowId, organizationId);
       if (result.success) {
         toast.success("Workflow paused");
         router.refresh();
@@ -158,7 +158,7 @@ export function WorkflowsTable({
 
   const handleDuplicate = async (workflowId: string) => {
     startTransition(async () => {
-      const result = await duplicateWorkflow(workflowId, organizationId);
+      const result = await duplicateAutomation(workflowId, organizationId);
       if (result.success) {
         toast.success("Workflow duplicated");
         router.refresh();
@@ -174,7 +174,7 @@ export function WorkflowsTable({
     }
 
     startTransition(async () => {
-      const result = await deleteWorkflow(workflowToDelete.id, organizationId);
+      const result = await deleteAutomation(workflowToDelete.id, organizationId);
       if (result.success) {
         toast.success("Workflow deleted");
         setDeleteDialogOpen(false);
@@ -230,7 +230,7 @@ export function WorkflowsTable({
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
-        cell: ({ row }: { row: { original: WorkflowWithMeta } }) => {
+        cell: ({ row }: { row: { original: AutomationWithMeta } }) => {
           const wf = row.original;
           const stepCount = getStepCount(wf);
           return (
@@ -250,17 +250,17 @@ export function WorkflowsTable({
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }: { row: { original: WorkflowWithMeta } }) => {
+        cell: ({ row }: { row: { original: AutomationWithMeta } }) => {
           const wf = row.original;
           const status = wf.status;
           return (
             <Badge
-              className={WORKFLOW_STATUS_COLORS[status]}
+              className={AUTOMATION_STATUS_COLORS[status]}
               variant="secondary"
             >
               {status === "enabled" && <CheckCircle className="mr-1 h-3 w-3" />}
               {status === "paused" && <Pause className="mr-1 h-3 w-3" />}
-              {WORKFLOW_STATUS_LABELS[status]}
+              {AUTOMATION_STATUS_LABELS[status]}
             </Badge>
           );
         },
@@ -268,7 +268,7 @@ export function WorkflowsTable({
       {
         accessorKey: "trigger",
         header: "Trigger",
-        cell: ({ row }: { row: { original: WorkflowWithMeta } }) => {
+        cell: ({ row }: { row: { original: AutomationWithMeta } }) => {
           const wf = row.original;
           return (
             <div className="flex items-center gap-2 text-sm">
@@ -283,7 +283,7 @@ export function WorkflowsTable({
       {
         accessorKey: "stats",
         header: "Executions",
-        cell: ({ row }: { row: { original: WorkflowWithMeta } }) => {
+        cell: ({ row }: { row: { original: AutomationWithMeta } }) => {
           const wf = row.original;
 
           if (wf.totalExecutions === 0) {
@@ -326,7 +326,7 @@ export function WorkflowsTable({
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
-        cell: ({ row }: { row: { original: WorkflowWithMeta } }) => {
+        cell: ({ row }: { row: { original: AutomationWithMeta } }) => {
           const date = new Date(row.original.updatedAt);
           return (
             <div className="text-muted-foreground text-sm">
@@ -337,7 +337,7 @@ export function WorkflowsTable({
       },
       {
         id: "actions",
-        cell: ({ row }: { row: { original: WorkflowWithMeta } }) => {
+        cell: ({ row }: { row: { original: AutomationWithMeta } }) => {
           const wf = row.original;
           const canEnable = wf.status === "draft" || wf.status === "paused";
           const canDisable = wf.status === "enabled";

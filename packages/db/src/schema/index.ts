@@ -8,4 +8,4 @@ export * from "./segments";
 export * from "./templates";
 export * from "./usage";
 export * from "./waitlist";
-export * from "./workflows";
+export * from "./automations";

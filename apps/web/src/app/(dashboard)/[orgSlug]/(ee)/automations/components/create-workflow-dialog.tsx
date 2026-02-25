@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { createWorkflow } from "@/actions/workflows";
+import { createAutomation } from "@/actions/automations";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -45,7 +45,7 @@ export function CreateWorkflowDialog({
     }
 
     startTransition(async () => {
-      const result = await createWorkflow(organizationId, {
+      const result = await createAutomation(organizationId, {
         name: name.trim(),
         description: description.trim() || undefined,
       });
@@ -56,7 +56,7 @@ export function CreateWorkflowDialog({
         setName("");
         setDescription("");
         // Navigate to the workflow builder
-        router.push(`/${orgSlug}/automations/${result.workflow.id}`);
+        router.push(`/${orgSlug}/automations/${result.automation.id}`);
       } else {
         toast.error(result.error);
       }

@@ -68,7 +68,7 @@ export default async function OrganizationLayout({
       topics: plan.features.topics,
       segments: plan.features.segments,
       campaigns: plan.features.campaigns,
-      workflows: plan.features.workflows,
+      automations: plan.features.automations,
       events: plan.features.events,
     },
   };

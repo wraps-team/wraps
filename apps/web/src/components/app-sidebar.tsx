@@ -144,13 +144,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   // Automations navigation - requires Scale+ plan
   const automationsNavGroup =
-    orgSlug && planFeatures?.workflows
+    orgSlug && planFeatures?.automations
       ? {
           title: "Automations",
           icon: Workflow,
           items: [
             {
-              title: "Workflows",
+              title: "Automations",
               url: `/${orgSlug}/automations`,
             },
           ],

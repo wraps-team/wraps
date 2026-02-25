@@ -12,7 +12,7 @@
  *
  * What we charge for (Platform value):
  * - Tracked events & history retention
- * - Visual workflow builder
+ * - Visual automation builder
  * - AI-powered generation
  * - Team collaboration
  * - Dashboard & analytics
@@ -38,7 +38,7 @@ export type PlanFeature =
   | "topics" // Growth+: Subscription management
   | "segments" // Growth+: Property-based targeting
   | "campaigns" // Growth+: Scheduled, targeted sends
-  | "workflows" // All tiers: Visual automation builder (1/unlimited by tier)
+  | "automations" // All tiers: Visual automation builder (1/unlimited by tier)
   | "events" // Scale+: Behavioral tracking
   | "advancedSegments" // Scale+: Behavioral segments
   | "customRetention" // Enterprise+: Custom data retention
@@ -124,7 +124,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       topics: false,
       segments: false,
       campaigns: false,
-      workflows: true, // 1 workflow limit
+      automations: true, // 1 automation limit
       events: false,
       advancedSegments: false,
       customRetention: false,
@@ -180,7 +180,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       topics: true, // Subscription management
       segments: true, // Property-based targeting
       campaigns: true, // Scheduled broadcasts
-      workflows: true, // Unlimited workflows
+      automations: true, // Unlimited automations
       events: true, // Custom event tracking
       advancedSegments: false, // Behavioral segments (Scale+)
       customRetention: false,
@@ -237,7 +237,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       topics: true, // Subscription management
       segments: true, // Property-based targeting
       campaigns: true, // Scheduled, targeted sends
-      workflows: true, // Unlimited workflows
+      automations: true, // Unlimited automations
       events: true, // Custom event tracking
       advancedSegments: false, // Behavioral segments (Scale+)
       customRetention: false,
@@ -294,7 +294,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       topics: true,
       segments: true,
       campaigns: true,
-      workflows: true,
+      automations: true,
       events: true, // Behavioral tracking
       advancedSegments: true, // Behavioral segments
       customRetention: false,

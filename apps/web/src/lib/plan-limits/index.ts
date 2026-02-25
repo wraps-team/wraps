@@ -177,7 +177,7 @@ export async function checkFeatureAccess(
     topics: "Topics (subscription management)",
     segments: "Segments",
     campaigns: "Campaigns",
-    workflows: "Workflows",
+    automations: "Automations",
     events: "Event tracking",
     advancedSegments: "Advanced segments",
     customRetention: "Custom retention",
@@ -278,7 +278,7 @@ export async function getUsageSummary(organizationId: string) {
       topics: plan.features.topics,
       segments: plan.features.segments,
       campaigns: plan.features.campaigns,
-      workflows: plan.features.workflows,
+      automations: plan.features.automations,
       events: plan.features.events,
     },
   };

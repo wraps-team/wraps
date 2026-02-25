@@ -101,7 +101,7 @@ export async function universalSearch(
 
     // Check feature access for gated entities in parallel
     const [workflowAccess, segmentAccess, topicAccess] = await Promise.all([
-      checkFeatureAccess(organizationId, "workflows"),
+      checkFeatureAccess(organizationId, "automations"),
       checkFeatureAccess(organizationId, "segments"),
       checkFeatureAccess(organizationId, "topics"),
     ]);

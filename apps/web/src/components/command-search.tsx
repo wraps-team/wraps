@@ -160,7 +160,7 @@ const ENTITY_CONFIG: Record<
   contact: { label: "Contacts", icon: Users },
   template: { label: "Templates", icon: FileText },
   broadcast: { label: "Broadcasts", icon: Send },
-  workflow: { label: "Workflows", icon: GitBranch },
+  workflow: { label: "Automations", icon: GitBranch },
   segment: { label: "Segments", icon: Filter },
   topic: { label: "Topics", icon: Tag },
   brandKit: { label: "Brand Kits", icon: Palette },
@@ -351,7 +351,7 @@ export function CommandSearch({ open, onOpenChange }: CommandSearchProps) {
         icon: SendHorizontal,
       },
       {
-        title: "New Workflow",
+        title: "New Automation",
         url: `/${orgSlug}/automations?new=true`,
         icon: GitBranch,
       },

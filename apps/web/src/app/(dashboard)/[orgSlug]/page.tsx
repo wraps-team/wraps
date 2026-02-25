@@ -1,11 +1,11 @@
 import { auth } from "@wraps/auth";
 import {
+  automationExecution,
   awsAccount,
   batchSend,
   contactEvent,
   db,
   template,
-  workflowExecution,
 } from "@wraps/db";
 import { and, count, desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
@@ -235,9 +235,9 @@ async function getRecentItems(
         },
       },
     }),
-    db.query.workflowExecution.findMany({
-      where: eq(workflowExecution.organizationId, organizationId),
-      orderBy: desc(workflowExecution.createdAt),
+    db.query.automationExecution.findMany({
+      where: eq(automationExecution.organizationId, organizationId),
+      orderBy: desc(automationExecution.createdAt),
       limit: 5,
       columns: {
         id: true,
@@ -245,7 +245,7 @@ async function getRecentItems(
         createdAt: true,
       },
       with: {
-        workflow: { columns: { name: true } },
+        automation: { columns: { name: true } },
         contact: { columns: { email: true, firstName: true } },
       },
     }),
@@ -279,7 +279,7 @@ async function getRecentItems(
   }
 
   for (const w of recentWorkflows) {
-    const name = w.workflow?.name ?? "Workflow";
+    const name = w.automation?.name ?? "Automation";
     const who = w.contact?.firstName ?? w.contact?.email ?? "";
     items.push({
       id: `workflow-${w.id}`,

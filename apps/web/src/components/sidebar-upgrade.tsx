@@ -35,7 +35,7 @@ export function SidebarUpgrade() {
   if (!(planFeatures.topics && planFeatures.segments)) {
     missingFeatures.push("Audience Segments");
   }
-  if (!planFeatures.workflows) {
+  if (!planFeatures.automations) {
     missingFeatures.push("Automations");
   }
 

@@ -8,7 +8,7 @@
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 import { Elysia } from "elysia";
-import { workflowsRoutes } from "./(ee)/routes/workflows";
+import { automationsRoutes } from "./(ee)/routes/automations";
 import { getPostHogClient } from "./lib/posthog";
 import { batchRoutes } from "./routes/batch";
 import { connectionsRoutes } from "./routes/connections";
@@ -20,8 +20,8 @@ import { templatesSyncRoutes } from "./routes/templates-sync";
 import { toolsRoutes } from "./routes/tools";
 import { unsubscribeRoutes } from "./routes/unsubscribe";
 import { webhooksRoutes } from "./routes/webhooks";
-import { workflowScheduleRoutes } from "./routes/workflow-schedules";
-import { workflowsSyncRoutes } from "./routes/workflows-sync";
+import { automationScheduleRoutes } from "./routes/automation-schedules";
+import { automationsSyncRoutes } from "./routes/automations-sync";
 
 /**
  * OpenAPI documentation configuration
@@ -33,7 +33,7 @@ const openApiDocumentation = {
     title: "Wraps Platform API",
     version: "1.0.0",
     description:
-      "REST API for the Wraps email marketing platform. Send emails, manage contacts, trigger workflows, and process events.",
+      "REST API for the Wraps email marketing platform. Send emails, manage contacts, trigger automations, and process events.",
     contact: {
       name: "Wraps Support",
       url: "https://wraps.dev",
@@ -64,11 +64,11 @@ const openApiDocumentation = {
     },
     {
       name: "events",
-      description: "Custom event ingestion for triggering workflows",
+      description: "Custom event ingestion for triggering automations",
     },
     {
-      name: "workflows",
-      description: "API-triggered workflow execution endpoints",
+      name: "automations",
+      description: "API-triggered automation execution endpoints",
     },
     {
       name: "connections",
@@ -134,14 +134,14 @@ export const app = new Elysia()
   .use(contactsRoutes)
   .use(batchRoutes)
   .use(eventsRoutes)
-  .use(workflowsRoutes)
+  .use(automationsRoutes)
   .use(webhooksRoutes)
   .use(unsubscribeRoutes)
   .use(preferenceEventsRoutes)
   .use(templatesSyncRoutes)
-  .use(workflowsSyncRoutes)
+  .use(automationsSyncRoutes)
   .use(toolsRoutes)
-  .use(workflowScheduleRoutes);
+  .use(automationScheduleRoutes);
 
 // Export type for Eden Treaty client
 export type App = typeof app;
