@@ -3,12 +3,12 @@
 import { Handle, Position } from "@xyflow/react";
 import { MailOpen } from "lucide-react";
 import { cn, formatDurationCompact } from "@/lib/utils";
-import type { WorkflowNodeData } from "../use-automation-store";
+import type { AutomationNodeData } from "../use-automation-store";
 import { useNodeValidation } from "../use-automation-store";
 
 type WaitForEmailEngagementNodeProps = {
   id: string;
-  data: WorkflowNodeData;
+  data: AutomationNodeData;
   selected?: boolean;
 };
 

@@ -1,14 +1,14 @@
 import {
+  type Automation,
+  type AutomationStep,
+  type AutomationStepConfig,
+  type AutomationStepType,
+  type AutomationTransition,
+  type AutomationTriggerType,
   CASCADE_ENGAGEMENT_FIELD,
   type CanvasViewport,
   type CascadeChannelConfig,
   type TriggerConfig,
-  type Workflow,
-  type WorkflowStep,
-  type WorkflowStepConfig,
-  type WorkflowStepType,
-  type WorkflowTransition,
-  type WorkflowTriggerType,
 } from "@wraps/db";
 import type {
   Connection,
@@ -42,21 +42,28 @@ import type { NodePaletteType } from "./node-palette";
  * Canvas node type = all step types + the "cascade" virtual node.
  * Cascade exists only on the canvas and is expanded to primitives on save.
  */
-export type CanvasNodeType = WorkflowStepType | "cascade";
+export type CanvasNodeType = AutomationStepType | "cascade";
 
-export type WorkflowNodeData = {
+export type AutomationNodeData = {
   stepId: string;
   type: CanvasNodeType;
   name: string;
-  config: WorkflowStepConfig;
+  config: AutomationStepConfig;
   isValid: boolean;
   errorMessage?: string;
   // Cascade channels (only present on cascade nodes)
   cascadeChannels?: CascadeChannelConfig[];
 };
 
-export type WorkflowNode = Node<WorkflowNodeData>;
-export type WorkflowEdge = Edge<{ label?: string }>;
+export type AutomationNode = Node<AutomationNodeData>;
+export type AutomationEdge = Edge<{ label?: string }>;
+
+/** @deprecated Use `AutomationNodeData` instead */
+export type WorkflowNodeData = AutomationNodeData;
+/** @deprecated Use `AutomationNode` instead */
+export type WorkflowNode = AutomationNode;
+/** @deprecated Use `AutomationEdge` instead */
+export type WorkflowEdge = AutomationEdge;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // STORE
@@ -72,15 +79,15 @@ type CascadeMapping = {
   allStepIds: string[];
 };
 
-type WorkflowStoreState = {
-  // Workflow metadata
-  workflow: Workflow | null;
+type AutomationStoreState = {
+  // Automation metadata
+  automation: Automation | null;
   isDirty: boolean;
   isSaving: boolean;
 
   // React Flow state
-  nodes: WorkflowNode[];
-  edges: WorkflowEdge[];
+  nodes: AutomationNode[];
+  edges: AutomationEdge[];
   canvasViewport: CanvasViewport;
 
   // UI state
@@ -91,22 +98,22 @@ type WorkflowStoreState = {
   validationResult: ValidationResult | null;
 
   // Actions
-  setWorkflow: (workflow: Workflow) => void;
-  setNodes: (nodes: WorkflowNode[]) => void;
-  setEdges: (edges: WorkflowEdge[]) => void;
-  onNodesChange: OnNodesChange<WorkflowNode>;
-  onEdgesChange: OnEdgesChange<WorkflowEdge>;
+  setAutomation: (automation: Automation) => void;
+  setNodes: (nodes: AutomationNode[]) => void;
+  setEdges: (edges: AutomationEdge[]) => void;
+  onNodesChange: OnNodesChange<AutomationNode>;
+  onEdgesChange: OnEdgesChange<AutomationEdge>;
   onConnect: OnConnect;
-  onReconnect: (oldEdge: WorkflowEdge, newConnection: Connection) => void;
+  onReconnect: (oldEdge: AutomationEdge, newConnection: Connection) => void;
 
   addNode: (
     type: NodePaletteType,
     position: { x: number; y: number },
-    config?: Partial<WorkflowStepConfig>
+    config?: Partial<AutomationStepConfig>
   ) => string;
   updateNodeConfig: (
     nodeId: string,
-    config: Partial<WorkflowStepConfig>
+    config: Partial<AutomationStepConfig>
   ) => void;
   updateNodeName: (nodeId: string, name: string) => void;
   deleteNode: (nodeId: string) => void;
@@ -122,11 +129,11 @@ type WorkflowStoreState = {
   setSettingsPanelOpen: (open: boolean) => void;
   setCanvasViewport: (viewport: CanvasViewport) => void;
 
-  // Workflow actions
+  // Automation actions
   updateWorkflowSettings: (settings: {
     name?: string;
     description?: string;
-    triggerType?: WorkflowTriggerType;
+    triggerType?: AutomationTriggerType;
     triggerConfig?: TriggerConfig;
     allowReentry?: boolean;
     reentryDelaySeconds?: number | null;
@@ -134,24 +141,24 @@ type WorkflowStoreState = {
 
   // Serialization
   getWorkflowDefinition: () => {
-    steps: WorkflowStep[];
-    transitions: WorkflowTransition[];
+    steps: AutomationStep[];
+    transitions: AutomationTransition[];
     canvasViewport: CanvasViewport;
   };
 
   setIsSaving: (isSaving: boolean) => void;
   markClean: () => void;
 
-  // Update workflow after save without touching nodes/edges (avoids re-triggering dirty state)
-  updateWorkflowAfterSave: (workflow: Workflow) => void;
+  // Update automation after save without touching nodes/edges (avoids re-triggering dirty state)
+  updateWorkflowAfterSave: (automation: Automation) => void;
 
   // Validation
   runValidation: () => ValidationResult;
 
   // AI Flow Designer
   applyAIFlow: (
-    steps: WorkflowStep[],
-    transitions: WorkflowTransition[]
+    steps: AutomationStep[],
+    transitions: AutomationTransition[]
   ) => void;
 };
 
@@ -164,7 +171,7 @@ type WorkflowStoreState = {
  * Collapses cascade primitive steps (identified by cascadeGroupId) back into
  * single cascade nodes using the stored cascadeChannels metadata.
  */
-function stepsToNodes(steps: WorkflowStep[]): WorkflowNode[] {
+function stepsToNodes(steps: AutomationStep[]): AutomationNode[] {
   // Identify cascade groups from steps
   const cascadeGroupIds = new Set<string>();
   for (const step of steps) {
@@ -189,7 +196,7 @@ function stepsToNodes(steps: WorkflowStep[]): WorkflowNode[] {
     }));
   }
 
-  const allNodes: WorkflowNode[] = [];
+  const allNodes: AutomationNode[] = [];
 
   // Process each cascade group → collapse into a single cascade node
   for (const groupId of cascadeGroupIds) {
@@ -207,7 +214,7 @@ function stepsToNodes(steps: WorkflowStep[]): WorkflowNode[] {
       a.position.y < b.position.y ? a : b
     );
 
-    const cascadeNode: WorkflowNode = {
+    const cascadeNode: AutomationNode = {
       id: groupId,
       type: "cascade",
       position: firstStep.position,
@@ -215,7 +222,7 @@ function stepsToNodes(steps: WorkflowStep[]): WorkflowNode[] {
         stepId: groupId,
         type: "cascade",
         name: "Cascade",
-        config: { type: "exit" } as WorkflowStepConfig, // placeholder
+        config: { type: "exit" } as AutomationStepConfig, // placeholder
         isValid: true,
         cascadeChannels: channels,
       },
@@ -249,7 +256,7 @@ function stepsToNodes(steps: WorkflowStep[]): WorkflowNode[] {
  * metadata is not available (backward compatibility with old data).
  */
 function reconstructChannelsFromPrimitives(
-  groupSteps: WorkflowStep[]
+  groupSteps: AutomationStep[]
 ): CascadeChannelConfig[] {
   const channels: CascadeChannelConfig[] = [];
 
@@ -314,9 +321,9 @@ function reconstructChannelsFromPrimitives(
  * and maps external transitions to/from cascade nodes.
  */
 function transitionsToEdges(
-  transitions: WorkflowTransition[],
-  steps: WorkflowStep[]
-): WorkflowEdge[] {
+  transitions: AutomationTransition[],
+  steps: AutomationStep[]
+): AutomationEdge[] {
   // Build cascade group membership map
   const stepToGroup = new Map<string, string>();
   const groupFirstStep = new Map<string, string>();
@@ -360,7 +367,7 @@ function transitionsToEdges(
     }
   }
 
-  const edges: WorkflowEdge[] = [];
+  const edges: AutomationEdge[] = [];
 
   for (const transition of transitions) {
     const fromGroup = stepToGroup.get(transition.fromStepId);
@@ -412,9 +419,9 @@ function transitionsToEdges(
 /**
  * Expand a cascade node into primitive workflow steps and transitions.
  */
-function expandCascadeNode(node: WorkflowNode): {
-  steps: WorkflowStep[];
-  transitions: WorkflowTransition[];
+function expandCascadeNode(node: AutomationNode): {
+  steps: AutomationStep[];
+  transitions: AutomationTransition[];
   /** ID of the first send step (entry point for incoming edges) */
   firstStepId: string;
   /** IDs of condition steps whose "yes" branch = "engaged" */
@@ -426,8 +433,8 @@ function expandCascadeNode(node: WorkflowNode): {
 } {
   const channels = node.data.cascadeChannels ?? [];
   const cascadeGroupId = node.id;
-  const steps: WorkflowStep[] = [];
-  const transitions: WorkflowTransition[] = [];
+  const steps: AutomationStep[] = [];
+  const transitions: AutomationTransition[] = [];
   const engagedConditionIds: string[] = [];
   let firstStepId = "";
   let lastSendId = "";
@@ -444,7 +451,7 @@ function expandCascadeNode(node: WorkflowNode): {
 
     // Create send step with deterministic ID
     const sendId = `${cascadeGroupId}-send-${i}`;
-    const sendStep: WorkflowStep = {
+    const sendStep: AutomationStep = {
       id: sendId,
       type: channel.type === "email" ? "send_email" : "send_sms",
       name:
@@ -457,11 +464,11 @@ function expandCascadeNode(node: WorkflowNode): {
           ? ({
               type: "send_email",
               templateId: channel.templateId || "",
-            } as WorkflowStepConfig)
+            } as AutomationStepConfig)
           : ({
               type: "send_sms",
               body: channel.body,
-            } as WorkflowStepConfig),
+            } as AutomationStepConfig),
       cascadeGroupId,
       // Store cascade metadata on the first step for reconstruction
       ...(isFirst ? { cascadeChannels: channels } : {}),
@@ -501,7 +508,7 @@ function expandCascadeNode(node: WorkflowNode): {
         config: {
           type: "wait_for_email_engagement",
           timeoutSeconds: channel.waitDuration,
-        } as WorkflowStepConfig,
+        } as AutomationStepConfig,
         cascadeGroupId,
       });
 
@@ -519,7 +526,7 @@ function expandCascadeNode(node: WorkflowNode): {
           field: CASCADE_ENGAGEMENT_FIELD,
           operator: "equals",
           value: "true",
-        } as WorkflowStepConfig,
+        } as AutomationStepConfig,
         cascadeGroupId,
       });
 
@@ -563,7 +570,7 @@ function expandCascadeNode(node: WorkflowNode): {
       config: {
         type: "exit",
         reason: "Engaged via cascade",
-      } as WorkflowStepConfig,
+      } as AutomationStepConfig,
       cascadeGroupId,
     });
 
@@ -592,13 +599,13 @@ function expandCascadeNode(node: WorkflowNode): {
  * Convert React Flow nodes to workflow steps.
  * Expands cascade nodes into primitive steps.
  */
-function nodesToSteps(nodes: WorkflowNode[]): {
-  steps: WorkflowStep[];
-  internalTransitions: WorkflowTransition[];
+function nodesToSteps(nodes: AutomationNode[]): {
+  steps: AutomationStep[];
+  internalTransitions: AutomationTransition[];
   cascadeMappings: Map<string, CascadeMapping>;
 } {
-  const steps: WorkflowStep[] = [];
-  const internalTransitions: WorkflowTransition[] = [];
+  const steps: AutomationStep[] = [];
+  const internalTransitions: AutomationTransition[] = [];
   const cascadeMappings = new Map<string, CascadeMapping>();
 
   for (const node of nodes) {
@@ -616,7 +623,7 @@ function nodesToSteps(nodes: WorkflowNode[]): {
     } else {
       steps.push({
         id: node.id,
-        type: node.data.type as WorkflowStepType,
+        type: node.data.type as AutomationStepType,
         name: node.data.name,
         position: node.position,
         config: node.data.config,
@@ -635,11 +642,11 @@ function edgesToTransitions(
   edges: WorkflowEdge[],
   cascadeMappings: Map<string, CascadeMapping>
 ): {
-  transitions: WorkflowTransition[];
+  transitions: AutomationTransition[];
   /** Cascade node IDs that have externally-routed engaged edges */
   engagedExternalCascades: Set<string>;
 } {
-  const transitions: WorkflowTransition[] = [];
+  const transitions: AutomationTransition[] = [];
   // Track which cascade nodes have externally-routed engaged edges
   const engagedExternalTargets = new Map<string, string>();
 
@@ -712,10 +719,10 @@ function edgesToTransitions(
  * should be removed to avoid duplicate routing.
  */
 function filterInternalTransitions(
-  internalTransitions: WorkflowTransition[],
+  internalTransitions: AutomationTransition[],
   cascadeMappings: Map<string, CascadeMapping>,
   engagedExternalCascades: Set<string>
-): WorkflowTransition[] {
+): AutomationTransition[] {
   if (engagedExternalCascades.size === 0) return internalTransitions;
 
   // Collect exit step IDs for externally-routed cascades
@@ -736,10 +743,10 @@ function filterInternalTransitions(
  * The exit node is no longer needed when the engaged path routes externally.
  */
 function filterEngagedExitSteps(
-  steps: WorkflowStep[],
+  steps: AutomationStep[],
   cascadeMappings: Map<string, CascadeMapping>,
   engagedExternalCascades: Set<string>
-): WorkflowStep[] {
+): AutomationStep[] {
   if (engagedExternalCascades.size === 0) return steps;
 
   const exitStepIds = new Set<string>();
@@ -756,7 +763,7 @@ function filterEngagedExitSteps(
 /**
  * Get default config for a step type
  */
-function getDefaultConfig(type: WorkflowStepType): WorkflowStepConfig {
+function getDefaultConfig(type: AutomationStepType): AutomationStepConfig {
   switch (type) {
     case "trigger":
       return { type: "trigger", triggerType: "event" };
@@ -788,7 +795,7 @@ function getDefaultConfig(type: WorkflowStepType): WorkflowStepConfig {
 /**
  * Get default name for a step type
  */
-function getDefaultName(type: WorkflowStepType): string {
+function getDefaultName(type: AutomationStepType): string {
   switch (type) {
     case "trigger":
       return "Trigger";
@@ -821,11 +828,11 @@ function getDefaultName(type: WorkflowStepType): string {
 // STORE IMPLEMENTATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const useWorkflowStore = create<WorkflowStoreState>()(
+export const useAutomationStore = create<AutomationStoreState>()(
   temporal(
     (set, get) => ({
       // Initial state
-      workflow: null,
+      automation: null,
       isDirty: false,
       isSaving: false,
       nodes: [],
@@ -836,14 +843,15 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
       validationResult: null,
 
       // Actions
-      setWorkflow: (workflow) => {
-        const steps = workflow.steps as WorkflowStep[];
-        const transitions = workflow.transitions as WorkflowTransition[];
+      setAutomation: (automation) => {
+        const steps = automation.steps as AutomationStep[];
+        const transitions = automation.transitions as AutomationTransition[];
         const nodes = stepsToNodes(steps);
-        const savedViewport = workflow.canvasViewport as CanvasViewport | null;
+        const savedViewport =
+          automation.canvasViewport as CanvasViewport | null;
 
         set({
-          workflow,
+          automation,
           nodes,
           edges: transitionsToEdges(transitions, steps),
           canvasViewport: savedViewport ?? { x: 0, y: 0, zoom: 1 },
@@ -851,8 +859,8 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
           selectedNodeId: null,
         });
 
-        // Clear undo/redo history on workflow load (fresh start)
-        useWorkflowStore.temporal.getState().clear();
+        // Clear undo/redo history on automation load (fresh start)
+        useAutomationStore.temporal.getState().clear();
       },
 
       setNodes: (nodes) => {
@@ -916,7 +924,7 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
         // Cascade: create a single self-contained node
         if (type === "cascade") {
           const id = crypto.randomUUID();
-          const newNode: WorkflowNode = {
+          const newNode: AutomationNode = {
             id,
             type: "cascade",
             position,
@@ -924,7 +932,7 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
               stepId: id,
               type: "cascade",
               name: "Cascade",
-              config: { type: "exit" } as WorkflowStepConfig, // placeholder
+              config: { type: "exit" } as AutomationStepConfig, // placeholder
               isValid: true,
               cascadeChannels: [
                 {
@@ -955,7 +963,7 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
           ? { ...defaultConfig, ...config }
           : defaultConfig;
 
-        const newNode: WorkflowNode = {
+        const newNode: AutomationNode = {
           id,
           type,
           position,
@@ -963,7 +971,7 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
             stepId: id,
             type,
             name: getDefaultName(type),
-            config: mergedConfig as WorkflowStepConfig,
+            config: mergedConfig as AutomationStepConfig,
             isValid: true,
           },
         };
@@ -988,7 +996,7 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
                     config: {
                       ...node.data.config,
                       ...config,
-                    } as WorkflowStepConfig,
+                    } as AutomationStepConfig,
                   },
                 }
               : node
@@ -1061,13 +1069,13 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
 
       updateWorkflowSettings: (settings) => {
         set((state) => {
-          if (!state.workflow) {
+          if (!state.automation) {
             return state;
           }
 
           return {
-            workflow: {
-              ...state.workflow,
+            automation: {
+              ...state.automation,
               ...settings,
             },
             isDirty: true,
@@ -1110,10 +1118,10 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
         set({ isDirty: false });
       },
 
-      updateWorkflowAfterSave: (workflow) => {
-        // Only update workflow metadata, don't touch nodes/edges
+      updateWorkflowAfterSave: (automation) => {
+        // Only update automation metadata, don't touch nodes/edges
         // This prevents React Flow from firing change events that would set isDirty=true
-        set({ workflow, isDirty: false });
+        set({ automation, isDirty: false });
       },
 
       runValidation: () => {
@@ -1238,24 +1246,26 @@ function mapCascadeValidationErrors(
 // Selector hooks for common state slices
 // Uses single selector to avoid double subscription and unnecessary re-renders
 export const useSelectedNode = () =>
-  useWorkflowStore((state) =>
+  useAutomationStore((state) =>
     state.selectedNodeId
       ? state.nodes.find((node) => node.id === state.selectedNodeId)
       : null
   );
 
-export const useIsDirty = () => useWorkflowStore((state) => state.isDirty);
-export const useIsSaving = () => useWorkflowStore((state) => state.isSaving);
+export const useIsDirty = () => useAutomationStore((state) => state.isDirty);
+export const useIsSaving = () => useAutomationStore((state) => state.isSaving);
 // Derived selector for node count - avoids subscribing to full nodes array
 export const useNodeCount = () =>
-  useWorkflowStore((state) => state.nodes.length);
+  useAutomationStore((state) => state.nodes.length);
 export const useSettingsPanelOpen = () =>
-  useWorkflowStore((state) => state.settingsPanelOpen);
+  useAutomationStore((state) => state.settingsPanelOpen);
 export const useValidationResult = () =>
-  useWorkflowStore((state) => state.validationResult);
+  useAutomationStore((state) => state.validationResult);
 
 export const useNodeValidation = (nodeId: string) => {
-  const validationResult = useWorkflowStore((state) => state.validationResult);
+  const validationResult = useAutomationStore(
+    (state) => state.validationResult
+  );
   if (!validationResult) {
     return { isValid: true, errorMessage: undefined };
   }
@@ -1289,22 +1299,28 @@ export function handleUndoRedo(event: {
   if (!mod) return;
 
   if (event.key === "z" && event.shiftKey) {
-    useWorkflowStore.temporal.getState().redo();
+    useAutomationStore.temporal.getState().redo();
   } else if (event.key === "z") {
-    useWorkflowStore.temporal.getState().undo();
+    useAutomationStore.temporal.getState().undo();
   } else if (event.key === "y") {
-    useWorkflowStore.temporal.getState().redo();
+    useAutomationStore.temporal.getState().redo();
   }
 }
 
 export const useCanUndo = () =>
-  useStore(useWorkflowStore.temporal, (state) => state.pastStates.length > 0);
+  useStore(useAutomationStore.temporal, (state) => state.pastStates.length > 0);
 
 export const useCanRedo = () =>
-  useStore(useWorkflowStore.temporal, (state) => state.futureStates.length > 0);
+  useStore(
+    useAutomationStore.temporal,
+    (state) => state.futureStates.length > 0
+  );
 
 // Re-export validation types for convenience
 export type {
   ValidationError,
   ValidationResult,
 } from "@/lib/automation-validation";
+
+/** @deprecated Use `useAutomationStore` instead */
+export const useWorkflowStore = useAutomationStore;

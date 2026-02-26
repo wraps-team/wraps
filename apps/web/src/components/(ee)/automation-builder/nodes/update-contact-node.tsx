@@ -1,13 +1,13 @@
 "use client";
 
 import { UserCog } from "lucide-react";
-import type { WorkflowNodeData } from "../use-automation-store";
+import type { AutomationNodeData } from "../use-automation-store";
 import { useNodeValidation } from "../use-automation-store";
 import { BaseNode } from "./base-node";
 
 type UpdateContactNodeProps = {
   id: string;
-  data: WorkflowNodeData;
+  data: AutomationNodeData;
   selected?: boolean;
 };
 

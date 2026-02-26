@@ -1,15 +1,22 @@
 "use client";
 
-import type { Workflow, WorkflowStep, WorkflowTransition } from "@wraps/db";
+import type {
+  Automation,
+  AutomationStep,
+  AutomationTransition,
+} from "@wraps/db";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useRef } from "react";
 import { AIDesignPanel } from "./ai-design-panel";
-import { WorkflowCanvas } from "./automation-canvas";
-import { WorkflowDataProvider } from "./automation-data-context";
-import { WorkflowPropertiesPanel } from "./automation-properties-panel";
-import { WorkflowSettingsPanel } from "./automation-settings-panel";
-import { WorkflowToolbar } from "./automation-toolbar";
-import { useSettingsPanelOpen, useWorkflowStore } from "./use-automation-store";
+import { AutomationCanvas } from "./automation-canvas";
+import { AutomationDataProvider } from "./automation-data-context";
+import { AutomationPropertiesPanel } from "./automation-properties-panel";
+import { AutomationSettingsPanel } from "./automation-settings-panel";
+import { AutomationToolbar } from "./automation-toolbar";
+import {
+  useAutomationStore,
+  useSettingsPanelOpen,
+} from "./use-automation-store";
 
 type Topic = {
   id: string;
@@ -36,8 +43,8 @@ type OrgDefaults = {
   defaultSenderId: string | null;
 } | null;
 
-type WorkflowBuilderProps = {
-  workflow: Workflow;
+type AutomationBuilderProps = {
+  automation: Automation;
   organizationId: string;
   orgSlug: string;
   topics: Topic[];
@@ -47,8 +54,8 @@ type WorkflowBuilderProps = {
   userRole: string;
 };
 
-export function WorkflowBuilder({
-  workflow,
+export function AutomationBuilder({
+  automation,
   organizationId,
   orgSlug,
   topics,
@@ -56,23 +63,23 @@ export function WorkflowBuilder({
   awsAccounts,
   orgDefaults,
   userRole,
-}: WorkflowBuilderProps) {
-  const setWorkflow = useWorkflowStore((state) => state.setWorkflow);
+}: AutomationBuilderProps) {
+  const setAutomation = useAutomationStore((state) => state.setAutomation);
   const settingsPanelOpen = useSettingsPanelOpen();
-  const setSettingsPanelOpen = useWorkflowStore(
+  const setSettingsPanelOpen = useAutomationStore(
     (state) => state.setSettingsPanelOpen
   );
-  const selectedNodeId = useWorkflowStore((state) => state.selectedNodeId);
+  const selectedNodeId = useAutomationStore((state) => state.selectedNodeId);
 
-  // Initialize store with workflow data once (and on workflow ID change)
+  // Initialize store with automation data once (and on automation ID change)
   const initializedForId = useRef<string | null>(null);
-  if (initializedForId.current !== workflow.id) {
-    initializedForId.current = workflow.id;
-    setWorkflow(workflow);
+  if (initializedForId.current !== automation.id) {
+    initializedForId.current = automation.id;
+    setAutomation(automation);
 
-    // Auto-open settings panel for new workflows (only trigger node, no transitions)
-    const steps = workflow.steps as WorkflowStep[];
-    const transitions = workflow.transitions as WorkflowTransition[];
+    // Auto-open settings panel for new automations (only trigger node, no transitions)
+    const steps = automation.steps as AutomationStep[];
+    const transitions = automation.transitions as AutomationTransition[];
     if (steps.length <= 1 && transitions.length === 0) {
       setSettingsPanelOpen(true);
     }
@@ -80,29 +87,29 @@ export function WorkflowBuilder({
 
   return (
     <ReactFlowProvider>
-      <WorkflowDataProvider segments={segments} topics={topics}>
+      <AutomationDataProvider segments={segments} topics={topics}>
         <div className="flex h-full flex-col">
-          <WorkflowToolbar
+          <AutomationToolbar
+            automation={automation}
             organizationId={organizationId}
             orgSlug={orgSlug}
-            workflow={workflow}
           />
           <div className="flex flex-1 overflow-hidden">
-            <AIDesignPanel orgSlug={orgSlug} workflowId={workflow.id} />
-            <WorkflowCanvas
+            <AIDesignPanel automationId={automation.id} orgSlug={orgSlug} />
+            <AutomationCanvas
               smsEnabled={awsAccounts.some((a) => a.smsEnabled)}
             />
             {settingsPanelOpen && !selectedNodeId ? (
-              <WorkflowSettingsPanel
+              <AutomationSettingsPanel
+                automation={automation}
                 awsAccounts={awsAccounts}
                 onClose={() => setSettingsPanelOpen(false)}
                 organizationId={organizationId}
                 orgDefaults={orgDefaults}
                 orgSlug={orgSlug}
-                workflow={workflow}
               />
             ) : (
-              <WorkflowPropertiesPanel
+              <AutomationPropertiesPanel
                 orgSlug={orgSlug}
                 segments={segments}
                 topics={topics}
@@ -110,10 +117,7 @@ export function WorkflowBuilder({
             )}
           </div>
         </div>
-      </WorkflowDataProvider>
+      </AutomationDataProvider>
     </ReactFlowProvider>
   );
 }
-
-/** AutomationBuilder is the new canonical name for the visual automation builder. */
-export const AutomationBuilder = WorkflowBuilder;

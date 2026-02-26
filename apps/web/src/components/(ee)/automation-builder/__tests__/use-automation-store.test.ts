@@ -1,6 +1,10 @@
-import type { Workflow, WorkflowStep, WorkflowTransition } from "@wraps/db";
+import type {
+  Automation,
+  AutomationStep,
+  AutomationTransition,
+} from "@wraps/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useWorkflowStore } from "../use-automation-store";
+import { useAutomationStore } from "../use-automation-store";
 
 // Mock crypto.randomUUID for deterministic IDs
 let uuidCounter = 0;
@@ -8,11 +12,11 @@ vi.stubGlobal("crypto", {
   randomUUID: () => `test-uuid-${++uuidCounter}`,
 });
 
-describe("useWorkflowStore", () => {
+describe("useAutomationStore", () => {
   beforeEach(() => {
     // Reset store state before each test
-    useWorkflowStore.setState({
-      workflow: null,
+    useAutomationStore.setState({
+      automation: null,
       isDirty: false,
       isSaving: false,
       nodes: [],
@@ -29,9 +33,9 @@ describe("useWorkflowStore", () => {
 
   describe("initial state", () => {
     it("should have correct initial state", () => {
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
 
-      expect(state.workflow).toBeNull();
+      expect(state.automation).toBeNull();
       expect(state.isDirty).toBe(false);
       expect(state.isSaving).toBe(false);
       expect(state.nodes).toEqual([]);
@@ -42,12 +46,12 @@ describe("useWorkflowStore", () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // setWorkflow
+  // setAutomation
   // ═══════════════════════════════════════════════════════════════════════════
 
-  describe("setWorkflow", () => {
+  describe("setAutomation", () => {
     it("should convert steps to nodes and transitions to edges", () => {
-      const mockWorkflow = createMockWorkflow({
+      const mockWorkflow = createMockAutomation({
         steps: [
           {
             id: "step-1",
@@ -77,8 +81,8 @@ describe("useWorkflowStore", () => {
         ],
       });
 
-      useWorkflowStore.getState().setWorkflow(mockWorkflow);
-      const state = useWorkflowStore.getState();
+      useAutomationStore.getState().setAutomation(mockWorkflow);
+      const state = useAutomationStore.getState();
 
       // Check nodes
       expect(state.nodes).toHaveLength(2);
@@ -113,7 +117,7 @@ describe("useWorkflowStore", () => {
     });
 
     it("should handle transitions with branch conditions", () => {
-      const mockWorkflow = createMockWorkflow({
+      const mockWorkflow = createMockAutomation({
         steps: [
           {
             id: "cond-1",
@@ -158,8 +162,8 @@ describe("useWorkflowStore", () => {
         ],
       });
 
-      useWorkflowStore.getState().setWorkflow(mockWorkflow);
-      const state = useWorkflowStore.getState();
+      useAutomationStore.getState().setAutomation(mockWorkflow);
+      const state = useAutomationStore.getState();
 
       expect(state.edges).toHaveLength(2);
       expect(state.edges[0]).toMatchObject({
@@ -179,10 +183,10 @@ describe("useWorkflowStore", () => {
 
   describe("addNode", () => {
     it("should add a trigger node with default config", () => {
-      const id = useWorkflowStore
+      const id = useAutomationStore
         .getState()
         .addNode("trigger", { x: 100, y: 100 });
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
 
       expect(id).toBe("test-uuid-1");
       expect(state.nodes).toHaveLength(1);
@@ -203,8 +207,8 @@ describe("useWorkflowStore", () => {
     });
 
     it("should add a send_email node with default config", () => {
-      useWorkflowStore.getState().addNode("send_email", { x: 200, y: 200 });
-      const state = useWorkflowStore.getState();
+      useAutomationStore.getState().addNode("send_email", { x: 200, y: 200 });
+      const state = useAutomationStore.getState();
 
       expect(state.nodes[0].data.config).toEqual({
         type: "send_email",
@@ -214,8 +218,8 @@ describe("useWorkflowStore", () => {
     });
 
     it("should add a delay node with default config", () => {
-      useWorkflowStore.getState().addNode("delay", { x: 0, y: 0 });
-      const state = useWorkflowStore.getState();
+      useAutomationStore.getState().addNode("delay", { x: 0, y: 0 });
+      const state = useAutomationStore.getState();
 
       expect(state.nodes[0].data.config).toEqual({
         type: "delay",
@@ -226,8 +230,8 @@ describe("useWorkflowStore", () => {
     });
 
     it("should add a condition node with default config", () => {
-      useWorkflowStore.getState().addNode("condition", { x: 0, y: 0 });
-      const state = useWorkflowStore.getState();
+      useAutomationStore.getState().addNode("condition", { x: 0, y: 0 });
+      const state = useAutomationStore.getState();
 
       expect(state.nodes[0].data.config).toEqual({
         type: "condition",
@@ -238,8 +242,8 @@ describe("useWorkflowStore", () => {
     });
 
     it("should add a webhook node with default config", () => {
-      useWorkflowStore.getState().addNode("webhook", { x: 0, y: 0 });
-      const state = useWorkflowStore.getState();
+      useAutomationStore.getState().addNode("webhook", { x: 0, y: 0 });
+      const state = useAutomationStore.getState();
 
       expect(state.nodes[0].data.config).toEqual({
         type: "webhook",
@@ -249,8 +253,8 @@ describe("useWorkflowStore", () => {
     });
 
     it("should add a wait_for_event node with default config", () => {
-      useWorkflowStore.getState().addNode("wait_for_event", { x: 0, y: 0 });
-      const state = useWorkflowStore.getState();
+      useAutomationStore.getState().addNode("wait_for_event", { x: 0, y: 0 });
+      const state = useAutomationStore.getState();
 
       expect(state.nodes[0].data.config).toEqual({
         type: "wait_for_event",
@@ -259,10 +263,10 @@ describe("useWorkflowStore", () => {
     });
 
     it("should add a wait_for_email_engagement node with default timeout", () => {
-      useWorkflowStore
+      useAutomationStore
         .getState()
         .addNode("wait_for_email_engagement", { x: 0, y: 0 });
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
 
       expect(state.nodes[0].data.config).toEqual({
         type: "wait_for_email_engagement",
@@ -271,8 +275,8 @@ describe("useWorkflowStore", () => {
     });
 
     it("should add topic nodes with default config", () => {
-      useWorkflowStore.getState().addNode("subscribe_topic", { x: 0, y: 0 });
-      let state = useWorkflowStore.getState();
+      useAutomationStore.getState().addNode("subscribe_topic", { x: 0, y: 0 });
+      let state = useAutomationStore.getState();
 
       expect(state.nodes[0].data.config).toEqual({
         type: "subscribe_topic",
@@ -280,10 +284,10 @@ describe("useWorkflowStore", () => {
         channel: "email",
       });
 
-      useWorkflowStore
+      useAutomationStore
         .getState()
         .addNode("unsubscribe_topic", { x: 100, y: 0 });
-      state = useWorkflowStore.getState();
+      state = useAutomationStore.getState();
 
       expect(state.nodes[1].data.config).toEqual({
         type: "unsubscribe_topic",
@@ -293,7 +297,7 @@ describe("useWorkflowStore", () => {
     });
 
     it("should merge custom config with defaults", () => {
-      useWorkflowStore.getState().addNode(
+      useAutomationStore.getState().addNode(
         "send_email",
         { x: 0, y: 0 },
         {
@@ -301,7 +305,7 @@ describe("useWorkflowStore", () => {
           templateId: "tmpl-custom",
         }
       );
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
 
       expect(state.nodes[0].data.config).toEqual({
         type: "send_email",
@@ -316,14 +320,14 @@ describe("useWorkflowStore", () => {
 
   describe("updateNodeConfig", () => {
     it("should update node config and mark dirty", () => {
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 0 });
-      useWorkflowStore.setState({ isDirty: false });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 0 });
+      useAutomationStore.setState({ isDirty: false });
 
-      useWorkflowStore.getState().updateNodeConfig("test-uuid-1", {
+      useAutomationStore.getState().updateNodeConfig("test-uuid-1", {
         templateId: "tmpl-updated",
       });
 
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
       expect(state.nodes[0].data.config).toEqual({
         type: "send_email",
         templateId: "tmpl-updated",
@@ -332,14 +336,14 @@ describe("useWorkflowStore", () => {
     });
 
     it("should only update the specified node", () => {
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
 
-      useWorkflowStore.getState().updateNodeConfig("test-uuid-1", {
+      useAutomationStore.getState().updateNodeConfig("test-uuid-1", {
         templateId: "first",
       });
 
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
       const config0 = state.nodes[0].data.config;
       const config1 = state.nodes[1].data.config;
       expect(config0.type === "send_email" && config0.templateId).toBe("first");
@@ -353,14 +357,14 @@ describe("useWorkflowStore", () => {
 
   describe("updateNodeName", () => {
     it("should update node name and mark dirty", () => {
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 0 });
-      useWorkflowStore.setState({ isDirty: false });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 0 });
+      useAutomationStore.setState({ isDirty: false });
 
-      useWorkflowStore
+      useAutomationStore
         .getState()
         .updateNodeName("test-uuid-1", "Welcome Email");
 
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
       expect(state.nodes[0].data.name).toBe("Welcome Email");
       expect(state.isDirty).toBe(true);
     });
@@ -373,11 +377,11 @@ describe("useWorkflowStore", () => {
   describe("deleteNode", () => {
     it("should remove node and connected edges", () => {
       // Add two nodes
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
 
       // Add edge between them
-      useWorkflowStore.getState().onConnect({
+      useAutomationStore.getState().onConnect({
         source: "test-uuid-1",
         target: "test-uuid-2",
         sourceHandle: null,
@@ -385,32 +389,32 @@ describe("useWorkflowStore", () => {
       });
 
       // Delete the trigger node
-      useWorkflowStore.getState().deleteNode("test-uuid-1");
+      useAutomationStore.getState().deleteNode("test-uuid-1");
 
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
       expect(state.nodes).toHaveLength(1);
       expect(state.nodes[0].id).toBe("test-uuid-2");
       expect(state.edges).toHaveLength(0);
     });
 
     it("should clear selectedNodeId if deleted node was selected", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      expect(useWorkflowStore.getState().selectedNodeId).toBe("test-uuid-1");
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      expect(useAutomationStore.getState().selectedNodeId).toBe("test-uuid-1");
 
-      useWorkflowStore.getState().deleteNode("test-uuid-1");
+      useAutomationStore.getState().deleteNode("test-uuid-1");
 
-      expect(useWorkflowStore.getState().selectedNodeId).toBeNull();
+      expect(useAutomationStore.getState().selectedNodeId).toBeNull();
     });
 
     it("should preserve selectedNodeId if different node is deleted", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
       // First node is auto-selected, then second node becomes selected
-      useWorkflowStore.getState().selectNode("test-uuid-1");
+      useAutomationStore.getState().selectNode("test-uuid-1");
 
-      useWorkflowStore.getState().deleteNode("test-uuid-2");
+      useAutomationStore.getState().deleteNode("test-uuid-2");
 
-      expect(useWorkflowStore.getState().selectedNodeId).toBe("test-uuid-1");
+      expect(useAutomationStore.getState().selectedNodeId).toBe("test-uuid-1");
     });
   });
 
@@ -420,18 +424,18 @@ describe("useWorkflowStore", () => {
 
   describe("onConnect", () => {
     it("should add edge and mark dirty", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
-      useWorkflowStore.setState({ isDirty: false });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.setState({ isDirty: false });
 
-      useWorkflowStore.getState().onConnect({
+      useAutomationStore.getState().onConnect({
         source: "test-uuid-1",
         target: "test-uuid-2",
         sourceHandle: null,
         targetHandle: null,
       });
 
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
       expect(state.edges).toHaveLength(1);
       expect(state.edges[0]).toMatchObject({
         source: "test-uuid-1",
@@ -447,17 +451,19 @@ describe("useWorkflowStore", () => {
 
   describe("selectNode", () => {
     it("should update selectedNodeId", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().selectNode("some-other-id");
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().selectNode("some-other-id");
 
-      expect(useWorkflowStore.getState().selectedNodeId).toBe("some-other-id");
+      expect(useAutomationStore.getState().selectedNodeId).toBe(
+        "some-other-id"
+      );
     });
 
     it("should allow clearing selection with null", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().selectNode(null);
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().selectNode(null);
 
-      expect(useWorkflowStore.getState().selectedNodeId).toBeNull();
+      expect(useAutomationStore.getState().selectedNodeId).toBeNull();
     });
   });
 
@@ -465,41 +471,41 @@ describe("useWorkflowStore", () => {
   // updateWorkflowSettings
   // ═══════════════════════════════════════════════════════════════════════════
 
-  describe("updateWorkflowSettings", () => {
+  describe("updateAutomationSettings", () => {
     it("should update workflow metadata and mark dirty", () => {
-      const mockWorkflow = createMockWorkflow({ steps: [], transitions: [] });
-      useWorkflowStore.getState().setWorkflow(mockWorkflow);
+      const mockWorkflow = createMockAutomation({ steps: [], transitions: [] });
+      useAutomationStore.getState().setAutomation(mockWorkflow);
 
-      useWorkflowStore.getState().updateWorkflowSettings({
+      useAutomationStore.getState().updateWorkflowSettings({
         name: "Updated Name",
         description: "Updated description",
       });
 
-      const state = useWorkflowStore.getState();
-      expect(state.workflow?.name).toBe("Updated Name");
-      expect(state.workflow?.description).toBe("Updated description");
+      const state = useAutomationStore.getState();
+      expect(state.automation?.name).toBe("Updated Name");
+      expect(state.automation?.description).toBe("Updated description");
       expect(state.isDirty).toBe(true);
     });
 
     it("should update trigger type and config", () => {
-      const mockWorkflow = createMockWorkflow({ steps: [], transitions: [] });
-      useWorkflowStore.getState().setWorkflow(mockWorkflow);
+      const mockWorkflow = createMockAutomation({ steps: [], transitions: [] });
+      useAutomationStore.getState().setAutomation(mockWorkflow);
 
-      useWorkflowStore.getState().updateWorkflowSettings({
+      useAutomationStore.getState().updateWorkflowSettings({
         triggerType: "segment_entry",
         triggerConfig: { segmentId: "seg-123" },
       });
 
-      const state = useWorkflowStore.getState();
-      expect(state.workflow?.triggerType).toBe("segment_entry");
-      expect(state.workflow?.triggerConfig).toEqual({ segmentId: "seg-123" });
+      const state = useAutomationStore.getState();
+      expect(state.automation?.triggerType).toBe("segment_entry");
+      expect(state.automation?.triggerConfig).toEqual({ segmentId: "seg-123" });
     });
 
     it("should not modify state if workflow is null", () => {
-      useWorkflowStore.getState().updateWorkflowSettings({ name: "Test" });
+      useAutomationStore.getState().updateWorkflowSettings({ name: "Test" });
 
-      const state = useWorkflowStore.getState();
-      expect(state.workflow).toBeNull();
+      const state = useAutomationStore.getState();
+      expect(state.automation).toBeNull();
       expect(state.isDirty).toBe(false);
     });
   });
@@ -510,10 +516,12 @@ describe("useWorkflowStore", () => {
 
   describe("getWorkflowDefinition", () => {
     it("should convert nodes back to steps", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 100, y: 100 });
-      useWorkflowStore.getState().updateNodeName("test-uuid-1", "Entry Point");
+      useAutomationStore.getState().addNode("trigger", { x: 100, y: 100 });
+      useAutomationStore
+        .getState()
+        .updateNodeName("test-uuid-1", "Entry Point");
 
-      const definition = useWorkflowStore.getState().getWorkflowDefinition();
+      const definition = useAutomationStore.getState().getWorkflowDefinition();
 
       expect(definition.steps).toHaveLength(1);
       expect(definition.steps[0]).toEqual({
@@ -526,16 +534,16 @@ describe("useWorkflowStore", () => {
     });
 
     it("should convert edges back to transitions", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
-      useWorkflowStore.getState().onConnect({
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.getState().onConnect({
         source: "test-uuid-1",
         target: "test-uuid-2",
         sourceHandle: null,
         targetHandle: null,
       });
 
-      const definition = useWorkflowStore.getState().getWorkflowDefinition();
+      const definition = useAutomationStore.getState().getWorkflowDefinition();
 
       expect(definition.transitions).toHaveLength(1);
       expect(definition.transitions[0]).toMatchObject({
@@ -545,11 +553,11 @@ describe("useWorkflowStore", () => {
     });
 
     it("should include branch condition from sourceHandle", () => {
-      useWorkflowStore.getState().addNode("condition", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.getState().addNode("condition", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
 
       // Manually add edge with sourceHandle (simulating React Flow)
-      useWorkflowStore.setState((_state) => ({
+      useAutomationStore.setState((_state) => ({
         edges: [
           {
             id: "edge-1",
@@ -560,13 +568,13 @@ describe("useWorkflowStore", () => {
         ],
       }));
 
-      const definition = useWorkflowStore.getState().getWorkflowDefinition();
+      const definition = useAutomationStore.getState().getWorkflowDefinition();
 
       expect(definition.transitions[0].condition).toEqual({ branch: "yes" });
     });
 
     it("should include default canvas viewport", () => {
-      const definition = useWorkflowStore.getState().getWorkflowDefinition();
+      const definition = useAutomationStore.getState().getWorkflowDefinition();
 
       expect(definition.canvasViewport).toEqual({ x: 0, y: 0, zoom: 1 });
     });
@@ -578,34 +586,34 @@ describe("useWorkflowStore", () => {
 
   describe("canvasViewport", () => {
     it("should have default viewport of {0, 0, 1}", () => {
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
       expect(state.canvasViewport).toEqual({ x: 0, y: 0, zoom: 1 });
     });
 
     it("should update viewport with setCanvasViewport", () => {
-      useWorkflowStore
+      useAutomationStore
         .getState()
         .setCanvasViewport({ x: 100, y: -50, zoom: 1.5 });
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
 
       expect(state.canvasViewport).toEqual({ x: 100, y: -50, zoom: 1.5 });
     });
 
     it("should initialize viewport from saved workflow data", () => {
-      const mockWorkflow = createMockWorkflow({
+      const mockWorkflow = createMockAutomation({
         steps: [],
         transitions: [],
         canvasViewport: { x: 200, y: 300, zoom: 0.8 },
       });
 
-      useWorkflowStore.getState().setWorkflow(mockWorkflow);
-      const state = useWorkflowStore.getState();
+      useAutomationStore.getState().setAutomation(mockWorkflow);
+      const state = useAutomationStore.getState();
 
       expect(state.canvasViewport).toEqual({ x: 200, y: 300, zoom: 0.8 });
     });
 
     it("should use default viewport when workflow has null canvasViewport", () => {
-      const mockWorkflow = createMockWorkflow({
+      const mockWorkflow = createMockAutomation({
         steps: [],
         transitions: [],
         canvasViewport: null as unknown as {
@@ -615,15 +623,17 @@ describe("useWorkflowStore", () => {
         },
       });
 
-      useWorkflowStore.getState().setWorkflow(mockWorkflow);
-      const state = useWorkflowStore.getState();
+      useAutomationStore.getState().setAutomation(mockWorkflow);
+      const state = useAutomationStore.getState();
 
       expect(state.canvasViewport).toEqual({ x: 0, y: 0, zoom: 1 });
     });
 
     it("should return tracked viewport from getWorkflowDefinition", () => {
-      useWorkflowStore.getState().setCanvasViewport({ x: 42, y: -10, zoom: 2 });
-      const definition = useWorkflowStore.getState().getWorkflowDefinition();
+      useAutomationStore
+        .getState()
+        .setCanvasViewport({ x: 42, y: -10, zoom: 2 });
+      const definition = useAutomationStore.getState().getWorkflowDefinition();
 
       expect(definition.canvasViewport).toEqual({ x: 42, y: -10, zoom: 2 });
     });
@@ -635,38 +645,38 @@ describe("useWorkflowStore", () => {
 
   describe("dirty state tracking", () => {
     it("should mark dirty when nodes change", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      expect(useWorkflowStore.getState().isDirty).toBe(true);
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      expect(useAutomationStore.getState().isDirty).toBe(true);
     });
 
     it("should mark dirty when edges change", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
-      useWorkflowStore.setState({ isDirty: false });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.setState({ isDirty: false });
 
-      useWorkflowStore.getState().onConnect({
+      useAutomationStore.getState().onConnect({
         source: "test-uuid-1",
         target: "test-uuid-2",
         sourceHandle: null,
         targetHandle: null,
       });
 
-      expect(useWorkflowStore.getState().isDirty).toBe(true);
+      expect(useAutomationStore.getState().isDirty).toBe(true);
     });
 
     it("should clear dirty flag with markClean", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      expect(useWorkflowStore.getState().isDirty).toBe(true);
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      expect(useAutomationStore.getState().isDirty).toBe(true);
 
-      useWorkflowStore.getState().markClean();
-      expect(useWorkflowStore.getState().isDirty).toBe(false);
+      useAutomationStore.getState().markClean();
+      expect(useAutomationStore.getState().isDirty).toBe(false);
     });
 
     it("should not mark dirty when loading workflow", () => {
-      const mockWorkflow = createMockWorkflow({ steps: [], transitions: [] });
-      useWorkflowStore.getState().setWorkflow(mockWorkflow);
+      const mockWorkflow = createMockAutomation({ steps: [], transitions: [] });
+      useAutomationStore.getState().setAutomation(mockWorkflow);
 
-      expect(useWorkflowStore.getState().isDirty).toBe(false);
+      expect(useAutomationStore.getState().isDirty).toBe(false);
     });
   });
 
@@ -674,36 +684,36 @@ describe("useWorkflowStore", () => {
   // updateWorkflowAfterSave
   // ═══════════════════════════════════════════════════════════════════════════
 
-  describe("updateWorkflowAfterSave", () => {
+  describe("updateAutomationAfterSave", () => {
     it("should update workflow metadata without marking dirty", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.setState({ isDirty: true });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.setState({ isDirty: true });
 
-      const updatedWorkflow = createMockWorkflow({
+      const updatedWorkflow = createMockAutomation({
         steps: [],
         transitions: [],
         name: "Saved Workflow",
       });
 
-      useWorkflowStore.getState().updateWorkflowAfterSave(updatedWorkflow);
+      useAutomationStore.getState().updateWorkflowAfterSave(updatedWorkflow);
 
-      const state = useWorkflowStore.getState();
-      expect(state.workflow?.name).toBe("Saved Workflow");
+      const state = useAutomationStore.getState();
+      expect(state.automation?.name).toBe("Saved Workflow");
       expect(state.isDirty).toBe(false);
     });
 
     it("should preserve existing nodes/edges", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
 
-      const updatedWorkflow = createMockWorkflow({
+      const updatedWorkflow = createMockAutomation({
         steps: [], // Different from current nodes
         transitions: [],
       });
 
-      useWorkflowStore.getState().updateWorkflowAfterSave(updatedWorkflow);
+      useAutomationStore.getState().updateWorkflowAfterSave(updatedWorkflow);
 
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
       // Nodes should not be replaced
       expect(state.nodes).toHaveLength(2);
     });
@@ -716,38 +726,38 @@ describe("useWorkflowStore", () => {
   describe("runValidation", () => {
     it("should run validation and store result", () => {
       // Empty workflow - should fail (no trigger)
-      const result = useWorkflowStore.getState().runValidation();
+      const result = useAutomationStore.getState().runValidation();
 
       expect(result.isValid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
-      expect(useWorkflowStore.getState().validationResult).toBe(result);
+      expect(useAutomationStore.getState().validationResult).toBe(result);
     });
 
     it("should return valid for properly configured workflow", () => {
       // Add trigger with valid config
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().updateNodeConfig("test-uuid-1", {
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().updateNodeConfig("test-uuid-1", {
         type: "trigger",
         triggerType: "event",
         eventName: "signup",
       });
 
       // Add action step
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
-      useWorkflowStore.getState().updateNodeConfig("test-uuid-2", {
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.getState().updateNodeConfig("test-uuid-2", {
         type: "send_email",
         templateId: "tmpl-123",
       });
 
       // Connect them
-      useWorkflowStore.getState().onConnect({
+      useAutomationStore.getState().onConnect({
         source: "test-uuid-1",
         target: "test-uuid-2",
         sourceHandle: null,
         targetHandle: null,
       });
 
-      const result = useWorkflowStore.getState().runValidation();
+      const result = useAutomationStore.getState().runValidation();
 
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -755,26 +765,26 @@ describe("useWorkflowStore", () => {
 
     it("should group errors by nodeId", () => {
       // Add trigger with missing config
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().updateNodeConfig("test-uuid-1", {
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().updateNodeConfig("test-uuid-1", {
         type: "trigger",
         triggerType: "event",
         // Missing eventName
       });
 
       // Add send_email with missing templateId
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
       // templateId is already empty by default
 
       // Connect them
-      useWorkflowStore.getState().onConnect({
+      useAutomationStore.getState().onConnect({
         source: "test-uuid-1",
         target: "test-uuid-2",
         sourceHandle: null,
         targetHandle: null,
       });
 
-      const result = useWorkflowStore.getState().runValidation();
+      const result = useAutomationStore.getState().runValidation();
 
       expect(result.errorsByNodeId.has("test-uuid-1")).toBe(true);
       expect(result.errorsByNodeId.has("test-uuid-2")).toBe(true);
@@ -787,13 +797,13 @@ describe("useWorkflowStore", () => {
 
   describe("saving state", () => {
     it("should track saving state with setIsSaving", () => {
-      expect(useWorkflowStore.getState().isSaving).toBe(false);
+      expect(useAutomationStore.getState().isSaving).toBe(false);
 
-      useWorkflowStore.getState().setIsSaving(true);
-      expect(useWorkflowStore.getState().isSaving).toBe(true);
+      useAutomationStore.getState().setIsSaving(true);
+      expect(useAutomationStore.getState().isSaving).toBe(true);
 
-      useWorkflowStore.getState().setIsSaving(false);
-      expect(useWorkflowStore.getState().isSaving).toBe(false);
+      useAutomationStore.getState().setIsSaving(false);
+      expect(useAutomationStore.getState().isSaving).toBe(false);
     });
   });
 });
@@ -802,16 +812,16 @@ describe("useWorkflowStore", () => {
 // TEST HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 
-function createMockWorkflow(
-  overrides: Partial<Workflow> & {
-    steps: WorkflowStep[];
-    transitions: WorkflowTransition[];
+function createMockAutomation(
+  overrides: Partial<Automation> & {
+    steps: AutomationStep[];
+    transitions: AutomationTransition[];
   }
-): Workflow {
+): Automation {
   const { steps, transitions, ...rest } = overrides;
   return {
     id: "wf-1",
-    name: "Test Workflow",
+    name: "Test Automation",
     description: null,
     status: "draft",
     triggerType: "event",

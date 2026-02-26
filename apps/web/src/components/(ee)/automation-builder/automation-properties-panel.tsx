@@ -1,6 +1,6 @@
 "use client";
 
-import type { CascadeChannelConfig, WorkflowStepConfig } from "@wraps/db";
+import type { AutomationStepConfig, CascadeChannelConfig } from "@wraps/db";
 import {
   AlertCircle,
   ArrowDown,
@@ -46,9 +46,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useTemplates } from "@/hooks/use-template-queries";
 import { amountUnitToSeconds, parseDurationToAmountUnit } from "@/lib/utils";
 import {
+  useAutomationStore,
   useSelectedNode,
   useValidationResult,
-  useWorkflowStore,
 } from "./use-automation-store";
 
 type Template = {
@@ -69,26 +69,28 @@ type Segment = {
   name: string;
 };
 
-type WorkflowPropertiesPanelProps = {
+type AutomationPropertiesPanelProps = {
   orgSlug: string;
   topics?: Topic[];
   segments?: Segment[];
 };
 
-export function WorkflowPropertiesPanel({
+export function AutomationPropertiesPanel({
   orgSlug,
   topics = [],
   segments = [],
-}: WorkflowPropertiesPanelProps) {
+}: AutomationPropertiesPanelProps) {
   const selectedNode = useSelectedNode();
-  const selectNode = useWorkflowStore((state) => state.selectNode);
-  const updateNodeConfig = useWorkflowStore((state) => state.updateNodeConfig);
-  const updateNodeName = useWorkflowStore((state) => state.updateNodeName);
-  const organizationId = useWorkflowStore(
-    (state) => state.workflow?.organizationId
+  const selectNode = useAutomationStore((state) => state.selectNode);
+  const updateNodeConfig = useAutomationStore(
+    (state) => state.updateNodeConfig
   );
-  const awsAccountId = useWorkflowStore(
-    (state) => state.workflow?.awsAccountId
+  const updateNodeName = useAutomationStore((state) => state.updateNodeName);
+  const organizationId = useAutomationStore(
+    (state) => state.automation?.organizationId
+  );
+  const awsAccountId = useAutomationStore(
+    (state) => state.automation?.awsAccountId
   );
 
   // Fetch templates via React Query (auto-refreshes when new templates are created)
@@ -153,7 +155,7 @@ export function WorkflowPropertiesPanel({
     }
     setShowEditorDialog(false);
   };
-  const deleteNode = useWorkflowStore((state) => state.deleteNode);
+  const deleteNode = useAutomationStore((state) => state.deleteNode);
   const validationResult = useValidationResult();
 
   // Get validation errors for the selected node
@@ -174,7 +176,7 @@ export function WorkflowPropertiesPanel({
 
   const { data } = selectedNode;
 
-  const handleConfigChange = (updates: Partial<WorkflowStepConfig>) => {
+  const handleConfigChange = (updates: Partial<AutomationStepConfig>) => {
     updateNodeConfig(selectedNode.id, updates);
   };
 
@@ -299,7 +301,7 @@ export function WorkflowPropertiesPanel({
                   currentConfig.type === "unsubscribe_topic"
                     ? currentConfig.channel
                     : "email",
-              } as WorkflowStepConfig);
+              } as AutomationStepConfig);
             }}
             topics={topics}
           />
@@ -355,10 +357,10 @@ function TriggerConfig({
   onChange,
   orgSlug,
 }: {
-  config: WorkflowStepConfig;
+  config: AutomationStepConfig;
   topics: { id: string; name: string }[];
   segments: { id: string; name: string }[];
-  onChange: (updates: Partial<WorkflowStepConfig>) => void;
+  onChange: (updates: Partial<AutomationStepConfig>) => void;
   orgSlug: string;
 }) {
   if (config.type !== "trigger") {
@@ -551,11 +553,11 @@ function SendEmailConfig({
   onEditTemplate,
   onRefreshDomains,
 }: {
-  config: WorkflowStepConfig;
+  config: AutomationStepConfig;
   templates: Template[];
   verifiedDomains: VerifiedIdentity[];
   domainsLoading: boolean;
-  onChange: (updates: Partial<WorkflowStepConfig>) => void;
+  onChange: (updates: Partial<AutomationStepConfig>) => void;
   onCreateNew?: () => void;
   onEditTemplate?: (templateId: string) => void;
   onRefreshDomains?: () => void;
@@ -759,8 +761,8 @@ function SendSmsConfig({
   config,
   onChange,
 }: {
-  config: WorkflowStepConfig;
-  onChange: (updates: Partial<WorkflowStepConfig>) => void;
+  config: AutomationStepConfig;
+  onChange: (updates: Partial<AutomationStepConfig>) => void;
 }) {
   if (config.type !== "send_sms") {
     return null;
@@ -788,8 +790,8 @@ function DelayConfig({
   config,
   onChange,
 }: {
-  config: WorkflowStepConfig;
-  onChange: (updates: Partial<WorkflowStepConfig>) => void;
+  config: AutomationStepConfig;
+  onChange: (updates: Partial<AutomationStepConfig>) => void;
 }) {
   if (config.type !== "delay") {
     return null;
@@ -835,8 +837,8 @@ function ConditionConfig({
   config,
   onChange,
 }: {
-  config: WorkflowStepConfig;
-  onChange: (updates: Partial<WorkflowStepConfig>) => void;
+  config: AutomationStepConfig;
+  onChange: (updates: Partial<AutomationStepConfig>) => void;
 }) {
   if (config.type !== "condition") {
     return null;
@@ -911,8 +913,8 @@ function UpdateContactConfig({
   config,
   onChange,
 }: {
-  config: WorkflowStepConfig;
-  onChange: (updates: Partial<WorkflowStepConfig>) => void;
+  config: AutomationStepConfig;
+  onChange: (updates: Partial<AutomationStepConfig>) => void;
 }) {
   if (config.type !== "update_contact") {
     return null;
@@ -1012,8 +1014,8 @@ function WebhookConfig({
   config,
   onChange,
 }: {
-  config: WorkflowStepConfig;
-  onChange: (updates: Partial<WorkflowStepConfig>) => void;
+  config: AutomationStepConfig;
+  onChange: (updates: Partial<AutomationStepConfig>) => void;
 }) {
   if (config.type !== "webhook") {
     return null;
@@ -1084,8 +1086,8 @@ function WaitForEventConfig({
   config,
   onChange,
 }: {
-  config: WorkflowStepConfig;
-  onChange: (updates: Partial<WorkflowStepConfig>) => void;
+  config: AutomationStepConfig;
+  onChange: (updates: Partial<AutomationStepConfig>) => void;
 }) {
   if (config.type !== "wait_for_event") {
     return null;
@@ -1159,8 +1161,8 @@ function WaitForEmailEngagementConfig({
   config,
   onChange,
 }: {
-  config: WorkflowStepConfig;
-  onChange: (updates: Partial<WorkflowStepConfig>) => void;
+  config: AutomationStepConfig;
+  onChange: (updates: Partial<AutomationStepConfig>) => void;
 }) {
   if (config.type !== "wait_for_email_engagement") {
     return null;
@@ -1250,9 +1252,9 @@ function TopicConfig({
   onChange,
   onTypeChange,
 }: {
-  config: WorkflowStepConfig;
+  config: AutomationStepConfig;
   topics: { id: string; name: string }[];
-  onChange: (updates: Partial<WorkflowStepConfig>) => void;
+  onChange: (updates: Partial<AutomationStepConfig>) => void;
   onTypeChange: (type: "subscribe_topic" | "unsubscribe_topic") => void;
 }) {
   if (
@@ -1348,7 +1350,7 @@ function CascadeConfig({
   onCreateNew?: () => void;
   onEditTemplate?: (templateId: string) => void;
 }) {
-  const updateCascadeChannels = useWorkflowStore(
+  const updateCascadeChannels = useAutomationStore(
     (state) => state.updateCascadeChannels
   );
 

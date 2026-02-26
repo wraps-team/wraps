@@ -12,17 +12,17 @@ type Segment = {
   name: string;
 };
 
-type WorkflowDataContextValue = {
+type AutomationDataContextValue = {
   topics: Topic[];
   segments: Segment[];
 };
 
-const WorkflowDataContext = createContext<WorkflowDataContextValue>({
+const AutomationDataContext = createContext<AutomationDataContextValue>({
   topics: [],
   segments: [],
 });
 
-export function WorkflowDataProvider({
+export function AutomationDataProvider({
   topics,
   segments,
   children,
@@ -32,12 +32,17 @@ export function WorkflowDataProvider({
   children: React.ReactNode;
 }) {
   return (
-    <WorkflowDataContext.Provider value={{ topics, segments }}>
+    <AutomationDataContext.Provider value={{ topics, segments }}>
       {children}
-    </WorkflowDataContext.Provider>
+    </AutomationDataContext.Provider>
   );
 }
 
-export function useWorkflowData() {
-  return useContext(WorkflowDataContext);
+export function useAutomationData() {
+  return useContext(AutomationDataContext);
 }
+
+/** @deprecated Use `AutomationDataProvider` instead */
+export const WorkflowDataProvider = AutomationDataProvider;
+/** @deprecated Use `useAutomationData` instead */
+export const useWorkflowData = useAutomationData;

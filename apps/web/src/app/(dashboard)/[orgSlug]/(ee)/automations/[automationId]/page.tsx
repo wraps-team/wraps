@@ -12,17 +12,17 @@ import { getAutomation } from "@/actions/automations";
 import { AutomationBuilder } from "@/components/(ee)/automation-builder/automation-builder";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
-type WorkflowBuilderPageProps = {
+type AutomationBuilderPageProps = {
   params: Promise<{
     orgSlug: string;
-    workflowId: string;
+    automationId: string;
   }>;
 };
 
-export default async function WorkflowBuilderPage({
+export default async function AutomationBuilderPage({
   params,
-}: WorkflowBuilderPageProps) {
-  const { orgSlug, workflowId } = await params;
+}: AutomationBuilderPageProps) {
+  const { orgSlug, automationId } = await params;
 
   const session = await auth.api.getSession({
     headers: await import("next/headers").then((mod) => mod.headers()),
@@ -42,9 +42,12 @@ export default async function WorkflowBuilderPage({
   }
 
   // Fetch automation
-  const workflowResult = await getAutomation(workflowId, orgWithMembership.id);
+  const automationResult = await getAutomation(
+    automationId,
+    orgWithMembership.id
+  );
 
-  if (!workflowResult.success) {
+  if (!automationResult.success) {
     redirect(`/${orgSlug}/automations`);
   }
 
@@ -91,6 +94,7 @@ export default async function WorkflowBuilderPage({
   return (
     <div className="-my-4 flex h-[calc(100dvh-var(--header-height)-1rem)] flex-col md:-my-6 md:h-[calc(100dvh-var(--header-height)-1.5rem)]">
       <AutomationBuilder
+        automation={automationResult.automation}
         awsAccounts={awsAccounts}
         organizationId={orgWithMembership.id}
         orgDefaults={orgDefaults ?? null}
@@ -98,7 +102,6 @@ export default async function WorkflowBuilderPage({
         segments={segments}
         topics={topics}
         userRole={orgWithMembership.userRole}
-        workflow={workflowResult.automation}
       />
     </div>
   );

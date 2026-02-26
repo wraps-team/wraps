@@ -20,15 +20,15 @@ import type { SQSEvent, SQSHandler } from "aws-lambda";
 import { and, sql } from "drizzle-orm";
 
 import { log } from "../../lib/logger";
-import type { WorkflowJob } from "../../services/automation-queue";
-import { createNextWorkflowSchedule } from "../../services/automation-scheduler";
+import type { AutomationJob } from "../../services/automation-queue";
+import { createNextAutomationSchedule } from "../../services/automation-scheduler";
 
 const TERMINAL_STATUSES = new Set(["completed", "cancelled", "failed"]);
 
 export const handler: SQSHandler = async (event: SQSEvent) => {
   for (const record of event.Records) {
     try {
-      const job: WorkflowJob = JSON.parse(record.body);
+      const job: AutomationJob = JSON.parse(record.body);
 
       log.warn("DLQ: processing failed job", {
         type: job.type,
@@ -60,7 +60,7 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
   }
 };
 
-async function handleExecute(job: Extract<WorkflowJob, { type: "execute" }>) {
+async function handleExecute(job: Extract<AutomationJob, { type: "execute" }>) {
   await failExecution(
     job.executionId,
     `Step ${job.stepId} failed after SQS retries exhausted`,
@@ -68,7 +68,7 @@ async function handleExecute(job: Extract<WorkflowJob, { type: "execute" }>) {
   );
 }
 
-async function handleResume(job: Extract<WorkflowJob, { type: "resume" }>) {
+async function handleResume(job: Extract<AutomationJob, { type: "resume" }>) {
   // Load execution to get currentStepId
   const execution = await db
     .select({
@@ -102,7 +102,7 @@ async function handleResume(job: Extract<WorkflowJob, { type: "resume" }>) {
   );
 }
 
-async function handleTrigger(job: Extract<WorkflowJob, { type: "trigger" }>) {
+async function handleTrigger(job: Extract<AutomationJob, { type: "trigger" }>) {
   // Check if an execution was created before the failure
   const executions = await db
     .select({
@@ -135,7 +135,7 @@ async function handleTrigger(job: Extract<WorkflowJob, { type: "trigger" }>) {
 }
 
 async function handleScheduleTrigger(
-  job: Extract<WorkflowJob, { type: "schedule-trigger" }>
+  job: Extract<AutomationJob, { type: "schedule-trigger" }>
 ) {
   const [wf] = await db
     .select({
@@ -167,7 +167,7 @@ async function handleScheduleTrigger(
   }
 
   try {
-    await createNextWorkflowSchedule({
+    await createNextAutomationSchedule({
       workflowId: wf.id,
       organizationId: wf.organizationId,
       cronExpression: config.schedule,

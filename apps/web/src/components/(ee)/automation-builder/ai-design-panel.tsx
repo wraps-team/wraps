@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { useThrottler } from "@tanstack/react-pacer";
 import { useQueryClient } from "@tanstack/react-query";
-import type { WorkflowStep, WorkflowTransition } from "@wraps/db";
+import type { AutomationStep, AutomationTransition } from "@wraps/db";
 import { DefaultChatTransport } from "ai";
 import {
   AlertTriangle,
@@ -39,22 +39,22 @@ import { getAiUsageQueryKey, useAiUsage } from "@/hooks/use-ai-usage";
 import { useAutoResizeTextarea } from "@/hooks/use-auto-resize-textarea";
 import { extractWorkflowFromMessage } from "@/lib/ai/workflow-parser";
 import { cn } from "@/lib/utils";
-import { useWorkflowStore } from "./use-automation-store";
+import { useAutomationStore } from "./use-automation-store";
 
-type ExistingWorkflow = {
+type ExistingAutomation = {
   name: string;
   steps: unknown[];
   transitions: unknown[];
 };
 
-type PendingWorkflow = {
-  steps: WorkflowStep[];
-  transitions: WorkflowTransition[];
+type PendingAutomation = {
+  steps: AutomationStep[];
+  transitions: AutomationTransition[];
 };
 
 type AIDesignPanelProps = {
   orgSlug: string;
-  workflowId: string;
+  automationId: string;
 };
 
 const QUICK_PROMPTS = [
@@ -85,12 +85,12 @@ const QUICK_PROMPTS = [
   },
 ];
 
-export function AIDesignPanel({ orgSlug, workflowId }: AIDesignPanelProps) {
+export function AIDesignPanel({ orgSlug, automationId }: AIDesignPanelProps) {
   const [input, setInput] = useState("");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hasShownWarningToast, setHasShownWarningToast] = useState(false);
-  const [pendingWorkflow, setPendingWorkflow] =
-    useState<PendingWorkflow | null>(null);
+  const [pendingAutomation, setPendingAutomation] =
+    useState<PendingAutomation | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 44,
@@ -102,14 +102,16 @@ export function AIDesignPanel({ orgSlug, workflowId }: AIDesignPanelProps) {
   const { data: aiUsage, refetch: refetchUsage } = useAiUsage(orgSlug);
 
   // Get the applyAIFlow action and workflow definition from the store
-  const applyAIFlow = useWorkflowStore((state) => state.applyAIFlow);
-  const getWorkflowDefinition = useWorkflowStore(
+  const applyAIFlow = useAutomationStore((state) => state.applyAIFlow);
+  const getWorkflowDefinition = useAutomationStore(
     (state) => state.getWorkflowDefinition
   );
-  const workflowName = useWorkflowStore((state) => state.workflow?.name ?? "");
+  const workflowName = useAutomationStore(
+    (state) => state.automation?.name ?? ""
+  );
 
   // Get existing workflow content from the store (like Template AI does with editor.getJSON())
-  const getExistingWorkflow = (): ExistingWorkflow | undefined => {
+  const getExistingAutomation = (): ExistingAutomation | undefined => {
     const definition = getWorkflowDefinition();
     // Only include if there are steps beyond the default trigger
     if (definition.steps.length <= 1) {
@@ -127,8 +129,8 @@ export function AIDesignPanel({ orgSlug, workflowId }: AIDesignPanelProps) {
     transport: new DefaultChatTransport({
       api: `/api/${orgSlug}/workflows/ai/generate`,
       body: {
-        workflowId,
-        existingWorkflow: getExistingWorkflow(),
+        workflowId: automationId,
+        existingWorkflow: getExistingAutomation(),
       },
     }),
     onError: (error) => {
@@ -189,7 +191,7 @@ export function AIDesignPanel({ orgSlug, workflowId }: AIDesignPanelProps) {
       const workflow = extractWorkflowFromMessage(textContent);
       if (workflow) {
         // Store as pending instead of auto-applying
-        setPendingWorkflow({
+        setPendingAutomation({
           steps: workflow.steps,
           transitions: workflow.transitions,
         });
@@ -199,20 +201,20 @@ export function AIDesignPanel({ orgSlug, workflowId }: AIDesignPanelProps) {
 
   // Handle applying the pending workflow
   const handleApplyWorkflow = useCallback(() => {
-    if (!pendingWorkflow) {
+    if (!pendingAutomation) {
       return;
     }
 
-    applyAIFlow(pendingWorkflow.steps, pendingWorkflow.transitions);
+    applyAIFlow(pendingAutomation.steps, pendingAutomation.transitions);
     toast.success("Workflow applied to canvas", {
-      description: `Created ${pendingWorkflow.steps.length} steps with ${pendingWorkflow.transitions.length} connections.`,
+      description: `Created ${pendingAutomation.steps.length} steps with ${pendingAutomation.transitions.length} connections.`,
     });
-    setPendingWorkflow(null);
-  }, [pendingWorkflow, applyAIFlow]);
+    setPendingAutomation(null);
+  }, [pendingAutomation, applyAIFlow]);
 
   // Handle discarding the pending workflow
   const handleDiscardWorkflow = useCallback(() => {
-    setPendingWorkflow(null);
+    setPendingAutomation(null);
   }, []);
 
   // Auto-scroll to bottom when new messages arrive
@@ -458,16 +460,16 @@ export function AIDesignPanel({ orgSlug, workflowId }: AIDesignPanelProps) {
       </ScrollArea>
 
       {/* Pending Workflow Actions */}
-      {pendingWorkflow && !isLoading && (
+      {pendingAutomation && !isLoading && (
         <div className="border-t bg-muted/50 px-3 py-2">
           <p className="mb-1.5 font-medium text-xs">
             Apply generated workflow?
           </p>
           <p className="mb-2 text-muted-foreground text-xs">
-            {pendingWorkflow.steps.length} step
-            {pendingWorkflow.steps.length !== 1 ? "s" : ""},{" "}
-            {pendingWorkflow.transitions.length} connection
-            {pendingWorkflow.transitions.length !== 1 ? "s" : ""}
+            {pendingAutomation.steps.length} step
+            {pendingAutomation.steps.length !== 1 ? "s" : ""},{" "}
+            {pendingAutomation.transitions.length} connection
+            {pendingAutomation.transitions.length !== 1 ? "s" : ""}
           </p>
           <div className="flex gap-1.5">
             <Button

@@ -5,7 +5,7 @@ import { FeatureGate } from "@/components/feature-gate";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkFeatureAccess, getOrganizationPlan } from "@/lib/plan-limits";
 import { getRequiredPlan, type PlanId } from "@/lib/plans";
-import { WorkflowsTable } from "./components/workflows-table";
+import { AutomationsTable } from "./components/automations-table";
 
 type AutomationsPageProps = {
   params: Promise<{
@@ -108,9 +108,9 @@ export default async function AutomationsPage({
         </div>
       </div>
 
-      {/* Workflows Table */}
+      {/* Automations Table */}
       <div className="@container/main px-4 lg:px-6">
-        <WorkflowsTable
+        <AutomationsTable
           organizationId={orgWithMembership.id}
           orgSlug={orgSlug}
           total={total}

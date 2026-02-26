@@ -131,7 +131,7 @@ export async function createContact(organizationId: string, data: Input) {
 |------|---------|
 | `src/actions/` | Server actions (contacts, templates, workflows, orgs, etc.) |
 | `src/app/(dashboard)/[orgSlug]/` | Dashboard pages |
-| `src/components/(ee)/workflow-builder/` | Workflow builder (React Flow + Zustand) |
+| `src/components/(ee)/automation-builder/` | Automation builder (React Flow + Zustand) |
 | `src/components/template-editor/` | Email template editor (TipTap + React Email) |
 | `src/hooks/` | Custom hooks (template queries, org context, etc.) |
 | `src/lib/` | Utilities (auth, logger, contacts, validation, serializers) |
@@ -148,7 +148,7 @@ export async function createContact(organizationId: string, data: Input) {
 ## Workflow Builder
 
 - `@xyflow/react` (React Flow v12) for visual canvas
-- Zustand store in `use-workflow-store.ts` manages all state
+- Zustand store in `use-automation-store.ts` manages all state
 - `validateWorkflow(steps, transitions)` returns `{ isValid, errors, errorsByNodeId }`
 - **Cascade nodes**: Single UI node that expands to multiple primitives (send + condition + wait) on save
 

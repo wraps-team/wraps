@@ -1,20 +1,20 @@
 "use client";
 
 import { Zap } from "lucide-react";
-import { useWorkflowData } from "../automation-data-context";
-import type { WorkflowNodeData } from "../use-automation-store";
+import { useAutomationData } from "../automation-data-context";
+import type { AutomationNodeData } from "../use-automation-store";
 import { useNodeValidation } from "../use-automation-store";
 import { BaseNode } from "./base-node";
 
 type TriggerNodeProps = {
   id: string;
-  data: WorkflowNodeData;
+  data: AutomationNodeData;
   selected?: boolean;
 };
 
 export function TriggerNode({ id, data, selected }: TriggerNodeProps) {
   const config = data.config;
-  const { topics, segments } = useWorkflowData();
+  const { topics, segments } = useAutomationData();
   const { isValid, errorMessage } = useNodeValidation(id);
   let description = "When triggered";
 

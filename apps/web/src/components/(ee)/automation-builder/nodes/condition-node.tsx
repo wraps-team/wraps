@@ -3,12 +3,12 @@
 import { Handle, Position } from "@xyflow/react";
 import { GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { WorkflowNodeData } from "../use-automation-store";
+import type { AutomationNodeData } from "../use-automation-store";
 import { useNodeValidation } from "../use-automation-store";
 
 type ConditionNodeProps = {
   id: string;
-  data: WorkflowNodeData;
+  data: AutomationNodeData;
   selected?: boolean;
 };
 

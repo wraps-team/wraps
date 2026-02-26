@@ -1,6 +1,10 @@
-import type { Workflow, WorkflowStep, WorkflowTransition } from "@wraps/db";
+import type {
+  Automation,
+  AutomationStep,
+  AutomationTransition,
+} from "@wraps/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useWorkflowStore } from "../use-automation-store";
+import { useAutomationStore } from "../use-automation-store";
 
 // Mock crypto.randomUUID for deterministic IDs
 let uuidCounter = 0;
@@ -10,8 +14,8 @@ vi.stubGlobal("crypto", {
 
 describe("undo/redo", () => {
   beforeEach(() => {
-    useWorkflowStore.setState({
-      workflow: null,
+    useAutomationStore.setState({
+      automation: null,
       isDirty: false,
       isSaving: false,
       nodes: [],
@@ -20,7 +24,7 @@ describe("undo/redo", () => {
       validationResult: null,
     });
     // Clear undo/redo history
-    useWorkflowStore.temporal.getState().clear();
+    useAutomationStore.temporal.getState().clear();
     uuidCounter = 0;
   });
 
@@ -30,15 +34,16 @@ describe("undo/redo", () => {
 
   describe("history tracking", () => {
     it("should have empty history initially", () => {
-      const { pastStates, futureStates } = useWorkflowStore.temporal.getState();
+      const { pastStates, futureStates } =
+        useAutomationStore.temporal.getState();
       expect(pastStates).toHaveLength(0);
       expect(futureStates).toHaveLength(0);
     });
 
     it("should create a history entry when addNode is called", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
 
-      const { pastStates } = useWorkflowStore.temporal.getState();
+      const { pastStates } = useAutomationStore.temporal.getState();
       expect(pastStates).toHaveLength(1);
       expect(pastStates[0].nodes).toEqual([]);
       expect(pastStates[0].edges).toEqual([]);
@@ -51,24 +56,24 @@ describe("undo/redo", () => {
 
   describe("undo after addNode", () => {
     it("should restore empty canvas after undoing addNode", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 100, y: 100 });
-      expect(useWorkflowStore.getState().nodes).toHaveLength(1);
+      useAutomationStore.getState().addNode("trigger", { x: 100, y: 100 });
+      expect(useAutomationStore.getState().nodes).toHaveLength(1);
 
-      useWorkflowStore.temporal.getState().undo();
+      useAutomationStore.temporal.getState().undo();
 
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
       expect(state.nodes).toHaveLength(0);
       expect(state.edges).toHaveLength(0);
     });
 
     it("should restore first node after undoing second addNode", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
-      expect(useWorkflowStore.getState().nodes).toHaveLength(2);
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
+      expect(useAutomationStore.getState().nodes).toHaveLength(2);
 
-      useWorkflowStore.temporal.getState().undo();
+      useAutomationStore.temporal.getState().undo();
 
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
       expect(state.nodes).toHaveLength(1);
       expect(state.nodes[0].type).toBe("trigger");
     });
@@ -80,24 +85,24 @@ describe("undo/redo", () => {
 
   describe("redo after undo", () => {
     it("should re-apply undone addNode", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.temporal.getState().undo();
-      expect(useWorkflowStore.getState().nodes).toHaveLength(0);
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.temporal.getState().undo();
+      expect(useAutomationStore.getState().nodes).toHaveLength(0);
 
-      useWorkflowStore.temporal.getState().redo();
+      useAutomationStore.temporal.getState().redo();
 
-      expect(useWorkflowStore.getState().nodes).toHaveLength(1);
-      expect(useWorkflowStore.getState().nodes[0].type).toBe("trigger");
+      expect(useAutomationStore.getState().nodes).toHaveLength(1);
+      expect(useAutomationStore.getState().nodes[0].type).toBe("trigger");
     });
 
     it("should clear future states when new action is taken after undo", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.temporal.getState().undo();
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.temporal.getState().undo();
 
       // New action should clear redo stack
-      useWorkflowStore.getState().addNode("delay", { x: 100, y: 100 });
+      useAutomationStore.getState().addNode("delay", { x: 100, y: 100 });
 
-      const { futureStates } = useWorkflowStore.temporal.getState();
+      const { futureStates } = useAutomationStore.temporal.getState();
       expect(futureStates).toHaveLength(0);
     });
   });
@@ -108,27 +113,27 @@ describe("undo/redo", () => {
 
   describe("undo after deleteNode", () => {
     it("should restore deleted node and its connected edges", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
-      useWorkflowStore.getState().onConnect({
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.getState().onConnect({
         source: "undo-uuid-1",
         target: "undo-uuid-2",
         sourceHandle: null,
         targetHandle: null,
       });
 
-      expect(useWorkflowStore.getState().nodes).toHaveLength(2);
-      expect(useWorkflowStore.getState().edges).toHaveLength(1);
+      expect(useAutomationStore.getState().nodes).toHaveLength(2);
+      expect(useAutomationStore.getState().edges).toHaveLength(1);
 
       // Delete the send_email node (removes node + edge)
-      useWorkflowStore.getState().deleteNode("undo-uuid-2");
-      expect(useWorkflowStore.getState().nodes).toHaveLength(1);
-      expect(useWorkflowStore.getState().edges).toHaveLength(0);
+      useAutomationStore.getState().deleteNode("undo-uuid-2");
+      expect(useAutomationStore.getState().nodes).toHaveLength(1);
+      expect(useAutomationStore.getState().edges).toHaveLength(0);
 
       // Undo should restore both node and edge
-      useWorkflowStore.temporal.getState().undo();
+      useAutomationStore.temporal.getState().undo();
 
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
       expect(state.nodes).toHaveLength(2);
       expect(state.edges).toHaveLength(1);
       expect(state.nodes.find((n) => n.id === "undo-uuid-2")).toBeDefined();
@@ -141,19 +146,19 @@ describe("undo/redo", () => {
 
   describe("undo after onConnect", () => {
     it("should remove edge but keep nodes when undoing a connection", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
-      useWorkflowStore.getState().onConnect({
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.getState().onConnect({
         source: "undo-uuid-1",
         target: "undo-uuid-2",
         sourceHandle: null,
         targetHandle: null,
       });
-      expect(useWorkflowStore.getState().edges).toHaveLength(1);
+      expect(useAutomationStore.getState().edges).toHaveLength(1);
 
-      useWorkflowStore.temporal.getState().undo();
+      useAutomationStore.temporal.getState().undo();
 
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
       expect(state.edges).toHaveLength(0);
       // Nodes should still be present (from previous state)
       expect(state.nodes).toHaveLength(2);
@@ -166,16 +171,16 @@ describe("undo/redo", () => {
 
   describe("undo after updateNodeConfig", () => {
     it("should restore previous node config", () => {
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 0 });
-      const originalConfig = useWorkflowStore.getState().nodes[0].data.config;
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 0 });
+      const originalConfig = useAutomationStore.getState().nodes[0].data.config;
 
-      useWorkflowStore
+      useAutomationStore
         .getState()
         .updateNodeConfig("undo-uuid-1", { templateId: "tmpl-new" });
 
-      useWorkflowStore.temporal.getState().undo();
+      useAutomationStore.temporal.getState().undo();
 
-      const restoredConfig = useWorkflowStore.getState().nodes[0].data.config;
+      const restoredConfig = useAutomationStore.getState().nodes[0].data.config;
       expect(restoredConfig).toEqual(originalConfig);
     });
   });
@@ -186,16 +191,20 @@ describe("undo/redo", () => {
 
   describe("undo after updateNodeName", () => {
     it("should restore previous node name", () => {
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 0 });
 
-      useWorkflowStore.getState().updateNodeName("undo-uuid-1", "Custom Name");
-      expect(useWorkflowStore.getState().nodes[0].data.name).toBe(
+      useAutomationStore
+        .getState()
+        .updateNodeName("undo-uuid-1", "Custom Name");
+      expect(useAutomationStore.getState().nodes[0].data.name).toBe(
         "Custom Name"
       );
 
-      useWorkflowStore.temporal.getState().undo();
+      useAutomationStore.temporal.getState().undo();
 
-      expect(useWorkflowStore.getState().nodes[0].data.name).toBe("Send Email");
+      expect(useAutomationStore.getState().nodes[0].data.name).toBe(
+        "Send Email"
+      );
     });
   });
 
@@ -206,12 +215,12 @@ describe("undo/redo", () => {
   describe("undo after applyAIFlow", () => {
     it("should restore previous canvas when undoing AI-generated flow", () => {
       // Set up existing canvas
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("delay", { x: 0, y: 150 });
-      expect(useWorkflowStore.getState().nodes).toHaveLength(2);
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("delay", { x: 0, y: 150 });
+      expect(useAutomationStore.getState().nodes).toHaveLength(2);
 
       // Apply AI flow (replaces everything)
-      const aiSteps: WorkflowStep[] = [
+      const aiSteps: AutomationStep[] = [
         {
           id: "ai-step-1",
           type: "trigger",
@@ -234,17 +243,17 @@ describe("undo/redo", () => {
           config: { type: "exit" },
         },
       ];
-      const aiTransitions: WorkflowTransition[] = [
+      const aiTransitions: AutomationTransition[] = [
         { id: "ai-t-1", fromStepId: "ai-step-1", toStepId: "ai-step-2" },
         { id: "ai-t-2", fromStepId: "ai-step-2", toStepId: "ai-step-3" },
       ];
-      useWorkflowStore.getState().applyAIFlow(aiSteps, aiTransitions);
-      expect(useWorkflowStore.getState().nodes).toHaveLength(3);
+      useAutomationStore.getState().applyAIFlow(aiSteps, aiTransitions);
+      expect(useAutomationStore.getState().nodes).toHaveLength(3);
 
       // Undo should restore original 2 nodes
-      useWorkflowStore.temporal.getState().undo();
+      useAutomationStore.temporal.getState().undo();
 
-      const state = useWorkflowStore.getState();
+      const state = useAutomationStore.getState();
       expect(state.nodes).toHaveLength(2);
       expect(state.nodes[0].type).toBe("trigger");
       expect(state.nodes[1].type).toBe("delay");
@@ -257,32 +266,32 @@ describe("undo/redo", () => {
 
   describe("canUndo and canRedo", () => {
     it("should both be false on fresh store", () => {
-      const temporal = useWorkflowStore.temporal.getState();
+      const temporal = useAutomationStore.temporal.getState();
       expect(temporal.pastStates).toHaveLength(0);
       expect(temporal.futureStates).toHaveLength(0);
     });
 
     it("should have canUndo true after an action", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
 
-      const { pastStates } = useWorkflowStore.temporal.getState();
+      const { pastStates } = useAutomationStore.temporal.getState();
       expect(pastStates.length > 0).toBe(true);
     });
 
     it("should have canRedo true after undo", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.temporal.getState().undo();
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.temporal.getState().undo();
 
-      const { futureStates } = useWorkflowStore.temporal.getState();
+      const { futureStates } = useAutomationStore.temporal.getState();
       expect(futureStates.length > 0).toBe(true);
     });
 
     it("should have canRedo false after undo then new action", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.temporal.getState().undo();
-      useWorkflowStore.getState().addNode("delay", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.temporal.getState().undo();
+      useAutomationStore.getState().addNode("delay", { x: 0, y: 0 });
 
-      const { futureStates } = useWorkflowStore.temporal.getState();
+      const { futureStates } = useAutomationStore.temporal.getState();
       expect(futureStates).toHaveLength(0);
     });
   });
@@ -293,66 +302,70 @@ describe("undo/redo", () => {
 
   describe("non-tracked changes", () => {
     it("should NOT create history entry for selectNode", () => {
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
       const countBefore =
-        useWorkflowStore.temporal.getState().pastStates.length;
+        useAutomationStore.temporal.getState().pastStates.length;
 
-      useWorkflowStore.getState().selectNode("some-id");
-      useWorkflowStore.getState().selectNode(null);
+      useAutomationStore.getState().selectNode("some-id");
+      useAutomationStore.getState().selectNode(null);
 
-      const countAfter = useWorkflowStore.temporal.getState().pastStates.length;
+      const countAfter =
+        useAutomationStore.temporal.getState().pastStates.length;
       expect(countAfter).toBe(countBefore);
     });
 
     it("should NOT create history entry for setCanvasViewport", () => {
       const countBefore =
-        useWorkflowStore.temporal.getState().pastStates.length;
+        useAutomationStore.temporal.getState().pastStates.length;
 
-      useWorkflowStore
+      useAutomationStore
         .getState()
         .setCanvasViewport({ x: 100, y: 200, zoom: 1.5 });
 
-      const countAfter = useWorkflowStore.temporal.getState().pastStates.length;
+      const countAfter =
+        useAutomationStore.temporal.getState().pastStates.length;
       expect(countAfter).toBe(countBefore);
     });
 
     it("should NOT create history entry for toggleSettingsPanel", () => {
       const countBefore =
-        useWorkflowStore.temporal.getState().pastStates.length;
+        useAutomationStore.temporal.getState().pastStates.length;
 
-      useWorkflowStore.getState().toggleSettingsPanel();
+      useAutomationStore.getState().toggleSettingsPanel();
 
-      const countAfter = useWorkflowStore.temporal.getState().pastStates.length;
+      const countAfter =
+        useAutomationStore.temporal.getState().pastStates.length;
       expect(countAfter).toBe(countBefore);
     });
 
     it("should NOT create history entry for setIsSaving", () => {
       const countBefore =
-        useWorkflowStore.temporal.getState().pastStates.length;
+        useAutomationStore.temporal.getState().pastStates.length;
 
-      useWorkflowStore.getState().setIsSaving(true);
-      useWorkflowStore.getState().setIsSaving(false);
+      useAutomationStore.getState().setIsSaving(true);
+      useAutomationStore.getState().setIsSaving(false);
 
-      const countAfter = useWorkflowStore.temporal.getState().pastStates.length;
+      const countAfter =
+        useAutomationStore.temporal.getState().pastStates.length;
       expect(countAfter).toBe(countBefore);
     });
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Unit 11: setWorkflow clears history
+  // Unit 11: setAutomation clears history
   // ═══════════════════════════════════════════════════════════════════════════
 
-  describe("setWorkflow clears history", () => {
-    it("should clear undo history when loading a workflow", () => {
+  describe("setAutomation clears history", () => {
+    it("should clear undo history when loading an automation", () => {
       // Build up some history
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.getState().addNode("send_email", { x: 0, y: 150 });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("send_email", { x: 0, y: 150 });
       expect(
-        useWorkflowStore.temporal.getState().pastStates.length
+        useAutomationStore.temporal.getState().pastStates.length
       ).toBeGreaterThan(0);
 
       // Load a workflow
-      const mockWorkflow = createMockWorkflow({
+      const mockWorkflow = createMockAutomation({
         steps: [
           {
             id: "loaded-step",
@@ -364,10 +377,11 @@ describe("undo/redo", () => {
         ],
         transitions: [],
       });
-      useWorkflowStore.getState().setWorkflow(mockWorkflow);
+      useAutomationStore.getState().setAutomation(mockWorkflow);
 
       // History should be cleared
-      const { pastStates, futureStates } = useWorkflowStore.temporal.getState();
+      const { pastStates, futureStates } =
+        useAutomationStore.temporal.getState();
       expect(pastStates).toHaveLength(0);
       expect(futureStates).toHaveLength(0);
     });
@@ -385,8 +399,8 @@ describe("undo/redo", () => {
     it("should undo on Cmd+Z (meta key)", async () => {
       const { handleUndoRedo } = await import("../use-workflow-store");
 
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      expect(useWorkflowStore.getState().nodes).toHaveLength(1);
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      expect(useAutomationStore.getState().nodes).toHaveLength(1);
 
       handleUndoRedo({
         key: "z",
@@ -395,13 +409,13 @@ describe("undo/redo", () => {
         shiftKey: false,
       });
 
-      expect(useWorkflowStore.getState().nodes).toHaveLength(0);
+      expect(useAutomationStore.getState().nodes).toHaveLength(0);
     });
 
     it("should undo on Ctrl+Z", async () => {
       const { handleUndoRedo } = await import("../use-workflow-store");
 
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
 
       handleUndoRedo({
         key: "z",
@@ -410,15 +424,15 @@ describe("undo/redo", () => {
         shiftKey: false,
       });
 
-      expect(useWorkflowStore.getState().nodes).toHaveLength(0);
+      expect(useAutomationStore.getState().nodes).toHaveLength(0);
     });
 
     it("should redo on Cmd+Shift+Z", async () => {
       const { handleUndoRedo } = await import("../use-workflow-store");
 
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.temporal.getState().undo();
-      expect(useWorkflowStore.getState().nodes).toHaveLength(0);
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.temporal.getState().undo();
+      expect(useAutomationStore.getState().nodes).toHaveLength(0);
 
       handleUndoRedo({
         key: "z",
@@ -427,14 +441,14 @@ describe("undo/redo", () => {
         shiftKey: true,
       });
 
-      expect(useWorkflowStore.getState().nodes).toHaveLength(1);
+      expect(useAutomationStore.getState().nodes).toHaveLength(1);
     });
 
     it("should redo on Ctrl+Y", async () => {
       const { handleUndoRedo } = await import("../use-workflow-store");
 
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
-      useWorkflowStore.temporal.getState().undo();
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.temporal.getState().undo();
 
       handleUndoRedo({
         key: "y",
@@ -443,13 +457,13 @@ describe("undo/redo", () => {
         shiftKey: false,
       });
 
-      expect(useWorkflowStore.getState().nodes).toHaveLength(1);
+      expect(useAutomationStore.getState().nodes).toHaveLength(1);
     });
 
     it("should not undo on plain Z key (no modifier)", async () => {
       const { handleUndoRedo } = await import("../use-workflow-store");
 
-      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useAutomationStore.getState().addNode("trigger", { x: 0, y: 0 });
 
       handleUndoRedo({
         key: "z",
@@ -458,7 +472,7 @@ describe("undo/redo", () => {
         shiftKey: false,
       });
 
-      expect(useWorkflowStore.getState().nodes).toHaveLength(1);
+      expect(useAutomationStore.getState().nodes).toHaveLength(1);
     });
   });
 });
@@ -467,12 +481,12 @@ describe("undo/redo", () => {
 // TEST HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 
-function createMockWorkflow(
-  overrides: Partial<Workflow> & {
-    steps: WorkflowStep[];
-    transitions: WorkflowTransition[];
+function createMockAutomation(
+  overrides: Partial<Automation> & {
+    steps: AutomationStep[];
+    transitions: AutomationTransition[];
   }
-): Workflow {
+): Automation {
   const { steps, transitions, ...rest } = overrides;
   return {
     id: "wf-1",

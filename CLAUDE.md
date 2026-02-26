@@ -103,7 +103,7 @@ wraps/                            # Monorepo root
 │   │       ├── actions/         # Server actions
 │   │       ├── components/
 │   │       │   ├── (ee)/        # Enterprise components
-│   │       │   │   └── workflow-builder/ # React Flow workflow canvas
+│   │       │   │   └── automation-builder/ # React Flow automation canvas
 │   │       │   ├── template-editor/     # TipTap email template editor
 │   │       │   └── ui/          # shadcn/ui components
 │   │       ├── hooks/           # Custom hooks
@@ -543,9 +543,9 @@ These are enforced by `baseline.toml` and will fail CI:
 - **packages/cli/src/utils/shared/config.ts**: Centralized API/app URL helpers
 - **packages/db/src/schema/**: All database table definitions
 - **apps/api/src/routes/**: API route handlers
-- **apps/api/src/services/workflow-events.ts**: Workflow event emission
+- **apps/api/src/services/automation-events.ts**: Automation event emission
 - **apps/web/src/actions/**: Next.js server actions
-- **apps/web/src/components/(ee)/workflow-builder/**: Workflow builder (React Flow)
+- **apps/web/src/components/(ee)/automation-builder/**: Automation builder (React Flow)
 - **apps/web/src/components/template-editor/**: Email template editor (TipTap)
 
 ## Common Tasks

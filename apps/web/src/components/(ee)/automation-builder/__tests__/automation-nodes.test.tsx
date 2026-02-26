@@ -11,14 +11,20 @@ import { ReactFlowProvider } from "@xyflow/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock the workflow store hooks
-vi.mock("../use-workflow-store", () => ({
+// Mock the automation store hooks
+vi.mock("../use-automation-store", () => ({
   useNodeValidation: vi.fn(() => ({ isValid: true, errorMessage: undefined })),
+  useAutomationStore: vi.fn(() => ({})),
   useWorkflowStore: vi.fn(() => ({})),
 }));
 
-// Mock the workflow data context
-vi.mock("../workflow-data-context", () => ({
+// Mock the automation data context
+vi.mock("../automation-data-context", () => ({
+  useAutomationData: vi.fn(() => ({
+    topics: [],
+    segments: [],
+    templates: [],
+  })),
   useWorkflowData: vi.fn(() => ({
     topics: [],
     segments: [],

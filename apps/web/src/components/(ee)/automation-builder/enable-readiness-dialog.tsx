@@ -1,6 +1,6 @@
 "use client";
 
-import type { Workflow } from "@wraps/db";
+import type { Automation } from "@wraps/db";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -23,13 +23,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { WorkflowNode } from "./use-automation-store";
-import { useWorkflowStore } from "./use-automation-store";
+import {
+  type AutomationNode,
+  useAutomationStore,
+} from "./use-automation-store";
 
 type EnableReadinessDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  workflow: Workflow;
+  automation: Automation;
   organizationId: string;
   orgSlug: string;
   onEnable: () => void;
@@ -64,16 +66,17 @@ function ReadinessCheckRow({ check }: { check: ReadinessCheck }) {
  * Build client-side readiness checks from local state.
  */
 function buildClientChecks(opts: {
-  workflow: Workflow;
-  workflowState: Workflow | null;
-  nodes: WorkflowNode[];
+  automation: Automation;
+  automationState: Automation | null;
+  nodes: AutomationNode[];
   validationResult: { errors: Array<{ severity: string }> } | null;
   isDirty: boolean;
 }): ReadinessCheck[] {
-  const { workflow, workflowState, nodes, validationResult, isDirty } = opts;
+  const { automation, automationState, nodes, validationResult, isDirty } =
+    opts;
   const checks: ReadinessCheck[] = [];
 
-  const awsAccountId = workflowState?.awsAccountId ?? workflow.awsAccountId;
+  const awsAccountId = automationState?.awsAccountId ?? automation.awsAccountId;
   checks.push({
     id: "aws_account",
     label: "AWS account configured",
@@ -92,7 +95,7 @@ function buildClientChecks(opts: {
   );
 
   if (hasEmailSteps) {
-    const defaultFrom = workflowState?.defaultFrom ?? workflow.defaultFrom;
+    const defaultFrom = automationState?.defaultFrom ?? automation.defaultFrom;
     checks.push({
       id: "sender_configured",
       label: "Sender email configured",
@@ -125,7 +128,7 @@ function buildClientChecks(opts: {
   return checks;
 }
 
-function getCascadeTemplateIds(node: WorkflowNode): string[] {
+function getCascadeTemplateIds(node: AutomationNode): string[] {
   if (node.data.type !== "cascade" || !node.data.cascadeChannels) {
     return [];
   }
@@ -137,7 +140,7 @@ function getCascadeTemplateIds(node: WorkflowNode): string[] {
 /**
  * Extract template IDs and condition fields from workflow nodes for server-side checks.
  */
-function extractServerPayload(nodes: WorkflowNode[]) {
+function extractServerPayload(nodes: AutomationNode[]) {
   const templateIds: string[] = [];
   const conditionFields: string[] = [];
 
@@ -158,7 +161,7 @@ function extractServerPayload(nodes: WorkflowNode[]) {
 export function EnableReadinessDialog({
   open,
   onOpenChange,
-  workflow,
+  automation,
   organizationId,
   orgSlug,
   onEnable,
@@ -168,11 +171,13 @@ export function EnableReadinessDialog({
   const [isChecking, startTransition] = useTransition();
   const [hasRun, setHasRun] = useState(false);
 
-  const nodes = useWorkflowStore((state) => state.nodes);
-  const workflowState = useWorkflowStore((state) => state.workflow);
-  const validationResult = useWorkflowStore((state) => state.validationResult);
-  const isDirty = useWorkflowStore((state) => state.isDirty);
-  const toggleSettingsPanel = useWorkflowStore(
+  const nodes = useAutomationStore((state) => state.nodes);
+  const automationState = useAutomationStore((state) => state.automation);
+  const validationResult = useAutomationStore(
+    (state) => state.validationResult
+  );
+  const isDirty = useAutomationStore((state) => state.isDirty);
+  const toggleSettingsPanel = useAutomationStore(
     (state) => state.toggleSettingsPanel
   );
 
@@ -184,8 +189,8 @@ export function EnableReadinessDialog({
     }
 
     const clientChecks = buildClientChecks({
-      workflow,
-      workflowState,
+      automation,
+      automationState,
       nodes,
       validationResult,
       isDirty,
@@ -199,7 +204,7 @@ export function EnableReadinessDialog({
     if (needsServerCheck) {
       startTransition(async () => {
         const result = await checkAutomationReadiness(
-          workflow.id,
+          automation.id,
           organizationId,
           payload
         );
@@ -213,8 +218,8 @@ export function EnableReadinessDialog({
     }
   }, [
     open,
-    workflow,
-    workflowState,
+    automation,
+    automationState,
     nodes,
     validationResult,
     isDirty,
@@ -237,7 +242,7 @@ export function EnableReadinessDialog({
         <DialogHeader>
           <DialogTitle>Enable Workflow</DialogTitle>
           <DialogDescription>
-            Pre-flight checks for {workflowState?.name ?? workflow.name}
+            Pre-flight checks for {automationState?.name ?? automation.name}
           </DialogDescription>
         </DialogHeader>
 

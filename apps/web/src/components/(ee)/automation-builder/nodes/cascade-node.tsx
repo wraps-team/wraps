@@ -4,12 +4,12 @@ import type { CascadeChannelConfig } from "@wraps/db";
 import { Handle, Position } from "@xyflow/react";
 import { Layers, Mail, MessageSquare } from "lucide-react";
 import { cn, formatDurationCompact } from "@/lib/utils";
-import type { WorkflowNodeData } from "../use-automation-store";
+import type { AutomationNodeData } from "../use-automation-store";
 import { useNodeValidation } from "../use-automation-store";
 
 type CascadeNodeProps = {
   id: string;
-  data: WorkflowNodeData;
+  data: AutomationNodeData;
   selected?: boolean;
 };
 

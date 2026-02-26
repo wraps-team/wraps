@@ -131,7 +131,7 @@ createdByUser: one(user, {
 | `segments.ts` | Audience segments |
 | `templates.ts` | Email and SMS templates |
 | `usage.ts` | Usage tracking |
-| `workflows.ts` | Workflow definitions and executions |
+| `automations.ts` | Automation definitions and executions |
 | `waitlist.ts` | Waitlist entries |
 
 ## Key Patterns

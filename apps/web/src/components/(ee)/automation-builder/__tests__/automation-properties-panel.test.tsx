@@ -14,9 +14,11 @@ const mockUseSelectedNode = vi.fn();
 const mockUseValidationResult = vi.fn();
 const mockUseWorkflowStore = vi.fn();
 
-vi.mock("../use-workflow-store", () => ({
+vi.mock("../use-automation-store", () => ({
   useSelectedNode: () => mockUseSelectedNode(),
   useValidationResult: () => mockUseValidationResult(),
+  useAutomationStore: (selector: (state: unknown) => unknown) =>
+    mockUseWorkflowStore(selector),
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     mockUseWorkflowStore(selector),
 }));
@@ -39,7 +41,7 @@ vi.mock("@/actions/aws-accounts", () => ({
 }));
 
 // Import after mocking
-import { WorkflowPropertiesPanel } from "../automation-properties-panel";
+import { AutomationPropertiesPanel as WorkflowPropertiesPanel } from "../automation-properties-panel";
 
 // =============================================================================
 // Empty State Tests

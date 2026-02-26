@@ -1,6 +1,6 @@
 "use client";
 
-import type { Workflow } from "@wraps/db";
+import type { Automation } from "@wraps/db";
 import {
   AlertCircle,
   Loader2,
@@ -36,6 +36,7 @@ import {
 import { EnableReadinessDialog } from "./enable-readiness-dialog";
 import { UnsavedChangesGuard } from "./unsaved-changes-guard";
 import {
+  useAutomationStore,
   useCanRedo,
   useCanUndo,
   useIsDirty,
@@ -43,49 +44,48 @@ import {
   useNodeCount,
   useSettingsPanelOpen,
   useValidationResult,
-  useWorkflowStore,
 } from "./use-automation-store";
 import { useBeforeUnload } from "./use-before-unload";
 
-type WorkflowToolbarProps = {
-  workflow: Workflow;
+type AutomationToolbarProps = {
+  automation: Automation;
   orgSlug: string;
   organizationId: string;
 };
 
-export function WorkflowToolbar({
-  workflow,
+export function AutomationToolbar({
+  automation,
   orgSlug,
   organizationId,
-}: WorkflowToolbarProps) {
+}: AutomationToolbarProps) {
   const [isPending, startTransition] = useTransition();
   const [isEnabling, startEnableTransition] = useTransition();
   const isDirty = useIsDirty();
   const isSaving = useIsSaving();
   const validationResult = useValidationResult();
-  const getWorkflowDefinition = useWorkflowStore(
+  const getWorkflowDefinition = useAutomationStore(
     (state) => state.getWorkflowDefinition
   );
-  const setIsSaving = useWorkflowStore((state) => state.setIsSaving);
-  const updateWorkflowAfterSave = useWorkflowStore(
+  const setIsSaving = useAutomationStore((state) => state.setIsSaving);
+  const updateWorkflowAfterSave = useAutomationStore(
     (state) => state.updateWorkflowAfterSave
   );
-  const runValidation = useWorkflowStore((state) => state.runValidation);
-  const workflowState = useWorkflowStore((state) => state.workflow);
-  const updateWorkflowSettings = useWorkflowStore(
+  const runValidation = useAutomationStore((state) => state.runValidation);
+  const automationState = useAutomationStore((state) => state.automation);
+  const updateWorkflowSettings = useAutomationStore(
     (state) => state.updateWorkflowSettings
   );
   const nodeCount = useNodeCount();
   const settingsPanelOpen = useSettingsPanelOpen();
-  const toggleSettingsPanel = useWorkflowStore(
+  const toggleSettingsPanel = useAutomationStore(
     (state) => state.toggleSettingsPanel
   );
 
   // Undo/redo state
   const canUndo = useCanUndo();
   const canRedo = useCanRedo();
-  const handleUndo = () => useWorkflowStore.temporal.getState().undo();
-  const handleRedo = () => useWorkflowStore.temporal.getState().redo();
+  const handleUndo = () => useAutomationStore.temporal.getState().undo();
+  const handleRedo = () => useAutomationStore.temporal.getState().redo();
 
   // Browser tab close guard
   useBeforeUnload();
@@ -102,8 +102,8 @@ export function WorkflowToolbar({
   // Use deferred nodes reference to batch rapid changes and reduce CPU usage during drag operations
   // (Using nodes ref instead of isDirty boolean because isDirty stays true after first change,
   // which would prevent re-validation on subsequent config changes)
-  const nodes = useWorkflowStore((state) => state.nodes);
-  const edges = useWorkflowStore((state) => state.edges);
+  const nodes = useAutomationStore((state) => state.nodes);
+  const edges = useAutomationStore((state) => state.edges);
   const deferredNodes = useDeferredValue(nodes);
   const deferredEdges = useDeferredValue(edges);
   useEffect(() => {
@@ -122,13 +122,16 @@ export function WorkflowToolbar({
   }, [isEditingName]);
 
   const handleStartEditingName = () => {
-    setEditedName(workflowState?.name || workflow.name);
+    setEditedName(automationState?.name || automation.name);
     setIsEditingName(true);
   };
 
   const handleSaveName = () => {
     const trimmedName = editedName.trim();
-    if (trimmedName && trimmedName !== (workflowState?.name || workflow.name)) {
+    if (
+      trimmedName &&
+      trimmedName !== (automationState?.name || automation.name)
+    ) {
       updateWorkflowSettings({ name: trimmedName });
     }
     setIsEditingName(false);
@@ -142,7 +145,7 @@ export function WorkflowToolbar({
     }
   };
 
-  const currentStatus = workflowState?.status ?? workflow.status;
+  const currentStatus = automationState?.status ?? automation.status;
   const isEnabled = currentStatus === "enabled";
   const errorCount =
     validationResult?.errors.filter((e) => e.severity === "error").length ?? 0;
@@ -158,9 +161,9 @@ export function WorkflowToolbar({
         const triggerStep = definition.steps.find((s) => s.type === "trigger");
         const triggerConfig = triggerStep?.config;
 
-        const result = await updateAutomation(workflow.id, organizationId, {
-          name: workflowState?.name ?? undefined,
-          description: workflowState?.description ?? undefined,
+        const result = await updateAutomation(automation.id, organizationId, {
+          name: automationState?.name ?? undefined,
+          description: automationState?.description ?? undefined,
           // Sync trigger settings from the trigger step
           triggerType:
             triggerConfig?.type === "trigger"
@@ -216,7 +219,7 @@ export function WorkflowToolbar({
 
   const handleConfirmEnable = () => {
     startEnableTransition(async () => {
-      const result = await enableAutomation(workflow.id, organizationId);
+      const result = await enableAutomation(automation.id, organizationId);
       if (result.success) {
         updateWorkflowAfterSave(result.automation);
         setReadinessDialogOpen(false);
@@ -229,7 +232,7 @@ export function WorkflowToolbar({
 
   const handleDisable = () => {
     startEnableTransition(async () => {
-      const result = await disableAutomation(workflow.id, organizationId);
+      const result = await disableAutomation(automation.id, organizationId);
       if (result.success) {
         updateWorkflowAfterSave(result.automation);
         toast.success("Automation paused");
@@ -263,18 +266,18 @@ export function WorkflowToolbar({
                 className="group flex items-center gap-1.5 font-semibold transition-colors hover:text-primary"
                 onClick={handleStartEditingName}
               >
-                {workflowState?.name || workflow.name}
+                {automationState?.name || automation.name}
                 <Pencil className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-50" />
               </button>
             )}
             <Badge
               variant={
-                (workflowState?.status ?? workflow.status) === "enabled"
+                (automationState?.status ?? automation.status) === "enabled"
                   ? "default"
                   : "secondary"
               }
             >
-              {workflowState?.status ?? workflow.status}
+              {automationState?.status ?? automation.status}
             </Badge>
             {isDirty && (
               <Badge
@@ -285,9 +288,9 @@ export function WorkflowToolbar({
               </Badge>
             )}
           </div>
-          {(workflowState?.description || workflow.description) && (
+          {(automationState?.description || automation.description) && (
             <p className="text-muted-foreground text-sm">
-              {workflowState?.description || workflow.description}
+              {automationState?.description || automation.description}
             </p>
           )}
         </div>
@@ -436,13 +439,13 @@ export function WorkflowToolbar({
       </div>
 
       <EnableReadinessDialog
+        automation={automation}
         isEnabling={isEnabling}
         onEnable={handleConfirmEnable}
         onOpenChange={setReadinessDialogOpen}
         open={readinessDialogOpen}
         organizationId={organizationId}
         orgSlug={orgSlug}
-        workflow={workflow}
       />
     </div>
   );

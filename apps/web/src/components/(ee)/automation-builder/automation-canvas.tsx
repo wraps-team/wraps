@@ -34,7 +34,7 @@ import { TriggerNode } from "./nodes/trigger-node";
 import { UpdateContactNode } from "./nodes/update-contact-node";
 import { WaitForEmailEngagementNode } from "./nodes/wait-for-email-engagement-node";
 import { WaitForEventNode } from "./nodes/wait-for-event-node";
-import { handleUndoRedo, useWorkflowStore } from "./use-automation-store";
+import { handleUndoRedo, useAutomationStore } from "./use-automation-store";
 
 const nodeTypes: NodeTypes = {
   trigger: TriggerNode,
@@ -59,31 +59,33 @@ const edgeTypes: EdgeTypes = {
   labeled: LabeledEdge,
 };
 
-type WorkflowCanvasProps = {
+type AutomationCanvasProps = {
   smsEnabled?: boolean;
 };
 
-export function WorkflowCanvas({ smsEnabled = false }: WorkflowCanvasProps) {
+export function AutomationCanvas({
+  smsEnabled = false,
+}: AutomationCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] =
     useState<ReactFlowInstance | null>(null);
 
-  const nodes = useWorkflowStore((state) => state.nodes);
-  const edges = useWorkflowStore((state) => state.edges);
-  const onNodesChange = useWorkflowStore(
+  const nodes = useAutomationStore((state) => state.nodes);
+  const edges = useAutomationStore((state) => state.edges);
+  const onNodesChange = useAutomationStore(
     (state) => state.onNodesChange
   ) as OnNodesChange<Node>;
-  const onEdgesChange = useWorkflowStore(
+  const onEdgesChange = useAutomationStore(
     (state) => state.onEdgesChange
   ) as OnEdgesChange;
-  const onConnect = useWorkflowStore((state) => state.onConnect) as OnConnect;
-  const onReconnect = useWorkflowStore(
+  const onConnect = useAutomationStore((state) => state.onConnect) as OnConnect;
+  const onReconnect = useAutomationStore(
     (state) => state.onReconnect
   ) as OnReconnect;
-  const addNode = useWorkflowStore((state) => state.addNode);
-  const selectNode = useWorkflowStore((state) => state.selectNode);
-  const selectedNodeId = useWorkflowStore((state) => state.selectedNodeId);
-  const setCanvasViewport = useWorkflowStore(
+  const addNode = useAutomationStore((state) => state.addNode);
+  const selectNode = useAutomationStore((state) => state.selectNode);
+  const selectedNodeId = useAutomationStore((state) => state.selectedNodeId);
+  const setCanvasViewport = useAutomationStore(
     (state) => state.setCanvasViewport
   );
 

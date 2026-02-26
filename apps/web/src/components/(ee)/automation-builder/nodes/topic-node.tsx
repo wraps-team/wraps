@@ -1,20 +1,20 @@
 "use client";
 
 import { Bell } from "lucide-react";
-import { useWorkflowData } from "../automation-data-context";
-import type { WorkflowNodeData } from "../use-automation-store";
+import { useAutomationData } from "../automation-data-context";
+import type { AutomationNodeData } from "../use-automation-store";
 import { useNodeValidation } from "../use-automation-store";
 import { BaseNode } from "./base-node";
 
 type TopicNodeProps = {
   id: string;
-  data: WorkflowNodeData;
+  data: AutomationNodeData;
   selected?: boolean;
 };
 
 export function TopicNode({ id, data, selected }: TopicNodeProps) {
   const config = data.config;
-  const { topics } = useWorkflowData();
+  const { topics } = useAutomationData();
   const { isValid, errorMessage } = useNodeValidation(id);
   let description = "Configure topic";
   let action = "Subscribe";

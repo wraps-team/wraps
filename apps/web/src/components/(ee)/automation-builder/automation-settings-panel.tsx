@@ -1,6 +1,6 @@
 "use client";
 
-import type { Workflow } from "@wraps/db";
+import type { Automation } from "@wraps/db";
 import { Loader2, RefreshCw, Settings, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { useWorkflowStore } from "./use-automation-store";
+import { useAutomationStore } from "./use-automation-store";
 
 type AwsAccount = {
   id: string;
@@ -40,8 +40,8 @@ type OrgDefaults = {
   defaultSenderId: string | null;
 } | null;
 
-type WorkflowSettingsPanelProps = {
-  workflow: Workflow;
+type AutomationSettingsPanelProps = {
+  automation: Automation;
   organizationId: string;
   orgSlug: string;
   awsAccounts: AwsAccount[];
@@ -49,44 +49,44 @@ type WorkflowSettingsPanelProps = {
   onClose: () => void;
 };
 
-export function WorkflowSettingsPanel({
-  workflow,
+export function AutomationSettingsPanel({
+  automation,
   organizationId,
   orgSlug,
   awsAccounts,
   orgDefaults,
   onClose,
-}: WorkflowSettingsPanelProps) {
-  const workflowState = useWorkflowStore((state) => state.workflow);
-  const updateWorkflowAfterSave = useWorkflowStore(
+}: AutomationSettingsPanelProps) {
+  const automationState = useAutomationStore((state) => state.automation);
+  const updateWorkflowAfterSave = useAutomationStore(
     (state) => state.updateWorkflowAfterSave
   );
 
   // Local state for form values
   // Fallback chain: workflow store -> workflow -> org defaults -> empty
   const [awsAccountId, setAwsAccountId] = useState(
-    workflowState?.awsAccountId ||
-      workflow.awsAccountId ||
+    automationState?.awsAccountId ||
+      automation.awsAccountId ||
       orgDefaults?.defaultAwsAccountId ||
       ""
   );
   const [fromPrefix, setFromPrefix] = useState("");
   const [fromDomain, setFromDomain] = useState("");
   const [fromName, setFromName] = useState(
-    workflowState?.defaultFromName ||
-      workflow.defaultFromName ||
+    automationState?.defaultFromName ||
+      automation.defaultFromName ||
       orgDefaults?.defaultFromName ||
       ""
   );
   const [replyTo, setReplyTo] = useState(
-    workflowState?.defaultReplyTo ||
-      workflow.defaultReplyTo ||
+    automationState?.defaultReplyTo ||
+      automation.defaultReplyTo ||
       orgDefaults?.defaultReplyTo ||
       ""
   );
   const [senderId, setSenderId] = useState(
-    workflowState?.defaultSenderId ||
-      workflow.defaultSenderId ||
+    automationState?.defaultSenderId ||
+      automation.defaultSenderId ||
       orgDefaults?.defaultSenderId ||
       ""
   );
@@ -94,8 +94,8 @@ export function WorkflowSettingsPanel({
   // Parse existing from email into prefix and domain
   useEffect(() => {
     const defaultFrom =
-      workflowState?.defaultFrom ||
-      workflow.defaultFrom ||
+      automationState?.defaultFrom ||
+      automation.defaultFrom ||
       orgDefaults?.defaultFrom ||
       "";
     if (defaultFrom?.includes("@")) {
@@ -104,8 +104,8 @@ export function WorkflowSettingsPanel({
       setFromDomain(domain || "");
     }
   }, [
-    workflowState?.defaultFrom,
-    workflow.defaultFrom,
+    automationState?.defaultFrom,
+    automation.defaultFrom,
     orgDefaults?.defaultFrom,
   ]);
 
@@ -243,7 +243,7 @@ export function WorkflowSettingsPanel({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const result = await updateAutomation(workflow.id, organizationId, {
+      const result = await updateAutomation(automation.id, organizationId, {
         awsAccountId: awsAccountId || null,
         defaultFrom: getFromAddress(),
         defaultFromName: fromName || null,

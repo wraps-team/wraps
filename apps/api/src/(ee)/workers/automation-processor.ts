@@ -12,6 +12,10 @@ import {
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { toPlainText } from "@react-email/render";
 import {
+  type AutomationDefinitionSnapshot,
+  type AutomationStep,
+  type AutomationStepConfig,
+  type AutomationTransition,
   awsAccount,
   CASCADE_ENGAGEMENT_FIELD,
   contact,
@@ -25,10 +29,6 @@ import {
   segment,
   type TriggerConfig,
   template,
-  type WorkflowDefinitionSnapshot,
-  type WorkflowStep,
-  type WorkflowStepConfig,
-  type WorkflowTransition,
   workflow,
   workflowExecution,
   workflowStepExecution,
@@ -46,20 +46,20 @@ import { trackFirstEmailSent } from "../../lib/activation-tracking";
 import { log } from "../../lib/logger";
 import { generateUnsubscribeToken } from "../../lib/unsubscribe-token";
 import {
+  type AutomationJob,
   deleteScheduledStep,
-  enqueueWorkflowStep,
-  enqueueWorkflowStepBatch,
+  enqueueAutomationStep,
+  enqueueAutomationStepBatch,
+  scheduleAutomationStep,
   scheduleWaitTimeout,
-  scheduleWorkflowStep,
-  type WorkflowJob,
 } from "../../services/automation-queue";
-import { createNextWorkflowSchedule } from "../../services/automation-scheduler";
+import { createNextAutomationSchedule } from "../../services/automation-scheduler";
 import { getCredentials } from "../../services/credentials";
 
 export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   const results = await Promise.allSettled(
     event.Records.map(async (record) => {
-      const job: WorkflowJob = JSON.parse(record.body);
+      const job: AutomationJob = JSON.parse(record.body);
 
       switch (job.type) {
         case "execute":
@@ -196,8 +196,8 @@ async function triggerWorkflow(
   }
 
   // Find the trigger step to get the first connected step
-  const steps = wf.steps as WorkflowStep[];
-  const transitions = wf.transitions as WorkflowTransition[];
+  const steps = wf.steps as AutomationStep[];
+  const transitions = wf.transitions as AutomationTransition[];
 
   const triggerStep = steps.find((s) => s.type === "trigger");
   if (!triggerStep) {
@@ -217,7 +217,7 @@ async function triggerWorkflow(
   }
 
   // Snapshot the definition so in-flight executions are immune to edits
-  const definitionSnapshot: WorkflowDefinitionSnapshot = {
+  const definitionSnapshot: AutomationDefinitionSnapshot = {
     steps,
     transitions,
     workflowVersion: wf.version,
@@ -265,7 +265,7 @@ async function triggerWorkflow(
   }
 
   // Process first step
-  await enqueueWorkflowStep({
+  await enqueueAutomationStep({
     type: "execute",
     executionId: execution.id,
     stepId: firstStepId,
@@ -354,7 +354,7 @@ async function processScheduleTrigger(
   });
 
   // Batch enqueue trigger jobs for all contacts
-  await enqueueWorkflowStepBatch(
+  await enqueueAutomationStepBatch(
     contacts.map((c) => ({
       type: "trigger" as const,
       workflowId,
@@ -378,7 +378,7 @@ async function processScheduleTrigger(
   // Isolated in try/catch — failure must NOT propagate to SQS retry,
   // which would duplicate the contact fan-out that already succeeded above.
   try {
-    await createNextWorkflowSchedule({
+    await createNextAutomationSchedule({
       workflowId,
       organizationId,
       cronExpression: config.schedule,
@@ -528,8 +528,8 @@ async function processStep(executionId: string, stepId: string): Promise<void> {
   // Use the frozen definition snapshot (immune to live edits) with
   // fallback to the live definition for pre-snapshot executions
   const snapshot =
-    execution.definitionSnapshot as WorkflowDefinitionSnapshot | null;
-  const steps = snapshot?.steps ?? (wf.steps as WorkflowStep[]);
+    execution.definitionSnapshot as AutomationDefinitionSnapshot | null;
+  const steps = snapshot?.steps ?? (wf.steps as AutomationStep[]);
   const step = steps.find((s) => s.id === stepId);
 
   if (!step) {
@@ -636,7 +636,7 @@ type WorkflowBranch =
   | "bounced";
 
 async function executeStep(
-  step: WorkflowStep,
+  step: AutomationStep,
   execution: typeof workflowExecution.$inferSelect,
   contactRecord: typeof contact.$inferSelect,
   organizationId: string
@@ -717,7 +717,7 @@ async function executeStep(
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function handleSendEmail(
-  config: Extract<WorkflowStepConfig, { type: "send_email" }>,
+  config: Extract<AutomationStepConfig, { type: "send_email" }>,
   execution: typeof workflowExecution.$inferSelect,
   contactRecord: typeof contact.$inferSelect,
   organizationId: string
@@ -1195,7 +1195,7 @@ export function isValidE164Phone(phone: string): boolean {
 }
 
 async function handleSendSms(
-  config: Extract<WorkflowStepConfig, { type: "send_sms" }>,
+  config: Extract<AutomationStepConfig, { type: "send_sms" }>,
   execution: typeof workflowExecution.$inferSelect,
   contactRecord: typeof contact.$inferSelect,
   organizationId: string
@@ -1379,7 +1379,7 @@ async function handleSendSms(
 }
 
 async function handleDelay(
-  config: Extract<WorkflowStepConfig, { type: "delay" }>,
+  config: Extract<AutomationStepConfig, { type: "delay" }>,
   execution: typeof workflowExecution.$inferSelect,
   stepId: string,
   organizationId: string
@@ -1403,8 +1403,8 @@ async function handleDelay(
 
   // Use snapshot transitions (immune to live edits) with fallback for pre-snapshot executions
   const snapshot =
-    execution.definitionSnapshot as WorkflowDefinitionSnapshot | null;
-  let transitions: WorkflowTransition[] | undefined;
+    execution.definitionSnapshot as AutomationDefinitionSnapshot | null;
+  let transitions: AutomationTransition[] | undefined;
 
   if (snapshot) {
     transitions = snapshot.transitions;
@@ -1419,7 +1419,7 @@ async function handleDelay(
         )
       )
       .limit(1);
-    transitions = wf?.transitions as WorkflowTransition[] | undefined;
+    transitions = wf?.transitions as AutomationTransition[] | undefined;
   }
 
   const nextTransition = transitions?.find((t) => t.fromStepId === stepId);
@@ -1431,7 +1431,7 @@ async function handleDelay(
   }
 
   // Schedule the next step
-  const schedulerName = await scheduleWorkflowStep({
+  const schedulerName = await scheduleAutomationStep({
     executionId: execution.id,
     stepId: nextTransition.toStepId,
     organizationId,
@@ -1453,10 +1453,10 @@ async function handleDelay(
 }
 
 async function handleCondition(
-  config: Extract<WorkflowStepConfig, { type: "condition" }>,
+  config: Extract<AutomationStepConfig, { type: "condition" }>,
   contactRecord: typeof contact.$inferSelect,
   execution: typeof workflowExecution.$inferSelect,
-  step: WorkflowStep
+  step: AutomationStep
 ): Promise<{ action: "next"; branch: "yes" | "no" }> {
   // Handle engagement.status — used by cascade condition steps to check
   // whether the contact engaged with a previous email. The preceding
@@ -1604,7 +1604,7 @@ const FIRST_CLASS_CONTACT_FIELDS = new Set([
 ]);
 
 export async function handleUpdateContact(
-  config: Extract<WorkflowStepConfig, { type: "update_contact" }>,
+  config: Extract<AutomationStepConfig, { type: "update_contact" }>,
   contactRecord: typeof contact.$inferSelect
 ): Promise<{ action: "next"; data: Record<string, unknown> }> {
   const updates = config.updates || [];
@@ -1766,7 +1766,7 @@ export async function validateWebhookUrl(url: string): Promise<void> {
 }
 
 async function handleWebhook(
-  config: Extract<WorkflowStepConfig, { type: "webhook" }>,
+  config: Extract<AutomationStepConfig, { type: "webhook" }>,
   contactRecord: typeof contact.$inferSelect,
   execution: typeof workflowExecution.$inferSelect
 ): Promise<{ action: "next"; data: Record<string, unknown> }> {
@@ -1827,7 +1827,7 @@ async function handleWebhook(
 }
 
 async function handleWaitForEvent(
-  config: Extract<WorkflowStepConfig, { type: "wait_for_event" }>,
+  config: Extract<AutomationStepConfig, { type: "wait_for_event" }>,
   execution: typeof workflowExecution.$inferSelect,
   stepId: string,
   organizationId: string
@@ -1859,9 +1859,9 @@ async function handleWaitForEvent(
 }
 
 export async function handleWaitForEmailEngagement(
-  config: Extract<WorkflowStepConfig, { type: "wait_for_email_engagement" }>,
+  config: Extract<AutomationStepConfig, { type: "wait_for_email_engagement" }>,
   execution: typeof workflowExecution.$inferSelect,
-  step: WorkflowStep,
+  step: AutomationStep,
   organizationId: string
 ): Promise<{ action: "wait" }> {
   const timeoutSeconds = config.timeoutSeconds || 259_200; // Default 3 days
@@ -1918,7 +1918,7 @@ export async function handleWaitForEmailEngagement(
 }
 
 async function handleSubscribeTopic(
-  config: Extract<WorkflowStepConfig, { type: "subscribe_topic" }>,
+  config: Extract<AutomationStepConfig, { type: "subscribe_topic" }>,
   contactRecord: typeof contact.$inferSelect
 ): Promise<{ action: "next"; data: Record<string, unknown> }> {
   // Upsert contact-topic subscription
@@ -1950,7 +1950,7 @@ async function handleSubscribeTopic(
 }
 
 async function handleUnsubscribeTopic(
-  config: Extract<WorkflowStepConfig, { type: "unsubscribe_topic" }>,
+  config: Extract<AutomationStepConfig, { type: "unsubscribe_topic" }>,
   contactRecord: typeof contact.$inferSelect
 ): Promise<{ action: "next"; data: Record<string, unknown> }> {
   // Update subscription to unsubscribe
@@ -1986,14 +1986,14 @@ async function handleUnsubscribeTopic(
  */
 async function processNextStep(
   execution: typeof workflowExecution.$inferSelect,
-  currentStep: WorkflowStep,
+  currentStep: AutomationStep,
   wf: typeof workflow.$inferSelect,
   branch?: WorkflowBranch
 ): Promise<void> {
-  const transitions = wf.transitions as WorkflowTransition[];
+  const transitions = wf.transitions as AutomationTransition[];
 
   // Find matching transition
-  let nextTransition: WorkflowTransition | undefined;
+  let nextTransition: AutomationTransition | undefined;
 
   if (branch) {
     // Look for transition with matching branch
@@ -2018,7 +2018,7 @@ async function processNextStep(
   }
 
   // Enqueue next step for processing
-  await enqueueWorkflowStep({
+  await enqueueAutomationStep({
     type: "execute",
     executionId: execution.id,
     stepId: nextTransition.toStepId,
@@ -2097,8 +2097,8 @@ async function resumeExecution(
 
   // Use snapshot (immune to live edits) with fallback for pre-snapshot executions
   const snapshot =
-    claimed.definitionSnapshot as WorkflowDefinitionSnapshot | null;
-  const steps = snapshot?.steps ?? (wf.steps as WorkflowStep[]);
+    claimed.definitionSnapshot as AutomationDefinitionSnapshot | null;
+  const steps = snapshot?.steps ?? (wf.steps as AutomationStep[]);
   const currentStep = steps.find((s) => s.id === claimed.currentStepId);
 
   if (!currentStep) {

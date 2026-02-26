@@ -3,12 +3,12 @@
 import { Handle, Position } from "@xyflow/react";
 import { Hourglass } from "lucide-react";
 import { cn, formatDurationVerbose } from "@/lib/utils";
-import type { WorkflowNodeData } from "../use-automation-store";
+import type { AutomationNodeData } from "../use-automation-store";
 import { useNodeValidation } from "../use-automation-store";
 
 type WaitForEventNodeProps = {
   id: string;
-  data: WorkflowNodeData;
+  data: AutomationNodeData;
   selected?: boolean;
 };
 

@@ -69,5 +69,5 @@ pnpm --filter @wraps/api test:coverage src/__tests__/my-test.test.ts
 ## Key Files
 
 - `src/routes/` - API route handlers
-- `src/services/workflow-events.ts` - Event emission helpers
+- `src/services/automation-events.ts` - Event emission helpers
 - `src/middleware/auth.ts` - Authentication middleware
