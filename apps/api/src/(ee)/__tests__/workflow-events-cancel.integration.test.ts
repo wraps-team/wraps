@@ -28,7 +28,8 @@ import {
 } from "vitest";
 
 // Mock the workflow-queue module to avoid actual AWS calls
-vi.mock("../../services/workflow-queue", () => ({
+vi.mock("../../services/automation-queue", () => ({
+  enqueueAutomationStep: vi.fn().mockResolvedValue(undefined),
   enqueueWorkflowStep: vi.fn().mockResolvedValue(undefined),
   deleteScheduledStep: vi.fn().mockResolvedValue(undefined),
 }));

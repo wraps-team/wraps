@@ -158,15 +158,19 @@ vi.mock("../../services/credentials", () => ({
   }),
 }));
 
-vi.mock("../../services/workflow-queue", () => ({
+vi.mock("../../services/automation-queue", () => ({
+  enqueueAutomationStep: mockEnqueueWorkflowStep,
   enqueueWorkflowStep: mockEnqueueWorkflowStep,
+  enqueueAutomationStepBatch: mockEnqueueWorkflowStepBatch,
   enqueueWorkflowStepBatch: mockEnqueueWorkflowStepBatch,
   scheduleWaitTimeout: mockScheduleWaitTimeout,
+  scheduleAutomationStep: mockScheduleWorkflowStep,
   scheduleWorkflowStep: mockScheduleWorkflowStep,
   deleteScheduledStep: mockDeleteScheduledStep,
 }));
 
-vi.mock("../../services/workflow-scheduler", () => ({
+vi.mock("../../services/automation-scheduler", () => ({
+  createNextAutomationSchedule: mockCreateNextWorkflowSchedule,
   createNextWorkflowSchedule: mockCreateNextWorkflowSchedule,
 }));
 

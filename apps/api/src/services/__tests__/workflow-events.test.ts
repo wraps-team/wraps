@@ -24,7 +24,11 @@ const enqueuedSteps: Array<{
 }> = [];
 
 // Mock enqueueWorkflowStep
-vi.mock("../workflow-queue", () => ({
+vi.mock("../automation-queue", () => ({
+  enqueueAutomationStep: vi.fn().mockImplementation((step) => {
+    enqueuedSteps.push(step);
+    return Promise.resolve();
+  }),
   enqueueWorkflowStep: vi.fn().mockImplementation((step) => {
     enqueuedSteps.push(step);
     return Promise.resolve();
@@ -79,12 +83,27 @@ vi.mock("@wraps/db", () => ({
   contact: { id: "id" },
   contactEvent: {},
   segment: { id: "id", name: "name" },
+  automation: {
+    id: "id",
+    organizationId: "organization_id",
+    status: "status",
+    triggerType: "trigger_type",
+    triggerConfig: "trigger_config",
+  },
   workflow: {
     id: "id",
     organizationId: "organization_id",
     status: "status",
     triggerType: "trigger_type",
     triggerConfig: "trigger_config",
+  },
+  automationExecution: {
+    id: "id",
+    contactId: "contact_id",
+    workflowId: "workflow_id",
+    status: "status",
+    delaySchedulerName: "delay_scheduler_name",
+    waitTimeoutSchedulerName: "wait_timeout_scheduler_name",
   },
   workflowExecution: {
     id: "id",

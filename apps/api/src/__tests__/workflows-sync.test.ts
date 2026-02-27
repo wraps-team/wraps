@@ -70,6 +70,7 @@ vi.mock("@wraps/db", () => ({
     id: "awsAccount.id",
     organizationId: "awsAccount.organizationId",
   },
+  automation: "workflow",
   workflow: "workflow",
   template: "template",
   eq: vi.fn(),

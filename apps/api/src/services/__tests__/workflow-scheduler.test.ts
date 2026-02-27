@@ -88,7 +88,7 @@ describe("createNextWorkflowSchedule", () => {
         cronExpression: "0 9 * * 1",
       })
     ).rejects.toThrow(
-      "EventBridge Scheduler not configured for workflow schedules"
+      "EventBridge Scheduler not configured for automation schedules"
     );
   });
 

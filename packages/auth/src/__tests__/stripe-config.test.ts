@@ -1,18 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { auth, subscriptionPlans } from "../index";
 
+const hasStripeEnv = !!process.env.STRIPE_SECRET_KEY;
+
 describe("Better-Auth Stripe Plugin Configuration", () => {
-  it("should have Stripe plugin configured", () => {
+  it("should have Stripe plugin configured when env vars are set", () => {
     expect(auth).toBeDefined();
     expect(auth.options).toBeDefined();
     expect(auth.options.plugins).toBeDefined();
 
-    // Check that plugins array includes stripe-related plugin
     const hasStripePlugin = auth.options.plugins?.some(
       (plugin: any) => plugin?.id === "stripe" || plugin?.$id === "stripe"
     );
 
-    expect(hasStripePlugin).toBe(true);
+    if (hasStripeEnv) {
+      expect(hasStripePlugin).toBe(true);
+    } else {
+      // Stripe plugin is conditionally loaded — won't be present without env vars
+      expect(hasStripePlugin).toBe(false);
+    }
   });
 
   it("should have organization plugin configured", () => {
@@ -124,28 +130,20 @@ describe("Better-Auth Stripe Plugin - Plan Configuration", () => {
 });
 
 describe("Better-Auth Environment Configuration", () => {
-  it("should require Stripe secret key", () => {
-    // In test environment, this might be empty, but the config should reference it
-    expect(
-      process.env.STRIPE_SECRET_KEY !== undefined ||
-        process.env.STRIPE_SECRET_KEY === ""
-    ).toBe(true);
+  it.skipIf(!hasStripeEnv)("should require Stripe secret key", () => {
+    expect(process.env.STRIPE_SECRET_KEY).toBeDefined();
   });
 
-  it("should require Stripe webhook secret", () => {
-    expect(
-      process.env.STRIPE_WEBHOOK_SECRET !== undefined ||
-        process.env.STRIPE_WEBHOOK_SECRET === ""
-    ).toBe(true);
+  it.skipIf(!hasStripeEnv)("should require Stripe webhook secret", () => {
+    expect(process.env.STRIPE_WEBHOOK_SECRET).toBeDefined();
   });
 
-  it("should have Growth plan price IDs configured", () => {
-    // Check that environment variables are expected to be set
-    expect(
-      process.env.STRIPE_GROWTH_PRICE_ID !== undefined ||
-        process.env.STRIPE_GROWTH_PRICE_ID === ""
-    ).toBe(true);
-  });
+  it.skipIf(!hasStripeEnv)(
+    "should have Growth plan price IDs configured",
+    () => {
+      expect(process.env.STRIPE_GROWTH_PRICE_ID).toBeDefined();
+    }
+  );
 
   it("should have database adapter configured", () => {
     expect(auth.options.database).toBeDefined();

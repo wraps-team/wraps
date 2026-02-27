@@ -29,6 +29,13 @@ vi.mock("@wraps/db", () => {
     getSegmentsByIds: vi.fn(),
     buildConditionSQL: vi.fn(),
     buildFilterSQL: vi.fn(),
+    automation: {
+      id: "id",
+      organizationId: "organization_id",
+      status: "status",
+      triggerType: "trigger_type",
+      triggerConfig: "trigger_config",
+    },
     workflow: {
       id: "id",
       organizationId: "organization_id",
@@ -52,6 +59,12 @@ vi.mock("@wraps/db", () => {
       eventName: "event_name",
       createdAt: "created_at",
     },
+    automationExecution: {
+      id: "id",
+      workflowId: "workflow_id",
+      contactId: "contact_id",
+      status: "status",
+    },
     workflowExecution: {
       id: "id",
       workflowId: "workflow_id",
@@ -61,10 +74,16 @@ vi.mock("@wraps/db", () => {
   };
 });
 
-// Mock workflow-queue
-vi.mock("../workflow-queue", () => ({
-  enqueueWorkflowStepBatch: vi.fn(),
-  enqueueWorkflowStep: vi.fn(),
+// Mock workflow-queue — both names must share the same vi.fn() instance
+const { mockEnqueueStepBatch, mockEnqueueStep } = vi.hoisted(() => ({
+  mockEnqueueStepBatch: vi.fn(),
+  mockEnqueueStep: vi.fn(),
+}));
+vi.mock("../automation-queue", () => ({
+  enqueueAutomationStepBatch: mockEnqueueStepBatch,
+  enqueueWorkflowStepBatch: mockEnqueueStepBatch,
+  enqueueAutomationStep: mockEnqueueStep,
+  enqueueWorkflowStep: mockEnqueueStep,
   deleteScheduledStep: vi.fn(),
 }));
 
@@ -80,11 +99,10 @@ vi.mock("../../lib/logger", () => ({
 // Import after mocks are set up
 import { contactMatchesCondition, getSegmentsByIds } from "@wraps/db";
 import { checkSegmentEntry, checkSegmentExit } from "../workflow-events";
-import { enqueueWorkflowStepBatch } from "../workflow-queue";
 
 const mockContactMatches = vi.mocked(contactMatchesCondition);
 const mockGetSegments = vi.mocked(getSegmentsByIds);
-const mockEnqueue = vi.mocked(enqueueWorkflowStepBatch);
+const mockEnqueue = mockEnqueueStepBatch;
 
 describe("checkSegmentEntry", () => {
   beforeEach(() => {

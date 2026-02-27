@@ -63,6 +63,15 @@ vi.mock("@wraps/db", () => ({
   messageSend: {},
   organization: {},
   template: {},
+  automation: {},
+  automationExecution: { id: "workflowExecution.id" },
+  automationStepExecution: {
+    executionId: "wse.executionId",
+    stepType: "wse.stepType",
+    status: "wse.status",
+    stepId: "wse.stepId",
+    completedAt: "wse.completedAt",
+  },
   workflow: {},
   workflowExecution: { id: "workflowExecution.id" },
   workflowStepExecution: {
@@ -97,15 +106,19 @@ vi.mock("../services/credentials", () => ({
 }));
 
 // Mock paths relative to THIS test file (src/__tests__/) to reach src/services/
-vi.mock("../services/workflow-queue", () => ({
+vi.mock("../services/automation-queue", () => ({
   deleteScheduledStep: vi.fn(),
+  enqueueAutomationStep: vi.fn(),
+  enqueueAutomationStepBatch: vi.fn(),
   enqueueWorkflowStep: vi.fn(),
   enqueueWorkflowStepBatch: vi.fn(),
   scheduleWaitTimeout: (...args: any[]) => mockScheduleWaitTimeout(...args),
+  scheduleAutomationStep: vi.fn(),
   scheduleWorkflowStep: vi.fn(),
 }));
 
-vi.mock("../services/workflow-scheduler", () => ({
+vi.mock("../services/automation-scheduler", () => ({
+  createNextAutomationSchedule: vi.fn(),
   createNextWorkflowSchedule: vi.fn(),
 }));
 
