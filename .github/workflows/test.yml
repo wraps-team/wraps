@@ -72,12 +72,7 @@ jobs:
           node-version: 20.x
 
       - name: Run baseline (changed files only)
-        if: github.event_name == 'pull_request'
         run: pnpm dlx code-baseline@1.2.2 scan --format github --changed-only .
-
-      - name: Run baseline (full scan)
-        if: github.event_name == 'push'
-        run: pnpm dlx code-baseline@1.2.2 scan --format github .
 
   lint:
     runs-on: blacksmith-2vcpu-ubuntu-2404

@@ -86,19 +86,23 @@ jobs:
             echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create release with assets
+      - name: Create or update release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ steps.meta.outputs.tag }}" \
-            wraps-*.tar.gz CHECKSUMS.sha256 \
-            --repo ${{ github.repository }} \
-            --title "CLI v${{ steps.meta.outputs.version }}" \
-            --generate-notes \
-            --notes "## Install
+          if gh release view "${{ steps.meta.outputs.tag }}" --repo ${{ github.repository }} >/dev/null 2>&1; then
+            gh release upload "${{ steps.meta.outputs.tag }}" wraps-*.tar.gz CHECKSUMS.sha256 --repo ${{ github.repository }} --clobber
+          else
+            gh release create "${{ steps.meta.outputs.tag }}" \
+              wraps-*.tar.gz CHECKSUMS.sha256 \
+              --repo ${{ github.repository }} \
+              --title "CLI v${{ steps.meta.outputs.version }}" \
+              --generate-notes \
+              --notes "## Install
 
-          \`\`\`bash
-          curl -fsSL https://get.wraps.dev | sh
-          \`\`\`
+            \`\`\`bash
+            curl -fsSL https://get.wraps.dev | sh
+            \`\`\`
 
-          Or download the binary for your platform below."
+            Or download the binary for your platform below."
+          fi
