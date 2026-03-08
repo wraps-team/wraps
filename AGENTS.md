@@ -560,8 +560,8 @@ Standard commands are in root `package.json` and `CLAUDE.md`. Key ones: `pnpm bu
 ### Non-obvious caveats
 
 - **Bun is required** for `apps/api` dev mode and `packages/tui` build. Install globally with `npm install -g bun`.
-- **`apps/web/.env.local` is the central env file.** Both `apps/api` (via `--env-file=../web/.env.local`) and SST read from it. Create it from `apps/web/.env.example`. At minimum set `DATABASE_URL`, `BETTER_AUTH_SECRET`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGIN`.
-- **`apps/website/.env.local`** needs at minimum `DATABASE_URL` (used for waitlist API endpoint).
+- **`.env.local` files are auto-generated from injected secrets.** The update script writes `apps/web/.env.local` and `apps/website/.env.local` from environment variables injected via Cursor Cloud secrets. Both `apps/api` (via `--env-file=../web/.env.local`) and SST read from `apps/web/.env.local`.
+- **If secrets change**, just re-run the update script or restart the VM to regenerate `.env.local` files.
 - **Build before dev**: Run `pnpm build` at least once after `pnpm install` so cross-package types/dist are available. Workspace packages like `@wraps/db`, `@wraps/core`, `@wraps/auth` must be built before dependent apps.
 - **Lint `pnpm check` vs `pnpm check:errors`**: `pnpm check` reports warnings + errors (currently ~3500 warnings). `pnpm check:errors` reports only errors and is what `check:all` uses. There is one pre-existing formatting error in `packages/cli/src/commands/email/templates/push.ts`.
 - **Auth tests need Stripe env vars**: 4 tests in `packages/auth` (`stripe-config.test.ts`) fail without `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_GROWTH_PRICE_ID` in the environment. All other tests pass without external services.
