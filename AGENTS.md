@@ -564,6 +564,6 @@ Standard commands are in root `package.json` and `CLAUDE.md`. Key ones: `pnpm bu
 - **If secrets change**, just re-run the update script or restart the VM to regenerate `.env.local` files.
 - **Build before dev**: Run `pnpm build` at least once after `pnpm install` so cross-package types/dist are available. Workspace packages like `@wraps/db`, `@wraps/core`, `@wraps/auth` must be built before dependent apps.
 - **Lint `pnpm check` vs `pnpm check:errors`**: `pnpm check` reports warnings + errors (currently ~3500 warnings). `pnpm check:errors` reports only errors and is what `check:all` uses. There is one pre-existing formatting error in `packages/cli/src/commands/email/templates/push.ts`.
-- **Auth tests need Stripe env vars**: 4 tests in `packages/auth` (`stripe-config.test.ts`) fail without `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_GROWTH_PRICE_ID` in the environment. All other tests pass without external services.
+- **Auth tests need Stripe env vars**: Tests in `packages/auth` (`stripe-config.test.ts`) require `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_GROWTH_PRICE_ID` in the environment. These are provided via Cursor Cloud secrets. All tests pass without external services when secrets are injected.
 - **Turbo TUI mode**: When redirecting turbo output to a file/pipe, set `TURBO_UI=stream` to avoid hangs.
 - **No database needed for most tests**: The test suites mock database calls. Only integration tests (`test:integration`) require a live Neon PostgreSQL connection.
