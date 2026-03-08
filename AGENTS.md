@@ -542,3 +542,28 @@ SMS sending: ~$0.00849/segment + carrier fees (AWS pricing).
 - npm (email): https://npmjs.com/package/@wraps.dev/email
 - npm (sms): https://npmjs.com/package/@wraps.dev/sms
 - npm (cli): https://npmjs.com/package/@wraps.dev/cli
+
+## Cursor Cloud specific instructions
+
+### Environment overview
+
+Turborepo monorepo with pnpm 10 workspaces. Three runnable services:
+
+| Service | Directory | Port | Dev command |
+|---------|-----------|------|-------------|
+| Web Dashboard | `apps/web` | 3000 | `pnpm --filter @wraps/web dev` |
+| Marketing Website | `apps/website` | 3001 | `pnpm --filter wraps-website dev` |
+| API (Elysia) | `apps/api` | 3002 | `pnpm --filter @wraps/api dev` (requires bun) |
+
+Standard commands are in root `package.json` and `CLAUDE.md`. Key ones: `pnpm build`, `pnpm dev`, `pnpm test`, `pnpm check`, `pnpm check:errors`, `pnpm check:all`.
+
+### Non-obvious caveats
+
+- **Bun is required** for `apps/api` dev mode and `packages/tui` build. Install globally with `npm install -g bun`.
+- **`apps/web/.env.local` is the central env file.** Both `apps/api` (via `--env-file=../web/.env.local`) and SST read from it. Create it from `apps/web/.env.example`. At minimum set `DATABASE_URL`, `BETTER_AUTH_SECRET`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGIN`.
+- **`apps/website/.env.local`** needs at minimum `DATABASE_URL` (used for waitlist API endpoint).
+- **Build before dev**: Run `pnpm build` at least once after `pnpm install` so cross-package types/dist are available. Workspace packages like `@wraps/db`, `@wraps/core`, `@wraps/auth` must be built before dependent apps.
+- **Lint `pnpm check` vs `pnpm check:errors`**: `pnpm check` reports warnings + errors (currently ~3500 warnings). `pnpm check:errors` reports only errors and is what `check:all` uses. There is one pre-existing formatting error in `packages/cli/src/commands/email/templates/push.ts`.
+- **Auth tests need Stripe env vars**: 4 tests in `packages/auth` (`stripe-config.test.ts`) fail without `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_GROWTH_PRICE_ID` in the environment. All other tests pass without external services.
+- **Turbo TUI mode**: When redirecting turbo output to a file/pipe, set `TURBO_UI=stream` to avoid hangs.
+- **No database needed for most tests**: The test suites mock database calls. Only integration tests (`test:integration`) require a live Neon PostgreSQL connection.
