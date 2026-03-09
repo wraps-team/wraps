@@ -1,4 +1,9 @@
-import type { Workflow, WorkflowStatus } from "@wraps/db";
+import type {
+  Workflow,
+  WorkflowExecutionStatus,
+  WorkflowStatus,
+  WorkflowStepExecutionStatus,
+} from "@wraps/db";
 
 /**
  * Workflow status labels for display
@@ -18,6 +23,44 @@ export const WORKFLOW_STATUS_COLORS: Record<WorkflowStatus, string> = {
   enabled: "bg-green-100 text-green-700",
   paused: "bg-yellow-100 text-yellow-700",
   archived: "bg-gray-100 text-gray-500",
+};
+
+export const EXECUTION_STATUS_LABELS: Record<WorkflowExecutionStatus, string> =
+  {
+    pending: "Pending",
+    active: "Active",
+    paused: "Paused",
+    waiting: "Waiting",
+    completed: "Completed",
+    failed: "Failed",
+    cancelled: "Cancelled",
+  };
+
+export const EXECUTION_STATUS_COLORS: Record<WorkflowExecutionStatus, string> =
+  {
+    pending: "bg-gray-100 text-gray-700",
+    active: "bg-blue-100 text-blue-700",
+    paused: "bg-yellow-100 text-yellow-700",
+    waiting: "bg-purple-100 text-purple-700",
+    completed: "bg-green-100 text-green-700",
+    failed: "bg-red-100 text-red-700",
+    cancelled: "bg-gray-100 text-gray-500",
+  };
+
+export const STEP_STATUS_LABELS: Record<WorkflowStepExecutionStatus, string> = {
+  pending: "Pending",
+  executing: "Executing",
+  completed: "Completed",
+  failed: "Failed",
+  skipped: "Skipped",
+};
+
+export const STEP_STATUS_COLORS: Record<WorkflowStepExecutionStatus, string> = {
+  pending: "bg-gray-100 text-gray-700",
+  executing: "bg-blue-100 text-blue-700",
+  completed: "bg-green-100 text-green-700",
+  failed: "bg-red-100 text-red-700",
+  skipped: "bg-gray-100 text-gray-500",
 };
 
 /**

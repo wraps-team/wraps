@@ -36,7 +36,6 @@ type Props = {
 };
 
 export default function NudgeSendBroadcast({
-  firstName,
   contactCount,
   dashboardUrl,
   unsubscribeUrl,
@@ -49,7 +48,7 @@ export default function NudgeSendBroadcast({
         <Body className="bg-white font-sans">
           <Container className="mx-auto max-w-[580px] px-4 py-10">
             <Text className="text-[15px] leading-relaxed text-gray-800">
-              Hey {firstName},
+              {"{{#if firstName}}Hey {{firstName}},{{else}}Hey there,{{/if}}"}
             </Text>
 
             <Text className="text-[15px] leading-relaxed text-gray-800">

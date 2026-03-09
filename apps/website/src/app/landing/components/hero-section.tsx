@@ -1,4 +1,5 @@
 import { Github } from "lucide-react";
+import Image from "next/image";
 import { DotPattern } from "@/components/dot-pattern";
 import { HeroAnimatedCTA } from "./hero-cta";
 
@@ -28,21 +29,34 @@ export function HeroSection() {
 
           {/* Main Headline - server rendered, CSS animation */}
           <h1 className="max-w-[864px] text-left text-[28px] font-medium leading-[32px] animate-fade-in-up md:text-[34px] md:leading-[40px] lg:text-[48px] lg:leading-[56px]">
-            Stop overpaying for email.
+            The email platform that sends through{" "}
+            <span className="text-orange-500">your AWS.</span>
           </h1>
 
           {/* Subheadline - server rendered, CSS animation */}
           <p className="mt-4 max-w-[750px] text-left text-[16px] leading-[24px] text-muted-foreground animate-fade-in-up animation-delay-100 md:text-[18px] md:leading-[26px] lg:text-[20px] lg:leading-[28px]">
-            AWS SES sends for $0.10/1,000 emails. Postmark charges $1.50.
-            <br />
-            Wraps gives you Postmark's DX on your own AWS — deployed in one
-            command.
+            Automate on user behavior. Design templates. Schedule broadcasts.
+            Transparent pricing. Sending infrastructure you own.
           </p>
 
           {/* Founder credibility */}
-          <p className="mt-3 text-left text-[13px] text-muted-foreground/70 animate-fade-in-up animation-delay-100">
-            Built by an ex-SendGrid engineer.
-          </p>
+          <div className="mt-4 flex items-center gap-2.5 animate-fade-in-up animation-delay-100">
+            <Image
+              alt="Jarod, founder of Wraps"
+              className="shrink-0 rounded-full"
+              height={36}
+              src="/team/jarod-medium-smile.webp"
+              width={36}
+            />
+            <a
+              className="text-left text-[15px] leading-[22px] text-muted-foreground underline underline-offset-2 hover:text-foreground md:text-[16px]"
+              href="https://x.com/stewartjarod"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Built by an ex-SendGrid engineer
+            </a>
+          </div>
 
           {/* CTA - client component for tracking */}
           <HeroAnimatedCTA />

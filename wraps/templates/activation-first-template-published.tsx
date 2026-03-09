@@ -16,7 +16,8 @@ import { Footer } from "./_components/footer";
 
 // ── Metadata ──
 
-export const subject = "Template published to SES, {{firstName}}";
+export const subject =
+  "Template published to SES{{#if firstName}}, {{firstName}}{{/if}}";
 export const emailType = "transactional" as const;
 export const previewText =
   "Your template is live on AWS SES. You can now send emails with it.";
@@ -40,7 +41,6 @@ type Props = {
 };
 
 export default function FirstTemplatePublishedEmail({
-  firstName,
   templateName,
   dashboardUrl,
   unsubscribeUrl,
@@ -102,9 +102,11 @@ export default function FirstTemplatePublishedEmail({
               </div>
               <div style={{ padding: "32px" }}>
                 <Text className="m-0 mb-5 text-base leading-relaxed text-gray-600">
-                  Great milestone, {firstName}. Your template is now available
-                  on AWS SES, which means you can use it anywhere &mdash;
-                  broadcasts, workflows, or the API.
+                  {
+                    "{{#if firstName}}Great milestone, {{firstName}}. Your{{else}}Your{{/if}}"
+                  }{" "}
+                  template is now available on AWS SES, which means you can use
+                  it anywhere &mdash; broadcasts, workflows, or the API.
                 </Text>
                 <Hr className="my-6 border-gray-200" />
                 <Text className="m-0 mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">

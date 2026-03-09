@@ -430,10 +430,12 @@ async function pushToSES(
   const ses = new SESClient({ region });
 
   try {
+    progress.start(
+      `Pushing ${templates.length} template${templates.length === 1 ? "" : "s"} to SES`
+    );
+
     const settled = await Promise.allSettled(
       templates.map(async (t) => {
-        progress.start(`Pushing ${pc.cyan(t.slug)} to SES`);
-
         const templateData = {
           TemplateName: t.sesTemplateName,
           SubjectPart: t.subject,
@@ -461,11 +463,11 @@ async function pushToSES(
           await ses.send(new CreateTemplateCommand({ Template: templateData }));
         }
 
-        progress.succeed(`Pushed ${pc.cyan(t.slug)} to SES`);
         return { slug: t.slug };
       })
     );
 
+    const failures: string[] = [];
     for (let i = 0; i < templates.length; i++) {
       const result = settled[i];
       if (result.status === "fulfilled") {
@@ -476,7 +478,21 @@ async function pushToSES(
             ? result.reason.message
             : String(result.reason);
         results.push({ slug: templates[i].slug, success: false });
-        progress.fail(`SES push failed for ${templates[i].slug}: ${msg}`);
+        failures.push(`${templates[i].slug}: ${msg}`);
+      }
+    }
+
+    const successCount = results.filter((r) => r.success).length;
+    if (failures.length === 0) {
+      progress.succeed(
+        `Pushed ${successCount} template${successCount === 1 ? "" : "s"} to SES`
+      );
+    } else {
+      progress.succeed(
+        `Pushed ${successCount}/${templates.length} templates to SES`
+      );
+      for (const f of failures) {
+        progress.fail(`SES push failed: ${f}`);
       }
     }
 

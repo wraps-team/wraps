@@ -16,7 +16,8 @@ import {
 
 // ── Metadata ──
 
-export const subject = "The setup just got easier, {{firstName}}.";
+export const subject =
+  "The setup just got easier{{#if firstName}}, {{firstName}}{{/if}}.";
 export const emailType = "marketing" as const;
 export const previewText =
   "We rebuilt the init process from scratch. 4 commands, 2 minutes, done.";
@@ -38,7 +39,6 @@ type Props = {
 };
 
 export default function ReengagementActivateEmail({
-  firstName,
   unsubscribeUrl,
   preferencesUrl,
 }: Props) {
@@ -100,7 +100,8 @@ export default function ReengagementActivateEmail({
                   color: "#fafaf9",
                 }}
               >
-                Hey {firstName}, the setup just got easier.
+                {"{{#if firstName}}Hey {{firstName}}, the{{else}}The{{/if}}"}{" "}
+                setup just got easier.
               </Heading>
               <Text
                 style={{

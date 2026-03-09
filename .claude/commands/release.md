@@ -20,7 +20,7 @@ If no arguments are provided, ask the user which package and bump type.
 
 ## Publishable Packages
 
-Only these packages trigger the CI publish workflow:
+Only these packages trigger the CI release workflow:
 
 | Short name | npm package | Directory |
 |---|---|---|
@@ -31,7 +31,7 @@ Only these packages trigger the CI publish workflow:
 
 ## Critical: Tag Format
 
-The CI workflow (`.github/workflows/publish.yml`) **requires** tags in the format:
+The CI workflow (`.github/workflows/release.yml`) **requires** tags in the format:
 
 ```
 <package>-v<version>
@@ -40,6 +40,15 @@ The CI workflow (`.github/workflows/publish.yml`) **requires** tags in the forma
 Examples: `cli-v2.9.3`, `cdk-v1.0.0`, `pulumi-v0.5.0-beta.1`
 
 **NEVER** use bare `v<version>` tags (e.g., `v2.9.3`). These will fail CI.
+
+## How CI Works
+
+Pushing a tag triggers `.github/workflows/release.yml` which handles:
+1. **npm publish** — all packages
+2. **Standalone binary builds** — CLI only (darwin-arm64, darwin-x64, linux-x64, linux-arm64)
+3. **GitHub release** — creates if missing, or uploads binaries to existing release
+
+This means you can optionally create the GH release with notes before pushing the tag (the workflow will detect it and just upload binaries), OR skip it and let the workflow auto-create with `--generate-notes`.
 
 ## Steps
 

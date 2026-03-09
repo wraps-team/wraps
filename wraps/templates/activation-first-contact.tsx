@@ -18,7 +18,8 @@ import { Footer } from "./_components/footer";
 
 // ── Metadata ──
 
-export const subject = "You added your first contact, {{firstName}}!";
+export const subject =
+  "You added your first contact{{#if firstName}}, {{firstName}}{{/if}}!";
 export const emailType = "transactional" as const;
 export const previewText =
   "Your audience is growing. Here's how to make the most of it.";
@@ -42,7 +43,6 @@ type Props = {
 };
 
 export default function FirstContactEmail({
-  firstName,
   contactName,
   dashboardUrl,
   unsubscribeUrl,
@@ -94,7 +94,9 @@ export default function FirstContactEmail({
                 </Text>
               </div>
               <Heading className="m-0 mb-4 text-2xl font-semibold text-gray-800">
-                Your audience starts here, {firstName}.
+                {
+                  "{{#if firstName}}Your audience starts here, {{firstName}}.{{else}}Your audience starts here.{{/if}}"
+                }
               </Heading>
               <Text className="m-0 mb-5 text-base leading-relaxed text-gray-600">
                 You just added <strong>{contactName}</strong> as your first

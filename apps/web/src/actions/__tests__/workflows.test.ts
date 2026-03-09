@@ -11,6 +11,7 @@ import {
   user,
   workflow,
   workflowExecution,
+  workflowStepExecution,
 } from "@wraps/db";
 import { eq } from "drizzle-orm";
 import {
@@ -29,7 +30,9 @@ import {
   duplicateWorkflow,
   enableWorkflow,
   getWorkflow,
+  getWorkflowExecution,
   getWorkflowStats,
+  listWorkflowExecutions,
   listWorkflows,
   updateWorkflow,
 } from "../workflows";
@@ -108,6 +111,26 @@ const testTemplate = {
   createdAt: new Date(),
   updatedAt: new Date(),
   createdBy: testUser.id,
+};
+
+const testContact = {
+  id: "test-workflows-contact-1",
+  organizationId: testOrganization.id,
+  email: "contact@example.com",
+  firstName: "Jane",
+  lastName: "Doe",
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
+const testContact2 = {
+  id: "test-workflows-contact-2",
+  organizationId: testOrganization.id,
+  email: "contact2@example.com",
+  firstName: "John",
+  lastName: "Smith",
+  createdAt: new Date(),
+  updatedAt: new Date(),
 };
 
 // Track current mock user
@@ -251,6 +274,23 @@ beforeAll(async () => {
       target: template.id,
       set: { name: testTemplate.name },
     });
+
+  // Insert test contacts (required for execution history tests)
+  await db
+    .insert(contact)
+    .values(testContact)
+    .onConflictDoUpdate({
+      target: contact.id,
+      set: { updatedAt: new Date() },
+    });
+
+  await db
+    .insert(contact)
+    .values(testContact2)
+    .onConflictDoUpdate({
+      target: contact.id,
+      set: { updatedAt: new Date() },
+    });
 });
 
 // Clean up workflows before each test and reset mock user
@@ -281,6 +321,8 @@ afterAll(async () => {
   await db
     .delete(subscription)
     .where(eq(subscription.id, `sub_test_workflows_${testOrganization.id}`));
+  await db.delete(contact).where(eq(contact.id, testContact.id));
+  await db.delete(contact).where(eq(contact.id, testContact2.id));
   await db.delete(organization).where(eq(organization.id, testOrganization.id));
   await db.delete(user).where(eq(user.id, testUser.id));
   await db.delete(user).where(eq(user.id, testMemberUser.id));
@@ -1289,6 +1331,189 @@ describe("Workflows Server Actions", () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.workflow.name).toBe("Updated by Member");
+      }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // listWorkflowExecutions
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe("listWorkflowExecutions", () => {
+    it("should return paginated executions with contact info, scoped by org", async () => {
+      // Create a workflow
+      const wfResult = await createWorkflow(testOrganization.id, {
+        name: "Execution List Test",
+      });
+      expect(wfResult.success).toBe(true);
+      if (!wfResult.success) return;
+
+      // Insert executions directly
+      await db.insert(workflowExecution).values([
+        {
+          workflowId: wfResult.workflow.id,
+          contactId: testContact.id,
+          organizationId: testOrganization.id,
+          status: "completed",
+          startedAt: new Date("2026-03-01"),
+          completedAt: new Date("2026-03-01T00:01:00"),
+        },
+        {
+          workflowId: wfResult.workflow.id,
+          contactId: testContact2.id,
+          organizationId: testOrganization.id,
+          status: "failed",
+          error: "Template not found",
+          startedAt: new Date("2026-03-02"),
+        },
+      ]);
+
+      const result = await listWorkflowExecutions(
+        wfResult.workflow.id,
+        testOrganization.id
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      expect(result.executions.length).toBe(2);
+      expect(result.total).toBe(2);
+
+      // Should include contact info
+      const exec = result.executions.find(
+        (e) => e.contactId === testContact.id
+      );
+      expect(exec).toBeDefined();
+      expect(exec?.contact?.email).toBe("contact@example.com");
+      expect(exec?.contact?.firstName).toBe("Jane");
+    });
+
+    it("should filter by status when provided", async () => {
+      const wfResult = await createWorkflow(testOrganization.id, {
+        name: "Execution Filter Test",
+      });
+      expect(wfResult.success).toBe(true);
+      if (!wfResult.success) return;
+
+      await db.insert(workflowExecution).values([
+        {
+          workflowId: wfResult.workflow.id,
+          contactId: testContact.id,
+          organizationId: testOrganization.id,
+          status: "completed",
+          startedAt: new Date("2026-03-01"),
+          completedAt: new Date("2026-03-01T00:01:00"),
+        },
+        {
+          workflowId: wfResult.workflow.id,
+          contactId: testContact2.id,
+          organizationId: testOrganization.id,
+          status: "failed",
+          error: "Something went wrong",
+          startedAt: new Date("2026-03-02"),
+        },
+      ]);
+
+      const result = await listWorkflowExecutions(
+        wfResult.workflow.id,
+        testOrganization.id,
+        { status: "failed" }
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      expect(result.executions.length).toBe(1);
+      expect(result.total).toBe(1);
+      expect(result.executions[0]!.status).toBe("failed");
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // getWorkflowExecution
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe("getWorkflowExecution", () => {
+    it("should return execution with step executions ordered by startedAt", async () => {
+      const wfResult = await createWorkflow(testOrganization.id, {
+        name: "Execution Detail Test",
+      });
+      expect(wfResult.success).toBe(true);
+      if (!wfResult.success) return;
+
+      // Insert execution
+      const [exec] = await db
+        .insert(workflowExecution)
+        .values({
+          workflowId: wfResult.workflow.id,
+          contactId: testContact.id,
+          organizationId: testOrganization.id,
+          status: "completed",
+          startedAt: new Date("2026-03-01T00:00:00"),
+          completedAt: new Date("2026-03-01T00:01:00"),
+        })
+        .returning();
+
+      // Insert step executions in reverse order to test ordering
+      await db.insert(workflowStepExecution).values([
+        {
+          executionId: exec!.id,
+          stepId: "step-2",
+          stepType: "send_email",
+          status: "completed",
+          idempotencyKey: `${exec!.id}-step-2`,
+          startedAt: new Date("2026-03-01T00:00:30"),
+          completedAt: new Date("2026-03-01T00:00:45"),
+        },
+        {
+          executionId: exec!.id,
+          stepId: "step-1",
+          stepType: "trigger",
+          status: "completed",
+          idempotencyKey: `${exec!.id}-step-1`,
+          startedAt: new Date("2026-03-01T00:00:00"),
+          completedAt: new Date("2026-03-01T00:00:01"),
+        },
+      ]);
+
+      const result = await getWorkflowExecution(exec!.id, testOrganization.id);
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      expect(result.execution.id).toBe(exec!.id);
+      expect(result.execution.contact?.email).toBe("contact@example.com");
+
+      // Step executions should be ordered by startedAt ascending
+      expect(result.execution.stepExecutions.length).toBe(2);
+      expect(result.execution.stepExecutions[0]!.stepId).toBe("step-1");
+      expect(result.execution.stepExecutions[1]!.stepId).toBe("step-2");
+    });
+
+    it("should return error for execution in different org (IDOR prevention)", async () => {
+      const wfResult = await createWorkflow(testOrganization.id, {
+        name: "IDOR Test",
+      });
+      expect(wfResult.success).toBe(true);
+      if (!wfResult.success) return;
+
+      const [exec] = await db
+        .insert(workflowExecution)
+        .values({
+          workflowId: wfResult.workflow.id,
+          contactId: testContact.id,
+          organizationId: testOrganization.id,
+          status: "completed",
+          startedAt: new Date("2026-03-01"),
+        })
+        .returning();
+
+      // Try to access with a different org ID — verifyOrgAccess blocks first
+      const result = await getWorkflowExecution(exec!.id, "different-org-id");
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain("don't have access");
       }
     });
   });

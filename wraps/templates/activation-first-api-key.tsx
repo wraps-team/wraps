@@ -16,7 +16,8 @@ import {
 
 // ── Metadata ──
 
-export const subject = "API key created. Your app is connected, {{firstName}}.";
+export const subject =
+  "API key created. Your app is connected{{#if firstName}}, {{firstName}}{{/if}}.";
 export const emailType = "transactional" as const;
 export const previewText =
   "Manage contacts, trigger workflows, and track events from your app.";
@@ -38,7 +39,6 @@ type Props = {
 };
 
 export default function FirstApiKeyEmail({
-  firstName,
   dashboardUrl,
   unsubscribeUrl,
 }: Props) {
@@ -98,7 +98,9 @@ export default function FirstApiKeyEmail({
                   color: "#fafaf9",
                 }}
               >
-                Your app is connected, {firstName}.
+                {
+                  "{{#if firstName}}Your app is connected, {{firstName}}.{{else}}Your app is connected.{{/if}}"
+                }
               </Heading>
               <Text
                 style={{

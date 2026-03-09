@@ -9,7 +9,6 @@ import {
   History,
   Inbox,
   Key,
-  LayoutDashboard,
   ListFilter,
   Send,
   Shield,
@@ -456,7 +455,6 @@ const tabs: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: "deploy", label: "Deploy", icon: Terminal },
   { key: "send", label: "Send", icon: Send },
   { key: "receive", label: "Receive", icon: Inbox },
-  { key: "console", label: "Console", icon: LayoutDashboard },
 ];
 
 type GlowingTabProps = {
@@ -522,7 +520,6 @@ export function CliTabs() {
       <GlowingTabBar activeIndex={activeIndex} onTabClick={setActiveIndex} />
 
       <div className="min-h-[500px]">
-        {activeTab === "console" && <ConsoleContent />}
         {activeTab === "deploy" && <DeployContent />}
         {activeTab === "send" && <SendContent />}
         {activeTab === "receive" && <ReceiveContent />}

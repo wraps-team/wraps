@@ -59,7 +59,8 @@ const features: {
   {
     icon: MousePointerClick,
     title: "Teams use the builder",
-    description: "Visual drag-and-drop editor for marketing, sales, and ops",
+    description:
+      "AI generates workflows from prompts for marketing, sales, and ops",
   },
   {
     icon: Play,
@@ -175,7 +176,7 @@ function ViewToggle({
         type="button"
       >
         <GitBranch className="size-3" />
-        Visual Builder
+        AI Builder
       </button>
     </div>
   );
@@ -263,7 +264,7 @@ export function AutomationsCodePanel() {
           </a>
         </Button>
         <p className="mt-3 text-muted-foreground text-sm">
-          1 workflow included free. Unlimited workflows on Starter ($29/mo).
+          1 workflow included free. Unlimited workflows on Starter ($19/mo).
         </p>
       </FadeIn>
     </div>

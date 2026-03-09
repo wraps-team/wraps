@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { CliTabbedSection } from "./landing/components/cli-tabbed-section";
 import { CTASection } from "./landing/components/cta-section";
+import { DualPathSection } from "./landing/components/dual-path-section";
 import { FaqSection } from "./landing/components/faq-section";
 import { LandingFooter } from "./landing/components/footer";
 import { HeroSection } from "./landing/components/hero-section";
+import { InfrastructureSection } from "./landing/components/infrastructure-section";
 import { LandingNavbar } from "./landing/components/navbar";
 import { PricingSection } from "./landing/components/pricing-section";
 import { PrinciplesSection } from "./landing/components/principles-section";
@@ -49,7 +51,7 @@ const faqSchema = {
       name: "What are the costs for running Wraps?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "With Wraps, you pay AWS directly at $0.10 per 1,000 emails with no markup. For example, 50,000 emails/month costs ~$5 to AWS. There's a free tier with 1,000 tracked events/month included. Paid plans start at $29/month for 10,000 tracked events.",
+        text: "With Wraps, you pay AWS directly at $0.10 per 1,000 emails with no markup. For example, 50,000 emails/month costs ~$5 to AWS. There's a free tier with 5,000 tracked events/month included. Paid plans start at $19/month.",
       },
     },
     {
@@ -109,17 +111,23 @@ export default function LandingPage() {
 
         {/* Main Content */}
         <main>
-          {/* Hero & Credibility */}
+          {/* 1. Hero & Feature Cards */}
           <HeroSection />
           <PrinciplesSection />
 
-          {/* How it works - CLI deploy + SDK */}
+          {/* 2. Two paths — code & AI side by side */}
+          <DualPathSection />
+
+          {/* 4. CLI deploy demo */}
           <CliTabbedSection />
 
-          {/* Pricing */}
+          {/* 5. AWS ownership */}
+          <InfrastructureSection />
+
+          {/* 6. Pricing */}
           <PricingSection />
 
-          {/* Footer sections */}
+          {/* 7. FAQ & CTA */}
           <FaqSection />
           <CTASection />
         </main>

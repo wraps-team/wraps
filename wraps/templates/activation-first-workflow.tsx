@@ -16,7 +16,8 @@ import { Footer } from "./_components/footer";
 
 // ── Metadata ──
 
-export const subject = "Your first workflow is ready, {{firstName}}";
+export const subject =
+  "Your first workflow is ready{{#if firstName}}, {{firstName}}{{/if}}";
 export const emailType = "transactional" as const;
 export const previewText =
   "Automation unlocked. Enable it when you're ready and it runs on autopilot.";
@@ -40,7 +41,6 @@ type Props = {
 };
 
 export default function FirstWorkflowEmail({
-  firstName,
   workflowName,
   dashboardUrl,
   unsubscribeUrl,
@@ -66,9 +66,9 @@ export default function FirstWorkflowEmail({
                 Automation unlocked.
               </Heading>
               <Text className="m-0 mb-6 text-base leading-relaxed text-gray-600">
-                {firstName}, you just created your first workflow:{" "}
-                <strong>{workflowName}</strong>. Once you enable it, emails will
-                send themselves.
+                {"{{#if firstName}}{{firstName}}, you{{else}}You{{/if}}"} just
+                created your first workflow: <strong>{workflowName}</strong>.
+                Once you enable it, emails will send themselves.
               </Text>
               {/* Visual workflow representation */}
               <div

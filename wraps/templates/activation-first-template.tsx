@@ -16,7 +16,8 @@ import { Footer } from "./_components/footer";
 
 // ── Metadata ──
 
-export const subject = "Your first template is ready, {{firstName}}";
+export const subject =
+  "Your first template is ready{{#if firstName}}, {{firstName}}{{/if}}";
 export const emailType = "transactional" as const;
 export const previewText =
   "Beautiful emails start with great templates. Publish it to start sending.";
@@ -40,7 +41,6 @@ type Props = {
 };
 
 export default function FirstTemplateEmail({
-  firstName,
   templateName,
   dashboardUrl,
   unsubscribeUrl,
@@ -95,7 +95,10 @@ export default function FirstTemplateEmail({
                 </Text>
               </div>
               <Heading className="m-0 mb-4 text-2xl font-semibold text-gray-800">
-                Nice work, {firstName}. Your first template is drafted.
+                {
+                  "{{#if firstName}}Nice work, {{firstName}}. Your{{else}}Your{{/if}}"
+                }{" "}
+                first template is drafted.
               </Heading>
               <Text className="m-0 mb-5 text-base leading-relaxed text-gray-600">
                 Templates are the building blocks of Wraps. Use them in

@@ -1,8 +1,10 @@
 import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
-import { messageSend } from "@wraps/db/schema/batch";
-import { and, count, eq, gte, isNotNull, lte } from "drizzle-orm";
+import { awsAccount } from "@wraps/db/schema/app";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { getSESMetricsSummary } from "@/lib/aws/cloudwatch";
+import { createRequestLogger, serializeError } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
 type RouteContext = {
@@ -14,6 +16,11 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { orgSlug } = await context.params;
+    const log = createRequestLogger({
+      path: "/api/[orgSlug]/analytics/overview",
+      method: "GET",
+      orgSlug,
+    });
 
     const session = await auth.api.getSession({
       headers: await import("next/headers").then((mod) => mod.headers()),
@@ -40,48 +47,80 @@ export async function GET(request: Request, context: RouteContext) {
     const endTime = new Date();
     const startTime = new Date(endTime.getTime() - days * 24 * 60 * 60 * 1000);
 
-    const [overview] = await db
-      .select({
-        totalSent: count(),
-        totalDelivered: count(messageSend.deliveredAt),
-        totalBounced: count(messageSend.bouncedAt),
-        totalComplaints: count(messageSend.complainedAt),
-      })
-      .from(messageSend)
-      .where(
-        and(
-          eq(messageSend.organizationId, orgWithMembership.id),
-          eq(messageSend.channel, "email"),
-          isNotNull(messageSend.sentAt),
-          gte(messageSend.sentAt, startTime),
-          lte(messageSend.sentAt, endTime)
-        )
-      );
+    const accounts = await db.query.awsAccount.findMany({
+      where: eq(awsAccount.organizationId, orgWithMembership.id),
+    });
 
-    const totalSent = Number(overview.totalSent);
-    const totalDelivered = Number(overview.totalDelivered);
-    const totalBounced = Number(overview.totalBounced);
-    const totalComplaints = Number(overview.totalComplaints);
+    if (accounts.length === 0) {
+      return NextResponse.json({
+        totalSent: 0,
+        totalDelivered: 0,
+        totalBounced: 0,
+        totalComplaints: 0,
+        deliveryRate: 0,
+        bounceRate: 0,
+        complaintRate: 0,
+      });
+    }
+
+    const metricsResults = await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          return await getSESMetricsSummary({
+            awsAccountId: account.id,
+            startTime,
+            endTime,
+            period: 3600,
+          });
+        } catch (error) {
+          log.error(
+            { err: serializeError(error), accountId: account.id },
+            "Failed to fetch metrics for account"
+          );
+          return null;
+        }
+      })
+    );
+
+    const calculateTotal = (
+      metricName: "sends" | "deliveries" | "bounces" | "complaints"
+    ) =>
+      metricsResults.reduce((total, metrics) => {
+        if (!metrics) {
+          return total;
+        }
+        const values = metrics[metricName]?.[0]?.Values || [];
+        return total + values.reduce((sum, val) => sum + (val || 0), 0);
+      }, 0);
+
+    const totalSent = calculateTotal("sends");
+    const totalDelivered = calculateTotal("deliveries");
+    const totalBounced = calculateTotal("bounces");
+    const totalComplaints = calculateTotal("complaints");
+
+    const deliveryRate = totalSent > 0 ? (totalDelivered / totalSent) * 100 : 0;
+    const bounceRate = totalSent > 0 ? (totalBounced / totalSent) * 100 : 0;
+    const complaintRate =
+      totalSent > 0 ? (totalComplaints / totalSent) * 100 : 0;
 
     return NextResponse.json({
-      totalSent,
-      totalDelivered,
-      totalBounced,
-      totalComplaints,
-      deliveryRate:
-        totalSent > 0
-          ? Number(((totalDelivered / totalSent) * 100).toFixed(2))
-          : 0,
-      bounceRate:
-        totalSent > 0
-          ? Number(((totalBounced / totalSent) * 100).toFixed(2))
-          : 0,
-      complaintRate:
-        totalSent > 0
-          ? Number(((totalComplaints / totalSent) * 100).toFixed(2))
-          : 0,
+      totalSent: Math.round(totalSent),
+      totalDelivered: Math.round(totalDelivered),
+      totalBounced: Math.round(totalBounced),
+      totalComplaints: Math.round(totalComplaints),
+      deliveryRate: Number(deliveryRate.toFixed(2)),
+      bounceRate: Number(bounceRate.toFixed(2)),
+      complaintRate: Number(complaintRate.toFixed(2)),
     });
   } catch (error) {
+    const log = createRequestLogger({
+      path: "/api/[orgSlug]/analytics/overview",
+      method: "GET",
+    });
+    log.error(
+      { err: serializeError(error) },
+      "Error fetching analytics overview"
+    );
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

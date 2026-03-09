@@ -869,6 +869,32 @@ describe("handleSendEmail", () => {
     expect(templateData.source).toBe("api");
     expect(templateData.plan).toBe("pro");
   });
+
+  it("uses step-level subject override instead of template subject", async () => {
+    const overrideStep = {
+      ...emailStep,
+      config: {
+        ...emailStep.config,
+        subject: "Custom: {{firstName}}, check this out",
+      },
+    };
+    setupEmailTest({
+      contact: { firstName: "Jane" },
+      workflow: {
+        steps: [
+          { id: "trigger-1", type: "trigger", config: { type: "trigger" } },
+          overrideStep,
+        ],
+      },
+    });
+    await handler(makeSQSEvent(emailJob));
+    expect(sesSendCalls).toHaveLength(1);
+    const content = (sesSendCalls[0][0] as Record<string, unknown>)
+      .Content as Record<string, unknown>;
+    // Subject override forces raw HTML path even when SES template exists
+    expect(content.Simple).toBeDefined();
+    expect(content.Template).toBeUndefined();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

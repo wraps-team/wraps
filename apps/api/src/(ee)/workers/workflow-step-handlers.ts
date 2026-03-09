@@ -191,10 +191,20 @@ export async function handleSendEmail(
     },
   });
 
-  // Build variable replacement data
+  // Build variable replacement data.
+  // Always include contact fields with empty string fallbacks — SES templates
+  // fail with a rendering error if a referenced variable is absent entirely.
   const replacementData: Record<string, string> = {
     email: contactRecord.email,
     contactEmail: contactRecord.email,
+    firstName: contactRecord.firstName ?? "",
+    lastName: contactRecord.lastName ?? "",
+    company: contactRecord.company ?? "",
+    jobTitle: contactRecord.jobTitle ?? "",
+    contactFirstName: contactRecord.firstName ?? "",
+    contactLastName: contactRecord.lastName ?? "",
+    contactCompany: contactRecord.company ?? "",
+    contactJobTitle: contactRecord.jobTitle ?? "",
   };
 
   const addIfPresent = (key: string, value: string | null | undefined) => {
@@ -202,15 +212,6 @@ export async function handleSendEmail(
       replacementData[key] = value;
     }
   };
-
-  addIfPresent("firstName", contactRecord.firstName);
-  addIfPresent("lastName", contactRecord.lastName);
-  addIfPresent("company", contactRecord.company);
-  addIfPresent("jobTitle", contactRecord.jobTitle);
-  addIfPresent("contactFirstName", contactRecord.firstName);
-  addIfPresent("contactLastName", contactRecord.lastName);
-  addIfPresent("contactCompany", contactRecord.company);
-  addIfPresent("contactJobTitle", contactRecord.jobTitle);
   addIfPresent("organizationName", org?.name);
 
   // Add contact properties
@@ -298,12 +299,16 @@ export async function handleSendEmail(
     );
   }
 
+  // Step-level subject override takes precedence over template subject
+  const baseSubject = config.subject || tmpl.subject || "Message";
+
   let result: { MessageId?: string };
   let subject: string;
 
-  if (sesTemplateName) {
+  if (sesTemplateName && !config.subject) {
     // Use SES template - let SES handle variable substitution
-    // Transform subject for SES (handles both simple vars and fallbacks)
+    // (SES templates have their own subject baked in, so only use this path
+    // when there's no step-level override)
     subject = sanitizeEmailSubject(tmpl.subject || "Message");
 
     result = await sesClient.send(
@@ -329,6 +334,41 @@ export async function handleSendEmail(
       template: sesTemplateName,
       to: contactRecord.email,
     });
+  } else if (sesTemplateName && config.subject) {
+    // SES template exists but step has a subject override — send as raw HTML
+    // so we can apply the overridden subject
+    const html = substituteVariables(tmpl.compiledHtml, replacementData, {
+      escapeHtml: true,
+    });
+
+    const rawSubject = substituteVariables(baseSubject, replacementData);
+    subject = sanitizeEmailSubject(rawSubject);
+
+    result = await sesClient.send(
+      new SendEmailCommand({
+        FromEmailAddress: fromDisplay,
+        ReplyToAddresses: replyTo ? [replyTo] : undefined,
+        Destination: {
+          ToAddresses: [contactRecord.email],
+        },
+        Content: {
+          Simple: {
+            Subject: { Data: subject },
+            Body: {
+              Html: { Data: html },
+              Text: { Data: htmlToPlainText(html) },
+            },
+            Headers: headers.length > 0 ? headers : undefined,
+          },
+        },
+        ConfigurationSetName: "wraps-email-tracking",
+        EmailTags: emailTags,
+      })
+    );
+
+    log.info("Workflow: email sent via raw HTML (subject override)", {
+      to: contactRecord.email,
+    });
   } else {
     // Fallback: Apply variable substitution locally and send raw HTML
     const html = substituteVariables(tmpl.compiledHtml, replacementData, {
@@ -336,10 +376,7 @@ export async function handleSendEmail(
     });
 
     // Build subject with variable substitution
-    const rawSubject = substituteVariables(
-      tmpl.subject || "Message",
-      replacementData
-    );
+    const rawSubject = substituteVariables(baseSubject, replacementData);
     subject = sanitizeEmailSubject(rawSubject);
 
     result = await sesClient.send(
@@ -586,23 +623,23 @@ export async function handleSendSms(
   }
 
   // Build replacement data (same pattern as handleSendEmail)
-  const replacementData: Record<string, string> = {};
+  const replacementData: Record<string, string> = {
+    email: contactRecord.email ?? "",
+    contactEmail: contactRecord.email ?? "",
+    firstName: contactRecord.firstName ?? "",
+    lastName: contactRecord.lastName ?? "",
+    company: contactRecord.company ?? "",
+    jobTitle: contactRecord.jobTitle ?? "",
+    contactFirstName: contactRecord.firstName ?? "",
+    contactLastName: contactRecord.lastName ?? "",
+    contactCompany: contactRecord.company ?? "",
+    contactJobTitle: contactRecord.jobTitle ?? "",
+    phone: contactRecord.phone ?? "",
+  };
 
   const addIfPresent = (key: string, value: string | null | undefined) => {
     if (value) replacementData[key] = value;
   };
-
-  addIfPresent("email", contactRecord.email);
-  addIfPresent("contactEmail", contactRecord.email);
-  addIfPresent("firstName", contactRecord.firstName);
-  addIfPresent("lastName", contactRecord.lastName);
-  addIfPresent("company", contactRecord.company);
-  addIfPresent("jobTitle", contactRecord.jobTitle);
-  addIfPresent("contactFirstName", contactRecord.firstName);
-  addIfPresent("contactLastName", contactRecord.lastName);
-  addIfPresent("contactCompany", contactRecord.company);
-  addIfPresent("contactJobTitle", contactRecord.jobTitle);
-  addIfPresent("phone", contactRecord.phone);
 
   // Add contact properties
   const properties = contactRecord.properties as Record<string, unknown> | null;

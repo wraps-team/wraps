@@ -16,6 +16,7 @@ import {
   ArrowUpDown,
   CheckCircle,
   Copy,
+  ListChecks,
   MoreHorizontal,
   Pause,
   Pencil,
@@ -363,6 +364,15 @@ export function WorkflowsTable({
                 >
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit workflow
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/${orgSlug}/automations/${wf.id}/executions`);
+                  }}
+                >
+                  <ListChecks className="mr-2 h-4 w-4" />
+                  View executions
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={isPending}

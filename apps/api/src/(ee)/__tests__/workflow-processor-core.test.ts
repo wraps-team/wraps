@@ -1313,3 +1313,90 @@ describe("Webhook Step", () => {
     expect(result.batchItemFailures).toEqual([]);
   });
 });
+
+describe("Step retry clears stale error", () => {
+  it("onConflictDoUpdate clears error and completedAt when re-executing a failed step", async () => {
+    const wf = makeWorkflow({
+      steps: [
+        { id: "trigger-1", type: "trigger", config: { type: "trigger" } },
+        {
+          id: "step-hook",
+          type: "webhook",
+          config: {
+            type: "webhook",
+            url: "https://hook.example.com",
+            method: "POST",
+            headers: {},
+            body: {},
+          },
+        },
+      ],
+      transitions: [
+        {
+          id: "t1",
+          fromStepId: "trigger-1",
+          toStepId: "step-hook",
+          condition: null,
+        },
+      ],
+    });
+
+    const execution = makeExecution({
+      currentStepId: "step-hook",
+      definitionSnapshot: { steps: wf.steps, transitions: wf.transitions },
+    });
+
+    const contactRecord = makeContact();
+
+    // select: workflow
+    mockDbSelect
+      .mockReturnValueOnce(selectChain([wf])())
+      // select: execution
+      .mockReturnValueOnce(selectChain([execution])())
+      // select: contact
+      .mockReturnValueOnce(selectChain([contactRecord])());
+
+    // Capture the onConflictDoUpdate config to assert on its `set` object
+    let capturedConflictConfig: Record<string, unknown> | null = null;
+    mockDbInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn((config: Record<string, unknown>) => {
+          capturedConflictConfig = config;
+          return {
+            returning: vi
+              .fn()
+              .mockResolvedValue([{ id: "se-1", status: "executing" }]),
+          };
+        }),
+      }),
+    });
+
+    // update calls (execution status, step completion)
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([execution]),
+        }),
+      }),
+    });
+
+    mockFetch.mockResolvedValue({ status: 200, ok: true });
+
+    await handler(
+      makeSQSEvent({
+        type: "execute",
+        executionId: "exec-1",
+        stepId: "step-hook",
+        organizationId: "org-1",
+      })
+    );
+
+    // The onConflictDoUpdate set must clear stale error/completedAt from previous failed attempt
+    expect(capturedConflictConfig).not.toBeNull();
+    const setObj = (
+      capturedConflictConfig as unknown as Record<string, unknown>
+    ).set as Record<string, unknown>;
+    expect(setObj).toHaveProperty("error", null);
+    expect(setObj).toHaveProperty("completedAt", null);
+  });
+});

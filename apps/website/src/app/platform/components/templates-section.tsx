@@ -22,8 +22,8 @@ const features = [
   },
   {
     icon: LayoutGrid,
-    title: "Drag & Drop",
-    description: "20+ components",
+    title: "React Email",
+    description: "20+ typed components",
   },
   {
     icon: CheckCircle,
@@ -120,7 +120,7 @@ export function DashboardTemplatesSection() {
           initial={{ opacity: 0, y: 20 }}
           transition={{ duration: 0.5, delay: 0.4 }}
         >
-          Drag-and-drop builder with AI generation. Built on React Email for
+          AI-first editor with raw code access. Built on React Email for
           pixel-perfect rendering across Gmail, Outlook, Apple Mail, and every
           other client.
         </motion.p>
@@ -162,7 +162,7 @@ export function DashboardTemplatesSection() {
           initial={{ opacity: 0 }}
           transition={{ duration: 0.5, delay: 0.7 }}
         >
-          Included in all plans starting at $10/mo
+          Included in all plans — even Free
         </motion.p>
       </div>
     </section>

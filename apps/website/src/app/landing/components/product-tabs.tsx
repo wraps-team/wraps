@@ -41,10 +41,10 @@ const templateFeatures = [
 
 const broadcastFeatures = [
   { icon: Send, title: "Send to All" },
-  { icon: Filter, title: "Segments", badge: "Growth" },
-  { icon: Calendar, title: "Schedule", badge: "Growth" },
-  { icon: Tag, title: "Topics", badge: "Growth" },
-  { icon: Users, title: "Preference Center", badge: "Growth" },
+  { icon: Filter, title: "Segments", badge: "Starter" },
+  { icon: Calendar, title: "Schedule", badge: "Starter" },
+  { icon: Tag, title: "Topics", badge: "Starter" },
+  { icon: Users, title: "Preference Center", badge: "Starter" },
 ];
 
 const automationFeatures = [

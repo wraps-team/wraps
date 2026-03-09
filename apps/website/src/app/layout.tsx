@@ -12,17 +12,17 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://wraps.dev"),
   title: {
-    default: "Wraps - AWS Email Pricing with Modern Developer Experience",
+    default: "Wraps - The Email Platform That Sends Through Your AWS",
     template: "%s | Wraps",
   },
   description:
-    "Email shouldn't cost $4/1K. SES shouldn't take hours to configure. Wraps gives you AWS pricing ($0.10/1K emails) with the SDK and dashboard you actually want. One command deploys everything.",
+    "Write email templates as React components. Define automations as TypeScript. Review in PRs, deploy with your app. Your marketing team edits and sends without code.",
   openGraph: {
     type: "website",
     siteName: "Wraps",
-    title: "Wraps - AWS Email Pricing with Modern Developer Experience",
+    title: "Wraps - The Email Platform That Sends Through Your AWS",
     description:
-      "Email shouldn't cost $4/1K. SES shouldn't take hours to configure. Wraps gives you AWS pricing ($0.10/1K emails) with the SDK and dashboard you actually want. One command deploys everything.",
+      "Write email templates as React components. Define automations as TypeScript. Review in PRs, deploy with your app. Your marketing team edits and sends without code.",
     url: "https://wraps.dev/",
     images: [
       {
@@ -36,9 +36,9 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     site: "@useWraps",
-    title: "Wraps - AWS Email Pricing with Modern Developer Experience",
+    title: "Wraps - The Email Platform That Sends Through Your AWS",
     description:
-      "Email shouldn't cost $4/1K. SES shouldn't take hours to configure. Wraps gives you AWS pricing ($0.10/1K emails) with the SDK and dashboard you actually want. One command deploys everything.",
+      "Write email templates as React components. Define automations as TypeScript. Review in PRs, deploy with your app. Your marketing team edits and sends without code.",
     images: ["/og-image.webp"],
   },
   icons: {

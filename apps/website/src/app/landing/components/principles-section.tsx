@@ -1,47 +1,32 @@
-import { CreditCard, Key, Shield } from "lucide-react";
-
-function GitHubIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
-      <path d="M9 18c-4.51 2-5-2-7-2" />
-    </svg>
-  );
-}
+import { Cloud, GitPullRequest, ShieldCheck, Sparkles } from "lucide-react";
 
 const principles = [
   {
-    icon: GitHubIcon,
-    title: "Open Source",
+    icon: GitPullRequest,
+    title: "Code You Can Review",
     description:
-      "See exactly what we deploy to your AWS and what we run in our infrastructure.",
+      "Templates and workflows live in your repo. Review in PRs. Roll back bad deploys. No more 'don't edit while I'm editing.'",
     delay: "animation-delay-0",
   },
   {
-    icon: Shield,
-    title: "Zero Credentials",
+    icon: ShieldCheck,
+    title: "Type-Safe Everything",
     description:
-      "OIDC for Vercel. IAM roles for AWS. We never store your secrets.",
+      "TypeScript SDK. Typed template variables. Typed workflow definitions. Catch errors before they reach an inbox.",
     delay: "animation-delay-100",
   },
   {
-    icon: Key,
-    title: "Your Sending, Your AWS",
-    description: "Emails send through your SES. Events store in your DynamoDB.",
+    icon: Sparkles,
+    title: "AI When You Want It",
+    description:
+      "Don't want to write code? AI generates templates and workflows from a prompt. You review the output, not a GUI.",
     delay: "animation-delay-200",
   },
   {
-    icon: CreditCard,
-    title: "No Sending Markup",
-    description: "Pay AWS directly for sending. $0.10 per 1,000 emails.",
+    icon: Cloud,
+    title: "Sends Through Your AWS",
+    description:
+      "Your SES. Your DynamoDB. Your domain reputation. Pay AWS directly. Leave anytime, keep everything.",
     delay: "animation-delay-300",
   },
 ];

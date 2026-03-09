@@ -81,7 +81,7 @@ export function DashboardAutomationsSection() {
           >
             <p className="text-lg text-muted-foreground">
               Build automated email sequences triggered by events, time delays,
-              or conditions. Visual workflow builder with AI assistance.
+              or conditions. Define in TypeScript or generate with AI.
             </p>
 
             {/* Features as list */}
@@ -119,19 +119,27 @@ export function DashboardAutomationsSection() {
               ))}
             </div>
 
-            {/* Scale tier hint */}
+            {/* Tier hints */}
             <motion.div
               animate={isInView ? { opacity: 1 } : { opacity: 0 }}
-              className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4"
+              className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4 space-y-1"
               initial={{ opacity: 0 }}
               transition={{ duration: 0.5, delay: 0.8 }}
             >
               <p className="text-sm">
                 <span className="font-medium text-orange-600 dark:text-orange-400">
-                  Scale ($149/mo):
+                  Free:
                 </span>{" "}
                 <span className="text-muted-foreground">
-                  Unlimited workflows, event tracking, and advanced segments
+                  1 workflow included
+                </span>
+              </p>
+              <p className="text-sm">
+                <span className="font-medium text-orange-600 dark:text-orange-400">
+                  Starter ($19/mo):
+                </span>{" "}
+                <span className="text-muted-foreground">
+                  Unlimited workflows
                 </span>
               </p>
             </motion.div>

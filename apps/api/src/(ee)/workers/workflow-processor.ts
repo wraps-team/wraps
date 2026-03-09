@@ -551,6 +551,8 @@ async function processStep(executionId: string, stepId: string): Promise<void> {
       set: {
         status: sql`'executing'`,
         startedAt: sql`${new Date().toISOString()}::timestamp`,
+        error: null,
+        completedAt: null,
       },
       // Only allow update when previous attempt failed (retry).
       // Rejects when status is 'executing' (concurrent) or 'completed' (done).

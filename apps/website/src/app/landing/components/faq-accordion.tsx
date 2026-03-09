@@ -36,7 +36,7 @@ const faqItems: FaqItem[] = [
     value: "item-2",
     question: "What are the costs for running Wraps?",
     answer:
-      "With Wraps, you pay AWS directly at $0.10 per 1,000 emails with no markup. For example, 50,000 emails/month costs ~$5 to AWS. There's a free tier with 1,000 tracked events/month included. Paid plans start at $29/month for 10,000 tracked events. The infrastructure is yours forever—no vendor lock-in, no surprise bills.",
+      "With Wraps, you pay AWS directly at $0.10 per 1,000 emails with no markup. For example, 50,000 emails/month costs ~$5 to AWS. There's a free tier with 5,000 tracked events/month included. Paid plans start at $19/month. The infrastructure is yours forever—no vendor lock-in, no surprise bills.",
   },
   {
     value: "item-2b",

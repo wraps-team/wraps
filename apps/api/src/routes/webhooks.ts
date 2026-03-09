@@ -12,9 +12,10 @@ import {
   db,
   eq,
   messageSend,
+  workflow,
   workflowExecution,
 } from "@wraps/db";
-import { and, sql } from "drizzle-orm";
+import { and, inArray, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { log } from "../lib/logger";
 import {
@@ -54,6 +55,7 @@ type EventBridgeEvent = {
       commonHeaders?: {
         subject?: string;
       };
+      tags?: Record<string, string[]>;
     };
     // Event-specific data
     delivery?: {
@@ -87,6 +89,11 @@ type EventBridgeEvent = {
       reason: string; // "Suppressed" or "OnAccountSuppressionList"
       timestamp: string;
       suppressedRecipients: Array<{ emailAddress: string }>;
+    };
+    // Rendering failure data (SES template variable missing, etc.)
+    failure?: {
+      errorMessage: string;
+      templateName: string;
     };
   };
 };
@@ -198,6 +205,15 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
             message,
             event.detail.suppression?.reason,
             event.detail.suppression?.timestamp
+          );
+          break;
+
+        case "Rendering Failure":
+          await processRenderingFailure(
+            message,
+            event.detail.failure?.errorMessage,
+            event.detail.failure?.templateName,
+            mail.tags
           );
           break;
 
@@ -524,6 +540,75 @@ async function processSuppression(
   log.info("Webhook: message suppressed", {
     messageId: message.id,
     reason: suppressionReason,
+  });
+}
+
+async function processRenderingFailure(
+  message: MessageRecord,
+  errorMessage?: string,
+  templateName?: string,
+  tags?: Record<string, string[]>
+): Promise<void> {
+  const errorText = errorMessage
+    ? `Rendering failure: ${errorMessage}`
+    : "Template rendering failure";
+
+  // Update messageSend status to failed with the rendering error
+  await db
+    .update(messageSend)
+    .set({
+      status: "failed",
+      error: errorText,
+    })
+    .where(eq(messageSend.id, message.id));
+
+  // Increment batchSend failure counter if applicable
+  if (message.batchSendId) {
+    await db
+      .update(batchSend)
+      .set({
+        failed: sql`${batchSend.failed} + 1`,
+      })
+      .where(eq(batchSend.id, message.batchSendId));
+  }
+
+  // Fail the workflow execution if this was a workflow-sent email
+  const executionId = tags?.executionId?.[0];
+  if (executionId) {
+    await db.transaction(async (tx) => {
+      const [execution] = await tx
+        .update(workflowExecution)
+        .set({
+          status: "failed",
+          error: errorText,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(workflowExecution.id, executionId),
+            inArray(workflowExecution.status, ["active", "paused", "waiting"])
+          )
+        )
+        .returning();
+
+      if (execution) {
+        await tx
+          .update(workflow)
+          .set({
+            activeExecutions: sql`GREATEST(0, ${workflow.activeExecutions} - 1)`,
+            failedExecutions: sql`${workflow.failedExecutions} + 1`,
+          })
+          .where(eq(workflow.id, execution.workflowId));
+      }
+    });
+  }
+
+  log.error("Webhook: template rendering failure", {
+    messageId: message.id,
+    errorMessage,
+    templateName,
+    executionId,
   });
 }
 

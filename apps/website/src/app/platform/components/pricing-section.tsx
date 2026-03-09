@@ -214,7 +214,7 @@ export function DashboardPricingSection() {
           transition={{ duration: 0.5, delay: 0.6 }}
         >
           AWS costs billed separately by AWS (~$0.10 per 1,000 emails). Free
-          tier available with 1,000 messages/month.
+          tier available with 5,000 tracked events/month.
         </motion.p>
       </div>
     </section>

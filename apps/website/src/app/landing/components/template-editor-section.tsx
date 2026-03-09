@@ -18,14 +18,15 @@ import { SectionWrapper } from "./section-card";
 const features = [
   {
     icon: Sparkles,
-    title: "AI-Powered Content",
-    description: "Generate entire emails or refine sections with AI assistance",
+    title: "AI-First Editing",
+    description:
+      "Generate entire emails from a prompt, then refine with AI chat",
     premium: true,
   },
   {
-    icon: LayoutGrid,
-    title: "20+ Drag & Drop Blocks",
-    description: "Buttons, images, sections, layouts, and pre-built templates",
+    icon: Code,
+    title: "Raw Code Access",
+    description: "Edit React Email and HTML directly — no abstraction layer",
   },
   {
     icon: InfinityIcon,
@@ -39,9 +40,10 @@ const features = [
     description: "See your email on desktop, tablet, and mobile instantly",
   },
   {
-    icon: Code,
-    title: "Export to Code",
-    description: "Export as React Email, HTML, or JSON for full flexibility",
+    icon: LayoutGrid,
+    title: "React Email Components",
+    description:
+      "Buttons, images, sections, layouts — all typed and composable",
   },
   {
     icon: Palette,
@@ -103,8 +105,8 @@ function ImageWithFallback({
 export function TemplateEditorSection() {
   return (
     <SectionWrapper
-      badge="Template Editor · Starter Plan"
-      description="A professional-grade email builder with drag-and-drop components, AI generation, real-time preview, and one-click publishing to your AWS account."
+      badge="Template Editor · All Plans"
+      description="An AI-first email editor with raw code access, real-time preview, and one-click publishing to your AWS account. No drag-and-drop — just AI and code."
       id="template-editor"
       premium
       title="Build Beautiful Emails with AI"
@@ -194,7 +196,7 @@ export function TemplateEditorSection() {
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                100 AI generations/month on Starter
+                10 AI generations on Free, 50 on Starter
               </li>
             </ul>
           </div>
@@ -214,25 +216,24 @@ export function TemplateEditorSection() {
               <div className="flex aspect-square size-10 items-center justify-center rounded-full border-2 border-orange-500 bg-orange-500/5">
                 <LayoutGrid className="size-5 text-orange-500" />
               </div>
-              <h3 className="font-semibold text-xl">Drag & Drop Components</h3>
+              <h3 className="font-semibold text-xl">Raw Code Editor</h3>
             </div>
             <p className="text-muted-foreground">
-              Choose from 20+ email-optimized components including buttons,
-              images, sections, layouts, and pre-built template sections like
-              headers, footers, and CTAs.
+              Edit React Email and HTML directly in the browser. Full syntax
+              highlighting, typed components, and instant preview as you type.
             </p>
             <ul className="space-y-2 text-muted-foreground text-sm">
               <li className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                Email-optimized responsive components
+                React Email components with TypeScript
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                Pre-built sections (Hero, Features, CTA)
+                Edit HTML or JSX — your choice
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                Save and reuse custom blocks across templates
+                Version history and instant rollback
               </li>
             </ul>
           </div>
@@ -263,7 +264,7 @@ export function TemplateEditorSection() {
         </Button>
       </div>
       <p className="mt-4 text-center text-muted-foreground text-sm">
-        Template editor included in Starter plan ($29/mo)
+        Template editor included in all plans — even Free
       </p>
     </SectionWrapper>
   );

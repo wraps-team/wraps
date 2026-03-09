@@ -44,7 +44,6 @@ type Props = {
 };
 
 export default function FirstBroadcastEmail({
-  firstName,
   recipientCount,
   templateName,
   dashboardUrl,
@@ -98,7 +97,10 @@ export default function FirstBroadcastEmail({
               </div>
               <div style={{ padding: "32px" }}>
                 <Text className="m-0 mb-5 text-base leading-relaxed text-gray-600">
-                  Congrats {firstName}! You just sent &ldquo;{templateName}
+                  {
+                    "{{#if firstName}}Congrats {{firstName}}! You{{else}}Congrats! You{{/if}}"
+                  }{" "}
+                  just sent &ldquo;{templateName}
                   &rdquo; to {recipientCount} contacts. SES is processing
                   deliveries now &mdash; results will appear in your dashboard
                   within minutes.

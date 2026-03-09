@@ -613,12 +613,26 @@ function SendEmailConfig({
             )}
           </p>
         )}
-        {selectedTemplate && (
-          <p className="text-muted-foreground text-xs">
-            Subject: {selectedTemplate.subject || "(no subject)"}
-          </p>
-        )}
       </div>
+
+      {selectedTemplate && (
+        <div className="space-y-2">
+          <Label htmlFor="subject-override">Subject Line (optional)</Label>
+          <Input
+            id="subject-override"
+            onChange={(e) => onChange({ subject: e.target.value || undefined })}
+            placeholder={
+              selectedTemplate.subject || "No subject set on template"
+            }
+            value={config.subject || ""}
+          />
+          <p className="text-muted-foreground text-xs">
+            {config.subject
+              ? "Overrides the template subject for this step."
+              : `Using template subject: ${selectedTemplate.subject || "(no subject)"}`}
+          </p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">

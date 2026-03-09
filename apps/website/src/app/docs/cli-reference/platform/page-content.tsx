@@ -205,42 +205,42 @@ export default function CLIReferencePlatformPageContent() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Starter</CardTitle>
-              <p className="text-muted-foreground text-sm">$10/mo</p>
+              <p className="text-muted-foreground text-sm">$19/mo</p>
             </CardHeader>
             <CardContent>
               <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
-                <li>Email templates</li>
-                <li>Batch sending</li>
-                <li>Analytics dashboard</li>
-                <li>30-day event history</li>
+                <li>AI template editor</li>
+                <li>Topics, segments & broadcasts</li>
+                <li>Unlimited workflows</li>
+                <li>50K tracked events/mo</li>
               </ul>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Growth</CardTitle>
-              <p className="text-muted-foreground text-sm">$49/mo</p>
+              <p className="text-muted-foreground text-sm">$79/mo</p>
             </CardHeader>
             <CardContent>
               <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
                 <li>Everything in Starter</li>
-                <li>Topics and segments</li>
-                <li>Campaigns</li>
-                <li>25 automated workflows</li>
+                <li>AI workflow generation</li>
+                <li>3 AWS accounts</li>
+                <li>250K tracked events/mo</li>
               </ul>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Scale</CardTitle>
-              <p className="text-muted-foreground text-sm">$149/mo</p>
+              <p className="text-muted-foreground text-sm">$199/mo</p>
             </CardHeader>
             <CardContent>
               <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
                 <li>Everything in Growth</li>
-                <li>Unlimited workflows</li>
-                <li>Full event tracking</li>
-                <li>Advanced segments</li>
+                <li>Behavioral segments</li>
+                <li>1K AI generations/mo</li>
+                <li>Unlimited AWS accounts</li>
               </ul>
             </CardContent>
           </Card>

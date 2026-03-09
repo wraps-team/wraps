@@ -14,12 +14,12 @@ export function AutomationsCodeSection() {
           <h2 className="mb-4 font-bold text-3xl tracking-tight md:text-4xl">
             Code it. Or{" "}
             <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
-              drag &amp; drop it.
+              prompt AI to build it.
             </span>
           </h2>
           <p className="text-lg text-muted-foreground">
             Developers define workflows in TypeScript and version them in git.
-            Marketing teams edit them visually. Both run on the Wraps platform.
+            AI generates them from a prompt. Both run on the Wraps platform.
           </p>
         </FadeIn>
 

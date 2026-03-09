@@ -12,6 +12,7 @@ import {
   History,
   Loader2,
   MoreHorizontal,
+  Pencil,
   Send,
   Sparkles,
   Terminal,
@@ -110,6 +111,7 @@ export function CodeTemplateToolbar({
 
   const status = template.status ?? "DRAFT";
   const displaySubject = subject || "No subject";
+  const displayPreviewText = previewText || "Add preview text\u2026";
 
   return (
     <TooltipProvider>
@@ -134,23 +136,48 @@ export function CodeTemplateToolbar({
 
           <Separator className="h-5" orientation="vertical" />
 
-          {/* Template name + subject */}
+          {/* Template name */}
+          <span className="shrink-0 truncate font-medium text-sm">
+            {template.name}
+          </span>
+
+          <Separator className="h-5" orientation="vertical" />
+
+          {/* Subject + preview text */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="min-w-0 flex-1">
-              <div className="flex items-baseline gap-2">
-                <span className="truncate font-medium text-sm">
-                  {template.name}
-                </span>
-              </div>
-              <p
+              <span
                 className={cn(
-                  "truncate text-muted-foreground text-xs",
-                  !subject && "italic"
+                  "truncate font-medium text-sm",
+                  !subject && "text-muted-foreground italic"
                 )}
               >
                 {displaySubject}
+              </span>
+              <p
+                className={cn(
+                  "truncate text-muted-foreground text-xs",
+                  !previewText && "italic"
+                )}
+              >
+                {displayPreviewText}
               </p>
             </div>
+
+            {/* Edit button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  className="h-7 w-7 shrink-0 p-0"
+                  onClick={() => setShowSubjectDialog(true)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Edit subject & preview</TooltipContent>
+            </Tooltip>
           </div>
 
           {/* Source indicator */}

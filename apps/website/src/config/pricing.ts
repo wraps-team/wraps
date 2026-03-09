@@ -170,7 +170,7 @@ export const PRICING_TIERS: PricingTier[] = [
     ctaLink: "https://app.wraps.dev/auth?mode=signup&plan=free",
     limits: TIER_LIMITS.free,
     features: [
-      "Hosted dashboard",
+      "Dashboard + AI template editor",
       "5K tracked events/mo",
       "1 workflow",
       "Unlimited contacts",
@@ -184,7 +184,7 @@ export const PRICING_TIERS: PricingTier[] = [
     price: 19,
     annualPrice: 199,
     period: "/mo",
-    description: "For indie hackers and side projects",
+    description: "For developers shipping their first integration",
     highlight: false,
     cta: "Subscribe",
     ctaLink: "https://app.wraps.dev/auth?mode=signup&plan=starter",
@@ -192,8 +192,8 @@ export const PRICING_TIERS: PricingTier[] = [
     features: [
       "50K tracked events/mo",
       "Unlimited workflows",
+      "React templates + AI editor",
       "Topics, segments & broadcasts",
-      "Event tracking & campaigns",
       "Unlimited team members",
       "Email support",
     ],
@@ -204,7 +204,7 @@ export const PRICING_TIERS: PricingTier[] = [
     price: 79,
     annualPrice: 799,
     period: "/mo",
-    description: "For teams shipping production email",
+    description: "For teams where developers and marketers ship together",
     highlight: true,
     cta: "Subscribe",
     ctaLink: "https://app.wraps.dev/auth?mode=signup&plan=growth",
@@ -212,9 +212,9 @@ export const PRICING_TIERS: PricingTier[] = [
     features: [
       "250K tracked events/mo",
       "Then $0.50/1K tracked events",
-      "Everything in Starter",
+      "Everything in Starter, plus:",
+      "AI workflow generation",
       "3 AWS accounts",
-      "250 AI generations/mo",
       "Priority support (24hr)",
     ],
   },
@@ -224,7 +224,7 @@ export const PRICING_TIERS: PricingTier[] = [
     price: 199,
     annualPrice: 1999,
     period: "/mo",
-    description: "For high-volume senders",
+    description: "For high-volume teams with multiple AWS accounts",
     highlight: false,
     cta: "Subscribe",
     ctaLink: "https://app.wraps.dev/auth?mode=signup&plan=scale",
@@ -232,7 +232,7 @@ export const PRICING_TIERS: PricingTier[] = [
     features: [
       "1M tracked events/mo",
       "Then $0.15/1K tracked events",
-      "Everything in Growth",
+      "Everything in Growth, plus:",
       "Behavioral segments",
       "1K AI generations/mo",
       "Unlimited AWS accounts",
@@ -511,9 +511,9 @@ export const FEATURE_COMPARISON: FeatureComparison[] = [
 // =============================================================================
 
 export const PRICING_COPY = {
-  headline: "Email Infrastructure You Own. Pricing You Control.",
+  headline: "Platform pricing. AWS sending costs. No surprises.",
   subheadline:
-    "Start free. Pay AWS directly for sending — $0.10/1K emails. Scale when you're ready.",
+    "Start free. Scale when you're ready. You pay us for the platform. You pay AWS directly for sending — $0.10/1K emails.",
   awsNote:
     "AWS costs are separate. You pay AWS directly for sending at $0.10 per 1,000 emails. Your sending infrastructure stays in your account — leave anytime, keep everything.",
   enterpriseNote:
@@ -530,7 +530,7 @@ export const PRICING_COPY = {
     "No credit card. No time limit. Your AWS account, your data.",
   trackedEventsHeadline: "Powered by Tracked Events",
   trackedEventsSubline:
-    "One API call triggers workflows, builds segments, and drives personalization.",
+    "One event triggers the workflows you wrote. Builds the segments your marketers target. Drives the automations that run on your AWS.",
   paidTiersHeadline: "Outgrowing the free tier?",
   paidTiersSubline:
     "Event tracking, segments, broadcasts, unlimited workflows, and team access — starting at $19/mo.",

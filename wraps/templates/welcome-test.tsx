@@ -15,7 +15,8 @@ import { Footer } from "./_components/footer";
 
 // ── Metadata ──
 
-export const subject = "[Test] Welcome to Wraps, {{firstName}}!";
+export const subject =
+  "[Test] Welcome to Wraps{{#if firstName}}, {{firstName}}{{/if}}!";
 export const emailType = "transactional" as const;
 export const previewText =
   "Deploy email infrastructure to your AWS account in 30 seconds.";
@@ -36,11 +37,7 @@ type Props = {
   unsubscribeUrl: string;
 };
 
-export default function WelcomeEmail({
-  firstName,
-  dashboardUrl,
-  unsubscribeUrl,
-}: Props) {
+export default function WelcomeEmail({ dashboardUrl, unsubscribeUrl }: Props) {
   return (
     <Html>
       <Head />
@@ -59,7 +56,9 @@ export default function WelcomeEmail({
             </Section>
             <Section className="rounded-lg bg-white p-10">
               <Heading className="m-0 mb-4 text-2xl font-semibold text-gray-800">
-                Welcome aboard, {firstName}!
+                {
+                  "{{#if firstName}}Welcome aboard, {{firstName}}!{{else}}Welcome aboard!{{/if}}"
+                }
               </Heading>
               <Text className="m-0 mb-5 text-base leading-relaxed text-gray-600">
                 You just deployed production-ready email infrastructure to your

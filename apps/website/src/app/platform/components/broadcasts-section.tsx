@@ -16,25 +16,25 @@ const features = [
     icon: Filter,
     title: "Segments",
     description: "Target by properties like plan or location",
-    badge: "Growth",
+    badge: "Starter",
   },
   {
     icon: Calendar,
     title: "Schedule",
     description: "Pick a date and time for automatic sending",
-    badge: "Growth",
+    badge: "Starter",
   },
   {
     icon: Tag,
     title: "Topics",
     description: "Let contacts subscribe to what they care about",
-    badge: "Growth",
+    badge: "Starter",
   },
   {
     icon: Users,
     title: "Preference Center",
     description: "Hosted page for managing subscriptions",
-    badge: "Growth",
+    badge: "Starter",
   },
 ];
 
@@ -115,8 +115,8 @@ export function DashboardBroadcastsSection() {
             transition={{ duration: 0.6, delay: 0.3 }}
           >
             <p className="text-lg text-muted-foreground">
-              Send newsletters, announcements, and marketing campaigns. Start
-              with simple broadcasts, then add targeting with Growth.
+              Send newsletters, announcements, and marketing campaigns.
+              Segments, topics, and scheduling included in Starter.
             </p>
 
             {/* Features as list */}
@@ -163,18 +163,18 @@ export function DashboardBroadcastsSection() {
             >
               <p className="text-sm">
                 <span className="font-medium text-orange-600 dark:text-orange-400">
-                  Starter ($10/mo):
+                  Starter ($19/mo):
                 </span>{" "}
                 <span className="text-muted-foreground">
-                  Basic broadcasts to all contacts
+                  Broadcasts, segments, scheduling, and topics
                 </span>
               </p>
               <p className="mt-1 text-sm">
                 <span className="font-medium text-orange-600 dark:text-orange-400">
-                  Growth ($49/mo):
+                  Growth ($79/mo):
                 </span>{" "}
                 <span className="text-muted-foreground">
-                  Add segments, scheduling, and topics
+                  Everything in Starter plus AI workflows and 3 AWS accounts
                 </span>
               </p>
             </motion.div>

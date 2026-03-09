@@ -4,17 +4,22 @@
 import { auth } from "@wraps/auth";
 import {
   type CanvasViewport,
+  contact,
   db,
   type TriggerConfig,
   template,
   type Workflow,
+  type WorkflowExecution,
+  type WorkflowExecutionStatus,
   type WorkflowStep,
+  type WorkflowStepExecutionRecord,
   type WorkflowTransition,
   type WorkflowTriggerType,
   workflow,
   workflowExecution,
+  workflowStepExecution,
 } from "@wraps/db";
-import { and, count, desc, eq, ilike, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { trackWorkflowCreated } from "@/lib/activation-tracking";
@@ -66,6 +71,40 @@ export type EnableWorkflowResult =
 
 export type DuplicateWorkflowResult =
   | { success: true; workflow: WorkflowWithMeta }
+  | { success: false; error: string };
+
+export type ExecutionWithContact = WorkflowExecution & {
+  contact: {
+    id: string;
+    email: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+};
+
+export type ListWorkflowExecutionsResult =
+  | {
+      success: true;
+      executions: ExecutionWithContact[];
+      total: number;
+      page: number;
+      pageSize: number;
+    }
+  | { success: false; error: string };
+
+export type ExecutionDetail = WorkflowExecution & {
+  contact: {
+    id: string;
+    email: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+  workflow: { name: string } | null;
+  stepExecutions: WorkflowStepExecutionRecord[];
+};
+
+export type GetWorkflowExecutionResult =
+  | { success: true; execution: ExecutionDetail }
   | { success: false; error: string };
 
 /**
@@ -1219,5 +1258,279 @@ export async function getWorkflowStats(
       "Failed to get workflow stats"
     );
     return { success: false, error: "Failed to get workflow stats" };
+  }
+}
+
+/**
+ * List workflow executions with pagination and optional status filter
+ */
+export async function listWorkflowExecutions(
+  workflowId: string,
+  organizationId: string,
+  options: {
+    page?: number;
+    pageSize?: number;
+    status?: WorkflowExecutionStatus;
+  } = {}
+): Promise<ListWorkflowExecutionsResult> {
+  try {
+    const access = await verifyOrgAccess(organizationId);
+    if (!access) {
+      return {
+        success: false,
+        error: "You don't have access to this organization",
+      };
+    }
+
+    const { page = 1, pageSize = 50, status } = options;
+    const offset = (page - 1) * pageSize;
+
+    const conditions = [
+      eq(workflowExecution.workflowId, workflowId),
+      eq(workflowExecution.organizationId, organizationId),
+    ];
+
+    if (status) {
+      conditions.push(eq(workflowExecution.status, status));
+    }
+
+    const [totalResult] = await db
+      .select({ count: count() })
+      .from(workflowExecution)
+      .where(and(...conditions));
+
+    const total = totalResult?.count ?? 0;
+
+    const executions = await db
+      .select({
+        execution: workflowExecution,
+        contact: {
+          id: contact.id,
+          email: contact.email,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+        },
+      })
+      .from(workflowExecution)
+      .leftJoin(contact, eq(workflowExecution.contactId, contact.id))
+      .where(and(...conditions))
+      .orderBy(desc(workflowExecution.startedAt))
+      .limit(pageSize)
+      .offset(offset);
+
+    const mapped: ExecutionWithContact[] = executions.map((row) => ({
+      ...row.execution,
+      contact: row.contact,
+    }));
+
+    return {
+      success: true,
+      executions: mapped,
+      total,
+      page,
+      pageSize,
+    };
+  } catch (error) {
+    const log = createActionLogger("listWorkflowExecutions", {
+      orgSlug: organizationId,
+    });
+    log.error(
+      { err: serializeError(error), workflowId },
+      "Failed to list workflow executions"
+    );
+    return { success: false, error: "Failed to list workflow executions" };
+  }
+}
+
+/**
+ * Get a single workflow execution with step trace and contact info
+ */
+export async function getWorkflowExecution(
+  executionId: string,
+  organizationId: string
+): Promise<GetWorkflowExecutionResult> {
+  try {
+    const access = await verifyOrgAccess(organizationId);
+    if (!access) {
+      return {
+        success: false,
+        error: "You don't have access to this organization",
+      };
+    }
+
+    const exec = await db.query.workflowExecution.findFirst({
+      where: and(
+        eq(workflowExecution.id, executionId),
+        eq(workflowExecution.organizationId, organizationId)
+      ),
+      with: {
+        contact: {
+          columns: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        workflow: {
+          columns: {
+            name: true,
+          },
+        },
+        stepExecutions: {
+          orderBy: [asc(workflowStepExecution.startedAt)],
+        },
+      },
+    });
+
+    if (!exec) {
+      return { success: false, error: "Execution not found" };
+    }
+
+    return {
+      success: true,
+      execution: exec as ExecutionDetail,
+    };
+  } catch (error) {
+    const log = createActionLogger("getWorkflowExecution", {
+      orgSlug: organizationId,
+    });
+    log.error(
+      { err: serializeError(error), executionId },
+      "Failed to get workflow execution"
+    );
+    return { success: false, error: "Failed to get workflow execution" };
+  }
+}
+
+export type RetryWorkflowExecutionResult =
+  | { success: true }
+  | { success: false; error: string };
+
+/**
+ * Retry a failed workflow execution from the step where it failed
+ */
+export async function retryWorkflowExecution(
+  executionId: string,
+  organizationId: string
+): Promise<RetryWorkflowExecutionResult> {
+  try {
+    const access = await verifyOrgAccess(organizationId);
+    if (!access) {
+      return {
+        success: false,
+        error: "You don't have access to this organization",
+      };
+    }
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) {
+      return { success: false, error: "API URL not configured" };
+    }
+
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.session?.token) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const response = await fetch(
+      `${apiUrl}/v1/workflows/executions/${executionId}/retry`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.session.token}`,
+          "X-Organization-Id": organizationId,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      return { success: false, error: text };
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      return { success: false, error: result.error ?? "Retry failed" };
+    }
+
+    revalidatePath("/[orgSlug]/automations", "page");
+
+    return { success: true };
+  } catch (error) {
+    const log = createActionLogger("retryWorkflowExecution", {
+      orgSlug: organizationId,
+    });
+    log.error(
+      { err: serializeError(error), executionId },
+      "Failed to retry execution"
+    );
+    return { success: false, error: "Failed to retry execution" };
+  }
+}
+
+export type CancelWorkflowExecutionResult =
+  | { success: true }
+  | { success: false; error: string };
+
+/**
+ * Cancel an active workflow execution
+ */
+export async function cancelWorkflowExecution(
+  executionId: string,
+  organizationId: string
+): Promise<CancelWorkflowExecutionResult> {
+  try {
+    const access = await verifyOrgAccess(organizationId);
+    if (!access) {
+      return {
+        success: false,
+        error: "You don't have access to this organization",
+      };
+    }
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) {
+      return { success: false, error: "API URL not configured" };
+    }
+
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.session?.token) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const response = await fetch(
+      `${apiUrl}/v1/workflows/executions/${executionId}/cancel`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.session.token}`,
+          "X-Organization-Id": organizationId,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      return { success: false, error: text };
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      return { success: false, error: result.error ?? "Cancel failed" };
+    }
+
+    revalidatePath("/[orgSlug]/automations", "page");
+
+    return { success: true };
+  } catch (error) {
+    const log = createActionLogger("cancelWorkflowExecution", {
+      orgSlug: organizationId,
+    });
+    log.error(
+      { err: serializeError(error), executionId },
+      "Failed to cancel execution"
+    );
+    return { success: false, error: "Failed to cancel execution" };
   }
 }

@@ -1,9 +1,15 @@
 import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
-import { messageSend } from "@wraps/db/schema/batch";
-import { and, count, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
+import { awsAccount } from "@wraps/db/schema/app";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { gapFillDates, generateDateRange } from "@/lib/analytics-utils";
+import {
+  aggregateByDate,
+  gapFillDates,
+  generateDateRange,
+} from "@/lib/analytics-utils";
+import { getCloudWatchMetrics, SES_METRICS } from "@/lib/aws/cloudwatch";
+import { createRequestLogger, serializeError } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
 type RouteContext = {
@@ -15,6 +21,11 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { orgSlug } = await context.params;
+    const log = createRequestLogger({
+      path: "/api/[orgSlug]/analytics/engagement",
+      method: "GET",
+      orgSlug,
+    });
 
     const session = await auth.api.getSession({
       headers: await import("next/headers").then((mod) => mod.headers()),
@@ -41,61 +52,127 @@ export async function GET(request: Request, context: RouteContext) {
     const endTime = new Date();
     const startTime = new Date(endTime.getTime() - days * 24 * 60 * 60 * 1000);
 
-    const pgData = await db
-      .select({
-        date: sql<string>`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
-        delivered: count(messageSend.deliveredAt),
-        opens: count(messageSend.openedAt),
-        clicks: count(messageSend.clickedAt),
+    const period = days <= 7 ? 3600 : days <= 30 ? 3600 * 6 : 3600 * 24;
+
+    const accounts = await db.query.awsAccount.findMany({
+      where: eq(awsAccount.organizationId, orgWithMembership.id),
+    });
+
+    if (accounts.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    const metricsResults = await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          const [sent, delivered, opens, clicks] = await Promise.all([
+            getCloudWatchMetrics({
+              awsAccountId: account.id,
+              metric: SES_METRICS.SEND,
+              period,
+              startTime,
+              endTime,
+            }),
+            getCloudWatchMetrics({
+              awsAccountId: account.id,
+              metric: SES_METRICS.DELIVERY,
+              period,
+              startTime,
+              endTime,
+            }),
+            getCloudWatchMetrics({
+              awsAccountId: account.id,
+              metric: SES_METRICS.OPEN,
+              period,
+              startTime,
+              endTime,
+            }),
+            getCloudWatchMetrics({
+              awsAccountId: account.id,
+              metric: SES_METRICS.CLICK,
+              period,
+              startTime,
+              endTime,
+            }),
+          ]);
+
+          return { sent, delivered, opens, clicks };
+        } catch (error) {
+          log.error(
+            { err: serializeError(error), accountId: account.id },
+            "Failed to fetch engagement metrics for account"
+          );
+          return null;
+        }
       })
-      .from(messageSend)
-      .where(
-        and(
-          eq(messageSend.organizationId, orgWithMembership.id),
-          eq(messageSend.channel, "email"),
-          isNotNull(messageSend.sentAt),
-          gte(messageSend.sentAt, startTime),
-          lte(messageSend.sentAt, endTime)
-        )
-      )
-      .groupBy(
-        sql`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`
-      )
-      .orderBy(
-        sql`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`
+    );
+
+    const keys = ["sent", "delivered", "opens", "clicks"] as const;
+    const dailyMap = new Map<string, Record<(typeof keys)[number], number>>();
+
+    for (const metrics of metricsResults) {
+      if (!metrics) {
+        continue;
+      }
+
+      const timestamps = metrics.sent[0]?.Timestamps || [];
+      const perAccount = aggregateByDate(
+        timestamps,
+        [
+          metrics.sent[0]?.Values || [],
+          metrics.delivered[0]?.Values || [],
+          metrics.opens[0]?.Values || [],
+          metrics.clicks[0]?.Values || [],
+        ],
+        [...keys]
       );
 
-    const dateRange = generateDateRange(startTime, endTime);
-    const pgMap = new Map(
-      pgData.map((d) => {
-        const delivered = Number(d.delivered);
-        const opens = Number(d.opens);
-        const clicks = Number(d.clicks);
-        const openRate = delivered > 0 ? (opens / delivered) * 100 : 0;
-        const clickRate = delivered > 0 ? (clicks / delivered) * 100 : 0;
-        const ctr = opens > 0 ? (clicks / opens) * 100 : 0;
-        return [
-          d.date,
-          {
-            openRate: Number(openRate.toFixed(1)),
-            clickRate: Number(clickRate.toFixed(1)),
-            ctr: Number(ctr.toFixed(1)),
-          },
-        ] as const;
-      })
-    );
+      for (const [dateStr, values] of perAccount) {
+        const existing = dailyMap.get(dateStr) || {
+          sent: 0,
+          delivered: 0,
+          opens: 0,
+          clicks: 0,
+        };
+        dailyMap.set(dateStr, {
+          sent: existing.sent + values.sent,
+          delivered: existing.delivered + values.delivered,
+          opens: existing.opens + values.opens,
+          clicks: existing.clicks + values.clicks,
+        });
+      }
+    }
 
-    return NextResponse.json(
-      gapFillDates(
-        dateRange,
-        pgMap as Map<
-          string,
-          { openRate: number; clickRate: number; ctr: number }
-        >,
-        { openRate: 0, clickRate: 0, ctr: 0 }
-      )
-    );
+    const dateRange = generateDateRange(startTime, endTime);
+    const dataPoints = gapFillDates(dateRange, dailyMap, {
+      sent: 0,
+      delivered: 0,
+      opens: 0,
+      clicks: 0,
+    }).map((d) => {
+      const openRate = d.delivered > 0 ? (d.opens / d.delivered) * 100 : 0;
+      const clickRate = d.delivered > 0 ? (d.clicks / d.delivered) * 100 : 0;
+      const ctr = d.opens > 0 ? (d.clicks / d.opens) * 100 : 0;
+
+      return {
+        date: d.date,
+        timestamp: d.timestamp,
+        openRate: Number(openRate.toFixed(1)),
+        clickRate: Number(clickRate.toFixed(1)),
+        ctr: Number(ctr.toFixed(1)),
+      };
+    });
+
+    return NextResponse.json(dataPoints);
   } catch (error) {
+    const log = createRequestLogger({
+      path: "/api/[orgSlug]/analytics/engagement",
+      method: "GET",
+    });
+    log.error(
+      { err: serializeError(error) },
+      "Error fetching engagement analytics"
+    );
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

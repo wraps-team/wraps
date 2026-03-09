@@ -3,6 +3,7 @@
 import type { Workflow } from "@wraps/db";
 import {
   AlertCircle,
+  ListChecks,
   Loader2,
   Pause,
   Pencil,
@@ -12,6 +13,7 @@ import {
   Settings,
   Undo2,
 } from "lucide-react";
+import Link from "next/link";
 import {
   useDeferredValue,
   useEffect,
@@ -356,6 +358,27 @@ export function WorkflowToolbar({
               <TooltipContent side="bottom">Redo (⌘⇧Z)</TooltipContent>
             </Tooltip>
           </div>
+        </TooltipProvider>
+
+        {/* Executions link */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                aria-label="View executions"
+                asChild
+                size="icon"
+                variant="outline"
+              >
+                <Link
+                  href={`/${orgSlug}/automations/${workflow.id}/executions`}
+                >
+                  <ListChecks className="h-4 w-4" />
+                </Link>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">View executions</TooltipContent>
+          </Tooltip>
         </TooltipProvider>
 
         {/* Settings button */}

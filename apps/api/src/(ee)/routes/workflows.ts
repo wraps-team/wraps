@@ -6,8 +6,8 @@
  * by external systems or customer code.
  */
 
-import { contact, db, eq, workflow } from "@wraps/db";
-import { and, inArray } from "drizzle-orm";
+import { contact, db, eq, workflow, workflowExecution } from "@wraps/db";
+import { and, inArray, sql } from "drizzle-orm";
 import { t } from "elysia";
 
 import { log } from "../../lib/logger";
@@ -16,6 +16,7 @@ import {
   createAuthenticatedRoutes,
 } from "../../middleware/auth";
 import { rateLimitMiddleware } from "../../middleware/rate-limit";
+import { cancelWorkflowExecution } from "../../services/workflow-cancel";
 import {
   enqueueWorkflowStep,
   enqueueWorkflowStepBatch,
@@ -380,6 +381,172 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
         summary: "Batch trigger workflow",
         description:
           "Trigger a workflow for multiple contacts at once. Each contact can have its own data that gets merged with common data.",
+        tags: ["workflows"],
+      },
+    }
+  )
+
+  /**
+   * Retry a failed workflow execution
+   *
+   * POST /v1/workflows/executions/:executionId/retry
+   *
+   * Resets the failed execution to active and re-enqueues the failed step
+   * for processing. Completed steps are preserved.
+   */
+  .post(
+    "/executions/:executionId/retry",
+    async (ctx) => {
+      const { params } = ctx;
+      const auth = (ctx as unknown as { auth: AuthContext }).auth;
+      const { executionId } = params;
+
+      // Load execution with org scoping
+      const [exec] = await db
+        .select()
+        .from(workflowExecution)
+        .where(
+          and(
+            eq(workflowExecution.id, executionId),
+            eq(workflowExecution.organizationId, auth.organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!exec) {
+        return { success: false, error: "Execution not found" };
+      }
+
+      if (exec.status !== "failed") {
+        return {
+          success: false,
+          error: "Only failed executions can be retried",
+        };
+      }
+
+      if (!exec.errorStepId) {
+        return { success: false, error: "No error step to retry from" };
+      }
+
+      const errorStepId = exec.errorStepId;
+
+      // Reset execution and fix workflow stats atomically.
+      // The WHERE includes status='failed' to prevent double-counting
+      // if two retry requests race — only one wins the UPDATE.
+      const claimed = await db.transaction(async (tx) => {
+        const [updated] = await tx
+          .update(workflowExecution)
+          .set({
+            status: "active",
+            currentStepId: errorStepId,
+            error: null,
+            errorStepId: null,
+            completedAt: null,
+            retryCount: sql`${workflowExecution.retryCount} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(workflowExecution.id, executionId),
+              eq(workflowExecution.status, "failed")
+            )
+          )
+          .returning({ id: workflowExecution.id });
+
+        if (!updated) return false;
+
+        await tx
+          .update(workflow)
+          .set({
+            activeExecutions: sql`${workflow.activeExecutions} + 1`,
+            failedExecutions: sql`GREATEST(0, ${workflow.failedExecutions} - 1)`,
+          })
+          .where(eq(workflow.id, exec.workflowId));
+
+        return true;
+      });
+
+      if (!claimed) {
+        return {
+          success: false,
+          error: "Execution is no longer in failed state",
+        };
+      }
+
+      // Enqueue the failed step for re-processing
+      await enqueueWorkflowStep({
+        type: "execute",
+        executionId: exec.id,
+        stepId: errorStepId,
+        organizationId: auth.organizationId,
+      });
+
+      log.info("Workflow execution retry", {
+        executionId: exec.id,
+        stepId: errorStepId,
+        workflowId: exec.workflowId,
+      });
+
+      return { success: true, message: "Execution retry started" };
+    },
+    {
+      params: t.Object({
+        executionId: t.String({
+          description: "Execution ID to retry",
+          maxLength: 36,
+        }),
+      }),
+      response: {
+        200: t.Object({
+          success: t.Boolean(),
+          message: t.Optional(t.String()),
+          error: t.Optional(t.String()),
+        }),
+      },
+      detail: {
+        summary: "Retry failed execution",
+        description:
+          "Retry a failed workflow execution from the step where it failed. Completed steps are preserved.",
+        tags: ["workflows"],
+      },
+    }
+  )
+
+  /**
+   * Cancel a workflow execution
+   *
+   * POST /v1/workflows/executions/:executionId/cancel
+   *
+   * Cancels an active execution, cleans up schedulers, adjusts workflow stats.
+   */
+  .post(
+    "/executions/:executionId/cancel",
+    async (ctx) => {
+      const { params } = ctx;
+      const auth = (ctx as unknown as { auth: AuthContext }).auth;
+
+      return cancelWorkflowExecution({
+        executionId: params.executionId,
+        organizationId: auth.organizationId,
+      });
+    },
+    {
+      params: t.Object({
+        executionId: t.String({
+          description: "Execution ID to cancel",
+          maxLength: 36,
+        }),
+      }),
+      response: {
+        200: t.Object({
+          success: t.Boolean(),
+          error: t.Optional(t.String()),
+        }),
+      },
+      detail: {
+        summary: "Cancel workflow execution",
+        description:
+          "Cancel an active workflow execution. Cleans up schedulers and adjusts workflow stats.",
         tags: ["workflows"],
       },
     }

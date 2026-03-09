@@ -12,7 +12,7 @@ import { Footer } from "./_components/footer";
 
 // -- Metadata --
 
-export const subject = "quick question, {{firstName}}";
+export const subject = "quick question{{#if firstName}}, {{firstName}}{{/if}}";
 export const emailType = "marketing" as const;
 export const previewText =
   "Your SES infrastructure has been sitting idle for 2 days.";
@@ -31,10 +31,7 @@ type Props = {
   unsubscribeUrl: string;
 };
 
-export default function NudgeSendFirstEmail({
-  firstName,
-  unsubscribeUrl,
-}: Props) {
+export default function NudgeSendFirstEmail({ unsubscribeUrl }: Props) {
   return (
     <Html>
       <Head />
@@ -43,7 +40,7 @@ export default function NudgeSendFirstEmail({
         <Body className="bg-white font-sans">
           <Container className="mx-auto max-w-[580px] px-4 py-10">
             <Text className="text-[15px] leading-relaxed text-gray-800">
-              Hey {firstName},
+              {"{{#if firstName}}Hey {{firstName}},{{else}}Hey there,{{/if}}"}
             </Text>
 
             <Text className="text-[15px] leading-relaxed text-gray-800">

@@ -17,7 +17,7 @@
     "test:coverage": "turbo run test:coverage --filter=@wraps.dev/cli",
     "typecheck": "turbo run typecheck",
     "check": "pnpm dlx ultracite@latest check",
-    "check:errors": "pnpm dlx ultracite@latest check --diagnostic-level=error",
+    "check:errors": "pnpm dlx ultracite@latest check --diagnostic-level=error --reporter=summary",
     "test:baseline": "vitest run --config vitest.config.ts && pnpm baseline",
     "check:fast": "pnpm check:errors && pnpm test:baseline",
     "check:all": "./scripts/check-all.sh",

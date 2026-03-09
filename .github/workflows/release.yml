@@ -1,0 +1,249 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*-v*'
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  # ── Parse tag into package metadata ──
+  parse:
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.meta.outputs.package }}
+      npm_package: ${{ steps.meta.outputs.npm_package }}
+      filter: ${{ steps.meta.outputs.filter }}
+      dist_tag: ${{ steps.meta.outputs.dist_tag }}
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      is_cli: ${{ steps.meta.outputs.is_cli }}
+    steps:
+      - name: Parse release tag
+        id: meta
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+
+          if [[ "$TAG" =~ ^([a-z]+)-v(.+)$ ]]; then
+            PACKAGE="${BASH_REMATCH[1]}"
+            VERSION="${BASH_REMATCH[2]}"
+          else
+            echo "::error::Tag must be <package>-v<version> (e.g., cli-v1.0.0)"
+            exit 1
+          fi
+
+          case "$PACKAGE" in
+            cli)    NPM_PACKAGE="@wraps.dev/cli";    FILTER="@wraps.dev/cli" ;;
+            cdk)    NPM_PACKAGE="@wraps.dev/cdk";    FILTER="@wraps.dev/cdk" ;;
+            pulumi) NPM_PACKAGE="@wraps.dev/pulumi"; FILTER="@wraps.dev/pulumi" ;;
+            core)   NPM_PACKAGE="@wraps/core";       FILTER="@wraps/core" ;;
+            *)      echo "::error::Unknown package '$PACKAGE'"; exit 1 ;;
+          esac
+
+          DIST_TAG="latest"
+          [[ "$TAG" =~ -beta\. ]]  && DIST_TAG="beta"
+          [[ "$TAG" =~ -alpha\. ]] && DIST_TAG="alpha"
+          [[ "$TAG" =~ -rc\. ]]    && DIST_TAG="rc"
+
+          IS_CLI=$([[ "$PACKAGE" == "cli" ]] && echo "true" || echo "false")
+
+          {
+            echo "package=$PACKAGE"
+            echo "npm_package=$NPM_PACKAGE"
+            echo "filter=$FILTER"
+            echo "dist_tag=$DIST_TAG"
+            echo "version=$VERSION"
+            echo "tag=$TAG"
+            echo "is_cli=$IS_CLI"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "## Release: $TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Package:** $NPM_PACKAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Version:** $VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Dist tag:** $DIST_TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Standalone builds:** $IS_CLI" >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Fast track: non-CLI packages (npm publish + GH release) ──
+  publish:
+    needs: parse
+    if: needs.parse.outputs.is_cli != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: npm install -g npm@latest
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build dependencies
+        run: |
+          pnpm --filter @wraps/core build
+          pnpm --filter @wraps/email-check build
+
+      - name: Build package
+        run: pnpm --filter ${{ needs.parse.outputs.filter }} build
+
+      - name: Publish to npm
+        run: |
+          pnpm --filter ${{ needs.parse.outputs.filter }} publish \
+            --access public --no-git-checks \
+            --tag ${{ needs.parse.outputs.dist_tag }}
+        env:
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ needs.parse.outputs.tag }}"
+          DIST_TAG="${{ needs.parse.outputs.dist_tag }}"
+          PRERELEASE_FLAG=""
+          [[ "$DIST_TAG" != "latest" ]] && PRERELEASE_FLAG="--prerelease"
+
+          if ! gh release view "$TAG" --repo "${{ github.repository }}" &>/dev/null; then
+            gh release create "$TAG" \
+              --repo "${{ github.repository }}" \
+              --title "$TAG" \
+              --generate-notes \
+              $PRERELEASE_FLAG
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Published ${{ needs.parse.outputs.npm_package }}@${{ needs.parse.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+          if [[ "${{ needs.parse.outputs.dist_tag }}" == "latest" ]]; then
+            echo "npm install ${{ needs.parse.outputs.npm_package }}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "npm install ${{ needs.parse.outputs.npm_package }}@${{ needs.parse.outputs.dist_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  # ── CLI: build standalone binaries (4 platforms in parallel) ──
+  build-standalone:
+    needs: parse
+    if: needs.parse.outputs.is_cli == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: darwin
+            arch: arm64
+            runner: macos-latest
+          - platform: darwin
+            arch: x64
+            runner: macos-15
+          - platform: linux
+            arch: x64
+            runner: ubuntu-latest
+          - platform: linux
+            arch: arm64
+            runner: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build dependencies
+        run: |
+          pnpm --filter @wraps/core build
+          pnpm --filter @wraps/email-check build
+
+      - run: pnpm --filter @wraps.dev/cli build
+
+      - name: Build standalone
+        run: bash scripts/build-standalone.sh --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wraps-${{ matrix.platform }}-${{ matrix.arch }}
+          path: wraps-*-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+
+  # ── CLI: npm publish + GH release with binaries ──
+  release-cli:
+    needs: [parse, build-standalone]
+    if: needs.parse.outputs.is_cli == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: npm install -g npm@latest
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build dependencies
+        run: |
+          pnpm --filter @wraps/core build
+          pnpm --filter @wraps/email-check build
+
+      - name: Build CLI
+        run: pnpm --filter @wraps.dev/cli build
+
+      - name: Publish to npm
+        run: |
+          pnpm --filter @wraps.dev/cli publish \
+            --access public --no-git-checks \
+            --tag ${{ needs.parse.outputs.dist_tag }}
+        env:
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Download standalone artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: sha256sum wraps-*.tar.gz > CHECKSUMS.sha256
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ needs.parse.outputs.tag }}"
+          VERSION="${{ needs.parse.outputs.version }}"
+          DIST_TAG="${{ needs.parse.outputs.dist_tag }}"
+          PRERELEASE_FLAG=""
+          [[ "$DIST_TAG" != "latest" ]] && PRERELEASE_FLAG="--prerelease"
+
+          if gh release view "$TAG" --repo "${{ github.repository }}" &>/dev/null; then
+            echo "::error::Release $TAG already exists — bump version and re-tag"
+            exit 1
+          fi
+
+          gh release create "$TAG" wraps-*.tar.gz CHECKSUMS.sha256 \
+            --repo "${{ github.repository }}" \
+            --title "CLI v$VERSION" \
+            --generate-notes \
+            $PRERELEASE_FLAG
+
+      - name: Summary
+        run: |
+          echo "## Published @wraps.dev/cli@${{ needs.parse.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+          if [[ "${{ needs.parse.outputs.dist_tag }}" == "latest" ]]; then
+            echo "npm install @wraps.dev/cli" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "npm install @wraps.dev/cli@${{ needs.parse.outputs.dist_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
