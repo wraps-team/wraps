@@ -392,8 +392,12 @@ export async function checkSegmentEntry(params: {
     return { workflowsTriggered: 0 };
   }
 
-  // 3. Batch-fetch all segments (1 query)
-  const segmentsMap = await getSegmentsByIds(db, segmentIds);
+  // 3. Batch-fetch all segments (1 query, org-scoped to prevent cross-org IDOR)
+  const segmentsMap = await getSegmentsByIds(
+    db,
+    segmentIds,
+    params.organizationId
+  );
 
   // 4. Evaluate via SQL and collect trigger jobs
   const jobs: WorkflowJob[] = [];
@@ -508,8 +512,12 @@ export async function checkSegmentExit(params: {
     return { workflowsTriggered: 0 };
   }
 
-  // 3. Batch-fetch all segments (1 query)
-  const segmentsMap = await getSegmentsByIds(db, segmentIds);
+  // 3. Batch-fetch all segments (1 query, org-scoped to prevent cross-org IDOR)
+  const segmentsMap = await getSegmentsByIds(
+    db,
+    segmentIds,
+    params.organizationId
+  );
 
   // 4. Evaluate via SQL and collect trigger jobs
   const jobs: WorkflowJob[] = [];

@@ -90,7 +90,8 @@ export async function contactIdsMatchingCondition(
  */
 export async function getSegmentsByIds(
   database: DB,
-  segmentIds: string[]
+  segmentIds: string[],
+  organizationId: string
 ): Promise<Map<string, typeof segment.$inferSelect>> {
   const result = new Map<string, typeof segment.$inferSelect>();
   if (segmentIds.length === 0) {
@@ -100,7 +101,12 @@ export async function getSegmentsByIds(
   const segments = await database
     .select()
     .from(segment)
-    .where(inArray(segment.id, segmentIds));
+    .where(
+      and(
+        inArray(segment.id, segmentIds),
+        eq(segment.organizationId, organizationId)
+      )
+    );
 
   for (const seg of segments) {
     result.set(seg.id, seg);

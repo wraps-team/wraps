@@ -55,7 +55,7 @@ export function AcceptInvitationForm({
         organization_name: invitation.organization.name,
         organization_slug: result.organizationSlug,
         role: invitation.role || "member",
-        inviter_email: invitation.inviter.email,
+        inviter_name: invitation.inviter.name,
       });
 
       toast.success(result.message);

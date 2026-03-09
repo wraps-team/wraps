@@ -37,7 +37,7 @@ export function DeclineInvitationForm({
       // Capture invitation declined event in PostHog
       posthog.capture("invitation_declined", {
         organization_name: invitation.organization.name,
-        inviter_email: invitation.inviter.email,
+        inviter_name: invitation.inviter.name,
       });
 
       toast.success(result.message);
@@ -74,9 +74,6 @@ export function DeclineInvitationForm({
               <p className="font-medium text-sm">From</p>
               <p className="text-foreground">
                 <strong>{invitation.inviter.name}</strong>
-              </p>
-              <p className="text-muted-foreground text-sm">
-                {invitation.inviter.email}
               </p>
             </div>
           </div>

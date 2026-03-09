@@ -144,7 +144,8 @@ describe("checkSegmentEntry", () => {
     expect(result).toEqual({ workflowsTriggered: 1 });
     expect(mockGetSegments).toHaveBeenCalledWith(
       expect.anything(), // db
-      ["seg-1"]
+      ["seg-1"],
+      "org-1"
     );
     expect(mockContactMatches).toHaveBeenCalledWith(
       expect.anything(), // db

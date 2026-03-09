@@ -157,12 +157,26 @@ async function trackPostHogSignup(
       return;
     }
 
+    const safeAttribution = attribution
+      ? {
+          utm_source: attribution.utm_source,
+          utm_medium: attribution.utm_medium,
+          utm_campaign: attribution.utm_campaign,
+          utm_content: attribution.utm_content,
+          utm_term: attribution.utm_term,
+          ref: attribution.ref,
+          referrer: attribution.referrer,
+          landing_page: attribution.landing_page,
+          timestamp: attribution.timestamp,
+        }
+      : undefined;
+
     posthog.identify({
       distinctId: user.email,
       properties: {
         email: user.email,
         name: user.name,
-        ...attribution,
+        ...safeAttribution,
       },
     });
 
@@ -173,7 +187,7 @@ async function trackPostHogSignup(
         email: user.email,
         name: user.name,
         method: user.method,
-        ...attribution,
+        ...safeAttribution,
       },
     });
 
@@ -202,6 +216,20 @@ async function trackUserSignup(
     const client = createPlatformClient({ apiKey });
     const normalizedEmail = user.email.toLowerCase().trim();
 
+    const safeAttribution = attribution
+      ? {
+          utm_source: attribution.utm_source,
+          utm_medium: attribution.utm_medium,
+          utm_campaign: attribution.utm_campaign,
+          utm_content: attribution.utm_content,
+          utm_term: attribution.utm_term,
+          ref: attribution.ref,
+          referrer: attribution.referrer,
+          landing_page: attribution.landing_page,
+          timestamp: attribution.timestamp,
+        }
+      : undefined;
+
     // Create/upsert the contact first (required for events)
     // Subscribe to product updates topic for announcements
     const { error: contactError } = await client.POST("/v1/contacts/", {
@@ -212,7 +240,7 @@ async function trackUserSignup(
           name: user.name || undefined,
           signupAt: new Date().toISOString(),
           source: "web",
-          ...attribution,
+          ...safeAttribution,
         },
         topicSlugs: ["wraps-product-updates"],
       },
@@ -231,7 +259,7 @@ async function trackUserSignup(
           name: user.name || undefined,
           signupAt: new Date().toISOString(),
           source: "web",
-          ...attribution,
+          ...safeAttribution,
         },
       },
     });
@@ -424,7 +452,7 @@ export const auth = betterAuth<BetterAuthOptions>({
       },
     },
   },
-  trustedOrigins: [process.env.CORS_ORIGIN || ""],
+  trustedOrigins: [process.env.CORS_ORIGIN].filter((v): v is string => !!v),
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
@@ -511,12 +539,12 @@ export const auth = betterAuth<BetterAuthOptions>({
       userCodeLength: 8,
       validateClient: async (clientId) => clientId === "wraps-cli",
     }),
-    // Only include Stripe plugin if the client is available (requires STRIPE_SECRET_KEY)
-    ...(stripeClient
+    // Only include Stripe plugin if the client and webhook secret are both available
+    ...(stripeClient && process.env.STRIPE_WEBHOOK_SECRET
       ? [
           stripe({
             stripeClient,
-            stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+            stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
             onEvent: async (event) => {
               try {
                 await handleStripeWebhook(event);

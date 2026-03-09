@@ -19,7 +19,6 @@ export type InvitationDetails = {
   };
   inviter: {
     name: string;
-    email: string;
   };
 };
 
@@ -112,7 +111,6 @@ export async function getInvitation(
         },
         inviter: {
           name: inviterUser.name,
-          email: inviterUser.email,
         },
       },
       isExpired,
@@ -280,6 +278,17 @@ export async function declineInvitation(
   invitationId: string
 ): Promise<DeclineInvitationResult> {
   try {
+    const session = await auth.api.getSession({
+      headers: await import("next/headers").then((mod) => mod.headers()),
+    });
+
+    if (!session?.user) {
+      return {
+        success: false,
+        error: "You must be logged in to decline an invitation.",
+      };
+    }
+
     // Fetch invitation
     const inv = await db.query.invitation.findFirst({
       where: eq(invitation.id, invitationId),
@@ -297,6 +306,14 @@ export async function declineInvitation(
       return {
         success: false,
         error: "This invitation has already been processed",
+      };
+    }
+
+    // Verify the logged-in user's email matches the invitation
+    if (session.user.email !== inv.email) {
+      return {
+        success: false,
+        error: `This invitation was sent to ${inv.email}. Please log in with that email address.`,
       };
     }
 
