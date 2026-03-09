@@ -411,7 +411,7 @@ message = "Remove console.log before deploying — use a proper logger or remove
 [[rule]]
 id = "no-http-links"
 type = "banned-pattern"
-severity = "warning"
+severity = "error"
 pattern = "http://"
 glob = "**/*.{ts,tsx}"
 exclude_glob = [
