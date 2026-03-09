@@ -1023,3 +1023,124 @@ describe("Contacts Server Actions", () => {
     });
   });
 });
+
+// ─── Security: email validation ────────────────────────────────────────────
+
+describe("createContact — email validation", () => {
+  it("rejects an email with no domain part (foo@)", async () => {
+    const result = await createContact(testOrganization.id, {
+      email: "foo@",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/invalid email/i);
+    }
+  });
+
+  it("rejects an email with no TLD (foo@bar)", async () => {
+    const result = await createContact(testOrganization.id, {
+      email: "foo@bar",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/invalid email/i);
+    }
+  });
+
+  it("rejects an email with no local part (@domain.com)", async () => {
+    const result = await createContact(testOrganization.id, {
+      email: "@domain.com",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/invalid email/i);
+    }
+  });
+
+  it("accepts a valid email address", async () => {
+    const result = await createContact(testOrganization.id, {
+      email: "valid-email-test@example.com",
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+// ─── Security: topicId cross-org IDOR ──────────────────────────────────────
+
+describe("createContact — topicId cross-org IDOR", () => {
+  const foreignOrg = {
+    id: "sec-foreign-org-1",
+    name: "Foreign Org",
+    slug: "sec-foreign-org",
+    createdAt: new Date(),
+    logo: null,
+    metadata: null,
+  };
+
+  const foreignTopic = {
+    id: "sec-foreign-topic-1",
+    organizationId: "sec-foreign-org-1",
+    name: "Foreign Topic",
+    slug: "foreign-topic",
+    description: null,
+    public: true,
+    doubleOptIn: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: null,
+  };
+
+  beforeAll(async () => {
+    await db
+      .insert(organization)
+      .values(foreignOrg)
+      .onConflictDoUpdate({
+        target: organization.id,
+        set: { name: foreignOrg.name },
+      });
+    await db
+      .insert(topic)
+      .values(foreignTopic)
+      .onConflictDoUpdate({
+        target: topic.id,
+        set: { name: foreignTopic.name },
+      });
+  });
+
+  afterAll(async () => {
+    await db.delete(topic).where(eq(topic.id, foreignTopic.id));
+    await db.delete(organization).where(eq(organization.id, foreignOrg.id));
+  });
+
+  it("does not subscribe a contact to a topic owned by a different organization", async () => {
+    const result = await createContact(testOrganization.id, {
+      email: "idor-topic-test@example.com",
+      topicIds: [foreignTopic.id],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // The foreign topic must not appear in the contact's subscriptions
+      const subscribedTopicIds =
+        result.contact.topics?.map((t) => t.topicId) ?? [];
+      expect(subscribedTopicIds).not.toContain(foreignTopic.id);
+    }
+  });
+
+  it("only subscribes to topics belonging to the correct organization", async () => {
+    const result = await createContact(testOrganization.id, {
+      email: "mixed-topics@example.com",
+      topicIds: [testTopic.id, foreignTopic.id],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      const subscribedTopicIds =
+        result.contact.topics?.map((t) => t.topicId) ?? [];
+      // Own topic is subscribed
+      expect(subscribedTopicIds).toContain(testTopic.id);
+      // Foreign topic is silently dropped
+      expect(subscribedTopicIds).not.toContain(foreignTopic.id);
+    }
+  });
+});

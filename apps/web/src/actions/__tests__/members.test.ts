@@ -1,7 +1,12 @@
 import { db, invitation, member, organization, user } from "@wraps/db";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { cancelInvitation, removeMember, updateMemberRole } from "../members";
+import {
+  cancelInvitation,
+  inviteMember,
+  removeMember,
+  updateMemberRole,
+} from "../members";
 
 // --- Test fixtures ---
 
@@ -267,5 +272,46 @@ describe("Members IDOR Vulnerabilities", () => {
           set: { status: invitationB.status },
         });
     });
+  });
+});
+
+// ─── Security: email validation in inviteMember ────────────────────────────
+
+describe("inviteMember — email validation", () => {
+  const INVALID_EMAILS = [
+    { label: "empty string", value: "" },
+    { label: "no @ sign", value: "notanemail" },
+    { label: "no domain (foo@)", value: "foo@" },
+    { label: "no TLD (foo@bar)", value: "foo@bar" },
+    { label: "only @ sign", value: "@" },
+    { label: "whitespace only", value: "   " },
+  ];
+
+  for (const { label, value } of INVALID_EMAILS) {
+    it(`rejects invalid email: ${label}`, async () => {
+      const result = await inviteMember(value, "member", orgA.id);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toMatch(/invalid email/i);
+      }
+    });
+  }
+
+  it("accepts a valid email address format", async () => {
+    // The invite will fail because orgA has no subscription, but the
+    // important thing is it does NOT fail on email validation.
+    const result = await inviteMember(
+      "valid-invite@example.com",
+      "member",
+      orgA.id
+    );
+
+    // Should not return an email validation error
+    if (!result.success) {
+      expect((result as { success: false; error: string }).error).not.toMatch(
+        /invalid email/i
+      );
+    }
   });
 });

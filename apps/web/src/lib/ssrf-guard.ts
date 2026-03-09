@@ -12,7 +12,7 @@ const PRIVATE_IP_PATTERNS = [
   /^169\.254\./, // link-local / AWS EC2 metadata
   /^0\./,
   /^::1$/,
-  /^fc[0-9a-f]{2}:/i,
+  /^f[cd][0-9a-f]{2}:/i,
   /^fe80:/i,
 ];
 
