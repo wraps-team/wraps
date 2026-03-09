@@ -1,6 +1,6 @@
 "use server";
 
-import { contact, contactTopic, db } from "@wraps/db";
+import { contact, contactTopic, db, topic } from "@wraps/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { trackContactsImported } from "@/lib/activation-tracking";
 import type { ImportContactsResult } from "@/lib/contacts";
@@ -72,6 +72,29 @@ export async function importContacts(
 
     if (data.contacts.length === 0) {
       return { success: false, error: "No contacts provided" };
+    }
+
+    const MAX_IMPORT_SIZE = 10_000;
+    if (data.contacts.length > MAX_IMPORT_SIZE) {
+      return {
+        success: false,
+        error: `Import size exceeds maximum of ${MAX_IMPORT_SIZE} contacts per batch.`,
+      };
+    }
+
+    // Validate topicIds belong to this organization to prevent cross-org IDOR
+    let validatedTopicIds: string[] = [];
+    if (data.topicIds && data.topicIds.length > 0) {
+      const ownedTopics = await db
+        .select({ id: topic.id })
+        .from(topic)
+        .where(
+          and(
+            inArray(topic.id, data.topicIds),
+            eq(topic.organizationId, organizationId)
+          )
+        );
+      validatedTopicIds = ownedTopics.map((t) => t.id);
     }
 
     // Check contact limit once up-front
@@ -310,7 +333,7 @@ export async function importContacts(
 
     // Topic subscriptions for all created + updated contacts
     const allContactIds = [...allCreatedContactIds, ...allUpdatedContactIds];
-    if (data.topicIds && data.topicIds.length > 0 && allContactIds.length > 0) {
+    if (validatedTopicIds.length > 0 && allContactIds.length > 0) {
       // For updated contacts, remove existing subscriptions to these topics first
       if (allUpdatedContactIds.length > 0) {
         await db
@@ -318,15 +341,14 @@ export async function importContacts(
           .where(
             and(
               inArray(contactTopic.contactId, allUpdatedContactIds),
-              inArray(contactTopic.topicId, data.topicIds)
+              inArray(contactTopic.topicId, validatedTopicIds)
             )
           );
       }
 
       // Batch insert topic subscriptions
-      const topicIds = data.topicIds;
       const topicValues = allContactIds.flatMap((contactId) =>
-        topicIds.map((topicId) => ({
+        validatedTopicIds.map((topicId) => ({
           contactId,
           topicId,
           status: "subscribed",

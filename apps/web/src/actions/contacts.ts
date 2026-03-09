@@ -1,7 +1,7 @@
 "use server";
 
-import { contact, contactTopic, db } from "@wraps/db";
-import { and, count, desc, eq, ilike, sql } from "drizzle-orm";
+import { contact, contactTopic, db, topic } from "@wraps/db";
+import { and, count, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { trackContactCreated } from "@/lib/activation-tracking";
 import type {
@@ -369,7 +369,8 @@ export async function createContact(
     }
 
     // Validate email if provided
-    if (email && !email.includes("@")) {
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (email && !EMAIL_REGEX.test(email)) {
       return { success: false, error: "Invalid email address" };
     }
 
@@ -462,15 +463,27 @@ export async function createContact(
       return { success: false, error: "Failed to create contact" };
     }
 
-    // Subscribe to topics if provided
+    // Subscribe to topics if provided, after verifying they belong to this org
     if (data.topicIds && data.topicIds.length > 0) {
-      await db.insert(contactTopic).values(
-        data.topicIds.map((topicId) => ({
-          contactId: newContact.id,
-          topicId,
-          status: "subscribed",
-        }))
-      );
+      const ownedTopics = await db
+        .select({ id: topic.id })
+        .from(topic)
+        .where(
+          and(
+            inArray(topic.id, data.topicIds),
+            eq(topic.organizationId, organizationId)
+          )
+        );
+      const ownedTopicIds = ownedTopics.map((t) => t.id);
+      if (ownedTopicIds.length > 0) {
+        await db.insert(contactTopic).values(
+          ownedTopicIds.map((topicId) => ({
+            contactId: newContact.id,
+            topicId,
+            status: "subscribed",
+          }))
+        );
+      }
     }
 
     // Revalidate
