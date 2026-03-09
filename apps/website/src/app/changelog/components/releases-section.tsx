@@ -159,7 +159,7 @@ const releases: Release[] = [
       "Patched XSS, cross-org IDOR, and RCE vulnerabilities",
       "Timing-safe secret comparison across all auth paths",
       "Resolved 22 Dependabot alerts via dependency upgrades and pnpm overrides",
-      "Migrated entire API from console.log to structured JSON logging",
+      "Migrated entire API from console logging to structured JSON logging",
       "Canonical log lines per authenticated request for debugging and analytics",
       "PostHog error tracking on API and Stripe webhooks",
       <>
