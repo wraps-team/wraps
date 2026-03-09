@@ -43,8 +43,14 @@ export async function GET(request: Request, context: RouteContext) {
 
     // Get time range from query params
     const { searchParams } = new URL(request.url);
-    const days = Number.parseInt(searchParams.get("days") || "30", 10);
-    const limit = Number.parseInt(searchParams.get("limit") || "10", 10);
+    const days = Math.min(
+      365,
+      Math.max(1, Number.parseInt(searchParams.get("days") || "30", 10))
+    );
+    const limit = Math.min(
+      500,
+      Math.max(1, Number.parseInt(searchParams.get("limit") || "10", 10))
+    );
     const endTime = new Date();
     const startTime = new Date(endTime.getTime() - days * 24 * 60 * 60 * 1000);
 

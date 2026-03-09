@@ -25,7 +25,10 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const { orgSlug } = await context.params;
     const { searchParams } = new URL(request.url);
-    const days = Number.parseInt(searchParams.get("days") || "30", 10);
+    const days = Math.min(
+      365,
+      Math.max(1, Number.parseInt(searchParams.get("days") || "30", 10))
+    );
 
     // Authenticate user
     const session = await auth.api.getSession({

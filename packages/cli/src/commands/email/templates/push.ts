@@ -430,57 +430,57 @@ async function pushToSES(
   const ses = new SESClient({ region });
 
   try {
-  const settled = await Promise.allSettled(
-    templates.map(async (t) => {
-      progress.start(`Pushing ${pc.cyan(t.slug)} to SES`);
+    const settled = await Promise.allSettled(
+      templates.map(async (t) => {
+        progress.start(`Pushing ${pc.cyan(t.slug)} to SES`);
 
-      const templateData = {
-        TemplateName: t.sesTemplateName,
-        SubjectPart: t.subject,
-        HtmlPart: t.compiledHtml,
-        TextPart: t.compiledText,
-      };
+        const templateData = {
+          TemplateName: t.sesTemplateName,
+          SubjectPart: t.subject,
+          HtmlPart: t.compiledHtml,
+          TextPart: t.compiledText,
+        };
 
-      // Check if template exists
-      let exists = false;
-      try {
-        await ses.send(
-          new GetTemplateCommand({ TemplateName: t.sesTemplateName })
-        );
-        exists = true;
-      } catch (err) {
-        const e = err as { name?: string };
-        if (e.name !== "TemplateDoesNotExistException") {
-          throw err;
+        // Check if template exists
+        let exists = false;
+        try {
+          await ses.send(
+            new GetTemplateCommand({ TemplateName: t.sesTemplateName })
+          );
+          exists = true;
+        } catch (err) {
+          const e = err as { name?: string };
+          if (e.name !== "TemplateDoesNotExistException") {
+            throw err;
+          }
         }
-      }
 
-      if (exists) {
-        await ses.send(new UpdateTemplateCommand({ Template: templateData }));
+        if (exists) {
+          await ses.send(new UpdateTemplateCommand({ Template: templateData }));
+        } else {
+          await ses.send(new CreateTemplateCommand({ Template: templateData }));
+        }
+
+        progress.succeed(`Pushed ${pc.cyan(t.slug)} to SES`);
+        return { slug: t.slug };
+      })
+    );
+
+    for (let i = 0; i < templates.length; i++) {
+      const result = settled[i];
+      if (result.status === "fulfilled") {
+        results.push({ slug: result.value.slug, success: true });
       } else {
-        await ses.send(new CreateTemplateCommand({ Template: templateData }));
+        const msg =
+          result.reason instanceof Error
+            ? result.reason.message
+            : String(result.reason);
+        results.push({ slug: templates[i].slug, success: false });
+        progress.fail(`SES push failed for ${templates[i].slug}: ${msg}`);
       }
-
-      progress.succeed(`Pushed ${pc.cyan(t.slug)} to SES`);
-      return { slug: t.slug };
-    })
-  );
-
-  for (let i = 0; i < templates.length; i++) {
-    const result = settled[i];
-    if (result.status === "fulfilled") {
-      results.push({ slug: result.value.slug, success: true });
-    } else {
-      const msg =
-        result.reason instanceof Error
-          ? result.reason.message
-          : String(result.reason);
-      results.push({ slug: templates[i].slug, success: false });
-      progress.fail(`SES push failed for ${templates[i].slug}: ${msg}`);
     }
-  }
 
-  return results;
+    return results;
   } finally {
     ses.destroy();
   }

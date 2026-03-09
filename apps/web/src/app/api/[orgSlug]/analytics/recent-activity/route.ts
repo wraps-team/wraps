@@ -43,7 +43,10 @@ export async function GET(request: Request, context: RouteContext) {
 
     // Get limit from query params
     const { searchParams } = new URL(request.url);
-    const limit = Number.parseInt(searchParams.get("limit") || "20", 10);
+    const limit = Math.min(
+      500,
+      Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10))
+    );
 
     // Get all AWS accounts for this organization
     const accounts = await db.query.awsAccount.findMany({

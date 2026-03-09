@@ -27,7 +27,10 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const { orgSlug } = await context.params;
     const { searchParams } = new URL(request.url);
-    const limit = Number.parseInt(searchParams.get("limit") || "20", 10);
+    const limit = Math.min(
+      500,
+      Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10))
+    );
 
     // Authenticate user
     const session = await auth.api.getSession({
