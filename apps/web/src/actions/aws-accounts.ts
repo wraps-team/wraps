@@ -780,14 +780,19 @@ export async function scanAWSAccountFeatures(
     const emailEnabled = !!configSetName;
 
     await db
-      .update(awsAccount) // baseline:allow-unscoped — org validated at function entry (line ~369)
+      .update(awsAccount)
       .set({
         emailEnabled,
         smsEnabled,
         features: featuresJson,
         updatedAt: new Date(),
       })
-      .where(eq(awsAccount.id, awsAccountId));
+      .where(
+        and(
+          eq(awsAccount.id, awsAccountId),
+          eq(awsAccount.organizationId, organizationId)
+        )
+      );
 
     // 17. Track domain verification if new verified domains were discovered
     const previousIdentities = account.features?.email?.identities ?? [];
@@ -892,8 +897,15 @@ export async function deleteAWSAccount(
       return { success: false, error: "AWS account not found" };
     }
 
-    // 4. Delete the account (cascade will delete related records)
-    await db.delete(awsAccount).where(eq(awsAccount.id, awsAccountId));
+    // 4. Delete the account (cascade will delete related records), re-scoped by org for defense-in-depth
+    await db
+      .delete(awsAccount)
+      .where(
+        and(
+          eq(awsAccount.id, awsAccountId),
+          eq(awsAccount.organizationId, organizationId)
+        )
+      );
 
     // 5. Revalidate the settings page
     revalidatePath("/[orgSlug]/settings", "page");
@@ -976,14 +988,19 @@ export async function saveWebhookSecretAction(
       };
     }
 
-    // Update the webhook secret
+    // Update the webhook secret, re-scoped by org for defense-in-depth
     await db
       .update(awsAccount)
       .set({
         webhookSecret,
         updatedAt: new Date(),
       })
-      .where(eq(awsAccount.id, awsAccountId));
+      .where(
+        and(
+          eq(awsAccount.id, awsAccountId),
+          eq(awsAccount.organizationId, account.organizationId)
+        )
+      );
 
     // Revalidate the page
     revalidatePath(`/settings/aws-accounts/${awsAccountId}`);
@@ -1055,14 +1072,19 @@ export async function removeWebhookSecretAction(
       };
     }
 
-    // Remove the webhook secret
+    // Remove the webhook secret, re-scoped by org for defense-in-depth
     await db
       .update(awsAccount)
       .set({
         webhookSecret: null,
         updatedAt: new Date(),
       })
-      .where(eq(awsAccount.id, awsAccountId));
+      .where(
+        and(
+          eq(awsAccount.id, awsAccountId),
+          eq(awsAccount.organizationId, account.organizationId)
+        )
+      );
 
     // Revalidate the page
     revalidatePath(`/settings/aws-accounts/${awsAccountId}`);

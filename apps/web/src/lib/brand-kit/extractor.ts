@@ -8,6 +8,8 @@
  * - Company name (from og:site_name or title)
  */
 
+import { isPrivateHost } from "@/lib/ssrf-guard";
+
 export type ExtractedBrandKit = {
   logoUrl: string | null;
   primaryColor: string;
@@ -41,7 +43,11 @@ export async function extractBrandKitFromDomain(
   let normalizedDomain: string;
 
   try {
-    normalizedDomain = new URL(url).hostname;
+    const parsed = new URL(url);
+    normalizedDomain = parsed.hostname;
+    if (isPrivateHost(normalizedDomain)) {
+      return { ...DEFAULT_BRAND_KIT, sourceDomain: domain };
+    }
   } catch {
     return { ...DEFAULT_BRAND_KIT, sourceDomain: domain };
   }
@@ -57,7 +63,7 @@ export async function extractBrandKitFromDomain(
           "Mozilla/5.0 (compatible; WrapsBrandExtractor/1.0; +https://wraps.dev)",
         Accept: "text/html",
       },
-      redirect: "follow",
+      redirect: "manual",
       signal: controller.signal,
     });
 
@@ -131,19 +137,20 @@ async function fetchFirstStylesheet(
       return "";
     }
 
-    // Find first non-font stylesheet
+    // Find first non-font stylesheet, skipping private/internal hosts
     let targetUrl: string | null = null;
     for (const href of allLinks) {
       const absoluteUrl = new URL(href, baseUrl).href;
+      const parsedAbsolute = new URL(absoluteUrl);
       if (
-        !(
-          absoluteUrl.includes("fonts.googleapis.com") ||
-          absoluteUrl.includes("use.typekit.net")
-        )
+        absoluteUrl.includes("fonts.googleapis.com") ||
+        absoluteUrl.includes("use.typekit.net") ||
+        isPrivateHost(parsedAbsolute.hostname)
       ) {
-        targetUrl = absoluteUrl;
-        break;
+        continue;
       }
+      targetUrl = absoluteUrl;
+      break;
     }
 
     if (!targetUrl) {

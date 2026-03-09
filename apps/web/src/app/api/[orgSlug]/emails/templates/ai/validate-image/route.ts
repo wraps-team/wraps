@@ -2,6 +2,7 @@ import { auth } from "@wraps/auth";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { getOrganizationWithMembership } from "@/lib/organization";
+import { validatePublicUrl } from "@/lib/ssrf-guard";
 
 type RouteContext = {
   params: Promise<{
@@ -48,23 +49,15 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    // Validate URL format
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(url);
-    } catch {
+    // Validate URL format and block private/internal addresses (SSRF prevention)
+    const urlValidation = validatePublicUrl(url);
+    if (!urlValidation.valid) {
       return NextResponse.json(
-        { valid: false, error: "Invalid URL format" },
+        { valid: false, error: urlValidation.error },
         { status: 400 }
       );
     }
-
-    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-      return NextResponse.json(
-        { valid: false, error: "Only HTTP and HTTPS URLs are supported" },
-        { status: 400 }
-      );
-    }
+    const parsedUrl = urlValidation.parsedUrl;
 
     // Send HEAD request to validate the image
     const controller = new AbortController();

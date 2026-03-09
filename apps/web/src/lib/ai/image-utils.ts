@@ -1,3 +1,5 @@
+import { validatePublicUrl } from "@/lib/ssrf-guard";
+
 export type ProcessedImage = {
   base64: string;
   mediaType: string;
@@ -11,6 +13,11 @@ const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 export async function fetchAndProcessImage(
   url: string
 ): Promise<ProcessedImage> {
+  const urlValidation = validatePublicUrl(url);
+  if (!urlValidation.valid) {
+    throw new Error(`Invalid image URL: ${urlValidation.error}`);
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
 

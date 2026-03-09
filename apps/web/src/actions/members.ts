@@ -282,6 +282,8 @@ export type InviteMemberResult =
       error: string;
     };
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 /**
  * Invite a new member to the organization
  */
@@ -291,6 +293,10 @@ export async function inviteMember(
   organizationId: string
 ): Promise<InviteMemberResult> {
   try {
+    if (!(email && EMAIL_REGEX.test(email.trim()))) {
+      return { success: false, error: "Invalid email address" };
+    }
+
     const session = await auth.api.getSession({
       headers: await import("next/headers").then((mod) => mod.headers()),
     });
