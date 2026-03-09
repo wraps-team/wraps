@@ -399,7 +399,10 @@ function nodeToReactEmail(
     case "emailDivider":
     case "horizontalRule":
       return (
-        <Hr className="my-6 border-gray-200 dark:border-gray-700" key={key} />
+        <Hr
+          className="my-6 border-brand-secondary/30 dark:border-brand-dark-secondary/40"
+          key={key}
+        />
       );
 
     case "emailSpacer": {
@@ -726,7 +729,7 @@ function nodeToReactEmail(
     case "blockquote":
       return (
         <blockquote
-          className="my-4 border-gray-200 border-l-4 pl-4 text-gray-600 italic dark:border-gray-600 dark:text-gray-400"
+          className="my-4 border-brand-secondary/30 border-l-4 pl-4 text-brand-text/80 italic dark:border-brand-dark-secondary/40 dark:text-brand-dark-text/80"
           key={key}
         >
           {node.content?.map((child, i) =>
@@ -738,7 +741,7 @@ function nodeToReactEmail(
     case "codeBlock":
       return (
         <pre
-          className="overflow-auto rounded bg-gray-100 p-4 font-mono text-sm dark:bg-gray-800"
+          className="overflow-auto rounded bg-brand-secondary/10 p-4 font-mono text-sm dark:bg-brand-dark-background"
           key={key}
         >
           <code>
@@ -873,7 +876,7 @@ export function tiptapToReactEmail(
   // otherwise fall back to brand-kit defaults
   const bodyClassName =
     (content.attrs?.bodyClassName as string) ||
-    "bg-gray-50 font-sans text-brand-text dark:bg-gray-900 dark:text-brand-dark-text";
+    "bg-brand-background font-sans text-brand-text dark:bg-brand-dark-background dark:text-brand-dark-text";
   const containerClassName =
     (content.attrs?.containerClassName as string) ||
     "mx-auto max-w-[600px] bg-brand-background p-5 dark:bg-brand-dark-background";
