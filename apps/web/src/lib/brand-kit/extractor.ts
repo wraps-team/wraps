@@ -137,14 +137,18 @@ async function fetchFirstStylesheet(
       return "";
     }
 
+    const FONT_CDN_HOSTNAMES = new Set([
+      "fonts.googleapis.com",
+      "use.typekit.net",
+    ]);
+
     // Find first non-font stylesheet, skipping private/internal hosts
     let targetUrl: string | null = null;
     for (const href of allLinks) {
       const absoluteUrl = new URL(href, baseUrl).href;
       const parsedAbsolute = new URL(absoluteUrl);
       if (
-        absoluteUrl.includes("fonts.googleapis.com") ||
-        absoluteUrl.includes("use.typekit.net") ||
+        FONT_CDN_HOSTNAMES.has(parsedAbsolute.hostname) ||
         isPrivateHost(parsedAbsolute.hostname)
       ) {
         continue;
