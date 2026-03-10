@@ -3,6 +3,16 @@ import { readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ConnectionMetadata } from "./metadata.js";
 
+function has404StatusCode(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const metadataError = error as Error & {
+    $metadata?: { httpStatusCode?: number };
+  };
+  return metadataError.$metadata?.httpStatusCode === 404;
+}
+
 /**
  * Get the S3 state bucket name for an account/region pair
  */
@@ -36,7 +46,7 @@ export async function stateBucketExists(
       error instanceof Error &&
       (error.name === "NotFound" ||
         error.name === "NoSuchBucket" ||
-        (error as any).$metadata?.httpStatusCode === 404)
+        has404StatusCode(error))
     ) {
       return false;
     }
@@ -76,7 +86,7 @@ export async function ensureStateBucket(
       error instanceof Error &&
       (error.name === "NotFound" ||
         error.name === "NoSuchBucket" ||
-        (error as any).$metadata?.httpStatusCode === 404);
+        has404StatusCode(error));
     if (!isNotFound) {
       throw error;
     }
@@ -257,7 +267,7 @@ export async function downloadMetadata(
     if (
       error instanceof Error &&
       (error.name === "NoSuchKey" ||
-        (error as any).$metadata?.httpStatusCode === 404)
+        has404StatusCode(error))
     ) {
       return null;
     }

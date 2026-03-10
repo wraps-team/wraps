@@ -417,6 +417,14 @@ export function createConnectionMetadata(
   };
 }
 
+function setConfigValue<K extends keyof WrapsEmailConfig>(
+  config: WrapsEmailConfig,
+  key: K,
+  value: WrapsEmailConfig[K]
+): void {
+  config[key] = value;
+}
+
 /**
  * Apply config updates to existing config while preserving user-customized fields.
  *
@@ -435,7 +443,8 @@ export function applyConfigUpdates(
   const result = { ...existingConfig };
 
   // Apply each update, with special handling for nested objects
-  for (const [key, value] of Object.entries(updates)) {
+  for (const key of Object.keys(updates) as Array<keyof WrapsEmailConfig>) {
+    const value = updates[key];
     if (value === undefined) {
       continue;
     }
@@ -502,7 +511,7 @@ export function applyConfigUpdates(
       } as NonNullable<WrapsEmailConfig["userWebhook"]>;
     } else {
       // Direct assignment for primitives and other objects
-      result[key as keyof WrapsEmailConfig] = value as any;
+      setConfigValue(result, key, value as WrapsEmailConfig[typeof key]);
     }
   }
 

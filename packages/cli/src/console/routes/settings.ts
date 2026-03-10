@@ -5,6 +5,14 @@ import { loadConnectionMetadata } from "../../utils/shared/metadata.js";
 import type { ServerConfig } from "../server.js";
 import { fetchEmailSettings } from "../services/settings-service.js";
 
+function isMissingDnsRecordError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const dnsError = error as NodeJS.ErrnoException;
+  return dnsError.code === "ENODATA" || dnsError.code === "ENOTFOUND";
+}
+
 export function createSettingsRouter(config: ServerConfig): Router {
   const router = createRouter();
 
@@ -111,11 +119,7 @@ export function createSettingsRouter(config: ServerConfig): Router {
       console.error("[Verify] Error verifying tracking domain:", error);
 
       // If no CNAME record exists, DNS will throw ENODATA or ENOTFOUND
-      if (
-        error instanceof Error &&
-        ((error as any).code === "ENODATA" ||
-          (error as any).code === "ENOTFOUND")
-      ) {
+      if (isMissingDnsRecordError(error)) {
         return res.json({
           verified: false,
           error: "No CNAME record found for this domain",
@@ -168,11 +172,7 @@ export function createSettingsRouter(config: ServerConfig): Router {
       console.error("[Verify] Error verifying DMARC:", error);
 
       // If no TXT record exists, DNS will throw ENODATA or ENOTFOUND
-      if (
-        error instanceof Error &&
-        ((error as any).code === "ENODATA" ||
-          (error as any).code === "ENOTFOUND")
-      ) {
+      if (isMissingDnsRecordError(error)) {
         return res.json({
           verified: false,
           error: "No DMARC record found for this domain",

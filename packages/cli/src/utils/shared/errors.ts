@@ -75,12 +75,15 @@ export function classifyDNSError(
  */
 export function isAWSNotFoundError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
+  const awsError = error as Error & {
+    $metadata?: { httpStatusCode?: number };
+  };
   return (
     error.name === "NotFoundException" ||
     error.name === "NoSuchEntityException" ||
     error.name === "NoSuchEntity" ||
     error.name === "ResourceNotFoundException" ||
-    (error as any).$metadata?.httpStatusCode === 404
+    awsError.$metadata?.httpStatusCode === 404
   );
 }
 

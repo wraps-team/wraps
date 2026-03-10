@@ -312,11 +312,9 @@ export default function SendGridVsWrapsPage() {
   return (
     <div className="min-h-screen bg-background">
       <LandingNavbar />
-      <Script
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
-        id="breadcrumb-jsonld"
-        type="application/ld+json"
-      />
+      <Script id="breadcrumb-jsonld" type="application/ld+json">
+        {JSON.stringify(breadcrumbJsonLd)}
+      </Script>
 
       <main className="container mx-auto px-4 pt-24 pb-16">
         <div className="mx-auto max-w-4xl">
