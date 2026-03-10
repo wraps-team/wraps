@@ -57,7 +57,7 @@
     "@types/mailparser": "^3.4.5",
     "@vitest/coverage-v8": "^4.0.7",
     "esbuild": "^0.24.2",
-    "mailparser": "^3.7.2",
+    "mailparser": "^3.9.3",
     "tsup": "^8.5.1",
     "tsx": "^4.19.2",
     "typescript": "^5.8.3",

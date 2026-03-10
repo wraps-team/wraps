@@ -76,7 +76,7 @@
     "get-port": "^7.1.0",
     "http-terminator": "^3.2.0",
     "isomorphic-dompurify": "2.32.0",
-    "mailparser": "3.9.0",
+    "mailparser": "3.9.3",
     "open": "^10.1.0",
     "picocolors": "^1.1.1",
     "react": "19.2.4",
