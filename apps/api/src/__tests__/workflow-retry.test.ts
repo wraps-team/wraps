@@ -194,4 +194,45 @@ describe("Workflow Execution Retry", () => {
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockEnqueueWorkflowStep).not.toHaveBeenCalled();
   });
+
+  it("rolls back retry state when enqueue fails", async () => {
+    const failedExecution = {
+      id: "exec-123",
+      workflowId: "wf-456",
+      organizationId: "org-123",
+      status: "failed",
+      errorStepId: "step-789",
+      error: "Template not found",
+    };
+
+    mockSelectLimit.mockResolvedValueOnce([failedExecution]);
+    mockTransaction.mockImplementation(async (cb: Function) => {
+      const txMock = {
+        update: vi.fn(() => ({
+          set: vi.fn(() => ({
+            where: vi.fn(() => ({
+              returning: vi.fn(() => [{ id: "exec-123" }]),
+            })),
+          })),
+        })),
+      };
+      return cb(txMock);
+    });
+    mockEnqueueWorkflowStep.mockRejectedValueOnce(
+      new Error("SQS send failed")
+    );
+
+    const app = createApp();
+    const response = await app.handle(
+      new Request("http://localhost/v1/workflows/executions/exec-123/retry", {
+        method: "POST",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.success).toBe(false);
+    expect(body.error).toContain("enqueue");
+    expect(mockTransaction).toHaveBeenCalledTimes(2);
+  });
 });

@@ -474,12 +474,59 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
       }
 
       // Enqueue the failed step for re-processing
-      await enqueueWorkflowStep({
-        type: "execute",
-        executionId: exec.id,
-        stepId: errorStepId,
-        organizationId: auth.organizationId,
-      });
+      try {
+        await enqueueWorkflowStep({
+          type: "execute",
+          executionId: exec.id,
+          stepId: errorStepId,
+          organizationId: auth.organizationId,
+        });
+      } catch (error) {
+        await db.transaction(async (tx) => {
+          const [rolledBack] = await tx
+            .update(workflowExecution)
+            .set({
+              status: "failed",
+              error: exec.error ?? "Retry enqueue failed",
+              errorStepId,
+              completedAt: new Date(),
+              retryCount: sql`GREATEST(0, ${workflowExecution.retryCount} - 1)`,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(workflowExecution.id, executionId),
+                eq(workflowExecution.organizationId, auth.organizationId),
+                eq(workflowExecution.status, "active"),
+                eq(workflowExecution.currentStepId, errorStepId),
+                sql`${workflowExecution.errorStepId} IS NULL`
+              )
+            )
+            .returning({ id: workflowExecution.id });
+
+          if (!rolledBack) {
+            return;
+          }
+
+          await tx
+            .update(workflow)
+            .set({
+              activeExecutions: sql`GREATEST(0, ${workflow.activeExecutions} - 1)`,
+              failedExecutions: sql`${workflow.failedExecutions} + 1`,
+            })
+            .where(eq(workflow.id, exec.workflowId));
+        });
+
+        log.error("Workflow execution retry enqueue failed", error, {
+          executionId: exec.id,
+          stepId: errorStepId,
+          workflowId: exec.workflowId,
+        });
+        return {
+          success: false,
+          error: "Failed to enqueue execution retry",
+        };
+      }
 
       log.info("Workflow execution retry", {
         executionId: exec.id,
