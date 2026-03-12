@@ -29,6 +29,22 @@ type QueryEmailEventsParams = {
   limit?: number;
 };
 
+type QueriedEmailEvent = Omit<EmailEvent, "to"> & { to: string[] };
+
+type EmailEngagementMetric = {
+  messageId: string;
+  subject: string;
+  from: string;
+  to: string[];
+  sentAt: number;
+  eventTypes: string[];
+  opens: number;
+  clicks: number;
+  hasDelivered: boolean;
+  hasBounced: boolean;
+  hasComplaint: boolean;
+};
+
 /**
  * Normalizes the 'to' field from DynamoDB to always be a string array.
  * DynamoDB String Sets (SS) get unmarshalled as JavaScript Set objects.
@@ -53,7 +69,7 @@ function normalizeRecipients(to: string[] | Set<string> | undefined): string[] {
  */
 export async function queryEmailEvents(
   params: QueryEmailEventsParams
-): Promise<Array<Omit<EmailEvent, "to"> & { to: string[] }>> {
+): Promise<QueriedEmailEvent[]> {
   const { awsAccountId, startTime, endTime, limit = 1000 } = params;
 
   // Get AWS account details from database
@@ -130,24 +146,14 @@ export async function queryEmailEvents(
  */
 export async function getEmailEngagementMetrics(
   params: QueryEmailEventsParams
-): Promise<
-  Array<{
-    messageId: string;
-    subject: string;
-    from: string;
-    to: string[];
-    sentAt: number;
-    eventTypes: string[];
-    opens: number;
-    clicks: number;
-    hasDelivered: boolean;
-    hasBounced: boolean;
-    hasComplaint: boolean;
-  }>
-> {
+): Promise<EmailEngagementMetric[]> {
   const events = await queryEmailEvents(params);
+  return aggregateEmailEngagementMetrics(events);
+}
 
-  // Group events by messageId
+export function aggregateEmailEngagementMetrics(
+  events: QueriedEmailEvent[]
+): EmailEngagementMetric[] {
   const emailsMap = new Map<
     string,
     {
@@ -205,7 +211,6 @@ export async function getEmailEngagementMetrics(
     }
   }
 
-  // Convert to array and sort by engagement
   return Array.from(emailsMap.values())
     .map((email) => ({
       ...email,
