@@ -52,10 +52,11 @@ export default function CLIReferencePlatformPage() {
   return (
     <>
       <Script
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
         id="breadcrumb-schema"
         type="application/ld+json"
-      />
+      >
+        {JSON.stringify(breadcrumbSchema)}
+      </Script>
       {/* Server-rendered content for SEO */}
       <article aria-hidden="true" className="sr-only">
         <h2>Platform CLI Commands</h2>
