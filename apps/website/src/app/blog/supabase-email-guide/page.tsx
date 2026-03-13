@@ -210,15 +210,17 @@ export default function Page() {
   return (
     <>
       <Script
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
         id="article-schema"
         type="application/ld+json"
-      />
+      >
+        {JSON.stringify(articleSchema)}
+      </Script>
       <Script
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
         id="faq-schema"
         type="application/ld+json"
-      />
+      >
+        {JSON.stringify(faqSchema)}
+      </Script>
 
       <div className="min-h-screen bg-background">
         <LandingNavbar />
