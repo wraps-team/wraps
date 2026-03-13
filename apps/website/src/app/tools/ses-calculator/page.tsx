@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import Script from "next/script";
 import { Suspense } from "react";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
@@ -107,16 +108,12 @@ const faqSchema = {
 export default function SESCalculatorPage() {
   return (
     <>
-      <script
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(webAppSchema) }}
-        suppressHydrationWarning
-        type="application/ld+json"
-      />
-      <script
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
-        suppressHydrationWarning
-        type="application/ld+json"
-      />
+      <Script id="ses-calculator-web-app-schema" type="application/ld+json">
+        {JSON.stringify(webAppSchema)}
+      </Script>
+      <Script id="ses-calculator-faq-schema" type="application/ld+json">
+        {JSON.stringify(faqSchema)}
+      </Script>
       <div className="min-h-dvh bg-background">
         <LandingNavbar />
 
