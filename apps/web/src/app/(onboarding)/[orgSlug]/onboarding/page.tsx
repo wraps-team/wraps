@@ -297,6 +297,9 @@ export default function OnboardingPage({ params }: OnboardingPageProps) {
     });
     if (!res.ok) {
       toast.error("Failed to complete onboarding. Please try again.");
+      if (path === "start_building" && currentStep >= 4) {
+        setCurrentStep(3);
+      }
       hasRedirected.current = false;
       return;
     }
