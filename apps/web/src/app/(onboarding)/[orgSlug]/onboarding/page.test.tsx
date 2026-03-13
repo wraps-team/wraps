@@ -7,14 +7,23 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockPush = vi.fn();
-const mockCapture = vi.fn();
-const mockToastError = vi.fn();
-const mockUseSession = vi.fn();
-const mockUseListOrganizations = vi.fn();
-const mockSearchParams = {
-  current: new URLSearchParams(),
-};
+const {
+  mockCapture,
+  mockPush,
+  mockSearchParams,
+  mockToastError,
+  mockUseListOrganizations,
+  mockUseSession,
+} = vi.hoisted(() => ({
+  mockCapture: vi.fn(),
+  mockPush: vi.fn(),
+  mockSearchParams: {
+    current: new URLSearchParams(),
+  },
+  mockToastError: vi.fn(),
+  mockUseListOrganizations: vi.fn(),
+  mockUseSession: vi.fn(),
+}));
 
 vi.mock("next/dynamic", () => ({
   default: () =>
