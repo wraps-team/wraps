@@ -14,16 +14,35 @@ vi.mock("../posthog-server", () => ({
   })),
 }));
 
-// Track whether POST/PATCH were called and completed
+// Track whether POST/PATCH/GET were called and completed
 const mockPost = vi.fn(() =>
   Promise.resolve({ data: { success: true }, error: null })
 );
 const mockPatch = vi.fn(() =>
   Promise.resolve({ data: { success: true }, error: null })
 );
+const mockGet = vi.fn(
+  (
+    _path: string,
+    options?: { params?: { query?: { search?: string } } }
+  ) =>
+    Promise.resolve({
+      data: {
+        contacts: [
+          {
+            id: options?.params?.query?.search ?? "user@example.com",
+            email: options?.params?.query?.search ?? "user@example.com",
+            properties: {},
+          },
+        ],
+      },
+      error: null,
+    })
+);
 
 vi.mock("@wraps.dev/client", () => ({
   createPlatformClient: vi.fn(() => ({
+    GET: mockGet,
     POST: mockPost,
     PATCH: mockPatch,
   })),
@@ -489,6 +508,60 @@ describe("activation-tracking: emit() calls to Wraps platform", () => {
 
     // Should NOT patch contact when no path provided
     expect(mockPatch).not.toHaveBeenCalled();
+  });
+
+  it("trackOnboardingCompleted should resolve contact by email and PATCH using contact id", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        contacts: [
+          {
+            id: "contact-123",
+            email: "user@example.com",
+            properties: { existingFlag: true },
+          },
+        ],
+      },
+      error: null,
+    });
+    mockPatch.mockResolvedValue({ data: { success: true }, error: null });
+    mockPost.mockResolvedValue({ data: { success: true }, error: null });
+
+    await trackOnboardingCompleted("user@example.com", "org-123", {
+      path: "start_building",
+    });
+
+    expect(mockPatch).toHaveBeenCalledWith(
+      "/v1/contacts/{id}",
+      expect.objectContaining({
+        params: { path: { id: "contact-123" } },
+        body: {
+          properties: expect.objectContaining({
+            existingFlag: true,
+            onboardingPath: "start_building",
+          }),
+        },
+      })
+    );
+  });
+
+  it("trackOnboardingCompleted should create contact when email is missing", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: { contacts: [] },
+      error: null,
+    });
+    mockPost.mockResolvedValue({ data: { success: true }, error: null });
+
+    await trackOnboardingCompleted("user@example.com", "org-123", {
+      path: "start_building",
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/v1/contacts/", {
+      body: {
+        email: "user@example.com",
+        emailStatus: "active",
+        properties: { onboardingPath: "start_building" },
+      },
+    });
   });
 
   // ─── Contact property hydration ──────────────────────────────────────────

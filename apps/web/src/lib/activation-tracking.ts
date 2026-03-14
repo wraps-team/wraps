@@ -17,6 +17,20 @@ import { getPostHogClient } from "./posthog-server";
 
 const log = logger.child({ module: "activation-tracking" });
 
+type ContactLookupResult = {
+  id: string;
+  email: string | null;
+  properties: Record<string, unknown> | null;
+};
+
+type ContactsListResponse = {
+  contacts?: ContactLookupResult[];
+};
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 /** Fire-and-forget PostHog capture. Never throws. */
 function capture(
   distinctId: string,
@@ -39,10 +53,48 @@ async function setContactProperties(
   try {
     const key = process.env.WRAPS_API_KEY;
     if (!key) return;
+    const normalizedEmail = userEmail.toLowerCase().trim();
+    if (!normalizedEmail) return;
     const client = createPlatformClient({ apiKey: key });
-    await client.PATCH("/v1/contacts/{id}", {
-      params: { path: { id: userEmail } },
-      body: { properties: props },
+    const searchResult = await client.GET("/v1/contacts/", {
+      params: { query: { search: normalizedEmail, pageSize: "10" } },
+    });
+
+    const contactsData = searchResult.data as ContactsListResponse | undefined;
+    const contacts = contactsData?.contacts ?? [];
+
+    let matchedContact: ContactLookupResult | undefined;
+    for (const candidate of contacts) {
+      if (
+        typeof candidate.email === "string" &&
+        candidate.email.toLowerCase().trim() === normalizedEmail
+      ) {
+        matchedContact = candidate;
+        break;
+      }
+    }
+
+    if (matchedContact) {
+      await client.PATCH("/v1/contacts/{id}", {
+        params: { path: { id: matchedContact.id } },
+        body: {
+          properties: {
+            ...(isObjectRecord(matchedContact.properties)
+              ? matchedContact.properties
+              : {}),
+            ...props,
+          },
+        },
+      });
+      return;
+    }
+
+    await client.POST("/v1/contacts/", {
+      body: {
+        email: normalizedEmail,
+        emailStatus: "active",
+        properties: props,
+      },
     });
   } catch {
     // contact properties update is best-effort
