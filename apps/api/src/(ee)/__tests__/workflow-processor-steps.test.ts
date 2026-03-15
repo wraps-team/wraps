@@ -1435,6 +1435,55 @@ describe("handleCondition", () => {
     );
   });
 
+  it("falls back to branchless continuation when the matching branch is empty", async () => {
+    const condStep = {
+      id: "step-cond",
+      type: "condition",
+      config: {
+        type: "condition",
+        field: "contact.properties.onboardingPath",
+        operator: "equals",
+        value: "start_building",
+      },
+    };
+
+    setupProcessStep({
+      execution: { currentStepId: "step-cond" },
+      contact: { properties: { onboardingPath: "start_building" } },
+      workflow: {
+        steps: [
+          { id: "trigger-1", type: "trigger", config: { type: "trigger" } },
+          condStep,
+          {
+            id: "step-after",
+            type: "webhook",
+            config: { type: "webhook", url: "https://x.com", method: "POST" },
+          },
+        ],
+        transitions: [
+          {
+            id: "t1",
+            fromStepId: "trigger-1",
+            toStepId: "step-cond",
+            condition: null,
+          },
+          {
+            id: "t2",
+            fromStepId: "step-cond",
+            toStepId: "step-after",
+            condition: null,
+          },
+        ],
+      },
+    });
+
+    await handler(makeSQSEvent(conditionJob));
+
+    expect(mockEnqueueWorkflowStep).toHaveBeenCalledWith(
+      expect.objectContaining({ stepId: "step-after" })
+    );
+  });
+
   it("strips contact. prefix for is_true on custom property", async () => {
     setupConditionTest(
       { field: "contact.hasConnectedAws", operator: "is_true" },

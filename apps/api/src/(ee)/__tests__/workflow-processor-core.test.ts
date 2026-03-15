@@ -839,6 +839,73 @@ describe("Wait-for-Event Resume Flow", () => {
     );
   });
 
+  it("falls back to branchless transition on timeout resume", async () => {
+    const wf = makeWorkflow({
+      steps: [
+        {
+          id: "step-wait",
+          type: "wait_for_event",
+          config: { type: "wait_for_event", eventName: "user.upgraded" },
+        },
+        {
+          id: "step-2",
+          type: "webhook",
+          config: {
+            type: "webhook",
+            url: "https://example.com",
+            method: "POST",
+          },
+        },
+      ],
+      transitions: [
+        {
+          id: "t1",
+          fromStepId: "step-wait",
+          toStepId: "step-2",
+          condition: null,
+        },
+      ],
+    });
+
+    const claimedExecution = makeExecution({
+      status: "active",
+      currentStepId: "step-wait",
+      waitTimeoutSchedulerName: "sched-timeout-abc",
+    });
+
+    mockDbUpdate.mockImplementation(() => ({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([claimedExecution]),
+        }),
+      }),
+    }));
+
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([wf]),
+        }),
+      }),
+    });
+
+    await handler(
+      makeSQSEvent({
+        type: "resume",
+        executionId: "exec-1",
+        branch: "timeout",
+      })
+    );
+
+    expect(mockEnqueueWorkflowStep).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "execute",
+        executionId: "exec-1",
+        stepId: "step-2",
+      })
+    );
+  });
+
   it("cancels timeout scheduler on event resume", async () => {
     const wf = makeWorkflow({
       steps: [
