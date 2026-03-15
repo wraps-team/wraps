@@ -1020,6 +1020,56 @@ describe("Contacts API Integration", () => {
       });
     });
 
+    it("preserves concurrent property updates", async () => {
+      const [existing] = await db
+        .insert(contact)
+        .values({
+          organizationId: testOrg.id,
+          email: "merge-concurrent@example.com",
+          emailHash: "hash-merge-concurrent",
+          properties: { source: "web" },
+        })
+        .returning();
+
+      const app = createTestApp();
+      const updates = [
+        { fastKeyA: "a" },
+        { fastKeyB: "b" },
+        { fastKeyC: "c" },
+        { fastKeyD: "d" },
+        { fastKeyE: "e" },
+      ];
+
+      const responses = await Promise.all(
+        updates.map((properties) =>
+          app.handle(
+            new Request(`http://localhost/v1/contacts/${existing.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ properties }),
+            })
+          )
+        )
+      );
+
+      for (const response of responses) {
+        expect(response.status).toBe(200);
+      }
+
+      const [updated] = await db
+        .select()
+        .from(contact)
+        .where(eq(contact.id, existing.id));
+      expect(updated.properties).toMatchObject({
+        source: "web",
+        fastKeyA: "a",
+        fastKeyB: "b",
+        fastKeyC: "c",
+        fastKeyD: "d",
+        fastKeyE: "e",
+      });
+    });
+
     it("updates contact subscriptions with topicSlugs", async () => {
       // Create contact without subscriptions
       const [existing] = await db

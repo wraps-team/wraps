@@ -717,7 +717,7 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
       // UUIDs never contain "@", so this is a safe heuristic.
       const isEmail = params.id.includes("@");
       const [existing] = await db
-        .select({ id: contact.id, properties: contact.properties })
+        .select({ id: contact.id })
         .from(contact)
         .where(
           and(
@@ -759,10 +759,9 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
       }
 
       if (body.properties !== undefined) {
-        // PATCH merges properties — spread existing then new to preserve unmentioned keys
-        const existingProps =
-          (existing.properties as Record<string, unknown>) || {};
-        updateValues.properties = { ...existingProps, ...body.properties };
+        const patchProperties = JSON.stringify(body.properties);
+        updateValues.properties =
+          sql`(COALESCE(${contact.properties}::jsonb, '{}'::jsonb) || ${patchProperties}::jsonb)::json`;
       }
 
       if (body.firstName !== undefined) {
@@ -789,7 +788,12 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
       const [updated] = await db
         .update(contact)
         .set(updateValues)
-        .where(eq(contact.id, contactId))
+        .where(
+          and(
+            eq(contact.id, contactId),
+            eq(contact.organizationId, authContext.organizationId)
+          )
+        )
         .returning();
 
       // Add topic subscriptions if specified (PATCH adds, doesn't replace)
