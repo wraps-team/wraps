@@ -995,6 +995,182 @@ describe("Wait-for-Event Resume Flow", () => {
   });
 });
 
+describe("Branchless continuation fallbacks", () => {
+  it("continues after a yes condition branch when only a branchless transition exists", async () => {
+    const wf = makeWorkflow({
+      steps: [
+        { id: "trigger-1", type: "trigger", config: { type: "trigger" } },
+        {
+          id: "step-cond",
+          type: "condition",
+          config: {
+            type: "condition",
+            field: "firstName",
+            operator: "equals",
+            value: "Test",
+          },
+        },
+        {
+          id: "step-next",
+          type: "webhook",
+          config: {
+            type: "webhook",
+            url: "https://example.com",
+            method: "POST",
+          },
+        },
+      ],
+      transitions: [
+        {
+          id: "t1",
+          fromStepId: "trigger-1",
+          toStepId: "step-cond",
+          condition: null,
+        },
+        {
+          id: "t2",
+          fromStepId: "step-cond",
+          toStepId: "step-next",
+          condition: null,
+        },
+      ],
+    });
+
+    const execution = makeExecution({ currentStepId: "step-cond" });
+    const contactRecord = makeContact({ firstName: "Test" });
+
+    mockDbQueryWorkflowExecution.findFirst.mockResolvedValue(execution);
+
+    let selectCount = 0;
+    mockDbSelect.mockImplementation(() => {
+      selectCount++;
+      if (selectCount === 1) {
+        return {
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([wf]),
+            }),
+          }),
+        };
+      }
+      return {
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([contactRecord]),
+          }),
+        }),
+      };
+    });
+
+    mockDbInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([
+            {
+              id: "se-1",
+              status: "executing",
+              idempotencyKey: "exec-1-step-cond",
+            },
+          ]),
+        }),
+      }),
+    });
+
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([execution]),
+        }),
+      }),
+    });
+
+    await handler(
+      makeSQSEvent({
+        type: "execute",
+        executionId: "exec-1",
+        stepId: "step-cond",
+        organizationId: "org-1",
+      })
+    );
+
+    expect(mockEnqueueWorkflowStep).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "execute",
+        executionId: "exec-1",
+        stepId: "step-next",
+        organizationId: "org-1",
+      })
+    );
+  });
+
+  it("continues after a timeout resume when only a branchless transition exists", async () => {
+    const wf = makeWorkflow({
+      steps: [
+        {
+          id: "step-wait",
+          type: "wait_for_event",
+          config: { type: "wait_for_event", eventName: "activation.aws_connected" },
+        },
+        {
+          id: "step-next",
+          type: "webhook",
+          config: {
+            type: "webhook",
+            url: "https://example.com",
+            method: "POST",
+          },
+        },
+      ],
+      transitions: [
+        {
+          id: "t1",
+          fromStepId: "step-wait",
+          toStepId: "step-next",
+          condition: null,
+        },
+      ],
+    });
+
+    const claimedExecution = makeExecution({
+      currentStepId: "step-wait",
+      waitTimeoutSchedulerName: "sched-timeout-xyz",
+    });
+
+    mockDbUpdate.mockImplementation(() => ({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([claimedExecution]),
+        }),
+      }),
+    }));
+
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([wf]),
+        }),
+      }),
+    });
+
+    await handler(
+      makeSQSEvent({
+        type: "resume",
+        executionId: "exec-1",
+        branch: "timeout",
+      })
+    );
+
+    expect(mockEnqueueWorkflowStep).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "execute",
+        executionId: "exec-1",
+        stepId: "step-next",
+        organizationId: "org-1",
+      })
+    );
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Suite 3: Concurrent Resume Race Condition
 // ═══════════════════════════════════════════════════════════════════════════
