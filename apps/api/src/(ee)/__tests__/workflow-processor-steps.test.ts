@@ -844,6 +844,16 @@ describe("handleSendEmail", () => {
     const content = (sesSendCalls[0][0] as Record<string, unknown>)
       .Content as Record<string, unknown>;
     const tmplContent = content.Template as Record<string, unknown>;
+    const templateData = JSON.parse(tmplContent.TemplateData as string) as Record<
+      string,
+      unknown
+    >;
+    expect(templateData.unsubscribeUrl).toBe(
+      "https://api.wraps.dev/unsubscribe/mock-token"
+    );
+    expect(templateData.preferencesUrl).toBe(
+      "https://app.wraps.dev/preferences/mock-token"
+    );
     expect(tmplContent.Headers).toBeUndefined();
   });
 
