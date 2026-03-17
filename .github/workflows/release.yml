@@ -75,12 +75,13 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: pnpm
+          registry-url: https://registry.npmjs.org
       - run: npm install -g npm@latest
       - run: pnpm install --frozen-lockfile
 
@@ -91,6 +92,12 @@ jobs:
 
       - name: Build package
         run: pnpm --filter ${{ needs.parse.outputs.filter }} build
+
+      - name: Configure npm token auth
+        if: ${{ secrets.NPM_TOKEN != '' }}
+        run: npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm
         run: |
@@ -151,9 +158,9 @@ jobs:
             runner: ubuntu-latest
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: pnpm
@@ -184,12 +191,13 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: pnpm
+          registry-url: https://registry.npmjs.org
       - run: npm install -g npm@latest
       - run: pnpm install --frozen-lockfile
 
@@ -200,6 +208,12 @@ jobs:
 
       - name: Build CLI
         run: pnpm --filter @wraps.dev/cli build
+
+      - name: Configure npm token auth
+        if: ${{ secrets.NPM_TOKEN != '' }}
+        run: npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm
         run: |
