@@ -4,7 +4,7 @@ packages:
   - 'wraps'
 
 catalog:
-  better-auth: 1.4.17
+  better-auth: 1.5.5
   dotenv: ^17.2.2
   stripe: ^19.1.0
   tsdown: ^0.15.5
