@@ -228,10 +228,7 @@ jobs:
           [[ "$DIST_TAG" != "latest" ]] && PRERELEASE_FLAG="--prerelease"
 
           if gh release view "$TAG" --repo "${{ github.repository }}" &>/dev/null; then
-            echo "Release $TAG already exists — uploading assets"
-            gh release upload "$TAG" wraps-*.tar.gz CHECKSUMS.sha256 \
-              --repo "${{ github.repository }}" \
-              --clobber
+            echo "Release $TAG already exists — skipping asset upload because releases are immutable"
           else
             gh release create "$TAG" wraps-*.tar.gz CHECKSUMS.sha256 \
               --repo "${{ github.repository }}" \
