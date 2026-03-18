@@ -13,6 +13,7 @@ import { createMetricsRouter } from "./routes/metrics.js";
 import { createSettingsRouter } from "./routes/settings.js";
 import { createSMSRouter } from "./routes/sms.js";
 import { createUserRouter } from "./routes/user.js";
+import { redactLoggedUrl } from "./logging.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -116,7 +117,7 @@ export async function startConsoleServer(
 
   // Request logging middleware — strip auth token from logged URLs
   app.use((req, _res, next) => {
-    const logUrl = req.url.replace(/([?&])token=[^&]+/g, "$1token=***");
+    const logUrl = redactLoggedUrl(req.url);
     console.log(`[${new Date().toISOString()}] ${req.method} ${logUrl}`);
     next();
   });
