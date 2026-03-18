@@ -353,6 +353,77 @@ describe("processJob cursor passing", () => {
   });
 
   it("uses legacy offset for queued chunk without cursor", async () => {
+    const { db } = await import("@wraps/db");
+    (db.select as ReturnType<typeof vi.fn>).mockReturnValue({
+      from: vi.fn().mockImplementation((table: unknown) => {
+        const name = getTableName(table);
+
+        if (name === "batch_send") {
+          return {
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  id: "batch-1",
+                  organizationId: "org-1",
+                  status: "processing",
+                  audienceType: "all",
+                  topicId: null,
+                  segmentId: null,
+                  emailTemplateId: "tmpl-1",
+                  from: "test@example.com",
+                  fromName: "Test",
+                  replyTo: null,
+                  subject: "Hello",
+                  htmlContent: null,
+                  totalRecipients: 100,
+                  processedRecipients: 50,
+                  sent: 50,
+                  failed: 0,
+                  variableMappings: null,
+                },
+              ]),
+            }),
+          };
+        }
+
+        if (name === "template") {
+          return {
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  sesTemplateName: "wraps-tmpl-1",
+                  compiledHtml: null,
+                  emailType: "marketing",
+                },
+              ]),
+            }),
+          };
+        }
+
+        if (name === "organization") {
+          return {
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([{ name: "Test Org" }]),
+            }),
+          };
+        }
+
+        return {
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              offset: vi.fn().mockImplementation((value: number) => {
+                contactQueryOffsets.push(value);
+                return {
+                  limit: vi.fn().mockResolvedValue(mockContacts),
+                };
+              }),
+              limit: vi.fn().mockResolvedValue(mockContacts),
+            }),
+          }),
+        };
+      }),
+    });
+
     const event = makeSQSEvent({
       batchId: "batch-1",
       organizationId: "org-1",
