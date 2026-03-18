@@ -129,7 +129,8 @@ async function processJob(job: BatchJob): Promise<void> {
       topicId: batch.topicId ?? undefined,
       segmentId: batch.segmentId ?? undefined,
     },
-    job.cursor
+    job.cursor,
+    !job.cursor && chunkIndex > 0 ? chunkIndex * CHUNK_SIZE : undefined
   );
 
   if (contacts.length === 0) {
@@ -673,7 +674,8 @@ export async function getContactsChunk(
   channel: string,
   limit: number,
   filter?: RecipientFilter,
-  cursor?: BatchCursor
+  cursor?: BatchCursor,
+  legacyOffset?: number
 ): Promise<ContactChunk[]> {
   const conditions: (ReturnType<typeof eq> | ReturnType<typeof sql>)[] = [
     eq(contact.organizationId, organizationId),
@@ -740,7 +742,7 @@ export async function getContactsChunk(
     );
   }
 
-  return db
+  const query = db
     .select({
       id: contact.id,
       email: contact.email,
@@ -754,8 +756,13 @@ export async function getContactsChunk(
     })
     .from(contact)
     .where(and(...(conditions as Parameters<typeof and>)))
-    .orderBy(contact.createdAt, contact.id)
-    .limit(limit);
+    .orderBy(contact.createdAt, contact.id);
+
+  if (!cursor && typeof legacyOffset === "number" && legacyOffset > 0) {
+    return query.offset(legacyOffset).limit(limit);
+  }
+
+  return query.limit(limit);
 }
 
 /**

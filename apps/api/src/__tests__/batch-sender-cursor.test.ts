@@ -127,4 +127,32 @@ describe("getContactsChunk - cursor pagination", () => {
     // No cursor = no offset either (first chunk starts from beginning)
     expect(queryChain.offset).not.toHaveBeenCalled();
   });
+
+  it("uses offset for legacy chunk messages without cursor", async () => {
+    contactQueryResult = [
+      {
+        id: "contact-51",
+        email: "legacy@example.com",
+        phone: null,
+        firstName: "Legacy",
+        lastName: null,
+        company: null,
+        jobTitle: null,
+        properties: {},
+        createdAt: new Date("2026-01-15T10:01:00Z"),
+      },
+    ];
+
+    const result = await getContactsChunk(
+      "org-123",
+      "email",
+      50,
+      undefined,
+      undefined,
+      50
+    );
+
+    expect(result).toHaveLength(1);
+    expect(queryChain.offset).toHaveBeenCalledWith(50);
+  });
 });

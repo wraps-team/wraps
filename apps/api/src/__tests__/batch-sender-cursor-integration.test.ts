@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Capture SQS SendMessageCommand calls
 const sqsSendCalls: Array<{ MessageBody: string; DelaySeconds?: number }> = [];
+const contactQueryOffsets: number[] = [];
 
 vi.mock("@aws-sdk/client-sesv2", () => ({
   SESv2Client: class {
@@ -146,6 +147,12 @@ vi.mock("@wraps/db", async () => {
           return {
             where: vi.fn().mockReturnValue({
               orderBy: vi.fn().mockReturnValue({
+                offset: vi.fn().mockImplementation((value: number) => {
+                  contactQueryOffsets.push(value);
+                  return {
+                    limit: vi.fn().mockResolvedValue(mockContacts),
+                  };
+                }),
                 limit: vi.fn().mockResolvedValue(mockContacts),
               }),
             }),
@@ -225,6 +232,7 @@ describe("processJob cursor passing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sqsSendCalls.length = 0;
+    contactQueryOffsets.length = 0;
     process.env.BATCH_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/queue";
   });
 
@@ -342,5 +350,19 @@ describe("processJob cursor passing", () => {
 
     // Should have called update to mark batch completed
     expect(db.update).toHaveBeenCalled();
+  });
+
+  it("uses legacy offset for queued chunk without cursor", async () => {
+    const event = makeSQSEvent({
+      batchId: "batch-1",
+      organizationId: "org-1",
+      awsAccountId: "aws-1",
+      channel: "email",
+      chunkIndex: 1,
+    });
+
+    await handler(event, {} as never, () => {});
+
+    expect(contactQueryOffsets).toEqual([50]);
   });
 });
