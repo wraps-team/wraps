@@ -103,4 +103,30 @@ describe("getCredentials", () => {
     // Verify the query uses and() to combine both conditions
     expect(mockAnd).toHaveBeenCalled();
   });
+
+  it("does not reuse cached credentials across organizations for the same account", async () => {
+    (__mockLimit as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([
+        {
+          roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
+          externalId: "ext-org-1",
+          region: "us-east-1",
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          roleArn: "arn:aws:iam::123456789012:role/wraps-email-role",
+          externalId: "ext-org-2",
+          region: "eu-central-1",
+        },
+      ]);
+
+    const first = await getCredentials("shared-account", "org-1");
+    const second = await getCredentials("shared-account", "org-2");
+
+    expect(first.region).toBe("us-east-1");
+    expect(second.region).toBe("eu-central-1");
+    expect(__mockLimit).toHaveBeenCalledTimes(2);
+    expect(mockStsSend).toHaveBeenCalledTimes(2);
+  });
 });
