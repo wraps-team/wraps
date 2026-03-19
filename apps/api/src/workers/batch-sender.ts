@@ -141,6 +141,21 @@ async function processJob(job: BatchJob): Promise<void> {
     return;
   }
 
+  if (channel !== "email") {
+    await db
+      .update(batchSend)
+      .set({
+        status: "failed",
+        completedAt: new Date(),
+        processedRecipients: batch.totalRecipients,
+        failed: batch.totalRecipients,
+        errorMessage: `Unsupported batch channel: ${channel}`,
+        errorDetails: { channel },
+      })
+      .where(eq(batchSend.id, batchId));
+    return;
+  }
+
   // Get customer AWS credentials
   const credentials = await getCredentials(awsAccountId, organizationId);
 
