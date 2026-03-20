@@ -10,6 +10,7 @@ import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
 import { toPlainText } from "@react-email/render";
 import {
   awsAccount,
+  and,
   db,
   eq,
   organization,
@@ -213,7 +214,12 @@ export async function sendTopicConfirmationEmail(
         compiledText: template.compiledText,
       })
       .from(template)
-      .where(eq(template.id, settings.confirmationTemplateId))
+      .where(
+        and(
+          eq(template.id, settings.confirmationTemplateId),
+          eq(template.organizationId, organizationId)
+        )
+      )
       .limit(1);
 
     if (customTemplate?.compiledHtml && customTemplate?.subject) {
