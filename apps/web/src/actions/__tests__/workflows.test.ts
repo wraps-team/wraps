@@ -73,9 +73,26 @@ const testOrganization = {
   metadata: null,
 };
 
+const testSecondaryOrganization = {
+  id: "test-workflows-org-2",
+  name: "Workflows Test Org 2",
+  slug: "workflows-test-org-2",
+  createdAt: new Date(),
+  logo: null,
+  metadata: null,
+};
+
 const testOwnerMember = {
   id: "test-workflows-owner-member-1",
   organizationId: testOrganization.id,
+  userId: testUser.id,
+  role: "owner" as const,
+  createdAt: new Date(),
+};
+
+const testSecondaryOwnerMember = {
+  id: "test-workflows-owner-member-2",
+  organizationId: testSecondaryOrganization.id,
   userId: testUser.id,
   role: "owner" as const,
   createdAt: new Date(),
@@ -215,6 +232,14 @@ beforeAll(async () => {
       set: { name: testOrganization.name },
     });
 
+  await db
+    .insert(organization)
+    .values(testSecondaryOrganization)
+    .onConflictDoUpdate({
+      target: organization.id,
+      set: { name: testSecondaryOrganization.name },
+    });
+
   // Set up organization extension
   await db
     .insert(organizationExtension)
@@ -249,6 +274,14 @@ beforeAll(async () => {
     .onConflictDoUpdate({
       target: member.id,
       set: { role: testOwnerMember.role },
+    });
+
+  await db
+    .insert(member)
+    .values(testSecondaryOwnerMember)
+    .onConflictDoUpdate({
+      target: member.id,
+      set: { role: testSecondaryOwnerMember.role },
     });
 
   await db
@@ -312,10 +345,17 @@ afterAll(async () => {
     .delete(workflowExecution)
     .where(eq(workflowExecution.organizationId, testOrganization.id));
   await db
+    .delete(workflowExecution)
+    .where(eq(workflowExecution.organizationId, testSecondaryOrganization.id));
+  await db
     .delete(workflow)
     .where(eq(workflow.organizationId, testOrganization.id));
+  await db
+    .delete(workflow)
+    .where(eq(workflow.organizationId, testSecondaryOrganization.id));
   await db.delete(template).where(eq(template.id, testTemplate.id));
   await db.delete(member).where(eq(member.id, testOwnerMember.id));
+  await db.delete(member).where(eq(member.id, testSecondaryOwnerMember.id));
   await db.delete(member).where(eq(member.id, testRegularMember.id));
   await db
     .delete(organizationExtension)
@@ -326,6 +366,9 @@ afterAll(async () => {
   await db.delete(contact).where(eq(contact.id, testContact.id));
   await db.delete(contact).where(eq(contact.id, testContact2.id));
   await db.delete(organization).where(eq(organization.id, testOrganization.id));
+  await db
+    .delete(organization)
+    .where(eq(organization.id, testSecondaryOrganization.id));
   await db.delete(user).where(eq(user.id, testUser.id));
   await db.delete(user).where(eq(user.id, testMemberUser.id));
 });
@@ -1918,6 +1961,86 @@ describe("Workflows Server Actions", () => {
       expect(result.stats["step-send-email"]!.sentCount).toBe(2);
       expect(result.stats["step-send-email"]!.openedCount).toBe(1);
       expect(result.stats["step-send-email"]!.clickedCount).toBe(0);
+    });
+
+    it("should aggregate engagement counts for send_sms steps", async () => {
+      const wfResult = await createWorkflow(testOrganization.id, {
+        name: "SMS Node Stats Test",
+      });
+      expect(wfResult.success).toBe(true);
+      if (!wfResult.success) return;
+
+      const [exec] = await db
+        .insert(workflowExecution)
+        .values({
+          workflowId: wfResult.workflow.id,
+          contactId: testContact.id,
+          organizationId: testOrganization.id,
+          status: "completed",
+          startedAt: new Date("2026-03-03T00:00:00"),
+          completedAt: new Date("2026-03-03T00:01:00"),
+        })
+        .returning();
+
+      await db.insert(workflowStepExecution).values({
+        executionId: exec!.id,
+        stepId: "step-send-sms",
+        stepType: "send_sms",
+        status: "completed",
+        idempotencyKey: `${exec!.id}-step-send-sms`,
+        startedAt: new Date("2026-03-03T00:00:01"),
+        completedAt: new Date("2026-03-03T00:00:02"),
+        result: { messageId: "node-stats-sms-msg-1" },
+      });
+
+      await db.insert(messageSend).values({
+        organizationId: testOrganization.id,
+        contactId: testContact.id,
+        awsAccountId: testAwsAccount.id,
+        channel: "sms",
+        sourceType: "workflow",
+        workflowExecutionId: exec!.id,
+        recipient: "+15551234567",
+        messageId: "node-stats-sms-msg-1",
+        status: "clicked",
+        sentAt: new Date("2026-03-03T00:00:02"),
+        deliveredAt: new Date("2026-03-03T00:00:05"),
+        clickedAt: new Date("2026-03-03T00:00:20"),
+      });
+
+      const result = await getWorkflowNodeStats(
+        wfResult.workflow.id,
+        testOrganization.id
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      expect(result.stats["step-send-sms"]).toBeDefined();
+      expect(result.stats["step-send-sms"]!.totalCount).toBe(1);
+      expect(result.stats["step-send-sms"]!.sentCount).toBe(1);
+      expect(result.stats["step-send-sms"]!.deliveredCount).toBe(1);
+      expect(result.stats["step-send-sms"]!.clickedCount).toBe(1);
+      expect(result.stats["step-send-sms"]!.openedCount).toBe(0);
+      expect(result.stats["step-send-sms"]!.bouncedCount).toBe(0);
+    });
+
+    it("should reject stats lookup for workflow in a different accessible organization", async () => {
+      const wfResult = await createWorkflow(testOrganization.id, {
+        name: "Cross Org Node Stats Test",
+      });
+      expect(wfResult.success).toBe(true);
+      if (!wfResult.success) return;
+
+      const result = await getWorkflowNodeStats(
+        wfResult.workflow.id,
+        testSecondaryOrganization.id
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe("Workflow not found");
+      }
     });
 
     it("should reject unauthorized access", async () => {
