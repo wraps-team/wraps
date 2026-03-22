@@ -74,23 +74,48 @@ type TestDataTransfer = {
 
 let mockStoreState: MockWorkflowStoreState;
 
-const mockFindEdgeAtPoint = vi.fn<
-  (clientX: number, clientY: number) => string | null
->();
-const mockHandleUndoRedo = vi.fn<(event: KeyboardEvent) => void>();
-const mockUseWorkflowStore = Object.assign(
-  vi.fn(<T,>(selector: (state: MockWorkflowStoreState) => T) =>
-    selector(mockStoreState)
-  ),
-  {
-    getState: vi.fn(() => mockStoreState),
-  }
-);
-const mockReactFlowInstance = {
-  flowToScreenPosition: vi.fn<(position: Position) => Position>(),
-  screenToFlowPosition: vi.fn<(position: Position) => Position>(),
-  getViewport: vi.fn<() => Viewport>(),
-};
+const {
+  storeStateHolder,
+  mockFindEdgeAtPoint,
+  mockHandleUndoRedo,
+  mockUseWorkflowStore,
+  mockReactFlowInstance,
+} = vi.hoisted(() => {
+  const holder: { current: MockWorkflowStoreState | null } = { current: null };
+
+  const useWorkflowStore = Object.assign(
+    vi.fn(<T,>(selector: (state: MockWorkflowStoreState) => T) => {
+      if (!holder.current) {
+        throw new Error("mock workflow store not initialized");
+      }
+
+      return selector(holder.current);
+    }),
+    {
+      getState: vi.fn(() => {
+        if (!holder.current) {
+          throw new Error("mock workflow store not initialized");
+        }
+
+        return holder.current;
+      }),
+    }
+  );
+
+  return {
+    storeStateHolder: holder,
+    mockFindEdgeAtPoint: vi.fn<
+      (clientX: number, clientY: number) => string | null
+    >(),
+    mockHandleUndoRedo: vi.fn<(event: KeyboardEvent) => void>(),
+    mockUseWorkflowStore: useWorkflowStore,
+    mockReactFlowInstance: {
+      flowToScreenPosition: vi.fn<(position: Position) => Position>(),
+      screenToFlowPosition: vi.fn<(position: Position) => Position>(),
+      getViewport: vi.fn<() => Viewport>(),
+    },
+  };
+});
 
 vi.mock("@xyflow/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@xyflow/react")>();
@@ -224,6 +249,7 @@ describe("WorkflowCanvas", () => {
 
     mockFindEdgeAtPoint.mockReturnValue(null);
     mockHandleUndoRedo.mockReset();
+    storeStateHolder.current = mockStoreState;
     mockUseWorkflowStore.mockImplementation(<T,>(
       selector: (state: MockWorkflowStoreState) => T
     ) => selector(mockStoreState));
