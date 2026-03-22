@@ -92,35 +92,40 @@ const mockReactFlowInstance = {
   getViewport: vi.fn<() => Viewport>(),
 };
 
-vi.mock("@xyflow/react", () => ({
-  Background: () => null,
-  BackgroundVariant: {
-    Dots: "dots",
-  },
-  Controls: () => null,
-  MiniMap: () => null,
-  ReactFlow: ({
-    children,
-    onInit,
-    onDragOver,
-    onDrop,
-    onDragLeave,
-  }: ReactFlowProps) => (
-    <div
-      data-testid="react-flow"
-      onDragLeave={onDragLeave}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      ref={(element) => {
-        if (element) {
-          onInit?.(mockReactFlowInstance);
-        }
-      }}
-    >
-      {children}
-    </div>
-  ),
-}));
+vi.mock("@xyflow/react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@xyflow/react")>();
+
+  return {
+    ...actual,
+    Background: () => null,
+    BackgroundVariant: {
+      Dots: "dots",
+    },
+    Controls: () => null,
+    MiniMap: () => null,
+    ReactFlow: ({
+      children,
+      onInit,
+      onDragOver,
+      onDrop,
+      onDragLeave,
+    }: ReactFlowProps) => (
+      <div
+        data-testid="react-flow"
+        onDragLeave={onDragLeave}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        ref={(element) => {
+          if (element) {
+            onInit?.(mockReactFlowInstance);
+          }
+        }}
+      >
+        {children}
+      </div>
+    ),
+  };
+});
 
 vi.mock("../use-workflow-store", () => ({
   handleUndoRedo: mockHandleUndoRedo,
