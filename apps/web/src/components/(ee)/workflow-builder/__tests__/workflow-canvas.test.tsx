@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import type { DragEvent, KeyboardEvent, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -229,6 +235,21 @@ function appendEdgeElement(edgeId: string): HTMLDivElement {
   return edgeElement;
 }
 
+function dispatchDrop(
+  target: HTMLElement,
+  clientX: number,
+  clientY: number,
+  nodeType: string
+) {
+  const event = createEvent.drop(target);
+  Object.defineProperty(event, "clientX", { value: clientX });
+  Object.defineProperty(event, "clientY", { value: clientY });
+  Object.defineProperty(event, "dataTransfer", {
+    value: createDataTransfer(nodeType),
+  });
+  fireEvent(target, event);
+}
+
 describe("WorkflowCanvas", () => {
   beforeEach(() => {
     mockStoreState = {
@@ -282,11 +303,7 @@ describe("WorkflowCanvas", () => {
 
     render(<WorkflowCanvas />);
 
-    fireEvent.drop(screen.getByTestId("react-flow"), {
-      clientX: 150,
-      clientY: 200,
-      dataTransfer: createDataTransfer("delay"),
-    });
+    dispatchDrop(screen.getByTestId("react-flow"), 150, 200, "delay");
 
     expect(mockReactFlowInstance.screenToFlowPosition).toHaveBeenCalledWith({
       x: 150,
@@ -324,11 +341,7 @@ describe("WorkflowCanvas", () => {
     expect(edgeElement).toHaveClass("edge-drop-target");
     expect(screen.getByText("Delay")).toBeInTheDocument();
 
-    fireEvent.drop(screen.getByTestId("react-flow"), {
-      clientX: 200,
-      clientY: 210,
-      dataTransfer: createDataTransfer("delay"),
-    });
+    dispatchDrop(screen.getByTestId("react-flow"), 200, 210, "delay");
 
     expect(mockStoreState.insertNodeBetweenEdge).toHaveBeenCalledWith(
       "delay",
