@@ -343,4 +343,64 @@ describe("processJob cursor passing", () => {
     // Should have called update to mark batch completed
     expect(db.update).toHaveBeenCalled();
   });
+
+  it("stops at totalRecipients even when more contacts are now available", async () => {
+    const { db } = await import("@wraps/db");
+
+    (db.select as ReturnType<typeof vi.fn>).mockReturnValue({
+      from: vi.fn().mockImplementation((table: unknown) => {
+        const name = getTableName(table);
+
+        if (name === "batch_send") {
+          return {
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  id: "batch-1",
+                  organizationId: "org-1",
+                  status: "processing",
+                  audienceType: "all",
+                  topicId: null,
+                  segmentId: null,
+                  emailTemplateId: "tmpl-1",
+                  from: "test@example.com",
+                  fromName: "Test",
+                  replyTo: null,
+                  subject: "Hello",
+                  htmlContent: null,
+                  totalRecipients: 50,
+                  processedRecipients: 50,
+                  sent: 50,
+                  failed: 0,
+                  variableMappings: null,
+                },
+              ]),
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected select for table: ${name}`);
+      }),
+    });
+
+    sqsSendCalls.length = 0;
+
+    const event = makeSQSEvent({
+      batchId: "batch-1",
+      organizationId: "org-1",
+      awsAccountId: "aws-1",
+      channel: "email",
+      chunkIndex: 1,
+      cursor: {
+        createdAt: mockContacts[49].createdAt.toISOString(),
+        id: mockContacts[49].id,
+      },
+    });
+
+    await handler(event, {} as never, () => {});
+
+    const updateCalls = (db.update as ReturnType<typeof vi.fn>).mock.calls;
+    expect(updateCalls.length).toBeGreaterThan(0);
+    expect(sqsSendCalls.length).toBe(0);
+  });
 });

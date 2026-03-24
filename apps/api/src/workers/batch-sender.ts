@@ -133,11 +133,23 @@ async function processJob(job: BatchJob): Promise<void> {
       .where(eq(batchSend.id, batchId));
   }
 
+  const remainingRecipients = Math.max(
+    batch.totalRecipients - batch.processedRecipients,
+    0
+  );
+  if (remainingRecipients === 0) {
+    await db
+      .update(batchSend)
+      .set({ status: "completed", completedAt: new Date() })
+      .where(eq(batchSend.id, batchId));
+    return;
+  }
+
   // Get contacts for this chunk using cursor-based pagination
   const contacts = await getContactsChunk(
     organizationId,
     channel,
-    CHUNK_SIZE,
+    Math.min(CHUNK_SIZE, remainingRecipients),
     {
       audienceType: batch.audienceType as
         | "all"
@@ -740,8 +752,10 @@ async function processJob(job: BatchJob): Promise<void> {
     ? { createdAt: lastContact.createdAt.toISOString(), id: lastContact.id }
     : undefined;
 
-  // If we got a full chunk, there may be more contacts — enqueue next chunk
-  if (contacts.length >= CHUNK_SIZE) {
+  const shouldEnqueueNextChunk =
+    contacts.length === Math.min(CHUNK_SIZE, remainingRecipients) &&
+    batch.processedRecipients + contacts.length < batch.totalRecipients;
+  if (shouldEnqueueNextChunk) {
     await enqueueNextChunk(
       { ...job, chunkIndex: chunkIndex + 1, cursor: nextCursor },
       { delaySeconds: rateLimitDelay }
