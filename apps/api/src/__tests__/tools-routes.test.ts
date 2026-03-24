@@ -315,7 +315,7 @@ describe("toolsRoutes", () => {
       quick: false,
       skipBlacklists: false,
       skipTls: true,
-      dkimSelectors: ["selector-b", "selector-a"],
+      dkimSelectors: ["selector-a", "selector-b"],
     });
     expect(mockDynamoSend).toHaveBeenCalledTimes(2);
     expect(getDynamoCommand(0).input.Key?.pk?.S).toBe(
