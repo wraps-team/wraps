@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { auth, subscriptionPlans } from "../index";
 
 describe("Better-Auth Stripe Plugin Configuration", () => {
@@ -124,6 +124,24 @@ describe("Better-Auth Stripe Plugin - Plan Configuration", () => {
 });
 
 describe("Better-Auth Environment Configuration", () => {
+  it("uses BETTER_AUTH_URL as Better Auth baseURL", async () => {
+    const originalBetterAuthUrl = process.env.BETTER_AUTH_URL;
+    vi.resetModules();
+    process.env.BETTER_AUTH_URL = "https://auth.wraps.dev";
+
+    try {
+      const { auth: reloadedAuth } = await import("../index");
+      expect(reloadedAuth.options.baseURL).toBe("https://auth.wraps.dev");
+    } finally {
+      if (originalBetterAuthUrl === undefined) {
+        delete process.env.BETTER_AUTH_URL;
+      } else {
+        process.env.BETTER_AUTH_URL = originalBetterAuthUrl;
+      }
+      vi.resetModules();
+    }
+  });
+
   it("should require Stripe secret key", () => {
     // In test environment, this might be empty, but the config should reference it
     expect(
