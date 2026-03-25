@@ -148,7 +148,7 @@ function makeBatch(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeSQSEvent() {
+function makeSQSEvent(channel: "email" | "sms" = "email") {
   return {
     Records: [
       {
@@ -156,7 +156,7 @@ function makeSQSEvent() {
           batchId: "batch-1",
           organizationId: "org-1",
           awsAccountId: "aws-1",
-          channel: "email",
+          channel,
           chunkIndex: 0,
         }),
         messageId: "msg-1",
@@ -319,5 +319,46 @@ describe("batch-sender from address resolution", () => {
     >[];
     expect(insertedRecords[0].status).toBe("failed");
     expect(insertedRecords[0].error).toContain("No sender email configured");
+  });
+
+  it("does not fail SMS batches when email sender is missing", async () => {
+    selectResults = [
+      [
+        makeBatch({
+          channel: "sms",
+          emailTemplateId: null,
+          from: null,
+          fromName: null,
+          body: "Hello from Wraps",
+          status: "queued",
+        }),
+      ],
+      [
+        {
+          id: "contact-sms-1",
+          email: null,
+          phone: "+15551234567",
+          firstName: "Sms",
+          lastName: "User",
+          company: null,
+          jobTitle: null,
+          properties: {},
+          createdAt: new Date("2026-01-15T10:00:00Z"),
+        },
+      ],
+    ];
+
+    await handler(makeSQSEvent("sms"), {} as never, vi.fn());
+
+    expect(mockDbUpdateSetWhere).toHaveBeenCalled();
+    expect(sesSendCalls).toHaveLength(1);
+    expect(mockDbInsertValues).not.toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: "failed",
+          error: expect.stringContaining("No sender email configured"),
+        }),
+      ])
+    );
   });
 });

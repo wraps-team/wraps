@@ -217,62 +217,63 @@ async function processJob(job: BatchJob): Promise<void> {
 
   const isMarketing = emailType === "marketing";
 
-  // Resolve sender: batch.from > org default > owner email domain > fail
-  let fromAddress: string | null = batch.from;
-  let fromName: string | null = batch.fromName;
-  if (!fromAddress) {
-    const [orgExt] = await db
-      .select({
-        defaultFrom: organizationExtension.defaultFrom,
-        defaultFromName: organizationExtension.defaultFromName,
-      })
-      .from(organizationExtension)
-      .where(eq(organizationExtension.organizationId, organizationId))
-      .limit(1);
-    fromAddress = orgExt?.defaultFrom ?? null;
-    if (!fromName) {
-      fromName = orgExt?.defaultFromName ?? null;
+  let fromDisplay = "";
+  if (channel === "email") {
+    let fromAddress: string | null = batch.from;
+    let fromName: string | null = batch.fromName;
+    if (!fromAddress) {
+      const [orgExt] = await db
+        .select({
+          defaultFrom: organizationExtension.defaultFrom,
+          defaultFromName: organizationExtension.defaultFromName,
+        })
+        .from(organizationExtension)
+        .where(eq(organizationExtension.organizationId, organizationId))
+        .limit(1);
+      fromAddress = orgExt?.defaultFrom ?? null;
+      if (!fromName) {
+        fromName = orgExt?.defaultFromName ?? null;
+      }
     }
-  }
 
-  if (!fromAddress) {
-    log.error("No sender address configured for batch", {
-      batchId,
-      organizationId,
-    });
-    // Mark all contacts in this chunk as failed
-    const failedRecords = emailContacts.map((recipient) => ({
-      organizationId,
-      contactId: recipient.id,
-      awsAccountId,
-      channel: "email" as const,
-      batchSendId: batchId,
-      sourceType: "batch" as const,
-      recipient: recipient.email ?? "",
-      subject: batch.subject,
-      from: batch.from,
-      fromName: batch.fromName,
-      emailTemplateId: batch.emailTemplateId,
-      status: "failed" as const,
-      error:
-        "No sender email configured. Set a default sender in Settings > Sender Defaults.",
-    }));
-    if (failedRecords.length > 0) {
-      await db.insert(messageSend).values(failedRecords);
+    if (!fromAddress) {
+      log.error("No sender address configured for batch", {
+        batchId,
+        organizationId,
+      });
+      const failedRecords = emailContacts.map((recipient) => ({
+        organizationId,
+        contactId: recipient.id,
+        awsAccountId,
+        channel: "email" as const,
+        batchSendId: batchId,
+        sourceType: "batch" as const,
+        recipient: recipient.email ?? "",
+        subject: batch.subject,
+        from: batch.from,
+        fromName: batch.fromName,
+        emailTemplateId: batch.emailTemplateId,
+        status: "failed" as const,
+        error:
+          "No sender email configured. Set a default sender in Settings > Sender Defaults.",
+      }));
+      if (failedRecords.length > 0) {
+        await db.insert(messageSend).values(failedRecords);
+      }
+      await db
+        .update(batchSend)
+        .set({
+          status: "failed",
+          completedAt: new Date(),
+          processedRecipients: sql`${batchSend.processedRecipients} + ${emailContacts.length}`,
+          failed: sql`${batchSend.failed} + ${emailContacts.length}`,
+        })
+        .where(eq(batchSend.id, batchId));
+      return;
     }
-    await db
-      .update(batchSend)
-      .set({
-        status: "failed",
-        completedAt: new Date(),
-        processedRecipients: sql`${batchSend.processedRecipients} + ${emailContacts.length}`,
-        failed: sql`${batchSend.failed} + ${emailContacts.length}`,
-      })
-      .where(eq(batchSend.id, batchId));
-    return;
-  }
 
-  const fromDisplay = fromName ? `${fromName} <${fromAddress}>` : fromAddress;
+    fromDisplay = fromName ? `${fromName} <${fromAddress}>` : fromAddress;
+  }
 
   // Use bulk sending for SES templates, individual sends for raw HTML
   if (sesTemplateName) {
