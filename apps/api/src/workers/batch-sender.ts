@@ -107,6 +107,23 @@ async function processJob(job: BatchJob): Promise<void> {
     return;
   }
 
+  // Reject unsupported channels before any state mutation
+  if (channel !== "email") {
+    log.error("Unsupported batch channel", undefined, { batchId, channel, organizationId });
+    await db
+      .update(batchSend)
+      .set({
+        status: "failed",
+        completedAt: new Date(),
+        processedRecipients: batch.totalRecipients,
+        failed: batch.totalRecipients,
+        errorMessage: `Unsupported batch channel: ${channel}`,
+        errorDetails: { channel },
+      })
+      .where(eq(batchSend.id, batchId));
+    return;
+  }
+
   // Mark as processing on first chunk
   if (chunkIndex === 0) {
     await db
@@ -137,21 +154,6 @@ async function processJob(job: BatchJob): Promise<void> {
     await db
       .update(batchSend)
       .set({ status: "completed", completedAt: new Date() })
-      .where(eq(batchSend.id, batchId));
-    return;
-  }
-
-  if (channel !== "email") {
-    await db
-      .update(batchSend)
-      .set({
-        status: "failed",
-        completedAt: new Date(),
-        processedRecipients: batch.totalRecipients,
-        failed: batch.totalRecipients,
-        errorMessage: `Unsupported batch channel: ${channel}`,
-        errorDetails: { channel },
-      })
       .where(eq(batchSend.id, batchId));
     return;
   }

@@ -16,7 +16,7 @@ const batchRow = {
   from: null,
   fromName: null,
   replyTo: null,
-  totalRecipients: 1,
+  totalRecipients: 5000,
   processedRecipients: 0,
   sent: 0,
   failed: 0,
@@ -178,8 +178,15 @@ describe("batch-sender unsupported channel handling", () => {
 
     expect(failedUpdate).toBeDefined();
     expect(failedUpdate?.errorMessage).toBe("Unsupported batch channel: sms");
-    expect(failedUpdate?.failed).toBe(1);
-    expect(failedUpdate?.processedRecipients).toBe(1);
+    expect(failedUpdate?.failed).toBe(5000);
+    expect(failedUpdate?.processedRecipients).toBe(5000);
+
+    // Guard fires before any state mutation — batch should never hit "processing"
+    const processingUpdate = updateSetCalls.find(
+      (values) => values.status === "processing"
+    );
+    expect(processingUpdate).toBeUndefined();
+
     expect(vi.mocked(getCredentials)).not.toHaveBeenCalled();
   });
 });
