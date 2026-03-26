@@ -4,6 +4,7 @@ import {
   formatDurationCompact,
   formatDurationVerbose,
   parseDurationToAmountUnit,
+  toSafeRedirectPath,
 } from "../utils";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -215,5 +216,29 @@ describe("formatDurationVerbose", () => {
     expect(formatDurationVerbose(5400)).toBe("1 hour");
     // 90000s = 1.04d -> "1 day"
     expect(formatDurationVerbose(90_000)).toBe("1 day");
+  });
+});
+
+describe("toSafeRedirectPath", () => {
+  it("returns fallback for null or empty values", () => {
+    expect(toSafeRedirectPath(null, "/dashboard")).toBe("/dashboard");
+    expect(toSafeRedirectPath("", "/dashboard")).toBe("/dashboard");
+    expect(toSafeRedirectPath("   ", "/dashboard")).toBe("/dashboard");
+  });
+
+  it("allows relative in-app paths", () => {
+    expect(toSafeRedirectPath("/onboarding", "/")).toBe("/onboarding");
+    expect(toSafeRedirectPath("/device?user_code=abc", "/")).toBe(
+      "/device?user_code=abc"
+    );
+    expect(toSafeRedirectPath("/invitations/test#section", "/")).toBe(
+      "/invitations/test#section"
+    );
+  });
+
+  it("rejects absolute and protocol-relative URLs", () => {
+    expect(toSafeRedirectPath("https://evil.example/phish", "/")).toBe("/");
+    expect(toSafeRedirectPath("javascript:alert(1)", "/")).toBe("/");
+    expect(toSafeRedirectPath("//evil.example/path", "/")).toBe("/");
   });
 });

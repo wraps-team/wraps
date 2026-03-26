@@ -5,6 +5,35 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function toSafeRedirectPath(
+  value: string | null | undefined,
+  fallback = "/"
+): string {
+  if (!value) {
+    return fallback;
+  }
+
+  const candidate = value.trim();
+  if (candidate === "") {
+    return fallback;
+  }
+
+  if (!candidate.startsWith("/") || candidate.startsWith("//")) {
+    return fallback;
+  }
+
+  try {
+    const parsed = new URL(candidate, "https://app.wraps.dev");
+    if (parsed.origin !== "https://app.wraps.dev") {
+      return fallback;
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
 /**
  * Format a date as relative time (e.g., "2 hours ago", "3 days ago")
  */
