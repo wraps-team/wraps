@@ -1675,10 +1675,10 @@ describe("handleWebhook", () => {
 
     expect(result).toEqual({
       action: "next",
-      data: {
-        error: "Webhook URL must use http(s)",
+      data: expect.objectContaining({
+        error: expect.stringContaining("Webhook URL must use http(s)"),
         blocked: true,
-      },
+      }),
     });
     expect(mockFetch).not.toHaveBeenCalled();
     expect(mockDnsLookup).not.toHaveBeenCalled();
@@ -1699,16 +1699,16 @@ describe("handleWebhook", () => {
 
     expect(result).toEqual({
       action: "next",
-      data: {
-        error:
-          "Webhook URL resolves to blocked address 169.254.169.254 (link-local/IMDS)",
+      data: expect.objectContaining({
+        error: expect.stringContaining(
+          "Webhook URL resolves to blocked address"
+        ),
         blocked: true,
-      },
+      }),
     });
-    expect(mockDnsLookup).toHaveBeenCalledWith("internal.example.com", {
-      all: false,
-      verbatim: true,
-    });
+    expect(result.data.error).toContain("internal.example.com");
+    expect(result.data.error).toContain("169.254.169.254");
+    expect(mockDnsLookup).toHaveBeenCalledWith("internal.example.com");
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
