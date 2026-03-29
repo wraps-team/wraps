@@ -272,7 +272,7 @@ vi.mock("node:dns/promises", () => ({
 
 vi.stubGlobal("fetch", mockFetch);
 
-const { handler, handleUpdateContact, handleWaitForEmailEngagement } =
+const { handler, handleUpdateContact, handleWaitForEmailEngagement, handleWebhook } =
   await import("../workers/workflow-processor");
 
 const { trackFirstEmailSent: mockTrackFirstEmailSent } = await import(
@@ -370,6 +370,7 @@ function setupProcessStep(opts: {
 beforeEach(() => {
   vi.clearAllMocks();
   mockFetch.mockReset();
+  mockDnsLookup.mockResolvedValue({ address: "93.184.216.34", family: 4 });
   sesSendCalls.length = 0;
   smsSendCalls.length = 0;
   sesSendOverride = null;
@@ -1657,6 +1658,58 @@ describe("handleCondition", () => {
     expect(mockEnqueueWorkflowStep).toHaveBeenCalledWith(
       expect.objectContaining({ stepId: "step-no" })
     );
+  });
+});
+
+describe("handleWebhook", () => {
+  it("returns a blocked result for invalid protocols without calling fetch", async () => {
+    const result = await handleWebhook(
+      {
+        type: "webhook",
+        url: "ftp://example.com/hook",
+        method: "POST",
+      } as never,
+      makeContact() as never,
+      makeExecution() as never
+    );
+
+    expect(result).toEqual({
+      action: "next",
+      data: {
+        error: "Webhook URL must use http(s)",
+        blocked: true,
+      },
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockDnsLookup).not.toHaveBeenCalled();
+  });
+
+  it("returns a blocked result when DNS resolves to a blocked address", async () => {
+    mockDnsLookup.mockResolvedValue({ address: "169.254.169.254", family: 4 });
+
+    const result = await handleWebhook(
+      {
+        type: "webhook",
+        url: "https://internal.example.com/hook",
+        method: "POST",
+      } as never,
+      makeContact() as never,
+      makeExecution() as never
+    );
+
+    expect(result).toEqual({
+      action: "next",
+      data: {
+        error:
+          "Webhook URL resolves to blocked address 169.254.169.254 (link-local/IMDS)",
+        blocked: true,
+      },
+    });
+    expect(mockDnsLookup).toHaveBeenCalledWith("internal.example.com", {
+      all: false,
+      verbatim: true,
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 
