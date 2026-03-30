@@ -1,8 +1,10 @@
 import {
   db,
+  member,
   messageSend,
   organizationExtension,
   template,
+  user,
   workflow,
 } from "@wraps/db";
 import { createPlatformClient } from "@wraps.dev/client";
@@ -31,6 +33,31 @@ async function emit(
   } catch (err) {
     log.error("Activation event emit threw", err, { event, contactEmail });
   }
+}
+
+async function getOrganizationContactEmail(
+  organizationId: string
+): Promise<string | null> {
+  const ownerRows = await db
+    .select({ email: user.email })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(and(eq(member.organizationId, organizationId), eq(member.role, "owner")))
+    .limit(1);
+
+  const ownerEmail = ownerRows[0]?.email;
+  if (ownerEmail) {
+    return ownerEmail;
+  }
+
+  const memberRows = await db
+    .select({ email: user.email })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(eq(member.organizationId, organizationId))
+    .limit(1);
+
+  return memberRows[0]?.email ?? null;
 }
 
 /**
@@ -210,7 +237,15 @@ export async function trackFirstResourceCreated(
     });
 
     // Emit to platform so activation workflows can react
-    await emit(organizationId, platformEvent, props);
+    const contactEmail = await getOrganizationContactEmail(organizationId);
+    if (contactEmail) {
+      await emit(contactEmail, platformEvent, props);
+    } else {
+      log.warn("Activation: no member email found, skipping platform event", {
+        organizationId,
+        resource,
+      });
+    }
 
     log.info("Activation: first resource created", {
       organizationId,
