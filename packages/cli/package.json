@@ -81,7 +81,7 @@
     "@pulumi/pulumi": "^3.216.0",
     "args": "^5.0.3",
     "better-auth": "catalog:",
-    "conf": "^13.0.1",
+    "conf": "^15.1.0",
     "cosmiconfig": "^9.0.0",
     "esbuild": "^0.25.12",
     "express": "^4.21.2",
