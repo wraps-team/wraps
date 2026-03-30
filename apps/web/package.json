@@ -138,7 +138,7 @@
     "react-day-picker": "^9.11.1",
     "react-dom": "19.2.4",
     "react-resizable-panels": "^3.0.4",
-    "recharts": "2.15.4",
+    "recharts": "3.8.1",
     "shiki": "3.15.0",
     "sonner": "^2.0.7",
     "sucrase": "3.35.1",
