@@ -22,6 +22,10 @@ export function toSafeRedirectPath(
     return fallback;
   }
 
+  if (/^\/[a-zA-Z][a-zA-Z\d+\-.]*:/.test(candidate)) {
+    return fallback;
+  }
+
   try {
     const parsed = new URL(candidate, "https://app.wraps.dev");
     if (parsed.origin !== "https://app.wraps.dev") {

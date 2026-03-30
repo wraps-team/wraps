@@ -241,4 +241,8 @@ describe("toSafeRedirectPath", () => {
     expect(toSafeRedirectPath("javascript:alert(1)", "/")).toBe("/");
     expect(toSafeRedirectPath("//evil.example/path", "/")).toBe("/");
   });
+
+  it("rejects scheme-like paths that pass origin check", () => {
+    expect(toSafeRedirectPath("/javascript:alert(1)", "/")).toBe("/");
+  });
 });
