@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudwatch-logs": "^3.750.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.1020.0",
     "@aws-sdk/client-dynamodb": "^3.750.0",
     "@aws-sdk/client-ses": "^3.750.0",
     "@aws-sdk/client-sesv2": "^3.750.0",
