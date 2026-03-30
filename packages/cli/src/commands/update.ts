@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { createWriteStream, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, createWriteStream, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -174,8 +174,8 @@ export async function update(currentVersion: string): Promise<void> {
         execFileSync("cp", ["-R", join(source, dir), join(INSTALL_DIR, dir)]);
       }
 
-      execFileSync("chmod", ["+x", join(INSTALL_DIR, "bin", "wraps")]);
-      execFileSync("chmod", ["+x", join(INSTALL_DIR, "runtime", "node")]);
+      chmodSync(join(INSTALL_DIR, "bin", "wraps"), 0o755);
+      chmodSync(join(INSTALL_DIR, "runtime", "node"), 0o755);
     });
 
     console.log();
