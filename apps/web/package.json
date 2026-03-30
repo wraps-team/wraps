@@ -171,7 +171,7 @@
     "@vitest/ui": "4.0.8",
     "eslint": "^9",
     "eslint-config-next": "16.1.0",
-    "handlebars": "4.7.8",
+    "handlebars": "4.7.9",
     "jsdom": "27.4.0",
     "tailwindcss": "^4.1.11",
     "tw-animate-css": "^1.3.6",
