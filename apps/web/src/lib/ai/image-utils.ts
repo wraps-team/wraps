@@ -22,7 +22,9 @@ export async function fetchAndProcessImage(
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(urlValidation.parsedUrl.toString(), {
+      signal: controller.signal,
+    });
     clearTimeout(timeout);
 
     if (!response.ok) {

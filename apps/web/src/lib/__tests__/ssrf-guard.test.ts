@@ -220,5 +220,17 @@ describe("validatePublicUrl", () => {
         expect(result.parsedUrl.protocol).toBe("https:");
       }
     });
+
+    it("returns a canonical URL string (callers must use parsedUrl, not raw input)", () => {
+      const result = validatePublicUrl(
+        "https://example.com:443/path/../image.png"
+      );
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.parsedUrl.toString()).toBe(
+          "https://example.com/image.png"
+        );
+      }
+    });
   });
 });

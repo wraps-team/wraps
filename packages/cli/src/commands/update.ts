@@ -1,5 +1,5 @@
-import { execSync } from "node:child_process";
-import { createWriteStream, mkdtempSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { createWriteStream, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -145,9 +145,11 @@ export async function update(currentVersion: string): Promise<void> {
         }
 
         const expected = line.split(WHITESPACE_RE)[0];
-        const shaCmd =
-          process.platform === "darwin" ? "shasum -a 256" : "sha256sum";
-        const actual = execSync(`${shaCmd} "${tarballPath}"`)
+        const [shaCmd, ...shaArgs] =
+          process.platform === "darwin"
+            ? ["shasum", "-a", "256"]
+            : ["sha256sum"];
+        const actual = execFileSync(shaCmd, [...shaArgs, tarballPath])
           .toString()
           .split(WHITESPACE_RE)[0];
 
@@ -162,18 +164,18 @@ export async function update(currentVersion: string): Promise<void> {
     // biome-ignore lint/suspicious/useAwait: progress.execute requires async callback
     await progress.execute("Installing update...", async () => {
       const extractDir = join(tmp, "extract");
-      execSync(`mkdir -p "${extractDir}"`);
-      execSync(`tar xzf "${tarballPath}" -C "${extractDir}"`);
+      mkdirSync(extractDir, { recursive: true });
+      execFileSync("tar", ["xzf", tarballPath, "-C", extractDir]);
 
       const source = join(extractDir, "wraps");
 
       for (const dir of ["bin", "runtime", "lib"]) {
-        execSync(`rm -rf "${join(INSTALL_DIR, dir)}"`);
-        execSync(`cp -R "${join(source, dir)}" "${join(INSTALL_DIR, dir)}"`);
+        rmSync(join(INSTALL_DIR, dir), { recursive: true, force: true });
+        execFileSync("cp", ["-R", join(source, dir), join(INSTALL_DIR, dir)]);
       }
 
-      execSync(`chmod +x "${join(INSTALL_DIR, "bin", "wraps")}"`);
-      execSync(`chmod +x "${join(INSTALL_DIR, "runtime", "node")}"`);
+      execFileSync("chmod", ["+x", join(INSTALL_DIR, "bin", "wraps")]);
+      execFileSync("chmod", ["+x", join(INSTALL_DIR, "runtime", "node")]);
     });
 
     console.log();

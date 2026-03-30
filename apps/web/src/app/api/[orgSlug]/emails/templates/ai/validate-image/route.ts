@@ -64,7 +64,7 @@ export async function POST(request: Request, context: RouteContext) {
     const timeout = setTimeout(() => controller.abort(), 5000);
 
     try {
-      const response = await fetch(url, {
+      const response = await fetch(parsedUrl.toString(), {
         method: "HEAD",
         signal: controller.signal,
       });
