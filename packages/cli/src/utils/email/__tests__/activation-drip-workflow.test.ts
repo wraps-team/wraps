@@ -109,7 +109,10 @@ describe("activation drip workflow", () => {
       field: "contact.hasSentBroadcast",
       operator: "is_true",
     });
-    expect(getBranchStepIds(broadcastGate!, "yes")).toEqual(["celebration"]);
+    expect(getBranchStepIds(broadcastGate!, "yes")).toEqual([
+      "celebration",
+      "fully-activated",
+    ]);
     expect(getBranchStepIds(broadcastGate!, "no")).toEqual([]);
 
     expect(celebrationStep).toMatchObject({
