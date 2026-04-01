@@ -225,7 +225,7 @@ function makeSQSEvent() {
 function setupSelects(opts: {
   batch: Record<string, unknown>;
   contacts?: unknown[];
-  alreadySentContactIds?: string[];
+  existingSendRecords?: Array<{ contactId: string; status: string }>;
 }) {
   selectResults = [
     // 1. batch
@@ -236,8 +236,8 @@ function setupSelects(opts: {
     [{ sesTemplateName: "wraps-tmpl-1", compiledHtml: "<p>Hi</p>", emailType: "marketing" }],
     // 4. organization
     [{ name: "Test Org" }],
-    // 5. already-sent contact IDs for dedup
-    (opts.alreadySentContactIds ?? []).map((id) => ({ contactId: id })),
+    // 5. existing send records for dedup
+    opts.existingSendRecords ?? [],
   ];
 }
 
@@ -254,7 +254,7 @@ describe("Batch sender idempotency", () => {
     // Simulate: contact-1 was already sent in a previous invocation
     setupSelects({
       batch: makeBatch(),
-      alreadySentContactIds: ["contact-1"],
+      existingSendRecords: [{ contactId: "contact-1", status: "sent" }],
     });
 
     await handler(makeSQSEvent(), {} as never, vi.fn());
@@ -269,7 +269,10 @@ describe("Batch sender idempotency", () => {
   it("skips entire chunk when all contacts already sent", async () => {
     setupSelects({
       batch: makeBatch(),
-      alreadySentContactIds: ["contact-1", "contact-2"],
+      existingSendRecords: [
+        { contactId: "contact-1", status: "sent" },
+        { contactId: "contact-2", status: "delivered" },
+      ],
     });
 
     await handler(makeSQSEvent(), {} as never, vi.fn());
@@ -284,12 +287,25 @@ describe("Batch sender idempotency", () => {
   it("sends to all contacts when none have been sent yet (first invocation)", async () => {
     setupSelects({
       batch: makeBatch(),
-      alreadySentContactIds: [],
+      existingSendRecords: [],
     });
 
     await handler(makeSQSEvent(), {} as never, vi.fn());
 
     // SES bulk send should include both contacts
+    const bulkCall = sesSendCalls[1]?.[0] as Record<string, unknown> | undefined;
+    const entries = bulkCall?.BulkEmailEntries as Array<Record<string, unknown>> | undefined;
+    expect(entries).toHaveLength(2);
+  });
+
+  it("does not skip contacts that only have failed send records", async () => {
+    setupSelects({
+      batch: makeBatch(),
+      existingSendRecords: [{ contactId: "contact-1", status: "failed" }],
+    });
+
+    await handler(makeSQSEvent(), {} as never, vi.fn());
+
     const bulkCall = sesSendCalls[1]?.[0] as Record<string, unknown> | undefined;
     const entries = bulkCall?.BulkEmailEntries as Array<Record<string, unknown>> | undefined;
     expect(entries).toHaveLength(2);

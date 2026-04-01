@@ -75,6 +75,15 @@ function transformVariablesForSes(html: string): string {
 const CHUNK_SIZE = 50; // SES SendBulkEmail limit per API call
 const DEFAULT_RATE_LIMIT = 14; // Fallback emails/sec if can't fetch from AWS
 const QUEUE_URL = process.env.BATCH_QUEUE_URL;
+const dedupStatuses = new Set<string>([
+  "sent",
+  "delivered",
+  "opened",
+  "clicked",
+  "bounced",
+  "complained",
+  "suppressed",
+] as const);
 
 export const handler: SQSHandler = async (event: SQSEvent) => {
   try {
@@ -251,8 +260,11 @@ async function processJob(job: BatchJob): Promise<void> {
   // Dedup: skip contacts that already have a send record for this batch
   // (protects against SQS duplicate delivery)
   if (emailContacts.length > 0) {
-    const alreadySent = await db
-      .select({ contactId: messageSend.contactId })
+    const existingSendRecords = await db
+      .select({
+        contactId: messageSend.contactId,
+        status: messageSend.status,
+      })
       .from(messageSend)
       .where(
         and(
@@ -264,12 +276,18 @@ async function processJob(job: BatchJob): Promise<void> {
           )
         )
       );
-    if (alreadySent.length > 0) {
-      const sentIds = new Set(alreadySent.map((r) => r.contactId));
+
+    const sentIds = new Set(
+      existingSendRecords
+        .filter((record) => dedupStatuses.has(record.status))
+        .map((record) => record.contactId)
+    );
+
+    if (sentIds.size > 0) {
       emailContacts = emailContacts.filter((c) => !sentIds.has(c.id));
       log.info("Batch dedup: skipped already-sent contacts", {
         batchId,
-        skipped: alreadySent.length,
+        skipped: sentIds.size,
         remaining: emailContacts.length,
       });
     }
