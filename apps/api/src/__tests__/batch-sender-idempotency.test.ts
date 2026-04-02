@@ -91,6 +91,7 @@ vi.mock("./variable-mappings", () => ({
 
 let selectCallIndex = 0;
 let selectResults: unknown[][] = [];
+const updateSetCalls: Record<string, unknown>[] = [];
 
 vi.mock("@wraps/db", async () => {
   const actual = await vi.importActual("@wraps/db");
@@ -118,8 +119,11 @@ vi.mock("@wraps/db", async () => {
         };
       }),
       update: vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
+        set: vi.fn().mockImplementation((values: Record<string, unknown>) => {
+          updateSetCalls.push(values);
+          return {
+            where: vi.fn().mockResolvedValue(undefined),
+          };
         }),
       }),
       insert: vi.fn().mockReturnValue({
@@ -248,6 +252,7 @@ describe("Batch sender idempotency", () => {
     sesBulkCallCount = 0;
     selectCallIndex = 0;
     selectResults = [];
+    updateSetCalls.length = 0;
   });
 
   it("skips contacts that already have send records for this batch (SQS retry)", async () => {
@@ -264,6 +269,13 @@ describe("Batch sender idempotency", () => {
     const bulkCall = sesSendCalls[1]?.[0] as Record<string, unknown> | undefined;
     const entries = bulkCall?.BulkEmailEntries as Array<Record<string, unknown>> | undefined;
     expect(entries).toHaveLength(1);
+
+    const progressUpdate = updateSetCalls.find(
+      (call) => "processedRecipients" in call
+    );
+    const processedExpr = progressUpdate?.processedRecipients;
+    expect(Array.isArray(processedExpr)).toBe(true);
+    expect((processedExpr as unknown[]).at(-1)).toBe(1);
   });
 
   it("skips entire chunk when all contacts already sent", async () => {
@@ -279,6 +291,13 @@ describe("Batch sender idempotency", () => {
       (call) => (call[0] as Record<string, unknown>)?.BulkEmailEntries !== undefined
     );
     expect(bulkSendCalls).toHaveLength(0);
+
+    const progressUpdate = updateSetCalls.find(
+      (call) => "processedRecipients" in call
+    );
+    const processedExpr = progressUpdate?.processedRecipients;
+    expect(Array.isArray(processedExpr)).toBe(true);
+    expect((processedExpr as unknown[]).at(-1)).toBe(0);
   });
 
   it("sends to all contacts when none have been sent yet (first invocation)", async () => {
@@ -293,5 +312,12 @@ describe("Batch sender idempotency", () => {
     const bulkCall = sesSendCalls[1]?.[0] as Record<string, unknown> | undefined;
     const entries = bulkCall?.BulkEmailEntries as Array<Record<string, unknown>> | undefined;
     expect(entries).toHaveLength(2);
+
+    const progressUpdate = updateSetCalls.find(
+      (call) => "processedRecipients" in call
+    );
+    const processedExpr = progressUpdate?.processedRecipients;
+    expect(Array.isArray(processedExpr)).toBe(true);
+    expect((processedExpr as unknown[]).at(-1)).toBe(2);
   });
 });

@@ -275,6 +275,7 @@ async function processJob(job: BatchJob): Promise<void> {
     }
   }
 
+  const chunkProcessedRecipients = emailContacts.length;
   const isMarketing = emailType === "marketing";
 
   // Resolve sender: batch.from > org default > owner email domain > fail
@@ -771,7 +772,7 @@ async function processJob(job: BatchJob): Promise<void> {
   await db
     .update(batchSend)
     .set({
-      processedRecipients: sql`${batchSend.processedRecipients} + ${contacts.length}`,
+      processedRecipients: sql`${batchSend.processedRecipients} + ${chunkProcessedRecipients}`,
       sent: sql`${batchSend.sent} + ${sent}`,
       failed: sql`${batchSend.failed} + ${failed}`,
     })
