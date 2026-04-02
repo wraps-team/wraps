@@ -93,6 +93,30 @@ let selectCallIndex = 0;
 let selectResults: unknown[][] = [];
 const updateSetCalls: Record<string, unknown>[] = [];
 
+function getSqlNumericParams(value: unknown): number[] {
+  if (typeof value !== "object" || value === null) {
+    return [];
+  }
+
+  if (!("queryChunks" in value)) {
+    return [];
+  }
+
+  const queryChunks = (value as { queryChunks?: unknown }).queryChunks;
+  if (!Array.isArray(queryChunks)) {
+    return [];
+  }
+
+  const numbers: number[] = [];
+  for (const chunk of queryChunks) {
+    if (typeof chunk === "number") {
+      numbers.push(chunk);
+    }
+  }
+
+  return numbers;
+}
+
 vi.mock("@wraps/db", async () => {
   const actual = await vi.importActual("@wraps/db");
 
@@ -274,8 +298,7 @@ describe("Batch sender idempotency", () => {
       (call) => "processedRecipients" in call
     );
     const processedExpr = progressUpdate?.processedRecipients;
-    expect(Array.isArray(processedExpr)).toBe(true);
-    expect((processedExpr as unknown[]).at(-1)).toBe(1);
+    expect(getSqlNumericParams(processedExpr).at(-1)).toBe(1);
   });
 
   it("skips entire chunk when all contacts already sent", async () => {
@@ -296,8 +319,7 @@ describe("Batch sender idempotency", () => {
       (call) => "processedRecipients" in call
     );
     const processedExpr = progressUpdate?.processedRecipients;
-    expect(Array.isArray(processedExpr)).toBe(true);
-    expect((processedExpr as unknown[]).at(-1)).toBe(0);
+    expect(getSqlNumericParams(processedExpr).at(-1)).toBe(0);
   });
 
   it("sends to all contacts when none have been sent yet (first invocation)", async () => {
@@ -317,7 +339,6 @@ describe("Batch sender idempotency", () => {
       (call) => "processedRecipients" in call
     );
     const processedExpr = progressUpdate?.processedRecipients;
-    expect(Array.isArray(processedExpr)).toBe(true);
-    expect((processedExpr as unknown[]).at(-1)).toBe(2);
+    expect(getSqlNumericParams(processedExpr).at(-1)).toBe(2);
   });
 });
