@@ -247,6 +247,7 @@ export async function createDNSRecordsForProvider(
           "dkim",
           "spf",
           "dmarc",
+          "tracking",
           "mailfrom_mx",
           "mailfrom_spf",
           "inbound_mx",
@@ -273,6 +274,9 @@ export async function createDNSRecordsForProvider(
           recordsCreated += 1;
         }
         if (categories.has("dmarc")) {
+          recordsCreated += 1;
+        }
+        if (data.customTrackingDomain && categories.has("tracking")) {
           recordsCreated += 1;
         }
         if (data.mailFromDomain) {

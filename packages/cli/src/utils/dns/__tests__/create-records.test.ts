@@ -1,11 +1,29 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as route53Utils from "../../route53.js";
 import {
   buildEmailDNSRecords,
+  createDNSRecordsForProvider,
   type DNSRecordInfo,
   formatDNSRecordsForDisplay,
+  formatManualDNSInstructions,
   getDNSProviderDisplayName,
   getDNSProviderTokenUrl,
 } from "../create-records.js";
+
+vi.mock("../../route53.js", async () => {
+  const actual = await vi.importActual<typeof import("../../route53.js")>(
+    "../../route53.js"
+  );
+
+  return {
+    ...actual,
+    createSelectedDNSRecords: vi.fn(),
+  };
+});
+
+function stripAnsi(value: string): string {
+  return value.replace(/\u001B\[[0-9;]*m/g, "");
+}
 
 describe("buildEmailDNSRecords", () => {
   it("should create DKIM CNAME records for all tokens", () => {
@@ -261,6 +279,77 @@ describe("formatDNSRecordsForDisplay", () => {
   it("should handle empty array", () => {
     const formatted = formatDNSRecordsForDisplay([]);
     expect(formatted).toEqual([]);
+  });
+});
+
+describe("formatManualDNSInstructions", () => {
+  it("should include grouped descriptions and formatted MX priorities", () => {
+    const output = stripAnsi(
+      formatManualDNSInstructions([
+        {
+          name: "track.example.com",
+          type: "CNAME",
+          value: "r.us-east-1.awstrack.me",
+          category: "tracking",
+        },
+        {
+          name: "mail.example.com",
+          type: "MX",
+          value: "feedback-smtp.us-east-1.amazonses.com",
+          priority: 10,
+          category: "mailfrom_mx",
+        },
+      ])
+    );
+
+    expect(output).toContain("Tracking (CNAME)");
+    expect(output).toContain(
+      "Routes open/click tracking through your domain instead of AWS"
+    );
+    expect(output).toContain("track.example.com");
+    expect(output).toContain("r.us-east-1.awstrack.me");
+    expect(output).toContain("MAIL FROM MX");
+    expect(output).toContain("10 feedback-smtp.us-east-1.amazonses.com");
+  });
+});
+
+describe("createDNSRecordsForProvider", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(route53Utils.createSelectedDNSRecords).mockResolvedValue(undefined);
+  });
+
+  it("should include tracking in default Route53 category selection", async () => {
+    const result = await createDNSRecordsForProvider(
+      {
+        provider: "route53",
+        hostedZoneId: "Z123456789",
+      },
+      {
+        domain: "example.com",
+        dkimTokens: ["token1", "token2", "token3"],
+        region: "us-east-1",
+        customTrackingDomain: "track.example.com",
+        mailFromDomain: "mail.example.com",
+      }
+    );
+
+    expect(result).toEqual({
+      success: true,
+      recordsCreated: 8,
+    });
+    expect(route53Utils.createSelectedDNSRecords).toHaveBeenCalledTimes(1);
+
+    const route53Call = vi.mocked(route53Utils.createSelectedDNSRecords).mock
+      .calls[0];
+
+    expect(route53Call[0]).toBe("Z123456789");
+    expect(route53Call[1]).toBe("example.com");
+    expect(route53Call[2]).toEqual(["token1", "token2", "token3"]);
+    expect(route53Call[3]).toBe("us-east-1");
+    expect(route53Call[4].has("tracking")).toBe(true);
+    expect(route53Call[5]).toBe("track.example.com");
+    expect(route53Call[6]).toBe("mail.example.com");
   });
 });
 
