@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "tsdown": "catalog:",
-    "vite": "7.2.2",
+    "vite": "6.4.2",
     "vitest": "^4.0.7"
   },
   "peerDependencies": {
