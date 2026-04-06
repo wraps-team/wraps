@@ -27,81 +27,100 @@ type PolicyDocument = {
   Statement: Array<Record<string, unknown>>;
 };
 
-const createdUsers: Array<{
-  logicalName: string;
-  args: MockUserArgs;
-  opts?: MockUserOptions;
-}> = [];
+const pulumiState = vi.hoisted(() => {
+  const createdUsers: Array<{
+    logicalName: string;
+    args: MockUserArgs;
+    opts?: MockUserOptions;
+  }> = [];
 
-const createdPolicies: Array<{
-  logicalName: string;
-  args: MockPolicyArgs;
-}> = [];
+  const createdPolicies: Array<{
+    logicalName: string;
+    args: MockPolicyArgs;
+  }> = [];
 
-const createdAccessKeys: Array<{
-  logicalName: string;
-  args: MockAccessKeyArgs;
-}> = [];
+  const createdAccessKeys: Array<{
+    logicalName: string;
+    args: MockAccessKeyArgs;
+  }> = [];
 
-const iamClientConfigs: MockIamClientConfig[] = [];
+  class MockUser {
+    readonly name: string;
 
-const sendMock = vi.fn<(command: unknown) => Promise<unknown>>();
-
-class MockUser {
-  readonly name: string;
-
-  constructor(
-    logicalName: string,
-    args: MockUserArgs,
-    opts?: MockUserOptions
-  ) {
-    this.name = args.name;
-    createdUsers.push({ logicalName, args, opts });
+    constructor(
+      logicalName: string,
+      args: MockUserArgs,
+      opts?: MockUserOptions
+    ) {
+      this.name = args.name;
+      createdUsers.push({ logicalName, args, opts });
+    }
   }
-}
 
-class MockUserPolicy {
-  constructor(logicalName: string, args: MockPolicyArgs) {
-    createdPolicies.push({ logicalName, args });
+  class MockUserPolicy {
+    constructor(logicalName: string, args: MockPolicyArgs) {
+      createdPolicies.push({ logicalName, args });
+    }
   }
-}
 
-class MockAccessKey {
-  readonly secret = {
-    apply: (fn: (secret: string) => string): string =>
-      fn("smtp-secret-access-key"),
+  class MockAccessKey {
+    readonly secret = {
+      apply: (fn: (secret: string) => string): string =>
+        fn("smtp-secret-access-key"),
+    };
+
+    constructor(logicalName: string, args: MockAccessKeyArgs) {
+      createdAccessKeys.push({ logicalName, args });
+    }
+  }
+
+  return {
+    createdUsers,
+    createdPolicies,
+    createdAccessKeys,
+    MockUser,
+    MockUserPolicy,
+    MockAccessKey,
   };
+});
 
-  constructor(logicalName: string, args: MockAccessKeyArgs) {
-    createdAccessKeys.push({ logicalName, args });
+const iamState = vi.hoisted(() => {
+  const iamClientConfigs: MockIamClientConfig[] = [];
+  const sendMock = vi.fn<(command: unknown) => Promise<unknown>>();
+
+  class MockIAMClient {
+    constructor(config: MockIamClientConfig) {
+      iamClientConfigs.push(config);
+    }
+
+    send(command: unknown): Promise<unknown> {
+      return sendMock(command);
+    }
   }
-}
 
-class MockIAMClient {
-  constructor(config: MockIamClientConfig) {
-    iamClientConfigs.push(config);
+  class MockGetUserCommand {
+    constructor(readonly input: { UserName: string }) {}
   }
 
-  send(command: unknown): Promise<unknown> {
-    return sendMock(command);
-  }
-}
-
-class MockGetUserCommand {
-  constructor(readonly input: { UserName: string }) {}
-}
+  return {
+    iamClientConfigs,
+    sendMock,
+    MockIAMClient,
+    MockGetUserCommand,
+  };
+});
 
 vi.mock("@pulumi/aws", () => ({
   iam: {
-    User: MockUser,
-    UserPolicy: MockUserPolicy,
-    AccessKey: MockAccessKey,
+    User: pulumiState.MockUser,
+    UserPolicy: pulumiState.MockUserPolicy,
+    AccessKey: pulumiState.MockAccessKey,
   },
 }));
 
 vi.mock("@aws-sdk/client-iam", () => ({
-  IAMClient: MockIAMClient,
-  GetUserCommand: MockGetUserCommand,
+  IAMClient: iamState.MockIAMClient,
+  GetUserCommand: iamState.MockGetUserCommand,
 }));
 
 import {
@@ -111,29 +130,29 @@ import {
 
 describe("smtp credentials resources", () => {
   beforeEach(() => {
-    createdUsers.length = 0;
-    createdPolicies.length = 0;
-    createdAccessKeys.length = 0;
-    iamClientConfigs.length = 0;
-    sendMock.mockReset();
+    pulumiState.createdUsers.length = 0;
+    pulumiState.createdPolicies.length = 0;
+    pulumiState.createdAccessKeys.length = 0;
+    iamState.iamClientConfigs.length = 0;
+    iamState.sendMock.mockReset();
   });
 
   it("creates an SMTP send policy without configuration set conditions", async () => {
     const notFoundError = new Error("SMTP user not found");
     notFoundError.name = "NoSuchEntityException";
-    sendMock.mockRejectedValueOnce(notFoundError);
+    iamState.sendMock.mockRejectedValueOnce(notFoundError);
 
     const resources = await createSMTPCredentials({
       configSetName: "wraps-email-tracking",
       region: "us-west-2",
     });
 
-    expect(iamClientConfigs).toHaveLength(1);
-    expect(iamClientConfigs[0]).toEqual({
+    expect(iamState.iamClientConfigs).toHaveLength(1);
+    expect(iamState.iamClientConfigs[0]).toEqual({
       region: expect.any(String),
     });
-    expect(createdUsers).toHaveLength(1);
-    expect(createdUsers[0]).toMatchObject({
+    expect(pulumiState.createdUsers).toHaveLength(1);
+    expect(pulumiState.createdUsers[0]).toMatchObject({
       logicalName: "wraps-email-smtp-user",
       args: {
         name: "wraps-email-smtp-user",
@@ -143,18 +162,18 @@ describe("smtp credentials resources", () => {
         },
       },
     });
-    expect(createdUsers[0]?.opts).toBeUndefined();
+    expect(pulumiState.createdUsers[0]?.opts).toBeUndefined();
 
-    expect(createdAccessKeys).toEqual([
+    expect(pulumiState.createdAccessKeys).toEqual([
       {
         logicalName: "wraps-email-smtp-key",
         args: { user: "wraps-email-smtp-user" },
       },
     ]);
 
-    expect(createdPolicies).toHaveLength(1);
+    expect(pulumiState.createdPolicies).toHaveLength(1);
     const policy = JSON.parse(
-      createdPolicies[0]!.args.policy
+      pulumiState.createdPolicies[0]!.args.policy
     ) as PolicyDocument;
 
     expect(policy).toEqual({
@@ -167,7 +186,7 @@ describe("smtp credentials resources", () => {
         },
       ],
     });
-    expect(createdPolicies[0]!.args.policy).not.toContain(
+    expect(pulumiState.createdPolicies[0]!.args.policy).not.toContain(
       "ConfigurationSetName"
     );
 
@@ -177,15 +196,15 @@ describe("smtp credentials resources", () => {
   });
 
   it("imports the existing SMTP user instead of creating a duplicate", async () => {
-    sendMock.mockResolvedValueOnce({});
+    iamState.sendMock.mockResolvedValueOnce({});
 
     await createSMTPCredentials({
       configSetName: "wraps-email-tracking",
       region: "us-east-1",
     });
 
-    expect(createdUsers).toHaveLength(1);
-    expect(createdUsers[0]).toMatchObject({
+    expect(pulumiState.createdUsers).toHaveLength(1);
+    expect(pulumiState.createdUsers[0]).toMatchObject({
       logicalName: "wraps-email-smtp-user",
       opts: { import: "wraps-email-smtp-user" },
       args: {
@@ -198,10 +217,10 @@ describe("smtp credentials resources", () => {
       },
     });
 
-    const [lookupCall] = sendMock.mock.calls;
+    const [lookupCall] = iamState.sendMock.mock.calls;
     expect(lookupCall).toHaveLength(1);
-    expect(lookupCall?.[0]).toBeInstanceOf(MockGetUserCommand);
-    expect((lookupCall?.[0] as MockGetUserCommand).input).toEqual({
+    expect(lookupCall?.[0]).toBeInstanceOf(iamState.MockGetUserCommand);
+    expect((lookupCall?.[0] as { input: { UserName: string } }).input).toEqual({
       UserName: "wraps-email-smtp-user",
     });
   });
