@@ -133,9 +133,15 @@ export async function connect(options: ConnectOptions): Promise<void> {
             try {
               const ids = await scanSESIdentities(r);
               return ids.length > 0 ? r : null;
-            } catch {
-              // Permission errors are expected in regions the user hasn't configured
-              return null;
+            } catch (error) {
+              if (
+                error instanceof Error &&
+                (error.name === "AccessDeniedException" ||
+                  error.name === "AccessDenied")
+              ) {
+                return null;
+              }
+              throw error;
             }
           })
         );
