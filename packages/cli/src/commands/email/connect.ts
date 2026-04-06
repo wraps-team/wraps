@@ -14,7 +14,7 @@ import {
   getAWSRegion,
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
-import { errors } from "../../utils/shared/errors.js";
+import { errors, isAWSError } from "../../utils/shared/errors.js";
 import {
   ensurePulumiWorkDir,
   getPulumiWorkDir,
@@ -133,9 +133,16 @@ export async function connect(options: ConnectOptions): Promise<void> {
             try {
               const ids = await scanSESIdentities(r);
               return ids.length > 0 ? r : null;
-            } catch {
-              // Permission errors are expected in regions the user hasn't configured
-              return null;
+            } catch (error: unknown) {
+              if (
+                isAWSError(error) &&
+                (error.name === "AccessDeniedException" ||
+                  error.name === "AccessDenied" ||
+                  error.name === "UnauthorizedAccess")
+              ) {
+                return null;
+              }
+              throw error;
             }
           })
         );
