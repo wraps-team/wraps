@@ -74,6 +74,11 @@ export async function emailTest(options: EmailTestOptions): Promise<void> {
   let domain: string;
   if (trackedDomains.length === 1) {
     domain = trackedDomains[0].domain;
+  } else if (isJsonMode()) {
+    const primaryTrackedDomain =
+      trackedDomains.find((trackedDomain) => trackedDomain.isPrimary) ||
+      trackedDomains[0];
+    domain = primaryTrackedDomain.domain;
   } else {
     const selected = await clack.select({
       message: "Which domain do you want to send from?",

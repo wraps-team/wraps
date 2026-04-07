@@ -503,6 +503,49 @@ describe("email test command", () => {
       setJsonMode(false);
     });
 
+    it("should not prompt for domain selection in JSON mode with multiple domains", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue({
+        ...MOCK_METADATA,
+        services: {
+          email: {
+            config: {
+              domain: "primary.com",
+              sendingEnabled: true,
+              additionalDomains: [
+                {
+                  domain: "secondary.com",
+                  addedAt: "2024-01-02T00:00:00.000Z",
+                  purpose: "marketing" as const,
+                },
+              ],
+            },
+            preset: "starter" as const,
+            deployedAt: "2024-01-01T00:00:00.000Z",
+          },
+        },
+      });
+
+      sesv2Mock.on(SendEmailCommand).resolves({
+        MessageId: "test-json-multi-domain-id",
+      });
+
+      const clack = await import("@clack/prompts");
+
+      await emailTest({
+        to: "success@simulator.amazonses.com",
+        json: true,
+      });
+
+      expect(clack.select).not.toHaveBeenCalled();
+
+      const calls = sesv2Mock.commandCalls(SendEmailCommand);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].args[0].input.FromEmailAddress).toBe("test@primary.com");
+    });
+
     it("should output JSON envelope with messageId on success", async () => {
       const { loadConnectionMetadata } = await import(
         "../../utils/shared/metadata.js"
