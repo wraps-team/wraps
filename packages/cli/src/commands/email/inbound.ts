@@ -114,6 +114,11 @@ export async function inboundInit(
   let domain: string;
   if (trackedDomains.length === 1) {
     domain = trackedDomains[0].domain;
+  } else if (options.yes || isJsonMode()) {
+    const primaryTrackedDomain =
+      trackedDomains.find((trackedDomain) => trackedDomain.isPrimary) ||
+      trackedDomains[0];
+    domain = primaryTrackedDomain.domain;
   } else {
     const selected = await clack.select({
       message: "Which domain do you want to receive email on?",
