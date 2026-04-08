@@ -41,7 +41,7 @@
     "@wraps/email-check": "workspace:*",
     "@wraps/template-render": "workspace:*",
     "croner": "9.1.0",
-    "drizzle-orm": "0.44.7",
+    "drizzle-orm": "0.45.2",
     "elysia": "^1.4.27",
     "handlebars": "4.7.9",
     "jose": "6.1.3",

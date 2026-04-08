@@ -39,7 +39,7 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",
     "dotenv": "catalog:",
-    "drizzle-orm": "^0.44.2",
+    "drizzle-orm": "^0.45.2",
     "zod": "catalog:"
   }
 }

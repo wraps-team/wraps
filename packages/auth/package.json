@@ -36,7 +36,7 @@
     "@wraps/email": "workspace:*",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
-    "drizzle-orm": "^0.44.2",
+    "drizzle-orm": "^0.45.2",
     "posthog-node": "^5.24.15",
     "stripe": "catalog:",
     "zod": "catalog:"
