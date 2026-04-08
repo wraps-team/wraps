@@ -59,7 +59,7 @@
   "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@aws-sdk/client-acm": "3.933.0",
-    "@aws-sdk/client-cloudformation": "^3.490.0",
+    "@aws-sdk/client-cloudformation": "^3.1027.0",
     "@aws-sdk/client-cloudfront": "3.933.0",
     "@aws-sdk/client-cloudwatch": "^3.490.0",
     "@aws-sdk/client-dynamodb": "^3.490.0",

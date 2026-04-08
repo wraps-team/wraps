@@ -17,7 +17,7 @@
     "@ai-sdk/anthropic": "2.0.53",
     "@ai-sdk/gateway": "2.0.18",
     "@ai-sdk/react": "2.0.109",
-    "@aws-sdk/client-cloudformation": "^3.490.0",
+    "@aws-sdk/client-cloudformation": "^3.1027.0",
     "@aws-sdk/client-cloudwatch": "^3.490.0",
     "@aws-sdk/client-dynamodb": "^3.957.0",
     "@aws-sdk/client-eventbridge": "3.935.0",
