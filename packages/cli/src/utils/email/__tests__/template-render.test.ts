@@ -25,6 +25,20 @@ function TemplateWithHandlebarsInHeading(props: Record<string, string>) {
   );
 }
 
+function TemplateWithDottedHandlebarsInHeading(
+  _props: Record<string, string>
+) {
+  return React.createElement(
+    Html,
+    null,
+    React.createElement(
+      Heading,
+      { as: "h1" },
+      "{{#if contact.firstName}}Hey {{contact.firstName}}, the{{else}}The{{/if}} setup just got easier."
+    )
+  );
+}
+
 describe("renderTemplateWithProxy", () => {
   it("normalizes uppercased Handlebars tokens that html-to-text produces from <Heading> content", async () => {
     const { html, text, accessedProps } = await renderTemplateWithProxy(
@@ -46,6 +60,22 @@ describe("renderTemplateWithProxy", () => {
     expect(text).not.toContain("{{FIRSTNAME}}");
     expect(text).toContain("{{#if firstName}}");
     expect(text).toContain("{{firstName}}");
+    expect(text).toContain("{{else}}");
+    expect(text).toContain("{{/if}}");
+  });
+
+  it("restores dotted Handlebars paths from the HTML scan when plain-text uppercases a heading", async () => {
+    const { html, text, accessedProps } = await renderTemplateWithProxy(
+      TemplateWithDottedHandlebarsInHeading
+    );
+
+    expect(accessedProps.size).toBe(0);
+    expect(html).toContain("{{#if contact.firstName}}");
+    expect(html).toContain("{{contact.firstName}}");
+    expect(text).not.toMatch(/\{\{#IF\b/);
+    expect(text).not.toContain("{{CONTACT.FIRSTNAME}}");
+    expect(text).toContain("{{#if contact.firstName}}");
+    expect(text).toContain("{{contact.firstName}}");
     expect(text).toContain("{{else}}");
     expect(text).toContain("{{/if}}");
   });
