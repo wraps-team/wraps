@@ -168,6 +168,21 @@ const ALIAS: Record<string, string> = {
 const toCamel = (name: string): string =>
   name.replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase());
 
+const getFlagVariants = (name: string): string[] => {
+  const camel = toCamel(name);
+  return camel === name ? [name] : [name, camel];
+};
+
+const expandFlagNames = (flags: readonly string[]): string[] => {
+  const expanded = new Set<string>();
+  for (const flag of flags) {
+    for (const variant of getFlagVariants(flag)) {
+      expanded.add(variant);
+    }
+  }
+  return [...expanded];
+};
+
 /**
  * Parse `process.argv` (including the leading `node` + script entries) into a
  * legacy-compatible `{ flags, sub }` shape.
@@ -184,33 +199,59 @@ const toCamel = (name: string): string =>
 export function parseCliArgs(argv: string[]): ParsedCli {
   // Skip the leading `node` + script entries, matching process.argv.slice(2).
   const userArgs = argv.slice(2);
+  const stringFlagNames = expandFlagNames(STRING_FLAGS);
+  const booleanFlagNames = expandFlagNames(BOOLEAN_FLAGS);
+  const negatedPositiveNames = NEGATED_BOOLEANS.map((n) => n.positive);
+  const negatedPositiveFlagNames = expandFlagNames(negatedPositiveNames);
+  const negatedLegacyNames = NEGATED_BOOLEANS.map((n) => String(n.camelKey));
 
   const parsed = mri<Record<string, unknown>>(userArgs, {
-    boolean: [...BOOLEAN_FLAGS, ...NEGATED_BOOLEANS.map((n) => n.positive)],
-    string: [...STRING_FLAGS],
+    boolean: [
+      ...booleanFlagNames,
+      ...negatedPositiveFlagNames,
+      ...negatedLegacyNames,
+    ],
+    string: stringFlagNames,
     alias: ALIAS,
   });
 
   const flags: CliFlags = {};
 
   for (const key of STRING_FLAGS) {
-    const value = parsed[key];
-    if (typeof value === "string" && value.length > 0) {
-      (flags as Record<string, unknown>)[toCamel(key)] = value;
+    const outputKey = toCamel(key);
+    for (const variant of getFlagVariants(key)) {
+      const value = parsed[variant];
+      if (typeof value === "string" && value.length > 0) {
+        (flags as Record<string, unknown>)[outputKey] = value;
+        break;
+      }
     }
   }
 
   for (const key of BOOLEAN_FLAGS) {
+    const outputKey = toCamel(key);
+    let isSet = false;
+    for (const variant of getFlagVariants(key)) {
+      if (parsed[variant] === true) {
+        isSet = true;
+        break;
+      }
+    }
     // Only surface booleans when set to true — matches the legacy "omit when
     // absent" shape and avoids polluting the flags bag with `false` entries.
-    if (parsed[key] === true) {
-      (flags as Record<string, unknown>)[toCamel(key)] = true;
+    if (isSet) {
+      (flags as Record<string, unknown>)[outputKey] = true;
     }
   }
 
   // Negated booleans: `--no-open` arrives as `open: false` from mri.
   for (const { positive, camelKey } of NEGATED_BOOLEANS) {
-    if (parsed[positive] === false) {
+    const positiveCamel = toCamel(positive);
+    if (
+      parsed[positive] === false ||
+      parsed[positiveCamel] === false ||
+      parsed[String(camelKey)] === true
+    ) {
       (flags as Record<string, unknown>)[camelKey] = true;
     }
   }

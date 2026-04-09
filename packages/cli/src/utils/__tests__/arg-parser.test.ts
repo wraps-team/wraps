@@ -120,6 +120,20 @@ describe("parseCliArgs", () => {
       );
       expect(flags.phoneNumber).toBe("+15555551234");
     });
+
+    it("parses --phoneNumber with camelCase", () => {
+      const { flags } = parseCliArgs(
+        argv("sms", "verify-number", "--phoneNumber", "+15555551234")
+      );
+      expect(flags.phoneNumber).toBe("+15555551234");
+    });
+
+    it("parses --dkimSelector with camelCase", () => {
+      const { flags } = parseCliArgs(
+        argv("email", "check", "--dkimSelector", "selector1")
+      );
+      expect(flags.dkimSelector).toBe("selector1");
+    });
   });
 
   describe("boolean flags", () => {
@@ -132,9 +146,24 @@ describe("parseCliArgs", () => {
       expect(flags.verbose).toBe(true);
     });
 
+    it("parses camelCase boolean flags", () => {
+      const { flags } = parseCliArgs(
+        argv("email", "check", "--skipTls", "--skipBlacklists")
+      );
+      expect(flags.skipTls).toBe(true);
+      expect(flags.skipBlacklists).toBe(true);
+    });
+
     it("parses --dry-run as dryRun", () => {
       const { flags } = parseCliArgs(
         argv("email", "templates", "push", "--dry-run")
+      );
+      expect(flags.dryRun).toBe(true);
+    });
+
+    it("parses --dryRun as dryRun", () => {
+      const { flags } = parseCliArgs(
+        argv("email", "templates", "push", "--dryRun")
       );
       expect(flags.dryRun).toBe(true);
     });
@@ -178,6 +207,25 @@ describe("parseCliArgs", () => {
     it("parses --no-claude as noClaude=true", () => {
       const { flags } = parseCliArgs(
         argv("email", "templates", "init", "--no-claude")
+      );
+      expect(flags.noClaude).toBe(true);
+    });
+
+    it("parses --noOpen as noOpen=true", () => {
+      const { flags } = parseCliArgs(argv("console", "--noOpen"));
+      expect(flags.noOpen).toBe(true);
+    });
+
+    it("parses --noExample as noExample=true", () => {
+      const { flags } = parseCliArgs(
+        argv("email", "templates", "init", "--noExample")
+      );
+      expect(flags.noExample).toBe(true);
+    });
+
+    it("parses --noClaude as noClaude=true", () => {
+      const { flags } = parseCliArgs(
+        argv("email", "templates", "init", "--noClaude")
       );
       expect(flags.noClaude).toBe(true);
     });
