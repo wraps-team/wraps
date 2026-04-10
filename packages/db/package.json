@@ -29,7 +29,7 @@
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "3.996.0",
     "@aws-sdk/util-dynamodb": "3.996.0",
-    "drizzle-kit": "^0.31.2",
+    "drizzle-kit": "^0.31.10",
     "tsdown": "catalog:",
     "tsx": "^4.20.6"
   },
