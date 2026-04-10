@@ -8,5 +8,6 @@ catalog:
   dotenv: ^17.2.2
   stripe: ^19.1.0
   tsdown: ^0.15.5
+  vitest: ^4.0.18
   typescript: ^5.9.3
   zod: ^4.1.12
