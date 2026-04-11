@@ -58,7 +58,7 @@
     "date-fns": "^4.1.0",
     "lucide-react": "^0.536.0",
     "motion": "12.23.24",
-    "next": "16.2.0",
+    "next": "16.2.3",
     "next-themes": "^0.4.6",
     "nuqs": "2.7.3",
     "posthog-js": "1.367.0",
