@@ -8,7 +8,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 import { authClient } from "@/lib/auth-client";
-import { cn } from "@/lib/utils";
+import { cn, toSafeRedirectPath } from "@/lib/utils";
 import Loader from "./loader";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -31,7 +31,7 @@ export default function SignInForm({
 } & React.ComponentProps<"div">) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") || "/";
+  const redirectTo = toSafeRedirectPath(searchParams.get("redirect"), "/");
   const { isPending, data: session } = authClient.useSession();
   const [show2FA, setShow2FA] = useState(false);
   const [twoFactorEmail, setTwoFactorEmail] = useState("");

@@ -6,6 +6,36 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Sanitize a redirect path from query params to prevent open-redirect and XSS.
+ * Only allows relative paths starting with "/" (not protocol-relative "//").
+ * Rejects scheme-like paths (e.g. "/javascript:...") including percent-encoded variants.
+ */
+const SCHEME_PATTERN = /^\/[a-zA-Z][a-zA-Z\d+\-.]*:/;
+
+export function toSafeRedirectPath(
+  value: string | null | undefined,
+  fallback = "/"
+): string {
+  const candidate = value?.trim() ?? "";
+  if (!candidate) return fallback;
+
+  // Must start with "/" but not "//" (protocol-relative)
+  if (!candidate.startsWith("/") || candidate.startsWith("//")) return fallback;
+
+  // Reject scheme-like paths: /javascript:, /vbscript:, etc.
+  if (SCHEME_PATTERN.test(candidate)) return fallback;
+
+  // Also check decoded form to catch percent-encoded colons (%3a)
+  try {
+    if (SCHEME_PATTERN.test(decodeURIComponent(candidate))) return fallback;
+  } catch {
+    return fallback;
+  }
+
+  return candidate;
+}
+
+/**
  * Format a date as relative time (e.g., "2 hours ago", "3 days ago")
  */
 export function formatRelativeTime(date: Date): string {

@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 import { authClient } from "@/lib/auth-client";
-import { cn } from "@/lib/utils";
+import { cn, toSafeRedirectPath } from "@/lib/utils";
 import Loader from "./loader";
 import { Button } from "./ui/button";
 import {
@@ -30,7 +30,7 @@ export default function SignUpForm({
 } & React.ComponentProps<"div">) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect");
+  const redirectTo = toSafeRedirectPath(searchParams.get("redirect"), "");
   const plan = searchParams.get("plan");
   const interval = searchParams.get("interval") || "monthly";
   const { isPending, data: session } = authClient.useSession();
@@ -41,8 +41,8 @@ export default function SignUpForm({
   const isAuthInProgress = isRedirecting || isGoogleLoading || isGitHubLoading;
 
   const isSpecialRedirect =
-    redirectTo?.startsWith("/invitations/") ||
-    redirectTo?.startsWith("/device");
+    redirectTo.startsWith("/invitations/") ||
+    redirectTo.startsWith("/device");
 
   // Compute callback URL for OAuth - use special redirect or onboarding
   const callbackUrl = useMemo(() => {
