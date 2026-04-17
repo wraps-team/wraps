@@ -39,7 +39,7 @@
     "test:deploy:cfn": "./tests/deployment/run.sh cfn"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.3.4",
+    "@biomejs/biome": "2.4.12",
     "@react-email/preview-server": "5.2.8",
     "@sentry/cli": "3.3.5",
     "@types/aws-lambda": "8.10.157",
