@@ -42,7 +42,7 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@radix-ui/react-use-controllable-state": "1.2.2",
     "@reactflow/node-resizer": "2.2.14",
-    "@shikijs/transformers": "3.21.0",
+    "@shikijs/transformers": "4.0.2",
     "@tailwindcss/postcss": "^4.1.17",
     "@tanstack/react-form": "^1.23.8",
     "@tanstack/react-table": "^8.21.3",
