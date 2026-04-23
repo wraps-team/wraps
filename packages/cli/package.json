@@ -95,7 +95,7 @@
     "picocolors": "^1.1.1",
     "react": "19.2.4",
     "tabtab": "^3.0.2",
-    "uuid": "^11.0.3"
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
