@@ -300,6 +300,11 @@ export const DOMAIN_BLACKLISTS: BlacklistConfig[] = [
   { name: "Mailspike Z", zone: "z.mailspike.net", priority: "medium" },
   { name: "SEM Fresh", zone: "fresh.spameatingmonkey.net", priority: "low" },
   { name: "SEM URI", zone: "uribl.spameatingmonkey.net", priority: "medium" },
+  { name: "0spam Domain", zone: "bl.0spam.org", priority: "medium" },
+  { name: "ZapBL RHSBL", zone: "rhsbl.zapbl.net", priority: "medium" },
+  { name: "Swinog URI", zone: "uribl.swinog.ch", priority: "medium" },
+  { name: "ScientificSpam RHSBL", zone: "rhsbl.scientificspam.net", priority: "medium" },
+  { name: "Woody URI", zone: "uri.blacklist.woody.ch", priority: "low" },
 ];
 
 /**
@@ -339,6 +344,10 @@ export const IP_BLACKLISTS: BlacklistConfig[] = [
   { name: "Mailspike BL", zone: "bl.mailspike.net", priority: "medium" },
   { name: "Mailspike Z", zone: "z.mailspike.net", priority: "medium" },
 
+  { name: "Lashback UBL", zone: "ubl.unsubscore.com", priority: "high" },
+  { name: "0spam IP", zone: "rbl.0spam.org", priority: "medium" },
+  { name: "ZapBL", zone: "dnsbl.zapbl.net", priority: "medium" },
+
   // Additional lists
   { name: "JustSpam", zone: "dnsbl.justspam.org", priority: "low" },
   {
@@ -357,10 +366,17 @@ export const IP_BLACKLISTS: BlacklistConfig[] = [
   { name: "BlockList.de", zone: "bl.blocklist.de", priority: "medium" },
   { name: "DroneBL", zone: "dnsbl.dronebl.org", priority: "low" },
   { name: "InterServer", zone: "rbl.interserver.net", priority: "low" },
+  { name: "Suomispam", zone: "bl.suomispam.net", priority: "medium" },
+  { name: "ScientificSpam", zone: "bl.scientificspam.net", priority: "medium" },
+  { name: "Swinog IP", zone: "dnsrbl.swinog.ch", priority: "medium" },
+  { name: "Kempt.net", zone: "dnsbl.kempt.net", priority: "low" },
+  { name: "Bbfh List", zone: "list.bbfh.org", priority: "low" },
+  { name: "Anonmails", zone: "spam.dnsbl.anonmails.de", priority: "low" },
 
   // Reputation lists
-  { name: "NiX Spam", zone: "ix.dnsbl.manitu.net", priority: "low" },
   { name: "Composite BL", zone: "cbl.anti-spam.org.cn", priority: "low" },
+  { name: "Tornevall", zone: "dnsbl.tornevall.org", priority: "low" },
+  { name: "OpenResolvers", zone: "dnsbl.openresolvers.org", priority: "low" },
 ];
 
 // =============================================================================
