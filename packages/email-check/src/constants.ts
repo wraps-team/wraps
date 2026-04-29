@@ -301,8 +301,8 @@ export const DOMAIN_BLACKLISTS: BlacklistConfig[] = [
   { name: "SEM Fresh", zone: "fresh.spameatingmonkey.net", priority: "low" },
   { name: "SEM URI", zone: "uribl.spameatingmonkey.net", priority: "medium" },
   { name: "0spam Domain", zone: "bl.0spam.org", priority: "medium" },
-  { name: "ZapBL RHSBL", zone: "rhsbl.zapbl.net", priority: "medium" },
-  { name: "Swinog URI", zone: "uribl.swinog.ch", priority: "medium" },
+  { name: "ZapBL RHSBL", zone: "rhsbl.zapbl.net", priority: "low" },
+  { name: "Swinog URI", zone: "uribl.swinog.ch", priority: "low" },
   { name: "ScientificSpam RHSBL", zone: "rhsbl.scientificspam.net", priority: "medium" },
 ];
 
