@@ -5,7 +5,7 @@ packages:
 
 catalog:
   '@aws-sdk/client-acm': 3.1030.0
-  '@aws-sdk/client-cloudformation': 3.1030.0
+  '@aws-sdk/client-cloudformation': 3.1045.0
   '@aws-sdk/client-cloudfront': 3.1030.0
   '@aws-sdk/client-cloudwatch': 3.1030.0
   '@aws-sdk/client-cloudwatch-logs': 3.1030.0
