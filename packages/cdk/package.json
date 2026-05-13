@@ -56,7 +56,7 @@
   "devDependencies": {
     "@wraps/core": "workspace:*",
     "tsx": "^4.20.6",
-    "aws-cdk-lib": "^2.177.0",
+    "aws-cdk-lib": "^2.253.1",
     "constructs": "^10.4.2",
     "tsup": "catalog:",
     "typescript": "catalog:",
