@@ -58,7 +58,7 @@
     "@types/mailparser": "^3.4.5",
     "@vitest/coverage-v8": "catalog:",
     "aws-sdk-client-mock": "^4.1.0",
-    "esbuild": "^0.24.2",
+    "esbuild": "^0.28.1",
     "mailparser": "^3.9.8",
     "tsup": "catalog:",
     "tsx": "^4.19.2",

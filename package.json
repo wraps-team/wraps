@@ -60,7 +60,7 @@
     "knip": "5.86.0",
     "react-email": "5.2.8",
     "sst": "4.2.4",
-    "turbo": "^2.9.9",
+    "turbo": "^2.9.14",
     "ultracite": "6.3.2",
     "vitest": "catalog:"
   },
