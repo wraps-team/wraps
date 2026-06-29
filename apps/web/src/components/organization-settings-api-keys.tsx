@@ -154,21 +154,38 @@ export function OrganizationSettingsApiKeys({
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const result = await listApiKeys(organization.id);
-      if (result.success) {
-        setApiKeys(result.apiKeys);
-      } else {
-        toast.error(result.error);
+      try {
+        const result = await listApiKeys(organization.id);
+        if (result.success) {
+          setApiKeys(result.apiKeys);
+        } else {
+          toast.error(result.error);
+        }
+      } catch (error) {
+        toast.error(
+          error instanceof TypeError
+            ? "Couldn't reach the server. Check your connection and try again."
+            : "Failed to load API keys."
+        );
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     loadData();
   }, [organization.id]);
 
   const refreshData = async () => {
-    const result = await listApiKeys(organization.id);
-    if (result.success) {
-      setApiKeys(result.apiKeys);
+    try {
+      const result = await listApiKeys(organization.id);
+      if (result.success) {
+        setApiKeys(result.apiKeys);
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof TypeError
+          ? "Couldn't refresh API keys. Check your connection."
+          : "Failed to refresh API keys."
+      );
     }
   };
 
