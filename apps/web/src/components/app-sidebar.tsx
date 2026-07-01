@@ -6,6 +6,7 @@ import {
   Mail,
   MessageSquare,
   Settings,
+  ShieldCheck,
   Users,
   Workflow,
 } from "lucide-react";
@@ -58,6 +59,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ],
       }
     : null;
+
+  // Deliverability — the SES operations hub. Sits as a top-level sibling to
+  // Email/SMS because it spans account-level reputation, IP pools, and AWS
+  // production access rather than a single sending surface.
+  const deliverabilityNavGroup =
+    orgSlug && !isBillingOnly
+      ? {
+          title: "Deliverability",
+          icon: ShieldCheck,
+          items: [
+            { title: "Overview", url: `/${orgSlug}/deliverability` },
+            {
+              title: "Reputation",
+              url: `/${orgSlug}/deliverability/reputation`,
+            },
+            { title: "IP Pools", url: `/${orgSlug}/deliverability/ip-pools` },
+            {
+              title: "Production Access",
+              url: `/${orgSlug}/deliverability/production-access`,
+            },
+          ],
+        }
+      : null;
 
   const smsNavGroup = orgSlug
     ? {
@@ -141,6 +165,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const orgScopedNavGroups = [
     audienceNavGroup,
     emailNavGroup,
+    deliverabilityNavGroup,
     smsNavGroup,
     automationsNavGroup,
     settingsNavGroup,

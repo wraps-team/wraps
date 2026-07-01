@@ -40,6 +40,9 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-muted: var(--brand-muted);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -108,6 +111,12 @@
   --warning-foreground: oklch(0.205 0 0);
   --info: oklch(0.62 0.15 250);
   --info-foreground: oklch(0.985 0 0);
+  /* Wraps brand orange — reserved for primary actions, status changes,
+     and interactive affordances on the Deliverability console. Dark
+     foreground keeps text at AA contrast on the vivid accent. */
+  --brand: oklch(0.68 0.18 47);
+  --brand-foreground: oklch(0.205 0 0);
+  --brand-muted: oklch(0.95 0.04 67);
   --color-1: oklch(66.2% 0.225 25.9);
   --color-2: oklch(60.4% 0.26 302);
   --color-3: oklch(69.6% 0.165 251);
@@ -153,6 +162,9 @@
   --warning-foreground: oklch(0.205 0 0);
   --info: oklch(0.68 0.15 250);
   --info-foreground: oklch(0.985 0 0);
+  --brand: oklch(0.72 0.18 47);
+  --brand-foreground: oklch(0.205 0 0);
+  --brand-muted: oklch(0.28 0.05 55);
   --color-1: oklch(66.2% 0.225 25.9);
   --color-2: oklch(60.4% 0.26 302);
   --color-3: oklch(69.6% 0.165 251);
