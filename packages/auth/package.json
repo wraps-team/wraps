@@ -26,11 +26,11 @@
     "typescript": "catalog:"
   },
   "dependencies": {
-    "@better-auth/core": "1.5.5",
-    "@better-auth/passkey": "1.5.5",
-    "@better-auth/scim": "1.5.5",
-    "@better-auth/sso": "1.5.5",
-    "@better-auth/stripe": "1.5.5",
+    "@better-auth/core": "1.6.23",
+    "@better-auth/passkey": "1.6.23",
+    "@better-auth/scim": "1.6.23",
+    "@better-auth/sso": "1.6.23",
+    "@better-auth/stripe": "1.6.23",
     "@wraps.dev/client": "0.4.0",
     "@wraps.dev/email": "^0.5.1",
     "@wraps.dev/sms": "^0.1.6",
