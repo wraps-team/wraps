@@ -395,6 +395,35 @@ async function isNewDeviceOrIp(
  * Exported for testability — called from session.create.after hook.
  * Failures are silently swallowed so a DB issue never breaks login.
  */
+/**
+ * Insert an in-app "new sign-in" notification (better-inbox row).
+ * Direct row insert — `auth` does not exist inside its own config, and a
+ * notification is just a row. Fire-and-forget like the audit log.
+ */
+export async function createLoginNotification(
+  userId: string,
+  ipAddress?: string,
+  userAgent?: string
+): Promise<void> {
+  await db
+    .insert(schema.notification)
+    .values({
+      id: crypto.randomUUID(),
+      userId,
+      type: "security.new_device_login",
+      title: "New sign-in to your account",
+      body: `From ${ipAddress ?? "an unknown IP"}. If this wasn't you, review your sessions.`,
+      href: "/settings/security",
+      data: {
+        ipAddress: ipAddress ?? null,
+        userAgent: userAgent ?? null,
+      },
+      read: false,
+      createdAt: new Date(),
+    })
+    .catch(() => {});
+}
+
 export async function writeLoginAuditLogs(
   userId: string,
   sessionId: string,
@@ -736,8 +765,7 @@ export const auth = betterAuth<BetterAuthOptions>({
               where: eq(schema.user.id, session.userId),
             });
 
-            // Only send if user has phone number and login alerts enabled
-            if (user?.phoneNumber && user?.loginAlertsEnabled) {
+            if (user?.loginAlertsEnabled) {
               const isNew = await isNewDeviceOrIp(
                 session.userId,
                 session.ipAddress ?? undefined,
@@ -745,11 +773,20 @@ export const auth = betterAuth<BetterAuthOptions>({
               );
 
               if (isNew) {
-                // Fire and forget - don't block auth flow
-                sendLoginAlertSms(user.phoneNumber, {
-                  ipAddress: session.ipAddress ?? undefined,
-                  userAgent: session.userAgent ?? undefined,
-                });
+                await createLoginNotification(
+                  session.userId,
+                  session.ipAddress ?? undefined,
+                  session.userAgent ?? undefined
+                );
+
+                // SMS only when a phone number is on file
+                if (user.phoneNumber) {
+                  // Fire and forget - don't block auth flow
+                  sendLoginAlertSms(user.phoneNumber, {
+                    ipAddress: session.ipAddress ?? undefined,
+                    userAgent: session.userAgent ?? undefined,
+                  });
+                }
               }
             }
 
