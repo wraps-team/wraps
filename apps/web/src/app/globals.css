@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 
 @source "../../../../packages/ui/src";
+@source "../../node_modules/better-inbox/dist/react/index.js";
 
 @custom-variant dark (&:is(.dark *));
 

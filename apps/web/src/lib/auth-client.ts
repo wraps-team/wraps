@@ -9,6 +9,7 @@ import {
   twoFactorClient,
 } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
+import { inboxClient } from "better-inbox/client";
 
 export const authClient = createAuthClient({
   baseURL:
@@ -16,6 +17,7 @@ export const authClient = createAuthClient({
     (typeof window !== "undefined" ? window.location.origin : "/"),
   plugins: [
     deviceAuthorizationClient(),
+    inboxClient(),
     lastLoginMethodClient(),
     passkeyClient(),
     twoFactorClient(),

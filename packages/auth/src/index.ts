@@ -20,6 +20,7 @@ import {
   organization,
   twoFactor,
 } from "better-auth/plugins";
+import { inbox } from "better-inbox";
 import { desc } from "drizzle-orm";
 import { PostHog } from "posthog-node";
 import Stripe from "stripe";
@@ -569,6 +570,7 @@ export const auth = betterAuth<BetterAuthOptions>({
   },
   plugins: [
     nextCookies(),
+    inbox(),
     haveIBeenPwned({
       customPasswordCompromisedMessage:
         "This password has been exposed in a data breach. Please choose a more secure password.",

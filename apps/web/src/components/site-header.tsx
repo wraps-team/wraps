@@ -1,11 +1,13 @@
 "use client";
 
 import { Separator } from "@wraps/ui/components/ui/separator";
+import { InboxButton } from "better-inbox/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CommandSearch, SearchTrigger } from "@/components/command-search";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useActiveOrganization } from "@/contexts/organization-context";
+import { authClient } from "@/lib/auth-client";
 
 /**
  * Check if the event target is an input element
@@ -118,6 +120,12 @@ export function SiteHeader() {
           />
           <div className="max-w-sm flex-1">
             <SearchTrigger onClick={() => setSearchOpen(true)} />
+          </div>
+          <div className="ml-auto">
+            <InboxButton
+              client={authClient}
+              onNavigate={(href) => router.push(href)}
+            />
           </div>
         </div>
       </header>

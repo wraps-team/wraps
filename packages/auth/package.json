@@ -38,6 +38,7 @@
     "@wraps/db": "workspace:*",
     "@wraps/email": "workspace:*",
     "better-auth": "catalog:",
+    "better-inbox": "catalog:",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
     "posthog-node": "catalog:",

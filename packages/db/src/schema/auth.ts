@@ -1,7 +1,9 @@
 import { relations } from "drizzle-orm";
 import {
   boolean,
+  index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -267,3 +269,29 @@ export const subscriptionRelations = relations(subscription, ({ one }) => ({
 }));
 
 // Note: organizationRelations is defined in app.ts with all relations (extension, awsAccounts, etc.)
+
+// In-app notifications (better-inbox plugin). organizationId is a plain text
+// stamp, not an FK — fan-out rows must survive org deletion for audit context.
+export const notification = pgTable(
+  "notification",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id"),
+    type: text("type").notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    href: text("href"),
+    data: jsonb("data").$type<Record<string, unknown>>(),
+    read: boolean("read").notNull().default(false),
+    createdAt: timestamp("created_at").notNull(),
+  },
+  (table) => ({
+    userCreatedIdx: index("notification_user_created_idx").on(
+      table.userId,
+      table.createdAt
+    ),
+  })
+);

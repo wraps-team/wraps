@@ -228,6 +228,46 @@ export async function handlePaymentFailed(
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.wraps.dev";
   const billingUrl = `${appUrl}/${org.slug}/settings/billing`;
 
+  // In-app notification: org fan-out to owners/admins (better-inbox).
+  // Lazy import — this module is imported by ./index, so a static import
+  // of `auth` would be circular.
+  try {
+    const { auth } = await import("./index");
+    // `auth` is declared with the wide BetterAuthOptions generic (the
+    // repo's TS2742 workaround), which erases plugin endpoint types —
+    // cast the one better-inbox endpoint we call.
+    const { notify } = auth.api as unknown as {
+      notify: (input: {
+        body: {
+          organizationId: string;
+          roles?: string[];
+          type: string;
+          title: string;
+          body?: string;
+          href?: string;
+        };
+      }) => Promise<{ count: number }>;
+    };
+    await notify({
+      body: {
+        organizationId: org.id,
+        roles: ["owner", "admin"],
+        type: "billing.payment_failed",
+        title: `Payment failed — ${currency} ${amount} for ${org.name}`,
+        body: "Update your payment method to keep sending.",
+        href: `/${org.slug}/settings/billing`,
+      },
+    });
+  } catch (notifyError) {
+    structuredError(
+      "Failed to create payment-failed notifications",
+      notifyError,
+      {
+        orgId: org.id,
+      }
+    );
+  }
+
   // Send payment failed email to all admins
   const wraps = await getWrapsClient();
   let notifiedCount = 0;
