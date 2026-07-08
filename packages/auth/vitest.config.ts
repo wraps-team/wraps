@@ -2,7 +2,7 @@ import path from "node:path";
 import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(() => {
   // Load .env.test file from apps/web (shared test environment)
   const env = loadEnv(
     "test",

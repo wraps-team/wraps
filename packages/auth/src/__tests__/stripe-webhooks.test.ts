@@ -241,7 +241,7 @@ describe("getSubscriptionOrgAdmins", () => {
   });
 
   it("should return null subscription when not found", async () => {
-    vi.mocked(db.query.subscription.findFirst).mockResolvedValue(null);
+    vi.mocked(db.query.subscription.findFirst).mockResolvedValue(undefined);
 
     const result = await getSubscriptionOrgAdmins({
       stripeCustomerId: "cus_unknown",
@@ -256,7 +256,7 @@ describe("getSubscriptionOrgAdmins", () => {
     vi.mocked(db.query.subscription.findFirst).mockResolvedValue(
       mockSubscription as any
     );
-    vi.mocked(db.query.organization.findFirst).mockResolvedValue(null);
+    vi.mocked(db.query.organization.findFirst).mockResolvedValue(undefined);
 
     const result = await getSubscriptionOrgAdmins({
       stripeCustomerId: "cus_123",
@@ -347,7 +347,7 @@ describe("handlePaymentFailed", () => {
   });
 
   it("should return failure when subscription is not found", async () => {
-    vi.mocked(db.query.subscription.findFirst).mockResolvedValue(null);
+    vi.mocked(db.query.subscription.findFirst).mockResolvedValue(undefined);
 
     const result = await handlePaymentFailed(mockInvoice as Stripe.Invoice);
 
@@ -360,12 +360,12 @@ describe("handleCheckoutCompleted", () => {
     vi.clearAllMocks();
     process.env.WRAPS_API_KEY = "test-api-key";
     // Default mock for Stripe subscription - monthly
-    vi.mocked(stripeClient?.subscriptions.retrieve).mockResolvedValue({
+    vi.mocked(stripeClient!.subscriptions.retrieve).mockResolvedValue({
       id: "sub_stripe_123",
       items: {
         data: [{ price: { recurring: { interval: "month" } } }],
       },
-    });
+    } as never);
   });
 
   const mockSession: Partial<Stripe.Checkout.Session> = {
@@ -453,12 +453,12 @@ describe("handleCheckoutCompleted", () => {
     vi.mocked(createPlatformClient).mockReturnValue({ POST: mockPost } as any);
 
     // Mock Stripe subscription with yearly interval
-    vi.mocked(stripeClient?.subscriptions.retrieve).mockResolvedValue({
+    vi.mocked(stripeClient!.subscriptions.retrieve).mockResolvedValue({
       id: "sub_stripe_123",
       items: {
         data: [{ price: { recurring: { interval: "year" } } }],
       },
-    });
+    } as never);
 
     vi.mocked(db.query.subscription.findFirst).mockResolvedValue({
       id: "sub_123",
@@ -492,7 +492,7 @@ describe("handleCheckoutCompleted", () => {
 
     expect(result.success).toBe(true);
     expect(
-      vi.mocked(stripeClient?.subscriptions.retrieve)
+      vi.mocked(stripeClient!.subscriptions.retrieve)
     ).toHaveBeenCalledWith("sub_stripe_123");
     expect(db.update).toHaveBeenCalled();
   });
@@ -512,12 +512,12 @@ describe("handleCheckoutCompleted", () => {
     vi.mocked(createPlatformClient).mockReturnValue({ POST: mockPost } as any);
 
     // Mock Stripe subscription with monthly interval (already default in beforeEach)
-    vi.mocked(stripeClient?.subscriptions.retrieve).mockResolvedValue({
+    vi.mocked(stripeClient!.subscriptions.retrieve).mockResolvedValue({
       id: "sub_stripe_123",
       items: {
         data: [{ price: { recurring: { interval: "month" } } }],
       },
-    });
+    } as never);
 
     vi.mocked(db.query.subscription.findFirst).mockResolvedValue({
       id: "sub_123",
@@ -568,12 +568,12 @@ describe("handleCheckoutCompleted", () => {
     vi.mocked(createPlatformClient).mockReturnValue({ POST: mockPost } as any);
 
     // Mock Stripe subscription with yearly interval
-    vi.mocked(stripeClient?.subscriptions.retrieve).mockResolvedValue({
+    vi.mocked(stripeClient!.subscriptions.retrieve).mockResolvedValue({
       id: "sub_stripe_123",
       items: {
         data: [{ price: { recurring: { interval: "year" } } }],
       },
-    });
+    } as never);
 
     vi.mocked(db.query.subscription.findFirst).mockResolvedValue({
       id: "sub_123",
@@ -664,7 +664,7 @@ describe("handleSubscriptionCreated", () => {
   });
 
   it("should return success=false when subscription not found in DB", async () => {
-    vi.mocked(db.query.subscription.findFirst).mockResolvedValue(null);
+    vi.mocked(db.query.subscription.findFirst).mockResolvedValue(undefined);
 
     const mockSubscription = createMockStripeSubscription("year");
     const result = await handleSubscriptionCreated(mockSubscription);
@@ -972,7 +972,7 @@ describe("handleStripeWebhook", () => {
   });
 
   it("should route invoice.payment_failed to handlePaymentFailed", async () => {
-    vi.mocked(db.query.subscription.findFirst).mockResolvedValue(null);
+    vi.mocked(db.query.subscription.findFirst).mockResolvedValue(undefined);
 
     const event: Partial<Stripe.Event> = {
       type: "invoice.payment_failed",
@@ -987,7 +987,7 @@ describe("handleStripeWebhook", () => {
   });
 
   it("should route checkout.session.completed to handleCheckoutCompleted", async () => {
-    vi.mocked(db.query.subscription.findFirst).mockResolvedValue(null);
+    vi.mocked(db.query.subscription.findFirst).mockResolvedValue(undefined);
 
     const event: Partial<Stripe.Event> = {
       type: "checkout.session.completed",
@@ -1037,7 +1037,7 @@ describe("handleStripeWebhook", () => {
   });
 
   it("should route customer.subscription.deleted to handleSubscriptionDeleted", async () => {
-    vi.mocked(db.query.subscription.findFirst).mockResolvedValue(null);
+    vi.mocked(db.query.subscription.findFirst).mockResolvedValue(undefined);
 
     const event: Partial<Stripe.Event> = {
       type: "customer.subscription.deleted",

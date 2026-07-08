@@ -14,7 +14,7 @@ export async function sendVerificationEmail({
   const wraps = await getWrapsClient();
 
   return wraps.sendTemplate({
-    from: process.env.AUTH_EMAIL_FROM,
+    from: process.env.AUTH_EMAIL_FROM as string,
     to,
     template: "email-verification",
     configurationSetName: process.env.AUTH_EMAIL_CONFIGURATION_SET,

@@ -97,7 +97,8 @@ export async function emitSubscriptionEvent(
       return false;
     }
 
-    if (data?.contactCreated) {
+    const responseData = data as { contactCreated?: boolean } | undefined;
+    if (responseData?.contactCreated) {
       structuredLog("Created contact", { email: normalizedEmail });
     }
     structuredLog("Emitted subscription event", {
@@ -130,19 +131,21 @@ export async function getSubscriptionOrgAdmins(subscriptionQuery: {
   let sub: typeof schema.subscription.$inferSelect | null = null;
 
   if (subscriptionQuery.stripeCustomerId) {
-    sub = await db.query.subscription.findFirst({
-      where: eq(
-        schema.subscription.stripeCustomerId,
-        subscriptionQuery.stripeCustomerId
-      ),
-    });
+    sub =
+      (await db.query.subscription.findFirst({
+        where: eq(
+          schema.subscription.stripeCustomerId,
+          subscriptionQuery.stripeCustomerId
+        ),
+      })) ?? null;
   } else if (subscriptionQuery.stripeSubscriptionId) {
-    sub = await db.query.subscription.findFirst({
-      where: eq(
-        schema.subscription.stripeSubscriptionId,
-        subscriptionQuery.stripeSubscriptionId
-      ),
-    });
+    sub =
+      (await db.query.subscription.findFirst({
+        where: eq(
+          schema.subscription.stripeSubscriptionId,
+          subscriptionQuery.stripeSubscriptionId
+        ),
+      })) ?? null;
   }
 
   if (!sub) {

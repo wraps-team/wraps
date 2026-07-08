@@ -382,7 +382,7 @@ async function isNewDeviceOrIp(
     const isNewIp = currentIp && !knownIps.has(currentIp);
     const isNewAgent = currentUserAgent && !knownAgents.has(currentUserAgent);
 
-    return isNewIp || isNewAgent;
+    return Boolean(isNewIp || isNewAgent);
   } catch (error) {
     console.error("Error checking for new device/IP:", error);
     return false;
@@ -521,7 +521,7 @@ export const auth = betterAuth<BetterAuthOptions>({
       try {
         const wraps = await getWrapsClient();
         await wraps.sendTemplate({
-          from: process.env.AUTH_EMAIL_FROM,
+          from: process.env.AUTH_EMAIL_FROM as string,
           to: user.email,
           template: "password-reset",
           configurationSetName: process.env.AUTH_EMAIL_CONFIGURATION_SET,
@@ -540,7 +540,7 @@ export const auth = betterAuth<BetterAuthOptions>({
       try {
         const wraps = await getWrapsClient();
         await wraps.sendTemplate({
-          from: process.env.AUTH_EMAIL_FROM,
+          from: process.env.AUTH_EMAIL_FROM as string,
           to: user.email,
           template: "password-changed",
           configurationSetName: process.env.AUTH_EMAIL_CONFIGURATION_SET,
@@ -620,10 +620,7 @@ export const auth = betterAuth<BetterAuthOptions>({
             onEvent: onStripeEvent,
             subscription: {
               enabled: true,
-              getCheckoutSessionParams: (
-                { user, session, plan, subscription },
-                _ctx
-              ) => ({
+              getCheckoutSessionParams: (_details, _ctx) => ({
                 params: {
                   automatic_tax: {
                     enabled: true,

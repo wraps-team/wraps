@@ -48,13 +48,18 @@ describe("Better Auth email hooks", () => {
   it("sends password reset emails using AUTH_EMAIL_FROM and AUTH_EMAIL_CONFIGURATION_SET", async () => {
     const params: SendResetPasswordParams = {
       user: {
+        id: "user-1",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        emailVerified: true,
         email: "user@example.com",
         name: "Test User",
       },
       url: "https://app.wraps.dev/reset-password?token=test-token",
+      token: "test-token",
     };
 
-    await emailAndPassword.sendResetPassword(params);
+    await emailAndPassword.sendResetPassword?.(params);
 
     expect(getWrapsClientMock).toHaveBeenCalledTimes(1);
     expect(sendTemplateMock).toHaveBeenCalledWith({
@@ -75,12 +80,16 @@ describe("Better Auth email hooks", () => {
   it("sends password changed emails using AUTH_EMAIL_FROM and AUTH_EMAIL_CONFIGURATION_SET", async () => {
     const params: OnPasswordResetParams = {
       user: {
+        id: "user-1",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        emailVerified: true,
         email: "user@example.com",
         name: "Test User",
       },
     };
 
-    await emailAndPassword.onPasswordReset(params);
+    await emailAndPassword.onPasswordReset?.(params);
 
     expect(getWrapsClientMock).toHaveBeenCalledTimes(1);
     expect(sendTemplateMock).toHaveBeenCalledWith({
