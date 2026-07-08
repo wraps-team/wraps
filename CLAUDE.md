@@ -71,7 +71,7 @@ See package-level CLAUDE.md files for specific enforcement patterns.
 
 ## Environment Setup
 
-Prerequisites: Node.js 20+, pnpm 10+, AWS CLI configured
+Prerequisites: Node.js 22+, pnpm 10+, AWS CLI configured
 
 ```bash
 pnpm install           # Install dependencies
