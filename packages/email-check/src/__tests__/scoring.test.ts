@@ -451,6 +451,49 @@ describe("calculateScore", () => {
   });
 });
 
+describe("DMARCbis scoring", () => {
+  it("rewards np=reject with a bonus when enforcing", () => {
+    const checks = createBaseChecks();
+    checks.dmarc.nonExistentSubdomainPolicy = "reject";
+
+    const result = calculateScore(checks);
+
+    expect(
+      result.bonuses.some(
+        (bonus) => bonus.check === "dmarc" && bonus.reason.includes("np=reject")
+      )
+    ).toBe(true);
+  });
+
+  it("penalizes DMARC testing mode (t=y) while a policy is set", () => {
+    const checks = createBaseChecks();
+    checks.dmarc.testing = true;
+
+    const result = calculateScore(checks);
+
+    expect(
+      result.deductions.some(
+        (deduction) =>
+          deduction.check === "dmarc" && deduction.reason.includes("testing")
+      )
+    ).toBe(true);
+  });
+
+  it("treats pct<100 as a deprecation nudge, not a hard penalty", () => {
+    const checks = createBaseChecks();
+    checks.dmarc.percentage = 25;
+
+    const result = calculateScore(checks);
+
+    const pctDeduction = result.deductions.find(
+      (deduction) =>
+        deduction.check === "dmarc" && deduction.reason.includes("pct")
+    );
+    expect(pctDeduction?.points).toBe(1);
+    expect(pctDeduction?.reason).toContain("deprecated");
+  });
+});
+
 describe("grade helpers", () => {
   it("maps grades to terminal colors", () => {
     expect(getGradeColor("A")).toBe("green");

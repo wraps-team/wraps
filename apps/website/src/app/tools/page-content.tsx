@@ -106,6 +106,8 @@ type EmailCheckResult = {
     record: string | null;
     policy: string | null;
     subdomainPolicy: string | null;
+    nonExistentSubdomainPolicy: string | null;
+    testing: boolean;
     reportingEnabled: boolean;
     pct: number | null;
     alignmentSpf: string;
@@ -1213,10 +1215,10 @@ export default function ToolsPageContent() {
                   </div>
                   <div>
                     <div className="mb-1 text-muted-foreground text-sm">
-                      Percentage
+                      Non-Existent Subdomains
                     </div>
                     <div className="font-mono text-lg">
-                      pct={result.dmarc.pct ?? 100}
+                      np={result.dmarc.nonExistentSubdomainPolicy || "inherit"}
                     </div>
                   </div>
                   <div>

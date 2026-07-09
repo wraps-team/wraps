@@ -92,7 +92,8 @@ describe("buildEmailDNSRecords", () => {
     expect(dmarcRecord).toEqual({
       name: "_dmarc.example.com",
       type: "TXT",
-      value: "v=DMARC1; p=quarantine; rua=mailto:postmaster@example.com",
+      value:
+        "v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@example.com",
       category: "dmarc",
     });
   });
@@ -109,7 +110,7 @@ describe("buildEmailDNSRecords", () => {
     const dmarcRecord = records.find((r) => r.category === "dmarc");
 
     expect(dmarcRecord?.value).toBe(
-      "v=DMARC1; p=quarantine; rua=mailto:postmaster@mail.example.com"
+      "v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@mail.example.com"
     );
   });
 

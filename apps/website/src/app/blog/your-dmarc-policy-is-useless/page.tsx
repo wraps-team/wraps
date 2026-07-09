@@ -140,14 +140,14 @@ const THE_FIX_STEPS = [
   {
     num: 3,
     title: "Move to quarantine",
-    code: "v=DMARC1; p=quarantine; pct=25; rua=mailto:dmarc@yourcompany.com",
-    desc: "Start quarantining failures at 25%, then 50%, then 100%. Monitor for legitimate mail going to spam.",
+    code: "v=DMARC1; p=quarantine; rua=mailto:dmarc@yourcompany.com",
+    desc: "Quarantine failures and keep watching your reports. (Skip pct — DMARCbis retires it; receivers now enforce all-or-nothing. Use t=y if you need a testing window.)",
   },
   {
     num: 4,
     title: "Enforce with reject",
-    code: "v=DMARC1; p=reject; rua=mailto:dmarc@yourcompany.com; fo=1",
-    desc: "Full protection. Spoofed emails are rejected before reaching any inbox. You're now in the 5.2%.",
+    code: "v=DMARC1; p=reject; sp=reject; np=reject; rua=mailto:dmarc@yourcompany.com; fo=1",
+    desc: "Full protection. Spoofed emails are rejected before reaching any inbox. np=reject also blocks spoofing from subdomains that don't exist. You're now in the 5.2%.",
   },
 ];
 

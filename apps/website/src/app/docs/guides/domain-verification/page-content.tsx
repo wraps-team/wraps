@@ -46,7 +46,7 @@ ghi789._domainkey.yourdomain.com → ghi789.dkim.amazonses.com`;
 const dmarcRecordExample = `# Add this TXT record to your DNS:
 Name:  _dmarc.yourdomain.com
 Type:  TXT
-Value: v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com`;
+Value: v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:dmarc@yourdomain.com`;
 
 export default function DomainVerificationPageContent() {
   return (

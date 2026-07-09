@@ -184,7 +184,7 @@ export class CloudflareDNSClient implements DNSProviderClient {
       const dmarcSuccess = await this.createRecord(
         `_dmarc.${domain}`,
         "TXT",
-        `v=DMARC1; p=quarantine; rua=mailto:postmaster@${mailFromDomain || domain}`
+        `v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@${mailFromDomain || domain}`
       );
       if (dmarcSuccess) {
         recordsCreated++;

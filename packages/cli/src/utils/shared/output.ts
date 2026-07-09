@@ -233,7 +233,7 @@ export function displaySuccess(outputs: SuccessOutputs) {
         ),
         "",
         pc.bold("DMARC Record (TXT):"),
-        `  ${pc.cyan(`_dmarc.${domain}`)} ${pc.dim("TXT")} "v=DMARC1; p=quarantine; rua=mailto:postmaster@${dmarcRuaDomain}"`
+        `  ${pc.cyan(`_dmarc.${domain}`)} ${pc.dim("TXT")} "v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@${dmarcRuaDomain}"`
       );
 
       // Add MAIL FROM domain DNS records if configured
@@ -588,7 +588,7 @@ export function displayStatus(status: StatusOutputs) {
           ),
           "",
           pc.bold("DMARC Record (TXT):"),
-          `  ${pc.cyan(`_dmarc.${domain.domain}`)} ${pc.dim("TXT")} "v=DMARC1; p=quarantine; rua=mailto:postmaster@${dmarcRuaDomain}"`
+          `  ${pc.cyan(`_dmarc.${domain.domain}`)} ${pc.dim("TXT")} "v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@${dmarcRuaDomain}"`
         );
       }
 

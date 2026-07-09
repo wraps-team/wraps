@@ -93,7 +93,7 @@ function createRoute53Records(
       type: "TXT",
       ttl: 1800,
       records: [
-        `v=DMARC1; p=quarantine; rua=mailto:postmaster@${mailFromDomain || domain}`,
+        `v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@${mailFromDomain || domain}`,
       ],
     },
     opts
@@ -185,7 +185,7 @@ function createCloudflareRecords(
       zoneId: config.zoneId,
       name: `_dmarc.${domain}`,
       type: "TXT",
-      content: `v=DMARC1; p=quarantine; rua=mailto:postmaster@${mailFromDomain || domain}`,
+      content: `v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@${mailFromDomain || domain}`,
       ttl: 1800,
     },
     cfOpts
@@ -294,7 +294,7 @@ function createVercelRecords(
   createVercelRecord(
     `${name}-dmarc`,
     "TXT",
-    `v=DMARC1; p=quarantine; rua=mailto:postmaster@${mailFromDomain || domain}`,
+    `v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@${mailFromDomain || domain}`,
     `_dmarc.${domain}`
   );
 

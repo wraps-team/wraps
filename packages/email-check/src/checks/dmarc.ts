@@ -16,6 +16,9 @@ export async function checkDmarc(domain: string): Promise<DmarcResult> {
     valid: false,
     policy: null,
     subdomainPolicy: null,
+    nonExistentSubdomainPolicy: null,
+    testing: false,
+    psd: null,
     percentage: 100,
     reportingEnabled: false,
     ruaAddresses: [],
@@ -90,7 +93,31 @@ function parseDmarcRecord(record: string, result: DmarcResult): void {
     result.subdomainPolicy = result.policy;
   }
 
-  // Get percentage
+  // Get non-existent subdomain policy (np) — DMARCbis / RFC 9989.
+  // Closes the phantom-subdomain spoofing gap that p= and sp= don't cover.
+  const np = tags.get("np");
+  if (np) {
+    if (["none", "quarantine", "reject"].includes(np)) {
+      result.nonExistentSubdomainPolicy =
+        np as DmarcResult["nonExistentSubdomainPolicy"];
+    } else {
+      result.warnings.push(`Invalid non-existent subdomain policy (np): ${np}`);
+    }
+  }
+
+  // Testing flag (t=y) — DMARCbis's replacement for pct-based ramping.
+  // When set, receivers apply the policy for reporting but not disposition.
+  if (tags.get("t") === "y") {
+    result.testing = true;
+  }
+
+  // Public suffix domain declaration (psd) — DMARCbis / RFC 9989
+  const psd = tags.get("psd");
+  if (psd && ["y", "n", "u"].includes(psd)) {
+    result.psd = psd as DmarcResult["psd"];
+  }
+
+  // Get percentage (pct) — retired in DMARCbis; receivers ignore it
   const pct = tags.get("pct");
   if (pct) {
     const pctNum = Number.parseInt(pct, 10);
@@ -99,7 +126,9 @@ function parseDmarcRecord(record: string, result: DmarcResult): void {
     } else {
       result.percentage = pctNum;
       if (pctNum < 100) {
-        result.warnings.push(`Only ${pctNum}% of messages subject to policy`);
+        result.warnings.push(
+          `pct=${pctNum} is deprecated (DMARCbis receivers ignore it; enforcement is all-or-nothing). Use t=y while testing instead.`
+        );
       }
     }
   }
@@ -180,6 +209,21 @@ function parseDmarcRecord(record: string, result: DmarcResult): void {
 
   if (result.subdomainPolicy === "none" && result.policy !== "none") {
     result.warnings.push("Subdomain policy is less strict than domain policy");
+  }
+
+  const enforcing =
+    result.policy === "quarantine" || result.policy === "reject";
+
+  if (result.testing && result.policy !== "none") {
+    result.warnings.push(
+      "t=y (testing) is set — receivers will not enforce the policy"
+    );
+  }
+
+  if (enforcing && !result.nonExistentSubdomainPolicy) {
+    result.warnings.push(
+      "No np= set — add np=reject to block spoofing from non-existent subdomains (DMARCbis)"
+    );
   }
 
   if (!result.reportingEnabled) {

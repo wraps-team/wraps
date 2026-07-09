@@ -122,7 +122,7 @@ export function buildEmailDNSRecords(
   records.push({
     name: `_dmarc.${domain}`,
     type: "TXT",
-    value: `v=DMARC1; p=quarantine; rua=mailto:postmaster@${dmarcRuaDomain}`,
+    value: `v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@${dmarcRuaDomain}`,
     category: "dmarc",
   });
 

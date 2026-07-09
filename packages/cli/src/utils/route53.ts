@@ -240,7 +240,7 @@ export async function previewDNSChanges(
   // DMARC record - check for existing DMARC
   const dmarcName = `_dmarc.${domain}`;
   const dmarcRuaDomain = mailFromDomain || domain;
-  const proposedDMARC = `"v=DMARC1; p=quarantine; rua=mailto:postmaster@${dmarcRuaDomain}"`;
+  const proposedDMARC = `"v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@${dmarcRuaDomain}"`;
   const existingDMARC = findExistingRecord(existingRecords, dmarcName, "TXT");
   const existingDMARCValue = getRecordValue(existingDMARC);
 
@@ -447,7 +447,7 @@ export async function createSelectedDNSRecords(
         TTL: 1800,
         ResourceRecords: [
           {
-            Value: `"v=DMARC1; p=quarantine; rua=mailto:postmaster@${dmarcRuaDomain}"`,
+            Value: `"v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@${dmarcRuaDomain}"`,
           },
         ],
       },
@@ -616,7 +616,7 @@ export async function createDNSRecords(
       TTL: 1800,
       ResourceRecords: [
         {
-          Value: `"v=DMARC1; p=quarantine; rua=mailto:postmaster@${dmarcRuaDomain}"`,
+          Value: `"v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@${dmarcRuaDomain}"`,
         },
       ],
     },

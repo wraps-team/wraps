@@ -454,11 +454,12 @@ function DmarcSection({ identity }: { identity?: EmailIdentityDetails }) {
             </div>
             <div className="flex items-start justify-between gap-2">
               <p className="font-mono text-muted-foreground text-xs">
-                v=DMARC1; p=quarantine; rua=mailto:dmarc@
+                v=DMARC1; p=quarantine; sp=quarantine; np=reject;
+                rua=mailto:dmarc@
                 {identity?.identityName || "yourdomain.com"}
               </p>
               <CopyButton
-                text={`v=DMARC1; p=quarantine; rua=mailto:dmarc@${identity?.identityName || "yourdomain.com"}`}
+                text={`v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:dmarc@${identity?.identityName || "yourdomain.com"}`}
               />
             </div>
           </div>

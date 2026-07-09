@@ -62,6 +62,8 @@ const emailCheckResponseSchema = t.Object({
       record: t.Union([t.String(), t.Null()]),
       policy: t.Union([t.String(), t.Null()]),
       subdomainPolicy: t.Union([t.String(), t.Null()]),
+      nonExistentSubdomainPolicy: t.Union([t.String(), t.Null()]),
+      testing: t.Boolean(),
       reportingEnabled: t.Boolean(),
       pct: t.Union([t.Number(), t.Null()]),
       alignmentSpf: t.Union([t.String(), t.Null()]),
@@ -198,6 +200,9 @@ function formatEmailCheckResult(result: EmailCheckResult) {
       record: result.dmarc.record,
       policy: result.dmarc.policy,
       subdomainPolicy: result.dmarc.subdomainPolicy,
+      nonExistentSubdomainPolicy:
+        result.dmarc.nonExistentSubdomainPolicy ?? null,
+      testing: result.dmarc.testing ?? false,
       reportingEnabled: result.dmarc.reportingEnabled,
       pct: result.dmarc.percentage,
       alignmentSpf: result.dmarc.alignmentSpf,

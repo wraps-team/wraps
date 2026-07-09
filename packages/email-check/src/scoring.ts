@@ -385,11 +385,18 @@ function collectDmarcIssues(
       reason: "DMARC policy is none (not enforcing)",
     });
   }
-  if (dmarc.percentage < 100) {
+  if (dmarc.testing && dmarc.policy !== "none") {
     deductions.push({
       check: "dmarc",
       points: 2,
-      reason: `DMARC pct=${dmarc.percentage} (not 100%)`,
+      reason: "DMARC testing mode (t=y) — receivers won't enforce the policy",
+    });
+  }
+  if (dmarc.percentage < 100) {
+    deductions.push({
+      check: "dmarc",
+      points: 1,
+      reason: `DMARC pct=${dmarc.percentage} is deprecated (DMARCbis receivers ignore it; enforcement is inconsistent)`,
     });
   }
   if (!dmarc.reportingEnabled) {
@@ -404,6 +411,16 @@ function collectDmarcIssues(
       check: "dmarc",
       points: 1,
       reason: "DMARC strict alignment configured",
+    });
+  }
+  if (
+    (dmarc.policy === "quarantine" || dmarc.policy === "reject") &&
+    dmarc.nonExistentSubdomainPolicy === "reject"
+  ) {
+    bonuses.push({
+      check: "dmarc",
+      points: 1,
+      reason: "np=reject blocks non-existent subdomain spoofing (DMARCbis)",
     });
   }
 }

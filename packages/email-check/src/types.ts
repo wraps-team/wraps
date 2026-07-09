@@ -109,6 +109,13 @@ export type DmarcResult = {
   valid: boolean;
   policy: "none" | "quarantine" | "reject" | null;
   subdomainPolicy: "none" | "quarantine" | "reject" | null;
+  /** np= tag — policy for non-existent subdomains (DMARCbis / RFC 9989) */
+  nonExistentSubdomainPolicy?: "none" | "quarantine" | "reject" | null;
+  /** t=y tag — testing mode; DMARCbis receivers won't enforce the policy */
+  testing?: boolean;
+  /** psd= tag — public suffix domain declaration (DMARCbis / RFC 9989) */
+  psd?: "y" | "n" | "u" | null;
+  /** @deprecated pct= is retired in DMARCbis; receivers ignore it */
   percentage: number;
   reportingEnabled: boolean;
   ruaAddresses: string[];

@@ -262,7 +262,7 @@ export class WrapsEmail extends Construct {
           zone: hostedZone,
           recordName: `_dmarc.${config.domain}`,
           values: [
-            `v=DMARC1; p=quarantine; rua=mailto:postmaster@${this.mailFromDomain || config.domain}`,
+            `v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@${this.mailFromDomain || config.domain}`,
           ],
           ttl: cdk.Duration.minutes(30),
           comment: "DMARC policy for email authentication",

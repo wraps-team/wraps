@@ -502,7 +502,7 @@ DMARC (TXT)
 Policy for how receivers handle emails failing DKIM/SPF checks
 
   TXT    _dmarc.example.com
-  →      v=DMARC1; p=quarantine; rua=mailto:postmaster@example.com
+  →      v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:postmaster@example.com
 ```
 
 ## Hosting Provider Integration

@@ -47,7 +47,7 @@ Value: v=spf1 include:amazonses.com ~all`;
 const dmarcRecordExample = `# Add this TXT record:
 Name:  _dmarc.yourdomain.com
 Type:  TXT
-Value: v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com`;
+Value: v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:dmarc@yourdomain.com`;
 
 export default function VercelSetupPageContent() {
   return (
