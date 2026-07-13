@@ -3,7 +3,8 @@
 import { Button } from "@wraps/ui/components/ui/button";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { CommandSearch, SearchTrigger } from "@/components/command-search";
 import { Logo } from "@/components/logo";
 import { DocsNav } from "./docs-nav";
 import { DocsToc } from "./docs-toc";
@@ -15,7 +16,21 @@ type DocsLayoutProps = {
 
 export function DocsLayout({ children, headerActions }: DocsLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Cmd/Ctrl+K opens the command palette on docs pages (which don't render the
+  // marketing SiteHeader that hosts it elsewhere).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -44,6 +59,9 @@ export function DocsLayout({ children, headerActions }: DocsLayoutProps) {
 
           {/* Navigation */}
           <div className="ml-auto flex items-center gap-2">
+            <div className="hidden w-40 sm:block lg:w-56">
+              <SearchTrigger onClick={() => setSearchOpen(true)} />
+            </div>
             {headerActions}
             <Button asChild variant="ghost">
               <Link href="/docs">Docs</Link>
@@ -54,6 +72,8 @@ export function DocsLayout({ children, headerActions }: DocsLayoutProps) {
           </div>
         </div>
       </header>
+
+      <CommandSearch onOpenChange={setSearchOpen} open={searchOpen} />
 
       <div className="container mx-auto flex px-4 sm:px-6 lg:px-8">
         {/* Sidebar - Desktop */}
