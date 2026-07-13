@@ -199,12 +199,18 @@ export default function DocsPageContent() {
           <p className="mb-4 text-muted-foreground text-sm">
             SDKs for sending email, SMS, and managing your platform.
           </p>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <LinkCard
               description="Send email, manage templates, track events"
               href="/docs/sdk-reference"
               icon={Mail}
               title="Email SDK"
+            />
+            <LinkCard
+              description="Send email from Python — attachments, templates, suppression"
+              href="/docs/python-sdk-reference"
+              icon={Code}
+              title="Python SDK"
             />
             <LinkCard
               description="Send SMS, manage opt-outs, verify numbers"

@@ -247,6 +247,13 @@ export function CommandSearch({ open, onOpenChange }: CommandSearchProps) {
       icon: Mail,
     },
     {
+      title: "Python Email SDK",
+      description: "send, attachments, templates, and suppression from Python",
+      url: "/docs/python-sdk-reference",
+      group: "Email",
+      icon: FileCode2,
+    },
+    {
       title: "Email CLI Commands",
       description: "init, status, verify, doctor, domains, templates",
       url: "/docs/cli-reference/email",
