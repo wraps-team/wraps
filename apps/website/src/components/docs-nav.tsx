@@ -13,7 +13,6 @@ import {
   FileCode2,
   FileJson,
   FileText,
-  Globe,
   History,
   KeyRound,
   Layers,
@@ -24,9 +23,7 @@ import {
   Server,
   Settings,
   ShieldCheck,
-  Sliders,
   Terminal,
-  Workflow,
   Zap,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -104,10 +101,41 @@ const navItems: NavSection[] = [
             title: "Cloudflare Workers",
             href: "/docs/quickstart/email/cloudflare",
           },
+        ],
+      },
+      {
+        title: "Features",
+        href: "/docs/quickstart/email/inbound",
+        icon: Blocks,
+        children: [
           { title: "Inbound", href: "/docs/quickstart/email/inbound" },
           { title: "Templates", href: "/docs/quickstart/email/templates" },
           { title: "Workflows", href: "/docs/quickstart/email/workflows" },
           { title: "Agents", href: "/docs/quickstart/email/agents" },
+          { title: "Reply Threading", href: "/docs/guides/reply-threading" },
+        ],
+      },
+      {
+        title: "Guides",
+        href: "/docs/guides/domain-verification",
+        icon: BookOpen,
+        children: [
+          {
+            title: "Domain Verification",
+            href: "/docs/guides/domain-verification",
+          },
+          {
+            title: "Production Access",
+            href: "/docs/guides/production-access",
+          },
+          { title: "SMTP Credentials", href: "/docs/guides/smtp" },
+          { title: "Webhooks", href: "/docs/guides/webhooks" },
+          { title: "Templates as Code", href: "/docs/guides/templates" },
+          { title: "Building Workflows", href: "/docs/guides/workflows" },
+          {
+            title: "Configuration Presets",
+            href: "/docs/guides/configuration-presets",
+          },
         ],
       },
       {
@@ -134,46 +162,6 @@ const navItems: NavSection[] = [
         title: "Infrastructure",
         href: "/docs/infrastructure/email",
         icon: Server,
-      },
-      {
-        title: "Domain Verification",
-        href: "/docs/guides/domain-verification",
-        icon: Globe,
-      },
-      {
-        title: "Production Access",
-        href: "/docs/guides/production-access",
-        icon: ShieldCheck,
-      },
-      {
-        title: "SMTP Credentials",
-        href: "/docs/guides/smtp",
-        icon: KeyRound,
-      },
-      {
-        title: "Webhooks",
-        href: "/docs/guides/webhooks",
-        icon: Zap,
-      },
-      {
-        title: "Reply Threading",
-        href: "/docs/guides/reply-threading",
-        icon: Radio,
-      },
-      {
-        title: "Templates Guide",
-        href: "/docs/guides/templates",
-        icon: FileCode2,
-      },
-      {
-        title: "Workflows Guide",
-        href: "/docs/guides/workflows",
-        icon: Workflow,
-      },
-      {
-        title: "Configuration Presets",
-        href: "/docs/guides/configuration-presets",
-        icon: Sliders,
       },
     ],
   },
@@ -374,7 +362,7 @@ function NavItemComponent({
       <div
         className={cn(
           "group flex items-center rounded-md text-sm transition-colors",
-          isActive
+          isActive && !isChildActive
             ? "bg-primary/10 font-medium text-primary"
             : isChildActive
               ? "font-medium text-foreground"
