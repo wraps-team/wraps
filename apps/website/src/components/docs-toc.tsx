@@ -18,6 +18,19 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, "");
 }
 
+// Return `base`, or `base-2`, `base-3`, … so repeated heading text (e.g. several
+// "Parameters" sections) yields unique ids. Records the result in `used`.
+function uniqueId(base: string, used: Set<string>): string {
+  let id = base;
+  let suffix = 2;
+  while (used.has(id)) {
+    id = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  used.add(id);
+  return id;
+}
+
 export function DocsToc({
   contentRef,
 }: {
@@ -36,6 +49,7 @@ export function DocsToc({
 
     const headings = container.querySelectorAll("h2, h3");
     const tocItems: TocItem[] = [];
+    const usedIds = new Set<string>();
 
     for (const heading of headings) {
       const el = heading as HTMLElement;
@@ -64,16 +78,21 @@ export function DocsToc({
         continue;
       }
 
-      if (!el.id) {
-        const slug = slugify(text);
-        if (!slug) {
-          continue;
-        }
-        el.id = slug;
+      const baseId = el.id || slugify(text);
+      if (!baseId) {
+        continue;
+      }
+
+      // Guarantee a unique id even when several headings share the same text —
+      // otherwise the TOC emits duplicate React keys and the page has duplicate
+      // anchors that break scroll-to.
+      const id = uniqueId(baseId, usedIds);
+      if (el.id !== id) {
+        el.id = id;
       }
 
       tocItems.push({
-        id: el.id,
+        id,
         text,
         level: el.tagName === "H2" ? 2 : 3,
       });
