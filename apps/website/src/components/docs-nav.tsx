@@ -33,7 +33,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-type NavItem = {
+export type NavItem = {
   title: string;
   href: string;
   icon?: React.ComponentType<{ className?: string }>;
@@ -42,12 +42,12 @@ type NavItem = {
   children?: NavItem[];
 };
 
-type NavSection = {
+export type NavSection = {
   title: string;
   items: NavItem[];
 };
 
-const navItems: NavSection[] = [
+export const navItems: NavSection[] = [
   {
     title: "Getting Started",
     items: [

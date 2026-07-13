@@ -19,7 +19,6 @@ import {
   Globe,
   KeyRound,
   Layers,
-  type LucideIcon,
   Mail,
   MessageSquare,
   Radio,
@@ -37,6 +36,7 @@ import {
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { type NavItem, navItems } from "./docs-nav";
 
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
@@ -130,7 +130,7 @@ type SearchItem = {
   description: string;
   url: string;
   group: string;
-  icon?: LucideIcon;
+  icon?: React.ComponentType<{ className?: string }>;
 };
 
 type CommandSearchProps = {
@@ -552,7 +552,40 @@ export function CommandSearch({ open, onOpenChange }: CommandSearchProps) {
     },
   ];
 
-  const groupedItems = searchItems.reduce(
+  // Auto-append any docs-nav route not already curated above, so the palette
+  // can never drift out of sync with the sidebar. Curated entries keep their
+  // rich descriptions; derived entries are still matchable by title and section.
+  const curatedUrls = new Set(searchItems.map((item) => item.url));
+  const flattenNav = (
+    items: NavItem[],
+    group: string,
+    fallbackIcon: React.ComponentType<{ className?: string }>
+  ): SearchItem[] =>
+    items.flatMap((item) => {
+      const icon = item.icon ?? fallbackIcon;
+      const self: SearchItem[] =
+        curatedUrls.has(item.href) || item.disabled
+          ? []
+          : [
+              {
+                title: item.title,
+                description: "",
+                url: item.href,
+                group,
+                icon,
+              },
+            ];
+      const children = item.children
+        ? flattenNav(item.children, group, icon)
+        : [];
+      return [...self, ...children];
+    });
+  const derivedItems = navItems.flatMap((section) =>
+    flattenNav(section.items, section.title, FileCode2)
+  );
+  const allItems = [...searchItems, ...derivedItems];
+
+  const groupedItems = allItems.reduce(
     (acc, item) => {
       if (!acc[item.group]) {
         acc[item.group] = [];
@@ -595,8 +628,13 @@ export function CommandSearch({ open, onOpenChange }: CommandSearchProps) {
                   return (
                     <CommandItem
                       key={item.url}
+                      keywords={[
+                        item.title,
+                        item.description,
+                        item.group,
+                      ].filter(Boolean)}
                       onSelect={() => handleSelect(item.url)}
-                      value={item.title}
+                      value={item.url}
                     >
                       {Icon && (
                         <Icon className="mr-2 h-4 w-4 shrink-0 self-start mt-0.5" />
