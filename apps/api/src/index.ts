@@ -17,6 +17,11 @@ import {
   shouldReportToMonitoring,
 } from "./lib/error-response";
 import { log } from "./lib/logger";
+import {
+  isMalformedRequest,
+  malformedRequestFields,
+  malformedRequestPart,
+} from "./lib/malformed-request";
 import { getPostHogClient } from "./lib/posthog";
 import { getAuthOptional } from "./middleware/auth";
 import { agentsRoutes } from "./routes/agents";
@@ -174,6 +179,27 @@ export const app = new Elysia()
       }
     );
 
+    // Malformed requests are not incidents, but they are a signal about our
+    // docs/SDK/spec — emit one wide event per occurrence so a spike on a given
+    // path or field is queryable. Field paths and schema expectations only:
+    // the caller's payload never enters the log.
+    if (isMalformedRequest(code)) {
+      log.warn("api.malformed_request", {
+        requestId,
+        method: request.method,
+        path: url.pathname,
+        status,
+        code,
+        part: malformedRequestPart(error),
+        fields: malformedRequestFields(error),
+        contentType: request.headers.get("content-type"),
+        userAgent: request.headers.get("user-agent"),
+        organizationId: auth?.organizationId,
+        apiKeyId: auth?.apiKeyId,
+        userId: auth?.userId,
+      });
+    }
+
     // Only report unexpected errors to Sentry/PostHog — deliberate 4xx
     // responses thrown by routes are part of the API contract, not incidents.
     if (shouldReportToMonitoring(status)) {
@@ -206,8 +232,6 @@ export const app = new Elysia()
     }
 
     if (code === "VALIDATION") {
-      const message = error instanceof Error ? error.message : String(error);
-      log.warn("Validation failed", { details: message });
       return { error: "Validation failed" };
     }
 

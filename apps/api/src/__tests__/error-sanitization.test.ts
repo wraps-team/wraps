@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { resolveErrorStatus } from "../lib/error-response";
 
@@ -10,8 +10,6 @@ import { resolveErrorStatus } from "../lib/error-response";
  * IMPORTANT: createTestApp() must mirror the onError handler in index.ts exactly.
  * When index.ts is updated, update this function to match.
  */
-const log = { warn: vi.fn(), error: vi.fn(), info: vi.fn() };
-
 function createTestApp() {
   return new Elysia()
     .onError(({ error, code, set }) => {
@@ -22,8 +20,6 @@ function createTestApp() {
       }
 
       if (code === "VALIDATION") {
-        const message = error instanceof Error ? error.message : String(error);
-        log.warn("Validation failed", { details: message });
         return { error: "Validation failed" };
       }
 
