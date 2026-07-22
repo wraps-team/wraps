@@ -1,6 +1,8 @@
 import { Elysia, t } from "elysia";
 import { describe, expect, it, vi } from "vitest";
 
+import { resolveErrorStatus } from "../lib/error-response";
+
 /**
  * Tests the error sanitization logic from index.ts onError handler.
  * Uses a standalone Elysia app to avoid importing index.ts (which calls app.listen).
@@ -13,12 +15,7 @@ const log = { warn: vi.fn(), error: vi.fn(), info: vi.fn() };
 function createTestApp() {
   return new Elysia()
     .onError(({ error, code, set }) => {
-      const status =
-        code === "NOT_FOUND"
-          ? 404
-          : code === "VALIDATION"
-            ? 400
-            : ((set.status as number) ?? 500);
+      const status = resolveErrorStatus(code, set.status);
 
       if (code === "NOT_FOUND") {
         return { error: "Not found" };

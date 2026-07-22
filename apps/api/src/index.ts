@@ -12,6 +12,10 @@ import { Elysia } from "elysia";
 import { workflowScheduleRoutes } from "./(ee)/routes/workflow-schedules";
 import { workflowsRoutes } from "./(ee)/routes/workflows";
 import { workflowsSyncRoutes } from "./(ee)/routes/workflows-sync";
+import {
+  resolveErrorStatus,
+  shouldReportToMonitoring,
+} from "./lib/error-response";
 import { log } from "./lib/logger";
 import { getPostHogClient } from "./lib/posthog";
 import { getAuthOptional } from "./middleware/auth";
@@ -152,12 +156,7 @@ export const app = new Elysia()
   .onError(({ error, request, code, set, requestId, ...ctx }) => {
     const auth = getAuthOptional(ctx);
     const url = new URL(request.url);
-    const status =
-      code === "NOT_FOUND"
-        ? 404
-        : code === "VALIDATION"
-          ? 400
-          : ((set.status as number) ?? 500);
+    const status = resolveErrorStatus(code, set.status);
 
     log.error(
       "api.error",
@@ -175,8 +174,9 @@ export const app = new Elysia()
       }
     );
 
-    // Only report unexpected errors to Sentry/PostHog (skip 404s and validation errors)
-    if (code !== "NOT_FOUND" && code !== "VALIDATION") {
+    // Only report unexpected errors to Sentry/PostHog — deliberate 4xx
+    // responses thrown by routes are part of the API contract, not incidents.
+    if (shouldReportToMonitoring(code, status)) {
       Sentry.captureException(
         error instanceof Error ? error : new Error(String(error)),
         {
