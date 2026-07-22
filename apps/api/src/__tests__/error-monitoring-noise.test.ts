@@ -1,10 +1,7 @@
 import { t } from "elysia";
 import { describe, expect, it } from "vitest";
 
-import {
-  resolveErrorStatus,
-  shouldReportToMonitoring,
-} from "../lib/error-response";
+import { resolveErrorStatus } from "../lib/error-handler";
 import { createErrorHarness } from "./error-handler-harness";
 
 /**
@@ -32,6 +29,10 @@ function createTestApp() {
       .get("/named-status", ({ set }) => {
         set.status = "Forbidden";
         throw new Error("AWS account does not belong to this organization");
+      })
+      .get("/unauthorized", ({ set }) => {
+        set.status = 401;
+        throw new Error("Not authenticated");
       })
       .get("/boom", () => {
         throw new Error("connection terminated unexpectedly");
@@ -132,6 +133,56 @@ describe("monitoring noise from route-level client errors", () => {
   });
 });
 
+describe("api.authz_denied signal", () => {
+  it("records a route-thrown 403 with the key that was denied", async () => {
+    const { app, sinks } = createTestApp();
+
+    const res = await app.handle(
+      new Request("http://localhost/forbidden", {
+        headers: { "x-source-ip": "203.0.113.7", "User-Agent": "curl/8.4.0" },
+      })
+    );
+
+    expect(res.status).toBe(403);
+    expect(sinks.log.warn).toHaveBeenCalledTimes(1);
+    expect(sinks.log.warn.mock.calls[0][0]).toBe("api.authz_denied");
+    expect(sinks.log.warn.mock.calls[0][1]).toMatchObject({
+      status: 403,
+      path: "/forbidden",
+      method: "GET",
+      sourceIp: "203.0.113.7",
+      userAgent: "curl/8.4.0",
+    });
+  });
+
+  it("records a 401 the same way", async () => {
+    const { app, sinks } = createTestApp();
+
+    await app.handle(new Request("http://localhost/unauthorized"));
+
+    expect(sinks.log.warn.mock.calls[0][0]).toBe("api.authz_denied");
+    expect(sinks.log.warn.mock.calls[0][1]).toMatchObject({ status: 401 });
+  });
+
+  it("does not double-log a denial as api.error", async () => {
+    const { app, sinks } = createTestApp();
+
+    await app.handle(new Request("http://localhost/forbidden"));
+
+    expect(sinks.log.error).not.toHaveBeenCalled();
+  });
+
+  it("leaves other 4xx on the api.error path", async () => {
+    const { app, sinks } = createTestApp();
+
+    await app.handle(new Request("http://localhost/batch/missing"));
+
+    expect(sinks.log.warn).not.toHaveBeenCalled();
+    expect(sinks.log.error).toHaveBeenCalledTimes(1);
+    expect(sinks.log.error.mock.calls[0][0]).toBe("api.error");
+  });
+});
+
 describe("resolveErrorStatus", () => {
   it("maps framework NOT_FOUND to 404 despite the stale 200 on set.status", () => {
     expect(resolveErrorStatus("NOT_FOUND", 200)).toBe(404);
@@ -153,18 +204,5 @@ describe("resolveErrorStatus", () => {
   it("defaults to 500 for an unrecognized status", () => {
     expect(resolveErrorStatus("UNKNOWN", undefined)).toBe(500);
     expect(resolveErrorStatus("UNKNOWN", "Not A Status")).toBe(500);
-  });
-});
-
-describe("shouldReportToMonitoring", () => {
-  it("reports 5xx", () => {
-    expect(shouldReportToMonitoring(500)).toBe(true);
-    expect(shouldReportToMonitoring(503)).toBe(true);
-  });
-
-  it("skips every 4xx status", () => {
-    for (const status of [400, 401, 403, 404, 409, 422, 429]) {
-      expect(shouldReportToMonitoring(status)).toBe(false);
-    }
   });
 });
