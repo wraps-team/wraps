@@ -115,7 +115,7 @@ function getHourKey(ip: string): string {
  */
 export const publicRateLimitMiddleware = new Elysia({
   name: "public-rate-limit",
-}).derive(async ({ request, set }) => {
+}).derive({ as: "scoped" }, async ({ request, set }) => {
   const clientIp = getClientIp(request);
 
   // Check minute limit

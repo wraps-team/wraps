@@ -27,6 +27,7 @@ const dynamoClient = new DynamoDBClient(awsDefaults);
 const TABLE_NAME = process.env.RATE_LIMIT_TABLE_NAME ?? "RateLimitTable";
 
 export const rateLimitMiddleware = new Elysia({ name: "rate-limit" }).derive(
+  { as: "scoped" },
   async (ctx) => {
     const authContext = getAuthOptional(ctx);
 
