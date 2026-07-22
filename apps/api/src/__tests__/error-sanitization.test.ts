@@ -1,35 +1,16 @@
-import { Elysia, t } from "elysia";
+import { t } from "elysia";
 import { describe, expect, it } from "vitest";
 
-import { resolveErrorStatus } from "../lib/error-response";
+import { createErrorHarness } from "./error-handler-harness";
 
 /**
- * Tests the error sanitization logic from index.ts onError handler.
- * Uses a standalone Elysia app to avoid importing index.ts (which calls app.listen).
- *
- * IMPORTANT: createTestApp() must mirror the onError handler in index.ts exactly.
- * When index.ts is updated, update this function to match.
+ * Tests the error sanitization behavior of the real onError handler, mounted
+ * via createErrorHarness so it cannot drift from index.ts.
  */
 function createTestApp() {
-  return new Elysia()
-    .onError(({ error, code, set }) => {
-      const status = resolveErrorStatus(code, set.status);
+  const { app } = createErrorHarness();
 
-      if (code === "NOT_FOUND") {
-        return { error: "Not found" };
-      }
-
-      if (code === "VALIDATION") {
-        return { error: "Validation failed" };
-      }
-
-      if (status >= 400 && status < 500) {
-        const message = error instanceof Error ? error.message : String(error);
-        return { error: message };
-      }
-
-      return { error: "Internal server error" };
-    })
+  return app
     .get("/throw-500", () => {
       throw new Error("SELECT * FROM secret_table WHERE password = 'leaked'");
     })
@@ -74,29 +55,22 @@ describe("API error sanitization", () => {
 });
 
 describe("API validation error — BUG-015: no details leaked to client", () => {
+  const invalidBody = () =>
+    new Request("http://localhost/validated", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notName: 123 }),
+    });
+
   it("returns 422 status for validation failures", async () => {
-    const app = createTestApp();
-    const res = await app.handle(
-      new Request("http://localhost/validated", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notName: 123 }),
-      })
-    );
+    const res = await createTestApp().handle(invalidBody());
 
     // Elysia returns 422 for schema validation errors
     expect(res.status).toBe(422);
   });
 
   it("returns generic { error: 'Validation failed' } with no details field", async () => {
-    const app = createTestApp();
-    const res = await app.handle(
-      new Request("http://localhost/validated", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notName: 123 }),
-      })
-    );
+    const res = await createTestApp().handle(invalidBody());
     const body = await res.json();
 
     expect(body.error).toBe("Validation failed");
@@ -104,14 +78,7 @@ describe("API validation error — BUG-015: no details leaked to client", () => 
   });
 
   it("does not expose schema internals in the response body", async () => {
-    const app = createTestApp();
-    const res = await app.handle(
-      new Request("http://localhost/validated", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notName: 123 }),
-      })
-    );
+    const res = await createTestApp().handle(invalidBody());
     const raw = await res.text();
 
     // Schema internals must not leak to the client

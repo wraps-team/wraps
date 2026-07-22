@@ -12,16 +12,8 @@ import { Elysia } from "elysia";
 import { workflowScheduleRoutes } from "./(ee)/routes/workflow-schedules";
 import { workflowsRoutes } from "./(ee)/routes/workflows";
 import { workflowsSyncRoutes } from "./(ee)/routes/workflows-sync";
-import {
-  resolveErrorStatus,
-  shouldReportToMonitoring,
-} from "./lib/error-response";
+import { type ApiErrorSinks, handleApiError } from "./lib/error-handler";
 import { log } from "./lib/logger";
-import {
-  isMalformedRequest,
-  malformedRequestFields,
-  malformedRequestPart,
-} from "./lib/malformed-request";
 import { getPostHogClient } from "./lib/posthog";
 import { getAuthOptional } from "./middleware/auth";
 import { agentsRoutes } from "./routes/agents";
@@ -130,6 +122,21 @@ const openApiDocumentation = {
  * browsers, and cookie auth on this API would require an allowlist instead.
  */
 
+/**
+ * Incident sinks for the error handler. Sentry and PostHog always fire
+ * together, so they are one dependency from the handler's point of view.
+ */
+const apiErrorSinks: ApiErrorSinks = {
+  log,
+  captureException: (error, context) => {
+    Sentry.captureException(error, { extra: { ...context } });
+    getPostHogClient().captureException(error, "api-error", {
+      url: context.url,
+      method: context.method,
+    });
+  },
+};
+
 export const app = new Elysia()
   .derive(({ request }) => ({
     startTime: performance.now(),
@@ -158,92 +165,19 @@ export const app = new Elysia()
       authMethod: auth.apiKeyId ? "api_key" : "session",
     });
   })
-  .onError(({ error, request, code, set, requestId, ...ctx }) => {
-    const auth = getAuthOptional(ctx);
-    const url = new URL(request.url);
-    const status = resolveErrorStatus(code, set.status);
-
-    log.error(
-      "api.error",
-      error instanceof Error ? error : new Error(String(error)),
+  .onError(({ error, request, code, set, requestId, ...ctx }) =>
+    handleApiError(
       {
-        requestId,
-        method: request.method,
-        path: url.pathname,
-        status,
+        error,
+        request,
         code,
-        organizationId: auth?.organizationId,
-        apiKeyId: auth?.apiKeyId,
-        userId: auth?.userId,
-        authMethod: auth?.apiKeyId ? "api_key" : auth ? "session" : undefined,
-      }
-    );
-
-    // Malformed requests are not incidents, but they are a signal about our
-    // docs/SDK/spec — emit one wide event per occurrence so a spike on a given
-    // path or field is queryable. Field paths and schema expectations only:
-    // the caller's payload never enters the log.
-    if (isMalformedRequest(code)) {
-      log.warn("api.malformed_request", {
+        setStatus: set.status,
         requestId,
-        method: request.method,
-        path: url.pathname,
-        status,
-        code,
-        part: malformedRequestPart(error),
-        fields: malformedRequestFields(error),
-        contentType: request.headers.get("content-type"),
-        userAgent: request.headers.get("user-agent"),
-        organizationId: auth?.organizationId,
-        apiKeyId: auth?.apiKeyId,
-        userId: auth?.userId,
-      });
-    }
-
-    // Only report unexpected errors to Sentry/PostHog — deliberate 4xx
-    // responses thrown by routes are part of the API contract, not incidents.
-    if (shouldReportToMonitoring(status)) {
-      Sentry.captureException(
-        error instanceof Error ? error : new Error(String(error)),
-        {
-          extra: {
-            requestId,
-            url: request.url,
-            method: request.method,
-            path: url.pathname,
-            status,
-            organizationId: auth?.organizationId,
-          },
-        }
-      );
-
-      const posthog = getPostHogClient();
-      posthog.captureException(
-        error instanceof Error ? error : new Error(String(error)),
-        "api-error",
-        {
-          url: request.url,
-          method: request.method,
-        }
-      );
-    }
-    if (code === "NOT_FOUND") {
-      return { error: "Not found" };
-    }
-
-    if (code === "VALIDATION") {
-      return { error: "Validation failed" };
-    }
-
-    // 4xx errors from routes are already sanitized — pass through
-    if (status >= 400 && status < 500) {
-      const message = error instanceof Error ? error.message : String(error);
-      return { error: message };
-    }
-
-    // 5xx: never leak internal details
-    return { error: "Internal server error" };
-  })
+        auth: getAuthOptional(ctx) ?? null,
+      },
+      apiErrorSinks
+    )
+  )
   .use(
     cors({
       origin: true,
