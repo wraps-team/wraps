@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -17,7 +17,7 @@ function createTestApp(captureException: (error: Error) => void) {
     .onError(({ error, code, set }) => {
       const status = resolveErrorStatus(code, set.status);
 
-      if (shouldReportToMonitoring(code, status)) {
+      if (shouldReportToMonitoring(status)) {
         captureException(
           error instanceof Error ? error : new Error(String(error))
         );
@@ -35,6 +35,13 @@ function createTestApp(captureException: (error: Error) => void) {
     })
     .get("/boom", () => {
       throw new Error("connection terminated unexpectedly");
+    })
+    .get("/created-then-boom", ({ set }) => {
+      set.status = 201;
+      throw new Error("workflow event emission failed");
+    })
+    .post("/validated", () => ({ ok: true }), {
+      body: t.Object({ name: t.String() }),
     });
 }
 
@@ -59,6 +66,32 @@ describe("monitoring noise from route-level client errors", () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 
+  it("does not report unmatched routes", async () => {
+    const captureException = vi.fn();
+    const app = createTestApp(captureException);
+
+    const res = await app.handle(new Request("http://localhost/nope"));
+
+    expect(res.status).toBe(404);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it("does not report schema validation failures", async () => {
+    const captureException = vi.fn();
+    const app = createTestApp(captureException);
+
+    const res = await app.handle(
+      new Request("http://localhost/validated", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notName: 123 }),
+      })
+    );
+
+    expect(res.status).toBe(422);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
   it("still reports unhandled 5xx errors to Sentry", async () => {
     const captureException = vi.fn();
     const app = createTestApp(captureException);
@@ -72,52 +105,48 @@ describe("monitoring noise from route-level client errors", () => {
     );
   });
 
-  it("does not report unmatched routes", async () => {
+  it("still reports a 5xx thrown after the route assigned a 2xx status", async () => {
     const captureException = vi.fn();
     const app = createTestApp(captureException);
 
-    await app.handle(new Request("http://localhost/nope"));
+    const res = await app.handle(
+      new Request("http://localhost/created-then-boom")
+    );
 
-    expect(captureException).not.toHaveBeenCalled();
+    // Elysia resets set.status to 500 before onError, so the earlier 201 does
+    // not suppress the report.
+    expect(res.status).toBe(500);
+    expect(captureException).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("resolveErrorStatus", () => {
-  it("maps framework NOT_FOUND to 404", () => {
-    expect(resolveErrorStatus("NOT_FOUND", undefined)).toBe(404);
+  it("maps framework NOT_FOUND to 404 despite the stale 200 on set.status", () => {
+    expect(resolveErrorStatus("NOT_FOUND", 200)).toBe(404);
   });
 
-  it("maps framework VALIDATION to 400", () => {
-    expect(resolveErrorStatus("VALIDATION", undefined)).toBe(400);
+  it("reports the 422 Elysia actually responds with for validation failures", () => {
+    expect(resolveErrorStatus("VALIDATION", 422)).toBe(422);
   });
 
   it("uses the status the route set", () => {
     expect(resolveErrorStatus("UNKNOWN", 403)).toBe(403);
   });
 
-  it("resolves a string status set by a route", () => {
-    expect(resolveErrorStatus("UNKNOWN", "Not Found")).toBe(404);
-  });
-
-  it("defaults to 500 when no status was set", () => {
+  it("defaults to 500 when no numeric status was set", () => {
     expect(resolveErrorStatus("UNKNOWN", undefined)).toBe(500);
   });
 });
 
 describe("shouldReportToMonitoring", () => {
   it("reports 5xx", () => {
-    expect(shouldReportToMonitoring("UNKNOWN", 500)).toBe(true);
-    expect(shouldReportToMonitoring("INTERNAL_SERVER_ERROR", 503)).toBe(true);
+    expect(shouldReportToMonitoring(500)).toBe(true);
+    expect(shouldReportToMonitoring(503)).toBe(true);
   });
 
-  it("skips every 4xx status regardless of code", () => {
+  it("skips every 4xx status", () => {
     for (const status of [400, 401, 403, 404, 409, 422, 429]) {
-      expect(shouldReportToMonitoring("UNKNOWN", status)).toBe(false);
+      expect(shouldReportToMonitoring(status)).toBe(false);
     }
-  });
-
-  it("skips framework validation and not-found codes", () => {
-    expect(shouldReportToMonitoring("VALIDATION", 400)).toBe(false);
-    expect(shouldReportToMonitoring("NOT_FOUND", 404)).toBe(false);
   });
 });

@@ -176,7 +176,7 @@ export const app = new Elysia()
 
     // Only report unexpected errors to Sentry/PostHog — deliberate 4xx
     // responses thrown by routes are part of the API contract, not incidents.
-    if (shouldReportToMonitoring(code, status)) {
+    if (shouldReportToMonitoring(status)) {
       Sentry.captureException(
         error instanceof Error ? error : new Error(String(error)),
         {
