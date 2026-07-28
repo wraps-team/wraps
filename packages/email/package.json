@@ -27,6 +27,7 @@
     "@aws-sdk/client-ses": "catalog:",
     "@aws-sdk/client-sesv2": "catalog:",
     "@aws-sdk/client-sts": "catalog:",
+    "@aws-sdk/credential-providers": "catalog:",
     "@react-email/render": "catalog:",
     "@vercel/oidc-aws-credentials-provider": "3.0.4",
     "@wraps.dev/email": "^0.5.1",
