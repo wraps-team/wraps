@@ -414,15 +414,15 @@ export default function ReengagementActivateEmail({
                     {"// Send your first email\n"}
                   </span>
                   <span style={{ color: "#c084fc" }}>import</span>
-                  {" { Wraps } "}
+                  {" { WrapsEmail } "}
                   <span style={{ color: "#c084fc" }}>from</span>
                   {" '@wraps.dev/email'\n\n"}
                   <span style={{ color: "#c084fc" }}>const</span>
-                  {" wraps = "}
+                  {" email = "}
                   <span style={{ color: "#c084fc" }}>new</span>
-                  {" Wraps()\n\n"}
+                  {" WrapsEmail()\n\n"}
                   <span style={{ color: "#c084fc" }}>await</span>
-                  {" wraps.emails.send({\n"}
+                  {" email.send({\n"}
                   {"  from: 'hello@yourdomain.com',\n"}
                   {"  to: 'user@example.com',\n"}
                   {"  subject: 'Hello from Wraps!',\n"}

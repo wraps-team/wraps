@@ -58,7 +58,7 @@ export default function NudgeSendFirstEmail({ unsubscribeUrl }: Props) {
                   fontSize: "14px",
                 }}
               >
-                wraps.emails.send()
+                email.send()
               </code>{" "}
               with a from, to, and subject and you&apos;ll see it land in
               seconds.{" "}

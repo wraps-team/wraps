@@ -19,7 +19,7 @@ import { WrapsEmail } from '@wraps.dev/email';
 
 const email = new WrapsEmail();
 
-await email.emails.send({
+await email.send({
   from: 'hello@acme.com',
   to: user.email,
   subject: 'Welcome to Acme',

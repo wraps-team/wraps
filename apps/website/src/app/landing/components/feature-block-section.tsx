@@ -23,8 +23,8 @@ const checks: Check[] = [
     title: "TypeScript-first SDK",
     description: (
       <>
-        <code>wraps.emails.send()</code> — full type inference, no boilerplate,
-        no wrappers.
+        <code>email.send()</code> — full type inference, no boilerplate, no
+        wrappers.
       </>
     ),
   },

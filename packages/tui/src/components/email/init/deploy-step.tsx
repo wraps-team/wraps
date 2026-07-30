@@ -114,11 +114,11 @@ export function DeployStep({
           <text fg="#888888">Quick start:</text>
           <text> </text>
           <text fg="#00AAFF">
-            {"import { Wraps } from '@wraps.dev/email';"}
+            {"import { WrapsEmail } from '@wraps.dev/email';"}
           </text>
           <text> </text>
-          <text fg="#FFFFFF">{"const wraps = new Wraps();"}</text>
-          <text fg="#FFFFFF">{"await wraps.emails.send({"}</text>
+          <text fg="#FFFFFF">{"const email = new WrapsEmail();"}</text>
+          <text fg="#FFFFFF">{"await email.send({"}</text>
           <text fg="#FFFFFF">{`  from: 'hello@${config.domain}',`}</text>
           <text fg="#FFFFFF">{"  to: 'user@example.com',"}</text>
           <text fg="#FFFFFF">{"  subject: 'Hello from Wraps!',"}</text>

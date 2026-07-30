@@ -161,11 +161,11 @@ email.resources.oidcProvider;   // iam.OpenIdConnectProvider (if OIDC)
 After deploying, use the [@wraps.dev/email](https://www.npmjs.com/package/@wraps.dev/email) SDK to send emails:
 
 ```typescript
-import { Wraps } from "@wraps.dev/email";
+import { WrapsEmail } from "@wraps.dev/email";
 
-const wraps = new Wraps();
+const email = new WrapsEmail();
 
-await wraps.emails.send({
+await email.send({
   from: "hello@example.com",
   to: "user@example.com",
   subject: "Hello from Wraps!",

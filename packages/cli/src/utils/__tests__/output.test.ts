@@ -339,7 +339,7 @@ describe("displaySuccess output content", () => {
 
     const output = consoleLogSpy.mock.calls.map((c) => c[0]).join("\n");
     // SDK import
-    expect(output).toContain("import { Wraps } from '@wraps.dev/email'");
+    expect(output).toContain("import { WrapsEmail } from '@wraps.dev/email'");
     // Actual roleArn
     expect(output).toContain("arn:aws:iam::999888777666:role/wraps-email-role");
     // Actual region
@@ -347,7 +347,7 @@ describe("displaySuccess output content", () => {
     // Actual domain in from address
     expect(output).toContain("hello@myapp.com");
     // Has send example
-    expect(output).toContain("wraps.emails.send");
+    expect(output).toContain("await email.send(");
   });
 
   it("should not embed SDK snippet when domain is not provided", () => {
@@ -358,7 +358,7 @@ describe("displaySuccess output content", () => {
 
     const output = consoleLogSpy.mock.calls.map((c) => c[0]).join("\n");
     expect(output).toContain("@wraps.dev/email");
-    expect(output).not.toContain("wraps.emails.send");
+    expect(output).not.toContain("await email.send(");
   });
 
   it("should display correct DNS provider name when DNS was auto-created", async () => {

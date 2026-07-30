@@ -101,11 +101,11 @@ npm install @wraps.dev/sms
 **Send your first email:**
 
 ```typescript
-import { Wraps } from '@wraps.dev/email';
+import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new Wraps();
+const email = new WrapsEmail();
 
-await wraps.emails.send({
+await email.send({
   from: 'hello@yourapp.com',
   to: 'user@example.com',
   subject: 'Welcome!',
@@ -116,11 +116,11 @@ await wraps.emails.send({
 **Send your first SMS:**
 
 ```typescript
-import { Wraps } from '@wraps.dev/sms';
+import { WrapsSMS } from '@wraps.dev/sms';
 
-const wraps = new Wraps();
+const sms = new WrapsSMS();
 
-await wraps.sms.send({
+await sms.send({
   to: '+14155551234',
   message: 'Your code is 123456',
 });
