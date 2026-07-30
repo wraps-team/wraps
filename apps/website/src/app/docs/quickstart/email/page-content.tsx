@@ -41,10 +41,10 @@ const installCommands = {
 const sendEmailCode = `import { WrapsEmail } from '@wraps.dev/email';
 
 // Initialize the client
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 // Send an email
-const result = await wraps.send({
+const result = await email.send({
   from: 'hello@yourdomain.com',
   to: 'user@example.com',
   subject: 'Welcome to Wraps!',

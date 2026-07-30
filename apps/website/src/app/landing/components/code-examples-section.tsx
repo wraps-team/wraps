@@ -12,10 +12,10 @@ const codeExamples: Record<string, string> = {
 
 import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 export async function sendWelcomeEmail(email: string) {
-  const result = await wraps.send({
+  const result = await email.send({
     from: 'hello@yourdomain.com',
     to: email,
     subject: 'Welcome to our app!',
@@ -46,7 +46,7 @@ export default function SignupPage() {
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 export default async function handler(
   req: NextApiRequest,
@@ -58,7 +58,7 @@ export default async function handler(
 
   const { to, subject, html } = req.body;
 
-  const result = await wraps.send({
+  const result = await email.send({
     from: 'hello@yourdomain.com',
     to,
     subject,
@@ -75,7 +75,7 @@ export default async function handler(
 import { WrapsEmail } from '@wraps.dev/email';
 
 const app = express();
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 app.use(express.json());
 
@@ -83,7 +83,7 @@ app.post('/api/send-email', async (req, res) => {
   try {
     const { to, subject, html } = req.body;
 
-    const result = await wraps.send({
+    const result = await email.send({
       from: 'hello@yourdomain.com',
       to,
       subject,
@@ -114,13 +114,13 @@ app.listen(3000);`,
 import { json, type ActionFunctionArgs } from '@remix-run/node';
 import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const email = formData.get('email') as string;
 
-  const result = await wraps.send({
+  const result = await email.send({
     from: 'hello@yourdomain.com',
     to: email,
     subject: 'Welcome to our app!',
@@ -146,7 +146,7 @@ export default function Signup() {
 import { WrapsEmail } from '@wraps.dev/email';
 
 // Automatically uses Vercel OIDC token
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 export default async function handler(req: Request) {
   if (req.method !== 'POST') {
@@ -155,7 +155,7 @@ export default async function handler(req: Request) {
 
   const { to, subject, html } = await req.json();
 
-  const result = await wraps.send({
+  const result = await email.send({
     from: 'hello@yourdomain.com',
     to,
     subject,
@@ -172,12 +172,12 @@ export const config = {
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 // Automatically uses Lambda IAM role
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   const { to, subject, html } = JSON.parse(event.body || '{}');
 
-  const result = await wraps.send({
+  const result = await email.send({
     from: 'hello@yourdomain.com',
     to,
     subject,

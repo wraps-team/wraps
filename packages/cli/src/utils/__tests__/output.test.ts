@@ -340,6 +340,8 @@ describe("displaySuccess output content", () => {
     const output = consoleLogSpy.mock.calls.map((c) => c[0]).join("\n");
     // SDK import
     expect(output).toContain("import { WrapsEmail } from '@wraps.dev/email'");
+    // Constructor matches the variable used in the send call
+    expect(output).toContain("const email = new WrapsEmail({");
     // Actual roleArn
     expect(output).toContain("arn:aws:iam::999888777666:role/wraps-email-role");
     // Actual region
@@ -358,7 +360,7 @@ describe("displaySuccess output content", () => {
 
     const output = consoleLogSpy.mock.calls.map((c) => c[0]).join("\n");
     expect(output).toContain("@wraps.dev/email");
-    expect(output).not.toContain("await email.send(");
+    expect(output).not.toContain("import { WrapsEmail }");
   });
 
   it("should display correct DNS provider name when DNS was auto-created", async () => {

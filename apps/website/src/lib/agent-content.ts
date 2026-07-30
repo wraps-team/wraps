@@ -30,8 +30,8 @@ npm install @wraps.dev/email
 
 \`\`\`typescript
 import { WrapsEmail } from '@wraps.dev/email';
-const wraps = new WrapsEmail();
-await wraps.send({
+const email = new WrapsEmail();
+await email.send({
   from: 'hello@yourdomain.com',
   to: 'user@example.com',
   subject: 'Welcome!',
@@ -102,9 +102,9 @@ npm install @wraps.dev/email
 \`\`\`typescript
 import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
-const result = await wraps.send({
+const result = await email.send({
   from: 'hello@yourdomain.com',
   to: 'user@example.com',
   subject: 'Welcome to Wraps!',
@@ -177,7 +177,7 @@ npm install @wraps.dev/email
 \`\`\`typescript
 import { WrapsEmail } from "@wraps.dev/email";
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 // Works for any agent framework:
 // LangGraph: register as a tool. Vercel AI SDK: pass to tool({}).
@@ -187,7 +187,7 @@ export async function sendEmailTool(input: {
   subject: string;
   html: string;
 }) {
-  const result = await wraps.send({
+  const result = await email.send({
     from: "agent@yourdomain.com",
     to: input.to,
     subject: input.subject,

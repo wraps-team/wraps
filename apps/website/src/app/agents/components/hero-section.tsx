@@ -28,7 +28,7 @@ export function AgentsHeroSection() {
                 three possible endings, and one of them is "a human decides". */}
             <pre className="mb-6 overflow-x-auto rounded-lg border border-border bg-card/60 px-4 py-3 font-mono text-[13px] leading-relaxed text-foreground/90">
               <span className="text-muted-foreground">tool</span>{" "}
-              <span className="text-orange-500">wraps.send</span>
+              <span className="text-orange-500">email.send</span>
               {"("}
               {"\n  "}from: <span className="text-foreground/60">string</span>,
               {"\n  "}to: <span className="text-foreground/60">string</span>,

@@ -28,7 +28,7 @@ const faqSchema = {
       name: "How is this different from using AWS SES directly?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Wraps deploys all the infrastructure AWS SES needs (IAM roles, EventBridge, DynamoDB, Lambda, SQS) in one command instead of 2+ hours of manual setup. You get event tracking, analytics, and a dashboard out of the box. The TypeScript SDK is just wraps.send() - no boilerplate.",
+        text: "Wraps deploys all the infrastructure AWS SES needs (IAM roles, EventBridge, DynamoDB, Lambda, SQS) in one command instead of 2+ hours of manual setup. You get event tracking, analytics, and a dashboard out of the box. The TypeScript SDK is just email.send() - no boilerplate.",
       },
     },
     {

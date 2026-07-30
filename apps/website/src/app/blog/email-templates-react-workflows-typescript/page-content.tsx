@@ -505,9 +505,9 @@ export function SdkCodeTabs() {
   const codes = {
     "Templated Send": `import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
-await wraps.sendTemplate({
+await email.sendTemplate({
   from: 'hello@yourapp.com',
   to: 'user@example.com',
   template: 'welcome',
@@ -520,13 +520,13 @@ await wraps.sendTemplate({
 import { WelcomeEmail } from './templates/welcome';
 import { render } from '@react-email/render';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 const html = await render(
   WelcomeEmail({ name: 'Jane' })
 );
 
-await wraps.send({
+await email.send({
   from: 'hello@yourapp.com',
   to: 'user@example.com',
   subject: 'Welcome to YourApp!',

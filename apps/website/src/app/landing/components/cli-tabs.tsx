@@ -89,9 +89,9 @@ npx @wraps.dev/cli email domains verify -d yourdomain.com`;
 
 const sdkExample = `import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
-const result = await wraps.send({
+const result = await email.send({
   from: 'hello@yourdomain.com',
   to: 'user@example.com',
   subject: 'Welcome to our app!',

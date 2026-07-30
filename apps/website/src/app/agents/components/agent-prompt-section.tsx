@@ -35,7 +35,7 @@ const prompts: Prompt[] = [
 
 1. Install @wraps.dev/email.
 2. Create src/tools/send-email.ts exporting an async function sendEmail({ to, subject, html })
-   that calls wraps.send and throws on failure.
+   that calls email.send and throws on failure.
 3. Register it with the existing agent framework (LangGraph / Vercel AI SDK / Mastra).
 4. Use Context7 to reference @wraps.dev/email docs while writing it.`,
   },

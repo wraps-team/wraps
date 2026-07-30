@@ -66,9 +66,9 @@ await s3.send(new PutObjectCommand({
 const url = 'https://cdn.yourdomain.com/images/logo.png';
 
 // Reference the CDN URL in your emails
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
-const result = await wraps.send({
+const result = await email.send({
   from: 'hello@yourapp.com',
   to: 'user@example.com',
   subject: 'Welcome!',

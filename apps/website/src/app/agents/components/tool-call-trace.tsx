@@ -21,7 +21,7 @@ const steps: Step[] = [
   {
     role: "tool",
     label: "tool_call",
-    body: `wraps.send({
+    body: `email.send({
   from: "reports@yourdomain.com",
   to: "sarah@acme.com",
   subject: "Q3 Report",
@@ -40,7 +40,7 @@ const steps: Step[] = [
   {
     role: "tool",
     label: "tool_call",
-    body: `wraps.send({
+    body: `email.send({
   from: "reports@yourdomain.com",
   to: "leads@competitor.com",
 })`,

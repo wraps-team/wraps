@@ -117,7 +117,9 @@ export function DeployStep({
             {"import { WrapsEmail } from '@wraps.dev/email';"}
           </text>
           <text> </text>
-          <text fg="#FFFFFF">{"const email = new WrapsEmail();"}</text>
+          <text fg="#FFFFFF">
+            {`const email = new WrapsEmail({ region: '${config.region}' });`}
+          </text>
           <text fg="#FFFFFF">{"await email.send({"}</text>
           <text fg="#FFFFFF">{`  from: 'hello@${config.domain}',`}</text>
           <text fg="#FFFFFF">{"  to: 'user@example.com',"}</text>

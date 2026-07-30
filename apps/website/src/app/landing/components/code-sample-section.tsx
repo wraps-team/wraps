@@ -27,7 +27,7 @@ await email.send({
 });`;
 
 const codeData = [
-  { language: "tsx", filename: "src/emails/welcome.ts", code: sampleCode },
+  { language: "tsx", filename: "src/emails/welcome.tsx", code: sampleCode },
 ];
 
 export function CodeSampleSection() {

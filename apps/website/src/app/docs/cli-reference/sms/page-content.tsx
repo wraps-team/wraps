@@ -668,10 +668,10 @@ export default function CLIReferenceSMSPageContent() {
                   filename: "send-sms.ts",
                   code: `import { WrapsSMS } from '@wraps.dev/sms';
 
-const wraps = new WrapsSMS();
+const sms = new WrapsSMS();
 
 // Send a transactional SMS
-const result = await wraps.send({
+const result = await sms.send({
   to: '+14155551234',
   message: 'Your verification code is 123456',
 });

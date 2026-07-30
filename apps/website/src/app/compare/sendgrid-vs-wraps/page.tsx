@@ -333,9 +333,9 @@ await sgMail.send({
 
 const wrapsCode = `import { WrapsEmail } from "@wraps.dev/email";
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
-await wraps.send({
+await email.send({
   to: "user@example.com",
   from: "you@company.com",
   subject: "Hello",

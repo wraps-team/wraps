@@ -50,6 +50,7 @@ import {
   withLockRetry,
 } from "../../utils/shared/pulumi.js";
 import { getSMSCostSummary } from "../../utils/sms/costs.js";
+import { displaySMSSDKUsage } from "../../utils/sms/output.js";
 import { getSMSPreset, validateSMSConfig } from "../../utils/sms/presets.js";
 
 /**
@@ -626,14 +627,7 @@ export async function init(options: SMSInitOptions): Promise<void> {
   // Show SDK usage example
   console.log("\n");
   clack.log.info(pc.bold("SDK Usage:"));
-  console.log(pc.dim("  npm install @wraps.dev/sms"));
-  console.log("");
-  console.log(pc.dim("  import { WrapsSMS } from '@wraps.dev/sms';"));
-  console.log(pc.dim("  const sms = new WrapsSMS();"));
-  console.log(pc.dim("  await sms.send({"));
-  console.log(pc.dim("    to: '+14155551234',"));
-  console.log(pc.dim("    message: 'Your code is 123456',"));
-  console.log(pc.dim("  });"));
+  displaySMSSDKUsage(region);
 
   clack.outro(pc.green("Setup complete!"));
 

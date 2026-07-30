@@ -172,13 +172,13 @@ describe("Chunk 5 — Agent-forward differentiation", () => {
   it("hero surfaces a mono tool-signature as a visual anchor (agent-forward treatment)", () => {
     const source = read("src/app/agents/components/hero-section.tsx");
     expect(source).toMatch(/font-mono/);
-    expect(source).toMatch(/wraps\.send/);
+    expect(source).toMatch(/email\.send/);
   });
 
   it("ToolCallTrace component exists, is a client component, and references the wraps send call", () => {
     const source = read("src/app/agents/components/tool-call-trace.tsx");
     expect(source).toMatch(/^"use client";/);
-    expect(source).toContain("wraps.send");
+    expect(source).toContain("email.send");
   });
 
   it("AgentPromptSection renders at least one natural-language prompt for agents", () => {

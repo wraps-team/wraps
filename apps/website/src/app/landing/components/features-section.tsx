@@ -28,7 +28,7 @@ const mainFeatures = [
     icon: Mail,
     title: "TypeScript-First SDK",
     description:
-      "Clean API with full type safety. Just `wraps.send()` - no boilerplate, no callbacks.",
+      "Clean API with full type safety. Just `email.send()` - no boilerplate, no callbacks.",
     status: "Available",
   },
   {

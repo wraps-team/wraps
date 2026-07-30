@@ -331,9 +331,9 @@ await client.sendEmail({
 
 const wrapsCode = `import { WrapsEmail } from "@wraps.dev/email";
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
-await wraps.send({
+await email.send({
   from: "you@example.com",
   to: "user@example.com",
   subject: "Hello",

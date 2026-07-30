@@ -230,7 +230,7 @@ export default function WhyWrapsPage() {
                 <CardContent>
                   <p className="text-muted-foreground text-sm">
                     Full type safety, intuitive API, great autocomplete.{" "}
-                    <code className="rounded bg-muted px-1">wraps.send()</code>
+                    <code className="rounded bg-muted px-1">email.send()</code>
                   </p>
                 </CardContent>
               </Card>

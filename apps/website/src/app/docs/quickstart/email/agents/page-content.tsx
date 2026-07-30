@@ -39,7 +39,7 @@ const installCommands = {
 
 const agentToolCode = `import { WrapsEmail } from "@wraps.dev/email";
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 // The shape works for any agent framework.
 // LangGraph: register as a tool. Vercel AI SDK: pass to tool({}).
@@ -49,7 +49,7 @@ export async function sendEmailTool(input: {
   subject: string;
   html: string;
 }) {
-  const result = await wraps.send({
+  const result = await email.send({
     from: "agent@yourdomain.com",
     to: input.to,
     subject: input.subject,
@@ -230,7 +230,7 @@ export default function AgentEmailQuickstartPageContent() {
         </h2>
         <p className="mb-4 text-muted-foreground">
           Wrap{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5">wraps.send()</code>{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">email.send()</code>{" "}
           in a typed function. The same shape registers as a tool in any major
           agent framework.
         </p>

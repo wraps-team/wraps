@@ -507,12 +507,12 @@ export default function Page() {
                 <CodeBlock
                   code={`import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 export async function POST(request: Request) {
   const { email, name } = await request.json();
 
-  const result = await wraps.send({
+  const result = await email.send({
     from: 'hello@yourdomain.com',
     to: email,
     subject: \`Welcome to the team, \${name}!\`,
@@ -538,10 +538,10 @@ export async function POST(request: Request) {
 
 import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 export async function sendWelcomeEmail(email: string, name: string) {
-  return await wraps.send({
+  return await email.send({
     from: 'hello@yourdomain.com',
     to: email,
     subject: \`Welcome, \${name}!\`,
@@ -642,9 +642,9 @@ export async function sendWelcomeEmail(email: string, name: string) {
                 <CodeBlock
                   code={`import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
-await wraps.send({
+await email.send({
   from: 'hello@yourdomain.com',
   to: 'user@example.com',
   subject: 'Hello!',
@@ -659,7 +659,7 @@ await wraps.send({
                   With All Options
                 </h3>
                 <CodeBlock
-                  code={`await wraps.send({
+                  code={`await email.send({
   from: 'Team <hello@yourdomain.com>',
   to: ['user1@example.com', 'user2@example.com'],
   cc: 'manager@example.com',
@@ -681,7 +681,7 @@ await wraps.send({
                   With Attachments
                 </h3>
                 <CodeBlock
-                  code={`await wraps.send({
+                  code={`await email.send({
   from: 'invoices@yourdomain.com',
   to: 'customer@example.com',
   subject: 'Your Invoice',
@@ -753,7 +753,7 @@ await wraps.send({
                 SES&apos;s mailbox simulator addresses:
               </p>
               <CodeBlock
-                code={`await wraps.send({
+                code={`await email.send({
   from: 'test@yourdomain.com',
   to: 'success@simulator.amazonses.com', // Always succeeds
   subject: 'Test email',

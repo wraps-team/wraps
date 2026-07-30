@@ -618,9 +618,9 @@ export function CodeTabs() {
       label: "Send Email",
       code: `import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
-await wraps.send({
+await email.send({
   from: 'hello@yourdomain.com',
   to: 'user@example.com',
   subject: 'Welcome!',
@@ -631,10 +631,10 @@ await wraps.send({
       label: "Batch Send",
       code: `import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 // Unique content per recipient, one SES call (max 100)
-await wraps.sendBatch({
+await email.sendBatch({
   from: 'updates@yourdomain.com',
   entries: [
     { to: 'alice@example.com', subject: 'Product Update', html: '<h1>Hi Alice</h1>' },

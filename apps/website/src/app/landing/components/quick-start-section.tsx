@@ -41,9 +41,9 @@ npx @wraps.dev/cli email status`;
 
 const sdkExample = `import { WrapsEmail } from '@wraps.dev/email';
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
-const result = await wraps.send({
+const result = await email.send({
   from: 'hello@yourdomain.com',
   to: 'user@example.com',
   subject: 'Welcome to our app!',
@@ -67,7 +67,7 @@ const tabContent = {
   send: {
     title: "TypeScript-First SDK",
     description:
-      "Clean API with full type safety. Automatic credential handling via OIDC. Just wraps.send() - no boilerplate.",
+      "Clean API with full type safety. Automatic credential handling via OIDC. Just email.send() - no boilerplate.",
     ctaText: "View SDK Reference",
     ctaLink: "/docs/sdk-reference",
   },

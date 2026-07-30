@@ -16,11 +16,11 @@ import {
 
 const sendFromAgent = `import { WrapsEmail } from "@wraps.dev/email";
 
-const wraps = new WrapsEmail();
+const email = new WrapsEmail();
 
 // The agent already has the rest — it knows the user,
 // the message, and when to send. It just needs a sender.
-await wraps.send({
+await email.send({
   from: "agent@yourdomain.com",
   to: userEmail,
   subject: reportSubject,

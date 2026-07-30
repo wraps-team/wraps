@@ -60,8 +60,8 @@ export default function NudgeSendFirstEmail({ unsubscribeUrl }: Props) {
               >
                 email.send()
               </code>{" "}
-              with a from, to, and subject and you&apos;ll see it land in
-              seconds.{" "}
+              with a from, to, subject, and html body and you&apos;ll see it
+              land in seconds.{" "}
               <Link
                 className="text-gray-800 underline"
                 href="https://wraps.dev/docs/quickstart/email"

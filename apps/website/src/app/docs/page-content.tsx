@@ -41,9 +41,9 @@ const installCode = "npx @wraps.dev/cli email init";
 
 const sendCode = `import { WrapsEmail } from '@wraps.dev/email'
 
-const wraps = new WrapsEmail()
+const email = new WrapsEmail()
 
-await wraps.send({
+await email.send({
   from: 'hello@yourdomain.com',
   to: 'user@example.com',
   subject: 'Welcome',
