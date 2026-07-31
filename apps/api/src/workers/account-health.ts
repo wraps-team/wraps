@@ -10,6 +10,8 @@
  *                             (SES review thresholds; pause is 10% / 0.5%)
  *   - ses.quota_warning       >= 80% of the 24h send quota consumed
  *   - ses.production_access   sandbox -> production transition observed
+ *   - aws.role_unreachable    the customer's console-access role cannot be
+ *                             assumed, or no longer grants SES read access
  *
  * Each alert is deduped per account per 24h via hasRecentNotification, so
  * an ongoing episode notifies once per day rather than once per hour.
@@ -24,7 +26,11 @@ import {
   CloudWatchClient,
   GetMetricDataCommand,
 } from "@aws-sdk/client-cloudwatch";
-import { GetAccountCommand, SESv2Client } from "@aws-sdk/client-sesv2";
+import {
+  GetAccountCommand,
+  type GetAccountCommandOutput,
+  SESv2Client,
+} from "@aws-sdk/client-sesv2";
 import { captureException, wrapHandler } from "@sentry/aws-serverless";
 import {
   awsAccount,
@@ -36,12 +42,41 @@ import {
 import type { Handler } from "aws-lambda";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { flushLogger, log } from "../lib/logger";
-import { getCredentials } from "../services/credentials";
+import { type AwsCredentials, getCredentials } from "../services/credentials";
 
 const DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000; // once per day per account
 const BOUNCE_RATE_WARN = 0.05; // SES review threshold
 const COMPLAINT_RATE_WARN = 0.001; // SES review threshold
 const QUOTA_WARN_RATIO = 0.8;
+
+/**
+ * STS/SES codes that all mean the same thing operationally: the customer's
+ * console-access role is gone, its trust policy no longer admits this Lambda,
+ * or it no longer carries the SES read permissions the sweep needs.
+ */
+const ROLE_ACCESS_ERROR_CODES = [
+  "AccessDenied",
+  "AccessDeniedException",
+  "NoSuchEntity",
+  "NoSuchEntityException",
+  "InvalidClientTokenId",
+  "ExpiredToken",
+  "ExpiredTokenException",
+  "UnrecognizedClientException",
+] as const;
+
+/**
+ * AWS SDK v3 error names are unreliable — some errors arrive as `name: "Error"`
+ * with the real code only in the message — so both are checked.
+ */
+function isRoleAccessError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return ROLE_ACCESS_ERROR_CODES.some(
+    (code) => error.name === code || error.message.includes(code)
+  );
+}
 
 type AccountRow = {
   id: string;
@@ -142,17 +177,42 @@ async function checkAccount(account: AccountRow): Promise<void> {
   }
   const accountHref = `/${orgSlug}/settings/aws-accounts/${account.id}`;
 
-  const credentials = await getCredentials(account.id, account.organizationId);
-  const sesClient = new SESv2Client({
-    region: credentials.region,
-    credentials: {
-      accessKeyId: credentials.accessKeyId,
-      secretAccessKey: credentials.secretAccessKey,
-      sessionToken: credentials.sessionToken,
-    },
-  });
-
-  const info = await sesClient.send(new GetAccountCommand({}));
+  // Assuming the role and reading SES are the two points where a deleted role,
+  // a drifted trust policy, or a stripped inline policy surfaces. That is the
+  // customer's configuration to repair, not a defect here: it never self-heals,
+  // so reporting it to Sentry every hour buries real failures while leaving the
+  // customer unaware their account stopped being health-checked.
+  let credentials: AwsCredentials;
+  let info: GetAccountCommandOutput;
+  try {
+    credentials = await getCredentials(account.id, account.organizationId);
+    info = await new SESv2Client({
+      region: credentials.region,
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+        sessionToken: credentials.sessionToken,
+      },
+    }).send(new GetAccountCommand({}));
+  } catch (error) {
+    if (!isRoleAccessError(error)) {
+      throw error;
+    }
+    await notifyOnce({
+      account,
+      type: "aws.role_unreachable",
+      title: "Wraps can no longer reach your AWS account",
+      body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) cannot be assumed or is missing SES permissions, so health checks — sending paused, reputation, and quota alerts — are not running for this account. Run \`wraps platform update-role\` to repair the role's trust policy and permissions, or \`wraps platform connect\` if the role was deleted.`,
+      href: accountHref,
+      data: { reason: error instanceof Error ? error.name : "unknown" },
+    });
+    log.warn("[account-health] Customer role unusable, skipping account", {
+      accountId: account.id,
+      organizationId: account.organizationId,
+      awsAccountId: account.accountId,
+    });
+    return;
+  }
 
   // 1. Sending paused / enforcement problems — the catastrophic one.
   const enforcement = info.EnforcementStatus;
