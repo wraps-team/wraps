@@ -15,13 +15,27 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const ACCOUNT_ROW = {
+/**
+ * Mutable so a test can flip the account between "has passed a check before"
+ * and "never has" — that distinction is what decides whether a broken role is
+ * a reportable regression or an unfinished setup.
+ */
+const ACCOUNT_ROW: {
+  id: string;
+  organizationId: string;
+  name: string;
+  accountId: string;
+  region: string;
+  features: { email: { sandbox: boolean } };
+  roleLastReachableAt: Date | null;
+} = {
   id: "acct-row-1",
   organizationId: "org-1",
   name: "Production",
   accountId: "472506473063",
   region: "us-east-1",
   features: { email: { sandbox: false } },
+  roleLastReachableAt: new Date("2026-07-01T00:00:00Z"),
 };
 
 const CREDENTIAL_ROW = {
@@ -76,6 +90,8 @@ vi.mock("../lib/logger", () => ({
 
 const mockNotifyOrg = vi.fn().mockResolvedValue([]);
 const mockHasRecentNotification = vi.fn().mockResolvedValue(false);
+/** Captures every db.update().set() payload so the "known good" stamp is visible. */
+const mockDbSet = vi.fn();
 
 vi.mock("@wraps/db", () => {
   const awsAccountTable = { __table: "awsAccount" };
@@ -100,7 +116,12 @@ vi.mock("@wraps/db", () => {
   return {
     db: {
       select: () => ({ from: chainFor }),
-      update: () => ({ set: () => ({ where: () => Promise.resolve([]) }) }),
+      update: () => ({
+        set: (values: unknown) => {
+          mockDbSet(values);
+          return { where: () => Promise.resolve([]) };
+        },
+      }),
     },
     awsAccount: awsAccountTable,
     organization: organizationTable,
@@ -138,11 +159,22 @@ const invoke = () =>
     }
   );
 
+let accountCounter = 0;
+
 describe("account-health with an unusable customer role", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockHasRecentNotification.mockResolvedValue(false);
     mockNotifyOrg.mockResolvedValue([]);
+    // Default: an account that has passed a check before, so the broken role
+    // is a genuine regression. The never-worked case sets this to null.
+    ACCOUNT_ROW.roleLastReachableAt = new Date("2026-07-01T00:00:00Z");
+    // getCredentials caches per `${accountId}:${orgId}` in module scope with
+    // the credential's own expiry, so a test that assumes the role successfully
+    // would serve every later test from cache and stop them reaching STS at
+    // all. A fresh id per test keeps that cache from crossing test boundaries.
+    accountCounter += 1;
+    ACCOUNT_ROW.id = `acct-row-${accountCounter}`;
   });
 
   it("notifies the organization instead of reporting to Sentry", async () => {
@@ -154,13 +186,80 @@ describe("account-health with an unusable customer role", () => {
     const payload = mockNotifyOrg.mock.calls[0][0];
     expect(payload.organizationId).toBe("org-1");
     expect(payload.type).toBe("aws.role_unreachable");
-    expect(payload.data).toMatchObject({ awsAccountId: "acct-row-1" });
+    expect(payload.data).toMatchObject({ awsAccountId: ACCOUNT_ROW.id });
     // The copy has to name the account and the repair command, or the customer
     // cannot act on it.
     expect(`${payload.title} ${payload.body}`).toContain("472506473063");
     expect(payload.body).toContain("wraps platform update-role");
 
     expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("stays silent when the role has never once been reachable", async () => {
+    // The account that produced 517 Sentry events: registered 2026-05-14, never
+    // received an SES event, role never assumable. Nothing regressed, so there
+    // is nothing to tell the customer that they could act on.
+    ACCOUNT_ROW.roleLastReachableAt = null;
+    mockStsSend.mockRejectedValue(accessDeniedError());
+
+    await invoke();
+
+    expect(mockNotifyOrg).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    // Silence must come from the never-reachable rule, not from dedupe
+    // accidentally suppressing it — dedupe is off in this test.
+    expect(mockHasRecentNotification).not.toHaveBeenCalled();
+  });
+
+  it("alerts a previously-working role and says when it last worked", async () => {
+    ACCOUNT_ROW.roleLastReachableAt = new Date("2026-07-01T00:00:00Z");
+    mockStsSend.mockRejectedValue(accessDeniedError());
+
+    await invoke();
+
+    expect(mockNotifyOrg).toHaveBeenCalledTimes(1);
+    expect(mockNotifyOrg.mock.calls[0][0].data).toMatchObject({
+      lastReachableAt: "2026-07-01T00:00:00.000Z",
+    });
+  });
+
+  it("stamps the account as reachable when the check succeeds", async () => {
+    // Without this write no account ever becomes alert-eligible, so a role
+    // that genuinely breaks later would be silently ignored forever.
+    mockStsSend.mockResolvedValue({
+      Credentials: {
+        AccessKeyId: "AKIA-test",
+        SecretAccessKey: "secret",
+        SessionToken: "token",
+        Expiration: new Date("2099-01-01"),
+      },
+    });
+    mockSesSend.mockResolvedValue({
+      SendingEnabled: true,
+      EnforcementStatus: "HEALTHY",
+      SendQuota: { Max24HourSend: 50_000, SentLast24Hours: 10 },
+    });
+    mockCloudWatchSend.mockResolvedValue({ MetricDataResults: [] });
+
+    await invoke();
+
+    const stamped = mockDbSet.mock.calls.find(
+      (call) => call[0]?.roleLastReachableAt instanceof Date
+    );
+    expect(stamped).toBeDefined();
+    expect(mockNotifyOrg).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("does not stamp reachability when the role is unusable", async () => {
+    mockStsSend.mockRejectedValue(accessDeniedError());
+
+    await invoke();
+
+    const stamped = mockDbSet.mock.calls.find(
+      (call) => call[0]?.roleLastReachableAt !== undefined
+    );
+    expect(stamped).toBeUndefined();
   });
 
   it("dedupes so an unrepaired role notifies once per window, not hourly", async () => {

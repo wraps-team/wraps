@@ -1,0 +1,1 @@
+ALTER TABLE "aws_account" ADD COLUMN "role_last_reachable_at" timestamp;

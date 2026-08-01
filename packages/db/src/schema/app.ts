@@ -80,8 +80,25 @@ export const awsAccount = pgTable(
     webhookSecret: text("webhook_secret"), // API key for webhook validation
 
     // Verification
+    // NOTE: both are set at REGISTRATION, before the CLI creates the IAM role,
+    // so neither is evidence the role was ever assumable — every connected
+    // account carries isVerified=true regardless of whether it works.
     isVerified: boolean("is_verified").default(false).notNull(),
     lastVerifiedAt: timestamp("last_verified_at"),
+
+    // Last time the account-health sweep actually assumed the console-access
+    // role AND read SES with it — a real "known good", unlike isVerified above.
+    //
+    // NULL means no successful check has ever been observed, which covers both
+    // the never-finished setup and any account already broken when this column
+    // shipped. Those two are indistinguishable from here, so the role_unreachable
+    // alert stays silent while NULL: an account that never worked has no
+    // regression to report, and telling someone their role "broke" when they
+    // never finished connecting it is noise they cannot act on.
+    //
+    // Self-backfilling: any account whose role does work is stamped on the next
+    // hourly sweep and becomes alert-eligible from then on.
+    roleLastReachableAt: timestamp("role_last_reachable_at"),
 
     // Liveness of the SES event feed: bumped (throttled) by the SES webhook
     // route every time an authenticated event arrives for this account.

@@ -11,7 +11,11 @@
  *   - ses.quota_warning       >= 80% of the 24h send quota consumed
  *   - ses.production_access   sandbox -> production transition observed
  *   - aws.role_unreachable    the customer's console-access role cannot be
- *                             assumed, or no longer grants SES read access
+ *                             assumed, or no longer grants SES read access.
+ *                             Only raised for an account that previously
+ *                             passed a check (roleLastReachableAt is set) —
+ *                             a role that has never worked is an unfinished
+ *                             setup, not a regression, and stays silent.
  *
  * Each alert is deduped per account per 24h via hasRecentNotification, so
  * an ongoing episode notifies once per day rather than once per hour.
@@ -85,6 +89,7 @@ type AccountRow = {
   accountId: string;
   region: string;
   features: typeof awsAccount.$inferSelect.features;
+  roleLastReachableAt: Date | null;
 };
 
 async function getOrgSlug(organizationId: string): Promise<string | null> {
@@ -198,21 +203,55 @@ async function checkAccount(account: AccountRow): Promise<void> {
     if (!isRoleAccessError(error)) {
       throw error;
     }
+    // "Can no longer reach" is only true if it was ever reached. An account
+    // that has never passed a check is one that was never finished being set
+    // up — there is no regression to report, and an alert saying the role
+    // broke is something the customer cannot act on because nothing changed.
+    // Silence here is deliberate: these accounts are the majority, they never
+    // self-heal, and alerting them buries the accounts that genuinely broke.
+    if (account.roleLastReachableAt === null) {
+      log.info(
+        "[account-health] Role unusable and never reachable, skipping silently",
+        {
+          accountId: account.id,
+          organizationId: account.organizationId,
+          awsAccountId: account.accountId,
+        }
+      );
+      return;
+    }
     await notifyOnce({
       account,
       type: "aws.role_unreachable",
       title: "Wraps can no longer reach your AWS account",
       body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) cannot be assumed or is missing SES permissions, so health checks — sending paused, reputation, and quota alerts — are not running for this account. Run \`wraps platform update-role\` to repair the role's trust policy and permissions, or \`wraps platform connect\` if the role was deleted.`,
       href: accountHref,
-      data: { reason: error instanceof Error ? error.name : "unknown" },
+      data: {
+        reason: error instanceof Error ? error.name : "unknown",
+        lastReachableAt: account.roleLastReachableAt.toISOString(),
+      },
     });
     log.warn("[account-health] Customer role unusable, skipping account", {
       accountId: account.id,
       organizationId: account.organizationId,
       awsAccountId: account.accountId,
+      lastReachableAt: account.roleLastReachableAt.toISOString(),
     });
     return;
   }
+
+  // Known good: the role assumed and SES answered. Stamped before the checks
+  // below so a later failure in one of them cannot retroactively make this
+  // account look unreachable.
+  await db
+    .update(awsAccount)
+    .set({ roleLastReachableAt: new Date() })
+    .where(
+      and(
+        eq(awsAccount.id, account.id),
+        eq(awsAccount.organizationId, account.organizationId)
+      )
+    );
 
   // 1. Sending paused / enforcement problems — the catastrophic one.
   const enforcement = info.EnforcementStatus;
@@ -319,6 +358,7 @@ export const handler: Handler = wrapHandler(async () => {
       accountId: awsAccount.accountId,
       region: awsAccount.region,
       features: awsAccount.features,
+      roleLastReachableAt: awsAccount.roleLastReachableAt,
     })
     .from(awsAccount)
     .where(isNotNull(awsAccount.webhookSecret));
