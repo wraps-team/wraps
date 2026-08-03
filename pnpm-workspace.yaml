@@ -56,3 +56,15 @@ catalog:
   zod: ^4.4.3
 
 strictDepBuilds: true
+
+allowBuilds:
+  '@posthog/cli': set this to true or false
+  '@pulumi/command': set this to true or false
+  '@sentry-internal/node-cpu-profiler': set this to true or false
+  '@sentry/cli': set this to true or false
+  core-js: set this to true or false
+  es5-ext: set this to true or false
+  esbuild: set this to true or false
+  protobufjs: set this to true or false
+  sharp: set this to true or false
+  unrs-resolver: set this to true or false
