@@ -3,9 +3,10 @@
 import { ModeToggle } from "@wraps/ui/components/mode-toggle";
 import { Button } from "@wraps/ui/components/ui/button";
 import { Separator } from "@wraps/ui/components/ui/separator";
-import { Github, Heart } from "lucide-react";
+import { Heart } from "lucide-react";
 import { XLogo } from "@/components/icons/x-logo";
 import { Logo } from "@/components/logo";
+import { Github } from "@/components/ui/svgs/brand-icons";
 import { WrapsMotifLayers } from "@/components/wraps-motif-layers";
 
 const footerLinks = {

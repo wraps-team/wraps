@@ -47,12 +47,12 @@ catalog:
   drizzle-orm: ^0.45.2
   handlebars: 4.7.9
   pg: ^8.22.0
-  posthog-node: ^5.38.2
+  posthog-node: ^5.46.1
   stripe: ^19.3.0
-  tsdown: ^0.15.12
+  tsdown: ^0.22.14
   tsup: ^8.5.1
   typescript: ^5.9.3
   vitest: 4.1.9
-  zod: ^4.3.6
+  zod: ^4.4.3
 
 strictDepBuilds: true

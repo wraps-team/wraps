@@ -1,10 +1,11 @@
 import { Button } from "@wraps/ui/components/ui/button";
-import { Cloud, Github, Lock, Package, Zap } from "lucide-react";
+import { Cloud, Lock, Package, Zap } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
+import { Github } from "@/components/ui/svgs/brand-icons";
 
 export const metadata: Metadata = {
   title: "About Wraps - Our Mission and Values",

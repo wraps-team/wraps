@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@wraps/ui/components/ui/button";
-import { Github } from "lucide-react";
 import {
   CodeBlock,
   CodeBlockBody,
@@ -12,6 +11,7 @@ import {
   CodeBlockHeader,
   CodeBlockItem,
 } from "@/components/ui/shadcn-io/code-block";
+import { Github } from "@/components/ui/svgs/brand-icons";
 import { SectionKicker } from "./section-kicker";
 
 const sampleCode = `// Install: npm i @wraps.dev/email

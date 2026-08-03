@@ -3,8 +3,9 @@
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Button } from "@wraps/ui/components/ui/button";
 import { Card, CardContent } from "@wraps/ui/components/ui/card";
-import { Cloud, Github, Lock, Package, Zap } from "lucide-react";
+import { Cloud, Lock, Package, Zap } from "lucide-react";
 import { CardDecorator } from "@/components/ui/card-decorator";
+import { Github } from "@/components/ui/svgs/brand-icons";
 
 const values = [
   {

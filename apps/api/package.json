@@ -36,8 +36,8 @@
     "@react-email/render": "catalog:",
     "@sentry/aws-serverless": "10.46.0",
     "@sentry/profiling-node": "10.46.0",
-    "@smithy/node-http-handler": "^4.8.2",
-    "@wraps.dev/client": "0.6.1",
+    "@smithy/node-http-handler": "^4.9.11",
+    "@wraps.dev/client": "0.8.1",
     "@wraps.dev/email-check": "workspace:*",
     "@wraps/auth": "workspace:*",
     "@wraps/core": "workspace:*",
@@ -54,7 +54,7 @@
     "pg": "^8.22.0",
     "pino": "10.1.0",
     "posthog-node": "catalog:",
-    "undici": "^7.28.0"
+    "undici": "^7.29.0"
   },
   "devDependencies": {
     "@aws-sdk/credential-providers": "catalog:",

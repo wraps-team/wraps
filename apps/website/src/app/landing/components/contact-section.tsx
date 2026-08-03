@@ -1,9 +1,10 @@
 "use client";
 
-import { BookOpen, Github, MessageCircle } from "lucide-react";
+import { BookOpen, MessageCircle } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { memo } from "react";
+import { Github } from "@/components/ui/svgs/brand-icons";
 
 const Cal = dynamic(() => import("@calcom/embed-react"), { ssr: false });
 

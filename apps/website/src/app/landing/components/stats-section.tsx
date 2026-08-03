@@ -1,6 +1,7 @@
 "use client";
 
-import { Clock, Github, ShieldCheck, Zap } from "lucide-react";
+import { Clock, ShieldCheck, Zap } from "lucide-react";
+import { Github } from "@/components/ui/svgs/brand-icons";
 
 const stats = [
   {

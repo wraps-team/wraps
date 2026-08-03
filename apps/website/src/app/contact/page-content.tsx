@@ -1,17 +1,12 @@
 "use client";
 
 import { Button } from "@wraps/ui/components/ui/button";
-import {
-  ArrowUpRight,
-  BookOpen,
-  Github,
-  Mail,
-  MessageCircle,
-} from "lucide-react";
+import { ArrowUpRight, BookOpen, Mail, MessageCircle } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
+import { Github } from "@/components/ui/svgs/brand-icons";
 
 const Cal = dynamic(() => import("@calcom/embed-react"), {
   ssr: false,

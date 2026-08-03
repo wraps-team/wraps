@@ -21,9 +21,10 @@ import {
   SheetTrigger,
 } from "@wraps/ui/components/ui/sheet";
 import { useTheme } from "@wraps/ui/hooks/use-theme";
-import { ChevronDown, Github, Menu, Moon, Sun, X } from "lucide-react";
+import { ChevronDown, Menu, Moon, Sun, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/logo";
+import { Github } from "@/components/ui/svgs/brand-icons";
 import { trackEvent } from "@/utils/analytics";
 
 const navigationItems: {

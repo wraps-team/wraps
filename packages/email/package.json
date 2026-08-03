@@ -30,7 +30,7 @@
     "@aws-sdk/credential-providers": "catalog:",
     "@react-email/render": "catalog:",
     "@vercel/oidc-aws-credentials-provider": "3.0.4",
-    "@wraps.dev/email": "^0.5.1",
+    "@wraps.dev/email": "^0.12.1",
     "@wraps/db": "workspace:*",
     "@wraps/template-render": "workspace:*",
     "jose": "6.1.3"

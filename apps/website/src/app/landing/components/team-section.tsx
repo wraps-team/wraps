@@ -8,8 +8,9 @@ import {
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Button } from "@wraps/ui/components/ui/button";
 import { Card, CardContent } from "@wraps/ui/components/ui/card";
-import { Github, Globe, Linkedin } from "lucide-react";
+import { Globe } from "lucide-react";
 import { CardDecorator } from "@/components/ui/card-decorator";
+import { Github, Linkedin } from "@/components/ui/svgs/brand-icons";
 
 const team = [
   {

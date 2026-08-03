@@ -1,7 +1,8 @@
 "use client";
 
 import { Button } from "@wraps/ui/components/ui/button";
-import { ArrowRight, Github } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { Github } from "@/components/ui/svgs/brand-icons";
 import { trackEvent } from "@/utils/analytics";
 
 export function CTAButtons() {

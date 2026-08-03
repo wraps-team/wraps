@@ -72,14 +72,14 @@
     "@aws-sdk/client-sesv2": "catalog:"
   },
   "devDependencies": {
-    "@pulumi/aws": "^7.34.0",
-    "@pulumi/cloudflare": "^6.17.0",
+    "@pulumi/aws": "^7.39.0",
+    "@pulumi/cloudflare": "^6.18.0",
     "@pulumi/command": "^1.2.1",
-    "@pulumi/pulumi": "^3.247.0",
+    "@pulumi/pulumi": "^3.254.0",
     "@types/node": "catalog:",
     "@wraps/core": "workspace:*",
     "tsup": "catalog:",
-    "tsx": "^4.22.4",
+    "tsx": "^4.23.1",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

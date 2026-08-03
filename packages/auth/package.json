@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "tsdown": "catalog:",
-    "vite": "^7.3.5",
+    "vite": "^7.3.6",
     "vitest": "catalog:"
   },
   "peerDependencies": {
@@ -35,8 +35,8 @@
     "@better-auth/stripe": "1.6.23",
     "@sentry/nextjs": "10.47.0",
     "@vercel/oidc-aws-credentials-provider": "3.0.4",
-    "@wraps.dev/client": "0.4.0",
-    "@wraps.dev/email": "^0.5.1",
+    "@wraps.dev/client": "0.8.1",
+    "@wraps.dev/email": "^0.12.1",
     "@wraps.dev/sms": "^0.1.6",
     "@wraps/db": "workspace:*",
     "@wraps/email": "workspace:*",
