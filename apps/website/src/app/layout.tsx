@@ -3,6 +3,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { AnalyticsProvider } from "@/components/analytics-provider";
+import { AttributionLinks } from "@/components/attribution-links";
 import { JsonLd } from "@/components/json-ld";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeShortcut } from "@/components/theme-shortcut";
@@ -125,6 +126,7 @@ export default function RootLayout({
             </AnalyticsProvider>
           </ThemeProvider>
         </NuqsAdapter>
+        <AttributionLinks />
         <WebMCP />
         <Analytics />
         <SpeedInsights />

@@ -1,11 +1,21 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { setAttributionCookie } from "@/lib/attribution";
 
 export async function middleware(request: NextRequest) {
   const accept = request.headers.get("accept") ?? "";
-  if (!accept.includes("text/markdown")) {
-    return NextResponse.next();
-  }
+  const response = accept.includes("text/markdown")
+    ? markdownRewrite(request)
+    : NextResponse.next();
 
+  // Campaign traffic lands on wraps.dev, not app.wraps.dev, so this is the only
+  // place first touch can be recorded. The cookie is domain-scoped so the
+  // dashboard reads it back at signup.
+  setAttributionCookie(request, response);
+
+  return response;
+}
+
+function markdownRewrite(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
   // Route the request to /api/md/<path> so dynamic route params carry the page path
   const mdPath = pathname === "/" ? "/api/md/root" : `/api/md${pathname}`;

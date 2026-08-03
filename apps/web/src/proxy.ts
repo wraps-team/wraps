@@ -18,8 +18,28 @@ const ATTRIBUTION_COOKIE = "wraps_attribution";
 const ATTRIBUTION_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
 
 /**
+ * Cookie domain for a given request host.
+ *
+ * `.wraps.dev` in production so this cookie and the one apps/website writes are
+ * the same cookie — campaign traffic lands on wraps.dev and signs up here.
+ * Undefined elsewhere: a domain attribute naming a host you are not on is
+ * rejected, which would drop the cookie on localhost and Vercel previews.
+ *
+ * Keep in sync with apps/website/src/lib/attribution.ts.
+ */
+function attributionCookieDomain(hostname: string): string | undefined {
+  return hostname === "wraps.dev" || hostname.endsWith(".wraps.dev")
+    ? ".wraps.dev"
+    : undefined;
+}
+
+/**
  * Set a first-touch attribution cookie if UTM or ref params are present
  * and no attribution cookie exists yet.
+ *
+ * Most campaign traffic never reaches this function — it arrives on wraps.dev,
+ * where apps/website's middleware writes the cookie. This covers links that
+ * point straight at the app with params attached.
  */
 function setAttributionCookie(
   request: NextRequest,
@@ -59,11 +79,14 @@ function setAttributionCookie(
   attribution.landing_page = request.nextUrl.pathname;
   attribution.timestamp = new Date().toISOString();
 
+  const domain = attributionCookieDomain(request.nextUrl.hostname);
+
   response.cookies.set(ATTRIBUTION_COOKIE, JSON.stringify(attribution), {
     maxAge: ATTRIBUTION_MAX_AGE,
     secure: true,
     sameSite: "lax",
     path: "/",
+    ...(domain ? { domain } : {}),
     // NOT httpOnly — needs client-side read for PostHog
   });
 }
