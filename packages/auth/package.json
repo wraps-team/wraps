@@ -35,6 +35,7 @@
     "@better-auth/stripe": "1.6.23",
     "@sentry/nextjs": "10.47.0",
     "@vercel/oidc-aws-credentials-provider": "3.0.4",
+    "@wraps.dev/better-auth": "^0.2.0",
     "@wraps.dev/client": "0.8.1",
     "@wraps.dev/email": "^0.12.1",
     "@wraps.dev/sms": "^0.1.6",

@@ -7,6 +7,7 @@ import * as schema from "@wraps/db/schema/auth";
 import * as scimSchema from "@wraps/db/schema/scim-provider";
 import * as ssoSchema from "@wraps/db/schema/sso-provider";
 import { getWrapsClient } from "@wraps/email";
+import { wraps as wrapsContactSync } from "@wraps.dev/better-auth";
 import { createPlatformClient } from "@wraps.dev/client";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -202,81 +203,6 @@ async function trackPostHogSignup(
     await posthog.flush();
   } catch (err) {
     console.error("Error tracking PostHog signup:", err);
-  }
-}
-
-/**
- * Track user signup event for welcome automation.
- * Creates the contact if needed, then emits the user.signup event.
- * Non-blocking - failures are logged but don't affect auth flow.
- */
-async function trackUserSignup(
-  user: { email: string; name: string | null },
-  attribution?: Attribution | null
-) {
-  try {
-    const apiKey = process.env.WRAPS_API_KEY;
-    if (!apiKey) {
-      console.warn("WRAPS_API_KEY not configured, skipping signup event");
-      return;
-    }
-
-    const client = createPlatformClient({ apiKey });
-    const normalizedEmail = user.email.toLowerCase().trim();
-
-    const safeAttribution = attribution
-      ? {
-          utm_source: attribution.utm_source,
-          utm_medium: attribution.utm_medium,
-          utm_campaign: attribution.utm_campaign,
-          utm_content: attribution.utm_content,
-          utm_term: attribution.utm_term,
-          ref: attribution.ref,
-          referrer: attribution.referrer,
-          landing_page: attribution.landing_page,
-          timestamp: attribution.timestamp,
-        }
-      : undefined;
-
-    // Create/upsert the contact first (required for events)
-    // Subscribe to product updates topic for announcements
-    const { error: contactError } = await client.POST("/v1/contacts/", {
-      body: {
-        email: normalizedEmail,
-        emailStatus: "active",
-        properties: {
-          name: user.name || undefined,
-          signupAt: new Date().toISOString(),
-          source: "web",
-          ...safeAttribution,
-        },
-        topicSlugs: ["wraps-product-updates"],
-      },
-    });
-
-    if (contactError) {
-      // Contact might already exist (e.g., from waitlist), that's OK
-    }
-
-    // Now emit the signup event
-    const { error: eventError } = await client.POST("/v1/events/", {
-      body: {
-        name: "user.signup",
-        contactEmail: normalizedEmail,
-        properties: {
-          name: user.name || undefined,
-          signupAt: new Date().toISOString(),
-          source: "web",
-          ...safeAttribution,
-        },
-      },
-    });
-
-    if (eventError) {
-      console.error("Failed to track user.signup event:", eventError);
-    }
-  } catch (err) {
-    console.error("Error tracking user.signup event:", err);
   }
 }
 
@@ -590,6 +516,26 @@ export const auth = betterAuth<BetterAuthOptions>({
       customPasswordCompromisedMessage:
         "This password has been exposed in a data breach. Please choose a more secure password.",
     }),
+    // Upserts the Wraps contact and emits user.signup, which is what triggers
+    // the onboarding-rescue workflow. `attribution: true` reads the
+    // wraps_attribution cookie the marketing site sets on first touch, so the
+    // contact record carries the campaign that produced the signup.
+    //
+    // Its database hooks are additive — better-auth collects plugin hooks and
+    // this file's own `databaseHooks` into one list and runs both.
+    wrapsContactSync({
+      apiKey: process.env.WRAPS_API_KEY,
+      eventName: "user.signup",
+      topicSlugs: ["wraps-product-updates"],
+      attribution: true,
+      properties: (user) => ({
+        name: user.name || undefined,
+        signupAt: new Date().toISOString(),
+        source: "web",
+      }),
+      onError: (error, { stage }) =>
+        console.error(`Wraps contact sync failed (${stage}):`, error),
+    }),
     lastLoginMethod({
       storeInDatabase: true,
     }),
@@ -741,19 +687,15 @@ export const auth = betterAuth<BetterAuthOptions>({
               method = "github";
             }
 
-            // Parse marketing attribution from cookie
+            // Parse marketing attribution from cookie. The Wraps contact and
+            // the user.signup event are handled by the wrapsContactSync plugin
+            // above; this hook only owns PostHog.
             const attribution = getAttributionFromContext(context);
 
-            await Promise.allSettled([
-              trackUserSignup(
-                { email: user.email, name: user.name },
-                attribution
-              ),
-              trackPostHogSignup(
-                { email: user.email, name: user.name, method },
-                attribution
-              ),
-            ]);
+            await trackPostHogSignup(
+              { email: user.email, name: user.name, method },
+              attribution
+            );
           } catch (error) {
             console.error("Error in user create tracking hook:", error);
           }

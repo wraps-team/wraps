@@ -6,9 +6,12 @@ packages:
   - "!packages/video"
   - wraps
 
-# better-inbox is our own package (github.com/better-inbox/better-inbox)
+# Our own packages — the release-age gate exists to catch a compromised
+# upstream publish, and we are the upstream.
+# github.com/better-inbox/better-inbox, github.com/wraps-team/better-auth-wraps
 minimumReleaseAgeExclude:
   - better-inbox
+  - '@wraps.dev/better-auth'
 
 catalog:
   '@aws-sdk/client-acm': 3.1074.0

@@ -1147,6 +1147,9 @@ importers:
       '@vercel/oidc-aws-credentials-provider':
         specifier: 3.0.4
         version: 3.0.4
+      '@wraps.dev/better-auth':
+        specifier: ^0.2.0
+        version: 0.2.0(@wraps.dev/email@0.12.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8))(better-auth@1.6.23(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1095.0)(socks@2.8.9))(next@16.2.6(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.9))
       '@wraps.dev/client':
         specifier: 0.8.1
         version: 0.8.1
@@ -8478,6 +8481,20 @@ packages:
 
   '@webgpu/types@0.1.71':
     resolution: {integrity: sha512-mMy8/ODcKhab808co15eW+yN+HgXoQxRQHTiBV9Mrvl1r0ufnid7YOcI+gi4eUWSWl9ezD6TW2KXccrL8HCh2A==}
+
+  '@wraps.dev/better-auth@0.2.0':
+    resolution: {integrity: sha512-HI9a2epkyCkEgSM4zQCWjdmioG5RnflzlT8X7C9oUhOMwK+HAyCA0c4etcEs89WvYFLMYy02ruRhFW6JM5Y/XQ==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@wraps.dev/email': '>=0.12.0'
+      better-auth: '>=1.6.0'
+    peerDependenciesMeta:
+      '@wraps.dev/email':
+        optional: true
+
+  '@wraps.dev/client@0.10.0':
+    resolution: {integrity: sha512-oJhBgu/vSjUhhRLvQ64s1QD4Nlbg/dHxqoPbHrh7f7aUquW1r1Iopk2KqUJ0vJENqhI2jxXdEAxqxVnZTJDttQ==}
+    engines: {node: '>=20.0.0'}
 
   '@wraps.dev/client@0.8.1':
     resolution: {integrity: sha512-0Jr8ZXWu1mUI3gkuTvwZFnOhXcps30HLMjHvcHqoK+NKcVDWX+qKYtmnizwOJmCUSkuVEOWuo+0YqIJDBjYZTg==}
@@ -21334,6 +21351,17 @@ snapshots:
 
   '@webgpu/types@0.1.71':
     optional: true
+
+  '@wraps.dev/better-auth@0.2.0(@wraps.dev/email@0.12.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8))(better-auth@1.6.23(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1095.0)(socks@2.8.9))(next@16.2.6(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.9))':
+    dependencies:
+      '@wraps.dev/client': 0.10.0
+      better-auth: 1.6.23(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1095.0)(socks@2.8.9))(next@16.2.6(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.9)
+    optionalDependencies:
+      '@wraps.dev/email': 0.12.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+
+  '@wraps.dev/client@0.10.0':
+    dependencies:
+      openapi-fetch: 0.14.1
 
   '@wraps.dev/client@0.8.1':
     dependencies:
