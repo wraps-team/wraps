@@ -20,7 +20,7 @@ const articleSchema = {
   description:
     "wraps-email 0.1.0 is on PyPI. It signs SigV4 straight against SES in your AWS account — no Wraps API key, no Wraps server in the request path.",
   datePublished: "2026-07-15T00:00:00.000Z",
-  dateModified: "2026-07-15T00:00:00.000Z",
+  dateModified: "2026-08-18T00:00:00.000Z",
   author: {
     "@type": "Organization",
     name: "Wraps",
@@ -766,6 +766,24 @@ except SESError as err:
                     the email API and fails before an email error is even
                     meaningful. Catch it explicitly, or catch both.
                   </p>
+                  <p className="mt-2 text-foreground/80 leading-relaxed">
+                    <strong className="text-foreground">Update (0.2.0):</strong>{" "}
+                    fixed.{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      CredentialsError
+                    </code>{" "}
+                    now subclasses{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      WrapsEmailError
+                    </code>
+                    , so the single catch really does cover everything. It is
+                    also raised from{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      send()
+                    </code>{" "}
+                    rather than the constructor &mdash; credential resolution is
+                    lazy now, so constructing a client does no I/O.
+                  </p>
                 </div>
               </div>
             </div>
@@ -777,6 +795,17 @@ except SESError as err:
               <code className="rounded bg-muted px-1.5 py-0.5">send_batch</code>{" "}
               reports partial failure through its return value, by design. The
               type is there for callers who want to raise their own.
+            </p>
+
+            <p className="mt-4 text-foreground/80 text-lg leading-relaxed">
+              <strong className="text-foreground">Update (0.2.0):</strong>{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">BatchError</code>{" "}
+              is gone. A dead export invited exactly the wrong assumption, so
+              0.2.0 removed it rather than keep exporting a class nothing
+              raises.{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">send_batch</code>{" "}
+              still reports partial failure through its return value &mdash;
+              that part was always the design.
             </p>
           </section>
 
