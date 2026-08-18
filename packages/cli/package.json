@@ -113,6 +113,7 @@
     "@wraps.dev/pulumi": "workspace:*",
     "@wraps/core": "workspace:*",
     "@wraps/db": "workspace:*",
+    "@wraps/template-render": "workspace:*",
     "aws-sdk-client-mock": "4.1.0",
     "aws-sdk-client-mock-vitest": "7.0.1",
     "handlebars": "catalog:",

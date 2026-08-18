@@ -1345,6 +1345,9 @@ importers:
       '@wraps/db':
         specifier: workspace:*
         version: link:../db
+      '@wraps/template-render':
+        specifier: workspace:*
+        version: link:../template-render
       aws-sdk-client-mock:
         specifier: 4.1.0
         version: 4.1.0

@@ -196,27 +196,11 @@ export async function compileForPreview(
  * form and only the published SES artifact is transformed. Anything that
  * asserts on "what SES will parse" has to run this first, or it is checking a
  * string SES never sees.
+ *
+ * Re-exported from `@wraps/template-render` rather than reimplemented: the CLI
+ * carried a byte-for-byte copy, and two copies of the rule that decides what
+ * SES parses is exactly the drift that package exists to prevent. tsup bundles
+ * it into dist (see `noExternal`), so the published CLI carries no runtime
+ * dependency on the private workspace package.
  */
-export function transformVariablesForSes(content: string): string {
-  return content.replace(
-    /\{\{\s*([a-zA-Z0-9_.]+)(?:\s*\|\s*([^}]*))?\s*\}\}/g,
-    (_match, varName, fallback) => {
-      // Flatten dot notation: contact.email → contactEmail
-      const sesName = varName.includes(".")
-        ? varName
-            .split(".")
-            .map((part: string, i: number) =>
-              i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)
-            )
-            .join("")
-        : varName;
-
-      if (fallback !== undefined) {
-        const trimmed = fallback.trim();
-        return `{{#if ${sesName}}}{{${sesName}}}{{else}}${trimmed}{{/if}}`;
-      }
-
-      return `{{${sesName}}}`;
-    }
-  );
-}
+export { transformVariablesForSes } from "@wraps/template-render/mustache-case";
