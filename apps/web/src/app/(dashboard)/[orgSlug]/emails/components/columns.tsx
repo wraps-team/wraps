@@ -3,274 +3,187 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Checkbox } from "@wraps/ui/components/ui/checkbox";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { captureEmailsRowOpened } from "../lib/analytics";
+import { getEmailStatusConfig } from "../lib/status-config";
 import {
-  Ban,
-  CheckCircle2,
-  type Circle,
-  Clock,
-  Mail,
-  MousePointerClick,
-  XCircle,
-} from "lucide-react";
-import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
-import type { EmailListItem, EmailStatus } from "../types";
+  formatFullTimestamp,
+  formatRelativeTimestamp,
+  formatSentDate,
+} from "../lib/timestamps";
+import type { EmailListItem } from "../types";
 
-const STATUS_CONFIG: Record<
-  EmailStatus,
-  {
-    label: string;
-    variant: "default" | "secondary" | "destructive" | "outline";
-    className: string;
-    icon: typeof Circle;
-  }
-> = {
-  sent: {
-    label: "Sent",
-    variant: "secondary",
-    className:
-      "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20",
-    icon: Clock,
-  },
-  delivered: {
-    label: "Delivered",
-    variant: "default",
-    className:
-      "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20",
-    icon: CheckCircle2,
-  },
-  opened: {
-    label: "Opened",
-    variant: "default",
-    className:
-      "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
-    icon: Mail,
-  },
-  clicked: {
-    label: "Clicked",
-    variant: "default",
-    className:
-      "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",
-    icon: MousePointerClick,
-  },
-  bounced: {
-    label: "Bounced",
-    variant: "default",
-    className:
-      "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20",
-    icon: XCircle,
-  },
-  suppressed: {
-    label: "Suppressed",
-    variant: "default",
-    className:
-      "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
-    icon: Ban,
-  },
-  complained: {
-    label: "Complained",
-    variant: "default",
-    className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
-    icon: XCircle,
-  },
-  failed: {
-    label: "Failed",
-    variant: "default",
-    className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
-    icon: XCircle,
-  },
-  rejected: {
-    label: "Rejected",
-    variant: "default",
-    className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
-    icon: XCircle,
-  },
-  rendering_failure: {
-    label: "Rendering Failed",
-    variant: "default",
-    className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
-    icon: XCircle,
-  },
-  delivery_delay: {
-    label: "Delayed",
-    variant: "secondary",
-    className:
-      "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20",
-    icon: Clock,
-  },
+export type EmailColumnsOptions = {
+  orgSlug: string;
+  /**
+   * The list's own query string (`days`, `status`, `q`). Carried onto the detail
+   * link so "Back to emails" returns to the view the message was opened from
+   * (audit F8) - the back link used to be a bare list URL.
+   */
+  listQuery: string;
 };
 
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffInDays = Math.floor(
-    (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
+/**
+ * A relative time that also states the exact one - in `title` for a pointer and
+ * in the accessible name for a screen reader (audit F15). Incident work needs
+ * the second, and the list used to make you open a message to get it.
+ */
+function Timestamp({
+  className,
+  format = formatRelativeTimestamp,
+  timestamp,
+}: {
+  className?: string;
+  format?: (timestamp: number) => string;
+  timestamp: number;
+}) {
+  const absolute = formatFullTimestamp(timestamp);
+  return (
+    <time
+      className={cn(className)}
+      dateTime={new Date(timestamp).toISOString()}
+      title={absolute}
+    >
+      {format(timestamp)}
+      <span className="sr-only"> ({absolute})</span>
+    </time>
   );
-
-  if (diffInDays === 0) {
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  }
-  if (diffInDays === 1) {
-    return "Yesterday";
-  }
-  if (diffInDays < 7) {
-    return `${diffInDays}d ago`;
-  }
-
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
 }
 
-function formatSentDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffInDays = Math.floor(
-    (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
-  );
+/**
+ * Built per render rather than exported as a constant because the subject cell
+ * needs the org slug and the current filters to build a real link (audit F7).
+ */
+export function createColumns({
+  listQuery,
+  orgSlug,
+}: EmailColumnsOptions): ColumnDef<EmailListItem>[] {
+  return [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          aria-label="Select all"
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          aria-label="Select row"
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      id: "to",
+      accessorKey: "to",
+      header: () => <div>To</div>,
+      cell: ({ row }) => {
+        const recipients = row.original.to;
+        return (
+          <div className="font-mono text-sm">
+            {recipients.length > 0 ? (
+              <>
+                {recipients[0]}
+                {recipients.length > 1 && (
+                  <span className="text-muted-foreground text-xs">
+                    {" "}
+                    +{recipients.length - 1} other
+                    {recipients.length > 2 ? "s" : ""}
+                  </span>
+                )}
+              </>
+            ) : (
+              "(no recipients)"
+            )}
+          </div>
+        );
+      },
+      // Server-driven order only (sent_at). A client sort here would reorder the
+      // rows already fetched and present that as the order of the whole set.
+      enableSorting: false,
+    },
+    {
+      id: "subject",
+      accessorKey: "subject",
+      header: () => <div>Subject</div>,
+      /**
+       * The only keyboard path to a message (audit F7, WCAG 2.1.1 Level A).
+       * Opening a message used to be an `onClick` on the `<tr>` with no
+       * `tabIndex`, no `role` and no key handler, and no cell rendered a link -
+       * so a keyboard or screen-reader user could filter, sort and export this
+       * table but could not open a single row. A real link also gets
+       * middle-click and cmd-click into a new tab, which row triage wants.
+       */
+      cell: ({ row }) => (
+        <div className="max-w-[400px]">
+          <Link
+            className="block truncate rounded-sm outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            href={`/${orgSlug}/emails/${row.original.id}${listQuery ? `?${listQuery}` : ""}`}
+            onClick={(event) => {
+              // The row's own handler would navigate a second time.
+              event.stopPropagation();
+              captureEmailsRowOpened({
+                position: row.index,
+                status: row.original.status,
+              });
+            }}
+          >
+            {row.original.subject}
+          </Link>
+          <div className="text-muted-foreground text-xs">
+            Sent{" "}
+            <Timestamp
+              format={formatSentDate}
+              timestamp={row.original.sentAt}
+            />
+          </div>
+        </div>
+      ),
+      enableSorting: false,
+    },
+    {
+      id: "status",
+      accessorKey: "status",
+      header: () => <div>Status</div>,
+      cell: ({ row }) => {
+        // Total in the status string: an unrecognised value renders neutral
+        // rather than blanking the table on an undefined icon (audit F12).
+        const config = getEmailStatusConfig(row.original.status);
+        const Icon = config.icon;
 
-  if (diffInDays === 0) {
-    return "today";
-  }
-  if (diffInDays === 1) {
-    return "yesterday";
-  }
-
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+        return (
+          <Badge
+            className={cn(config.tone.surface, config.tone.text)}
+            variant="outline"
+          >
+            <Icon className="mr-1 h-3 w-3" />
+            {config.label}
+          </Badge>
+        );
+      },
+      enableSorting: false,
+    },
+    {
+      id: "lastActivityAt",
+      accessorKey: "lastActivityAt",
+      header: () => <div>Activity</div>,
+      cell: ({ row }) => (
+        <Timestamp
+          className="text-muted-foreground text-sm"
+          timestamp={row.original.lastActivityAt}
+        />
+      ),
+      enableSorting: false,
+    },
+  ];
 }
-
-export const columns: ColumnDef<EmailListItem>[] = [
-  {
-    id: "select",
-    header: ({ table }) => (
-      <Checkbox
-        aria-label="Select all"
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        aria-label="Select row"
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        onClick={(e) => e.stopPropagation()}
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    id: "to",
-    accessorKey: "to",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} label="To" />
-    ),
-    cell: ({ row }) => {
-      const recipients = row.original.to;
-      return (
-        <div className="font-mono text-sm">
-          {recipients.length > 0 ? (
-            <>
-              {recipients[0]}
-              {recipients.length > 1 && (
-                <span className="text-muted-foreground text-xs">
-                  {" "}
-                  +{recipients.length - 1} other
-                  {recipients.length > 2 ? "s" : ""}
-                </span>
-              )}
-            </>
-          ) : (
-            "(no recipients)"
-          )}
-        </div>
-      );
-    },
-    meta: {
-      label: "Recipient",
-      placeholder: "Search recipients",
-      variant: "text",
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "subject",
-    accessorKey: "subject",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} label="Subject" />
-    ),
-    cell: ({ row }) => (
-      <div className="max-w-[400px]">
-        <div className="truncate">{row.original.subject}</div>
-        <div className="text-muted-foreground text-xs">
-          Sent {formatSentDate(row.original.sentAt)}
-        </div>
-      </div>
-    ),
-    meta: {
-      label: "Subject",
-      placeholder: "Search subjects",
-      variant: "text",
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "status",
-    accessorKey: "status",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} label="Status" />
-    ),
-    cell: ({ row }) => {
-      const status = row.original.status;
-      const config = STATUS_CONFIG[status];
-      const Icon = config.icon;
-
-      return (
-        <Badge className={config.className} variant={config.variant}>
-          <Icon className="mr-1 h-3 w-3" />
-          {config.label}
-        </Badge>
-      );
-    },
-    filterFn: (row, id, value) => value.includes(row.getValue(id)),
-    meta: {
-      label: "Status",
-      variant: "multiSelect",
-      options: Object.entries(STATUS_CONFIG).map(([key, config]) => ({
-        label: config.label,
-        value: key,
-      })),
-    },
-    enableColumnFilter: true,
-    enableSorting: true,
-  },
-  {
-    id: "lastActivityAt",
-    accessorKey: "lastActivityAt",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} label="Activity" />
-    ),
-    cell: ({ row }) => (
-      <span className="text-muted-foreground text-sm">
-        {formatTimestamp(row.original.lastActivityAt)}
-      </span>
-    ),
-    meta: {
-      label: "Activity",
-      variant: "dateRange",
-    },
-    enableColumnFilter: true,
-    enableSorting: true,
-  },
-];

@@ -7,56 +7,56 @@ import { Card, CardContent } from "@wraps/ui/components/ui/card";
 import { and, eq, or } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { EmailArchiveViewer } from "@/components/email-archive-viewer";
 import { Button } from "@/components/ui/button";
 import { queryEmailEvents, queryEventsByMessageIds } from "@/lib/aws/dynamodb";
 import { isOpenEventBot } from "@/lib/email-bot-detection";
 import { logger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
+import { cn } from "@/lib/utils";
+import { getEmailStatusConfig } from "../lib/status-config";
+import { formatFullTimestamp } from "../lib/timestamps";
 import type { Email, EmailStatus } from "../types";
 import { CopyButton } from "./components/copy-button";
 import { EmailFields } from "./components/email-fields";
+import { EmailUnavailable } from "./components/email-unavailable";
 import { EventItem } from "./components/event-item";
 import { EventTimeline } from "./components/event-timeline";
+import { TimelineState } from "./components/timeline-state";
+import {
+  classifyLookupError,
+  classifyTimelineFailure,
+  type EmailLookupFailure,
+  type EmailTimelineState,
+} from "./lookup";
 
 type EmailDetailPageProps = {
   params: Promise<{
     orgSlug: string;
     emailId: string;
   }>;
+  /**
+   * The filters the list was showing when this message was opened, carried on
+   * the row's link. "Back to emails" used to be a bare list URL, so triaging
+   * bounces over 30 days and opening one message dropped you back into the
+   * default 7-day, all-status view (audit F8).
+   */
+  searchParams: Promise<{
+    days?: string;
+    q?: string;
+    sort?: string;
+    status?: string;
+  }>;
 };
 
-const EVENT_COLORS: Record<EmailStatus, string> = {
-  sent: "text-blue-500",
-  delivered: "text-green-500",
-  bounced: "text-red-500",
-  complained: "text-red-500",
-  opened: "text-purple-500",
-  clicked: "text-indigo-500",
-  failed: "text-red-500",
-  rejected: "text-red-500",
-  rendering_failure: "text-red-500",
-  delivery_delay: "text-yellow-500",
-  suppressed: "text-amber-500",
-};
-
-const STATUS_VARIANTS: Record<
-  EmailStatus,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  delivered: "default",
-  sent: "secondary",
-  bounced: "destructive",
-  complained: "destructive",
-  failed: "destructive",
-  opened: "default",
-  clicked: "default",
-  rejected: "destructive",
-  rendering_failure: "destructive",
-  delivery_delay: "secondary",
-  suppressed: "destructive",
-};
+type EmailLookupResult =
+  | {
+      ok: true;
+      email: Email & { archivingEnabled: boolean };
+      timeline: EmailTimelineState;
+    }
+  | ({ ok: false } & EmailLookupFailure);
 
 // Map SES event types to our EmailStatus
 function mapEventTypeToStatus(eventType: string): EmailStatus {
@@ -163,7 +163,22 @@ function buildEmailFromEvents(
 async function fetchEmail(
   organizationId: string,
   emailId: string
-): Promise<(Email & { archivingEnabled: boolean }) | null> {
+): Promise<EmailLookupResult> {
+  // Per-account DynamoDB failures are non-fatal (another account may hold the
+  // message), but they must not be mistaken for "the message doesn't exist" —
+  // we keep the first one and report it if the lookup ends empty. The account it
+  // happened in is kept alongside it so the timeline can name it (audit F11).
+  let lookupError: unknown;
+  let failedAccountId: string | null = null;
+
+  const rememberFailure = (error: unknown, accountId: string) => {
+    if (lookupError) {
+      return;
+    }
+    lookupError = error;
+    failedAccountId = accountId;
+  };
+
   try {
     const endTime = new Date();
     const startTime = new Date(endTime.getTime() - 90 * 24 * 60 * 60 * 1000);
@@ -173,7 +188,7 @@ async function fetchEmail(
     });
 
     if (accounts.length === 0) {
-      return null;
+      return { ok: false, reason: "no-aws-account" };
     }
 
     // Step 1: time-windowed DynamoDB query (fast path for recent emails)
@@ -187,7 +202,12 @@ async function fetchEmail(
             limit: 1000,
           });
           return { account, events };
-        } catch {
+        } catch (error) {
+          rememberFailure(error, account.accountId);
+          logger.warn(
+            { err: error, awsAccountId: account.id, organizationId },
+            "email detail: windowed DynamoDB query failed"
+          );
           return { account, events: [] };
         }
       })
@@ -207,11 +227,15 @@ async function fetchEmail(
 
     if (emailEvents.length > 0 && emailAccount) {
       emailEvents.sort((a, b) => a.sentAt - b.sentAt);
-      return buildEmailFromEvents(
-        emailId,
-        emailEvents,
-        emailAccount.features?.email?.archivingEnabled ?? false
-      );
+      return {
+        ok: true,
+        email: buildEmailFromEvents(
+          emailId,
+          emailEvents,
+          emailAccount.features?.email?.archivingEnabled ?? false
+        ),
+        timeline: { status: "ok", accountId: emailAccount.accountId },
+      };
     }
 
     // Step 2: look up the PG record to get the canonical messageId and account.
@@ -241,7 +265,16 @@ async function fetchEmail(
       .then((rows) => rows[0] ?? null);
 
     if (!pgRecord) {
-      return null;
+      // Nothing in Postgres either. If DynamoDB blew up on the way here we
+      // cannot claim the message doesn't exist — say the lookup failed.
+      if (lookupError) {
+        return {
+          ok: false,
+          reason: "lookup-failed",
+          kind: classifyLookupError(lookupError),
+        };
+      }
+      return { ok: false, reason: "not-found" };
     }
 
     // Step 3: try a direct DynamoDB PK lookup (no time window) using the real messageId
@@ -256,70 +289,83 @@ async function fetchEmail(
         });
         if (dynEvents.length > 0) {
           dynEvents.sort((a, b) => a.sentAt - b.sentAt);
-          return buildEmailFromEvents(
-            realMessageId,
-            dynEvents,
-            pgAccount.features?.email?.archivingEnabled ?? false
-          );
+          return {
+            ok: true,
+            email: buildEmailFromEvents(
+              realMessageId,
+              dynEvents,
+              pgAccount.features?.email?.archivingEnabled ?? false
+            ),
+            timeline: { status: "ok", accountId: pgAccount.accountId },
+          };
         }
-      } catch {
-        // fall through to PG-only
+      } catch (error) {
+        // Non-fatal: fall through to the PG-only view, but remember why the
+        // event history is missing.
+        rememberFailure(error, pgAccount.accountId);
+        logger.warn(
+          { err: error, awsAccountId: pgAccount.id, organizationId },
+          "email detail: direct DynamoDB lookup failed"
+        );
       }
     }
 
     // Step 4: PG-only fallback — show whatever metadata we have
     if (!pgRecord.sentAt) {
-      return null;
+      return {
+        ok: false,
+        reason: "not-sent",
+        subject: pgRecord.subject ?? "(no subject)",
+        recipient: pgRecord.recipient,
+        status: pgStatusToEmailStatus(pgRecord.status),
+      };
     }
+    /**
+     * No events to show. Whether that is because the read threw or because the
+     * history genuinely holds nothing for this message is the whole of F11 - the
+     * two used to render the same sentence.
+     */
+    const timeline: EmailTimelineState = lookupError
+      ? {
+          status: classifyTimelineFailure(lookupError),
+          accountId: failedAccountId ?? pgAccount?.accountId ?? null,
+        }
+      : { status: "empty", accountId: pgAccount?.accountId ?? null };
+
     return {
-      id: emailId,
-      messageId: realMessageId,
-      from: pgRecord.from ?? "",
-      to: [pgRecord.recipient],
-      replyTo: undefined,
-      subject: pgRecord.subject ?? "(no subject)",
-      htmlBody: undefined,
-      textBody: undefined,
-      status: pgStatusToEmailStatus(pgRecord.status),
-      sentAt: pgRecord.sentAt.getTime(),
-      archivingEnabled: false,
-      events: [],
+      ok: true,
+      email: {
+        id: emailId,
+        messageId: realMessageId,
+        from: pgRecord.from ?? "",
+        to: [pgRecord.recipient],
+        replyTo: undefined,
+        subject: pgRecord.subject ?? "(no subject)",
+        htmlBody: undefined,
+        textBody: undefined,
+        status: pgStatusToEmailStatus(pgRecord.status),
+        sentAt: pgRecord.sentAt.getTime(),
+        archivingEnabled: false,
+        events: [],
+      },
+      timeline,
     };
   } catch (error) {
-    logger.error({ err: error }, "fetchEmail failed");
-    return null;
+    logger.error({ err: error, emailId, organizationId }, "fetchEmail failed");
+    return {
+      ok: false,
+      reason: "lookup-failed",
+      kind: classifyLookupError(error),
+    };
   }
-}
-
-function _formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-function formatFullTimestamp(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
 }
 
 export default async function EmailDetailPage({
   params,
+  searchParams,
 }: EmailDetailPageProps) {
   const { orgSlug, emailId } = await params;
+  const listFilters = await searchParams;
   const session = await auth.api.getSession({
     headers: await import("next/headers").then((mod) => mod.headers()),
   });
@@ -337,20 +383,66 @@ export default async function EmailDetailPage({
     redirect("/");
   }
 
-  // Fetch actual email directly (not via API to avoid auth issues)
-  const email = await fetchEmail(orgWithMembership.id, emailId);
-
-  // If email not found, redirect back to emails list
-  if (!email) {
-    redirect(`/${orgSlug}/emails`);
+  /** Back to the view this message was opened from, filters intact (F8). */
+  const backParams = new URLSearchParams();
+  if (listFilters.days) {
+    backParams.set("days", listFilters.days);
   }
+  if (listFilters.status) {
+    backParams.set("status", listFilters.status);
+  }
+  if (listFilters.q) {
+    backParams.set("q", listFilters.q);
+  }
+  if (listFilters.sort) {
+    backParams.set("sort", listFilters.sort);
+  }
+  const listHref = backParams.size
+    ? `/${orgSlug}/emails?${backParams}`
+    : `/${orgSlug}/emails`;
+
+  // Fetch actual email directly (not via API to avoid auth issues)
+  const result = await fetchEmail(orgWithMembership.id, emailId);
+
+  // A genuine miss is a 404, not a silent bounce back to the list. Everything
+  // else (no AWS account, unsent message, failed lookup) renders a state that
+  // says what happened.
+  if (!result.ok) {
+    if (result.reason === "not-found") {
+      notFound();
+    }
+
+    return (
+      <>
+        <div className="px-4 lg:px-6">
+          <Button asChild size="sm" variant="ghost">
+            <Link href={listHref}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to emails
+            </Link>
+          </Button>
+        </div>
+        <EmailUnavailable
+          emailId={emailId}
+          failure={result}
+          orgSlug={orgSlug}
+        />
+      </>
+    );
+  }
+
+  const email = result.email;
+  // One palette for both pages, and a status we do not recognise renders
+  // neutral instead of blanking (audit F12).
+  const statusConfig = getEmailStatusConfig(email.status);
+  const StatusIcon = statusConfig.icon;
 
   return (
     <>
       {/* Back Button */}
       <div className="px-4 lg:px-6">
         <Button asChild size="sm" variant="ghost">
-          <Link href={`/${orgSlug}/emails`}>
+          <Link href={listHref}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to emails
           </Link>
@@ -379,10 +471,15 @@ export default async function EmailDetailPage({
                   </div>
                 </div>
                 <Badge
-                  className="font-medium"
-                  variant={STATUS_VARIANTS[email.status]}
+                  className={cn(
+                    "font-medium",
+                    statusConfig.tone.surface,
+                    statusConfig.tone.text
+                  )}
+                  variant="outline"
                 >
-                  {email.status.charAt(0).toUpperCase() + email.status.slice(1)}
+                  <StatusIcon className="mr-1 h-3 w-3" />
+                  {statusConfig.label}
                 </Badge>
               </div>
 
@@ -399,13 +496,11 @@ export default async function EmailDetailPage({
         {/* Event Timeline - Collapsible */}
         <EventTimeline eventCount={email.events.length}>
           {email.events.length === 0 ? (
-            <div className="text-muted-foreground text-sm">
-              No events recorded yet
-            </div>
+            <TimelineState state={result.timeline} />
           ) : (
             email.events.map((event, index) => (
               <EventItem
-                color={EVENT_COLORS[event.type]}
+                color={getEmailStatusConfig(event.type).tone.text}
                 event={event}
                 iconType={event.type}
                 isLast={index === email.events.length - 1}

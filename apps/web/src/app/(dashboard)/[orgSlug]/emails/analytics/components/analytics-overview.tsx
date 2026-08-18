@@ -37,13 +37,13 @@ export function AnalyticsOverview({ orgSlug }: { orgSlug: string }) {
         icon={<Users className="h-6 w-6" />}
         isLoading={isLoading}
         title="Open Rate"
-        value={"\u2014"}
+        value={data ? `${data.openRate.toFixed(1)}%` : "0%"}
       />
       <StatCard
         icon={<MousePointerClick className="h-6 w-6" />}
         isLoading={isLoading}
         title="Click Rate"
-        value={"\u2014"}
+        value={data ? `${data.clickRate.toFixed(1)}%` : "0%"}
       />
     </div>
   );

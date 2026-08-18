@@ -30,13 +30,11 @@ vi.mock("@/lib/organization", () => ({
   })),
 }));
 
-const mockGetSESMetricsSummary = vi.fn();
 const mockGetSESReputationMetrics = vi.fn();
 vi.mock("@/lib/aws/cloudwatch", () => ({
-  getSESMetricsSummary: (...args: unknown[]) =>
-    mockGetSESMetricsSummary(...args),
   getSESReputationMetrics: (...args: unknown[]) =>
     mockGetSESReputationMetrics(...args),
+  getCloudWatchErrorKind: () => "unknown",
 }));
 
 const mockGetEmailMetricsFromPostgres = vi.fn();
@@ -64,21 +62,44 @@ vi.mock("@/lib/logger", () => ({
   serializeError: (e: unknown) => e,
 }));
 
-function makeMetrics(values: {
-  sends: number;
-  deliveries: number;
-  bounces: number;
+/**
+ * One day of `message_send` aggregates.
+ *
+ * `sent` counts rows whose status is NOT 'failed' and `renderingFailures`
+ * counts rows whose status IS 'failed' - disjoint sets. So `sent` is already
+ * the effective denominator, which is the whole difference from the CloudWatch
+ * shape this route used to read, where `Send` INCLUDED rendering failures.
+ */
+function makeDay(values: {
+  sent: number;
+  delivered: number;
+  bounced: number;
   complaints: number;
   renderingFailures: number;
+  opens?: number;
+  clicks?: number;
 }) {
-  const metric = (val: number) => [{ Timestamps: [new Date()], Values: [val] }];
-  return {
-    sends: metric(values.sends),
-    deliveries: metric(values.deliveries),
-    bounces: metric(values.bounces),
-    complaints: metric(values.complaints),
-    renderingFailures: metric(values.renderingFailures),
-  };
+  return new Map([
+    [
+      "2026-04-10",
+      {
+        date: "2026-04-10",
+        opens: 0,
+        clicks: 0,
+        ...values,
+      },
+    ],
+  ]);
+}
+
+async function callOverview() {
+  const { GET } = await import("../[orgSlug]/analytics/overview/route");
+  const request = new Request(
+    "http://localhost/api/test-org/analytics/overview"
+  );
+  const context = { params: Promise.resolve({ orgSlug: "test-org" }) };
+  const response = await GET(request, context);
+  return { response, data: await response.json() };
 }
 
 describe("Analytics Overview API", () => {
@@ -91,55 +112,59 @@ describe("Analytics Overview API", () => {
     });
   });
 
-  it("returns correct deliveryRate when rendering failures exist", async () => {
-    // 124 sends, 13 rendering failures → effectiveSent = 111
-    // 110 deliveries → deliveryRate = 110/111 * 100 = 99.10%
-    mockGetSESMetricsSummary.mockResolvedValueOnce(
-      makeMetrics({
-        sends: 124,
-        deliveries: 110,
-        bounces: 1,
+  it("reads totals from Postgres, never from account-wide CloudWatch", async () => {
+    mockGetEmailMetricsFromPostgres.mockResolvedValueOnce(
+      makeDay({
+        sent: 111,
+        delivered: 110,
+        bounced: 1,
         complaints: 0,
         renderingFailures: 13,
       })
     );
 
-    const { GET } = await import("../[orgSlug]/analytics/overview/route");
-    const request = new Request(
-      "http://localhost/api/test-org/analytics/overview"
+    const { data } = await callOverview();
+
+    expect(mockGetEmailMetricsFromPostgres).toHaveBeenCalledWith(
+      "org-1",
+      expect.any(Date),
+      expect.any(Date)
     );
-    const context = { params: Promise.resolve({ orgSlug: "test-org" }) };
-
-    const response = await GET(request, context);
-    const data = await response.json();
-
-    // effectiveSent = 124 - 13 = 111
-    // deliveryRate = 110 / 111 * 100 = 99.10 (rounded to 2 decimal places)
-    expect(data.deliveryRate).toBeCloseTo(99.1, 1);
-    // NOT the old incorrect rate of 88.71
-    expect(data.deliveryRate).not.toBeCloseTo(88.71, 1);
+    expect(data.totalSent).toBe(111);
   });
 
-  it("returns deliveryRate 0 when 100% rendering failures (no division by zero)", async () => {
-    // All sends are rendering failures → effectiveSent = 0 → rates = 0
-    mockGetSESMetricsSummary.mockResolvedValueOnce(
-      makeMetrics({
-        sends: 50,
-        deliveries: 0,
-        bounces: 0,
+  it("does not subtract rendering failures a second time", async () => {
+    // 111 sends (failures already excluded), 13 failures, 110 delivered.
+    // Correct: 110/111 = 99.10%. Subtracting again gives 110/98 = 112.24%,
+    // which is the CloudWatch-era arithmetic and is now impossible.
+    mockGetEmailMetricsFromPostgres.mockResolvedValueOnce(
+      makeDay({
+        sent: 111,
+        delivered: 110,
+        bounced: 1,
+        complaints: 0,
+        renderingFailures: 13,
+      })
+    );
+
+    const { data } = await callOverview();
+
+    expect(data.deliveryRate).toBeCloseTo(99.1, 1);
+    expect(data.deliveryRate).toBeLessThanOrEqual(100);
+  });
+
+  it("returns deliveryRate 0 when nothing was sent (no division by zero)", async () => {
+    mockGetEmailMetricsFromPostgres.mockResolvedValueOnce(
+      makeDay({
+        sent: 0,
+        delivered: 0,
+        bounced: 0,
         complaints: 0,
         renderingFailures: 50,
       })
     );
 
-    const { GET } = await import("../[orgSlug]/analytics/overview/route");
-    const request = new Request(
-      "http://localhost/api/test-org/analytics/overview"
-    );
-    const context = { params: Promise.resolve({ orgSlug: "test-org" }) };
-
-    const response = await GET(request, context);
-    const data = await response.json();
+    const { data } = await callOverview();
 
     expect(data.deliveryRate).toBe(0);
     expect(data.bounceRate).toBe(0);
@@ -147,83 +172,115 @@ describe("Analytics Overview API", () => {
   });
 
   it("uses SES reputation metrics for bounce/complaint rates when available", async () => {
-    // Simulates the real-world bug: low recent send volume inflates computed rates,
-    // but SES reputation covers the full account history.
-    // 3 bounces / 13 sends = 23% computed, but SES shows 0.02% from full history.
-    mockGetSESMetricsSummary.mockResolvedValueOnce(
-      makeMetrics({
-        sends: 13,
-        deliveries: 10,
-        bounces: 3,
+    // Low recent volume inflates window rates (3/13 = 23%), while SES
+    // reputation covers the account's full history (0.02%).
+    mockGetEmailMetricsFromPostgres.mockResolvedValueOnce(
+      makeDay({
+        sent: 13,
+        delivered: 10,
+        bounced: 3,
         complaints: 0,
         renderingFailures: 0,
       })
     );
     mockGetSESReputationMetrics.mockResolvedValueOnce({
       bounceRate: 0.0002,
-      complaintRate: 0.001, // 0.1% — rounds to 0.10 with toFixed(2)
+      complaintRate: 0.001,
     });
 
-    const { GET } = await import("../[orgSlug]/analytics/overview/route");
-    const request = new Request(
-      "http://localhost/api/test-org/analytics/overview"
-    );
-    const context = { params: Promise.resolve({ orgSlug: "test-org" }) };
+    const { data } = await callOverview();
 
-    const response = await GET(request, context);
-    const data = await response.json();
-
-    // Should use SES reputation rate (0.0002 * 100 = 0.02%), not computed (3/13 = 23%)
     expect(data.bounceRate).toBeCloseTo(0.02, 2);
     expect(data.complaintRate).toBeCloseTo(0.1, 1);
+    expect(data.meta.reputationScope).toBe("ses-account");
   });
 
-  it("falls back to computed rates when reputation metrics unavailable", async () => {
-    mockGetSESMetricsSummary.mockResolvedValueOnce(
-      makeMetrics({
-        sends: 100,
-        deliveries: 95,
-        bounces: 3,
+  it("falls back to window rates when reputation metrics unavailable", async () => {
+    mockGetEmailMetricsFromPostgres.mockResolvedValueOnce(
+      makeDay({
+        sent: 100,
+        delivered: 95,
+        bounced: 3,
         complaints: 1,
         renderingFailures: 0,
       })
     );
-    // mockGetSESReputationMetrics already returns null,null from beforeEach
 
-    const { GET } = await import("../[orgSlug]/analytics/overview/route");
-    const request = new Request(
-      "http://localhost/api/test-org/analytics/overview"
-    );
-    const context = { params: Promise.resolve({ orgSlug: "test-org" }) };
-
-    const response = await GET(request, context);
-    const data = await response.json();
+    const { data } = await callOverview();
 
     expect(data.bounceRate).toBeCloseTo(3, 0);
     expect(data.complaintRate).toBeCloseTo(1, 0);
+    expect(data.meta.reputationScope).toBe("window");
+  });
+
+  it("reports a reputation read failure instead of rendering a healthy 0%", async () => {
+    mockGetEmailMetricsFromPostgres.mockResolvedValueOnce(
+      makeDay({
+        sent: 100,
+        delivered: 95,
+        bounced: 3,
+        complaints: 1,
+        renderingFailures: 0,
+      })
+    );
+    mockGetSESReputationMetrics.mockRejectedValueOnce(
+      new Error(
+        "AccessDenied: not authorized to perform cloudwatch:GetMetricData"
+      )
+    );
+
+    const { data } = await callOverview();
+
+    expect(data.meta.awsAccountsUnavailable).toBe(1);
+    expect(data.meta.awsAccountCount).toBe(1);
+    // Volume is unaffected by a CloudWatch failure - it comes from Postgres.
+    expect(data.totalSent).toBe(100);
   });
 
   it("includes totalRenderingFailures in response", async () => {
-    mockGetSESMetricsSummary.mockResolvedValueOnce(
-      makeMetrics({
-        sends: 124,
-        deliveries: 110,
-        bounces: 1,
+    mockGetEmailMetricsFromPostgres.mockResolvedValueOnce(
+      makeDay({
+        sent: 111,
+        delivered: 110,
+        bounced: 1,
         complaints: 0,
         renderingFailures: 13,
       })
     );
 
-    const { GET } = await import("../[orgSlug]/analytics/overview/route");
-    const request = new Request(
-      "http://localhost/api/test-org/analytics/overview"
-    );
-    const context = { params: Promise.resolve({ orgSlug: "test-org" }) };
-
-    const response = await GET(request, context);
-    const data = await response.json();
+    const { data } = await callOverview();
 
     expect(data).toHaveProperty("totalRenderingFailures");
     expect(data.totalRenderingFailures).toBe(13);
+  });
+
+  it("reports open and click rates against delivered mail", async () => {
+    mockGetEmailMetricsFromPostgres.mockResolvedValueOnce(
+      makeDay({
+        sent: 100,
+        delivered: 80,
+        bounced: 3,
+        complaints: 1,
+        renderingFailures: 0,
+        opens: 40,
+        clicks: 8,
+      })
+    );
+
+    const { data } = await callOverview();
+
+    expect(data.totalOpens).toBe(40);
+    expect(data.totalClicks).toBe(8);
+    expect(data.openRate).toBeCloseTo(50, 1);
+    expect(data.clickRate).toBeCloseTo(10, 1);
+  });
+
+  it("rejects an unauthenticated request", async () => {
+    const { auth } = await import("@wraps/auth");
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce(null);
+
+    const { response } = await callOverview();
+
+    expect(response.status).toBe(401);
   });
 });

@@ -86,6 +86,10 @@ export const getOrganizationWithDashboardData = cache(
           columns: {
             emailEnabled: true,
             smsEnabled: true,
+            // `features.email.sandbox` drives the go-live banner: connecting an
+            // AWS account is not going live, getting out of the SES sandbox is.
+            features: true,
+            isVerified: true,
           },
         },
       },

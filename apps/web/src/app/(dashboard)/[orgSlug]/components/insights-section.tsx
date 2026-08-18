@@ -123,20 +123,16 @@ export function detectVolumeAnomalies(
       }
     }
 
-    // Delivery rate anomaly. Rendering failures never left SES, so exclude
-    // them from the denominator to match the Overview card's delivery rate
-    // (Delivery / (Send − RenderingFailure)). Gate on effective volume — a
+    // Delivery rate anomaly. This consumes /analytics/volume, which is served
+    // by `getEmailMetricsFromPostgres`: `sent` counts rows whose status is NOT
+    // 'failed' and `renderingFailures` counts rows whose status IS 'failed' -
+    // disjoint sets (analytics-fallback.ts). `sent` is therefore ALREADY the
+    // effective denominator. Subtracting rendering failures again (needed only
+    // when CloudWatch's `Send`, which included them, was the source) shrinks
+    // the denominator and invents delivery-rate drops. Gate on volume - a
     // pp-delta on a few dozen sends is noise, not a deliverability signal.
-    const prevRenderingFailures = prev.reduce(
-      (s, d) => s + (d.renderingFailures ?? 0),
-      0
-    );
-    const currRenderingFailures = curr.reduce(
-      (s, d) => s + (d.renderingFailures ?? 0),
-      0
-    );
-    const prevEffectiveSent = Math.max(0, prevSent - prevRenderingFailures);
-    const currEffectiveSent = Math.max(0, currSent - currRenderingFailures);
+    const prevEffectiveSent = prevSent;
+    const currEffectiveSent = currSent;
 
     if (
       prevEffectiveSent >= MIN_VOLUME_FOR_DELIVERY_ANOMALY &&

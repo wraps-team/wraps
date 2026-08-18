@@ -5,16 +5,16 @@ import { eq } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
 import { getEmailMetricsFromPostgres } from "@/lib/analytics-fallback";
+import type { EmailChartMeta } from "@/lib/analytics-scope";
 import {
-  aggregateByDate,
   gapFillDates,
   generateDateRange,
   validateTimezone,
 } from "@/lib/analytics-utils";
 import {
-  getCloudWatchMetricsBatch,
+  type CloudWatchErrorKind,
+  getCloudWatchErrorKind,
   getSESReputationMetrics,
-  SES_METRICS,
 } from "@/lib/aws/cloudwatch";
 import { createRequestLogger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
@@ -25,6 +25,31 @@ type RouteContext = {
   }>;
 };
 
+function resolveReputationScope(
+  hasReputation: boolean,
+  effectiveSent: number
+): EmailChartMeta["reputationScope"] {
+  if (hasReputation) {
+    return "ses-account";
+  }
+  return effectiveSent > 0 ? "window" : "none";
+}
+
+/**
+ * Chart data for the emails page.
+ *
+ * Volume comes from Postgres `message_send` and nothing else. It previously came
+ * from undimensioned `AWS/SES` CloudWatch metrics, which are account-wide: they
+ * counted SES traffic sent outside Wraps entirely, traffic that can never appear
+ * in the table below the chart. That is the documented "graph shows data but the
+ * table is empty" complaint. `getEmailMetricsFromPostgres` filters on the same
+ * predicate the table's query uses — organization, `channel = 'email'`, a
+ * non-null `sentAt` inside the window — so the two agree by construction rather
+ * than by coincidence.
+ *
+ * CloudWatch is still read for one thing: account-level SES reputation, which is
+ * account-scoped by nature and is labelled as such in the UI.
+ */
 function buildEmailChartData(orgId: string, days: number, timezone: string) {
   return unstable_cache(
     async () => {
@@ -32,157 +57,44 @@ function buildEmailChartData(orgId: string, days: number, timezone: string) {
       const startTime = new Date(
         endTime.getTime() - days * 24 * 60 * 60 * 1000
       );
-      const period = days <= 7 ? 3600 : days <= 30 ? 3600 * 6 : 3600 * 24;
+
+      const log = createRequestLogger({
+        path: "/api/[orgSlug]/analytics/email-chart",
+        method: "GET",
+        organizationId: orgId,
+      });
 
       const accounts = await db.query.awsAccount.findMany({
         where: eq(awsAccount.organizationId, orgId),
       });
 
-      if (accounts.length === 0) {
-        return {
-          overview: {
-            totalSent: 0,
-            totalDelivered: 0,
-            totalBounced: 0,
-            totalComplaints: 0,
-            totalRenderingFailures: 0,
-            deliveryRate: 0,
-            bounceRate: 0,
-            complaintRate: 0,
-          },
-          volume: [],
-          engagement: [],
-        };
-      }
+      // Reputation is the only reason left to talk to CloudWatch. A per-account
+      // failure must not be silently rendered as a healthy 0% — classify it,
+      // log it, and count it so the tile can admit the figure is incomplete.
+      const reputationResults = await Promise.all(
+        accounts.map(async (account) => {
+          try {
+            return await getSESReputationMetrics(account.id);
+          } catch (error) {
+            const kind: CloudWatchErrorKind = getCloudWatchErrorKind(error);
+            log.warn(
+              { awsAccountId: account.id, kind, err: error },
+              "SES reputation read failed for one AWS account"
+            );
+            return null;
+          }
+        })
+      );
+      const awsAccountsUnavailable = reputationResults.filter(
+        (r) => r === null
+      ).length;
 
-      const allMetrics = [
-        SES_METRICS.SEND,
-        SES_METRICS.DELIVERY,
-        SES_METRICS.BOUNCE,
-        SES_METRICS.COMPLAINT,
-        SES_METRICS.OPEN,
-        SES_METRICS.CLICK,
-        SES_METRICS.RENDERING_FAILURE,
-      ];
-
-      const [metricsResults, reputationResults] = await Promise.all([
-        Promise.all(
-          accounts.map(async (account) => {
-            try {
-              return await getCloudWatchMetricsBatch({
-                awsAccountId: account.id,
-                metrics: allMetrics,
-                period,
-                startTime,
-                endTime,
-              });
-            } catch {
-              return null;
-            }
-          })
-        ),
-        Promise.all(
-          accounts.map(async (account) => {
-            try {
-              return await getSESReputationMetrics(account.id);
-            } catch {
-              return null;
-            }
-          })
-        ),
-      ]);
-
-      const allKeys = [
-        "sent",
-        "delivered",
-        "bounced",
-        "complaints",
-        "opens",
-        "clicks",
-        "renderingFailures",
-      ] as const;
-      let dailyMap = new Map<
-        string,
-        Record<(typeof allKeys)[number], number>
-      >();
-
-      for (const metrics of metricsResults) {
-        if (!metrics) {
-          continue;
-        }
-
-        const timestamps = metrics[SES_METRICS.SEND]?.[0]?.Timestamps || [];
-        const perAccount = aggregateByDate(
-          timestamps,
-          [
-            metrics[SES_METRICS.SEND]?.[0]?.Values || [],
-            metrics[SES_METRICS.DELIVERY]?.[0]?.Values || [],
-            metrics[SES_METRICS.BOUNCE]?.[0]?.Values || [],
-            metrics[SES_METRICS.COMPLAINT]?.[0]?.Values || [],
-            metrics[SES_METRICS.OPEN]?.[0]?.Values || [],
-            metrics[SES_METRICS.CLICK]?.[0]?.Values || [],
-            metrics[SES_METRICS.RENDERING_FAILURE]?.[0]?.Values || [],
-          ],
-          [...allKeys],
-          timezone
-        );
-
-        for (const [dateStr, values] of perAccount) {
-          const existing = dailyMap.get(dateStr) || {
-            sent: 0,
-            delivered: 0,
-            bounced: 0,
-            complaints: 0,
-            opens: 0,
-            clicks: 0,
-            renderingFailures: 0,
-          };
-          dailyMap.set(dateStr, {
-            sent: existing.sent + values.sent,
-            delivered: existing.delivered + values.delivered,
-            bounced: existing.bounced + values.bounced,
-            complaints: existing.complaints + values.complaints,
-            opens: existing.opens + values.opens,
-            clicks: existing.clicks + values.clicks,
-            renderingFailures:
-              existing.renderingFailures + values.renderingFailures,
-          });
-        }
-      }
-
-      const pgData = await getEmailMetricsFromPostgres(
+      const dailyMap = await getEmailMetricsFromPostgres(
         orgId,
         startTime,
         endTime,
         timezone
       );
-      if (dailyMap.size === 0) {
-        // CloudWatch returned nothing (no metrics yet, or all accounts errored)
-        dailyMap = pgData;
-      } else {
-        // CloudWatch Open/Click are always empty — no CloudWatch event destination
-        // is deployed — so engagement comes from Postgres message_send.
-        for (const [dateStr, m] of pgData) {
-          const existing = dailyMap.get(dateStr);
-          if (existing) {
-            existing.opens = m.opens;
-            existing.clicks = m.clicks;
-          } else {
-            // Day present in Postgres but absent from CloudWatch (period/timezone
-            // boundary) — CloudWatch contributed nothing for it, so use the full
-            // Postgres row rather than dropping the day.
-            dailyMap.set(dateStr, {
-              sent: m.sent,
-              delivered: m.delivered,
-              bounced: m.bounced,
-              complaints: m.complaints,
-              opens: m.opens,
-              clicks: m.clicks,
-              renderingFailures: m.renderingFailures,
-            });
-          }
-        }
-      }
 
       let totalSent = 0;
       let totalDelivered = 0;
@@ -197,14 +109,21 @@ function buildEmailChartData(orgId: string, days: number, timezone: string) {
         totalRenderingFailures += day.renderingFailures;
       }
 
-      const effectiveSent = Math.max(0, totalSent - totalRenderingFailures);
+      // `message_send` counts `sent` as status != 'failed' and `renderingFailures`
+      // as status = 'failed' — disjoint sets. Unlike CloudWatch's `Send`, the
+      // total already excludes failures, so subtracting them again (as this did
+      // when CloudWatch was the source) would deflate the denominator and
+      // overstate every rate below.
+      const effectiveSent = totalSent;
 
       const deliveryRate =
         effectiveSent > 0 ? (totalDelivered / effectiveSent) * 100 : 0;
 
       const reputationBounceRate = reputationResults.reduce<number | null>(
         (worst, r) => {
-          if (r?.bounceRate == null) return worst;
+          if (r?.bounceRate == null) {
+            return worst;
+          }
           const pct = r.bounceRate * 100;
           return worst === null ? pct : Math.max(worst, pct);
         },
@@ -212,25 +131,22 @@ function buildEmailChartData(orgId: string, days: number, timezone: string) {
       );
       const reputationComplaintRate = reputationResults.reduce<number | null>(
         (worst, r) => {
-          if (r?.complaintRate == null) return worst;
+          if (r?.complaintRate == null) {
+            return worst;
+          }
           const pct = r.complaintRate * 100;
           return worst === null ? pct : Math.max(worst, pct);
         },
         null
       );
 
-      const bounceRate =
-        reputationBounceRate !== null
-          ? reputationBounceRate
-          : effectiveSent > 0
-            ? (totalBounced / effectiveSent) * 100
-            : 0;
-      const complaintRate =
-        reputationComplaintRate !== null
-          ? reputationComplaintRate
-          : effectiveSent > 0
-            ? (totalComplaints / effectiveSent) * 100
-            : 0;
+      const windowBounceRate =
+        effectiveSent > 0 ? (totalBounced / effectiveSent) * 100 : 0;
+      const windowComplaintRate =
+        effectiveSent > 0 ? (totalComplaints / effectiveSent) * 100 : 0;
+
+      const bounceRate = reputationBounceRate ?? windowBounceRate;
+      const complaintRate = reputationComplaintRate ?? windowComplaintRate;
 
       const dateRange = generateDateRange(startTime, endTime, timezone);
       const defaults = {
@@ -265,6 +181,15 @@ function buildEmailChartData(orgId: string, days: number, timezone: string) {
         };
       });
 
+      const hasReputation =
+        reputationBounceRate !== null || reputationComplaintRate !== null;
+      const meta: EmailChartMeta = {
+        reputationScope: resolveReputationScope(hasReputation, effectiveSent),
+        awsAccountCount: accounts.length,
+        awsAccountsUnavailable,
+        generatedAt: Date.now(),
+      };
+
       return {
         overview: {
           totalSent: Math.round(totalSent),
@@ -278,6 +203,7 @@ function buildEmailChartData(orgId: string, days: number, timezone: string) {
         },
         volume,
         engagement,
+        meta,
       };
     },
     ["email-chart", orgId, String(days), timezone],
@@ -307,9 +233,11 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const { searchParams } = new URL(request.url);
+    // Default 7, matching the emails table's default window. The chart used to
+    // default to 30 over a 7-day table, which made them disagree by design.
     const days = Math.min(
       365,
-      Math.max(1, Number.parseInt(searchParams.get("days") || "30", 10))
+      Math.max(1, Number.parseInt(searchParams.get("days") || "7", 10))
     );
     const timezone = validateTimezone(searchParams.get("tz"));
 

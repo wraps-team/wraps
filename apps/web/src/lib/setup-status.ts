@@ -3,10 +3,12 @@ import {
   batchSend,
   contact,
   db,
+  messageSend,
   template,
   workflow,
 } from "@wraps/db";
-import { and, count, eq, ne } from "drizzle-orm";
+import { and, count, eq, isNotNull, ne } from "drizzle-orm";
+import { cache } from "react";
 import { queryEmailEvents } from "@/lib/aws/dynamodb";
 
 export type AccountFeatures = {
@@ -113,16 +115,82 @@ async function checkEmailsSent(
   return { hasSentEmail: false, emailCount: 0 };
 }
 
-/** Check if organization has any AWS accounts */
-export async function checkHasAwsAccounts(
-  organizationId: string
-): Promise<boolean> {
-  const accounts = await db.query.awsAccount.findMany({
-    where: eq(awsAccount.organizationId, organizationId),
-    columns: { id: true },
-  });
-  return accounts.length > 0;
-}
+/**
+ * Check if organization has any AWS accounts.
+ *
+ * Request-deduped like the `lib/organization.ts` helpers, because it sits on
+ * the critical path of four dashboard pages and is called again inside the
+ * emails page's own Suspense boundary.
+ */
+export const checkHasAwsAccounts = cache(
+  async (organizationId: string): Promise<boolean> => {
+    const accounts = await db.query.awsAccount.findMany({
+      where: eq(awsAccount.organizationId, organizationId),
+      columns: { id: true },
+    });
+    return accounts.length > 0;
+  }
+);
+
+export type EmailsListStatus = {
+  /** Any email send on record, in any window. */
+  hasEverSent: boolean;
+  /** `true` in the SES sandbox, `false` in production, `null` never scanned. */
+  sandboxStatus: boolean | null;
+};
+
+/**
+ * The two facts the emails list needs to tell its zero-states apart
+ * (audit finding F6).
+ *
+ * `hasEverSent` separates "this organization has never sent" from "nothing
+ * landed in the selected window" - only the second may talk about the time
+ * range. `sandboxStatus` separates both from the organization AWS will reject,
+ * for which "send your first email" is advice that cannot be followed.
+ *
+ * The send probe matches the predicate the list and the chart already share:
+ * this organization, `channel = 'email'`, a non-null `sentAt`. `null` sandbox
+ * means the account's SES settings have never been scanned, and is reported as
+ * unknown rather than guessed at.
+ */
+export const getEmailsListStatus = cache(
+  async (organizationId: string): Promise<EmailsListStatus> => {
+    const [accounts, sends] = await Promise.all([
+      db.query.awsAccount.findMany({
+        where: eq(awsAccount.organizationId, organizationId),
+        columns: { isVerified: true, features: true },
+      }),
+      db
+        .select({ id: messageSend.id })
+        .from(messageSend)
+        .where(
+          and(
+            eq(messageSend.organizationId, organizationId),
+            eq(messageSend.channel, "email"),
+            isNotNull(messageSend.sentAt)
+          )
+        )
+        .limit(1),
+    ]);
+
+    // Prefer a verified account's answer; fall back to any account that has
+    // been scanned. Only report `true` when SES actually said sandbox.
+    const ordered = [
+      ...accounts.filter((a) => a.isVerified),
+      ...accounts.filter((a) => !a.isVerified),
+    ];
+    let sandboxStatus: boolean | null = null;
+    for (const account of ordered) {
+      const value = (account.features as AccountFeatures)?.email?.sandbox;
+      if (typeof value === "boolean") {
+        sandboxStatus = value;
+        break;
+      }
+    }
+
+    return { hasEverSent: sends.length > 0, sandboxStatus };
+  }
+);
 
 /** Check if organization has any contacts */
 async function checkHasContacts(organizationId: string): Promise<boolean> {

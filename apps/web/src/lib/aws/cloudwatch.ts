@@ -1,233 +1,118 @@
 import {
   CloudWatchClient,
   GetMetricDataCommand,
-  type MetricDataQuery,
-  type MetricDataResult,
+  type GetMetricDataCommandOutput,
 } from "@aws-sdk/client-cloudwatch";
 import { db } from "@wraps/db";
 import { getOrAssumeRole } from "./credential-cache";
 
-type GetMetricsParams = {
-  awsAccountId: string;
-  metric: string;
-  period: number;
-  startTime: Date;
-  endTime: Date;
-  stat?: "Sum" | "Average" | "Maximum" | "Minimum" | "SampleCount";
+/**
+ * Why a CloudWatch read failed, in terms the dashboard can act on.
+ *
+ * AWS SDK v3 error names are unreliable — several services return
+ * `name: "Error"` with the real exception only in `message` — so every
+ * classifier below checks the name AND the message.
+ */
+export type CloudWatchErrorKind =
+  | "credentials"
+  | "access_denied"
+  | "throttled"
+  | "invalid_request"
+  | "not_found"
+  | "unknown";
+
+type CloudWatchError = Error & {
+  cloudWatchErrorKind: CloudWatchErrorKind;
 };
 
+const ERROR_PATTERNS: Array<{ kind: CloudWatchErrorKind; match: RegExp }> = [
+  {
+    kind: "credentials",
+    match:
+      /ExpiredToken|InvalidClientTokenId|UnrecognizedClient|CredentialsProviderError|IncompleteSignature|SignatureDoesNotMatch|Could not load credentials/i,
+  },
+  {
+    kind: "access_denied",
+    match: /AccessDenied|UnauthorizedOperation|not authorized to perform/i,
+  },
+  {
+    kind: "throttled",
+    match: /Throttling|TooManyRequests|RequestLimitExceeded|Rate exceeded/i,
+  },
+  { kind: "not_found", match: /ResourceNotFound|NoSuchEntity|NotFound/i },
+  {
+    kind: "invalid_request",
+    match: /InvalidParameter|ValidationError|MissingParameter|InvalidFormat/i,
+  },
+];
+
 /**
- * Fetches CloudWatch metrics for a customer's SES account.
- * Automatically handles credential retrieval and caching.
+ * Map an unknown thrown value to a `CloudWatchErrorKind`.
  *
- * @param params - Account ID, metric name, time range, and aggregation settings
- * @returns CloudWatch metric data results
- *
- * @example
- * ```ts
- * // Get email send count for last 24 hours
- * const metrics = await getCloudWatchMetrics({
- *   awsAccountId: 'aws-account-uuid',
- *   metric: 'Send',
- *   period: 3600, // 1 hour intervals
- *   startTime: new Date(Date.now() - 24 * 60 * 60 * 1000),
- *   endTime: new Date(),
- * });
- * ```
+ * Pure and exported so callers can classify without catching a tagged error,
+ * and so the mapping is testable without an AWS client.
  */
-export async function getCloudWatchMetrics(
-  params: GetMetricsParams
-): Promise<MetricDataResult[]> {
-  const {
-    awsAccountId,
-    metric,
-    period,
-    startTime,
-    endTime,
-    stat = "Sum",
-  } = params;
-
-  // Get AWS account details from database
-  const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
-  });
-
-  if (!account) {
-    throw new Error("AWS account not found");
+export function classifyCloudWatchError(error: unknown): CloudWatchErrorKind {
+  if (!(error instanceof Error)) {
+    return "unknown";
   }
 
-  // Get temporary credentials for customer account
-  const credentials = await getOrAssumeRole({
-    roleArn: account.roleArn,
-    externalId: account.externalId,
-    region: account.region,
-  });
+  const tagged = (error as Partial<CloudWatchError>).cloudWatchErrorKind;
+  if (tagged) {
+    return tagged;
+  }
 
-  // Create CloudWatch client with temporary credentials
-  const cloudwatch = new CloudWatchClient({
-    region: account.region,
-    credentials: {
-      accessKeyId: credentials.accessKeyId,
-      secretAccessKey: credentials.secretAccessKey,
-      sessionToken: credentials.sessionToken,
-    },
-  });
-
-  // Define metric query
-  const metricQuery: MetricDataQuery = {
-    Id: "m1",
-    MetricStat: {
-      Metric: {
-        Namespace: "AWS/SES",
-        MetricName: metric,
-      },
-      Period: period,
-      Stat: stat,
-    },
-  };
-
-  // Fetch metrics
-  const command = new GetMetricDataCommand({
-    MetricDataQueries: [metricQuery],
-    StartTime: startTime,
-    EndTime: endTime,
-  });
-
-  try {
-    const response = await cloudwatch.send(command);
-    return response.MetricDataResults || [];
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to fetch CloudWatch metrics: ${error.message}`);
+  // Name and message both — `name` is frequently just "Error".
+  const haystack = `${error.name} ${error.message}`;
+  for (const { kind, match } of ERROR_PATTERNS) {
+    if (match.test(haystack)) {
+      return kind;
     }
-    throw error;
   }
+
+  return "unknown";
+}
+
+/** Read the kind off an error thrown by this module. */
+export function getCloudWatchErrorKind(error: unknown): CloudWatchErrorKind {
+  return classifyCloudWatchError(error);
 }
 
 /**
- * Common SES metrics available in CloudWatch
+ * Wrap a CloudWatch failure in an error that names what went wrong, keeping
+ * the original as `cause` so structured logs still carry the AWS detail.
+ */
+function cloudWatchError(action: string, error: unknown): CloudWatchError {
+  const kind = classifyCloudWatchError(error);
+  const detail = error instanceof Error ? error.message : String(error);
+  const wrapped = new Error(
+    `CloudWatch ${action} failed (${kind}): ${detail}`,
+    { cause: error }
+  ) as CloudWatchError;
+  wrapped.cloudWatchErrorKind = kind;
+  return wrapped;
+}
+
+/**
+ * SES metrics this app reads from CloudWatch.
+ *
+ * Deliberately only the reputation rates. The count metrics (`Send`,
+ * `Delivery`, `Bounce`, `Open`, ...) used to live here too, and every reader of
+ * them was wrong in the same way: SES publishes those undimensioned, so they
+ * are ACCOUNT-WIDE and include mail sent outside Wraps. Scoping them to the
+ * Wraps configuration set is not possible - SES only publishes per-set counts
+ * when the set has a CloudWatch event destination, and Wraps deploys an
+ * EventBridge destination instead (packages/pulumi/src/resources/ses.ts).
+ * Verified against a live Wraps-deployed account: the only `AWS/SES` metrics
+ * carrying a `ses:configuration-set` dimension there are `Reputation.*`.
+ *
+ * Counts come from Postgres `message_send` instead - see
+ * `src/lib/analytics-fallback.ts`. Do not add count metrics back here.
  */
 export const SES_METRICS = {
-  SEND: "Send",
-  DELIVERY: "Delivery",
-  BOUNCE: "Bounce",
-  COMPLAINT: "Complaint",
-  REJECT: "Reject",
-  OPEN: "Open",
-  CLICK: "Click",
-  RENDERING_FAILURE: "RenderingFailure",
   REPUTATION_BOUNCE_RATE: "Reputation.BounceRate",
   REPUTATION_COMPLAINT_RATE: "Reputation.ComplaintRate",
 } as const;
-
-/**
- * Fetches multiple CloudWatch metrics in a single API call.
- * Much more efficient than calling getCloudWatchMetrics multiple times —
- * one DB lookup, one client, one API call instead of N of each.
- */
-export async function getCloudWatchMetricsBatch(params: {
-  awsAccountId: string;
-  metrics: string[];
-  period: number;
-  startTime: Date;
-  endTime: Date;
-  stat?: "Sum" | "Average" | "Maximum" | "Minimum" | "SampleCount";
-}): Promise<Record<string, MetricDataResult[]>> {
-  const {
-    awsAccountId,
-    metrics,
-    period,
-    startTime,
-    endTime,
-    stat = "Sum",
-  } = params;
-
-  const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
-  });
-
-  if (!account) {
-    throw new Error("AWS account not found");
-  }
-
-  const credentials = await getOrAssumeRole({
-    roleArn: account.roleArn,
-    externalId: account.externalId,
-    region: account.region,
-  });
-
-  const cloudwatch = new CloudWatchClient({
-    region: account.region,
-    credentials: {
-      accessKeyId: credentials.accessKeyId,
-      secretAccessKey: credentials.secretAccessKey,
-      sessionToken: credentials.sessionToken,
-    },
-  });
-
-  const queries: MetricDataQuery[] = metrics.map((metric, i) => ({
-    Id: `m${i}`,
-    MetricStat: {
-      Metric: {
-        Namespace: "AWS/SES",
-        MetricName: metric,
-      },
-      Period: period,
-      Stat: stat,
-    },
-  }));
-
-  const command = new GetMetricDataCommand({
-    MetricDataQueries: queries,
-    StartTime: startTime,
-    EndTime: endTime,
-  });
-
-  const response = await cloudwatch.send(command);
-  const results = response.MetricDataResults || [];
-
-  const out: Record<string, MetricDataResult[]> = {};
-  for (let i = 0; i < metrics.length; i++) {
-    const result = results.find((r) => r.Id === `m${i}`);
-    out[metrics[i]] = result ? [result] : [];
-  }
-
-  return out;
-}
-
-/**
- * Gets multiple SES metrics at once for dashboard display
- */
-export async function getSESMetricsSummary(params: {
-  awsAccountId: string;
-  startTime: Date;
-  endTime: Date;
-  period?: number;
-}): Promise<Record<string, MetricDataResult[]>> {
-  const { awsAccountId, startTime, endTime, period = 3600 } = params;
-
-  const results = await getCloudWatchMetricsBatch({
-    awsAccountId,
-    metrics: [
-      SES_METRICS.SEND,
-      SES_METRICS.DELIVERY,
-      SES_METRICS.BOUNCE,
-      SES_METRICS.COMPLAINT,
-      SES_METRICS.RENDERING_FAILURE,
-    ],
-    period,
-    startTime,
-    endTime,
-  });
-
-  return {
-    sends: results[SES_METRICS.SEND] || [],
-    deliveries: results[SES_METRICS.DELIVERY] || [],
-    bounces: results[SES_METRICS.BOUNCE] || [],
-    complaints: results[SES_METRICS.COMPLAINT] || [],
-    renderingFailures: results[SES_METRICS.RENDERING_FAILURE] || [],
-  };
-}
 
 /**
  * Fetches SES account-level reputation rates from CloudWatch.
@@ -300,7 +185,12 @@ export async function getSESReputationMetrics(
     EndTime: endTime,
   });
 
-  const response = await cloudwatch.send(command);
+  let response: GetMetricDataCommandOutput;
+  try {
+    response = await cloudwatch.send(command);
+  } catch (error) {
+    throw cloudWatchError("GetMetricData(Reputation)", error);
+  }
   const results = response.MetricDataResults || [];
 
   const latestValue = (id: string): number | null => {

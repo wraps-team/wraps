@@ -137,6 +137,9 @@ describe("webhook reject → messageSend failed (real DB)", () => {
 
     const row = await getMessage(messageId);
     expect(row.status).toBe("failed");
+    // The enum cannot say "rejected", so the reason lives in `error`. Without
+    // it the dashboard shows a bare "Failed" and no cause.
+    expect(row.error).toBe("Rejected by SES");
   });
 
   it("does NOT overwrite a terminal 'bounced' status (precedence guard)", async () => {
@@ -152,6 +155,7 @@ describe("webhook reject → messageSend failed (real DB)", () => {
 
     const row = await getMessage(messageId);
     expect(row.status).toBe("bounced");
+    expect(row.error).toBeNull();
   });
 
   it("does NOT overwrite a terminal 'complained' status (precedence guard)", async () => {

@@ -5,7 +5,12 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getEmailMetricsFromPostgres } from "@/lib/analytics-fallback";
 import {
-  getSESMetricsSummary,
+  type EmailChartMeta,
+  resolveReputationScope,
+} from "@/lib/analytics-scope";
+import {
+  type CloudWatchErrorKind,
+  getCloudWatchErrorKind,
   getSESReputationMetrics,
 } from "@/lib/aws/cloudwatch";
 import { createRequestLogger } from "@/lib/logger";
@@ -17,14 +22,21 @@ type RouteContext = {
   }>;
 };
 
+/**
+ * Headline totals for the analytics page.
+ *
+ * Totals come from Postgres `message_send`. They previously came from
+ * `getSESMetricsSummary`, which reads undimensioned `AWS/SES` metrics — those
+ * are account-wide and include SES traffic sent outside Wraps, so the tiles
+ * could report thousands of sends for an org whose emails list was empty.
+ *
+ * CloudWatch is still read for one thing: SES account-level reputation. That
+ * figure is account-scoped by nature and is labelled as such via `meta`, rather
+ * than being blended silently into window-scoped arithmetic.
+ */
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { orgSlug } = await context.params;
-    const log = createRequestLogger({
-      path: "/api/[orgSlug]/analytics/overview",
-      method: "GET",
-      orgSlug,
-    });
 
     const session = await auth.api.getSession({
       headers: await import("next/headers").then((mod) => mod.headers()),
@@ -43,6 +55,12 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const log = createRequestLogger({
+      path: "/api/[orgSlug]/analytics/overview",
+      method: "GET",
+      organizationId: orgWithMembership.id,
+    });
+
     const { searchParams } = new URL(request.url);
     const days = Math.min(
       365,
@@ -55,110 +73,81 @@ export async function GET(request: Request, context: RouteContext) {
       where: eq(awsAccount.organizationId, orgWithMembership.id),
     });
 
-    if (accounts.length === 0) {
-      return NextResponse.json({
-        totalSent: 0,
-        totalDelivered: 0,
-        totalBounced: 0,
-        totalComplaints: 0,
-        totalRenderingFailures: 0,
-        deliveryRate: 0,
-        bounceRate: 0,
-        complaintRate: 0,
-      });
-    }
-
-    const [metricsResults, reputationResults] = await Promise.all([
-      Promise.all(
-        accounts.map(async (account) => {
-          try {
-            return await getSESMetricsSummary({
-              awsAccountId: account.id,
-              startTime,
-              endTime,
-              period: 3600,
-            });
-          } catch (error) {
-            log.error(
-              { err: error, accountId: account.id },
-              "Failed to fetch metrics for account"
-            );
-            return null;
-          }
-        })
-      ),
-      Promise.all(
-        accounts.map(async (account) => {
-          try {
-            return await getSESReputationMetrics(account.id);
-          } catch (error) {
-            log.error(
-              { err: error, accountId: account.id },
-              "Failed to fetch reputation metrics for account"
-            );
-            return null;
-          }
-        })
-      ),
-    ]);
-
-    const calculateTotal = (
-      metricName:
-        | "sends"
-        | "deliveries"
-        | "bounces"
-        | "complaints"
-        | "renderingFailures"
-    ) =>
-      metricsResults.reduce((total, metrics) => {
-        if (!metrics) {
-          return total;
+    // A per-account reputation failure must not render as a healthy 0%.
+    // Classify it, log it, and count it so the UI can admit the figure is
+    // incomplete. AWS SDK v3 error names are unreliable, so the classifier
+    // checks name AND message.
+    const reputationResults = await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          return await getSESReputationMetrics(account.id);
+        } catch (error) {
+          const kind: CloudWatchErrorKind = getCloudWatchErrorKind(error);
+          log.warn(
+            { awsAccountId: account.id, kind, err: error },
+            "SES reputation read failed for one AWS account"
+          );
+          return null;
         }
-        const values = metrics[metricName]?.[0]?.Values || [];
-        return total + values.reduce((sum, val) => sum + (val || 0), 0);
-      }, 0);
+      })
+    );
+    const awsAccountsUnavailable = reputationResults.filter(
+      (r) => r === null
+    ).length;
 
-    let totalSent = calculateTotal("sends");
-    let totalDelivered = calculateTotal("deliveries");
-    let totalBounced = calculateTotal("bounces");
-    let totalComplaints = calculateTotal("complaints");
-    let totalRenderingFailures = calculateTotal("renderingFailures");
+    const pgData = await getEmailMetricsFromPostgres(
+      orgWithMembership.id,
+      startTime,
+      endTime
+    );
 
-    // Fallback to PostgreSQL message_send when CloudWatch returns no data
-    if (totalSent === 0) {
-      const pgData = await getEmailMetricsFromPostgres(
-        orgWithMembership.id,
-        startTime,
-        endTime
-      );
-      for (const m of pgData.values()) {
-        totalSent += m.sent;
-        totalDelivered += m.delivered;
-        totalBounced += m.bounced;
-        totalComplaints += m.complaints;
-        totalRenderingFailures += m.renderingFailures;
-      }
+    let totalSent = 0;
+    let totalDelivered = 0;
+    let totalBounced = 0;
+    let totalComplaints = 0;
+    let totalOpens = 0;
+    let totalClicks = 0;
+    let totalRenderingFailures = 0;
+    for (const m of pgData.values()) {
+      totalSent += m.sent;
+      totalDelivered += m.delivered;
+      totalBounced += m.bounced;
+      totalComplaints += m.complaints;
+      totalOpens += m.opens;
+      totalClicks += m.clicks;
+      totalRenderingFailures += m.renderingFailures;
     }
 
-    // Rendering failures are counted as "sends" by CloudWatch but never
-    // actually left SES. Subtract them to get the true send denominator.
-    const effectiveSent = Math.max(0, totalSent - totalRenderingFailures);
+    // `message_send` counts `sent` as status != 'failed' and `renderingFailures`
+    // as status = 'failed' — disjoint sets. Unlike CloudWatch's `Send`, the
+    // total already excludes failures, so subtracting them again (as this did
+    // when CloudWatch was the source) would deflate the denominator and
+    // overstate every rate below.
+    const effectiveSent = totalSent;
 
     const deliveryRate =
       effectiveSent > 0 ? (totalDelivered / effectiveSent) * 100 : 0;
 
-    // Use SES account-level reputation metrics for bounce/complaint rates when
-    // available. SES computes these over its own rolling window (covering full
-    // account history), which matches what the SES console displays. Computing
-    // rates from period-filtered sends produces inflated numbers for accounts
-    // with low recent volume (e.g., 1 bounce / 13 sends = 7.5% vs SES's 0.02%).
-    //
-    // Reputation metrics are decimals (0–1); multiply by 100 for percentages.
-    // Take the worst rate across accounts since each account's reputation is
-    // independent and any bad actor affects the org's health.
+    // Open and click rates are new here. SES publishes no Open/Click metrics to
+    // CloudWatch unless the configuration set has a CloudWatch event
+    // destination, and Wraps deploys an EventBridge one, so while this route
+    // read CloudWatch these tiles could only ever show a dash. Postgres records
+    // both, bot-filtered. Rates are of delivered mail, matching the emails
+    // chart, because an undelivered message cannot be opened.
+    const openRate =
+      totalDelivered > 0 ? (totalOpens / totalDelivered) * 100 : 0;
+    const clickRate =
+      totalDelivered > 0 ? (totalClicks / totalDelivered) * 100 : 0;
+
+    // SES computes reputation over its own rolling window covering the whole
+    // account history, which is what the SES console shows. Take the worst rate
+    // across accounts: each account's reputation is independent and any bad
+    // actor affects the org's standing. Rates are decimals (0-1).
     const reputationBounceRate = reputationResults.reduce<number | null>(
       (worst, r) => {
-        if (r?.bounceRate == null) return worst;
+        if (r?.bounceRate == null) {
+          return worst;
+        }
         const pct = r.bounceRate * 100;
         return worst === null ? pct : Math.max(worst, pct);
       },
@@ -166,35 +155,46 @@ export async function GET(request: Request, context: RouteContext) {
     );
     const reputationComplaintRate = reputationResults.reduce<number | null>(
       (worst, r) => {
-        if (r?.complaintRate == null) return worst;
+        if (r?.complaintRate == null) {
+          return worst;
+        }
         const pct = r.complaintRate * 100;
         return worst === null ? pct : Math.max(worst, pct);
       },
       null
     );
 
-    const bounceRate =
-      reputationBounceRate !== null
-        ? reputationBounceRate
-        : effectiveSent > 0
-          ? (totalBounced / effectiveSent) * 100
-          : 0;
-    const complaintRate =
-      reputationComplaintRate !== null
-        ? reputationComplaintRate
-        : effectiveSent > 0
-          ? (totalComplaints / effectiveSent) * 100
-          : 0;
+    const windowBounceRate =
+      effectiveSent > 0 ? (totalBounced / effectiveSent) * 100 : 0;
+    const windowComplaintRate =
+      effectiveSent > 0 ? (totalComplaints / effectiveSent) * 100 : 0;
+
+    const bounceRate = reputationBounceRate ?? windowBounceRate;
+    const complaintRate = reputationComplaintRate ?? windowComplaintRate;
+
+    const hasReputation =
+      reputationBounceRate !== null || reputationComplaintRate !== null;
+    const meta: EmailChartMeta = {
+      reputationScope: resolveReputationScope(hasReputation, effectiveSent),
+      awsAccountCount: accounts.length,
+      awsAccountsUnavailable,
+      generatedAt: Date.now(),
+    };
 
     return NextResponse.json({
       totalSent: Math.round(totalSent),
       totalDelivered: Math.round(totalDelivered),
       totalBounced: Math.round(totalBounced),
       totalComplaints: Math.round(totalComplaints),
+      totalOpens: Math.round(totalOpens),
+      totalClicks: Math.round(totalClicks),
       totalRenderingFailures: Math.round(totalRenderingFailures),
       deliveryRate: Number(deliveryRate.toFixed(2)),
+      openRate: Number(openRate.toFixed(2)),
+      clickRate: Number(clickRate.toFixed(2)),
       bounceRate: Number(bounceRate.toFixed(2)),
       complaintRate: Number(complaintRate.toFixed(2)),
+      meta,
     });
   } catch (error) {
     const log = createRequestLogger({

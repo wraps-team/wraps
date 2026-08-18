@@ -1,16 +1,11 @@
 import { auth } from "@wraps/auth";
-import { db } from "@wraps/db";
-import { awsAccount } from "@wraps/db/schema/app";
-import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getEmailMetricsFromPostgres } from "@/lib/analytics-fallback";
 import {
-  aggregateByDate,
   gapFillDates,
   generateDateRange,
   validateTimezone,
 } from "@/lib/analytics-utils";
-import { getCloudWatchMetricsBatch, SES_METRICS } from "@/lib/aws/cloudwatch";
 import { createRequestLogger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
@@ -20,14 +15,26 @@ type RouteContext = {
   }>;
 };
 
+/**
+ * Daily email volume for the analytics page.
+ *
+ * Counts come from Postgres `message_send` and nothing else. This route used to
+ * read undimensioned `AWS/SES` CloudWatch metrics, which are ACCOUNT-WIDE: they
+ * count every send made from the customer's AWS account, including mail sent
+ * outside Wraps entirely, which can never appear in the emails list. Postgres
+ * cannot be scoped wrong — `getEmailMetricsFromPostgres` filters on the same
+ * predicate the list uses (organization, `channel = 'email'`, non-null `sentAt`
+ * inside the window) — so the chart and the list describe one population.
+ *
+ * Orgs with foreign SES traffic will see these numbers drop. That is the point.
+ *
+ * No AWS call is made here, so there is no AWS account gate: an org that has
+ * sends recorded but whose event pipeline never came up (the `fsi-language-courses`
+ * case) still gets its real volume instead of an empty chart.
+ */
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { orgSlug } = await context.params;
-    const log = createRequestLogger({
-      path: "/api/[orgSlug]/analytics/volume",
-      method: "GET",
-      orgSlug,
-    });
 
     const session = await auth.api.getSession({
       headers: await import("next/headers").then((mod) => mod.headers()),
@@ -55,95 +62,29 @@ export async function GET(request: Request, context: RouteContext) {
     const endTime = new Date();
     const startTime = new Date(endTime.getTime() - days * 24 * 60 * 60 * 1000);
 
-    const period = days <= 7 ? 3600 : days <= 30 ? 3600 * 6 : 3600 * 24;
-
-    const accounts = await db.query.awsAccount.findMany({
-      where: eq(awsAccount.organizationId, orgWithMembership.id),
-    });
-
-    if (accounts.length === 0) {
-      return NextResponse.json([]);
-    }
-
-    const metricsResults = await Promise.all(
-      accounts.map(async (account) => {
-        try {
-          return await getCloudWatchMetricsBatch({
-            awsAccountId: account.id,
-            metrics: [
-              SES_METRICS.SEND,
-              SES_METRICS.DELIVERY,
-              SES_METRICS.BOUNCE,
-              SES_METRICS.RENDERING_FAILURE,
-            ],
-            period,
-            startTime,
-            endTime,
-          });
-        } catch (error) {
-          log.error(
-            { err: error, accountId: account.id },
-            "Failed to fetch volume metrics for account"
-          );
-          return null;
-        }
-      })
+    const pgData = await getEmailMetricsFromPostgres(
+      orgWithMembership.id,
+      startTime,
+      endTime,
+      timezone
     );
 
-    const keys = ["sent", "delivered", "bounced", "renderingFailures"] as const;
-    const dailyMap = new Map<string, Record<(typeof keys)[number], number>>();
-
-    for (const metrics of metricsResults) {
-      if (!metrics) {
-        continue;
+    const dailyMap = new Map<
+      string,
+      {
+        sent: number;
+        delivered: number;
+        bounced: number;
+        renderingFailures: number;
       }
-
-      const timestamps = metrics[SES_METRICS.SEND]?.[0]?.Timestamps || [];
-      const perAccount = aggregateByDate(
-        timestamps,
-        [
-          metrics[SES_METRICS.SEND]?.[0]?.Values || [],
-          metrics[SES_METRICS.DELIVERY]?.[0]?.Values || [],
-          metrics[SES_METRICS.BOUNCE]?.[0]?.Values || [],
-          metrics[SES_METRICS.RENDERING_FAILURE]?.[0]?.Values || [],
-        ],
-        [...keys],
-        timezone
-      );
-
-      for (const [dateStr, values] of perAccount) {
-        const existing = dailyMap.get(dateStr) || {
-          sent: 0,
-          delivered: 0,
-          bounced: 0,
-          renderingFailures: 0,
-        };
-        dailyMap.set(dateStr, {
-          sent: existing.sent + values.sent,
-          delivered: existing.delivered + values.delivered,
-          bounced: existing.bounced + values.bounced,
-          renderingFailures:
-            existing.renderingFailures + values.renderingFailures,
-        });
-      }
-    }
-
-    // Fallback to PostgreSQL message_send when CloudWatch returns no data
-    if (dailyMap.size === 0) {
-      const pgData = await getEmailMetricsFromPostgres(
-        orgWithMembership.id,
-        startTime,
-        endTime,
-        timezone
-      );
-      for (const [dateStr, m] of pgData) {
-        dailyMap.set(dateStr, {
-          sent: m.sent,
-          delivered: m.delivered,
-          bounced: m.bounced,
-          renderingFailures: m.renderingFailures,
-        });
-      }
+    >();
+    for (const [dateStr, m] of pgData) {
+      dailyMap.set(dateStr, {
+        sent: m.sent,
+        delivered: m.delivered,
+        bounced: m.bounced,
+        renderingFailures: m.renderingFailures,
+      });
     }
 
     const dateRange = generateDateRange(startTime, endTime, timezone);
@@ -152,13 +93,7 @@ export async function GET(request: Request, context: RouteContext) {
       delivered: 0,
       bounced: 0,
       renderingFailures: 0,
-    }).map((d) => ({
-      ...d,
-      sent: Math.round(d.sent),
-      delivered: Math.round(d.delivered),
-      bounced: Math.round(d.bounced),
-      renderingFailures: Math.round(d.renderingFailures),
-    }));
+    });
 
     return NextResponse.json(dataPoints);
   } catch (error) {

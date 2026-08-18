@@ -1,4 +1,4 @@
-import { globSync, readFileSync } from "node:fs";
+import { existsSync, globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 
@@ -1593,5 +1593,219 @@ describe("pnpm config is not stranded in package.json", () => {
         "CVE floors for transitive deps; dropping them re-admits the advisory " +
         "versions without any install-time signal."
     ).toBeGreaterThan(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// Test: clickable table rows must be reachable by keyboard
+// (This cannot be a baseline.toml GritQL rule: deciding whether a row is
+//  reachable requires reading the SIBLING columns.tsx, because cells are
+//  rendered through flexRender and the link that opens the row lives there,
+//  not in the row markup. GritQL matches within one file.
+//  It is NOT here because of the 500-char baseline-skip gotcha — no file
+//  containing <TableRow> comes close to that limit.)
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Tables that open on row click and have not yet been given a keyboard path.
+ * Opening a row is then mouse-only: no role, no key handler, no link, so
+ * keyboard and screen-reader users cannot reach the destination at all
+ * (WCAG 2.1.1, Level A — audit finding F7 on the emails list).
+ *
+ * This list only shrinks. Fix a NAVIGATING table by making its primary cell a
+ * real `<Link>` (see `emails/components/columns.tsx`); fix one that opens a
+ * sheet or dialog by putting a real button in the row. Then delete its line.
+ */
+const CLICKABLE_ROW_ALLOWLIST = new Set([
+  "apps/web/src/app/(dashboard)/[orgSlug]/(ee)/automations/[workflowId]/executions/components/executions-table.tsx",
+  "apps/web/src/app/(dashboard)/[orgSlug]/(ee)/automations/components/workflows-table.tsx",
+  "apps/web/src/app/(dashboard)/[orgSlug]/contacts/components/contacts-table.tsx",
+  "apps/web/src/app/(dashboard)/[orgSlug]/emails/broadcasts/components/batch-table.tsx",
+  // Opens a details sheet rather than navigating, so no link can stand in for
+  // it. The fix is a real button inside the row; until then it is pinned here.
+  "apps/web/src/app/(dashboard)/[orgSlug]/events/components/events-table.tsx",
+  "apps/web/src/app/(dashboard)/[orgSlug]/emails/inbound/components/inbound-emails-table.tsx",
+  "apps/web/src/app/(dashboard)/[orgSlug]/segments/components/segments-table.tsx",
+  "apps/web/src/app/(dashboard)/[orgSlug]/sms/components/sms-table.tsx",
+  "apps/web/src/app/(dashboard)/[orgSlug]/topics/components/topics-table.tsx",
+]);
+
+const TABLE_ROW_OPEN_TAG = /<TableRow\b/g;
+const NAVIGATION_CALL =
+  /\brouter\.(push|replace)\s*\(|\bredirect\s*\(|\bnavigate\s*\(|\bwindow\.location\b/;
+const KEY_HANDLER = /onKeyDown|onKeyUp|onKeyPress/;
+const ACTIVATABLE_ROLE = /role="(button|link)"/;
+const CELL_LINK = /<Link\b|<a\s|role="link"/;
+const IDENTIFIER = /[A-Za-z_$][\w$]*/g;
+/** How far past a handler's declaration to look for a navigation call. */
+const HANDLER_BODY_CHARS = 700;
+
+/**
+ * The full opening tag starting at `start`, brace-aware so the `>` inside an
+ * inline `onClick={() => ...}` arrow does not truncate it.
+ */
+function openingTagAt(content: string, start: number): string {
+  let depth = 0;
+  for (let i = start; i < content.length; i++) {
+    const char = content[i];
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+    } else if (char === ">" && depth === 0) {
+      return content.slice(start, i + 1);
+    }
+  }
+  return content.slice(start);
+}
+
+/** The brace-matched value of `attr={...}`, or null if the attribute is absent. */
+function jsxAttributeValue(tag: string, attr: string): string | null {
+  const at = tag.indexOf(`${attr}={`);
+  if (at === -1) {
+    return null;
+  }
+  const start = tag.indexOf("{", at);
+  let depth = 0;
+  for (let i = start; i < tag.length; i++) {
+    const char = tag[i];
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return tag.slice(start + 1, i);
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Whether the row's click handler navigates somewhere, as opposed to opening a
+ * sheet, selecting, or expanding in place. Inline handlers are read directly;
+ * `onClick={handleRowClick}` is followed one hop to the handler's declaration
+ * in the same file. One hop only - a handler that delegates further reads as
+ * non-navigating, which is the safe direction (it demands more, not less).
+ */
+function rowClickNavigates(content: string, openingTag: string): boolean {
+  const handler = jsxAttributeValue(openingTag, "onClick");
+  if (handler === null) {
+    return false;
+  }
+  if (NAVIGATION_CALL.test(handler)) {
+    return true;
+  }
+  for (const name of handler.match(IDENTIFIER) ?? []) {
+    const declared = content.indexOf(`const ${name} =`);
+    if (declared === -1) {
+      continue;
+    }
+    if (
+      NAVIGATION_CALL.test(
+        content.slice(declared, declared + HANDLER_BODY_CHARS)
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether the row itself can be operated from the keyboard: a key handler AND
+ * a role that announces it as operable. `tabIndex` alone is deliberately NOT
+ * enough - it makes the row focusable, which is not the same as activatable,
+ * and a focus stop that does nothing on Enter is worse than none.
+ */
+function rowIsActivatableItself(openingTag: string): boolean {
+  return KEY_HANDLER.test(openingTag) && ACTIVATABLE_ROLE.test(openingTag);
+}
+
+/**
+ * Rows in `file` that open on click with no keyboard path to the same place.
+ *
+ * Cells render through `flexRender`, so the link that makes a navigating row
+ * reachable normally lives in the sibling `columns.tsx`. Two paths are
+ * accepted, and only two:
+ *
+ *   1. the row is activatable in its own markup (key handler + role), or
+ *   2. the row's onClick NAVIGATES and the columns file renders a link.
+ *
+ * Requiring (2) to be a navigation is what stops an unrelated link in some
+ * other cell - a "view contact" link in an events table, say - from exempting
+ * a row that opens a details sheet, which no link can reach.
+ *
+ * Known limits, both deliberate:
+ *   - when the row navigates, ANY link in the columns file counts; hrefs are
+ *     not compared against the onClick destination. Checking that statically
+ *     is not worth it, and a table whose row navigates and whose cells link
+ *     somewhere is overwhelmingly linking to the row's own subject.
+ *   - for a non-navigating row the affordance must be in the row markup. A
+ *     button in a columns cell does not count, because in practice that is a
+ *     row-actions menu, not the row's own action.
+ */
+function findClickOnlyRows(file: string, content: string): number[] {
+  const columnsFile = `${file.slice(0, file.lastIndexOf("/"))}/columns.tsx`;
+  let columnsContent = "";
+  if (existsSync(resolve(ROOT, columnsFile))) {
+    columnsContent = readFile(columnsFile);
+  }
+  const columnsLink = CELL_LINK.test(columnsContent);
+
+  const rows: number[] = [];
+  TABLE_ROW_OPEN_TAG.lastIndex = 0;
+  for (const match of content.matchAll(TABLE_ROW_OPEN_TAG)) {
+    const openingTag = openingTagAt(content, match.index);
+    if (!openingTag.includes("onClick")) {
+      continue;
+    }
+    if (rowIsActivatableItself(openingTag)) {
+      continue;
+    }
+    if (columnsLink && rowClickNavigates(content, openingTag)) {
+      continue;
+    }
+    rows.push(content.slice(0, match.index).split("\n").length);
+  }
+  return rows;
+}
+
+describe("clickable table rows are reachable by keyboard", () => {
+  test("a <TableRow> with onClick offers a keyboard path to the same place", () => {
+    const files = findFiles("apps/web/src/**/*.tsx").filter(
+      (f) => !(f.includes("__tests__") || f.includes(".test."))
+    );
+
+    const violations: string[] = [];
+
+    for (const file of files) {
+      const content = readFile(file);
+      if (!content.includes("<TableRow") || CLICKABLE_ROW_ALLOWLIST.has(file)) {
+        continue;
+      }
+
+      for (const lineNum of findClickOnlyRows(file, content)) {
+        violations.push(
+          `${file}:${lineNum} — <TableRow onClick> with no keyboard path to what it opens. ` +
+            "If the row navigates, make its primary cell a <Link> in columns.tsx. " +
+            "If it opens a sheet or dialog, put a real button in the row."
+        );
+      }
+    }
+
+    expect(violations, violations.join("\n")).toEqual([]);
+  });
+
+  // A stale allowlist reads as coverage. Fixing a table must force its entry out.
+  test("the clickable-row allowlist has no stale entries", () => {
+    const stale = [...CLICKABLE_ROW_ALLOWLIST].filter(
+      (file) => findClickOnlyRows(file, readFile(file)).length === 0
+    );
+
+    expect(
+      stale,
+      `These tables have a keyboard path now. Remove them from CLICKABLE_ROW_ALLOWLIST:\n${stale.join("\n")}`
+    ).toEqual([]);
   });
 });

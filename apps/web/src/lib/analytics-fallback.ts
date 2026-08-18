@@ -106,7 +106,7 @@ export async function getBounceMetricsFromPostgres(
   const rows = await db
     .select({
       date: sql<string>`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC' AT TIME ZONE ${tzLiteral}, 'YYYY-MM-DD')`,
-      sent: sql<number>`count(*)::int`,
+      sent: sql<number>`count(*) filter (where ${messageSend.status} != 'failed')::int`,
       permanent: sql<number>`count(*) filter (where ${messageSend.bounceType} = 'Permanent')::int`,
       transient: sql<number>`count(*) filter (where ${messageSend.bounceType} = 'Transient')::int`,
       undetermined: sql<number>`count(*) filter (where ${messageSend.bouncedAt} is not null and (${messageSend.bounceType} is null or ${messageSend.bounceType} not in ('Permanent', 'Transient')))::int`,
@@ -156,7 +156,7 @@ export async function getComplaintMetricsFromPostgres(
   const rows = await db
     .select({
       date: sql<string>`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC' AT TIME ZONE ${tzLiteral}, 'YYYY-MM-DD')`,
-      sent: sql<number>`count(*)::int`,
+      sent: sql<number>`count(*) filter (where ${messageSend.status} != 'failed')::int`,
       complaints: sql<number>`count(*) filter (where ${messageSend.complainedAt} is not null)::int`,
     })
     .from(messageSend)
@@ -185,8 +185,7 @@ export async function getComplaintMetricsFromPostgres(
 // ---------------------------------------------------------------------------
 
 export type DailySuppressionMetrics = {
-  accountLevel: number;
-  globalLevel: number;
+  suppressed: number;
   sent: number;
 };
 
@@ -200,7 +199,7 @@ export async function getSuppressionMetricsFromPostgres(
   const rows = await db
     .select({
       date: sql<string>`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC' AT TIME ZONE ${tzLiteral}, 'YYYY-MM-DD')`,
-      sent: sql<number>`count(*)::int`,
+      sent: sql<number>`count(*) filter (where ${messageSend.status} != 'failed')::int`,
       suppressed: sql<number>`count(*) filter (where ${messageSend.suppressedAt} is not null)::int`,
     })
     .from(messageSend)
@@ -219,11 +218,7 @@ export async function getSuppressionMetricsFromPostgres(
 
   const map = new Map<string, DailySuppressionMetrics>();
   for (const row of rows) {
-    map.set(row.date, {
-      accountLevel: 0,
-      globalLevel: row.suppressed,
-      sent: row.sent,
-    });
+    map.set(row.date, { suppressed: row.suppressed, sent: row.sent });
   }
   return map;
 }
@@ -242,32 +237,50 @@ export type TopPerformer = {
   sentAt: number;
 };
 
+/**
+ * Ranks subjects by engagement over the SAME population the chart and the
+ * emails list describe: this organization's email sends with a `sent_at`
+ * inside the window. It used to filter on `delivered_at IS NOT NULL` while
+ * reporting the group size as `sent`, so the column labelled "sent" in the UI
+ * was really a delivered count, and every rate below it was divided by
+ * deliveries while claiming to be per send.
+ *
+ * `sent` here means what it means everywhere else in this file: rows whose
+ * status is not 'failed'. Groups where nothing actually left SES are dropped
+ * rather than listed as a performer with a zero denominator.
+ */
 export async function getTopPerformersFromPostgres(
   organizationId: string,
   startTime: Date,
   endTime: Date,
   limit: number
 ): Promise<TopPerformer[]> {
+  const sentCount = sql<number>`count(*) filter (where ${messageSend.status} != 'failed')::int`;
   const rows = await db
     .select({
       subject: messageSend.subject,
-      sent: sql<number>`count(*)::int`,
+      sent: sentCount,
       opens: sql<number>`count(*) filter (where ${messageSend.openedAt} is not null and ${isNotBotOpen})::int`,
       clicks: sql<number>`count(*) filter (where ${messageSend.clickedAt} is not null)::int`,
-      earliestSent: sql<Date>`min(${messageSend.sentAt})`,
+      // Epoch millis, not the raw timestamp: drizzle's node-postgres driver
+      // hands back timestamps as strings and only its own column mappers turn
+      // them into Dates. A bare `sql<Date>` gets the string, so `.getTime()`
+      // on it threw and took the whole route down whenever it had rows.
+      earliestSentMs: sql<number>`(extract(epoch from min(${messageSend.sentAt})) * 1000)::float8`,
     })
     .from(messageSend)
     .where(
       and(
         eq(messageSend.organizationId, organizationId),
         eq(messageSend.channel, "email"),
-        isNotNull(messageSend.deliveredAt),
+        isNotNull(messageSend.sentAt),
         isNotNull(messageSend.subject),
         gte(messageSend.sentAt, startTime),
         lte(messageSend.sentAt, endTime)
       )
     )
     .groupBy(messageSend.subject)
+    .having(sql`${sentCount} > 0`)
     .orderBy(
       desc(
         sql`count(*) filter (where ${messageSend.clickedAt} is not null) * 2 + count(*) filter (where ${messageSend.openedAt} is not null)`
@@ -285,7 +298,7 @@ export async function getTopPerformersFromPostgres(
       sent: r.sent,
       opens: r.opens,
       clicks: r.clicks,
-      sentAt: r.earliestSent.getTime(),
+      sentAt: r.earliestSentMs,
     };
   });
 }
@@ -296,6 +309,12 @@ export async function getTopPerformersFromPostgres(
 
 export type RecentActivity = {
   id: string;
+  /**
+   * What `/[orgSlug]/emails/[emailId]` should be linked with. The detail route
+   * resolves either the Postgres row id or the SES message id, and older rows
+   * have no message id at all, so fall back to the row id.
+   */
+  messageId: string;
   subject: string;
   eventType: string;
   timestamp: number;
@@ -311,6 +330,7 @@ export async function getRecentActivityFromPostgres(
   const rows = await db
     .select({
       id: messageSend.id,
+      messageId: messageSend.messageId,
       subject: messageSend.subject,
       status: messageSend.status,
       sentAt: messageSend.sentAt,
@@ -325,13 +345,18 @@ export async function getRecentActivityFromPostgres(
     .where(
       and(
         eq(messageSend.organizationId, organizationId),
-        eq(messageSend.channel, "email")
+        eq(messageSend.channel, "email"),
+        // Same predicate as every other reader in this file. Without it, rows
+        // that were created but never sent (no `sent_at`) came back and were
+        // stamped with `Date.now()` below - a queued message reported as
+        // activity that happened just now.
+        isNotNull(messageSend.sentAt)
       )
     )
     .orderBy(desc(messageSend.createdAt))
     .limit(limit);
 
-  return rows.map((r) => {
+  return rows.flatMap((r) => {
     const statusToEventType: Record<string, string> = {
       sent: "Send",
       delivered: "Delivery",
@@ -344,8 +369,15 @@ export async function getRecentActivityFromPostgres(
       pending: "Send",
       queued: "Send",
     };
+    // The WHERE clause guarantees this; the guard is how TypeScript learns it,
+    // and it is a skip rather than a fabricated timestamp so a row that somehow
+    // arrives unsent is left out instead of being dated "just now".
+    if (!r.sentAt) {
+      return [];
+    }
+
     const eventType = statusToEventType[r.status] ?? "Send";
-    const sentAtTs = r.sentAt?.getTime() ?? Date.now();
+    const sentAtTs = r.sentAt.getTime();
 
     // Use the most recent event timestamp, not always sentAt
     const eventTimeMap: Record<string, number | undefined> = {
@@ -356,14 +388,17 @@ export async function getRecentActivityFromPostgres(
     };
     const ts = eventTimeMap[eventType] ?? sentAtTs;
 
-    return {
-      id: r.id,
-      subject: r.subject ?? "(no subject)",
-      eventType,
-      timestamp: ts,
-      sentAt: sentAtTs,
-      timestampFormatted: new Date(ts).toISOString(),
-      metadata: { to: r.recipient },
-    };
+    return [
+      {
+        id: r.id,
+        messageId: r.messageId ?? r.id,
+        subject: r.subject ?? "(no subject)",
+        eventType,
+        timestamp: ts,
+        sentAt: sentAtTs,
+        timestampFormatted: new Date(ts).toISOString(),
+        metadata: { to: r.recipient },
+      },
+    ];
   });
 }

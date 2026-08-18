@@ -2,20 +2,67 @@ import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
 import { awsAccount } from "@wraps/db/schema/app";
 import { messageSend } from "@wraps/db/schema/batch";
-import { and, desc, eq, gte, ilike, isNotNull, lte, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  isNotNull,
+  lte,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { NextResponse } from "next/server";
+import {
+  decodeEmailCursor,
+  EMAIL_LIST_MAX_DAYS,
+  EMAIL_LIST_MAX_PAGE_SIZE,
+  EMAIL_LIST_PAGE_SIZE,
+  EMAIL_SEARCH_MIN_LENGTH,
+  EMAIL_SEARCH_TOO_SHORT_MESSAGE,
+  encodeEmailCursor,
+  escapeLikeTerm,
+  isEmailListSort,
+  isEmailListStatus,
+  maskAwsAccountId,
+  toPgTimestamp,
+} from "@/app/(dashboard)/[orgSlug]/emails/lib/list-query";
 import type {
   EmailListItem,
+  EmailListResponse,
   EmailStatus,
 } from "@/app/(dashboard)/[orgSlug]/emails/types";
-import { queryEmailEvents, queryEventsByMessageIds } from "@/lib/aws/dynamodb";
-import {
-  aggregateEmailEvents,
-  findIncompleteMessageIds,
-  STATUS_PRIORITY,
-} from "@/lib/email-aggregation";
-import { createRequestLogger } from "@/lib/logger";
+import { createRequestLogger, serializeError } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The emails list.
+ *
+ * One Postgres query serves browse AND search (audit F2 + F3). It used to be
+ * two code paths reading two stores: browsing merged DynamoDB event history
+ * with `message_send`, searching read `message_send` alone, so a message
+ * visible while browsing could vanish the moment you searched for it - a
+ * customer reported exactly that. DynamoDB is event-keyed (one row per event,
+ * unbounded per message), which is why "the next 50 messages" was not
+ * expressible against it and why this list was capped at 100 rows with no way
+ * past them. `message_send` is a superset by construction: the same EventBridge
+ * rule that feeds DynamoDB feeds the webhook that writes here, and the webhook
+ * materializes a row for any message id it has never seen.
+ *
+ * Reading DynamoDB from here is gone, and with it the per-account read failure
+ * that used to be swallowed into a silently partial list (F11 at the list
+ * level). DynamoDB keeps exactly one job: the per-message timeline on the
+ * detail page.
+ *
+ * Pagination is keyset on `(sent_at DESC, id DESC)` with an opaque cursor, and
+ * never counts: our largest organization has 1.95M rows and a `count(*)` on
+ * every page load is not a thing this page can afford.
+ */
 
 type RouteContext = {
   params: Promise<{
@@ -23,11 +70,112 @@ type RouteContext = {
   }>;
 };
 
-export async function GET(request: Request, context: RouteContext) {
-  try {
-    const { orgSlug } = await context.params;
+/**
+ * Postgres/driver codes that mean "the database was unreachable", as opposed
+ * to "the query was wrong". They are worth telling apart: one is retryable and
+ * transient, the other is ours to fix.
+ */
+const DB_UNREACHABLE_CODES = new Set([
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ENOTFOUND",
+  "ETIMEDOUT",
+  "08000",
+  "08001",
+  "08003",
+  "08006",
+  "57P01",
+  "57P02",
+  "57P03",
+]);
 
-    // Authenticate user
+function isDbUnreachable(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" && DB_UNREACHABLE_CODES.has(code);
+}
+
+/** Every column the list needs. No joins - one index scan, one page. */
+const LIST_COLUMNS = {
+  id: messageSend.id,
+  messageId: messageSend.messageId,
+  from: messageSend.from,
+  recipient: messageSend.recipient,
+  subject: messageSend.subject,
+  status: messageSend.status,
+  sentAt: messageSend.sentAt,
+  deliveredAt: messageSend.deliveredAt,
+  openedAt: messageSend.openedAt,
+  clickedAt: messageSend.clickedAt,
+  bouncedAt: messageSend.bouncedAt,
+  complainedAt: messageSend.complainedAt,
+  suppressedAt: messageSend.suppressedAt,
+} as const;
+
+type ListRow = {
+  id: string;
+  messageId: string | null;
+  from: string | null;
+  recipient: string;
+  subject: string | null;
+  status: string;
+  sentAt: Date;
+  deliveredAt: Date | null;
+  openedAt: Date | null;
+  clickedAt: Date | null;
+  bouncedAt: Date | null;
+  complainedAt: Date | null;
+  suppressedAt: Date | null;
+};
+
+function toListItem(row: ListRow): EmailListItem {
+  const sentAt = row.sentAt;
+  const lastActivityAt = Math.max(
+    row.clickedAt?.getTime() ?? 0,
+    row.openedAt?.getTime() ?? 0,
+    row.bouncedAt?.getTime() ?? 0,
+    row.complainedAt?.getTime() ?? 0,
+    row.suppressedAt?.getTime() ?? 0,
+    row.deliveredAt?.getTime() ?? 0,
+    sentAt.getTime()
+  );
+
+  // Derived from the timestamp columns, not counted. The column is labelled
+  // "Activity" for that reason; the detail page is the only place that reports
+  // a real event count.
+  const eventCount = [
+    true,
+    Boolean(row.deliveredAt),
+    Boolean(row.openedAt),
+    Boolean(row.clickedAt),
+    Boolean(row.bouncedAt),
+    Boolean(row.complainedAt),
+    Boolean(row.suppressedAt),
+  ].filter(Boolean).length;
+
+  return {
+    id: row.messageId ?? row.id,
+    messageId: row.messageId ?? row.id,
+    from: row.from ?? "",
+    to: [row.recipient],
+    subject: row.subject ?? "(no subject)",
+    status: (row.status as EmailStatus) ?? "sent",
+    sentAt: sentAt.getTime(),
+    lastActivityAt,
+    eventCount,
+    hasOpened: Boolean(row.openedAt),
+    hasClicked: Boolean(row.clickedAt),
+  };
+}
+
+export async function GET(request: Request, context: RouteContext) {
+  const { orgSlug } = await context.params;
+  const log = createRequestLogger({
+    path: "/api/[orgSlug]/emails",
+    method: "GET",
+    orgSlug,
+  });
+
+  try {
     const session = await auth.api.getSession({
       headers: await import("next/headers").then((mod) => mod.headers()),
     });
@@ -36,7 +184,6 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify organization membership
     const orgWithMembership = await getOrganizationWithMembership(
       orgSlug,
       session.user.id
@@ -46,311 +193,227 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Get query parameters
+    // Every predicate below is ANDed with this organization id, which comes
+    // from the membership check above and never from the request.
+    const organizationId = orgWithMembership.id;
+
     const { searchParams } = new URL(request.url);
     const days = Math.min(
-      365,
-      Math.max(1, Number.parseInt(searchParams.get("days") || "7", 10))
+      EMAIL_LIST_MAX_DAYS,
+      Math.max(1, Number.parseInt(searchParams.get("days") || "7", 10) || 7)
     );
     const limit = Math.min(
-      500,
-      Math.max(1, Number.parseInt(searchParams.get("limit") || "100", 10))
+      EMAIL_LIST_MAX_PAGE_SIZE,
+      Math.max(
+        1,
+        Number.parseInt(
+          searchParams.get("limit") || String(EMAIL_LIST_PAGE_SIZE),
+          10
+        ) || EMAIL_LIST_PAGE_SIZE
+      )
     );
+
     const rawStatus = searchParams.get("status");
-    const status: EmailStatus | null =
-      rawStatus && (STATUS_PRIORITY as string[]).includes(rawStatus)
-        ? (rawStatus as EmailStatus)
-        : null;
-    const search = searchParams.get("search")?.trim() || null;
+    const status = isEmailListStatus(rawStatus) ? rawStatus : null;
 
-    const endTime = new Date();
-    const startTime = new Date(endTime.getTime() - days * 24 * 60 * 60 * 1000);
+    const rawSort = searchParams.get("sort");
+    const sort = isEmailListSort(rawSort) ? rawSort : "desc";
 
-    // Search path: PostgreSQL-first using trigram indexes on recipient/subject/from.
-    // Skips the DynamoDB time-window scan entirely — PG is the authoritative record
-    // store and has all the fields needed to build EmailListItem responses.
-    // Run packages/db/scripts/create-email-search-indexes.ts to create the GIN indexes.
-    if (search) {
-      const log = createRequestLogger({
-        path: "/api/[orgSlug]/emails",
-        method: "GET",
-        orgSlug,
-      });
+    const rawSearch = searchParams.get("search")?.trim() || null;
+    if (rawSearch && rawSearch.length < EMAIL_SEARCH_MIN_LENGTH) {
+      return NextResponse.json(
+        { error: EMAIL_SEARCH_TOO_SHORT_MESSAGE },
+        { status: 400 }
+      );
+    }
 
-      const searchResults = await db
+    const rawCursor = searchParams.get("cursor");
+    const cursor = rawCursor ? decodeEmailCursor(rawCursor) : null;
+    if (rawCursor && !cursor) {
+      return NextResponse.json(
+        { error: "That page link is no longer valid. Reload the list." },
+        { status: 400 }
+      );
+    }
+
+    // A cursor is a position in ONE ordering. Applied to the opposite sort the
+    // keyset seeks the wrong way and serves a page out of the middle of a set
+    // nobody asked for - so a mismatch is refused rather than guessed at. A
+    // legacy cursor carries no sort and is taken at face value, as before.
+    if (cursor?.sort && cursor.sort !== sort) {
+      return NextResponse.json(
+        { error: "That page link is no longer valid. Reload the list." },
+        { status: 400 }
+      );
+    }
+
+    // A cursor pins the window its first page was served with. Recomputing
+    // `to = new Date()` on every request slides the window forward mid-walk:
+    // sends arriving between pages join the set behind the keyset (harmless
+    // but invisible), and - the real defect - rows sitting near the `from`
+    // edge age out of the window before the reader pages down to them, so
+    // they are dropped from the result set with nothing to indicate it. Only
+    // an uncursored request (page 1) picks a fresh window.
+    //
+    // The token is opaque but unsigned, so clamp what it carries to the bounds
+    // a fresh request would get: never into the future, never wider than
+    // EMAIL_LIST_MAX_DAYS. Nothing here crosses an organization - that is the
+    // `organizationId` predicate below - this only stops a hand-edited cursor
+    // from asking for a scan the `days` cap exists to refuse.
+    const now = new Date();
+    const pinned = cursor?.window ?? null;
+    const to = pinned
+      ? new Date(Math.min(pinned.to.getTime(), now.getTime()))
+      : now;
+    const earliest = to.getTime() - EMAIL_LIST_MAX_DAYS * DAY_MS;
+    const from = pinned
+      ? new Date(Math.max(pinned.from.getTime(), earliest))
+      : new Date(to.getTime() - days * DAY_MS);
+
+    const filters: (SQL | undefined)[] = [
+      eq(messageSend.channel, "email"),
+      isNotNull(messageSend.sentAt),
+      gte(messageSend.sentAt, from),
+      lte(messageSend.sentAt, to),
+    ];
+
+    if (status) {
+      filters.push(
+        eq(
+          messageSend.status,
+          status as (typeof messageSend.status)["_"]["data"]
+        )
+      );
+    }
+
+    if (rawSearch) {
+      const pattern = `%${escapeLikeTerm(rawSearch)}%`;
+      filters.push(
+        or(
+          ilike(messageSend.recipient, pattern),
+          ilike(messageSend.subject, pattern),
+          ilike(messageSend.from, pattern)
+        )
+      );
+    }
+
+    // Row-value comparison, so the composite index can seek straight to the
+    // page rather than filtering after the fact.
+    if (cursor) {
+      const cursorSentAt = toPgTimestamp(cursor.sentAt);
+      filters.push(
+        sort === "desc"
+          ? sql`(${messageSend.sentAt}, ${messageSend.id}) < (${cursorSentAt}::timestamp, ${cursor.id})`
+          : sql`(${messageSend.sentAt}, ${messageSend.id}) > (${cursorSentAt}::timestamp, ${cursor.id})`
+      );
+    }
+
+    const orderBy =
+      sort === "desc"
+        ? [desc(messageSend.sentAt), desc(messageSend.id)]
+        : [asc(messageSend.sentAt), asc(messageSend.id)];
+
+    // limit + 1 is the whole of the "has more" logic. Never count(*).
+    const [rows, accounts, everSent] = await Promise.all([
+      db
+        .select(LIST_COLUMNS)
+        .from(messageSend)
+        .where(and(eq(messageSend.organizationId, organizationId), ...filters))
+        .orderBy(...orderBy)
+        .limit(limit + 1),
+      db
         .select({
-          id: messageSend.id,
-          messageId: messageSend.messageId,
-          from: messageSend.from,
-          recipient: messageSend.recipient,
-          subject: messageSend.subject,
-          status: messageSend.status,
-          sentAt: messageSend.sentAt,
-          deliveredAt: messageSend.deliveredAt,
-          openedAt: messageSend.openedAt,
-          clickedAt: messageSend.clickedAt,
-          bouncedAt: messageSend.bouncedAt,
-          complainedAt: messageSend.complainedAt,
-          suppressedAt: messageSend.suppressedAt,
+          accountId: awsAccount.accountId,
+          lastEventReceivedAt: awsAccount.lastEventReceivedAt,
+          eventFeedStaleSince: awsAccount.eventFeedStaleSince,
         })
+        .from(awsAccount)
+        .where(eq(awsAccount.organizationId, organizationId)),
+      // Deliberately wider than the chart's `sent`, which counts only
+      // `status != 'failed'`. This drives the zero-state - the difference
+      // between "you have never sent anything" and "nothing matched these
+      // filters" - and an org whose only send failed has still sent. Showing
+      // it the never-sent onboarding copy would be wrong and would hide the
+      // failure it needs to see. So: any email row with a `sent_at`, in any
+      // status, in any window, counts. Do not narrow this to match the chart.
+      db
+        .select({ id: messageSend.id })
         .from(messageSend)
         .where(
           and(
-            eq(messageSend.organizationId, orgWithMembership.id),
+            eq(messageSend.organizationId, organizationId),
             eq(messageSend.channel, "email"),
-            isNotNull(messageSend.sentAt),
-            gte(messageSend.sentAt, startTime),
-            lte(messageSend.sentAt, endTime),
-            status
-              ? eq(
-                  messageSend.status,
-                  status as (typeof messageSend.status)["_"]["data"]
-                )
-              : undefined,
-            or(
-              ilike(messageSend.subject, `%${search}%`),
-              ilike(messageSend.recipient, `%${search}%`),
-              ilike(messageSend.from, `%${search}%`)
-            )
+            isNotNull(messageSend.sentAt)
           )
         )
-        .orderBy(desc(messageSend.sentAt))
-        .limit(limit);
+        .limit(1),
+    ]);
 
-      const results: EmailListItem[] = searchResults
-        .filter((r) => r.sentAt != null)
-        .map((r) => {
-          const lastActivityAt = Math.max(
-            r.clickedAt?.getTime() ?? 0,
-            r.openedAt?.getTime() ?? 0,
-            r.bouncedAt?.getTime() ?? 0,
-            r.complainedAt?.getTime() ?? 0,
-            r.suppressedAt?.getTime() ?? 0,
-            r.deliveredAt?.getTime() ?? 0,
-            r.sentAt!.getTime()
-          );
-          // Approximated from PG timestamp columns — full event count requires
-          // DynamoDB lookup. Detail view will show the accurate value.
-          const eventCount = [
-            true,
-            !!r.deliveredAt,
-            !!r.openedAt,
-            !!r.clickedAt,
-            !!r.bouncedAt,
-            !!r.complainedAt,
-            !!r.suppressedAt,
-          ].filter(Boolean).length;
-          return {
-            id: r.messageId ?? r.id,
-            messageId: r.messageId ?? r.id,
-            from: r.from ?? "",
-            to: [r.recipient],
-            subject: r.subject ?? "(no subject)",
-            status: (r.status as EmailStatus) ?? "sent",
-            sentAt: r.sentAt!.getTime(),
-            lastActivityAt,
-            eventCount,
-            hasOpened: !!r.openedAt,
-            hasClicked: !!r.clickedAt,
-          };
-        });
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const last = page.at(-1);
+    const nextCursor =
+      hasMore && last?.sentAt && last.id
+        ? encodeEmailCursor({
+            sentAt: last.sentAt,
+            id: last.id,
+            sort,
+            // Carried, not recomputed, so page 3 sees page 1's window.
+            window: { from, to },
+          })
+        : null;
 
-      log.info(
-        { resultCount: results.length, search },
-        "Email search complete"
-      );
-      return NextResponse.json(results);
-    }
+    const body: EmailListResponse = {
+      // `sent_at IS NOT NULL` is in the WHERE clause; the narrowing here is
+      // only so the mapper can take a non-null Date.
+      items: page.flatMap((row) =>
+        row.sentAt ? [toListItem({ ...row, sentAt: row.sentAt })] : []
+      ),
+      nextCursor,
+      window: { days, from: from.toISOString(), to: to.toISOString() },
+      feed: {
+        hasEverSent: everSent.length > 0,
+        accounts: accounts.map((account) => ({
+          maskedAccountId: maskAwsAccountId(account.accountId),
+          eventFeedStaleSince:
+            account.eventFeedStaleSince?.toISOString() ?? null,
+          hasEverReceivedEvents: account.lastEventReceivedAt !== null,
+        })),
+      },
+    };
 
-    // Non-search path: DynamoDB-first (authoritative for event history).
-    const accounts = await db.query.awsAccount.findMany({
-      where: eq(awsAccount.organizationId, orgWithMembership.id),
-    });
-
-    if (accounts.length === 0) {
-      return NextResponse.json([]);
-    }
-
-    const log = createRequestLogger({
-      path: "/api/[orgSlug]/emails",
-      method: "GET",
-      orgSlug,
-    });
-
-    // Fetch email events from all accounts (time-windowed via GSI)
-    const allEvents = await Promise.all(
-      accounts.map(async (account) => {
-        try {
-          return await queryEmailEvents({
-            awsAccountId: account.id,
-            startTime,
-            endTime,
-            limit: 500,
-          });
-        } catch (error) {
-          log.error(
-            { err: error, accountId: account.id },
-            "Failed to fetch emails for account"
-          );
-          return [];
-        }
-      })
+    log.info(
+      {
+        days,
+        hasMore,
+        hasSearch: Boolean(rawSearch),
+        paged: Boolean(cursor),
+        rowCount: body.items.length,
+        sort,
+        status,
+      },
+      "Emails list served"
     );
 
-    // Backfill complete events for messages missing their Send event.
-    // The time-windowed query may only return engagement events (Open/Click)
-    // for old emails, missing the original Send/Delivery events.
-    const incomplete = findIncompleteMessageIds(allEvents);
-
-    if (incomplete.size > 0) {
-      // Map AWS account numbers back to internal DB IDs
-      const accountsByNumber = new Map(
-        accounts.map((a) => [a.accountId, a.id])
-      );
-
-      // Group incomplete messageIds by account
-      const byAccount = new Map<string, string[]>();
-      for (const [messageId, awsAccountNumber] of incomplete) {
-        const internalId = accountsByNumber.get(awsAccountNumber);
-        if (internalId) {
-          const existing = byAccount.get(internalId) || [];
-          existing.push(messageId);
-          byAccount.set(internalId, existing);
-        }
-      }
-
-      // Query complete event history for each account's incomplete messages
-      const backfilled = await Promise.all(
-        [...byAccount.entries()].map(async ([awsAccountId, messageIds]) => {
-          try {
-            return await queryEventsByMessageIds({ awsAccountId, messageIds });
-          } catch (error) {
-            log.error(
-              { err: error, awsAccountId },
-              "Failed to backfill events"
-            );
-            return [];
-          }
-        })
-      );
-
-      for (const events of backfilled) {
-        allEvents.push(events);
-      }
-    }
-
-    // Aggregate DynamoDB events — use a larger working set when filtering by status
-    // so the post-enrichment filter has enough candidates before slicing to limit.
-    const workingLimit = status
-      ? Math.min(5000, allEvents.flat().length + 1000)
-      : limit;
-    const emails = aggregateEmailEvents(allEvents).slice(0, workingLimit);
-
-    // Query PostgreSQL for all messages in the time window.
-    // Used to both enrich authoritative sentAt on DynamoDB records AND fill in
-    // any messages that exist in PG but are missing from DynamoDB (e.g. when
-    // DynamoDB has older events but the Lambda hasn't written the newest sends yet).
-    const pgEmails = await db
-      .select({
-        id: messageSend.id,
-        messageId: messageSend.messageId,
-        from: messageSend.from,
-        recipient: messageSend.recipient,
-        subject: messageSend.subject,
-        status: messageSend.status,
-        sentAt: messageSend.sentAt,
-        openedAt: messageSend.openedAt,
-        clickedAt: messageSend.clickedAt,
-      })
-      .from(messageSend)
-      .where(
-        and(
-          eq(messageSend.organizationId, orgWithMembership.id),
-          eq(messageSend.channel, "email"),
-          isNotNull(messageSend.sentAt),
-          gte(messageSend.sentAt, startTime),
-          lte(messageSend.sentAt, endTime),
-          status
-            ? eq(
-                messageSend.status,
-                status as (typeof messageSend.status)["_"]["data"]
-              )
-            : undefined
-        )
-      )
-      .orderBy(desc(messageSend.sentAt))
-      .limit(limit);
-
-    const pgByMessageId = new Map(
-      pgEmails
-        .filter((r) => r.messageId && r.sentAt)
-        .map((r) => [r.messageId!, r])
-    );
-
-    // Enrich sentAt and status for existing DynamoDB entries using authoritative PG data.
-    // PG status takes priority when it reflects a more severe outcome (e.g. complaint
-    // recorded by the webhook but not yet written to DynamoDB by the Lambda processor).
-    const dynamoMessageIds = new Set<string>();
-    for (const email of emails) {
-      dynamoMessageIds.add(email.messageId);
-      const pg = pgByMessageId.get(email.messageId);
-      if (pg?.sentAt) {
-        const authoritative = pg.sentAt.getTime();
-        if (authoritative < email.sentAt) {
-          email.sentAt = authoritative;
-        }
-      }
-      if (pg?.status) {
-        const pgStatus = pg.status as EmailStatus;
-        const pgPriority = STATUS_PRIORITY.indexOf(pgStatus);
-        const currentPriority = STATUS_PRIORITY.indexOf(email.status);
-        if (pgPriority !== -1 && pgPriority < currentPriority) {
-          email.status = pgStatus;
-        }
-      }
-    }
-
-    // Add PG records not present in DynamoDB results
-    let addedFromPg = false;
-    for (const pg of pgEmails) {
-      const msgId = pg.messageId ?? pg.id;
-      if (dynamoMessageIds.has(msgId)) continue;
-      emails.push({
-        id: msgId,
-        messageId: msgId,
-        from: pg.from ?? "",
-        to: [pg.recipient],
-        subject: pg.subject ?? "(no subject)",
-        status: (pg.status as EmailStatus) ?? "sent",
-        sentAt: pg.sentAt!.getTime(),
-        lastActivityAt:
-          pg.clickedAt?.getTime() ??
-          pg.openedAt?.getTime() ??
-          pg.sentAt!.getTime(),
-        eventCount: 1,
-        hasOpened: !!pg.openedAt,
-        hasClicked: !!pg.clickedAt,
-      });
-      addedFromPg = true;
-    }
-
-    if (addedFromPg) {
-      emails.sort((a, b) => b.sentAt - a.sentAt);
-    }
-
-    const filtered = status
-      ? emails.filter((email) => email.status === status)
-      : emails;
-
-    return NextResponse.json(filtered.slice(0, limit));
+    return NextResponse.json(body);
   } catch (error) {
-    const log = createRequestLogger({
-      path: "/api/[orgSlug]/emails",
-      method: "GET",
-    });
-    log.error({ err: error }, "Error fetching emails");
+    if (isDbUnreachable(error)) {
+      log.error(
+        { err: serializeError(error) },
+        "Emails list unavailable: message store unreachable"
+      );
+      return NextResponse.json(
+        {
+          error:
+            "Wraps could not reach the message store. Your history is intact - retry in a moment.",
+        },
+        { status: 503 }
+      );
+    }
+
+    log.error({ err: serializeError(error) }, "Emails list query failed");
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to load messages." },
       { status: 500 }
     );
   }

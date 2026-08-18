@@ -1,10 +1,18 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import type { EmailChartMeta } from "@/lib/analytics-scope";
 
 const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-type AnalyticsOverview = {
+/**
+ * Totals every email payload reports.
+ *
+ * `bounceRate` and `complaintRate` may be SES account-lifetime figures rather
+ * than window arithmetic - read `meta.reputationScope` before pairing either
+ * with a count from the same payload.
+ */
+type EmailTotals = {
   totalSent: number;
   totalDelivered: number;
   totalBounced: number;
@@ -15,6 +23,20 @@ type AnalyticsOverview = {
   complaintRate: number;
 };
 
+/** What `/analytics/overview` returns. */
+type AnalyticsOverview = EmailTotals & {
+  totalOpens: number;
+  totalClicks: number;
+  openRate: number;
+  clickRate: number;
+  /**
+   * Which population the rates describe. Absent on cached pre-scope payloads,
+   * so every reader must tolerate `undefined`.
+   */
+  meta?: EmailChartMeta;
+};
+
+/** What `/analytics/volume` returns. No engagement columns. */
 type VolumeDataPoint = {
   date: string;
   timestamp: number;
@@ -22,6 +44,15 @@ type VolumeDataPoint = {
   delivered: number;
   bounced: number;
   renderingFailures: number;
+};
+
+/** What `/analytics/email-chart` returns in `volume`. Engagement, no failures. */
+type ChartVolumePoint = {
+  date: string;
+  timestamp: number;
+  sent: number;
+  delivered: number;
+  bounced: number;
   opens: number;
   clicks: number;
 };
@@ -46,6 +77,8 @@ type TopPerformer = {
 
 type RecentActivity = {
   id: string;
+  /** Link target for the message detail page. */
+  messageId: string;
   subject: string;
   eventType: string;
   timestamp: number;
@@ -76,20 +109,20 @@ type ComplaintDataPoint = {
 type SuppressionDataPoint = {
   date: string;
   timestamp: number;
-  accountLevel: number;
-  globalLevel: number;
-  total: number;
+  suppressed: number;
   sent: number;
   suppressionRate: number;
 };
 
 type EmailChartData = {
-  overview: AnalyticsOverview;
-  volume: VolumeDataPoint[];
+  overview: EmailTotals;
+  volume: ChartVolumePoint[];
   engagement: EngagementDataPoint[];
+  /** Which population each number describes. Absent on cached pre-scope payloads. */
+  meta?: EmailChartMeta;
 };
 
-export function useEmailChartData(orgSlug: string, days = 30) {
+export function useEmailChartData(orgSlug: string, days = 7) {
   return useQuery<EmailChartData>({
     queryKey: ["analytics", "email-chart", orgSlug, days],
     queryFn: async () => {
@@ -97,11 +130,17 @@ export function useEmailChartData(orgSlug: string, days = 30) {
         `/api/${orgSlug}/analytics/email-chart?days=${days}&tz=${encodeURIComponent(browserTz)}`
       );
       if (!response.ok) {
-        throw new Error("Failed to fetch email chart data");
+        throw new Error(
+          `Failed to fetch email chart data (HTTP ${response.status} ${response.statusText})`
+        );
       }
       return response.json();
     },
     staleTime: 10 * 60 * 1000,
+    // Same reasoning as the emails list: a single blip must not become a
+    // permanent "no emails sent in this period".
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 }
 

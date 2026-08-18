@@ -14,6 +14,8 @@ export type ProductsStatus = {
   emailEnabled: boolean;
   smsEnabled: boolean;
   hasAwsAccounts: boolean;
+  /** `true` in the SES sandbox, `false` in production, `null` never scanned. */
+  sandboxStatus: boolean | null;
   planId: PlanId;
   planFeatures: PlanFeatures;
   memberCount: number;

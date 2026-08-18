@@ -7,8 +7,10 @@ export {
   assumeRole,
 } from "./assume-role";
 export {
-  getCloudWatchMetrics,
-  getSESMetricsSummary,
+  type CloudWatchErrorKind,
+  classifyCloudWatchError,
+  getCloudWatchErrorKind,
+  getSESReputationMetrics,
   SES_METRICS,
 } from "./cloudwatch";
 export {

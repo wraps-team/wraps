@@ -1,16 +1,11 @@
 import { auth } from "@wraps/auth";
-import { db } from "@wraps/db";
-import { awsAccount } from "@wraps/db/schema/app";
-import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getBounceMetricsFromPostgres } from "@/lib/analytics-fallback";
 import {
   gapFillDates,
   generateDateRange,
-  toLocaleDateStr,
   validateTimezone,
 } from "@/lib/analytics-utils";
-import { queryEmailEvents } from "@/lib/aws/dynamodb";
 import { createRequestLogger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
@@ -31,16 +26,20 @@ type BounceDataPoint = {
   bounceRate: number; // Percentage
 };
 
+/**
+ * Daily bounce breakdown for the analytics page.
+ *
+ * Read from Postgres `message_send`, the authoritative store for anything that
+ * claims to be this org's email activity. It previously scanned the customer's
+ * DynamoDB event table, which is keyed per AWS ACCOUNT and therefore counted
+ * SES bounces from mail sent outside Wraps — the same account-wide-source
+ * defect the volume chart had. That read was also capped at 10,000 events with
+ * no pagination, so a busy account silently lost the older half of its window.
+ */
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { orgSlug } = await context.params;
-    const log = createRequestLogger({
-      path: "/api/[orgSlug]/analytics/bounces",
-      method: "GET",
-      orgSlug,
-    });
 
-    // Authenticate user
     const session = await auth.api.getSession({
       headers: await import("next/headers").then((mod) => mod.headers()),
     });
@@ -49,7 +48,6 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify organization membership
     const orgWithMembership = await getOrganizationWithMembership(
       orgSlug,
       session.user.id
@@ -59,7 +57,6 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Get time range from query params
     const { searchParams } = new URL(request.url);
     const days = Math.min(
       365,
@@ -69,110 +66,13 @@ export async function GET(request: Request, context: RouteContext) {
     const endTime = new Date();
     const startTime = new Date(endTime.getTime() - days * 24 * 60 * 60 * 1000);
 
-    // Get all AWS accounts for this organization
-    const accounts = await db.query.awsAccount.findMany({
-      where: eq(awsAccount.organizationId, orgWithMembership.id),
-    });
-
-    if (accounts.length === 0) {
-      return NextResponse.json([]);
-    }
-
-    // Fetch all events for all accounts (need both Send and Bounce)
-    const allEvents = await Promise.all(
-      accounts.map(async (account) => {
-        try {
-          return await queryEmailEvents({
-            awsAccountId: account.id,
-            startTime,
-            endTime,
-            limit: 10_000,
-          });
-        } catch (error) {
-          log.error(
-            { err: error, accountId: account.id },
-            "Failed to fetch events for account"
-          );
-          return [];
-        }
-      })
+    const dataPointsMap = await getBounceMetricsFromPostgres(
+      orgWithMembership.id,
+      startTime,
+      endTime,
+      timezone
     );
 
-    // Flatten all events
-    const events = allEvents.flat();
-    const bounceEvents = events.filter((event) => event.eventType === "Bounce");
-    const sendEvents = events.filter((event) => event.eventType === "Send");
-
-    // Group by date - track both bounces and sends
-    let dataPointsMap = new Map<
-      string,
-      {
-        permanent: number;
-        transient: number;
-        undetermined: number;
-        sent: number;
-      }
-    >();
-
-    // Count sent emails by date
-    for (const event of sendEvents) {
-      const date = toLocaleDateStr(new Date(event.sentAt), timezone);
-      const existing = dataPointsMap.get(date) || {
-        permanent: 0,
-        transient: 0,
-        undetermined: 0,
-        sent: 0,
-      };
-      existing.sent++;
-      dataPointsMap.set(date, existing);
-    }
-
-    // Count bounces by type and date
-    for (const event of bounceEvents) {
-      // Parse additionalData to get bounce type
-      let bounceType = "Undetermined";
-      if (event.additionalData) {
-        try {
-          const data = JSON.parse(event.additionalData);
-          bounceType = data.bounceType || "Undetermined";
-        } catch {
-          // Ignore parse errors
-        }
-      }
-
-      // Get the date (YYYY-MM-DD) from sentAt timestamp
-      const date = toLocaleDateStr(new Date(event.sentAt), timezone);
-
-      const existing = dataPointsMap.get(date) || {
-        permanent: 0,
-        transient: 0,
-        undetermined: 0,
-        sent: 0,
-      };
-
-      // Increment the appropriate bounce type counter
-      if (bounceType === "Permanent") {
-        existing.permanent++;
-      } else if (bounceType === "Transient") {
-        existing.transient++;
-      } else {
-        existing.undetermined++;
-      }
-
-      dataPointsMap.set(date, existing);
-    }
-
-    // Fallback to PostgreSQL message_send when DynamoDB returns no data
-    if (dataPointsMap.size === 0) {
-      dataPointsMap = await getBounceMetricsFromPostgres(
-        orgWithMembership.id,
-        startTime,
-        endTime,
-        timezone
-      );
-    }
-
-    // Gap-fill every day in the range including today, then compute rates
     const dateRange = generateDateRange(startTime, endTime, timezone);
     const dataPoints: BounceDataPoint[] = gapFillDates(
       dateRange,

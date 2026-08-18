@@ -16,6 +16,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { isBotOpen } from "@/lib/email-bot-detection";
 import { describeEventDiagnostics } from "@/lib/email-diagnostics";
+import {
+  formatFullTimestamp,
+  formatShortTimestamp,
+} from "../../lib/timestamps";
 import { DiagnosticPanel } from "./diagnostic-panel";
 
 type EventItemProps = {
@@ -52,31 +56,6 @@ const ICON_MAP = {
   rejected: X,
   delivery_delay: Clock,
 } as const;
-
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-function formatFullTimestamp(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-}
 
 export function EventItem({ event, iconType, color, isLast }: EventItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -136,7 +115,7 @@ export function EventItem({ event, iconType, color, isLast }: EventItemProps) {
             </div>
             <div className="flex items-center gap-2">
               <div className="text-muted-foreground text-sm">
-                {formatTimestamp(event.timestamp)}
+                {formatShortTimestamp(event.timestamp)}
               </div>
               {hasMetadata && (
                 <div className="flex h-8 w-8 items-center justify-center">

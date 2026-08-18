@@ -32,25 +32,14 @@ vi.mock("@/lib/organization", () => ({
 
 // Mock unstable_cache to just call the function directly (no caching)
 vi.mock("next/cache", () => ({
-  unstable_cache: (fn: Function) => () => fn(),
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => () => fn(),
 }));
 
-const mockGetCloudWatchMetricsBatch = vi.fn();
 const mockGetSESReputationMetrics = vi.fn();
 vi.mock("@/lib/aws/cloudwatch", () => ({
-  getCloudWatchMetricsBatch: (...args: unknown[]) =>
-    mockGetCloudWatchMetricsBatch(...args),
   getSESReputationMetrics: (...args: unknown[]) =>
     mockGetSESReputationMetrics(...args),
-  SES_METRICS: {
-    SEND: "Send",
-    DELIVERY: "Delivery",
-    BOUNCE: "Bounce",
-    COMPLAINT: "Complaint",
-    OPEN: "Open",
-    CLICK: "Click",
-    RENDERING_FAILURE: "RenderingFailure",
-  },
+  getCloudWatchErrorKind: () => "unknown",
 }));
 
 const mockGetEmailMetricsFromPostgres = vi.fn();
@@ -69,6 +58,12 @@ vi.mock("@wraps/db", () => ({
   },
 }));
 
+vi.mock("@wraps/db/schema/app", () => ({
+  awsAccount: { organizationId: "organizationId" },
+}));
+
+vi.mock("drizzle-orm", () => ({ eq: () => ({}) }));
+
 vi.mock("@/lib/logger", () => ({
   createRequestLogger: () => ({
     info: vi.fn(),
@@ -78,24 +73,7 @@ vi.mock("@/lib/logger", () => ({
   serializeError: (e: unknown) => e,
 }));
 
-// Mock analytics-utils — return the data as-is
 vi.mock("@/lib/analytics-utils", () => ({
-  aggregateByDate: (
-    timestamps: Date[],
-    valueSets: number[][],
-    keys: string[]
-  ) => {
-    const map = new Map();
-    for (let i = 0; i < timestamps.length; i++) {
-      const date = timestamps[i].toISOString().slice(0, 10);
-      const entry: Record<string, number> = {};
-      for (let k = 0; k < keys.length; k++) {
-        entry[keys[k]] = valueSets[k]?.[i] || 0;
-      }
-      map.set(date, entry);
-    }
-    return map;
-  },
   gapFillDates: (
     range: string[],
     map: Map<string, Record<string, number>>,
@@ -118,25 +96,48 @@ vi.mock("@/lib/analytics-utils", () => ({
   validateTimezone: (tz: string | null | undefined) => tz || "UTC",
 }));
 
-function makeCloudWatchBatchResult(day: {
-  sends: number;
-  deliveries: number;
-  bounces: number;
-  complaints: number;
-  opens: number;
-  clicks: number;
-  renderingFailures: number;
+const TEST_DATE = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+const TEST_DAY = TEST_DATE.toISOString().slice(0, 10);
+
+/**
+ * One day of `message_send` aggregates, shaped like
+ * `getEmailMetricsFromPostgres` returns them. `sent` excludes failed rows;
+ * `renderingFailures` counts them.
+ */
+function postgresDay(day: {
+  sent: number;
+  delivered: number;
+  bounced?: number;
+  complaints?: number;
+  opens?: number;
+  clicks?: number;
+  renderingFailures?: number;
 }) {
-  const ts = [new Date("2026-04-10")];
-  return {
-    Send: [{ Timestamps: ts, Values: [day.sends] }],
-    Delivery: [{ Timestamps: ts, Values: [day.deliveries] }],
-    Bounce: [{ Timestamps: ts, Values: [day.bounces] }],
-    Complaint: [{ Timestamps: ts, Values: [day.complaints] }],
-    Open: [{ Timestamps: ts, Values: [day.opens] }],
-    Click: [{ Timestamps: ts, Values: [day.clicks] }],
-    RenderingFailure: [{ Timestamps: ts, Values: [day.renderingFailures] }],
-  };
+  return new Map([
+    [
+      TEST_DAY,
+      {
+        date: TEST_DAY,
+        sent: day.sent,
+        delivered: day.delivered,
+        bounced: day.bounced ?? 0,
+        complaints: day.complaints ?? 0,
+        opens: day.opens ?? 0,
+        clicks: day.clicks ?? 0,
+        renderingFailures: day.renderingFailures ?? 0,
+      },
+    ],
+  ]);
+}
+
+async function callRoute() {
+  const { GET } = await import("../[orgSlug]/analytics/email-chart/route");
+  const request = new Request(
+    "http://localhost/api/test-org/analytics/email-chart?days=30&tz=UTC"
+  );
+  const context = { params: Promise.resolve({ orgSlug: "test-org" }) };
+  const response = await GET(request, context);
+  return response.json();
 }
 
 describe("Email Chart API", () => {
@@ -149,61 +150,32 @@ describe("Email Chart API", () => {
     mockGetEmailMetricsFromPostgres.mockResolvedValue(new Map());
   });
 
-  it("returns correct deliveryRate in overview when rendering failures exist", async () => {
-    mockGetCloudWatchMetricsBatch.mockResolvedValueOnce(
-      makeCloudWatchBatchResult({
-        sends: 124,
-        deliveries: 110,
-        bounces: 1,
-        complaints: 0,
-        opens: 20,
-        clicks: 5,
-        renderingFailures: 13,
-      })
+  it("computes deliveryRate against sends that actually left, excluding failures", async () => {
+    // 124 attempted, 13 of them rendering failures — Postgres reports the 111
+    // that were not failed as `sent`, so the rate is 110/111.
+    mockGetEmailMetricsFromPostgres.mockResolvedValue(
+      postgresDay({ sent: 111, delivered: 110, renderingFailures: 13 })
     );
 
-    const { GET } = await import("../[orgSlug]/analytics/email-chart/route");
-    const request = new Request(
-      "http://localhost/api/test-org/analytics/email-chart?days=30&tz=UTC"
-    );
-    const context = { params: Promise.resolve({ orgSlug: "test-org" }) };
+    const data = await callRoute();
 
-    const response = await GET(request, context);
-    const data = await response.json();
-
-    // effectiveSent = 124 - 13 = 111
-    // deliveryRate = 110/111 * 100 = 99.10
     expect(data.overview.deliveryRate).toBeCloseTo(99.1, 1);
-    // NOT the buggy rate
+    // Counting the failures in the denominator would give 110/124 = 88.71%.
     expect(data.overview.deliveryRate).not.toBeCloseTo(88.71, 1);
+    expect(data.overview.totalRenderingFailures).toBe(13);
   });
 
   it("uses SES reputation bounceRate/complaintRate over period-based calculation", async () => {
-    mockGetCloudWatchMetricsBatch.mockResolvedValueOnce(
-      makeCloudWatchBatchResult({
-        sends: 24,
-        deliveries: 20,
-        bounces: 1,
-        complaints: 1,
-        opens: 5,
-        clicks: 1,
-        renderingFailures: 0,
-      })
+    mockGetEmailMetricsFromPostgres.mockResolvedValue(
+      postgresDay({ sent: 24, delivered: 20, bounced: 1, complaints: 1 })
     );
     // SES reputation shows much lower rates based on full account history
-    mockGetSESReputationMetrics.mockResolvedValueOnce({
+    mockGetSESReputationMetrics.mockResolvedValue({
       bounceRate: 0.0002,
       complaintRate: 0.0003,
     });
 
-    const { GET } = await import("../[orgSlug]/analytics/email-chart/route");
-    const request = new Request(
-      "http://localhost/api/test-org/analytics/email-chart?days=30&tz=UTC"
-    );
-    const context = { params: Promise.resolve({ orgSlug: "test-org" }) };
-
-    const response = await GET(request, context);
-    const data = await response.json();
+    const data = await callRoute();
 
     // period-based would be 1/24*100 = 4.17% — reputation should win
     expect(data.overview.bounceRate).toBeCloseTo(0.02, 2);
@@ -212,56 +184,21 @@ describe("Email Chart API", () => {
     expect(data.overview.complaintRate).toBeCloseTo(0.03, 2);
   });
 
-  it("overlays opens/clicks from Postgres when CloudWatch has send data but no engagement metrics", async () => {
-    const testDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-    const testDay = testDate.toISOString().slice(0, 10);
-
-    const ts = [testDate];
-    mockGetCloudWatchMetricsBatch.mockResolvedValueOnce({
-      Send: [{ Timestamps: ts, Values: [100] }],
-      Delivery: [{ Timestamps: ts, Values: [90] }],
-      Bounce: [{ Timestamps: ts, Values: [0] }],
-      Complaint: [{ Timestamps: ts, Values: [0] }],
-      Open: [{ Timestamps: ts, Values: [0] }],
-      Click: [{ Timestamps: ts, Values: [0] }],
-      RenderingFailure: [{ Timestamps: ts, Values: [0] }],
-    });
-
-    mockGetEmailMetricsFromPostgres.mockResolvedValueOnce(
-      new Map([
-        [
-          testDay,
-          {
-            date: testDay,
-            sent: 100,
-            delivered: 90,
-            bounced: 0,
-            complaints: 0,
-            opens: 45,
-            clicks: 9,
-            renderingFailures: 0,
-          },
-        ],
-      ])
+  it("carries engagement through to the volume and engagement series", async () => {
+    mockGetEmailMetricsFromPostgres.mockResolvedValue(
+      postgresDay({ sent: 100, delivered: 90, opens: 45, clicks: 9 })
     );
 
-    const { GET } = await import("../[orgSlug]/analytics/email-chart/route");
-    const request = new Request(
-      "http://localhost/api/test-org/analytics/email-chart?days=30&tz=UTC"
-    );
-    const context = { params: Promise.resolve({ orgSlug: "test-org" }) };
-
-    const response = await GET(request, context);
-    const data = await response.json();
+    const data = await callRoute();
 
     const volumePoint = data.volume.find(
-      (v: { date: string }) => v.date === testDay
+      (v: { date: string }) => v.date === TEST_DAY
     );
     expect(volumePoint.opens).toBe(45);
     expect(volumePoint.clicks).toBe(9);
 
     const engagementPoint = data.engagement.find(
-      (v: { date: string }) => v.date === testDay
+      (v: { date: string }) => v.date === TEST_DAY
     );
     expect(engagementPoint.openRate).toBe(50);
     expect(engagementPoint.clickRate).toBe(10);

@@ -180,7 +180,9 @@ export function RecentActivity({ orgSlug }: { orgSlug: string }) {
       <CardContent>
         <ItemGroup>
           {activities.map((activity, index) => {
-            const messageId = activity.id.split("-").slice(0, -1).join("-");
+            // Sent by the route. This used to be reconstructed by splitting a
+            // composite DynamoDB id on "-", which mangles a Postgres UUID.
+            const messageId = activity.messageId;
             return (
               <Fragment key={activity.id}>
                 <Item asChild>

@@ -1,7 +1,4 @@
 import { auth } from "@wraps/auth";
-import { db } from "@wraps/db";
-import { awsAccount } from "@wraps/db/schema/app";
-import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getEmailMetricsFromPostgres } from "@/lib/analytics-fallback";
 import {
@@ -48,17 +45,12 @@ export async function GET(request: Request, context: RouteContext) {
     const endTime = new Date();
     const startTime = new Date(endTime.getTime() - days * 24 * 60 * 60 * 1000);
 
-    const accounts = await db.query.awsAccount.findMany({
-      where: eq(awsAccount.organizationId, orgWithMembership.id),
-    });
-
-    if (accounts.length === 0) {
-      return NextResponse.json([]);
-    }
-
     // SES publishes no Open/Click metrics to CloudWatch without a CloudWatch
-    // event destination (Wraps deploys EventBridge only) — Postgres
+    // event destination (Wraps deploys EventBridge only) - Postgres
     // message_send is the only source of engagement data.
+    //
+    // No AWS account gate: this route makes no AWS call, and an org whose event
+    // pipeline never came up still has real sends to report.
     const pgData = await getEmailMetricsFromPostgres(
       orgWithMembership.id,
       startTime,

@@ -2,6 +2,7 @@ import { auth } from "@wraps/auth";
 import { Mail } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -12,9 +13,10 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { getOrganizationWithMembership } from "@/lib/organization";
-import { checkHasAwsAccounts } from "@/lib/setup-status";
+import { checkHasAwsAccounts, getEmailsListStatus } from "@/lib/setup-status";
 import { EmailAnalytics } from "./components/email-analytics";
 import { EmailsTable } from "./components/emails-table";
+import { EmailsTableSkeleton } from "./components/emails-table-skeleton";
 
 type EmailsPageProps = {
   params: Promise<{
@@ -22,6 +24,9 @@ type EmailsPageProps = {
   }>;
   searchParams: Promise<{
     days?: string;
+    q?: string;
+    /** `asc` for oldest first. Absent or anything else means newest first. */
+    sort?: string;
     status?: string;
   }>;
 };
@@ -31,7 +36,7 @@ export default async function EmailsPage({
   searchParams,
 }: EmailsPageProps) {
   const { orgSlug } = await params;
-  const { days = "7", status } = await searchParams;
+  const { days = "7", q, sort, status } = await searchParams;
 
   const session = await auth.api.getSession({
     headers: await import("next/headers").then((mod) => mod.headers()),
@@ -92,20 +97,100 @@ export default async function EmailsPage({
 
   return (
     <>
+      {/*
+        The page had no heading at all (audit F14), so assistive tech had no
+        page identity and every message tab read "{Org} | Wraps".
+      */}
+      <div className="px-4 lg:px-6">
+        <h1 className="font-bold text-3xl text-foreground">Emails</h1>
+      </div>
+
       {/* Email Analytics */}
       <div className="px-4 lg:px-6">
         <EmailAnalytics orgSlug={orgSlug} />
       </div>
 
-      {/* Emails Table */}
+      {/*
+        The table's own boundary (audit finding F16). The table needs two extra
+        facts from the database to tell its zero-states apart; the chart needs
+        none. Without a boundary here the whole page - chart included - waits on
+        that query before a single byte streams.
+      */}
       <div className="@container/main px-4 lg:px-6">
-        <EmailsTable
-          days={Number.parseInt(days, 10)}
-          organizationId={orgWithMembership.id}
-          orgSlug={orgSlug}
-          status={status}
-        />
+        <Suspense fallback={<EmailsTableSkeleton />}>
+          <EmailsTableSection
+            days={Number.parseInt(days, 10)}
+            organizationId={orgWithMembership.id}
+            orgSlug={orgSlug}
+            search={q}
+            sort={sort}
+            status={status}
+          />
+        </Suspense>
       </div>
     </>
   );
+}
+
+type EmailsTableSectionProps = {
+  days: number;
+  organizationId: string;
+  orgSlug: string;
+  search?: string;
+  sort?: string;
+  status?: string;
+};
+
+async function EmailsTableSection({
+  days,
+  organizationId,
+  orgSlug,
+  search,
+  sort,
+  status,
+}: EmailsTableSectionProps) {
+  const { hasEverSent, sandboxStatus } =
+    await getEmailsListStatus(organizationId);
+
+  return (
+    <EmailsTable
+      days={days}
+      hasEverSent={hasEverSent}
+      organizationId={organizationId}
+      orgSlug={orgSlug}
+      sandboxStatus={sandboxStatus}
+      search={search}
+      sort={sort}
+      status={status}
+    />
+  );
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ orgSlug: string }>;
+}) {
+  const { orgSlug } = await params;
+  const session = await auth.api.getSession({
+    headers: await import("next/headers").then((mod) => mod.headers()),
+  });
+
+  if (!session?.user) {
+    return { title: "Emails" };
+  }
+
+  const orgWithMembership = await getOrganizationWithMembership(
+    orgSlug,
+    session.user.id
+  );
+
+  if (!orgWithMembership) {
+    return { title: "Organization Not Found" };
+  }
+
+  return {
+    title: `Emails | ${orgWithMembership.name}`,
+    description: `Message history and delivery events for ${orgWithMembership.name}`,
+  };
 }

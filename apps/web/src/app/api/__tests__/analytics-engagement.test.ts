@@ -146,7 +146,10 @@ describe("Engagement Analytics API", () => {
     expect(point.ctr).toBe(0);
   });
 
-  it("returns an empty array and skips Postgres when the org has no AWS accounts", async () => {
+  it("still reports sends when the org has no AWS account row", async () => {
+    // This route makes no AWS call, so gating on an AWS account only produced a
+    // false empty chart for orgs whose event pipeline never came up while their
+    // sends were recorded in Postgres all along.
     mockFindMany.mockResolvedValueOnce([]);
 
     const { GET } = await import("../[orgSlug]/analytics/engagement/route");
@@ -158,8 +161,14 @@ describe("Engagement Analytics API", () => {
     const response = await GET(request, context);
     const data = await response.json();
 
-    expect(data).toEqual([]);
-    expect(mockGetEmailMetricsFromPostgres).not.toHaveBeenCalled();
+    expect(mockGetEmailMetricsFromPostgres).toHaveBeenCalledWith(
+      "org-1",
+      expect.any(Date),
+      expect.any(Date),
+      "UTC"
+    );
+    expect(Array.isArray(data)).toBe(true);
+    expect(data.length).toBeGreaterThan(0);
   });
 
   it("returns 401 when the session is unauthorized", async () => {

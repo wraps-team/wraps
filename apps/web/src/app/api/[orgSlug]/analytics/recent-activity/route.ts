@@ -1,10 +1,6 @@
 import { auth } from "@wraps/auth";
-import { db } from "@wraps/db";
-import { awsAccount } from "@wraps/db/schema/app";
-import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getRecentActivityFromPostgres } from "@/lib/analytics-fallback";
-import { getRecentEmailActivity } from "@/lib/aws/dynamodb";
 import { createRequestLogger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
@@ -14,16 +10,21 @@ type RouteContext = {
   }>;
 };
 
+/**
+ * Recent email activity feed for the analytics page.
+ *
+ * Read from Postgres `message_send`. The DynamoDB read this replaces was per
+ * AWS ACCOUNT, so the feed could show activity for mail Wraps never sent, whose
+ * rows then 404'd when clicked because no message existed to open.
+ *
+ * Each item carries an explicit `messageId` for the detail link. The client used
+ * to reconstruct one by splitting the composite DynamoDB id on "-" and dropping
+ * the last segment, which mangles a Postgres UUID into a dead link.
+ */
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { orgSlug } = await context.params;
-    const log = createRequestLogger({
-      path: "/api/[orgSlug]/analytics/recent-activity",
-      method: "GET",
-      orgSlug,
-    });
 
-    // Authenticate user
     const session = await auth.api.getSession({
       headers: await import("next/headers").then((mod) => mod.headers()),
     });
@@ -32,7 +33,6 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify organization membership
     const orgWithMembership = await getOrganizationWithMembership(
       orgSlug,
       session.user.id
@@ -42,62 +42,16 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Get limit from query params
     const { searchParams } = new URL(request.url);
     const limit = Math.min(
       500,
       Math.max(1, Number.parseInt(searchParams.get("limit") || "20", 10))
     );
 
-    // Get all AWS accounts for this organization
-    const accounts = await db.query.awsAccount.findMany({
-      where: eq(awsAccount.organizationId, orgWithMembership.id),
-    });
-
-    if (accounts.length === 0) {
-      return NextResponse.json([]);
-    }
-
-    // Fetch recent activity from all accounts
-    const allActivity = await Promise.all(
-      accounts.map(async (account) => {
-        try {
-          return await getRecentEmailActivity({
-            awsAccountId: account.id,
-            limit: 50, // Get more initially
-          });
-        } catch (error) {
-          log.error(
-            { err: error, accountId: account.id },
-            "Failed to fetch recent activity for account"
-          );
-          return [];
-        }
-      })
+    const recentActivity = await getRecentActivityFromPostgres(
+      orgWithMembership.id,
+      limit
     );
-
-    // Flatten, sort by timestamp, and limit
-    let recentActivity = allActivity
-      .flat()
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, limit)
-      .map((activity) => ({
-        id: `${activity.messageId}-${activity.timestamp}`,
-        subject: activity.subject,
-        eventType: activity.eventType,
-        timestamp: activity.timestamp,
-        sentAt: activity.sentAt,
-        timestampFormatted: new Date(activity.timestamp).toISOString(),
-        metadata: activity.metadata,
-      }));
-
-    // Fallback to PostgreSQL message_send when DynamoDB returns no data
-    if (recentActivity.length === 0) {
-      recentActivity = await getRecentActivityFromPostgres(
-        orgWithMembership.id,
-        limit
-      );
-    }
 
     return NextResponse.json(recentActivity);
   } catch (error) {

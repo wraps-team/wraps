@@ -938,11 +938,14 @@ async function processReject(
     return;
   }
 
-  // SES rejected the message before attempting delivery (e.g., bad content, account reputation)
+  // SES rejected the message before attempting delivery (e.g., bad content, account reputation).
+  // The status enum has no `rejected`, so the reason has to be carried in `error` -
+  // otherwise the dashboard shows a bare "Failed" with nothing to act on.
   await db
     .update(messageSend)
     .set({
       status: "failed",
+      error: "Rejected by SES",
     })
     .where(
       and(

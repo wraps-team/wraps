@@ -1,10 +1,6 @@
 import { auth } from "@wraps/auth";
-import { db } from "@wraps/db";
-import { awsAccount } from "@wraps/db/schema/app";
-import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getTopPerformersFromPostgres } from "@/lib/analytics-fallback";
-import { getEmailEngagementMetrics } from "@/lib/aws/dynamodb";
 import { createRequestLogger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
@@ -14,16 +10,18 @@ type RouteContext = {
   }>;
 };
 
+/**
+ * Best-performing subjects for the analytics page.
+ *
+ * Read from Postgres `message_send`, grouped by subject. The DynamoDB read this
+ * replaces was per AWS ACCOUNT — it ranked subjects from mail sent outside
+ * Wraps alongside the org's own — and it sampled only the newest 1,000 events
+ * per account, so the "top" list was really "top of an arbitrary recent slice".
+ */
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { orgSlug } = await context.params;
-    const log = createRequestLogger({
-      path: "/api/[orgSlug]/analytics/top-performers",
-      method: "GET",
-      orgSlug,
-    });
 
-    // Authenticate user
     const session = await auth.api.getSession({
       headers: await import("next/headers").then((mod) => mod.headers()),
     });
@@ -32,7 +30,6 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify organization membership
     const orgWithMembership = await getOrganizationWithMembership(
       orgSlug,
       session.user.id
@@ -42,7 +39,6 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Get time range from query params
     const { searchParams } = new URL(request.url);
     const days = Math.min(
       365,
@@ -55,77 +51,12 @@ export async function GET(request: Request, context: RouteContext) {
     const endTime = new Date();
     const startTime = new Date(endTime.getTime() - days * 24 * 60 * 60 * 1000);
 
-    // Get all AWS accounts for this organization
-    const accounts = await db.query.awsAccount.findMany({
-      where: eq(awsAccount.organizationId, orgWithMembership.id),
-    });
-
-    if (accounts.length === 0) {
-      return NextResponse.json([]);
-    }
-
-    // Fetch engagement metrics from all accounts
-    const allEmailMetrics = await Promise.all(
-      accounts.map(async (account) => {
-        try {
-          return await getEmailEngagementMetrics({
-            awsAccountId: account.id,
-            startTime,
-            endTime,
-            limit: 1000, // Get more initially, will filter later
-          });
-        } catch (error) {
-          log.error(
-            { err: error, accountId: account.id },
-            "Failed to fetch email metrics for account"
-          );
-          return [];
-        }
-      })
+    const topPerformers = await getTopPerformersFromPostgres(
+      orgWithMembership.id,
+      startTime,
+      endTime,
+      limit
     );
-
-    // Flatten and filter for delivered emails only
-    const deliveredEmails = allEmailMetrics
-      .flat()
-      .filter((email) => email.hasDelivered);
-
-    // Calculate engagement rates
-    const emailsWithRates = deliveredEmails.map((email) => {
-      const recipientCount = email.to.length;
-      const openRate =
-        recipientCount > 0 ? (email.opens / recipientCount) * 100 : 0;
-      const clickRate =
-        recipientCount > 0 ? (email.clicks / recipientCount) * 100 : 0;
-
-      return {
-        subject: email.subject,
-        openRate: Number(openRate.toFixed(1)),
-        clickRate: Number(clickRate.toFixed(1)),
-        sent: recipientCount,
-        opens: email.opens,
-        clicks: email.clicks,
-        sentAt: email.sentAt,
-      };
-    });
-
-    // Sort by engagement score (clicks weighted higher than opens)
-    let topPerformers = emailsWithRates
-      .sort((a, b) => {
-        const scoreA = a.clicks * 2 + a.opens;
-        const scoreB = b.clicks * 2 + b.opens;
-        return scoreB - scoreA;
-      })
-      .slice(0, limit);
-
-    // Fallback to PostgreSQL message_send when DynamoDB returns no data
-    if (topPerformers.length === 0) {
-      topPerformers = await getTopPerformersFromPostgres(
-        orgWithMembership.id,
-        startTime,
-        endTime,
-        limit
-      );
-    }
 
     return NextResponse.json(topPerformers);
   } catch (error) {

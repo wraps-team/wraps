@@ -9,6 +9,28 @@ import {
 } from "@/lib/organization";
 import { getOrganizationPlan, isSelfHosted } from "@/lib/plan-limits";
 import { PLANS } from "@/lib/plans";
+import type { AccountFeatures } from "@/lib/setup-status";
+
+/**
+ * SES sandbox state for the organization, or `null` when no connected account
+ * has been scanned. Prefers a verified account's answer and never guesses:
+ * "unknown" is a different thing to say than "in the sandbox".
+ */
+function resolveSandboxStatus(
+  accounts: Array<{ features: unknown; isVerified: boolean }>
+): boolean | null {
+  const ordered = [
+    ...accounts.filter((a) => a.isVerified),
+    ...accounts.filter((a) => !a.isVerified),
+  ];
+  for (const account of ordered) {
+    const value = (account.features as AccountFeatures)?.email?.sandbox;
+    if (typeof value === "boolean") {
+      return value;
+    }
+  }
+  return null;
+}
 
 type OrganizationLayoutProps = {
   children: ReactNode;
@@ -63,6 +85,7 @@ export default async function OrganizationLayout({
     emailEnabled: orgData.awsAccounts.some((a) => a.emailEnabled),
     smsEnabled: orgData.awsAccounts.some((a) => a.smsEnabled),
     hasAwsAccounts: orgData.awsAccounts.length > 0,
+    sandboxStatus: resolveSandboxStatus(orgData.awsAccounts),
     planId,
     planFeatures: {
       batch: plan.features.batch,
@@ -79,7 +102,13 @@ export default async function OrganizationLayout({
   return (
     <>
       <ProductsStatusHydrator orgId={orgData.id} status={productsStatus} />
-      {!productsStatus.hasAwsAccounts && <GoLiveBanner orgSlug={orgSlug} />}
+      {/*
+        The banner used to be gated on `!hasAwsAccounts`, which meant it
+        disappeared the moment an account was connected - exactly when an
+        organization stuck in the SES sandbox is most stuck, and reading as
+        "you are done". It now decides for itself (audit finding F6).
+      */}
+      <GoLiveBanner orgSlug={orgSlug} />
       {children}
     </>
   );
