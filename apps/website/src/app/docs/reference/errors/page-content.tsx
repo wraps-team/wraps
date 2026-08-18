@@ -657,7 +657,10 @@ const SECTION_MD = {
 - **SESError** — AWS SES API error. Properties: \`code\` (string), \`requestId\` (string), \`retryable\` (boolean). Common codes: MessageRejected, Throttling, AccountSuspended, MailFromDomainNotVerified.
 - **DynamoDBError** — Email history read/write error. Properties: \`code\` (string), \`requestId\` (string), \`retryable\` (boolean).
 - **ValidationError** — Invalid input. Properties: \`field\` (string), \`message\` (string).
-- **BatchError** — Exported for type compatibility but **not currently thrown**. \`sendBatch()\` never throws on partial failure — it reports per-entry outcomes in its resolved \`SendBatchResult\` (\`results\`, \`successCount\`, \`failureCount\`) instead. Always inspect the result rather than relying on a catch block.`,
+- **CredentialsError** — The AWS credential chain produced nothing, so no request was signed. Properties: \`cause\` (unknown). The message lists every way to supply credentials without ranking them.
+- **SandboxError** — Extends \`SESError\`. SES rejected the send because an identity is not verified in the region used — either a region mismatch or the SES sandbox; the message separates the two. Properties: \`region\` (string, when resolvable) plus everything on \`SESError\`.
+
+\`sendBatch()\` never throws on partial send failure — it reports per-entry outcomes in its resolved \`SendBatchResult\` (\`results\`, \`successCount\`, \`failureCount\`). A credential failure is the exception: nothing was attempted, so it throws \`CredentialsError\`. (\`BatchError\` was removed in 0.13.0 — it was never thrown.)`,
 
   sdkSmsErrors: `## SDK Error Classes — SMS SDK (@wraps.dev/sms)
 
@@ -665,7 +668,10 @@ const SECTION_MD = {
 - **SMSError** — AWS End User Messaging error. Properties: \`code\` (string), \`retryable\` (boolean).
 - **ValidationError** — Invalid input. Properties: \`field\` (string), \`message\` (string).
 - **OptedOutError** — Recipient opted out. Properties: \`phoneNumber\` (string).
-- **RateLimitError** — Rate limit exceeded. Properties: \`retryAfter\` (number, seconds).`,
+- **RateLimitError** — Rate limit exceeded. Properties: \`retryAfter\` (number, seconds).
+- **CredentialsError** — The AWS credential chain produced nothing. Properties: \`cause\` (unknown). Neutral message listing every credential option.
+- **ConfigurationError** — No AWS region could be resolved from config, environment, or profile. Properties: \`cause\` (unknown). New in 0.2.0: there is no implicit us-east-1 default.
+- **SendingRestrictionError** — AWS refused the send because of an account-level restriction, not the request. Properties: \`restriction\` (e.g. SANDBOX_DESTINATION_NOT_VERIFIED, NO_ORIGINATION_IDENTITY, SPEND_LIMIT_REACHED).`,
 
   retryPattern: `## Retry Pattern
 
@@ -1147,25 +1153,15 @@ export default function PageContent() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">BatchError</CardTitle>
+                <CardTitle className="text-base">CredentialsError</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="mb-3 text-muted-foreground text-sm">
-                  Exported for type compatibility but{" "}
-                  <strong className="text-foreground">
-                    not currently thrown
-                  </strong>
-                  .{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5">
-                    sendBatch()
-                  </code>{" "}
-                  never throws on partial failure — it reports per-entry
-                  outcomes in its resolved{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5">
-                    SendBatchResult
-                  </code>{" "}
-                  instead. Always inspect the result rather than relying on a
-                  catch block.
+                  The AWS credential chain produced nothing usable, so no
+                  request was ever signed. The message lists every way to supply
+                  credentials — SSO, access keys, environment variables, a named
+                  profile, or the constructor — without ranking one over
+                  another.
                 </p>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -1186,34 +1182,59 @@ export default function PageContent() {
                       <tr className="border-b">
                         <td className="px-4 py-2">
                           <code className="rounded bg-muted px-1.5 py-0.5">
-                            results
+                            cause
                           </code>
                         </td>
-                        <td className="px-4 py-2">BatchEntryResult[]</td>
+                        <td className="px-4 py-2">unknown</td>
                         <td className="px-4 py-2">
-                          Per-entry results in the same order as input
+                          The underlying AWS SDK error, for debugging
                         </td>
                       </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">SandboxError</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="mb-3 text-muted-foreground text-sm">
+                  Extends SESError. SES rejected the send because an identity
+                  involved is not verified in the region the request went to.
+                  Two unrelated causes produce this one AWS error — a region
+                  mismatch and the SES sandbox — so the message names the region
+                  actually used and walks through both, including the
+                  mailbox-simulator address that proves sending works without
+                  production access.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="px-4 py-2 text-left font-medium">
+                          Property
+                        </th>
+                        <th className="px-4 py-2 text-left font-medium">
+                          Type
+                        </th>
+                        <th className="px-4 py-2 text-left font-medium">
+                          Description
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-muted-foreground">
                       <tr className="border-b">
                         <td className="px-4 py-2">
                           <code className="rounded bg-muted px-1.5 py-0.5">
-                            successCount
+                            region
                           </code>
                         </td>
-                        <td className="px-4 py-2">number</td>
+                        <td className="px-4 py-2">string | undefined</td>
                         <td className="px-4 py-2">
-                          Number of entries sent successfully
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-2">
-                          <code className="rounded bg-muted px-1.5 py-0.5">
-                            failureCount
-                          </code>
-                        </td>
-                        <td className="px-4 py-2">number</td>
-                        <td className="px-4 py-2">
-                          Number of entries that failed
+                          The region this client sent to, when resolvable
                         </td>
                       </tr>
                     </tbody>

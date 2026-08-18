@@ -37,7 +37,7 @@
     "@sentry/aws-serverless": "10.46.0",
     "@sentry/profiling-node": "10.46.0",
     "@smithy/node-http-handler": "^4.9.11",
-    "@wraps.dev/client": "0.8.1",
+    "@wraps.dev/client": "0.10.1",
     "@wraps.dev/email-check": "workspace:*",
     "@wraps/auth": "workspace:*",
     "@wraps/core": "workspace:*",

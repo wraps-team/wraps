@@ -49,7 +49,7 @@
     "@tanstack/react-table": "^8.21.3",
     "@vercel/analytics": "1.6.1",
     "@vercel/speed-insights": "1.3.1",
-    "@wraps.dev/client": "0.8.1",
+    "@wraps.dev/client": "0.10.1",
     "@wraps/ui": "workspace:*",
     "asciinema-player": "3.13.4",
     "class-variance-authority": "^0.7.1",

@@ -12,6 +12,9 @@ packages:
 minimumReleaseAgeExclude:
   - better-inbox
   - '@wraps.dev/better-auth'
+  - '@wraps.dev/client@0.10.1'
+  - '@wraps.dev/email@0.13.0'
+  - '@wraps.dev/sms@0.2.0'
 
 # Version pins for transitive deps: advisory/CVE floors for indirect packages.
 overrides:
