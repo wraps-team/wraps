@@ -48,6 +48,57 @@ const Code = ({ children }: { children: ReactNode }) => (
 
 const releases: Release[] = [
   {
+    version: "Platform v0.21.0",
+    date: "August 2026",
+    icon: Inbox,
+    title: "Message-Level Search & Honest Email History",
+    items: [
+      <>
+        The emails page now pages through your entire send history with cursor
+        pagination - the previous build capped the list at the 100 most recent
+        rows. Search runs server-side across recipient, subject, and sender, and
+        uses the same query as browsing, so a message visible in the list can no
+        longer vanish the moment you search for it
+      </>,
+      <>
+        Dashboard charts now count only mail sent through Wraps. They previously
+        read account-wide SES metrics, so totals could include mail your AWS
+        account sent outside Wraps - if you have such traffic, your chart
+        numbers will drop. That is the count becoming correct, not data loss.
+        Account-level SES reputation is still shown, now labelled as
+        account-wide
+      </>,
+      <>
+        Every state tells the truth: a failed load says so and offers retry
+        instead of rendering "No emails found", sandboxed AWS accounts are told
+        they are in the SES sandbox instead of being asked to send their first
+        email, and orgs whose event pipeline has never delivered an event see a
+        banner explaining why everything reads as Sent
+      </>,
+      <>
+        The message detail page distinguishes an unreadable event timeline from
+        an empty one, names the AWS account involved, and points at{" "}
+        <Code>wraps email doctor</Code> - it previously bounced you back to the
+        list on any failure
+      </>,
+      <>
+        Filters, search, sort, and time range live in the URL, so a filtered
+        view survives reload and can be handed to a colleague mid-incident. Rows
+        are real links: keyboard, middle-click, and screen readers all reach
+        message detail now
+      </>,
+      <>
+        CSV export pages through up to 10,000 matching rows and states the cap
+        before writing the file - it previously exported whatever was on screen
+        and reported it as the total
+      </>,
+      <>
+        Fix: the analytics refresh button now expires the server-side cache
+        instead of refetching the same cached payload for up to five minutes
+      </>,
+    ],
+  },
+  {
     version: "CLI v3.1.0",
     date: "August 2026",
     icon: ShieldCheck,
