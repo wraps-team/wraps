@@ -144,3 +144,23 @@ export function renderForPreview(
   }
   return getCompiledTemplate(html)(buildSesRenderData(data));
 }
+
+// Variables that usually hold a paragraph rather than a word, so a form gives
+// them a textarea. An <input> cannot hold a newline at all — text pasted into
+// one is silently flattened — which is how a broadcast's {{content}} lost its
+// line breaks before reaching the renderer.
+const LONG_FORM_NAME_PATTERN =
+  /content|body|message|paragraph|description|markdown|html/i;
+
+/**
+ * Shared by the broadcast variable mapper and the send-test form so the same
+ * variable does not get a textarea in one and a single-line input in the other.
+ *
+ * Deliberately no length heuristic: this is recomputed on every render, so a
+ * "value is long now" rule would swap <Input> for <Textarea> mid-keystroke and
+ * unmount the focused element. Newlines only arrive from loaded data, never
+ * from typing, so that check is stable while the user types.
+ */
+export function isLongFormVariable(name: string, value: string): boolean {
+  return LONG_FORM_NAME_PATTERN.test(name) || value.includes("\n");
+}

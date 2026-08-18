@@ -28,7 +28,7 @@ afterEach(cleanup);
 
 const COMPILED_HTML =
   "<p>{{contact.firstName}} at {{organization.name}}</p>" +
-  "<p>{{heading}}</p><p>Hi {{greetingName|there}}</p>";
+  "<p>{{heading}}</p><p>Hi {{greetingName|there}}</p><p>{{content}}</p>";
 
 function renderModal() {
   render(
@@ -45,6 +45,7 @@ function renderModal() {
         { name: "organization.name" },
         { name: "heading" },
         { name: "greetingName" },
+        { name: "content" },
       ]}
     />
   );
@@ -98,5 +99,35 @@ describe("SendTestModal template variable fields", () => {
 
     const frame = screen.getByTitle("Test email preview");
     expect(frame.getAttribute("sandbox")).toBe("");
+  });
+
+  // An <input> cannot hold a newline, so a long-form variable typed into one
+  // silently loses its line breaks before the value ever reaches the renderer.
+  // The broadcast mapper gives these a textarea; the test form has to agree,
+  // or the same variable behaves differently depending on which form you use.
+  it("gives a long-form variable a textarea, not a single-line input", () => {
+    renderModal();
+    const field = screen.getByPlaceholderText("Value for content");
+    expect(field.tagName).toBe("TEXTAREA");
+  });
+
+  it("keeps short variables on a single-line input", () => {
+    renderModal();
+    expect(screen.getByPlaceholderText("Value for heading").tagName).toBe(
+      "INPUT"
+    );
+  });
+
+  it("carries newlines typed into a long-form variable through to the render", () => {
+    renderModal();
+    fireEvent.change(screen.getByPlaceholderText("Value for content"), {
+      target: { value: "line one\nline two" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    const srcDoc = (
+      screen.getByTitle("Test email preview") as HTMLIFrameElement
+    ).getAttribute("srcdoc");
+    expect(srcDoc).toContain("line one\nline two");
   });
 });

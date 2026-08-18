@@ -35,6 +35,7 @@ import { useEffect, useMemo, useState } from "react";
 import { extractTemplateVariables } from "@/actions/batch";
 import { Input } from "@/components/ui/input";
 import type { ExtractedVariable, VariableMapping } from "@/lib/batch";
+import { isLongFormVariable } from "@/lib/handlebars";
 import { cn } from "@/lib/utils";
 
 type VariableMapperProps = {
@@ -64,20 +65,6 @@ const FORM_MANAGED_LABELS: Record<string, string> = {
   subject: "Subject line",
   previewText: "Preview text",
 };
-
-// Variables that usually hold a paragraph rather than a word, so they get a
-// textarea (an <input> silently drops the newlines pasted into it).
-const LONG_FORM_NAME_PATTERN =
-  /content|body|message|paragraph|description|markdown|html/i;
-
-// Deliberately no length heuristic: this is recomputed on every render, so a
-// "value is long now" rule would swap <Input> for <Textarea> mid-keystroke and
-// unmount the focused element. Newlines can only arrive from loaded draft data
-// — browsers strip them from text pasted into an <input> — so that check is
-// stable while the user types.
-function isLongFormVariable(name: string, value: string): boolean {
-  return LONG_FORM_NAME_PATTERN.test(name) || value.includes("\n");
-}
 
 export function VariableMapper({
   organizationId,

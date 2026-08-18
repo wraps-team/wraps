@@ -18,6 +18,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@wraps/ui/components/ui/tabs";
+import { Textarea } from "@wraps/ui/components/ui/textarea";
 import { AlertCircle, Loader2, Mail, Send, User } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -31,7 +32,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useSession } from "@/lib/auth-client";
-import { renderForPreview } from "@/lib/handlebars";
+import { isLongFormVariable, renderForPreview } from "@/lib/handlebars";
 
 type TemplateVariable = { name: string; fallback?: string };
 
@@ -469,17 +470,35 @@ export function SendTestModal({
                                   {`{{${f.name}}}`}
                                 </FieldLabel>
                                 <FieldContent>
-                                  <Input
-                                    aria-invalid={isInvalid}
-                                    id={field.name}
-                                    name={field.name}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) =>
-                                      field.handleChange(e.target.value)
-                                    }
-                                    placeholder={`Value for ${f.name}`}
-                                    value={String(field.state.value ?? "")}
-                                  />
+                                  {isLongFormVariable(
+                                    f.name,
+                                    String(field.state.value ?? "")
+                                  ) ? (
+                                    <Textarea
+                                      aria-invalid={isInvalid}
+                                      id={field.name}
+                                      name={field.name}
+                                      onBlur={field.handleBlur}
+                                      onChange={(e) =>
+                                        field.handleChange(e.target.value)
+                                      }
+                                      placeholder={`Value for ${f.name}`}
+                                      rows={5}
+                                      value={String(field.state.value ?? "")}
+                                    />
+                                  ) : (
+                                    <Input
+                                      aria-invalid={isInvalid}
+                                      id={field.name}
+                                      name={field.name}
+                                      onBlur={field.handleBlur}
+                                      onChange={(e) =>
+                                        field.handleChange(e.target.value)
+                                      }
+                                      placeholder={`Value for ${f.name}`}
+                                      value={String(field.state.value ?? "")}
+                                    />
+                                  )}
                                   {isInvalid && <FieldError errors={errors} />}
                                 </FieldContent>
                               </Field>
