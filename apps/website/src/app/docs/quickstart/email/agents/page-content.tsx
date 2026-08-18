@@ -39,7 +39,8 @@ const agentPrompt = `Give this project's AI agent the ability to send email via 
 3. Install the SDK: npm install @wraps.dev/email
 4. Create a typed send_email tool wrapping WrapsEmail from @wraps.dev/email and register it with my agent framework (detect LangGraph / Vercel AI SDK / Mastra from the codebase, or ask me).
 5. Add the Wraps MCP server to my agent config so I can inspect sends, events, and suppressions:
-   { "command": "npx", "args": ["-y", "@wraps.dev/mcp"] }
+   { "command": "npx", "args": ["-y", "@wraps.dev/mcp"], "env": { "AWS_REGION": "us-east-1" } }
+   Use the region my Wraps stack is deployed in. The server requires AWS_REGION (or AWS_DEFAULT_REGION) in its own environment and exits on startup without one.
 6. Do a test tool-call send and report the messageId.
 
 Full guide (agent-readable): fetch https://wraps.dev/docs/quickstart/email/agents with header "Accept: text/markdown".`;
@@ -90,7 +91,10 @@ const wrapsMcpConfig = `{
   "mcpServers": {
     "wraps": {
       "command": "npx",
-      "args": ["-y", "@wraps.dev/mcp"]
+      "args": ["-y", "@wraps.dev/mcp"],
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
     }
   }
 }`;
@@ -405,6 +409,17 @@ export default function AgentEmailQuickstartPageContent() {
             )}
           </CodeBlockBody>
         </CodeBlock>
+        <p className="mb-4 text-muted-foreground text-sm">
+          Set <code className="rounded bg-muted px-1.5 py-0.5">AWS_REGION</code>{" "}
+          to the region your Wraps stack is deployed in. The server reads it
+          from its own environment — either{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">AWS_REGION</code> or{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            AWS_DEFAULT_REGION
+          </code>{" "}
+          — and never from your AWS config file, so it exits on startup without
+          one.
+        </p>
         <p className="text-muted-foreground text-sm">
           Tools, configuration, and write-mode guardrails are covered{" "}
           <Link

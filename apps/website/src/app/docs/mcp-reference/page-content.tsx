@@ -26,7 +26,10 @@ const claudeCodeConfig = `{
   "mcpServers": {
     "wraps": {
       "command": "npx",
-      "args": ["-y", "@wraps.dev/mcp"]
+      "args": ["-y", "@wraps.dev/mcp"],
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
     }
   }
 }`;
@@ -301,8 +304,16 @@ export default function McpReferencePageContent() {
         <p className="mb-4 text-muted-foreground">
           Add to{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">.mcp.json</code> in
-          your project root. Claude Code inherits your shell's AWS environment,
-          so no extra env config is needed if your credentials are already set.
+          your project root. Claude Code passes your shell environment through,
+          so whichever AWS credentials you already use are picked up. Set{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">AWS_REGION</code>{" "}
+          here regardless: the server reads the region from its own environment
+          — either that or{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            AWS_DEFAULT_REGION
+          </code>{" "}
+          — and never from your AWS config file, so it exits on startup without
+          one.
         </p>
         <div className="mb-8">
           <ConfigBlock code={claudeCodeConfig} filename=".mcp.json" />
@@ -312,8 +323,10 @@ export default function McpReferencePageContent() {
           Claude Desktop, Cursor, Windsurf
         </h3>
         <p className="mb-4 text-muted-foreground">
-          GUI clients don't inherit your shell environment, so pass the region
-          and profile explicitly. For Claude Desktop the file is{" "}
+          GUI clients inherit nothing from your shell, so any credential
+          settings belong in the same{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">env</code> block
+          alongside the region. For Claude Desktop the file is{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">
             ~/Library/Application Support/Claude/claude_desktop_config.json
           </code>

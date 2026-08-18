@@ -864,20 +864,23 @@ Prerequisites: a deployed Wraps email stack (`wraps email init`) and AWS credent
 
 ### Setup
 
-Claude Code (`.mcp.json` in project root — inherits shell AWS environment):
+Claude Code (`.mcp.json` in project root — inherits the shell AWS environment, but the region must be set here: the server reads `AWS_REGION` or `AWS_DEFAULT_REGION` from its own environment, never from the AWS config file, and exits on startup without one):
 
 ```json
 {
   "mcpServers": {
     "wraps": {
       "command": "npx",
-      "args": ["-y", "@wraps.dev/mcp"]
+      "args": ["-y", "@wraps.dev/mcp"],
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
     }
   }
 }
 ```
 
-Claude Desktop / Cursor / Windsurf (GUI clients need explicit env):
+Claude Desktop / Cursor / Windsurf (GUI clients inherit nothing from the shell, so credential settings go in the same `env` block):
 
 ```json
 {

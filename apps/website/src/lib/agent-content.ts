@@ -230,11 +230,16 @@ Context7 gives your editor the docs; \`@wraps.dev/mcp\` gives your agent the inf
   "mcpServers": {
     "wraps": {
       "command": "npx",
-      "args": ["-y", "@wraps.dev/mcp"]
+      "args": ["-y", "@wraps.dev/mcp"],
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
     }
   }
 }
 \`\`\`
+
+Set \`AWS_REGION\` to the region your Wraps stack is deployed in. The server reads it from its own environment (\`AWS_REGION\` or \`AWS_DEFAULT_REGION\`), never from your AWS config file, and exits on startup without one.
 
 Tools, configuration, and write-mode guardrails: [MCP Server Reference](https://wraps.dev/docs/mcp-reference).
 
@@ -268,14 +273,17 @@ MCP server for Wraps email infrastructure. Gives AI agents access to your AWS SE
 
 ## Setup: Claude Code
 
-Add to \`.mcp.json\` in your project root. Claude Code inherits your shell's AWS environment — no extra env config needed.
+Add to \`.mcp.json\` in your project root. Claude Code passes your shell environment through, so whichever AWS credentials you already use are picked up. Set \`AWS_REGION\` here regardless: the server reads the region from its own environment (\`AWS_REGION\` or \`AWS_DEFAULT_REGION\`), never from your AWS config file, and exits on startup without one.
 
 \`\`\`json
 {
   "mcpServers": {
     "wraps": {
       "command": "npx",
-      "args": ["-y", "@wraps.dev/mcp"]
+      "args": ["-y", "@wraps.dev/mcp"],
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
     }
   }
 }
@@ -283,7 +291,7 @@ Add to \`.mcp.json\` in your project root. Claude Code inherits your shell's AWS
 
 ## Setup: Claude Desktop / Cursor / Windsurf
 
-GUI clients don't inherit your shell, so pass region and profile explicitly. Claude Desktop config lives at \`~/Library/Application Support/Claude/claude_desktop_config.json\`; Cursor uses \`.cursor/mcp.json\`.
+GUI clients inherit nothing from your shell, so any credential settings belong in the same \`env\` block alongside the region. Claude Desktop config lives at \`~/Library/Application Support/Claude/claude_desktop_config.json\`; Cursor uses \`.cursor/mcp.json\`.
 
 \`\`\`json
 {

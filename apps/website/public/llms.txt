@@ -75,14 +75,20 @@ Wraps ships an MCP server, `@wraps.dev/mcp`, that exposes a deployed email
 stack as tools: `list_recent_sends`, `get_email_event_log`,
 `verify_domain_status`, `list_suppressions`, and `send_email` (disabled by
 default; guarded by allowlists and caps when enabled). It runs locally over
-stdio and resolves AWS credentials from the environment — no API key.
+stdio and resolves AWS credentials from the environment — no API key. Set
+`AWS_REGION` in the `env` block: the server reads the region from its own
+environment (`AWS_REGION` or `AWS_DEFAULT_REGION`), never from your AWS config
+file, and exits on startup without one.
 
 ```json
 {
   "mcpServers": {
     "wraps": {
       "command": "npx",
-      "args": ["-y", "@wraps.dev/mcp"]
+      "args": ["-y", "@wraps.dev/mcp"],
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
     }
   }
 }
