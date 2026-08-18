@@ -61,10 +61,13 @@ const releases: Release[] = [
         longer vanish the moment you search for it
       </>,
       <>
-        Dashboard charts now count only mail sent through Wraps. They previously
-        read account-wide SES metrics, so totals could include mail your AWS
-        account sent outside Wraps - if you have such traffic, your chart
-        numbers will drop. That is the count becoming correct, not data loss.
+        Dashboard numbers now come from Wraps&rsquo; own record of what it sent
+        rather than from account-wide SES metrics. Two things change as a
+        result, and both are the count becoming correct rather than data loss.
+        Totals no longer include mail your AWS account sent outside Wraps. And
+        open and click counts are now unique per message - a recipient who opens
+        the same email three times counts once, where SES counted three times -
+        so those two numbers in particular will read lower than they did before.
         Account-level SES reputation is still shown, now labelled as
         account-wide
       </>,
