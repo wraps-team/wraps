@@ -220,4 +220,72 @@ describe("SendConfirmDialog", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/other broadcast/)).not.toBeInTheDocument();
   });
+
+  it("should never render a fabricated 0-contact number when recipientCount is null (send variant)", () => {
+    render(
+      <SendConfirmDialog
+        onConfirm={vi.fn()}
+        onOpenChange={vi.fn()}
+        open={true}
+        recipientCount={null}
+        variant="send"
+      />
+    );
+
+    expect(screen.queryByText(/0 contacts/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/This will immediately send emails to/)
+    ).not.toBeInTheDocument();
+  });
+
+  it("should say the count could not be loaded when recipientCount is null", () => {
+    render(
+      <SendConfirmDialog
+        onConfirm={vi.fn()}
+        onOpenChange={vi.fn()}
+        open={true}
+        recipientCount={null}
+        variant="send"
+      />
+    );
+
+    expect(screen.getByText(/could not be loaded/i)).toBeInTheDocument();
+  });
+
+  it("should disable confirmation and never call onConfirm when recipientCount is null", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+
+    render(
+      <SendConfirmDialog
+        onConfirm={onConfirm}
+        onOpenChange={vi.fn()}
+        open={true}
+        recipientCount={null}
+        variant="send"
+      />
+    );
+
+    const confirmButton = screen.getByRole("button", { name: /send now/i });
+    expect(confirmButton).toBeDisabled();
+
+    await user.click(confirmButton);
+
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("should never render a fabricated 0-contact number when recipientCount is null (schedule variant)", () => {
+    render(
+      <SendConfirmDialog
+        onConfirm={vi.fn()}
+        onOpenChange={vi.fn()}
+        open={true}
+        recipientCount={null}
+        variant="schedule"
+      />
+    );
+
+    expect(screen.queryByText(/0 contacts/)).not.toBeInTheDocument();
+    expect(screen.getByText(/could not be loaded/i)).toBeInTheDocument();
+  });
 });

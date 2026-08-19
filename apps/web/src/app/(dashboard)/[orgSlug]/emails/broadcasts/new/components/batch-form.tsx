@@ -365,6 +365,7 @@ export function BatchForm({
   // Recipient count
   const [recipientCount, setRecipientCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
+  const [countError, setCountError] = useState<string | null>(null);
 
   const steps: { id: Step; label: string; number: number }[] = [
     { id: "setup", label: "Setup", number: 1 },
@@ -386,18 +387,31 @@ export function BatchForm({
     return { audienceType: "all" };
   }, [campaignData.audienceType, campaignData.topicId, campaignData.segmentId]);
 
-  // Load recipient count when filter changes
+  // Load recipient count when filter changes. The count is cleared first so a
+  // failed fetch can never leave the previous filter's number on screen, and
+  // `null` means "unknown" — never "zero". Every consumer must distinguish them.
   useEffect(() => {
+    let cancelled = false;
     const loadCount = async () => {
       setLoadingCount(true);
+      setCountError(null);
+      setRecipientCount(null);
       const filter = getCurrentFilter();
       const result = await getRecipientCount(organizationId, "email", filter);
+      if (cancelled) {
+        return;
+      }
       if (result.success) {
         setRecipientCount(result.count);
+      } else {
+        setCountError(result.error);
       }
       setLoadingCount(false);
     };
     loadCount();
+    return () => {
+      cancelled = true;
+    };
   }, [organizationId, getCurrentFilter]);
 
   const updateData = (updates: Partial<CampaignData>) => {
@@ -712,6 +726,7 @@ export function BatchForm({
           )}
           {currentStep === "audience" && (
             <AudienceStep
+              countError={countError}
               data={campaignData}
               loadingCount={loadingCount}
               onChange={updateData}
@@ -726,6 +741,7 @@ export function BatchForm({
           )}
           {currentStep === "review" && (
             <ReviewStep
+              countError={countError}
               data={campaignData}
               isPending={isPending}
               loadingCount={loadingCount}
@@ -1182,6 +1198,7 @@ function ContentStep({
 // Audience Step Component
 function AudienceStep({
   data,
+  countError,
   loadingCount,
   onChange,
   organizationId,
@@ -1192,6 +1209,7 @@ function AudienceStep({
   topics,
   topicsEnabled,
 }: {
+  countError: string | null;
   data: CampaignData;
   loadingCount: boolean;
   onChange: (updates: Partial<CampaignData>) => void;
@@ -1394,7 +1412,9 @@ function AudienceStep({
               <p className="font-semibold text-2xl">
                 {loadingCount
                   ? "..."
-                  : (recipientCount?.toLocaleString() ?? "0")}
+                  : countError || recipientCount === null
+                    ? "Unknown"
+                    : recipientCount.toLocaleString()}
               </p>
             </div>
           </div>
@@ -1404,8 +1424,9 @@ function AudienceStep({
             <div className="mt-4 border-t pt-4">
               <div className="mb-2 flex items-center justify-between">
                 <p className="font-medium text-muted-foreground text-sm">
-                  Preview ({sampleContacts.length} of{" "}
-                  {recipientCount?.toLocaleString() ?? 0})
+                  {recipientCount === null
+                    ? `Preview (${sampleContacts.length})`
+                    : `Preview (${sampleContacts.length} of ${recipientCount.toLocaleString()})`}
                 </p>
                 <Link
                   className="text-primary text-xs hover:underline"
@@ -1451,6 +1472,7 @@ function AudienceStep({
 function ReviewStep({
   data,
   isPending,
+  countError,
   loadingCount,
   onChange,
   onSend,
@@ -1461,6 +1483,7 @@ function ReviewStep({
   segments,
   topics,
 }: {
+  countError: string | null;
   data: CampaignData;
   isPending: boolean;
   loadingCount: boolean;
@@ -1656,7 +1679,9 @@ function ReviewStep({
                 <p className="font-semibold text-2xl">
                   {loadingCount
                     ? "..."
-                    : `${recipientCount?.toLocaleString() ?? "0"} recipients`}
+                    : countError || recipientCount === null
+                      ? "Recipient count unavailable"
+                      : `${recipientCount.toLocaleString()} recipients`}
                 </p>
               </div>
             </div>
@@ -1690,10 +1715,29 @@ function ReviewStep({
         </div>
       )}
 
+      {/* Recipient count unavailable warning */}
+      {countError && (
+        <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+          <div className="space-y-1">
+            <p className="font-medium text-warning text-sm">
+              We couldn't count this audience. Sending is blocked until the
+              count loads.
+            </p>
+            <p className="text-warning/80 text-xs">
+              Reload the page to try again — if it keeps failing, check that the
+              selected topic or segment still exists. ({countError})
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-end pt-4">
         <Button
           disabled={
             isPending ||
+            loadingCount ||
+            recipientCount === null ||
             recipientCount === 0 ||
             (data.scheduleType === "later" && !data.scheduledDate)
           }
@@ -1706,15 +1750,17 @@ function ReviewStep({
             ) : (
               "Sending..."
             )
+          ) : recipientCount === null ? (
+            "Recipient count unavailable"
           ) : data.scheduleType === "later" ? (
             <>
               <Clock className="mr-2 h-4 w-4" />
-              Schedule for {recipientCount?.toLocaleString() ?? 0} contacts
+              Schedule for {recipientCount.toLocaleString()} contacts
             </>
           ) : (
             <>
               <Send className="mr-2 h-4 w-4" />
-              Send to {recipientCount?.toLocaleString() ?? 0} contacts
+              Send to {recipientCount.toLocaleString()} contacts
             </>
           )}
         </Button>
@@ -1731,7 +1777,7 @@ function ReviewStep({
         }}
         onOpenChange={setShowConfirmDialog}
         open={showConfirmDialog}
-        recipientCount={recipientCount ?? 0}
+        recipientCount={recipientCount}
         scheduledDate={data.scheduledDate}
         variant={data.scheduleType === "later" ? "schedule" : "send"}
       />

@@ -15,7 +15,9 @@ type SendConfirmDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
-  recipientCount: number;
+  /** The audience size, or null when it could not be loaded. Null must never
+   *  be rendered as 0 — this dialog is the blast-radius guarantee. */
+  recipientCount: number | null;
   variant: "send" | "schedule";
   scheduledDate?: Date;
   loading?: boolean;
@@ -41,7 +43,8 @@ export function SendConfirmDialog({
   inFlightBatches,
   inFlightRecipients,
 }: SendConfirmDialogProps) {
-  const formattedCount = recipientCount.toLocaleString();
+  const countUnknown = recipientCount === null;
+  const formattedCount = recipientCount?.toLocaleString() ?? "";
 
   const scheduleDescription = scheduledDate
     ? `This will schedule emails to ${formattedCount} contacts for ${scheduledDate.toLocaleDateString(undefined, { dateStyle: "medium" })} at ${scheduledDate.toLocaleTimeString(undefined, { timeStyle: "short" })}.`
@@ -65,17 +68,19 @@ export function SendConfirmDialog({
             {variant === "schedule" ? "Confirm schedule" : "Confirm send"}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {(variant === "schedule"
-              ? scheduleDescription
-              : `This will immediately send emails to ${formattedCount} contacts. This action cannot be undone.`) +
-              durationNote +
-              contentionNote}
+            {countUnknown
+              ? "The number of recipients could not be loaded, so this send can't be confirmed. Close this dialog and try again."
+              : (variant === "schedule"
+                  ? scheduleDescription
+                  : `This will immediately send emails to ${formattedCount} contacts. This action cannot be undone.`) +
+                durationNote +
+                contentionNote}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            disabled={loading}
+            disabled={loading || countUnknown}
             onClick={(e) => {
               e.preventDefault();
               onConfirm();
