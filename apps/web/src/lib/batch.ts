@@ -29,15 +29,17 @@ export const BATCH_STATUS_LABELS: Record<BatchStatus, string> = {
   cancelled: "Cancelled",
 };
 
-// Status colors for badges
+// Status colors for badges. Semantic theme tokens only — the raw Tailwind
+// palette these used to carry rendered identically in light and dark, which
+// made every badge glare against the dark surface.
 export const BATCH_STATUS_COLORS: Record<BatchStatus, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  scheduled: "bg-purple-100 text-purple-700",
-  queued: "bg-blue-100 text-blue-700",
-  processing: "bg-yellow-100 text-yellow-700",
-  completed: "bg-green-100 text-green-700",
-  failed: "bg-red-100 text-red-700",
-  cancelled: "bg-gray-100 text-gray-500",
+  draft: "bg-muted text-muted-foreground",
+  scheduled: "bg-info/15 text-info",
+  queued: "bg-info/15 text-info",
+  processing: "bg-info/15 text-info",
+  completed: "bg-success/15 text-success",
+  failed: "bg-destructive/15 text-destructive",
+  cancelled: "bg-muted text-muted-foreground",
 };
 
 /** A paused broadcast keeps status 'processing' — batchSendStatusEnum has no
@@ -50,7 +52,7 @@ export function getPausedPresentation(
   if (status !== "processing" || !pausedReason) {
     return null;
   }
-  const color = "bg-amber-100 text-amber-800";
+  const color = "bg-warning/15 text-warning";
   if (pausedReason === "daily_quota") {
     return {
       label: "Paused — daily quota",
@@ -87,8 +89,89 @@ export function getZeroSendPresentation(
   }
   return {
     label: "Completed — nothing sent",
-    color: "bg-amber-100 text-amber-800",
+    color: "bg-warning/15 text-warning",
   };
+}
+
+/** A broadcast that should have moved by now but hasn't. `queued` and
+ *  `scheduled` are never swept by the broadcast reaper (it only watches
+ *  `processing`), so without this a broadcast can sit dead indefinitely while
+ *  its badge reads "Queued" or "Scheduled". Surfacing it is what makes the
+ *  resume action on the detail page reachable. */
+export type StallPresentation = { label: string; explanation: string };
+
+/** Matches BROADCAST_STALL_THRESHOLD_MS in apps/api's broadcast-reaper: below
+ *  this, an idle chain is still inside the DLQ recovery window and is not yet
+ *  evidence of anything. */
+const STALL_THRESHOLD_MS = 30 * 60 * 1000;
+/** Scheduler delivery jitter. A schedule that fired on time is picked up well
+ *  inside this, so anything past it never fired. */
+const OVERDUE_SCHEDULE_MS = 15 * 60 * 1000;
+
+export function getStallPresentation(
+  batch: Pick<
+    BatchSendWithMeta,
+    "status" | "pausedReason" | "lastChunkAt" | "scheduledFor" | "createdAt"
+  >,
+  now: Date = new Date()
+): StallPresentation | null {
+  const age = (d: Date | string | null) =>
+    d === null ? null : now.getTime() - new Date(d).getTime();
+
+  if (batch.status === "scheduled") {
+    const overdueBy = batch.scheduledFor ? age(batch.scheduledFor) : null;
+    if (overdueBy !== null && overdueBy > OVERDUE_SCHEDULE_MS) {
+      return {
+        label: "Overdue",
+        explanation:
+          "This broadcast's scheduled time has passed and it never started sending. The schedule may not have been created.",
+      };
+    }
+    return null;
+  }
+
+  if (batch.status === "queued") {
+    const waitingFor = age(batch.createdAt);
+    if (waitingFor !== null && waitingFor > STALL_THRESHOLD_MS) {
+      return {
+        label: "Not started",
+        explanation:
+          "This broadcast was queued but no worker has picked it up. It is not sending.",
+      };
+    }
+    return null;
+  }
+
+  // `processing` without a pause reason is the reaper's territory, but the
+  // reaper runs on a schedule — showing the stall the moment it is visible
+  // beats waiting for the sweep.
+  if (batch.status === "processing" && !batch.pausedReason) {
+    const idleFor = age(batch.lastChunkAt);
+    if (idleFor !== null && idleFor > STALL_THRESHOLD_MS) {
+      return {
+        label: "No progress",
+        explanation:
+          "Sending has made no progress for over 30 minutes and is not paused for quota.",
+      };
+    }
+  }
+
+  return null;
+}
+
+/** Drafts never expire and nothing resurfaces them, so they accumulate
+ *  silently — production holds one 117 days old. Flagging the age in the list
+ *  is what makes an abandoned draft visible without deleting anything. */
+const STALE_DRAFT_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function isStaleDraft(
+  batch: Pick<BatchSendWithMeta, "status" | "createdAt">,
+  now: Date = new Date()
+): boolean {
+  return (
+    batch.status === "draft" &&
+    now.getTime() - new Date(batch.createdAt).getTime() > STALE_DRAFT_MS
+  );
 }
 
 // Channel display

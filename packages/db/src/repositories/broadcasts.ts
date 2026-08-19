@@ -178,6 +178,53 @@ export async function getBroadcastSendOutcomes(
   return result ?? { total: 0, accepted: 0, failed: 0 };
 }
 
+/**
+ * Batched form of getBroadcastSendOutcomes for a list of broadcasts. The list
+ * view renders the same sent/failed figures as the detail page, so it needs the
+ * same reconciled source — one grouped query rather than N per-row queries.
+ * Broadcasts with no per-message rows are simply absent from the map; callers
+ * fall back to the counters exactly as the single-batch path does.
+ */
+export async function getBroadcastSendOutcomesForBatches(
+  batchIds: string[],
+  organizationId: string,
+  dbClient: DbClient = db
+): Promise<Map<string, BroadcastSendOutcomes>> {
+  if (batchIds.length === 0) {
+    return new Map();
+  }
+  const unaccepted = sql.raw(
+    MESSAGE_SEND_UNACCEPTED_STATUSES.map((s) => `'${s}'`).join(", ")
+  );
+  const rows = await dbClient
+    .select({
+      batchSendId: messageSend.batchSendId,
+      total: sql<number>`count(*)::int`,
+      accepted: sql<number>`count(*) filter (where ${messageSend.status} not in (${unaccepted}))::int`,
+      failed: sql<number>`count(*) filter (where ${messageSend.status} = 'failed')::int`,
+    })
+    .from(messageSend)
+    .where(
+      and(
+        inArray(messageSend.batchSendId, batchIds),
+        eq(messageSend.organizationId, organizationId)
+      )
+    )
+    .groupBy(messageSend.batchSendId);
+
+  const byBatch = new Map<string, BroadcastSendOutcomes>();
+  for (const row of rows) {
+    if (row.batchSendId) {
+      byBatch.set(row.batchSendId, {
+        total: row.total,
+        accepted: row.accepted,
+        failed: row.failed,
+      });
+    }
+  }
+  return byBatch;
+}
+
 export const MAX_RECIPIENT_EXPORT_ROWS = 50_000;
 
 export type BroadcastRecipientRow = {

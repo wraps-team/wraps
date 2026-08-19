@@ -19,6 +19,7 @@ import {
   findTemplateForValidation,
   findTemplateVariables,
   getBroadcastSendOutcomes,
+  getBroadcastSendOutcomesForBatches,
   getSampleBroadcastRecipients,
   getSampleRecipientsWithProperties,
   insertDraftBroadcast,
@@ -121,39 +122,53 @@ export const listBatchSends = orgAction(
   ): Promise<ListBatchesResult> => {
     const { batches, total } = await listBroadcasts(organizationId, options);
 
+    // Same reconciled source as the detail page (loadBatchWithMeta): the list
+    // used to render the raw batch_send counters, so one broadcast showed two
+    // different sent/failed figures depending on which page you were on.
+    // Broadcasts with no per-message rows are absent from the map and fall
+    // back to the counters, exactly as the single-batch path does.
+    const outcomesByBatch = await getBroadcastSendOutcomesForBatches(
+      batches.map((b) => b.id),
+      organizationId
+    );
+
     return {
       success: true,
-      batches: batches.map((b) => ({
-        id: b.id,
-        name: b.name,
-        channel: b.channel as Channel,
-        status: b.status as BatchStatus,
-        subject: b.subject,
-        previewText: b.previewText,
-        from: b.from,
-        fromName: b.fromName,
-        replyTo: b.replyTo,
-        templateId: b.emailTemplateId,
-        templateName: b.emailTemplate?.name,
-        totalRecipients: b.totalRecipients,
-        processedRecipients: b.processedRecipients,
-        sent: b.sent,
-        delivered: b.delivered,
-        failed: b.failed,
-        opened: b.opened,
-        clicked: b.clicked,
-        bounced: b.bounced,
-        complained: b.complained,
-        errorMessage: b.errorMessage,
-        pausedReason: b.pausedReason,
-        lastChunkAt: b.lastChunkAt,
-        scheduledFor: b.scheduledFor,
-        startedAt: b.startedAt,
-        completedAt: b.completedAt,
-        createdAt: b.createdAt,
-        createdBy: b.createdByUser,
-        awsAccount: b.awsAccount,
-      })),
+      batches: batches.map((b) => {
+        const outcomes = outcomesByBatch.get(b.id);
+        const hasPerMessageRows = (outcomes?.total ?? 0) > 0;
+        return {
+          id: b.id,
+          name: b.name,
+          channel: b.channel as Channel,
+          status: b.status as BatchStatus,
+          subject: b.subject,
+          previewText: b.previewText,
+          from: b.from,
+          fromName: b.fromName,
+          replyTo: b.replyTo,
+          templateId: b.emailTemplateId,
+          templateName: b.emailTemplate?.name,
+          totalRecipients: b.totalRecipients,
+          processedRecipients: b.processedRecipients,
+          sent: hasPerMessageRows && outcomes ? outcomes.accepted : b.sent,
+          delivered: b.delivered,
+          failed: hasPerMessageRows && outcomes ? outcomes.failed : b.failed,
+          opened: b.opened,
+          clicked: b.clicked,
+          bounced: b.bounced,
+          complained: b.complained,
+          errorMessage: b.errorMessage,
+          pausedReason: b.pausedReason,
+          lastChunkAt: b.lastChunkAt,
+          scheduledFor: b.scheduledFor,
+          startedAt: b.startedAt,
+          completedAt: b.completedAt,
+          createdAt: b.createdAt,
+          createdBy: b.createdByUser,
+          awsAccount: b.awsAccount,
+        };
+      }),
       total,
     };
   }

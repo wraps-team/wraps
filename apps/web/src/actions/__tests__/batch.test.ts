@@ -1306,3 +1306,119 @@ describe("listBatchSends / exportAllBroadcasts", () => {
     expect(result.truncated).toBe(false);
   });
 });
+
+describe("listBatchSends reconciled counts (H1)", () => {
+  afterEach(async () => {
+    await db
+      .delete(messageSend)
+      .where(eq(messageSend.organizationId, testOrganization.id));
+    await db
+      .delete(batchSend)
+      .where(eq(batchSend.organizationId, testOrganization.id));
+  });
+
+  async function seedBatchWithCounters(counters: {
+    sent: number;
+    failed: number;
+  }) {
+    const [batch] = await db
+      .insert(batchSend)
+      .values({
+        organizationId: testOrganization.id,
+        channel: "email",
+        status: "completed",
+        name: "Reconciled Counts Batch",
+        createdBy: testUser.id,
+        sent: counters.sent,
+        failed: counters.failed,
+      })
+      .returning();
+    if (!batch) {
+      throw new Error("failed to seed batch for reconciliation test");
+    }
+    return batch;
+  }
+
+  it("prefers message_send row statuses over the batch_send counters", async () => {
+    // Counters say 10 sent / 0 failed; the rows say 1 sent / 2 failed. The
+    // rows are the truth the detail page renders, so the list must agree.
+    const batch = await seedBatchWithCounters({ sent: 10, failed: 0 });
+    await db.insert(messageSend).values([
+      {
+        organizationId: testOrganization.id,
+        awsAccountId: testAwsAccount.id,
+        channel: "email",
+        sourceType: "batch",
+        batchSendId: batch.id,
+        recipient: "reconciled-1@example.com",
+        status: "sent",
+      },
+      {
+        organizationId: testOrganization.id,
+        awsAccountId: testAwsAccount.id,
+        channel: "email",
+        sourceType: "batch",
+        batchSendId: batch.id,
+        recipient: "reconciled-2@example.com",
+        status: "failed",
+      },
+      {
+        organizationId: testOrganization.id,
+        awsAccountId: testAwsAccount.id,
+        channel: "email",
+        sourceType: "batch",
+        batchSendId: batch.id,
+        recipient: "reconciled-3@example.com",
+        status: "failed",
+      },
+    ]);
+
+    const result = await listBatchSends(testOrganization.id, {});
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const row = result.batches.find((b) => b.id === batch.id);
+    expect(row).toBeDefined();
+    expect(row?.sent).toBe(1);
+    expect(row?.failed).toBe(2);
+  });
+
+  it("falls back to the counters for broadcasts that predate per-message rows", async () => {
+    const batch = await seedBatchWithCounters({ sent: 7, failed: 3 });
+
+    const result = await listBatchSends(testOrganization.id, {});
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const row = result.batches.find((b) => b.id === batch.id);
+    expect(row?.sent).toBe(7);
+    expect(row?.failed).toBe(3);
+  });
+
+  it("does not count another organization's message_send rows", async () => {
+    const batch = await seedBatchWithCounters({ sent: 5, failed: 0 });
+    await db.insert(messageSend).values({
+      organizationId: testSecondaryOrganization.id,
+      awsAccountId: testAwsAccount.id,
+      channel: "email",
+      sourceType: "batch",
+      batchSendId: batch.id,
+      recipient: "cross-org@example.com",
+      status: "failed",
+    });
+
+    const result = await listBatchSends(testOrganization.id, {});
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const row = result.batches.find((b) => b.id === batch.id);
+    // The foreign row must not be visible at all — no per-message rows exist
+    // for this org, so the counters stand.
+    expect(row?.sent).toBe(5);
+    expect(row?.failed).toBe(0);
+
+    await db
+      .delete(messageSend)
+      .where(eq(messageSend.organizationId, testSecondaryOrganization.id));
+  });
+});

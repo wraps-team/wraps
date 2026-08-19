@@ -11,6 +11,16 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@wraps/ui/components/ui/alert-dialog";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Checkbox } from "@wraps/ui/components/ui/checkbox";
 import {
@@ -43,6 +53,7 @@ import {
 } from "@wraps/ui/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import {
+  AlertTriangle,
   ArrowUpDown,
   CalendarClock,
   CheckCircle,
@@ -87,6 +98,9 @@ import {
   type BatchStatus,
   calculateProgress,
   getPausedPresentation,
+  getStallPresentation,
+  getZeroSendPresentation,
+  isStaleDraft,
 } from "@/lib/batch";
 import { broadcastCSVColumns } from "@/lib/csv-columns";
 import { exportTableToCSV } from "@/lib/csv-export";
@@ -133,10 +147,15 @@ export function BatchTable({
   // Ref for search input to enable keyboard shortcut
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Keyboard shortcut: Cmd+F to focus search
+  // Keyboard shortcut: Cmd+F focuses the table search. Pressing it a second
+  // time while the search box already has focus falls through to the browser's
+  // own find — otherwise the page permanently takes ⌘F away with no escape.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        if (document.activeElement === searchInputRef.current) {
+          return;
+        }
         e.preventDefault();
         searchInputRef.current?.focus();
       }
@@ -147,41 +166,72 @@ export function BatchTable({
 
   const canManage = userRole === "owner" || userRole === "admin";
 
-  const handleCancel = async (batchId: string) => {
-    startTransition(async () => {
-      const result = await cancelBatchSend(batchId, organizationId);
-      if (result.success) {
-        toast.success("Broadcast cancelled");
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
-    });
-  };
+  // Both destructive row actions are irreversible, so neither fires from the
+  // menu directly — the menu arms this dialog and the dialog does the work.
+  // The detail page has always guarded cancellation this way; the row menu
+  // used to call the same server action with no confirmation at all.
+  const [pendingDestructive, setPendingDestructive] = useState<{
+    kind: "cancel" | "delete";
+    batchId: string;
+    name: string;
+  } | null>(null);
 
-  const handleDeleteDraft = async (batchId: string) => {
-    startTransition(async () => {
-      const result = await deleteDraftBatchSend(batchId, organizationId);
-      if (result.success) {
-        toast.success("Draft deleted");
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
-    });
-  };
+  const runCancel = useCallback(
+    (batchId: string) => {
+      startTransition(async () => {
+        const result = await cancelBatchSend(batchId, organizationId);
+        if (result.success) {
+          toast.success("Broadcast cancelled");
+          router.refresh();
+        } else {
+          toast.error(result.error);
+        }
+      });
+    },
+    [organizationId, router]
+  );
 
-  const handleDuplicate = async (batchId: string) => {
-    startTransition(async () => {
-      const result = await duplicateBatchSend(batchId, organizationId);
-      if (result.success) {
-        toast.success("Broadcast duplicated");
-        router.push(`/${orgSlug}/emails/broadcasts/${result.batch.id}/edit`);
-      } else {
-        toast.error(result.error);
-      }
-    });
-  };
+  const runDeleteDraft = useCallback(
+    (batchId: string) => {
+      startTransition(async () => {
+        const result = await deleteDraftBatchSend(batchId, organizationId);
+        if (result.success) {
+          toast.success("Draft deleted");
+          router.refresh();
+        } else {
+          toast.error(result.error);
+        }
+      });
+    },
+    [organizationId, router]
+  );
+
+  const confirmDestructive = useCallback(() => {
+    if (!pendingDestructive) {
+      return;
+    }
+    if (pendingDestructive.kind === "cancel") {
+      runCancel(pendingDestructive.batchId);
+    } else {
+      runDeleteDraft(pendingDestructive.batchId);
+    }
+    setPendingDestructive(null);
+  }, [pendingDestructive, runCancel, runDeleteDraft]);
+
+  const handleDuplicate = useCallback(
+    (batchId: string) => {
+      startTransition(async () => {
+        const result = await duplicateBatchSend(batchId, organizationId);
+        if (result.success) {
+          toast.success("Broadcast duplicated");
+          router.push(`/${orgSlug}/emails/broadcasts/${result.batch.id}/edit`);
+        } else {
+          toast.error(result.error);
+        }
+      });
+    },
+    [organizationId, orgSlug, router]
+  );
 
   const updateSearchParams = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -319,16 +369,24 @@ export function BatchTable({
           const batch = row.original;
           const status = batch.status;
           const paused = getPausedPresentation(status, batch.pausedReason);
+          const zeroSend = getZeroSendPresentation(status, batch.sent);
+          const stall = getStallPresentation(batch);
+          const presentation = paused ?? zeroSend;
           return (
             <div className="space-y-1">
               <Badge
-                className={paused ? paused.color : BATCH_STATUS_COLORS[status]}
+                className={
+                  presentation
+                    ? presentation.color
+                    : BATCH_STATUS_COLORS[status]
+                }
                 variant="secondary"
               >
-                {status === "processing" && (
+                {/* A paused broadcast is not working — the spinner said it was. */}
+                {status === "processing" && !paused && (
                   <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                 )}
-                {status === "completed" && (
+                {status === "completed" && !zeroSend && (
                   <CheckCircle className="mr-1 h-3 w-3" />
                 )}
                 {status === "failed" && <XCircle className="mr-1 h-3 w-3" />}
@@ -336,13 +394,36 @@ export function BatchTable({
                 {status === "scheduled" && (
                   <CalendarClock className="mr-1 h-3 w-3" />
                 )}
-                {paused ? paused.label : BATCH_STATUS_LABELS[status]}
+                {presentation
+                  ? presentation.label
+                  : BATCH_STATUS_LABELS[status]}
               </Badge>
+              {stall && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      className="bg-warning/15 text-warning"
+                      variant="secondary"
+                    >
+                      <AlertTriangle className="mr-1 h-3 w-3" />
+                      {stall.label}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    {stall.explanation}
+                  </TooltipContent>
+                </Tooltip>
+              )}
               {status === "scheduled" && batch.scheduledFor && (
                 <p className="text-muted-foreground text-xs">
                   {formatDistanceToNow(new Date(batch.scheduledFor), {
                     addSuffix: true,
                   })}
+                </p>
+              )}
+              {isStaleDraft(batch) && (
+                <p className="text-muted-foreground text-xs">
+                  Untouched for {formatDistanceToNow(new Date(batch.createdAt))}
                 </p>
               )}
             </div>
@@ -356,8 +437,20 @@ export function BatchTable({
           const batch = row.original;
           const progress = calculateProgress(batch);
 
-          if (batch.status === "draft" || batch.status === "scheduled") {
-            return <span className="text-muted-foreground">-</span>;
+          // Drafts have no audience snapshot — nothing counts recipients until
+          // the send is created — so there is no number to show. Scheduled
+          // broadcasts DO carry one, and it is the blast radius of something
+          // that will fire unattended, so it is the one that must be visible.
+          if (batch.status === "draft") {
+            return <span className="text-muted-foreground">Not counted</span>;
+          }
+
+          if (batch.status === "scheduled") {
+            return (
+              <span className="text-sm">
+                {batch.totalRecipients.toLocaleString()} recipients
+              </span>
+            );
           }
 
           return (
@@ -432,7 +525,38 @@ export function BatchTable({
           const date = new Date(row.getValue("createdAt"));
           return (
             <div className="text-muted-foreground">
-              {date.toLocaleDateString()}
+              <div>{date.toLocaleDateString()}</div>
+              <div className="text-xs">
+                {date.toLocaleTimeString(undefined, { timeStyle: "short" })}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        // Created date alone made same-day broadcasts indistinguishable and
+        // made the default sort look arbitrary. This is the column that says
+        // when each one actually sent, or when it is going to.
+        id: "sentAt",
+        header: "Sent / scheduled",
+        cell: ({ row }: { row: { original: BatchSendWithMeta } }) => {
+          const batch = row.original;
+          const stamp =
+            batch.status === "scheduled"
+              ? batch.scheduledFor
+              : (batch.startedAt ?? batch.completedAt);
+
+          if (!stamp) {
+            return <span className="text-muted-foreground">-</span>;
+          }
+
+          const date = new Date(stamp);
+          return (
+            <div className="text-muted-foreground">
+              <div>{date.toLocaleDateString()}</div>
+              <div className="text-xs">
+                {date.toLocaleTimeString(undefined, { timeStyle: "short" })}
+              </div>
             </div>
           );
         },
@@ -496,7 +620,13 @@ export function BatchTable({
                     <DropdownMenuItem
                       className="text-destructive"
                       disabled={isPending}
-                      onClick={() => handleDeleteDraft(batch.id)}
+                      onClick={() =>
+                        setPendingDestructive({
+                          kind: "delete",
+                          batchId: batch.id,
+                          name: batch.name || "Untitled",
+                        })
+                      }
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete draft
@@ -509,7 +639,13 @@ export function BatchTable({
                     <DropdownMenuItem
                       className="text-destructive"
                       disabled={isPending}
-                      onClick={() => handleCancel(batch.id)}
+                      onClick={() =>
+                        setPendingDestructive({
+                          kind: "cancel",
+                          batchId: batch.id,
+                          name: batch.name || "Untitled",
+                        })
+                      }
                     >
                       Cancel send
                     </DropdownMenuItem>
@@ -521,15 +657,7 @@ export function BatchTable({
         },
       },
     ],
-    [
-      canManage,
-      isPending,
-      orgSlug,
-      router,
-      handleCancel,
-      handleDeleteDraft,
-      handleDuplicate,
-    ]
+    [canManage, isPending, orgSlug, router, handleDuplicate]
   );
 
   const table = useReactTable({
@@ -698,28 +826,39 @@ export function BatchTable({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.length > 0 ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  className="cursor-pointer hover:bg-muted/50"
-                  key={row.id}
-                  onClick={() => {
-                    const href =
-                      row.original.status === "draft"
-                        ? `/${orgSlug}/emails/broadcasts/${row.original.id}/edit`
-                        : `/${orgSlug}/emails/broadcasts/${row.original.id}`;
-                    router.push(href);
-                  }}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.map((row) => {
+                const href =
+                  row.original.status === "draft"
+                    ? `/${orgSlug}/emails/broadcasts/${row.original.id}/edit`
+                    : `/${orgSlug}/emails/broadcasts/${row.original.id}`;
+                return (
+                  <TableRow
+                    aria-label={`Open ${row.original.name || "Untitled"}`}
+                    className="cursor-pointer hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2"
+                    key={row.id}
+                    onClick={() => router.push(href)}
+                    onKeyDown={(event) => {
+                      // Rows used to open on click only, so keyboard users had to
+                      // route through the overflow menu to reach a broadcast.
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        router.push(href);
+                      }
+                    }}
+                    role="link"
+                    tabIndex={0}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell
@@ -758,6 +897,48 @@ export function BatchTable({
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingDestructive(null);
+          }
+        }}
+        open={pendingDestructive !== null}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingDestructive?.kind === "cancel"
+                ? "Cancel this broadcast?"
+                : "Delete this draft?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDestructive?.kind === "cancel"
+                ? `"${pendingDestructive.name}" will stop sending. Any emails that have already been sent cannot be recalled.`
+                : `"${pendingDestructive?.name}" will be permanently deleted. This cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {pendingDestructive?.kind === "cancel"
+                ? "Keep sending"
+                : "Keep draft"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDestructive();
+              }}
+            >
+              {pendingDestructive?.kind === "cancel"
+                ? "Cancel send"
+                : "Delete draft"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Pagination */}
       {total > 0 && (
