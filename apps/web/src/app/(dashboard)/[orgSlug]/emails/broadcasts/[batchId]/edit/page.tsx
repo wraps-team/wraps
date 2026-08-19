@@ -131,6 +131,7 @@ export default async function EditBatchPage({ params }: EditBatchPageProps) {
     <div className="px-4 lg:px-6">
       <BatchForm
         awsAccounts={awsAccounts}
+        currentUserEmail={session.user.email}
         draftId={batchResult.batch.id}
         initialValues={initialValues}
         initialVerifiedDomains={initialVerifiedDomains}

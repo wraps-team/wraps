@@ -101,6 +101,7 @@ import {
   stripSelfReferencingPlaceholder,
 } from "./batch-form-utils";
 import { EmailPreviewCarousel } from "./email-preview-carousel";
+import { TestSendCard } from "./test-send-card";
 import { VariableMapper } from "./variable-mapper";
 
 type Template = {
@@ -149,6 +150,9 @@ type BatchFormProps = {
   templates: Template[];
   topics: Topic[];
   topicsEnabled: boolean;
+  /** Prefills the test-send recipient — the signed-in user can always
+   *  receive it, including in the SES sandbox once they verify themselves. */
+  currentUserEmail: string;
   // Draft-edit retrofit — all optional so the create-new flow is unchanged.
   mode?: BatchFormMode;
   draftId?: string;
@@ -230,6 +234,7 @@ export function BatchForm({
   templates,
   topics,
   topicsEnabled,
+  currentUserEmail,
   mode = "create",
   draftId,
   initialValues,
@@ -874,6 +879,7 @@ export function BatchForm({
           {currentStep === "review" && (
             <ReviewStep
               countError={countError}
+              currentUserEmail={currentUserEmail}
               data={campaignData}
               isPending={isPending}
               loadingCount={loadingCount}
@@ -1605,6 +1611,7 @@ function ReviewStep({
   data,
   isPending,
   countError,
+  currentUserEmail,
   loadingCount,
   onChange,
   onSend,
@@ -1616,6 +1623,7 @@ function ReviewStep({
   topics,
 }: {
   countError: string | null;
+  currentUserEmail: string;
   data: CampaignData;
   isPending: boolean;
   loadingCount: boolean;
@@ -1833,6 +1841,22 @@ function ReviewStep({
     return combined;
   })();
 
+  const testSendBlockedReason = (() => {
+    if (!(data.fromPrefix && data.fromDomain)) {
+      return "Set a from address in step 1 before sending a test.";
+    }
+    if (!data.subject) {
+      return "Add a subject line in step 2 before sending a test.";
+    }
+    if (data.contentType === "template" && !data.templateId) {
+      return "Pick a template in step 2 before sending a test.";
+    }
+    if (data.contentType === "html" && !data.htmlContent.trim()) {
+      return "Add HTML content in step 2 before sending a test.";
+    }
+    return;
+  })();
+
   const getContentLabel = () => {
     if (data.contentType === "template") {
       const template = templates.find((t) => t.id === data.templateId);
@@ -1914,6 +1938,34 @@ function ReviewStep({
           </div>
         </CardContent>
       </Card>
+
+      {/* Test send — the flow had none, so the only way to try a broadcast was
+          to send a real one. See finding H5. */}
+      <TestSendCard
+        defaultTo={currentUserEmail}
+        disabledReason={testSendBlockedReason}
+        organizationId={organizationId}
+        payload={{
+          awsAccountId: data.awsAccountId,
+          from: `${data.fromPrefix}@${data.fromDomain}`,
+          fromName: data.fromName || undefined,
+          replyTo: data.replyTo || undefined,
+          subject: data.subject,
+          templateId:
+            data.contentType === "template"
+              ? data.templateId || undefined
+              : undefined,
+          htmlContent:
+            data.contentType === "html"
+              ? data.htmlContent || undefined
+              : undefined,
+          variableMappings:
+            data.variableMappings.length > 0
+              ? data.variableMappings
+              : undefined,
+          recipientFilter: reviewRecipientFilter,
+        }}
+      />
 
       {/* Scheduling Card */}
       <SchedulingCard

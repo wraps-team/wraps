@@ -49,6 +49,10 @@ export async function findAwsAccountForOrg(
   roleArn: string;
   externalId: string;
   region: string;
+  /** Scanned SES capabilities. Needed to resolve the per-domain configuration
+   *  set, which a broadcast test send must match or it is tracked differently
+   *  from the broadcast it is testing. */
+  features: (typeof awsAccount.$inferSelect)["features"];
 } | null> {
   const [result] = await dbClient
     .select({
@@ -57,6 +61,7 @@ export async function findAwsAccountForOrg(
       roleArn: awsAccount.roleArn,
       externalId: awsAccount.externalId,
       region: awsAccount.region,
+      features: awsAccount.features,
     })
     .from(awsAccount)
     .where(

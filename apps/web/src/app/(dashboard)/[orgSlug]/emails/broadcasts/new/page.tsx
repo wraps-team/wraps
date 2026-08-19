@@ -110,6 +110,7 @@ export default async function NewBatchPage({ params }: NewBatchPageProps) {
     <div className="px-4 lg:px-6">
       <BatchForm
         awsAccounts={awsAccounts}
+        currentUserEmail={session.user.email}
         initialVerifiedDomains={initialVerifiedDomains}
         organizationId={orgWithMembership.id}
         orgDefaults={orgDefaults ?? null}
