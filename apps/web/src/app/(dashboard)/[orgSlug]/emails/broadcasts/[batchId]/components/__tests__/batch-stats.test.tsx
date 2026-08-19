@@ -155,3 +155,143 @@ describe("BatchStats", () => {
     expect(screen.getByText("Delivered")).toBeTruthy();
   });
 });
+
+describe("BatchStats — missing delivery events (M6)", () => {
+  const sentButNoFates = {
+    id: "batch-no-events",
+    status: "completed",
+    channel: "email" as const,
+    totalRecipients: 500,
+    processedRecipients: 500,
+    sent: 500,
+    delivered: 0,
+    opened: 0,
+    clicked: 0,
+    bounced: 0,
+    complained: 0,
+    failed: 0,
+    hardBounced: 0,
+    softBounced: 0,
+    startedAt: new Date("2026-02-22T08:36:50Z"),
+    completedAt: new Date("2026-02-22T09:06:50Z"),
+  };
+
+  it("says rates are unknown when no delivery event ever arrived", () => {
+    render(<BatchStats batch={sentButNoFates} organizationId="org-1" />);
+
+    expect(
+      screen.getByText(/No delivery events have arrived/i)
+    ).toBeTruthy();
+    expect(screen.getByText(/unknown, not zero/i)).toBeTruthy();
+  });
+
+  it("stays quiet once any fate has been recorded", () => {
+    render(
+      <BatchStats
+        batch={{ ...sentButNoFates, delivered: 500 }}
+        organizationId="org-1"
+      />
+    );
+
+    expect(
+      screen.queryByText(/No delivery events have arrived/i)
+    ).toBeNull();
+  });
+
+  it("stays quiet on a broadcast that never sent — C1 already covers that", () => {
+    render(
+      <BatchStats
+        batch={{ ...sentButNoFates, sent: 0, processedRecipients: 0 }}
+        organizationId="org-1"
+      />
+    );
+
+    expect(
+      screen.queryByText(/No delivery events have arrived/i)
+    ).toBeNull();
+  });
+});
+
+describe("BatchStats — unsubscribe denominator (M5)", () => {
+  const engagedBatch = {
+    id: "batch-unsub",
+    status: "completed",
+    channel: "email" as const,
+    totalRecipients: 1000,
+    processedRecipients: 1000,
+    sent: 1000,
+    delivered: 800,
+    opened: 400,
+    clicked: 100,
+    bounced: 200,
+    complained: 0,
+    failed: 0,
+    hardBounced: 200,
+    softBounced: 0,
+    startedAt: new Date("2026-02-22T08:36:50Z"),
+    completedAt: new Date("2026-02-22T09:06:50Z"),
+  };
+
+  it("rates unsubscribes against delivered and names the population", () => {
+    // 40 of 800 delivered = 5.0%. Against `sent` (1000) it would read 4.0%,
+    // which is not comparable to the open and click rates beside it.
+    render(
+      <BatchStats
+        batch={engagedBatch}
+        organizationId="org-1"
+        unsubscribeCount={40}
+      />
+    );
+
+    expect(
+      screen.getByText(/5\.0% of 800 delivered/i)
+    ).toBeTruthy();
+  });
+});
+
+describe("BatchStats — clicked-URL truncation (L2)", () => {
+  const clickedBatch = {
+    id: "batch-clicks",
+    status: "completed",
+    channel: "email" as const,
+    totalRecipients: 100,
+    processedRecipients: 100,
+    sent: 100,
+    delivered: 100,
+    opened: 50,
+    clicked: 20,
+    bounced: 0,
+    complained: 0,
+    failed: 0,
+    hardBounced: 0,
+    softBounced: 0,
+    startedAt: new Date("2026-02-22T08:36:50Z"),
+    completedAt: new Date("2026-02-22T09:06:50Z"),
+  };
+
+  it("says how many links it left out rather than truncating silently", () => {
+    render(
+      <BatchStats
+        batch={clickedBatch}
+        clicksByUrl={[{ url: "https://example.com/a", count: 20 }]}
+        omittedUrlCount={137}
+        organizationId="org-1"
+      />
+    );
+
+    expect(screen.getByText(/137 more distinct links/i)).toBeTruthy();
+  });
+
+  it("says nothing when the full list fits", () => {
+    render(
+      <BatchStats
+        batch={clickedBatch}
+        clicksByUrl={[{ url: "https://example.com/a", count: 20 }]}
+        omittedUrlCount={0}
+        organizationId="org-1"
+      />
+    );
+
+    expect(screen.queryByText(/more distinct links/i)).toBeNull();
+  });
+});

@@ -5,7 +5,7 @@ import { Progress } from "@wraps/ui/components/ui/progress";
 import { formatDistanceToNow } from "date-fns";
 import { CheckCircle, Clock, Loader2, RefreshCw, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
   BATCH_STATUS_COLORS,
@@ -64,7 +64,10 @@ export function CompactProgress({
 }: CompactProgressProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [autoRefresh, setAutoRefresh] = useState(isActive(status));
+  // Derived from the current status rather than latched at mount. It used to
+  // initialise once and only ever turn off, so a `scheduled` broadcast that
+  // started sending while the page was open never began polling.
+  const autoRefresh = isActive(status);
   const paused = getPausedPresentation(status, pausedReason ?? null);
   const zeroSend = getZeroSendPresentation(status, sent);
 
@@ -86,12 +89,6 @@ export function CompactProgress({
     const interval = setInterval(refresh, 5000);
     return () => clearInterval(interval);
   }, [autoRefresh, refresh]);
-
-  useEffect(() => {
-    if (isTerminal(status)) {
-      setAutoRefresh(false);
-    }
-  }, [status]);
 
   const statusIcon = {
     processing: <Loader2 className="mr-1 h-3 w-3 animate-spin" />,
@@ -161,9 +158,16 @@ export function CompactProgress({
         </p>
       )}
 
-      {/* Row 2: Progress bar (only shown when active) */}
+      {/* Row 2: Progress bar (only shown when active). aria-live so a screen
+          reader hears the send advance — this region rewrites itself every 5s
+          while autoRefresh is on, and used to do so silently. `polite` and a
+          whole-region atomic read keep it from interrupting. */}
       {!isTerminal(status) && status !== "draft" && (
-        <div className="space-y-1">
+        <output
+          aria-atomic="true"
+          aria-live="polite"
+          className="block space-y-1"
+        >
           <div className="flex justify-between text-muted-foreground text-xs">
             <span>
               {processedRecipients.toLocaleString("en-US")} /{" "}
@@ -172,7 +176,7 @@ export function CompactProgress({
             <span>{progress}%</span>
           </div>
           <Progress className="h-1.5" value={progress} />
-        </div>
+        </output>
       )}
     </div>
   );

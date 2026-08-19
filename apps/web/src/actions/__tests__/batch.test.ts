@@ -31,6 +31,7 @@ import {
   listBatchSends,
   listBroadcastRecipientOutcomes,
   promoteDraftToSend,
+  resumeBatchSend,
   saveDraftBatchSend,
   updateDraftBatchSend,
 } from "../batch";
@@ -1420,5 +1421,122 @@ describe("listBatchSends reconciled counts (H1)", () => {
     await db
       .delete(messageSend)
       .where(eq(messageSend.organizationId, testSecondaryOrganization.id));
+  });
+});
+
+describe("resumeBatchSend (H4)", () => {
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await db
+      .delete(batchSend)
+      .where(eq(batchSend.organizationId, testOrganization.id));
+  });
+
+  async function seedBatch(status: "processing" | "failed" | "completed") {
+    const [batch] = await db
+      .insert(batchSend)
+      .values({
+        organizationId: testOrganization.id,
+        awsAccountId: testAwsAccount.id,
+        channel: "email",
+        status,
+        name: "Resume Test",
+        createdBy: testUser.id,
+      })
+      .returning();
+    if (!batch) {
+      throw new Error("failed to seed batch for resume test");
+    }
+    return batch;
+  }
+
+  function stubResumeEndpoint(response: Response) {
+    const realFetch = globalThis.fetch.bind(globalThis);
+    return vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (...args: Parameters<typeof fetch>) => {
+        const [url] = args;
+        const asString = typeof url === "string" ? url : url.toString();
+        if (asString.includes("/v1/batch/") && asString.endsWith("/resume")) {
+          return response.clone();
+        }
+        return realFetch(...args);
+      });
+  }
+
+  it("calls the resume endpoint and reports the chunk it restarts from", async () => {
+    const origApiUrl = process.env.NEXT_PUBLIC_API_URL;
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+    try {
+      const batch = await seedBatch("failed");
+      const spy = stubResumeEndpoint(
+        new Response(JSON.stringify({ resumed: true, fromChunkIndex: 7 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      const result = await resumeBatchSend(batch.id, testOrganization.id);
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.fromChunkIndex).toBe(7);
+      expect(
+        spy.mock.calls.some(([url]) =>
+          String(url).endsWith(`/v1/batch/${batch.id}/resume`)
+        )
+      ).toBe(true);
+    } finally {
+      process.env.NEXT_PUBLIC_API_URL = origApiUrl;
+    }
+  });
+
+  it("refuses a status the API would reject, without a round trip", async () => {
+    const batch = await seedBatch("completed");
+    const spy = stubResumeEndpoint(new Response("{}", { status: 200 }));
+
+    const result = await resumeBatchSend(batch.id, testOrganization.id);
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toContain("completed");
+    expect(
+      spy.mock.calls.some(([url]) => String(url).includes("/resume"))
+    ).toBe(false);
+  });
+
+  it("surfaces the API's own error rather than a generic failure", async () => {
+    const origApiUrl = process.env.NEXT_PUBLIC_API_URL;
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+    try {
+      const batch = await seedBatch("processing");
+      stubResumeEndpoint(
+        new Response(
+          JSON.stringify({
+            error: "Broadcast resume is temporarily disabled",
+          }),
+          { status: 503, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const result = await resumeBatchSend(batch.id, testOrganization.id);
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe("Broadcast resume is temporarily disabled");
+    } finally {
+      process.env.NEXT_PUBLIC_API_URL = origApiUrl;
+    }
+  });
+
+  it("does not resume a batch belonging to another organization", async () => {
+    const batch = await seedBatch("failed");
+
+    const result = await resumeBatchSend(
+      batch.id,
+      testSecondaryOrganization.id
+    );
+
+    expect(result.success).toBe(false);
   });
 });

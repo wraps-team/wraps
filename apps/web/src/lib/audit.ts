@@ -50,6 +50,7 @@ export type AuditLogAction =
   | "broadcast.draft_deleted"
   | "broadcast.duplicated"
   | "broadcast.cancelled"
+  | "broadcast.resumed"
   | "sso.provider_saved"
   | "sso.provider_deleted"
   | "sso.domain_verification_requested"

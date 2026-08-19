@@ -174,6 +174,25 @@ export function isStaleDraft(
   );
 }
 
+/** "0% opened" reads the same whether nobody opened the email or SES events
+ *  never arrived at all. Four internal broadcasts show `sent > 0` with zero
+ *  delivered, failed, bounced and complained — from the UI those were
+ *  indistinguishable from total disengagement. When no fate has been recorded
+ *  for any message, engagement rates are unknown, not zero. */
+export function hasDeliveryEvents(
+  batch: Pick<
+    BatchSendWithMeta,
+    "sent" | "delivered" | "failed" | "bounced" | "complained"
+  >
+): boolean {
+  return (
+    batch.delivered > 0 ||
+    batch.failed > 0 ||
+    batch.bounced > 0 ||
+    batch.complained > 0
+  );
+}
+
 // Channel display
 export const CHANNEL_LABELS: Record<Channel, string> = {
   email: "Email",
@@ -342,7 +361,15 @@ export type GetBatchResult =
   | {
       success: false;
       error: string;
+      /** Only `NOT_FOUND` may render a 404. Every other failure — a dropped
+       *  connection, a query error — must render an error state instead, or an
+       *  operator watching a live send is told their broadcast does not exist. */
+      errorCode?: "NOT_FOUND";
     };
+
+export type ResumeBatchResult =
+  | { success: true; fromChunkIndex: number }
+  | { success: false; error: string };
 
 export type CancelBatchResult =
   | {

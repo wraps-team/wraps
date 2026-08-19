@@ -1,6 +1,8 @@
 "use client";
 
 import { Card, CardContent } from "@wraps/ui/components/ui/card";
+import { Info } from "lucide-react";
+import { hasDeliveryEvents } from "@/lib/batch";
 import { CompactProgress } from "./compact-progress";
 import { SankeyChart } from "./sankey-chart";
 
@@ -27,15 +29,21 @@ type BatchStatsProps = {
   };
   clicksByUrl?: Array<{ url: string; count: number }>;
   unsubscribeCount?: number;
+  /** Distinct clicked URLs beyond the display cap, so the chart can say what
+   *  it left out rather than silently truncating. */
+  omittedUrlCount?: number;
   organizationId: string;
 };
 
 export function BatchStats({
   batch,
   clicksByUrl,
+  omittedUrlCount,
   unsubscribeCount,
 }: BatchStatsProps) {
   const hasData = batch.sent > 0;
+  // No fate recorded for any message: rates here are unknown, not zero.
+  const eventsMissing = batch.sent > 0 && !hasDeliveryEvents(batch);
   const isDraft = batch.status === "draft";
   const isTerminal =
     batch.status === "completed" ||
@@ -90,19 +98,40 @@ export function BatchStats({
         )}
         {unsubscribeCount != null && unsubscribeCount > 0 && (
           <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ backgroundColor: "hsl(38 92% 50%)" }}
-            />
+            <span className="inline-block h-2 w-2 rounded-full bg-warning" />
             <span>
               {unsubscribeCount.toLocaleString("en-US")} unsubscribed
-              {batch.sent > 0 && (
+              {/* Denominator is `delivered`, matching opens and clicks — an
+                  unsubscribe requires a delivered email. This used to divide by
+                  `sent`, so the rate was not comparable to the others and no
+                  label said which population it was over. */}
+              {batch.delivered > 0 && (
                 <span className="ml-1 text-xs">
-                  ({((unsubscribeCount / batch.sent) * 100).toFixed(1)}%)
+                  ({((unsubscribeCount / batch.delivered) * 100).toFixed(1)}% of{" "}
+                  {batch.delivered.toLocaleString("en-US")} delivered)
                 </span>
               )}
             </span>
           </div>
+        )}
+        {eventsMissing && (
+          <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">
+                No delivery events have arrived for this broadcast.
+              </span>{" "}
+              Open and click rates are unknown, not zero. If this persists,
+              check that SES event publishing is connected for this AWS account.
+            </p>
+          </div>
+        )}
+        {omittedUrlCount != null && omittedUrlCount > 0 && (
+          <p className="text-muted-foreground text-xs">
+            Showing the top {clicksByUrl?.length ?? 0} clicked links.{" "}
+            {omittedUrlCount.toLocaleString("en-US")} more distinct links are
+            not shown.
+          </p>
         )}
         {hasData && (
           <SankeyChart

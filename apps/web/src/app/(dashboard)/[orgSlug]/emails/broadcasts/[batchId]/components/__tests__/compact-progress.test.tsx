@@ -215,3 +215,43 @@ describe("CompactProgress", () => {
     expect(screen.queryByText(/nothing sent/)).toBeNull();
   });
 });
+
+describe("CompactProgress — auto-refresh and announcements", () => {
+  const baseProps = {
+    completedAt: null,
+    processedRecipients: 100,
+    sent: 100,
+    startedAt: new Date("2026-02-22T08:36:50Z"),
+    totalRecipients: 1000,
+  };
+
+  it("starts polling when a scheduled broadcast transitions to processing (L1)", () => {
+    const { rerender } = render(
+      <CompactProgress {...baseProps} status="scheduled" />
+    );
+    expect(screen.queryByText(/Auto-refreshing/i)).toBeNull();
+
+    // Auto-refresh used to latch at mount and only ever turn off, so this
+    // transition left the page frozen for the whole send.
+    rerender(<CompactProgress {...baseProps} status="processing" />);
+    expect(screen.getByText(/Auto-refreshing/i)).toBeTruthy();
+  });
+
+  it("stops polling once the broadcast reaches a terminal status", () => {
+    const { rerender } = render(
+      <CompactProgress {...baseProps} status="processing" />
+    );
+    expect(screen.getByText(/Auto-refreshing/i)).toBeTruthy();
+
+    rerender(<CompactProgress {...baseProps} status="completed" />);
+    expect(screen.queryByText(/Auto-refreshing/i)).toBeNull();
+  });
+
+  it("announces progress to screen readers while sending (L3)", () => {
+    render(<CompactProgress {...baseProps} status="processing" />);
+
+    const live = screen.getByRole("status");
+    expect(live.getAttribute("aria-live")).toBe("polite");
+    expect(live.textContent).toContain("100 / 1,000 processed");
+  });
+});

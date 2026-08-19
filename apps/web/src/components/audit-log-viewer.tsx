@@ -91,6 +91,7 @@ const ACTION_LABELS: Record<AuditLogAction, string> = {
   "broadcast.draft_deleted": "Draft Deleted",
   "broadcast.duplicated": "Broadcast Duplicated",
   "broadcast.cancelled": "Broadcast Cancelled",
+  "broadcast.resumed": "Broadcast Resumed",
   "sso.provider_saved": "SSO Provider Saved",
   "sso.provider_deleted": "SSO Provider Deleted",
   "sso.domain_verification_requested": "Domain Verification Requested",

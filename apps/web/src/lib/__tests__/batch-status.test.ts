@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BATCH_STATUS_COLORS,
   BATCH_STATUSES,
+  type BatchStatus,
   getPausedPresentation,
   getStallPresentation,
   getZeroSendPresentation,
@@ -92,7 +93,13 @@ describe("getStallPresentation", () => {
   });
 
   it("returns null for terminal statuses", () => {
-    for (const status of ["completed", "failed", "cancelled", "draft"]) {
+    const terminal: BatchStatus[] = [
+      "completed",
+      "failed",
+      "cancelled",
+      "draft",
+    ];
+    for (const status of terminal) {
       expect(
         getStallPresentation({ ...base, status, createdAt: daysAgo(90) }, NOW)
       ).toBeNull();

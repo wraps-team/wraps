@@ -57,6 +57,7 @@ import type {
   ListBatchesResult,
   PromoteDraftBatchResult,
   RecipientFilter,
+  ResumeBatchResult,
   SampleContact,
   SaveDraftBatchResult,
   UpdateDraftBatchInput,
@@ -192,7 +193,11 @@ export const getBatchSend = orgAction(
   ): Promise<GetBatchResult> => {
     // Validate UUID format before any database operations
     if (!uuidSchema.safeParse(batchId).success) {
-      return { success: false, error: "Invalid batch ID" };
+      return {
+        success: false,
+        error: "Invalid batch ID",
+        errorCode: "NOT_FOUND",
+      };
     }
     if (!uuidSchema.safeParse(organizationId).success) {
       return { success: false, error: "Invalid organization ID" };
@@ -1093,7 +1098,11 @@ async function loadBatchWithMeta(
   ]);
 
   if (!b) {
-    return { success: false, error: "Batch send not found" };
+    return {
+      success: false,
+      error: "Batch send not found",
+      errorCode: "NOT_FOUND",
+    };
   }
 
   const hasPerMessageRows = outcomes.total > 0;
@@ -1600,6 +1609,119 @@ export const cancelBatchSend = orgAction(
     );
 
     return { success: true };
+  }
+);
+
+/**
+ * Resume a stalled or failed broadcast from its last completed chunk.
+ *
+ * The API has always had POST /v1/batch/:id/resume, but nothing in the
+ * dashboard called it — recovering a stuck send needed curl and a runbook, so
+ * a recoverable failure read as terminal. This is the dashboard's path to it.
+ * The API re-validates every gate; the checks here exist to give a useful
+ * message before a round trip, not to be the authority.
+ */
+export const resumeBatchSend = orgAction(
+  {
+    name: "resumeBatchSend",
+    resource: "broadcasts",
+    permission: ["send"],
+    orgId: (_batchId: string, organizationId: string) => organizationId,
+    onError: "Failed to resume broadcast",
+  },
+  async (
+    ctx,
+    batchId: string,
+    organizationId: string
+  ): Promise<ResumeBatchResult> => {
+    // Only batchId is shape-checked: orgAction has already resolved and
+    // verified membership for this exact organizationId, so re-validating its
+    // shape here would reject nothing that got this far.
+    if (!uuidSchema.safeParse(batchId).success) {
+      return { success: false, error: "Invalid batch ID" };
+    }
+
+    const batch = await findBroadcast(batchId, organizationId);
+
+    if (!batch) {
+      return { success: false, error: "Broadcast not found" };
+    }
+
+    if (!(batch.status === "processing" || batch.status === "failed")) {
+      return {
+        success: false,
+        error: `Only a sending or failed broadcast can be resumed. This one is ${batch.status}.`,
+      };
+    }
+
+    if (batch.channel !== "email") {
+      return {
+        success: false,
+        error: "Resume is only supported for email broadcasts.",
+      };
+    }
+
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) {
+      return { success: false, error: "Session not found" };
+    }
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) {
+      return { success: false, error: "API URL not configured" };
+    }
+
+    const response = await fetch(`${apiUrl}/v1/batch/${batch.id}/resume`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.session.token}`,
+        "X-Organization-Id": organizationId,
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      try {
+        const errorData = JSON.parse(errorText) as { error?: string };
+        return {
+          success: false,
+          error: errorData.error || "Failed to resume broadcast",
+        };
+      } catch {
+        return {
+          success: false,
+          error: errorText || "Failed to resume broadcast",
+        };
+      }
+    }
+
+    const result = (await response.json()) as { fromChunkIndex: number };
+
+    const auditCtx = await getAuditContext();
+    await db.insert(auditLog).values(
+      auditLogEntry(auditCtx, {
+        organizationId,
+        actorId: ctx.access.userId,
+        actorEmail: ctx.access.userEmail,
+        action: "broadcast.resumed",
+        resource: "broadcast",
+        resourceId: batchId,
+        metadata: {
+          broadcastId: batchId,
+          fromChunkIndex: result.fromChunkIndex,
+        },
+      })
+    );
+
+    revalidatePath(`/${ctx.access.orgSlug}/emails/broadcasts`, "page");
+    revalidatePath(
+      `/${ctx.access.orgSlug}/emails/broadcasts/${batchId}`,
+      "page"
+    );
+
+    return { success: true, fromChunkIndex: result.fromChunkIndex };
   }
 );
 

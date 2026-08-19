@@ -285,6 +285,67 @@ export async function listBroadcastRecipients(
   return { rows, total: totalResult?.count ?? 0 };
 }
 
+/** Cap on distinct clicked URLs returned for one broadcast. Unsubscribe and
+ *  preference links are per-recipient, so an unbounded GROUP BY returns one row
+ *  per recipient — a 100k-recipient broadcast returned 100k rows. Those two
+ *  link families are counted in aggregate instead and excluded from the list. */
+export const MAX_CLICKED_URLS = 50;
+
+/** Matches the per-recipient unsubscribe and preference links the sender
+ *  injects. Mirrors isUnsubscribeUrl in apps/web's sankey-utils — both test the
+ *  URL path, not the host, so a self-hosted domain matches too. */
+const PREFERENCE_LINK_PATTERN = "^https?://[^/]+/(unsubscribe|preferences)/";
+
+export type BroadcastClickBreakdown = {
+  /** Top content links by click count, unsubscribe/preference links excluded. */
+  clicksByUrl: Array<{ url: string; count: number }>;
+  /** Total clicks on unsubscribe and preference links, counted in aggregate. */
+  unsubscribeCount: number;
+  /** Distinct content URLs that exist, so callers can say what they omitted. */
+  totalDistinctUrls: number;
+};
+
+export async function getBroadcastClickBreakdown(
+  batchId: string,
+  organizationId: string,
+  dbClient: DbClient = db
+): Promise<BroadcastClickBreakdown> {
+  const scope = and(
+    eq(messageSend.batchSendId, batchId),
+    eq(messageSend.organizationId, organizationId),
+    isNotNull(messageSend.clickedUrl)
+  );
+
+  const isPreferenceLink = sql`${messageSend.clickedUrl} ~ ${PREFERENCE_LINK_PATTERN}`;
+
+  const [aggregate] = await dbClient
+    .select({
+      unsubscribeCount: sql<number>`count(*) filter (where ${isPreferenceLink})::int`,
+      totalDistinctUrls: sql<number>`count(distinct ${messageSend.clickedUrl}) filter (where not ${isPreferenceLink})::int`,
+    })
+    .from(messageSend)
+    .where(scope);
+
+  const rows = await dbClient
+    .select({
+      url: messageSend.clickedUrl,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(messageSend)
+    .where(and(scope, sql`not ${isPreferenceLink}`))
+    .groupBy(messageSend.clickedUrl)
+    .orderBy(sql`count(*) desc`)
+    .limit(MAX_CLICKED_URLS);
+
+  return {
+    clicksByUrl: rows.filter(
+      (r): r is { url: string; count: number } => r.url !== null
+    ),
+    unsubscribeCount: aggregate?.unsubscribeCount ?? 0,
+    totalDistinctUrls: aggregate?.totalDistinctUrls ?? 0,
+  };
+}
+
 export async function listBroadcasts(
   organizationId: string,
   options: {

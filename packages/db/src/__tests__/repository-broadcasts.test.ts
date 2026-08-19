@@ -4,6 +4,7 @@ import { db } from "../index";
 import {
   checkSegmentUsable,
   countBroadcastRecipients,
+  getBroadcastClickBreakdown,
   getSampleRecipientsWithProperties,
   listBroadcastRecipients,
   listBroadcasts,
@@ -788,5 +789,154 @@ describe("Repository: listBroadcasts", () => {
     expect(total).toBe(1);
     expect(batches.map((b) => b.id)).toEqual([escTargetId]);
     expect(batches.some((b) => b.id === escDistractorId)).toBe(false);
+  });
+});
+
+describe("Repository: getBroadcastClickBreakdown", () => {
+  const clickOrgId = `repo-click-org-${crypto.randomUUID().slice(0, 8)}`;
+  const crossOrgId = `repo-click-cross-${crypto.randomUUID().slice(0, 8)}`;
+  const clickAwsId = `repo-click-aws-${crypto.randomUUID().slice(0, 8)}`;
+  const crossAwsId = `repo-click-cross-aws-${crypto.randomUUID().slice(0, 8)}`;
+  const clickBatchId = `repo-click-batch-${crypto.randomUUID().slice(0, 8)}`;
+
+  beforeAll(async () => {
+    await db
+      .insert(organization)
+      .values([
+        {
+          id: clickOrgId,
+          name: "Click Breakdown Org",
+          slug: `click-repo-${clickOrgId.slice(-8)}`,
+          createdAt: new Date(),
+        },
+        {
+          id: crossOrgId,
+          name: "Click Breakdown Cross Org",
+          slug: `click-cross-${crossOrgId.slice(-8)}`,
+          createdAt: new Date(),
+        },
+      ])
+      .onConflictDoNothing();
+
+    await db
+      .insert(awsAccount)
+      .values([
+        {
+          id: clickAwsId,
+          organizationId: clickOrgId,
+          name: "Click Test AWS",
+          accountId: "333333333333",
+          region: "us-east-1",
+          roleArn: "arn:aws:iam::333333333333:role/click-test",
+          externalId: `click-ext-${clickOrgId.slice(-8)}`,
+        },
+        {
+          id: crossAwsId,
+          organizationId: crossOrgId,
+          name: "Click Cross AWS",
+          accountId: "444444444444",
+          region: "us-east-1",
+          roleArn: "arn:aws:iam::444444444444:role/click-cross",
+          externalId: `click-cross-ext-${crossOrgId.slice(-8)}`,
+        },
+      ])
+      .onConflictDoNothing();
+
+    await db
+      .insert(batchSend)
+      .values({
+        id: clickBatchId,
+        organizationId: clickOrgId,
+        channel: "email",
+        status: "completed",
+      })
+      .onConflictDoNothing();
+
+    const row = (recipient: string, clickedUrl: string | null) => ({
+      id: `repo-click-msg-${crypto.randomUUID().slice(0, 12)}`,
+      organizationId: clickOrgId,
+      awsAccountId: clickAwsId,
+      channel: "email" as const,
+      sourceType: "batch" as const,
+      batchSendId: clickBatchId,
+      recipient,
+      status: "clicked" as const,
+      clickedUrl,
+    });
+
+    await db.insert(messageSend).values([
+      // Three clicks on one content link, one on another.
+      row("c1@example.com", "https://acme.example.com/pricing"),
+      row("c2@example.com", "https://acme.example.com/pricing"),
+      row("c3@example.com", "https://acme.example.com/pricing"),
+      row("c4@example.com", "https://acme.example.com/blog"),
+      // Per-recipient preference links — one distinct URL each. These are what
+      // made the old unbounded GROUP BY return one row per recipient.
+      row("c5@example.com", "https://app.wraps.dev/unsubscribe/tok-aaa"),
+      row("c6@example.com", "https://app.wraps.dev/unsubscribe/tok-bbb"),
+      row("c7@example.com", "https://app.wraps.dev/preferences/tok-ccc"),
+      // No click at all.
+      row("c8@example.com", null),
+    ]);
+
+    await db.insert(messageSend).values({
+      id: `repo-click-msg-cross-${crypto.randomUUID().slice(0, 12)}`,
+      organizationId: crossOrgId,
+      awsAccountId: crossAwsId,
+      channel: "email",
+      sourceType: "batch",
+      batchSendId: clickBatchId,
+      recipient: "other-org@example.com",
+      status: "clicked",
+      clickedUrl: "https://acme.example.com/pricing",
+    });
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(messageSend)
+      .where(eq(messageSend.organizationId, clickOrgId));
+    await db
+      .delete(messageSend)
+      .where(eq(messageSend.organizationId, crossOrgId));
+    await db.delete(batchSend).where(eq(batchSend.organizationId, clickOrgId));
+    await db
+      .delete(awsAccount)
+      .where(eq(awsAccount.organizationId, clickOrgId));
+    await db
+      .delete(awsAccount)
+      .where(eq(awsAccount.organizationId, crossOrgId));
+    await db.delete(organization).where(eq(organization.id, clickOrgId));
+    await db.delete(organization).where(eq(organization.id, crossOrgId));
+  });
+
+  it("counts unsubscribe and preference clicks in aggregate", async () => {
+    const result = await getBroadcastClickBreakdown(clickBatchId, clickOrgId);
+    expect(result.unsubscribeCount).toBe(3);
+  });
+
+  it("excludes per-recipient preference links from the URL list", async () => {
+    const result = await getBroadcastClickBreakdown(clickBatchId, clickOrgId);
+    expect(result.clicksByUrl.map((r) => r.url).sort()).toEqual([
+      "https://acme.example.com/blog",
+      "https://acme.example.com/pricing",
+    ]);
+    expect(result.totalDistinctUrls).toBe(2);
+  });
+
+  it("ranks content links by click count", async () => {
+    const result = await getBroadcastClickBreakdown(clickBatchId, clickOrgId);
+    expect(result.clicksByUrl[0]).toEqual({
+      url: "https://acme.example.com/pricing",
+      count: 3,
+    });
+  });
+
+  it("never counts another organization's clicks on the same batch id", async () => {
+    const result = await getBroadcastClickBreakdown(clickBatchId, crossOrgId);
+    expect(result.clicksByUrl).toEqual([
+      { url: "https://acme.example.com/pricing", count: 1 },
+    ]);
+    expect(result.unsubscribeCount).toBe(0);
   });
 });

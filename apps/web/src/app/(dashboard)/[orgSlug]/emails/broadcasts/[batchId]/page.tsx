@@ -1,5 +1,12 @@
 import { auth } from "@wraps/auth";
-import { and, db, eq, messageSend } from "@wraps/db";
+import {
+  and,
+  db,
+  eq,
+  getBroadcastClickBreakdown,
+  MAX_CLICKED_URLS,
+  messageSend,
+} from "@wraps/db";
 import {
   Card,
   CardContent,
@@ -7,17 +14,31 @@ import {
   CardTitle,
 } from "@wraps/ui/components/ui/card";
 import { Separator } from "@wraps/ui/components/ui/separator";
-import { isNotNull, sql } from "drizzle-orm";
-import { ArrowLeft, Mail, MessageSquare, XCircle } from "lucide-react";
+import { sql } from "drizzle-orm";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Mail,
+  MessageSquare,
+  XCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getBatchSend } from "@/actions/batch";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { BatchStats } from "./components/batch-stats";
 import { CancelBatchButton } from "./components/cancel-button";
 import { RecipientsPanel } from "./components/recipients-panel";
-import { isUnsubscribeUrl } from "./components/sankey-utils";
+import { ResumeBatchButton } from "./components/resume-button";
 
 type BatchDetailPageProps = {
   params: Promise<{
@@ -52,7 +73,35 @@ export default async function BatchDetailPage({
   const result = await getBatchSend(batchId, orgWithMembership.id);
 
   if (!result.success) {
-    notFound();
+    // Only a genuine miss is a 404. Anything else — a dropped connection, a
+    // query error — used to render "not found" at an operator watching a live
+    // send, which is the one reading they must never be given.
+    if ("errorCode" in result && result.errorCode === "NOT_FOUND") {
+      notFound();
+    }
+    return (
+      <div className="flex flex-1 items-center justify-center p-4 lg:p-6">
+        <Empty className="max-w-2xl border border-destructive/30">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <AlertTriangle className="size-6 text-destructive" />
+            </EmptyMedia>
+            <EmptyTitle>We couldn't load this broadcast.</EmptyTitle>
+            <EmptyDescription>
+              {result.error} This does not mean the broadcast is gone — if it
+              was sending, it is still sending.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button asChild variant="outline">
+              <Link href={`/${orgSlug}/emails/broadcasts/${batchId}`}>
+                Try again
+              </Link>
+            </Button>
+          </EmptyContent>
+        </Empty>
+      </div>
+    );
   }
 
   const batch = result.batch;
@@ -80,36 +129,28 @@ export default async function BatchDetailPage({
   const hardBounced = bounceBreakdown[0]?.hardBounced ?? 0;
   const softBounced = bounceBreakdown[0]?.softBounced ?? 0;
 
-  // Fetch click URL breakdown
-  const clicksByUrl = await db
-    .select({
-      url: messageSend.clickedUrl,
-      count: sql<number>`count(*)::int`,
-    })
-    .from(messageSend)
-    .where(
-      and(
-        eq(messageSend.batchSendId, batch.id),
-        eq(messageSend.organizationId, orgWithMembership.id),
-        isNotNull(messageSend.clickedUrl)
-      )
-    )
-    .groupBy(messageSend.clickedUrl)
-    .orderBy(sql`count(*) desc`);
+  // Click URL breakdown. Bounded — unsubscribe and preference links are
+  // per-recipient, so grouping every distinct URL returned one row per
+  // recipient. They are counted in aggregate and excluded from the list.
+  const { clicksByUrl, unsubscribeCount, totalDistinctUrls } =
+    await getBroadcastClickBreakdown(batch.id, orgWithMembership.id);
 
-  const filteredClicksByUrl = clicksByUrl.filter(
-    (r): r is { url: string; count: number } => r.url !== null
-  );
-
-  const unsubscribeCount = filteredClicksByUrl
-    .filter((r) => isUnsubscribeUrl(r.url))
-    .reduce((sum, r) => sum + r.count, 0);
+  const isManager = ["owner", "admin"].includes(orgWithMembership.userRole);
 
   const canCancel =
     (batch.status === "scheduled" ||
       batch.status === "queued" ||
       batch.status === "processing") &&
-    ["owner", "admin"].includes(orgWithMembership.userRole);
+    isManager;
+
+  // Mirrors the API's own gate (POST /v1/batch/:id/resume): email only, and
+  // only from 'processing' or 'failed'. Without this the endpoint existed but
+  // was reachable only by curl, so a recoverable send looked terminal.
+  const canResume =
+    (batch.status === "processing" || batch.status === "failed") &&
+    batch.channel === "email" &&
+    Boolean(batch.awsAccount) &&
+    isManager;
 
   return (
     <div className="space-y-6 px-4 lg:px-6">
@@ -143,12 +184,21 @@ export default async function BatchDetailPage({
             </p>
           </div>
         </div>
-        {canCancel && (
-          <CancelBatchButton
-            batchId={batch.id}
-            organizationId={orgWithMembership.id}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {canResume && (
+            <ResumeBatchButton
+              batchId={batch.id}
+              organizationId={orgWithMembership.id}
+              status={batch.status}
+            />
+          )}
+          {canCancel && (
+            <CancelBatchButton
+              batchId={batch.id}
+              organizationId={orgWithMembership.id}
+            />
+          )}
+        </div>
       </div>
 
       {/* Stats with auto-refresh + engagement funnel */}
@@ -173,7 +223,8 @@ export default async function BatchDetailPage({
           startedAt: batch.startedAt,
           completedAt: batch.completedAt,
         }}
-        clicksByUrl={filteredClicksByUrl}
+        clicksByUrl={clicksByUrl}
+        omittedUrlCount={Math.max(0, totalDistinctUrls - MAX_CLICKED_URLS)}
         organizationId={orgWithMembership.id}
         unsubscribeCount={unsubscribeCount}
       />
