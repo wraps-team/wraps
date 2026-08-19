@@ -179,9 +179,7 @@ describe("BatchStats — missing delivery events (M6)", () => {
   it("says rates are unknown when no delivery event ever arrived", () => {
     render(<BatchStats batch={sentButNoFates} organizationId="org-1" />);
 
-    expect(
-      screen.getByText(/No delivery events have arrived/i)
-    ).toBeTruthy();
+    expect(screen.getByText(/No delivery events have arrived/i)).toBeTruthy();
     expect(screen.getByText(/unknown, not zero/i)).toBeTruthy();
   });
 
@@ -193,9 +191,7 @@ describe("BatchStats — missing delivery events (M6)", () => {
       />
     );
 
-    expect(
-      screen.queryByText(/No delivery events have arrived/i)
-    ).toBeNull();
+    expect(screen.queryByText(/No delivery events have arrived/i)).toBeNull();
   });
 
   it("stays quiet on a broadcast that never sent — C1 already covers that", () => {
@@ -206,9 +202,7 @@ describe("BatchStats — missing delivery events (M6)", () => {
       />
     );
 
-    expect(
-      screen.queryByText(/No delivery events have arrived/i)
-    ).toBeNull();
+    expect(screen.queryByText(/No delivery events have arrived/i)).toBeNull();
   });
 });
 
@@ -243,9 +237,7 @@ describe("BatchStats — unsubscribe denominator (M5)", () => {
       />
     );
 
-    expect(
-      screen.getByText(/5\.0% of 800 delivered/i)
-    ).toBeTruthy();
+    expect(screen.getByText(/5\.0% of 800 delivered/i)).toBeTruthy();
   });
 });
 

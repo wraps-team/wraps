@@ -1620,7 +1620,6 @@ const CLICKABLE_ROW_ALLOWLIST = new Set([
   "apps/web/src/app/(dashboard)/[orgSlug]/(ee)/automations/[workflowId]/executions/components/executions-table.tsx",
   "apps/web/src/app/(dashboard)/[orgSlug]/(ee)/automations/components/workflows-table.tsx",
   "apps/web/src/app/(dashboard)/[orgSlug]/contacts/components/contacts-table.tsx",
-  "apps/web/src/app/(dashboard)/[orgSlug]/emails/broadcasts/components/batch-table.tsx",
   // Opens a details sheet rather than navigating, so no link can stand in for
   // it. The fix is a real button inside the row; until then it is pinned here.
   "apps/web/src/app/(dashboard)/[orgSlug]/events/components/events-table.tsx",
