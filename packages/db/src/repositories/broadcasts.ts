@@ -426,6 +426,25 @@ export async function promoteBroadcast(
   return result ?? null;
 }
 
+/**
+ * Record that a broadcast is marked `scheduled` but has no EventBridge schedule
+ * behind it, so nothing will ever fire. Written to `errorMessage` so the detail
+ * page says the same thing the creation toast said, days later.
+ */
+export async function markBroadcastNotScheduled(
+  id: string,
+  organizationId: string,
+  message: string,
+  dbClient: DbClient = db
+): Promise<void> {
+  await dbClient
+    .update(batchSend)
+    .set({ errorMessage: message, updatedAt: new Date() })
+    .where(
+      and(eq(batchSend.id, id), eq(batchSend.organizationId, organizationId))
+    );
+}
+
 export async function cancelBroadcast(
   id: string,
   organizationId: string,

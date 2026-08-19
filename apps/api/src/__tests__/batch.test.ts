@@ -20,12 +20,17 @@ const {
   mockCreateBroadcast,
   mockEnqueueJob,
   mockCreateBroadcastSchedule,
+  mockMarkBroadcastNotScheduled,
 } = vi.hoisted(() => ({
   mockFindAwsAccountForOrg: vi.fn(),
   mockCountBroadcastRecipients: vi.fn(),
   mockCreateBroadcast: vi.fn(),
   mockEnqueueJob: vi.fn(async (_args: unknown) => {}),
-  mockCreateBroadcastSchedule: vi.fn(async (_args: unknown) => {}),
+  mockCreateBroadcastSchedule: vi.fn(async (args: { batchId: string }) => ({
+    scheduleName: `wraps-batch-${args.batchId}`,
+    created: true,
+  })),
+  mockMarkBroadcastNotScheduled: vi.fn(async () => {}),
 }));
 
 vi.mock("@wraps/db", () => ({
@@ -35,6 +40,7 @@ vi.mock("@wraps/db", () => ({
   findBroadcast: vi.fn(),
   promoteBroadcast: vi.fn(),
   cancelBroadcast: vi.fn(),
+  markBroadcastNotScheduled: mockMarkBroadcastNotScheduled,
 }));
 
 vi.mock("../middleware/auth", () => ({
@@ -114,6 +120,13 @@ describe("POST /v1/batch", () => {
     mockCreateBroadcast.mockReset();
     mockEnqueueJob.mockReset();
     mockCreateBroadcastSchedule.mockReset();
+    mockCreateBroadcastSchedule.mockImplementation(
+      async (args: { batchId: string }) => ({
+        scheduleName: `wraps-batch-${args.batchId}`,
+        created: true,
+      })
+    );
+    mockMarkBroadcastNotScheduled.mockReset();
   });
 
   it("returns full response shape: id, status, channel, totalRecipients, createdAt", async () => {

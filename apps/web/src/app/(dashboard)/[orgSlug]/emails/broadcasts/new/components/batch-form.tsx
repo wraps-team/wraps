@@ -70,6 +70,7 @@ import {
   type CheckTemplateVariableCoverageResult,
   type ContentType,
   checkBroadcastSendDuration,
+  checkHtmlVariableCoverage,
   checkTemplateVariableCoverage,
   createBatchSend,
   getRecipientCount,
@@ -204,6 +205,18 @@ function buildScheduledFor(data: CampaignData): Date | null {
 }
 
 type Step = "setup" | "content" | "audience" | "review";
+
+/** The viewer's IANA zone, e.g. "America/Denver". Every scheduled time in this
+ *  wizard is built in local time via Date#setHours, and the detail page renders
+ *  in the viewer's zone too — but nothing ever said which zone, so "9:00 AM"
+ *  was unverifiable and looked like it disagreed with the detail page. */
+function localTimeZoneLabel(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "local time";
+  } catch {
+    return "local time";
+  }
+}
 
 export function BatchForm({
   awsAccounts,
@@ -418,6 +431,86 @@ export function BatchForm({
     setCampaignData((prev) => ({ ...prev, ...updates }));
   };
 
+  // Wizard state lived only in memory: a reload, a crash, or a mistaken back
+  // navigation mid-compose lost hand-authored HTML and every variable mapping.
+  // A serialised snapshot in sessionStorage survives all three, and is offered
+  // back rather than applied silently — restoring over a deliberate fresh start
+  // would be its own surprise.
+  const draftStorageKey = `wraps:broadcast-wizard:${organizationId}:${draftId ?? "new"}`;
+  const [recoverable, setRecoverable] = useState<CampaignData | null>(null);
+  const [hasUnsavedWork, setHasUnsavedWork] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      const raw = window.sessionStorage.getItem(draftStorageKey);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw) as CampaignData & {
+        scheduledDate?: string;
+      };
+      setRecoverable({
+        ...parsed,
+        scheduledDate: parsed.scheduledDate
+          ? new Date(parsed.scheduledDate)
+          : undefined,
+      });
+    } catch {
+      // A snapshot we cannot parse is worth exactly nothing — drop it rather
+      // than blocking the wizard behind a broken recovery prompt.
+      window.sessionStorage.removeItem(draftStorageKey);
+    }
+  }, [draftStorageKey]);
+
+  // Only content the user actually authored is worth warning about losing.
+  const hasAuthoredContent = Boolean(
+    campaignData.name ||
+      campaignData.subject ||
+      campaignData.htmlContent.trim() ||
+      campaignData.templateId ||
+      campaignData.variableMappings.length > 0
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !hasAuthoredContent) {
+      return;
+    }
+    setHasUnsavedWork(true);
+    const timeoutId = setTimeout(() => {
+      try {
+        window.sessionStorage.setItem(
+          draftStorageKey,
+          JSON.stringify(campaignData)
+        );
+      } catch {
+        // Quota or private-mode failures are not worth interrupting the user.
+      }
+    }, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [campaignData, draftStorageKey, hasAuthoredContent]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !hasUnsavedWork) {
+      return;
+    }
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsavedWork]);
+
+  const clearRecoverySnapshot = useCallback(() => {
+    setHasUnsavedWork(false);
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(draftStorageKey);
+    }
+  }, [draftStorageKey]);
+
   const handleNext = () => {
     const nextIndex = currentStepIndex + 1;
     if (nextIndex < steps.length) {
@@ -448,6 +541,7 @@ export function BatchForm({
             payload
           );
           if (result.success) {
+            clearRecoverySnapshot();
             toast.success("Draft saved");
             if (mode !== "edit") {
               router.push(`/${orgSlug}/emails/broadcasts/${existingId}/edit`);
@@ -463,6 +557,7 @@ export function BatchForm({
         const result = await saveDraftBatchSend(organizationId, payload);
         if (result.success) {
           savedDraftId.current = result.batch.id;
+          clearRecoverySnapshot();
           toast.success("Draft saved");
           router.push(`/${orgSlug}/emails/broadcasts/${result.batch.id}/edit`);
         } else {
@@ -559,6 +654,7 @@ export function BatchForm({
             ? await promoteDraftToSend(draftId, organizationId, payload)
             : await createBatchSend(organizationId, payload);
         if (result.success) {
+          clearRecoverySnapshot();
           const isScheduled = result.batch.status === "scheduled";
 
           // Capture broadcast sent event in PostHog
@@ -581,7 +677,7 @@ export function BatchForm({
             isScheduled ? "Broadcast scheduled" : "Broadcast created",
             {
               description: isScheduled
-                ? `Will send to ${result.batch.totalRecipients} recipients at ${format(scheduledFor!, "PPp")}`
+                ? `Will send to ${result.batch.totalRecipients} recipients at ${format(scheduledFor!, "PPp")} (${localTimeZoneLabel()})`
                 : `Sending to ${result.batch.totalRecipients} recipients`,
             }
           );
@@ -647,6 +743,42 @@ export function BatchForm({
           </p>
         </div>
       </div>
+
+      {recoverable && (
+        <div className="mb-6 flex flex-col gap-3 rounded-lg border border-info/30 bg-info/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm">
+            <span className="font-medium">
+              We kept your unfinished broadcast.
+            </span>{" "}
+            You left this page mid-compose. Restoring brings back your content
+            and variable mappings.
+          </p>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              onClick={() => {
+                setCampaignData(recoverable);
+                setRecoverable(null);
+                toast.success("Restored your unfinished broadcast");
+              }}
+              size="sm"
+              type="button"
+            >
+              Restore
+            </Button>
+            <Button
+              onClick={() => {
+                setRecoverable(null);
+                clearRecoverySnapshot();
+              }}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              Discard
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Progress Steps */}
       <div className="border-b pb-6">
@@ -1499,11 +1631,21 @@ function ReviewStep({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [coverageResult, setCoverageResult] =
     useState<CheckTemplateVariableCoverageResult | null>(null);
+  // A preflight that threw used to be indistinguishable from one that passed:
+  // no `.catch`, so the promise rejected, state stayed null, and the review
+  // step rendered a clean bill of health. These track "the check did not run".
+  const [coverageCheckFailed, setCoverageCheckFailed] = useState(false);
+  const [durationCheckFailed, setDurationCheckFailed] = useState(false);
 
-  // Check variable coverage when template + audience are both set
+  // Check variable coverage once content + audience are both set. Custom HTML
+  // goes through the same check as a template — it used to have none.
   useEffect(() => {
-    if (data.contentType !== "template" || !data.templateId) {
+    const usesTemplate = data.contentType === "template" && data.templateId;
+    const usesHtml =
+      data.contentType === "html" && data.htmlContent.trim().length > 0;
+    if (!(usesTemplate || usesHtml)) {
       setCoverageResult(null);
+      setCoverageCheckFailed(false);
       return;
     }
     const filter: RecipientFilter = {
@@ -1511,16 +1653,48 @@ function ReviewStep({
       topicId: data.audienceType === "topic" ? data.topicId : undefined,
       segmentId: data.audienceType === "segment" ? data.segmentId : undefined,
     };
-    checkTemplateVariableCoverage(
-      organizationId,
-      data.templateId,
-      filter,
-      data.variableMappings.length > 0 ? data.variableMappings : undefined
-    ).then(setCoverageResult);
+    const mappings =
+      data.variableMappings.length > 0 ? data.variableMappings : undefined;
+
+    let cancelled = false;
+    const check = usesTemplate
+      ? checkTemplateVariableCoverage(
+          organizationId,
+          data.templateId,
+          filter,
+          mappings
+        )
+      : checkHtmlVariableCoverage(
+          organizationId,
+          data.htmlContent,
+          data.subject || undefined,
+          filter,
+          mappings
+        );
+
+    check
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+        setCoverageResult(result);
+        setCoverageCheckFailed(!result.success);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCoverageResult(null);
+          setCoverageCheckFailed(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [
     organizationId,
     data.contentType,
     data.templateId,
+    data.htmlContent,
+    data.subject,
     data.audienceType,
     data.topicId,
     data.segmentId,
@@ -1542,15 +1716,33 @@ function ReviewStep({
   useEffect(() => {
     if (!data.awsAccountId || recipientCount === null) {
       setDurationResult(null);
+      setDurationCheckFailed(false);
       return;
     }
+    let cancelled = false;
     checkBroadcastSendDuration(
       organizationId,
       data.awsAccountId,
       "email",
       recipientCount,
       Boolean(data.scheduleType === "later" && data.scheduledDate)
-    ).then(setDurationResult);
+    )
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+        setDurationResult(result);
+        setDurationCheckFailed(!result.success);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDurationResult(null);
+          setDurationCheckFailed(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [
     organizationId,
     data.awsAccountId,
@@ -1564,6 +1756,11 @@ function ReviewStep({
       ? durationResult.estimatedDays
       : null;
 
+  const dailyCapacity =
+    durationResult?.success && durationResult.available
+      ? durationResult.dailyCapacity
+      : 0;
+
   const inFlightBatches =
     durationResult?.success && durationResult.available
       ? durationResult.inFlightBatches
@@ -1573,6 +1770,22 @@ function ReviewStep({
     durationResult?.success && durationResult.available
       ? durationResult.inFlightRecipients
       : 0;
+
+  // The SES sandbox is the actual cause of an enormous day estimate (200/day),
+  // and it also means SES rejects every unverified recipient. Before this the
+  // wizard rendered "~100 days" and never named it.
+  const inSandbox =
+    durationResult?.success &&
+    durationResult.available &&
+    !durationResult.productionAccessEnabled;
+
+  // The server blocks this exact case, so offering Send and rejecting after the
+  // point-of-no-return dialog is the wrong order to find out.
+  const blockedByCoverage = Boolean(
+    coverageResult?.success &&
+      coverageResult.allFail &&
+      coverageResult.missingVariables.length > 0
+  );
 
   // Fetch templates with React Query - auto-updates when templates change
   const { data: templatesData } = useTemplates(orgSlug);
@@ -1606,6 +1819,19 @@ function ReviewStep({
     }
     return "—";
   };
+
+  // data.scheduledDate carries midnight; the time-of-day lives in
+  // data.scheduledTime. The dialog was given the bare date, so it announced
+  // "12:00 AM" for a send the user scheduled for 9am.
+  const scheduledDateTimeForConfirm = (() => {
+    if (data.scheduleType !== "later" || !data.scheduledDate) {
+      return;
+    }
+    const [hours, minutes] = data.scheduledTime.split(":").map(Number);
+    const combined = new Date(data.scheduledDate);
+    combined.setHours(hours, minutes, 0, 0);
+    return combined;
+  })();
 
   const getContentLabel = () => {
     if (data.contentType === "template") {
@@ -1715,6 +1941,69 @@ function ReviewStep({
         </div>
       )}
 
+      {/* SES sandbox — named, not left to an unexplained day count (H6) */}
+      {inSandbox && (
+        <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+          <div className="space-y-1">
+            <p className="font-medium text-warning text-sm">
+              This AWS account is still in the SES sandbox
+            </p>
+            <p className="text-warning/80 text-xs">
+              SES will reject every recipient that is not a verified address,
+              and the sandbox daily quota is {dailyCapacity.toLocaleString()} —
+              which is why the estimate below is what it is. Requesting
+              production access in the SES console is the one step that changes
+              it. You can still send now to verified addresses.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Blocked by variable coverage — say so here, not after confirming (M8) */}
+      {blockedByCoverage && (
+        <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+          <div className="space-y-1">
+            <p className="font-medium text-destructive text-sm">
+              Every contact is missing a required variable, so this send is
+              blocked.
+            </p>
+            <p className="text-destructive/80 text-xs">
+              Missing:{" "}
+              {coverageResult?.success
+                ? coverageResult.missingVariables.join(", ")
+                : ""}
+              . Set a value under Template Variables, add these attributes to
+              your contacts, or set a fallback in your{" "}
+              {data.contentType === "template" ? "template" : "HTML"}.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* A safety check that did not run must not read as one that passed (H8) */}
+      {(coverageCheckFailed || durationCheckFailed) && (
+        <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+          <div className="space-y-1">
+            <p className="font-medium text-warning text-sm">
+              Some pre-send checks couldn't run.
+            </p>
+            <p className="text-warning/80 text-xs">
+              {coverageCheckFailed && durationCheckFailed
+                ? "The variable-coverage check and the send-duration estimate both failed"
+                : coverageCheckFailed
+                  ? "The variable-coverage check failed"
+                  : "The send-duration estimate failed"}
+              , so this page can't tell you whether they would have warned you.
+              Reload to try again. Sending is still allowed — the server runs
+              its own checks — but you are sending without this warning.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Recipient count unavailable warning */}
       {countError && (
         <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
@@ -1739,6 +2028,7 @@ function ReviewStep({
             loadingCount ||
             recipientCount === null ||
             recipientCount === 0 ||
+            blockedByCoverage ||
             (data.scheduleType === "later" && !data.scheduledDate)
           }
           onClick={() => setShowConfirmDialog(true)}
@@ -1767,6 +2057,8 @@ function ReviewStep({
       </div>
 
       <SendConfirmDialog
+        audienceLabel={getAudienceLabel()}
+        countIsProvisional
         estimatedDays={estimatedDays}
         inFlightBatches={inFlightBatches}
         inFlightRecipients={inFlightRecipients}
@@ -1778,7 +2070,8 @@ function ReviewStep({
         onOpenChange={setShowConfirmDialog}
         open={showConfirmDialog}
         recipientCount={recipientCount}
-        scheduledDate={data.scheduledDate}
+        scheduledDate={scheduledDateTimeForConfirm}
+        timeZoneLabel={localTimeZoneLabel()}
         variant={data.scheduleType === "later" ? "schedule" : "send"}
       />
     </div>
@@ -2003,7 +2296,8 @@ function SchedulingCard({
               )}
               {data.scheduleType === "later" && scheduledDateTime && (
                 <p className="text-muted-foreground text-xs">
-                  Scheduled for {format(scheduledDateTime, "PPPP 'at' p")}
+                  Scheduled for {format(scheduledDateTime, "PPPP 'at' p")} (
+                  {localTimeZoneLabel()})
                 </p>
               )}
             </div>

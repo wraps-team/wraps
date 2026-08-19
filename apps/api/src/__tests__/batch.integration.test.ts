@@ -34,7 +34,9 @@ vi.mock("../services/queue", () => ({
 
 // Mock the scheduler service (we don't want to actually create EventBridge schedules in tests)
 vi.mock("../services/scheduler", () => ({
-  createBroadcastSchedule: vi.fn().mockResolvedValue("mock-schedule-name"),
+  createBroadcastSchedule: vi
+    .fn()
+    .mockResolvedValue({ scheduleName: "mock-schedule-name", created: true }),
   deleteBroadcastSchedule: vi.fn().mockResolvedValue(undefined),
 }));
 

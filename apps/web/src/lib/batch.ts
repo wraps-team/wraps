@@ -455,6 +455,11 @@ export type CheckSendDurationResult =
        */
       estimatedDays: number | null;
       dailyCapacity: number;
+      /** `false` = the SES sandbox. The sandbox's 200/day quota is what makes
+       *  `estimatedDays` enormous, and it also means SES will reject every
+       *  recipient that is not a verified address. Callers must name the
+       *  sandbox rather than presenting the day count as the whole story. */
+      productionAccessEnabled: boolean;
       /** Other queued/processing email broadcasts on this AWS account. */
       inFlightBatches: number;
       /** Their combined unsent remainder — the quota this send has to share. */

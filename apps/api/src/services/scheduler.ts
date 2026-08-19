@@ -28,15 +28,26 @@ export type ScheduleBroadcastParams = {
   channel: "email" | "sms";
 };
 
+export type ScheduleCreationResult = {
+  scheduleName: string;
+  /**
+   * `false` when scheduler config is absent and we are not in production: no
+   * EventBridge schedule exists, so nothing will ever fire. Callers MUST
+   * surface this — reporting "Scheduled" for a send that will never happen is
+   * what a self-hosted or dev deployment used to do silently.
+   */
+  created: boolean;
+};
+
 /**
  * Create a one-time EventBridge schedule for a broadcast
  *
- * In development/test mode, logs a warning if scheduler config is missing
- * but doesn't fail. In production, throws an error.
+ * In production, missing scheduler config throws. Outside production it is a
+ * no-op, and the result says so rather than pretending the schedule exists.
  */
 export async function createBroadcastSchedule(
   params: ScheduleBroadcastParams
-): Promise<string> {
+): Promise<ScheduleCreationResult> {
   const scheduleName = `wraps-batch-${params.batchId}`;
 
   if (!(TARGET_QUEUE_ARN && SCHEDULER_ROLE_ARN)) {
@@ -45,11 +56,10 @@ export async function createBroadcastSchedule(
         "EventBridge Scheduler not configured: BATCH_QUEUE_ARN and SCHEDULER_ROLE_ARN required"
       );
     }
-    // In development/test, log warning and return without creating schedule
     console.warn(
       `[scheduler] Skipping EventBridge schedule creation for ${scheduleName} - config not set`
     );
-    return scheduleName;
+    return { scheduleName, created: false };
   }
 
   // Format: at(yyyy-mm-ddThh:mm:ss) - no milliseconds, no Z
@@ -77,7 +87,7 @@ export async function createBroadcastSchedule(
     })
   );
 
-  return scheduleName;
+  return { scheduleName, created: true };
 }
 
 /**

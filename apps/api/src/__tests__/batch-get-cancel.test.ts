@@ -54,7 +54,10 @@ vi.mock("../services/queue", () => ({
 }));
 
 vi.mock("../services/scheduler", () => ({
-  createBroadcastSchedule: vi.fn(async () => {}),
+  createBroadcastSchedule: vi.fn(async () => ({
+    scheduleName: "mock-schedule-name",
+    created: true,
+  })),
   deleteBroadcastSchedule: mockDeleteBroadcastSchedule,
 }));
 

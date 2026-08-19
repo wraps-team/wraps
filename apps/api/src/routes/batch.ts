@@ -15,6 +15,7 @@ import {
   eq,
   findAwsAccountForOrg,
   findBroadcast,
+  markBroadcastNotScheduled,
   promoteBroadcast,
 } from "@wraps/db";
 import { t } from "elysia";
@@ -127,7 +128,71 @@ const batchResponseSchema = t.Object({
     description: "Creation timestamp",
     format: "date-time",
   }),
+  warning: t.Optional(
+    t.String({
+      description:
+        "Set when the broadcast was accepted but something about it needs saying — e.g. it was marked scheduled in an environment with no scheduler configured, so it will never fire.",
+    })
+  ),
 });
+
+/**
+ * A `scheduledFor` in the past used to fall through to `isScheduled = false`
+ * and send immediately. Clock skew between the browser and the server, or a
+ * retried request, silently converted "schedule for later" into "send now" —
+ * an irreversible action the caller did not ask for. Reject instead.
+ *
+ * The tolerance absorbs ordinary skew: anything inside it was plainly meant as
+ * "now" and sends now, which is what the caller expected either way.
+ */
+const SCHEDULE_PAST_TOLERANCE_MS = 60 * 1000;
+
+/**
+ * Outside production, EventBridge Scheduler is usually unconfigured and
+ * createBroadcastSchedule is a no-op. The batch still gets status 'scheduled',
+ * so without this the dashboard reported "Scheduled" for a send that would
+ * never fire — a self-hosted deployment's first scheduled broadcast just
+ * vanished.
+ */
+const SCHEDULER_UNCONFIGURED_WARNING =
+  "Scheduling is not configured in this environment, so this broadcast will not send automatically. Send it now, or configure EventBridge Scheduler (BATCH_QUEUE_ARN and SCHEDULER_ROLE_ARN).";
+
+async function markBroadcastScheduleUnconfigured(
+  batchId: string,
+  organizationId: string
+): Promise<void> {
+  await markBroadcastNotScheduled(
+    batchId,
+    organizationId,
+    SCHEDULER_UNCONFIGURED_WARNING
+  );
+}
+
+function resolveSchedule(
+  raw: string | undefined
+):
+  | { ok: true; scheduledFor: Date | undefined; isScheduled: boolean }
+  | { ok: false; error: string } {
+  if (!raw) {
+    return { ok: true, scheduledFor: undefined, isScheduled: false };
+  }
+  const scheduledFor = new Date(raw);
+  if (Number.isNaN(scheduledFor.getTime())) {
+    return { ok: false, error: "scheduledFor is not a valid date" };
+  }
+  const msFromNow = scheduledFor.getTime() - Date.now();
+  if (msFromNow < -SCHEDULE_PAST_TOLERANCE_MS) {
+    return {
+      ok: false,
+      error:
+        "The scheduled time is in the past. Pick a future time, or send now — a past schedule will not be converted into an immediate send.",
+    };
+  }
+  if (msFromNow <= 0) {
+    return { ok: true, scheduledFor: undefined, isScheduled: false };
+  }
+  return { ok: true, scheduledFor, isScheduled: true };
+}
 
 export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
   .use(rateLimitMiddleware)
@@ -169,11 +234,12 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
           }
         ));
 
-      // Determine if this is a scheduled send
-      const scheduledFor = body.scheduledFor
-        ? new Date(body.scheduledFor)
-        : undefined;
-      const isScheduled = scheduledFor && scheduledFor > new Date();
+      const schedule = resolveSchedule(body.scheduledFor);
+      if (!schedule.ok) {
+        set.status = 400;
+        throw new Error(schedule.error);
+      }
+      const { scheduledFor, isScheduled } = schedule;
 
       const batch = await createBroadcast({
         organizationId: authContext.organizationId,
@@ -199,14 +265,24 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
         createdBy: authContext.userId,
       });
 
+      let scheduleWarning: string | undefined;
       if (isScheduled && scheduledFor) {
-        await createBroadcastSchedule({
+        const schedulingResult = await createBroadcastSchedule({
           batchId: batch.id,
           organizationId: authContext.organizationId,
           awsAccountId: body.awsAccountId,
           scheduledFor,
           channel: (body.channel ?? "email") as "email" | "sms",
         });
+        if (!schedulingResult.created) {
+          scheduleWarning = SCHEDULER_UNCONFIGURED_WARNING;
+          // Persist it so the broadcast detail page says the same thing later,
+          // not just the toast at creation time.
+          await markBroadcastScheduleUnconfigured(
+            batch.id,
+            authContext.organizationId
+          );
+        }
       } else {
         await enqueueJob({
           batchId: batch.id,
@@ -223,6 +299,7 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
         channel: batch.channel,
         totalRecipients: recipientCount,
         createdAt: batch.createdAt.toISOString(),
+        ...(scheduleWarning ? { warning: scheduleWarning } : {}),
       };
     },
     {
@@ -325,11 +402,12 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
         throw new Error("AWS account does not belong to this organization");
       }
 
-      // Determine if this is a scheduled send
-      const scheduledFor = body.scheduledFor
-        ? new Date(body.scheduledFor)
-        : undefined;
-      const isScheduled = Boolean(scheduledFor && scheduledFor > new Date());
+      const schedule = resolveSchedule(body.scheduledFor);
+      if (!schedule.ok) {
+        set.status = 400;
+        throw new Error(schedule.error);
+      }
+      const { scheduledFor, isScheduled } = schedule;
 
       const channel = body.channel ?? existing.channel ?? "email";
 
@@ -367,14 +445,22 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
         throw new Error("Expected to promote exactly 1 draft row, updated 0");
       }
 
+      let scheduleWarning: string | undefined;
       if (isScheduled && scheduledFor) {
-        await createBroadcastSchedule({
+        const schedulingResult = await createBroadcastSchedule({
           batchId: batch.id,
           organizationId: authContext.organizationId,
           awsAccountId: body.awsAccountId,
           scheduledFor,
           channel: channel as "email" | "sms",
         });
+        if (!schedulingResult.created) {
+          scheduleWarning = SCHEDULER_UNCONFIGURED_WARNING;
+          await markBroadcastScheduleUnconfigured(
+            batch.id,
+            authContext.organizationId
+          );
+        }
       } else {
         await enqueueJob({
           batchId: batch.id,
@@ -389,6 +475,7 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
       return {
         id: batch.id,
         status: batch.status,
+        ...(scheduleWarning ? { warning: scheduleWarning } : {}),
       };
     },
     {
@@ -440,6 +527,7 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
         201: t.Object({
           id: t.String(),
           status: t.String(),
+          warning: t.Optional(t.String()),
         }),
       },
       detail: {

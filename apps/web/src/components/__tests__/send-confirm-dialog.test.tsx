@@ -288,4 +288,71 @@ describe("SendConfirmDialog", () => {
     expect(screen.queryByText(/0 contacts/)).not.toBeInTheDocument();
     expect(screen.getByText(/could not be loaded/i)).toBeInTheDocument();
   });
+
+  it("names the audience, not just the size (M14)", () => {
+    // A right-size, wrong-segment send is invisible when only a count is shown.
+    render(
+      <SendConfirmDialog
+        audienceLabel="Segment: Trial expiring"
+        onConfirm={vi.fn()}
+        onOpenChange={vi.fn()}
+        open={true}
+        recipientCount={1500}
+        variant="send"
+      />
+    );
+
+    expect(
+      screen.getByText(/1,500 contacts in Segment: Trial expiring/)
+    ).toBeInTheDocument();
+  });
+
+  it("says the count is provisional when it will be recounted (M7)", () => {
+    render(
+      <SendConfirmDialog
+        countIsProvisional
+        onConfirm={vi.fn()}
+        onOpenChange={vi.fn()}
+        open={true}
+        recipientCount={1500}
+        variant="send"
+      />
+    );
+
+    expect(
+      screen.getByText(/re-resolved when sending starts/i)
+    ).toBeInTheDocument();
+  });
+
+  it("omits the provisional note when the count is final", () => {
+    render(
+      <SendConfirmDialog
+        onConfirm={vi.fn()}
+        onOpenChange={vi.fn()}
+        open={true}
+        recipientCount={1500}
+        variant="send"
+      />
+    );
+
+    expect(
+      screen.queryByText(/re-resolved when sending starts/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it("names the timezone on a scheduled send (H10)", () => {
+    render(
+      <SendConfirmDialog
+        onConfirm={vi.fn()}
+        onOpenChange={vi.fn()}
+        open={true}
+        recipientCount={200}
+        scheduledDate={new Date("2026-09-01T15:00:00Z")}
+        timeZoneLabel="America/Denver"
+        variant="schedule"
+      />
+    );
+
+    expect(screen.getByText(/America\/Denver/)).toBeInTheDocument();
+  });
 });

@@ -40,11 +40,16 @@ describe("Scheduler Service", () => {
       channel: "email" as const,
     };
 
-    it("returns schedule name without calling AWS when config is missing (non-production)", async () => {
-      // Environment variables are not set by default in tests
+    it("reports created: false without calling AWS when config is missing (non-production)", async () => {
+      // Environment variables are not set by default in tests. The caller has
+      // to be able to tell this apart from a schedule that really exists —
+      // reporting "Scheduled" for a send that will never fire is the bug.
       const result = await createBroadcastSchedule(baseParams);
 
-      expect(result).toBe("wraps-batch-test-batch-123");
+      expect(result).toEqual({
+        scheduleName: "wraps-batch-test-batch-123",
+        created: false,
+      });
       expect(mockSend).not.toHaveBeenCalled();
     });
 
@@ -56,7 +61,8 @@ describe("Scheduler Service", () => {
 
       const result = await createBroadcastSchedule(smsParams);
 
-      expect(result).toBe("wraps-batch-test-batch-123");
+      expect(result.scheduleName).toBe("wraps-batch-test-batch-123");
+      expect(result.created).toBe(false);
     });
 
     it("generates correct schedule name from batchId", async () => {
@@ -67,7 +73,7 @@ describe("Scheduler Service", () => {
 
       const result = await createBroadcastSchedule(params);
 
-      expect(result).toBe("wraps-batch-unique-id-abc-123");
+      expect(result.scheduleName).toBe("wraps-batch-unique-id-abc-123");
     });
   });
 

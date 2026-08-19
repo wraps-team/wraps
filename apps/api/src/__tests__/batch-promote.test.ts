@@ -20,12 +20,17 @@ const {
   mockEnqueueJob,
   mockCreateBroadcastSchedule,
   mockDeleteBroadcastSchedule,
+  mockMarkBroadcastNotScheduled,
 } = vi.hoisted(() => ({
+  mockMarkBroadcastNotScheduled: vi.fn(async () => {}),
   mockFindBroadcast: vi.fn(),
   mockFindAwsAccountForOrg: vi.fn(),
   mockPromoteBroadcast: vi.fn(),
   mockEnqueueJob: vi.fn(async (_args: unknown) => {}),
-  mockCreateBroadcastSchedule: vi.fn(async (_args: unknown) => {}),
+  mockCreateBroadcastSchedule: vi.fn(async (args: { batchId: string }) => ({
+    scheduleName: `wraps-batch-${args.batchId}`,
+    created: true,
+  })),
   mockDeleteBroadcastSchedule: vi.fn(async (_args: unknown) => {}),
 }));
 
@@ -36,6 +41,7 @@ vi.mock("@wraps/db", () => ({
   countBroadcastRecipients: vi.fn(),
   createBroadcast: vi.fn(),
   cancelBroadcast: vi.fn(),
+  markBroadcastNotScheduled: mockMarkBroadcastNotScheduled,
 }));
 
 vi.mock("../middleware/auth", () => ({
@@ -314,5 +320,125 @@ describe("POST /v1/batch/:id/send (promote draft)", () => {
     // No side effects after the null return
     expect(mockEnqueueJob).not.toHaveBeenCalled();
     expect(mockCreateBroadcastSchedule).not.toHaveBeenCalled();
+  });
+
+  it("rejects a scheduledFor in the past instead of silently sending now", async () => {
+    // Clock skew or a retried request used to fall through to
+    // `isScheduled = false`, converting "schedule for later" into an
+    // irreversible immediate send the caller never asked for.
+    const scheduledFor = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+    mockFindBroadcast.mockResolvedValueOnce(draftRow);
+    mockFindAwsAccountForOrg.mockResolvedValueOnce({
+      id: draftRow.awsAccountId,
+    });
+
+    const app = createApp();
+
+    const response = await app.handle(
+      new Request(`http://localhost/v1/batch/${draftRow.id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          awsAccountId: draftRow.awsAccountId,
+          channel: "email",
+          subject: "Hello",
+          from: "hello@example.com",
+          totalRecipients: 7,
+          scheduledFor: scheduledFor.toISOString(),
+        }),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    // This bare test app has no global onError, so the thrown message arrives
+    // as text. In the real app handleApiError passes 4xx messages through
+    // verbatim as { error }, which is what the dashboard reads.
+    expect(await response.text()).toMatch(/in the past/i);
+
+    expect(mockPromoteBroadcast).not.toHaveBeenCalled();
+    expect(mockEnqueueJob).not.toHaveBeenCalled();
+    expect(mockCreateBroadcastSchedule).not.toHaveBeenCalled();
+  });
+
+  it("treats a scheduledFor inside the skew tolerance as send-now", async () => {
+    const scheduledFor = new Date(Date.now() - 5000);
+
+    mockFindBroadcast.mockResolvedValueOnce(draftRow);
+    mockFindAwsAccountForOrg.mockResolvedValueOnce({
+      id: draftRow.awsAccountId,
+    });
+    mockPromoteBroadcast.mockResolvedValueOnce({
+      ...draftRow,
+      status: "queued",
+      totalRecipients: 7,
+    });
+
+    const app = createApp();
+
+    const response = await app.handle(
+      new Request(`http://localhost/v1/batch/${draftRow.id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          awsAccountId: draftRow.awsAccountId,
+          channel: "email",
+          subject: "Hello",
+          from: "hello@example.com",
+          totalRecipients: 7,
+          scheduledFor: scheduledFor.toISOString(),
+        }),
+      })
+    );
+
+    expect(response.status).toBe(201);
+    expect(mockEnqueueJob).toHaveBeenCalledTimes(1);
+    expect(mockCreateBroadcastSchedule).not.toHaveBeenCalled();
+  });
+
+  it("warns and records when the environment has no scheduler configured", async () => {
+    const scheduledFor = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    mockFindBroadcast.mockResolvedValueOnce(draftRow);
+    mockFindAwsAccountForOrg.mockResolvedValueOnce({
+      id: draftRow.awsAccountId,
+    });
+    mockPromoteBroadcast.mockResolvedValueOnce({
+      ...draftRow,
+      status: "scheduled",
+      scheduledFor,
+      totalRecipients: 7,
+    });
+    mockCreateBroadcastSchedule.mockResolvedValueOnce({
+      scheduleName: "wraps-batch-x",
+      created: false,
+    });
+
+    const app = createApp();
+
+    const response = await app.handle(
+      new Request(`http://localhost/v1/batch/${draftRow.id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          awsAccountId: draftRow.awsAccountId,
+          channel: "email",
+          subject: "Hello",
+          from: "hello@example.com",
+          totalRecipients: 7,
+          scheduledFor: scheduledFor.toISOString(),
+        }),
+      })
+    );
+
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { warning?: string };
+    expect(body.warning).toMatch(/will not send automatically/i);
+    // Persisted too, so the detail page says it days later, not just the toast.
+    expect(mockMarkBroadcastNotScheduled).toHaveBeenCalledWith(
+      draftRow.id,
+      "org-123",
+      expect.stringMatching(/will not send automatically/i)
+    );
   });
 });

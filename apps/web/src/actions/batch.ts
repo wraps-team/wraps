@@ -217,28 +217,99 @@ export const getBatchSend = orgAction(
  * are missing them. Returns coverage stats without performing auth checks
  * (callers are responsible for auth).
  */
-async function assessVariableCoverage(
-  organizationId: string,
-  templateId: string,
-  recipientFilter: RecipientFilter | undefined,
-  variableMappings: VariableMapping[] | undefined
-): Promise<{
+type CoverageResult = {
   allFail: boolean;
   missingCount: number;
   totalSampled: number;
   totalRecipients: number;
   missingVariables: string[];
-}> {
-  const EMPTY = {
-    allFail: false,
-    missingCount: 0,
-    totalSampled: 0,
-    totalRecipients: 0,
-    missingVariables: [] as string[],
-  };
+};
 
+type SourceVar = { name: string; fallback?: string | null };
+
+const EMPTY_COVERAGE: CoverageResult = {
+  allFail: false,
+  missingCount: 0,
+  totalSampled: 0,
+  totalRecipients: 0,
+  missingVariables: [],
+};
+
+async function assessVariableCoverage(
+  organizationId: string,
+  templateId: string,
+  recipientFilter: RecipientFilter | undefined,
+  variableMappings: VariableMapping[] | undefined
+): Promise<CoverageResult> {
   const templateData = await findTemplateVariables(templateId, organizationId);
-  if (!templateData) return EMPTY;
+  if (!templateData) return EMPTY_COVERAGE;
+
+  const storedVars = (templateData.variables ?? []) as SourceVar[];
+  const seen = new Set(storedVars.map((v) => v.name));
+  const allVars: SourceVar[] = [...storedVars];
+  // Subject-line variables aren't stored in templateData.variables (which is
+  // extracted from body HTML only), so parse them separately.
+  if (templateData.subject) {
+    for (const v of extractHandlebarsVariables(templateData.subject)) {
+      if (!seen.has(v.name)) {
+        seen.add(v.name);
+        allVars.push(v);
+      }
+    }
+  }
+
+  return assessCoverageForVariables(
+    organizationId,
+    allVars,
+    recipientFilter,
+    variableMappings
+  );
+}
+
+/**
+ * Same coverage check for hand-authored HTML. Custom-HTML broadcasts had no
+ * variable check on either the client or the server, so the exact `{{...}}`
+ * failure mode that failed 1200/1200 sends in July 2026 was unguarded on this
+ * path while the template path blocked it.
+ */
+async function assessHtmlVariableCoverage(
+  organizationId: string,
+  htmlContent: string,
+  subject: string | undefined,
+  recipientFilter: RecipientFilter | undefined,
+  variableMappings: VariableMapping[] | undefined
+): Promise<CoverageResult> {
+  const seen = new Set<string>();
+  const allVars: SourceVar[] = [];
+  for (const source of [htmlContent, subject ?? ""]) {
+    for (const v of extractHandlebarsVariables(source)) {
+      if (!seen.has(v.name)) {
+        seen.add(v.name);
+        allVars.push(v);
+      }
+    }
+  }
+
+  return assessCoverageForVariables(
+    organizationId,
+    allVars,
+    recipientFilter,
+    variableMappings
+  );
+}
+
+/**
+ * Shared core: given the variables a message references, work out how many
+ * sampled contacts would fail to resolve at least one of them. Performs no
+ * auth — callers are responsible.
+ */
+async function assessCoverageForVariables(
+  organizationId: string,
+  allVars: SourceVar[],
+  recipientFilter: RecipientFilter | undefined,
+  variableMappings: VariableMapping[] | undefined
+): Promise<CoverageResult> {
+  const EMPTY = EMPTY_COVERAGE;
 
   // A variable with a non-empty static value is satisfied for every contact.
   const staticMappedVars = new Set(
@@ -279,22 +350,6 @@ async function assessVariableCoverage(
   const knownVariableNames = new Set(
     getVariablesForContext("broadcast").map((v) => v.name)
   );
-
-  type StoredVar = { name: string; fallback?: string | null };
-  const storedVars = (templateData.variables ?? []) as StoredVar[];
-
-  // Also parse variables from the subject line — these aren't stored in
-  // templateData.variables (which is extracted from body HTML only)
-  const subjectVarsSeen = new Set(storedVars.map((v) => v.name));
-  const allVars: StoredVar[] = [...storedVars];
-  if (templateData.subject) {
-    for (const v of extractHandlebarsVariables(templateData.subject)) {
-      if (!subjectVarsSeen.has(v.name)) {
-        subjectVarsSeen.add(v.name);
-        allVars.push(v);
-      }
-    }
-  }
 
   const riskyVars: string[] = [];
   for (const v of allVars) {
@@ -409,6 +464,13 @@ async function assessQuotaHeadroom(params: {
       reserve: number;
       dailyCapacity: number;
       /**
+       * `false` means the account is in the SES sandbox: SES accepts mail only
+       * to verified addresses, and the 200/day sandbox quota is what makes the
+       * multi-day estimate enormous. Without this the preflight reported
+       * "~100 days" for a cause it could not name.
+       */
+      productionAccessEnabled: boolean;
+      /**
        * Non-null only when the audience, plus recipients still unsent on
        * other in-flight broadcasts on this AWS account, exceeds a full day's
        * capacity.
@@ -447,6 +509,10 @@ async function assessQuotaHeadroom(params: {
     const accountInfo = await sesClient.send(new GetAccountCommand({}));
     const max24HourSend = accountInfo.SendQuota?.Max24HourSend;
     const sentLast24Hours = accountInfo.SendQuota?.SentLast24Hours;
+    // Absent means AWS did not say. Treating silence as "in the sandbox" would
+    // put a scary warning on accounts that are fine, so default to enabled.
+    const productionAccessEnabled =
+      accountInfo.ProductionAccessEnabled !== false;
 
     if (
       !(
@@ -466,6 +532,7 @@ async function assessQuotaHeadroom(params: {
         sentLast24Hours,
         reserve,
         dailyCapacity,
+        productionAccessEnabled,
         estimatedDays: null,
         blockError: `Broadcast blocked: the transactional reserve (${reserve.toLocaleString()}) is at or above this account's daily SES quota (${max24HourSend.toLocaleString()}), so no broadcast can ever send. Lower the reserve in AWS account settings.`,
         quotaWarning: undefined,
@@ -559,6 +626,7 @@ async function assessQuotaHeadroom(params: {
       sentLast24Hours,
       reserve,
       dailyCapacity,
+      productionAccessEnabled,
       estimatedDays,
       blockError: null,
       quotaWarning,
@@ -603,6 +671,46 @@ export const checkTemplateVariableCoverage = orgAction(
     const coverage = await assessVariableCoverage(
       organizationId,
       templateId,
+      recipientFilter,
+      variableMappings
+    );
+
+    return { success: true, ...coverage };
+  }
+);
+
+/**
+ * Pre-flight check for hand-authored HTML, mirroring
+ * checkTemplateVariableCoverage. The review step had no coverage warning at all
+ * on the custom-HTML path, so the same `{{...}}` failure the template path
+ * warns about arrived only as a rejected send.
+ */
+export const checkHtmlVariableCoverage = orgAction(
+  {
+    name: "checkHtmlVariableCoverage",
+    resource: "broadcasts",
+    permission: ["read"],
+    orgId: (
+      organizationId: string,
+      _htmlContent: string,
+      _subject: string | undefined,
+      _recipientFilter: RecipientFilter,
+      _variableMappings?: VariableMapping[]
+    ) => organizationId,
+    onError: "Failed to check variable coverage",
+  },
+  async (
+    ctx,
+    organizationId: string,
+    htmlContent: string,
+    subject: string | undefined,
+    recipientFilter: RecipientFilter,
+    variableMappings?: VariableMapping[]
+  ): Promise<CheckTemplateVariableCoverageResult> => {
+    const coverage = await assessHtmlVariableCoverage(
+      organizationId,
+      htmlContent,
+      subject,
       recipientFilter,
       variableMappings
     );
@@ -675,6 +783,7 @@ export const checkBroadcastSendDuration = orgAction(
       available: true,
       estimatedDays: headroom.estimatedDays,
       dailyCapacity: headroom.dailyCapacity,
+      productionAccessEnabled: headroom.productionAccessEnabled,
       inFlightBatches: headroom.inFlightBatches,
       inFlightRecipients: headroom.inFlightRecipients,
     };
@@ -697,13 +806,22 @@ type PrepareSendData = {
   awsAccountId: string;
   channel?: Channel;
   templateId?: string;
+  /** Hand-authored HTML. Checked for variable coverage exactly like a template. */
+  htmlContent?: string;
+  subject?: string;
   recipientFilter?: RecipientFilter;
   scheduledFor?: Date;
   variableMappings?: VariableMapping[];
 };
 
 type PrepareSendResult =
-  | { ok: true; recipientCount: number; quotaWarning?: string }
+  | {
+      ok: true;
+      recipientCount: number;
+      quotaWarning?: string;
+      /** Set when the account has no SES production access. Never blocks. */
+      sandboxWarning?: string;
+    }
   | { ok: false; error: string };
 
 async function validateAndPrepareSend(
@@ -834,6 +952,7 @@ async function validateAndPrepareSend(
   // the reserve a cliff — only zero disabled the block, and zero also removed
   // the protection.
   let quotaWarning: string | undefined;
+  let sandboxWarning: string | undefined;
   if (data.channel !== "sms") {
     const headroom = await assessQuotaHeadroom({
       organizationId,
@@ -853,27 +972,57 @@ async function validateAndPrepareSend(
         return { ok: false, error: headroom.blockError };
       }
       quotaWarning = headroom.quotaWarning;
+      // The sandbox is not a reason to block — sending to verified addresses
+      // works, and that first send is how people learn the product. It IS the
+      // reason a multi-day estimate exists, so it has to be named alongside it
+      // rather than leaving the day count to speak for a cause it can't state.
+      if (!headroom.productionAccessEnabled) {
+        sandboxWarning = `This AWS account is still in the SES sandbox, so SES will reject every recipient that is not a verified address, and the daily quota is ${headroom.max24HourSend.toLocaleString()}. Request production access in the SES console to send to your full list.`;
+      }
     }
   }
 
-  // Block sends where every contact would fail template rendering due to
-  // missing custom variables that have no fallback and no static mapping.
-  if (data.templateId && data.channel !== "sms") {
-    const coverage = await assessVariableCoverage(
-      organizationId,
-      data.templateId,
-      data.recipientFilter,
-      data.variableMappings
-    );
-    if (coverage.allFail && coverage.missingVariables.length > 0) {
+  // Block sends where every contact would fail rendering due to missing custom
+  // variables that have no fallback and no static mapping. Custom HTML goes
+  // through the same gate as a template — it used to go through none at all.
+  if (data.channel !== "sms") {
+    let coverage: CoverageResult | null = null;
+    if (data.templateId) {
+      coverage = await assessVariableCoverage(
+        organizationId,
+        data.templateId,
+        data.recipientFilter,
+        data.variableMappings
+      );
+    } else if (data.htmlContent) {
+      coverage = await assessHtmlVariableCoverage(
+        organizationId,
+        data.htmlContent,
+        data.subject,
+        data.recipientFilter,
+        data.variableMappings
+      );
+    }
+    if (coverage?.allFail && coverage.missingVariables.length > 0) {
+      const source = data.templateId ? "the template" : "your HTML";
       return {
         ok: false,
-        error: `All contacts are missing required template variables: ${coverage.missingVariables.join(", ")}. Set a value under Template Variables, add these attributes to your contacts, or set a fallback in the template.`,
+        error: `All contacts are missing required variables: ${coverage.missingVariables.join(", ")}. Set a value under Template Variables, add these attributes to your contacts, or set a fallback in ${source}.`,
       };
     }
   }
 
-  return { ok: true, recipientCount, quotaWarning };
+  return { ok: true, recipientCount, quotaWarning, sandboxWarning };
+}
+
+/** Both post-send warnings ride the single `warning` field. Joined rather than
+ *  dropped: an account that is both in the sandbox and over its daily quota has
+ *  two separate things wrong with it. */
+function joinSendWarnings(
+  ...parts: Array<string | undefined>
+): string | undefined {
+  const present = parts.filter((p): p is string => Boolean(p));
+  return present.length > 0 ? present.join(" ") : undefined;
 }
 
 /**
@@ -896,6 +1045,8 @@ export const createBatchSend = orgAction(
       awsAccountId: data.awsAccountId,
       channel: data.channel,
       templateId: data.templateId,
+      htmlContent: data.htmlContent,
+      subject: data.subject,
       recipientFilter: data.recipientFilter,
       scheduledFor: data.scheduledFor,
       variableMappings: data.variableMappings,
@@ -951,21 +1102,40 @@ export const createBatchSend = orgAction(
 
     if (!response.ok) {
       const errorText = await response.text();
+      const log = createActionLogger("createBatchSend", { organizationId });
       try {
         const errorData = JSON.parse(errorText) as {
           error?: string;
           debug?: unknown;
         };
+        // The debug payload goes to the log, not into a toast. Concatenating it
+        // into the message produced an unreadable JSON blob at the worst moment
+        // in the flow.
+        log.error(
+          { status: response.status, debug: errorData.debug },
+          "Batch create rejected by API"
+        );
         return {
           success: false,
-          error: `${errorData.error} | debug: ${JSON.stringify(errorData.debug)}`,
+          error: errorData.error || "The broadcast could not be created.",
         };
       } catch {
-        return { success: false, error: errorText || "Unknown error" };
+        log.error(
+          { status: response.status, body: errorText.slice(0, 500) },
+          "Batch create rejected by API with a non-JSON body"
+        );
+        return {
+          success: false,
+          error:
+            errorText.slice(0, 300) || "The broadcast could not be created.",
+        };
       }
     }
 
-    const result = (await response.json()) as { id: string };
+    const result = (await response.json()) as {
+      id: string;
+      warning?: string;
+    };
 
     revalidatePath(`/${ctx.access.orgSlug}/emails/broadcasts`, "page");
 
@@ -1002,9 +1172,12 @@ export const createBatchSend = orgAction(
     });
 
     const created = await getBatchSend(result.id, organizationId);
-    return created.success && prep.quotaWarning
-      ? { ...created, warning: prep.quotaWarning }
-      : created;
+    const warning = joinSendWarnings(
+      result.warning,
+      prep.sandboxWarning,
+      prep.quotaWarning
+    );
+    return created.success && warning ? { ...created, warning } : created;
   }
 );
 
@@ -1300,6 +1473,8 @@ export const promoteDraftToSend = orgAction(
       awsAccountId: merged.awsAccountId,
       channel: merged.channel,
       templateId: merged.templateId,
+      htmlContent: merged.htmlContent,
+      subject: merged.subject,
       recipientFilter: merged.recipientFilter,
       scheduledFor: merged.scheduledFor,
       variableMappings: merged.variableMappings,
@@ -1374,6 +1549,10 @@ export const promoteDraftToSend = orgAction(
       }
     }
 
+    const promoteResponse = (await response.json().catch(() => ({}))) as {
+      warning?: string;
+    };
+
     revalidatePath(`/${ctx.access.orgSlug}/emails/broadcasts`, "page");
     revalidatePath(
       `/${ctx.access.orgSlug}/emails/broadcasts/${batchId}`,
@@ -1413,8 +1592,13 @@ export const promoteDraftToSend = orgAction(
     });
 
     const promoted = await loadBatchWithMeta(batchId, organizationId);
-    return promoted.success && prep.quotaWarning
-      ? { ...promoted, warning: prep.quotaWarning }
+    const promoteWarning = joinSendWarnings(
+      promoteResponse.warning,
+      prep.sandboxWarning,
+      prep.quotaWarning
+    );
+    return promoted.success && promoteWarning
+      ? { ...promoted, warning: promoteWarning }
       : promoted;
   }
 );

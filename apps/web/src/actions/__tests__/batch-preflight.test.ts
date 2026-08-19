@@ -31,6 +31,7 @@ import {
 import { checkFeatureAccess } from "@/lib/plan-limits";
 import {
   checkBroadcastSendDuration,
+  checkHtmlVariableCoverage,
   checkTemplateVariableCoverage,
   createBatchSend,
   promoteDraftToSend,
@@ -240,6 +241,8 @@ let sesGetAccountQuota: {
   Max24HourSend?: number;
   SentLast24Hours?: number;
 } | null = null;
+/** undefined = AWS said nothing, which must NOT read as "in the sandbox". */
+let sesProductionAccessEnabled: boolean | undefined;
 
 vi.mock("@aws-sdk/client-sesv2", () => ({
   SESv2Client: class {
@@ -247,7 +250,12 @@ vi.mock("@aws-sdk/client-sesv2", () => ({
       if (sesGetAccountShouldThrow) {
         return Promise.reject(new Error("GetAccount failed: network error"));
       }
-      return Promise.resolve({ SendQuota: sesGetAccountQuota ?? {} });
+      return Promise.resolve({
+        SendQuota: sesGetAccountQuota ?? {},
+        ...(sesProductionAccessEnabled === undefined
+          ? {}
+          : { ProductionAccessEnabled: sesProductionAccessEnabled }),
+      });
     });
   },
   GetAccountCommand: class {
@@ -327,6 +335,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   sesGetAccountShouldThrow = false;
   sesGetAccountQuota = null;
+  sesProductionAccessEnabled = undefined;
   getOrAssumeRoleMock.mockResolvedValue({
     accessKeyId: "AKIA-test",
     secretAccessKey: "secret-test",
@@ -1072,6 +1081,249 @@ describe("promoteDraftToSend — static mappings unblock all-fail sends", () => 
       delete process.env.NEXT_PUBLIC_API_URL;
       await db.delete(batchSend).where(eq(batchSend.organizationId, orgId));
       await db.delete(template).where(eq(template.id, blankTemplate.id));
+      await db.delete(contact).where(eq(contact.id, contactId));
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+      await db.delete(member).where(eq(member.id, memberId));
+      await db.delete(subscription).where(eq(subscription.id, subId));
+      await db
+        .delete(organizationExtension)
+        .where(eq(organizationExtension.organizationId, orgId));
+      await db.delete(organization).where(eq(organization.id, orgId));
+    }
+  });
+
+  it("blocks an all-fail custom-HTML send the same way it blocks a template (H7)", async () => {
+    // The custom-HTML path had no coverage check at all — client or server —
+    // so the exact `{{...}}` failure that failed 1200/1200 sends in July 2026
+    // was unguarded here while the template path blocked it.
+    const orgId = `preflight-html-org-${RUN_ID}`;
+    const contactId = `preflight-html-contact-${RUN_ID}`;
+    const memberId = `preflight-html-member-${RUN_ID}`;
+    const awsId = `preflight-html-aws-${RUN_ID}`;
+    const subId = `sub_preflight_html_${RUN_ID}`;
+
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+
+    const realFetch = globalThis.fetch.bind(globalThis);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (...args: Parameters<typeof fetch>) => {
+        const [url] = args;
+        const asString = typeof url === "string" ? url : url.toString();
+        if (asString.endsWith("/v1/batch")) {
+          return new Response(JSON.stringify({ error: "enqueue-refused" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return realFetch(...args);
+      });
+
+    await db
+      .insert(organization)
+      .values({
+        id: orgId,
+        name: "HTML Send Org",
+        slug: `html-send-org-${RUN_ID}`,
+        createdAt: new Date(),
+      })
+      .onConflictDoNothing();
+    await db
+      .insert(organizationExtension)
+      .values({ organizationId: orgId })
+      .onConflictDoNothing();
+    await db
+      .insert(subscription)
+      .values({
+        id: subId,
+        plan: "growth",
+        referenceId: orgId,
+        status: "active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoNothing();
+    await db
+      .insert(member)
+      .values({
+        id: memberId,
+        organizationId: orgId,
+        userId: testUser.id,
+        role: "owner" as const,
+        createdAt: new Date(),
+      })
+      .onConflictDoNothing();
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        organizationId: orgId,
+        externalId: `html-send-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+    await db
+      .insert(contact)
+      .values({
+        id: contactId,
+        organizationId: orgId,
+        email: `html-send-${RUN_ID}@example.com`,
+        emailHash: `hash-html-send-${RUN_ID}`,
+        emailStatus: "active" as const,
+        properties: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoNothing();
+
+    const payload = {
+      awsAccountId: awsId,
+      from: "sender@example.com",
+      subject: "What's new",
+      htmlContent: "<p>Read the {{changelogLink}}</p>",
+      recipientFilter: { audienceType: "all" as const },
+    };
+
+    try {
+      const blocked = await createBatchSend(orgId, payload);
+      expect(blocked.success).toBe(false);
+      if (blocked.success) return;
+      expect(blocked.error).toContain("changelogLink");
+      expect(blocked.error).toContain("your HTML");
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      // A static mapping clears the same gate and hands off to the API.
+      const sent = await createBatchSend(orgId, {
+        ...payload,
+        variableMappings: [
+          {
+            variableName: "changelogLink",
+            source: { type: "static", value: "https://example.com/changelog" },
+          },
+        ],
+      });
+
+      expect(sent.success).toBe(false);
+      if (sent.success) return;
+      expect(sent.error).toContain("enqueue-refused");
+      expect(sent.error).not.toContain("changelogLink");
+    } finally {
+      fetchSpy.mockRestore();
+      delete process.env.NEXT_PUBLIC_API_URL;
+      await db.delete(batchSend).where(eq(batchSend.organizationId, orgId));
+      await db.delete(contact).where(eq(contact.id, contactId));
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+      await db.delete(member).where(eq(member.id, memberId));
+      await db.delete(subscription).where(eq(subscription.id, subId));
+      await db
+        .delete(organizationExtension)
+        .where(eq(organizationExtension.organizationId, orgId));
+      await db.delete(organization).where(eq(organization.id, orgId));
+    }
+  });
+
+  it("does not leak the API's debug payload into the user-facing error (M9)", async () => {
+    const orgId = `preflight-debug-org-${RUN_ID}`;
+    const memberId = `preflight-debug-member-${RUN_ID}`;
+    const awsId = `preflight-debug-aws-${RUN_ID}`;
+    const subId = `sub_preflight_debug_${RUN_ID}`;
+    const contactId = `preflight-debug-contact-${RUN_ID}`;
+
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+
+    const realFetch = globalThis.fetch.bind(globalThis);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (...args: Parameters<typeof fetch>) => {
+        const [url] = args;
+        const asString = typeof url === "string" ? url : url.toString();
+        if (asString.endsWith("/v1/batch")) {
+          return new Response(
+            JSON.stringify({
+              error: "Sending is not configured",
+              debug: { stack: "deep internal detail", ids: [1, 2, 3] },
+            }),
+            { status: 500, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        return realFetch(...args);
+      });
+
+    await db
+      .insert(organization)
+      .values({
+        id: orgId,
+        name: "Debug Blob Org",
+        slug: `debug-blob-org-${RUN_ID}`,
+        createdAt: new Date(),
+      })
+      .onConflictDoNothing();
+    await db
+      .insert(organizationExtension)
+      .values({ organizationId: orgId })
+      .onConflictDoNothing();
+    await db
+      .insert(subscription)
+      .values({
+        id: subId,
+        plan: "growth",
+        referenceId: orgId,
+        status: "active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoNothing();
+    await db
+      .insert(member)
+      .values({
+        id: memberId,
+        organizationId: orgId,
+        userId: testUser.id,
+        role: "owner" as const,
+        createdAt: new Date(),
+      })
+      .onConflictDoNothing();
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        organizationId: orgId,
+        externalId: `debug-blob-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+    await db
+      .insert(contact)
+      .values({
+        id: contactId,
+        organizationId: orgId,
+        email: `debug-blob-${RUN_ID}@example.com`,
+        emailHash: `hash-debug-blob-${RUN_ID}`,
+        emailStatus: "active" as const,
+        properties: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoNothing();
+
+    try {
+      const result = await createBatchSend(orgId, {
+        awsAccountId: awsId,
+        from: "sender@example.com",
+        subject: "Hello",
+        htmlContent: "<p>Plain content, no variables</p>",
+        recipientFilter: { audienceType: "all" as const },
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe("Sending is not configured");
+      expect(result.error).not.toContain("debug");
+      expect(result.error).not.toContain("deep internal detail");
+    } finally {
+      fetchSpy.mockRestore();
+      delete process.env.NEXT_PUBLIC_API_URL;
+      await db.delete(batchSend).where(eq(batchSend.organizationId, orgId));
       await db.delete(contact).where(eq(contact.id, contactId));
       await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
       await db.delete(member).where(eq(member.id, memberId));
@@ -2690,5 +2942,204 @@ describe("cross-broadcast quota accounting", () => {
         .where(eq(batchSend.organizationId, testOrganization.id));
       await db.delete(awsAccount).where(eq(awsAccount.id, quotaAwsId));
     }
+  });
+});
+
+describe("SES sandbox awareness (H6)", () => {
+  it("reports productionAccessEnabled: false when the account is in the sandbox", async () => {
+    const awsId = `preflight-sandbox-aws-${RUN_ID}`;
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        externalId: `sandbox-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    // Sandbox accounts get a 200/day quota — the real cause of the enormous
+    // day estimate the wizard used to show with no explanation.
+    sesGetAccountQuota = { Max24HourSend: 200, SentLast24Hours: 0 };
+    sesProductionAccessEnabled = false;
+
+    try {
+      const result = await checkBroadcastSendDuration(
+        testOrganization.id,
+        awsId,
+        "email",
+        20_000,
+        false
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.available).toBe(true);
+      if (!result.available) return;
+      expect(result.productionAccessEnabled).toBe(false);
+      expect(result.estimatedDays).toBe(100);
+    } finally {
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+    }
+  });
+
+  it("reports productionAccessEnabled: true when AWS says production access is on", async () => {
+    const awsId = `preflight-prod-aws-${RUN_ID}`;
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        externalId: `prod-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    sesGetAccountQuota = { Max24HourSend: 50_000, SentLast24Hours: 0 };
+    sesProductionAccessEnabled = true;
+
+    try {
+      const result = await checkBroadcastSendDuration(
+        testOrganization.id,
+        awsId,
+        "email",
+        10,
+        false
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.available).toBe(true);
+      if (!result.available) return;
+      expect(result.productionAccessEnabled).toBe(true);
+    } finally {
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+    }
+  });
+
+  it("treats a silent AWS response as production, not as the sandbox", async () => {
+    const awsId = `preflight-silent-aws-${RUN_ID}`;
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        externalId: `silent-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    sesGetAccountQuota = { Max24HourSend: 50_000, SentLast24Hours: 0 };
+    sesProductionAccessEnabled = undefined;
+
+    try {
+      const result = await checkBroadcastSendDuration(
+        testOrganization.id,
+        awsId,
+        "email",
+        10,
+        false
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.available).toBe(true);
+      if (!result.available) return;
+      // Guessing "sandbox" would put a scary, wrong warning on healthy accounts.
+      expect(result.productionAccessEnabled).toBe(true);
+    } finally {
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+    }
+  });
+});
+
+describe("checkHtmlVariableCoverage (H7)", () => {
+  const filter = { audienceType: "all" as const };
+
+  it("flags a custom variable in hand-authored HTML that no contact has", async () => {
+    const result = await checkHtmlVariableCoverage(
+      testOrganization.id,
+      "<p>Open your {{missingThing}}</p>",
+      "Hello",
+      filter
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.missingVariables).toContain("missingThing");
+    expect(result.allFail).toBe(true);
+  });
+
+  it("flags a custom variable that only appears in the subject line", async () => {
+    const result = await checkHtmlVariableCoverage(
+      testOrganization.id,
+      "<p>Hi there</p>",
+      "Your {{subjectOnlyThing}} is ready",
+      filter
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.missingVariables).toContain("subjectOnlyThing");
+  });
+
+  it("does not flag a variable with a fallback", async () => {
+    const result = await checkHtmlVariableCoverage(
+      testOrganization.id,
+      "<p>Open {{dashboardUrl|https://default.example.com}}</p>",
+      "Hello",
+      filter
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.missingVariables).toEqual([]);
+    expect(result.allFail).toBe(false);
+  });
+
+  it("does not flag a variable satisfied by a static mapping", async () => {
+    const result = await checkHtmlVariableCoverage(
+      testOrganization.id,
+      "<p>Open {{missingThing}}</p>",
+      "Hello",
+      filter,
+      [
+        {
+          variableName: "missingThing",
+          source: { type: "static", value: "https://example.com" },
+        },
+      ]
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.missingVariables).toEqual([]);
+  });
+
+  it("does not flag contact fields the batch sender always provides", async () => {
+    const result = await checkHtmlVariableCoverage(
+      testOrganization.id,
+      '<p>Hi {{firstName}}, <a href="{{unsubscribeUrl}}">unsubscribe</a></p>',
+      "Hello {{contact.firstName}}",
+      filter
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.missingVariables).toEqual([]);
+  });
+
+  it("reports partial coverage when only some contacts have the property", async () => {
+    // contactWithProp has dashboardUrl, contactWithoutProp does not.
+    const result = await checkHtmlVariableCoverage(
+      testOrganization.id,
+      "<p>Open {{dashboardUrl}}</p>",
+      "Hello",
+      filter
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.missingVariables).toEqual(["dashboardUrl"]);
+    expect(result.allFail).toBe(false);
+    expect(result.missingCount).toBeGreaterThan(0);
+    expect(result.missingCount).toBeLessThan(result.totalSampled);
   });
 });
