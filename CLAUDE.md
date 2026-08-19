@@ -70,10 +70,17 @@ pnpm test:ee           # Run enterprise edition tests
 pnpm check:all         # Full CI check: lint -> typecheck -> baseline -> build -> test
 ```
 
-| Variable | Default (via `pnpm cli`) | Production |
+`pnpm dev` serves every app through `portless` (a global CLI) on HTTPS hostnames, not
+ports. Use these when checking local work in a browser — `localhost:3000` will not be listening:
+
+| App | Local dev URL | Production |
 |---|---|---|
-| `WRAPS_API_URL` | `http://localhost:3001` | `https://api.wraps.dev` |
-| `WRAPS_APP_URL` | `http://localhost:3000` | `https://app.wraps.dev` |
+| Dashboard (`apps/web`) | `https://web.wraps.localhost` | `https://app.wraps.dev` |
+| Marketing site (`apps/website`) | `https://website.wraps.localhost` | `https://wraps.dev` |
+| API (`apps/api`) | `https://api.wraps.localhost` | `https://api.wraps.dev` |
+
+`pnpm cli` uses the CLI's own defaults (`http://localhost:3001` / `:3000`); use `pnpm cli:dev`
+to point the CLI at the portless URLs above.
 
 ## Design Context
 
