@@ -140,7 +140,7 @@ export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
             className="aspect-auto h-[300px] w-full"
             config={chartConfig}
           >
-            <AreaChart data={chartData}>
+            <AreaChart accessibilityLayer data={chartData}>
               <defs>
                 <linearGradient
                   id="fillSuppressionRate"

@@ -129,7 +129,7 @@ export function DeliverabilityChart({ orgSlug }: { orgSlug: string }) {
             className="aspect-auto h-[300px] w-full"
             config={chartConfig}
           >
-            <BarChart data={chartData}>
+            <BarChart accessibilityLayer data={chartData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
                 axisLine={false}

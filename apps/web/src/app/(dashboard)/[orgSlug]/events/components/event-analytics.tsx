@@ -210,7 +210,7 @@ export function EventAnalytics({ organizationId }: EventAnalyticsProps) {
                   className="aspect-auto h-[200px] w-full"
                   config={areaChartConfig}
                 >
-                  <AreaChart data={dailyData}>
+                  <AreaChart accessibilityLayer data={dailyData}>
                     <defs>
                       <linearGradient
                         id="fillEvents"

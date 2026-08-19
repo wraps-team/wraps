@@ -43,9 +43,45 @@ import { countYAxisProps } from "@/lib/chart-axis";
 import { useEmailChartData } from "../analytics/hooks/use-analytics";
 import { captureEmailsErrorRetried } from "../lib/analytics";
 
+/**
+ * Colour alone cannot carry four series, so every series also owns a stroke
+ * treatment. `sent` and `delivered` are near-identical for a healthy account -
+ * a 100%-delivery day drew `delivered` exactly on top of `sent` and the legend
+ * advertised a "Sent" colour that appeared nowhere on the canvas.
+ */
+const SERIES_STROKE = {
+  sent: { dash: undefined, width: 3 },
+  delivered: { dash: "6 3", width: 2.5 },
+  opened: { dash: "4 2", width: 1.5 },
+  clicked: { dash: "1 3", width: 1.5 },
+} as const;
+
+/** A legend swatch that mirrors the line it stands for, not just its hue. */
+function seriesSwatch(series: keyof typeof SERIES_STROKE) {
+  const { dash, width } = SERIES_STROKE[series];
+
+  return function SeriesSwatch() {
+    return (
+      <svg aria-hidden="true" fill="none" viewBox="0 0 12 12">
+        <line
+          stroke={`var(--color-${series})`}
+          strokeDasharray={dash}
+          strokeLinecap="round"
+          strokeWidth={width}
+          x1="1"
+          x2="11"
+          y1="6"
+          y2="6"
+        />
+      </svg>
+    );
+  };
+}
+
 const chartConfig = {
   sent: {
     label: "Sent",
+    icon: seriesSwatch("sent"),
     theme: {
       light: "oklch(0.55 0.12 250)",
       dark: "oklch(0.70 0.12 250)",
@@ -53,6 +89,7 @@ const chartConfig = {
   },
   delivered: {
     label: "Delivered",
+    icon: seriesSwatch("delivered"),
     theme: {
       light: "oklch(0.50 0.15 160)",
       dark: "oklch(0.65 0.15 160)",
@@ -60,16 +97,21 @@ const chartConfig = {
   },
   opened: {
     label: "Opened",
+    icon: seriesSwatch("opened"),
     theme: {
       light: "oklch(0.55 0.15 80)",
       dark: "oklch(0.70 0.15 80)",
     },
   },
+  // Deliberately not red: --destructive is oklch(0.704 0.191 22.216) in dark
+  // mode, so a red "Clicked" line read as a failure on a card that also
+  // reports bounces and complaints.
   clicked: {
     label: "Clicked",
+    icon: seriesSwatch("clicked"),
     theme: {
-      light: "oklch(0.50 0.18 30)",
-      dark: "oklch(0.65 0.18 30)",
+      light: "oklch(0.48 0.20 320)",
+      dark: "oklch(0.72 0.16 320)",
     },
   },
 } satisfies ChartConfig;
@@ -125,39 +167,39 @@ function MetricsSidebar({
       <div className="text-muted-foreground text-xs uppercase tracking-wide">
         {rangeLabel}
       </div>
-      <div className="rounded-lg border bg-card p-3">
+      <div className="rounded-lg border bg-muted/40 p-3">
         <div className="text-muted-foreground text-xs">Sent</div>
         <div className="font-semibold text-2xl tabular-nums">
           {overview?.totalSent.toLocaleString() ?? 0}
         </div>
       </div>
-      <div className="rounded-lg border bg-card p-3">
+      <div className="rounded-lg border bg-muted/40 p-3">
         <div className="text-muted-foreground text-xs">Delivered</div>
         <div className="flex items-baseline gap-2">
           <span className="font-semibold text-2xl tabular-nums">
             {overview?.totalDelivered.toLocaleString() ?? 0}
           </span>
           <span className="text-muted-foreground text-sm">
-            ({overview?.deliveryRate.toFixed(1) ?? 0}%)
+            ({(overview?.deliveryRate ?? 0).toFixed(1)}%)
           </span>
         </div>
       </div>
 
       <div className="mt-1 border-t pt-3">
-        <div className="rounded-lg border border-dashed bg-muted/40 p-3">
+        <div className="rounded-lg border border-border/50 p-3">
           <div className="text-muted-foreground text-xs">
             {reputation?.title ?? "Account reputation"}
           </div>
           <div className="flex items-baseline gap-3 text-sm">
             <span>
               <span className="font-medium">
-                {overview?.bounceRate.toFixed(2) ?? 0}%
+                {(overview?.bounceRate ?? 0).toFixed(2)}%
               </span>{" "}
               <span className="text-muted-foreground">bounces</span>
             </span>
             <span>
               <span className="font-medium">
-                {overview?.complaintRate.toFixed(3) ?? 0}%
+                {(overview?.complaintRate ?? 0).toFixed(3)}%
               </span>{" "}
               <span className="text-muted-foreground">complaints</span>
             </span>
@@ -293,12 +335,26 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
   }, [data]);
 
   const maxValue = Math.max(
+    0,
     ...chartData.map((d) => Math.max(d.sent || 0, d.delivered || 0))
+  );
+
+  // Opens and clicks land on mail sent before the window, so a period can hold
+  // real engagement with zero sends. Gating the empty state on `sent` alone
+  // told the customer nothing happened while the data said otherwise.
+  const hasActivity = chartData.some(
+    (d) => d.sent > 0 || d.delivered > 0 || d.opened > 0 || d.clicked > 0
   );
 
   const range = TIME_RANGES.find((r) => r.days === days) ?? TIME_RANGES[1];
   const reputation = meta ? reputationScopeLabel(meta) : null;
   const reputationPartial = meta ? reputationPartialLabel(meta) : null;
+
+  // The SVG conveys none of this to a screen reader, and recharts' keyboard
+  // layer announces individual days, not the shape of the period.
+  const chartSummary = `Email activity, ${range.long.toLowerCase()}: ${
+    overview?.totalSent ?? 0
+  } sent, ${overview?.totalDelivered ?? 0} delivered.`;
 
   const updatedLabel =
     meta && now !== null
@@ -310,7 +366,9 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Email Activity</CardTitle>
+        <CardTitle aria-level={2} role="heading">
+          Email Activity
+        </CardTitle>
         <CardDescription>
           <span className="@[540px]/card:block hidden">
             {EMAIL_COVERAGE_EXPLAINER}
@@ -318,7 +376,10 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
           <span className="@[540px]/card:hidden">Email volume</span>
         </CardDescription>
         <CardAction className="self-center">
-          <ButtonGroup className="@[767px]/card:flex hidden">
+          <ButtonGroup
+            aria-label="Time range"
+            className="@[767px]/card:flex hidden"
+          >
             {TIME_RANGES.map((r) => (
               <Button
                 aria-pressed={days === r.days}
@@ -331,7 +392,10 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
                 {r.short}
               </Button>
             ))}
-            <RefreshButton onRefresh={handleRefresh} />
+            <RefreshButton
+              label="Refresh email activity"
+              onRefresh={handleRefresh}
+            />
           </ButtonGroup>
           <Select onValueChange={selectDays} value={String(days)}>
             <SelectTrigger
@@ -355,6 +419,7 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
           </Select>
           <RefreshButton
             className="@[767px]/card:hidden"
+            label="Refresh email activity"
             onRefresh={handleRefresh}
           />
         </CardAction>
@@ -383,17 +448,21 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
           <div className="grid grid-cols-1 gap-6 @[540px]/card:grid-cols-[1fr_200px]">
             {/* Chart */}
             <div className="min-w-0">
-              {chartData.length === 0 ||
-              chartData.every((d) => d.sent === 0) ? (
-                <div className="flex h-[280px] items-center justify-center text-muted-foreground text-sm">
-                  No emails sent in this period
-                </div>
-              ) : (
+              {hasActivity ? (
+                // role="figure", not "img": accessibilityLayer puts a
+                // focusable role="application" surface inside, and role="img"
+                // makes its subtree presentational - which would hide the
+                // keyboard path we just added.
                 <ChartContainer
+                  aria-label={chartSummary}
                   className="aspect-auto h-[280px] w-full"
                   config={chartConfig}
+                  role="figure"
                 >
-                  <AreaChart data={chartData}>
+                  {/* accessibilityLayer makes the plot tabbable and
+                      arrow-navigable; without it every number here was
+                      mouse-hover only. */}
+                  <AreaChart accessibilityLayer data={chartData}>
                     <defs>
                       <linearGradient id="fillSent" x1="0" x2="0" y1="0" y2="1">
                         <stop
@@ -456,38 +525,46 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
                       }
                     />
                     <Legend content={<ChartLegendContent />} />
+                    {/* type="linear": these are counted events, and monotone
+                        splines invented peaks and fractional values between
+                        days that never existed. */}
                     <Area
                       dataKey="sent"
                       fill="url(#fillSent)"
                       stroke="var(--color-sent)"
-                      strokeWidth={2}
-                      type="monotone"
+                      strokeWidth={SERIES_STROKE.sent.width}
+                      type="linear"
                     />
                     <Area
                       dataKey="delivered"
                       fill="url(#fillDelivered)"
                       stroke="var(--color-delivered)"
-                      strokeWidth={2}
-                      type="monotone"
+                      strokeDasharray={SERIES_STROKE.delivered.dash}
+                      strokeWidth={SERIES_STROKE.delivered.width}
+                      type="linear"
                     />
                     <Area
                       dataKey="opened"
                       fill="transparent"
                       stroke="var(--color-opened)"
-                      strokeDasharray="4 2"
-                      strokeWidth={1.5}
-                      type="monotone"
+                      strokeDasharray={SERIES_STROKE.opened.dash}
+                      strokeWidth={SERIES_STROKE.opened.width}
+                      type="linear"
                     />
                     <Area
                       dataKey="clicked"
                       fill="transparent"
                       stroke="var(--color-clicked)"
-                      strokeDasharray="4 2"
-                      strokeWidth={1.5}
-                      type="monotone"
+                      strokeDasharray={SERIES_STROKE.clicked.dash}
+                      strokeWidth={SERIES_STROKE.clicked.width}
+                      type="linear"
                     />
                   </AreaChart>
                 </ChartContainer>
+              ) : (
+                <div className="flex h-[280px] items-center justify-center text-muted-foreground text-sm">
+                  No email activity in this period
+                </div>
               )}
             </div>
 

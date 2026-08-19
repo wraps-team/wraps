@@ -255,7 +255,7 @@ export function InboundAnalytics({
                 className="aspect-auto h-[200px] w-full"
                 config={areaChartConfig}
               >
-                <AreaChart data={analytics.dailyData}>
+                <AreaChart accessibilityLayer data={analytics.dailyData}>
                   <defs>
                     <linearGradient
                       id="fillInbound"

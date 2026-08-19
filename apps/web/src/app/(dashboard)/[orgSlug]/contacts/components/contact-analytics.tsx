@@ -174,7 +174,7 @@ export function ContactAnalytics({ organizationId }: ContactAnalyticsProps) {
                   className="aspect-auto h-[250px] w-full"
                   config={chartConfig}
                 >
-                  <AreaChart data={chartData}>
+                  <AreaChart accessibilityLayer data={chartData}>
                     <defs>
                       <linearGradient
                         id="fillCount"

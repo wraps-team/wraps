@@ -145,7 +145,7 @@ export function SMSDeliverabilityChart({ orgSlug }: { orgSlug: string }) {
             className="aspect-auto h-[300px] w-full"
             config={chartConfig}
           >
-            <AreaChart data={chartData}>
+            <AreaChart accessibilityLayer data={chartData}>
               <defs>
                 <linearGradient id="fillDelivered" x1="0" x2="0" y1="0" y2="1">
                   <stop

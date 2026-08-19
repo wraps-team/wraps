@@ -141,7 +141,7 @@ export function EngagementChart({ orgSlug }: { orgSlug: string }) {
             className="aspect-auto h-[300px] w-full"
             config={chartConfig}
           >
-            <LineChart data={chartData}>
+            <LineChart accessibilityLayer data={chartData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
                 axisLine={false}

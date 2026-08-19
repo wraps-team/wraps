@@ -8,9 +8,15 @@ import { Button } from "./button";
 type RefreshButtonProps = {
   onRefresh: () => void | Promise<void>;
   className?: string;
+  /** Name what is being refreshed - a page can hold several of these. */
+  label?: string;
 };
 
-export function RefreshButton({ onRefresh, className }: RefreshButtonProps) {
+export function RefreshButton({
+  onRefresh,
+  className,
+  label = "Refresh",
+}: RefreshButtonProps) {
   const [isPending, startTransition] = useTransition();
 
   function handleClick() {
@@ -21,7 +27,7 @@ export function RefreshButton({ onRefresh, className }: RefreshButtonProps) {
 
   return (
     <Button
-      aria-label="Refresh"
+      aria-label={label}
       className={className}
       disabled={isPending}
       onClick={handleClick}
