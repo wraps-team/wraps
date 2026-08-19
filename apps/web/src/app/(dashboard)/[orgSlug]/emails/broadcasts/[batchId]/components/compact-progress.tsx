@@ -11,12 +11,14 @@ import {
   BATCH_STATUS_COLORS,
   BATCH_STATUS_LABELS,
   getPausedPresentation,
+  getZeroSendPresentation,
 } from "@/lib/batch";
 
 type CompactProgressProps = {
   status: string;
   totalRecipients: number;
   processedRecipients: number;
+  sent: number;
   startedAt: Date | null;
   completedAt: Date | null;
   pausedReason?: string | null;
@@ -54,6 +56,7 @@ export function CompactProgress({
   status,
   totalRecipients,
   processedRecipients,
+  sent,
   startedAt,
   completedAt,
   pausedReason,
@@ -63,6 +66,7 @@ export function CompactProgress({
   const [isPending, startTransition] = useTransition();
   const [autoRefresh, setAutoRefresh] = useState(isActive(status));
   const paused = getPausedPresentation(status, pausedReason ?? null);
+  const zeroSend = getZeroSendPresentation(status, sent);
 
   const progress =
     totalRecipients === 0
@@ -105,16 +109,22 @@ export function CompactProgress({
             className={
               paused
                 ? paused.color
-                : BATCH_STATUS_COLORS[
-                    status as keyof typeof BATCH_STATUS_COLORS
-                  ]
+                : zeroSend
+                  ? zeroSend.color
+                  : BATCH_STATUS_COLORS[
+                      status as keyof typeof BATCH_STATUS_COLORS
+                    ]
             }
             variant="secondary"
           >
-            {!paused && statusIcon}
+            {!(paused || zeroSend) && statusIcon}
             {paused
               ? paused.label
-              : BATCH_STATUS_LABELS[status as keyof typeof BATCH_STATUS_LABELS]}
+              : zeroSend
+                ? zeroSend.label
+                : BATCH_STATUS_LABELS[
+                    status as keyof typeof BATCH_STATUS_LABELS
+                  ]}
           </Badge>
 
           {/* Timing info */}

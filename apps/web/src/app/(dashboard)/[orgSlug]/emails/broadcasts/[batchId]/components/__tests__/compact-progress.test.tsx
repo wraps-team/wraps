@@ -17,6 +17,7 @@ describe("CompactProgress", () => {
       <CompactProgress
         completedAt={new Date("2026-02-22T09:06:50Z")}
         processedRecipients={12_500}
+        sent={12_500}
         startedAt={new Date("2026-02-22T08:36:50Z")}
         status="completed"
         totalRecipients={12_500}
@@ -30,6 +31,7 @@ describe("CompactProgress", () => {
       <CompactProgress
         completedAt={null}
         processedRecipients={6250}
+        sent={6250}
         startedAt={new Date("2026-02-22T08:36:50Z")}
         status="processing"
         totalRecipients={12_500}
@@ -45,6 +47,7 @@ describe("CompactProgress", () => {
       <CompactProgress
         completedAt={null}
         processedRecipients={6250}
+        sent={6250}
         startedAt={new Date("2026-02-22T08:36:50Z")}
         status="processing"
         totalRecipients={12_500}
@@ -58,6 +61,7 @@ describe("CompactProgress", () => {
       <CompactProgress
         completedAt={new Date("2026-02-22T09:06:50Z")}
         processedRecipients={12_500}
+        sent={12_500}
         startedAt={new Date("2026-02-22T08:36:50Z")}
         status="completed"
         totalRecipients={12_500}
@@ -72,6 +76,7 @@ describe("CompactProgress", () => {
       <CompactProgress
         completedAt={new Date("2026-02-22T09:06:50Z")}
         processedRecipients={12_500}
+        sent={12_500}
         startedAt={new Date("2026-02-22T08:36:50Z")}
         status="completed"
         totalRecipients={12_500}
@@ -85,6 +90,7 @@ describe("CompactProgress", () => {
       <CompactProgress
         completedAt={new Date("2026-02-22T09:06:50Z")}
         processedRecipients={12_500}
+        sent={12_500}
         startedAt={new Date("2026-02-22T08:36:50Z")}
         status="completed"
         totalRecipients={12_500}
@@ -99,6 +105,7 @@ describe("CompactProgress", () => {
         completedAt={null}
         pausedReason={null}
         processedRecipients={6250}
+        sent={6250}
         startedAt={new Date("2026-02-22T08:36:50Z")}
         status="processing"
         totalRecipients={12_500}
@@ -114,6 +121,7 @@ describe("CompactProgress", () => {
         completedAt={null}
         pausedReason="quota_reserve"
         processedRecipients={6250}
+        sent={6250}
         startedAt={new Date("2026-02-22T08:36:50Z")}
         status="processing"
         totalRecipients={12_500}
@@ -132,6 +140,7 @@ describe("CompactProgress", () => {
         completedAt={null}
         pausedReason="daily_quota"
         processedRecipients={6250}
+        sent={6250}
         startedAt={new Date("2026-02-22T08:36:50Z")}
         status="processing"
         totalRecipients={12_500}
@@ -150,6 +159,7 @@ describe("CompactProgress", () => {
         completedAt={null}
         pausedReason="something_new"
         processedRecipients={6250}
+        sent={6250}
         startedAt={new Date("2026-02-22T08:36:50Z")}
         status="processing"
         totalRecipients={12_500}
@@ -164,6 +174,7 @@ describe("CompactProgress", () => {
         completedAt={new Date("2026-02-22T09:06:50Z")}
         pausedReason="daily_quota"
         processedRecipients={12_500}
+        sent={12_500}
         startedAt={new Date("2026-02-22T08:36:50Z")}
         status="completed"
         totalRecipients={12_500}
@@ -171,5 +182,36 @@ describe("CompactProgress", () => {
     );
     expect(screen.getByText("Completed")).toBeTruthy();
     expect(screen.queryByText(/Paused/)).toBeNull();
+  });
+
+  it("does not present a zero-send completed batch as plain success", () => {
+    render(
+      <CompactProgress
+        completedAt={new Date("2026-02-22T09:06:50Z")}
+        processedRecipients={0}
+        sent={0}
+        startedAt={new Date("2026-02-22T08:36:50Z")}
+        status="completed"
+        totalRecipients={1200}
+      />
+    );
+    expect(screen.queryByText("Completed")).toBeNull();
+    expect(screen.getByText("Completed — nothing sent")).toBeTruthy();
+  });
+
+  it("is unaffected by sent while paused — the two presentations never collide", () => {
+    render(
+      <CompactProgress
+        completedAt={null}
+        pausedReason="daily_quota"
+        processedRecipients={0}
+        sent={0}
+        startedAt={new Date("2026-02-22T08:36:50Z")}
+        status="processing"
+        totalRecipients={12_500}
+      />
+    );
+    expect(screen.getByText(/Paused/)).toBeTruthy();
+    expect(screen.queryByText(/nothing sent/)).toBeNull();
   });
 });

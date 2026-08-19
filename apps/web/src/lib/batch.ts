@@ -74,6 +74,23 @@ export function getPausedPresentation(
   };
 }
 
+/** A `completed` broadcast that sent nothing is not a success. batchSendStatusEnum
+ *  has no value for it — like getPausedPresentation, this synthesises the
+ *  presentation instead. Callers render this in place of the status badge when
+ *  it returns non-null. */
+export function getZeroSendPresentation(
+  status: string,
+  sent: number
+): { label: string; color: string } | null {
+  if (status !== "completed" || sent > 0) {
+    return null;
+  }
+  return {
+    label: "Completed — nothing sent",
+    color: "bg-amber-100 text-amber-800",
+  };
+}
+
 // Channel display
 export const CHANNEL_LABELS: Record<Channel, string> = {
   email: "Email",

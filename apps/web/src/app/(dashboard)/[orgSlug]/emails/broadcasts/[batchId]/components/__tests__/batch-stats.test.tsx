@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({
@@ -30,25 +30,57 @@ describe("BatchStats", () => {
     completedAt: new Date("2026-02-22T09:06:50Z"),
   };
 
+  const zeroSendBatch = {
+    ...completedBatch,
+    totalRecipients: 1200,
+    processedRecipients: 0,
+    sent: 0,
+    delivered: 0,
+    opened: 0,
+    clicked: 0,
+    bounced: 0,
+    complained: 0,
+    failed: 0,
+    hardBounced: 0,
+    softBounced: 0,
+  };
+
   it("renders the status badge", () => {
     render(<BatchStats batch={completedBatch} organizationId="org-1" />);
     expect(screen.getByText("Completed")).toBeTruthy();
   });
 
   it("renders the sankey chart with node labels", () => {
-    render(<BatchStats batch={completedBatch} organizationId="org-1" />);
-    expect(screen.getByText("Sent")).toBeTruthy();
-    expect(screen.getByText("Delivered")).toBeTruthy();
-    expect(screen.getByText("Opened")).toBeTruthy();
-    expect(screen.getByText("Clicked")).toBeTruthy();
+    // Scoped to the SVG: the new outcome-numbers row (added by this plan)
+    // also renders a "Sent" label/count outside the chart, so an unscoped
+    // query would match both and throw on ambiguity.
+    const { container } = render(
+      <BatchStats batch={completedBatch} organizationId="org-1" />
+    );
+    const svg = Array.from(container.querySelectorAll("svg")).find(
+      (el) => el.querySelector("rect") !== null
+    ) as unknown as HTMLElement;
+    const chart = within(svg);
+    expect(chart.getByText("Sent")).toBeTruthy();
+    expect(chart.getByText("Delivered")).toBeTruthy();
+    expect(chart.getByText("Opened")).toBeTruthy();
+    expect(chart.getByText("Clicked")).toBeTruthy();
   });
 
   it("renders sankey chart counts", () => {
-    render(<BatchStats batch={completedBatch} organizationId="org-1" />);
-    expect(screen.getByText("12,450")).toBeTruthy();
-    expect(screen.getByText("12,380")).toBeTruthy();
-    expect(screen.getByText("4,952")).toBeTruthy();
-    expect(screen.getByText("1,238")).toBeTruthy();
+    // Scoped to the SVG for the same reason as above: "12,450" is both the
+    // Sent node's value in the chart and the Sent number in the outcome row.
+    const { container } = render(
+      <BatchStats batch={completedBatch} organizationId="org-1" />
+    );
+    const svg = Array.from(container.querySelectorAll("svg")).find(
+      (el) => el.querySelector("rect") !== null
+    ) as unknown as HTMLElement;
+    const chart = within(svg);
+    expect(chart.getByText("12,450")).toBeTruthy();
+    expect(chart.getByText("12,380")).toBeTruthy();
+    expect(chart.getByText("4,952")).toBeTruthy();
+    expect(chart.getByText("1,238")).toBeTruthy();
   });
 
   it("renders an SVG for the sankey diagram", () => {
@@ -70,5 +102,56 @@ describe("BatchStats", () => {
   it("renders duration", () => {
     render(<BatchStats batch={completedBatch} organizationId="org-1" />);
     expect(screen.getByText(/30m/)).toBeTruthy();
+  });
+
+  it("renders the outcome numbers for a zero-send batch", () => {
+    render(<BatchStats batch={zeroSendBatch} organizationId="org-1" />);
+    expect(screen.getByText("Sent")).toBeTruthy();
+    expect(screen.getByText("Failed")).toBeTruthy();
+    expect(screen.getByText("Not sent")).toBeTruthy();
+  });
+
+  it("names the shortfall for a zero-send batch", () => {
+    render(<BatchStats batch={zeroSendBatch} organizationId="org-1" />);
+    expect(
+      screen.getByText(/1,200 of 1,200 recipients were never sent/)
+    ).toBeTruthy();
+  });
+
+  it("does not present a zero-send batch as success", () => {
+    render(<BatchStats batch={zeroSendBatch} organizationId="org-1" />);
+    expect(screen.queryByText("Completed")).toBeNull();
+    expect(screen.getByText("Completed — nothing sent")).toBeTruthy();
+  });
+
+  it("shows failures on screen for a partially-failed terminal batch", () => {
+    // Because sent > 0 here, the Sankey chart also renders and shows its own
+    // "1,199" Failed-node value — so this asserts the count is present
+    // OUTSIDE the chart (the actual point of the test: not only inside the
+    // chart), rather than using a single getByText that would ambiguously
+    // match both.
+    const { container } = render(
+      <BatchStats
+        batch={{
+          ...completedBatch,
+          sent: 1,
+          failed: 1199,
+          totalRecipients: 1200,
+          processedRecipients: 1200,
+        }}
+        organizationId="org-1"
+      />
+    );
+    const matches = screen.getAllByText("1,199");
+    const outsideChart = matches.some((el) => !el.closest("svg"));
+    expect(outsideChart).toBe(true);
+    expect(container.querySelector("svg")).toBeTruthy();
+  });
+
+  it("still renders the plain Completed badge and Sankey labels for a healthy batch", () => {
+    render(<BatchStats batch={completedBatch} organizationId="org-1" />);
+    expect(screen.getByText("Completed")).toBeTruthy();
+    expect(screen.queryByText("Completed — nothing sent")).toBeNull();
+    expect(screen.getByText("Delivered")).toBeTruthy();
   });
 });

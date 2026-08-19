@@ -36,6 +36,15 @@ export function BatchStats({
   unsubscribeCount,
 }: BatchStatsProps) {
   const hasData = batch.sent > 0;
+  const isDraft = batch.status === "draft";
+  const isTerminal =
+    batch.status === "completed" ||
+    batch.status === "failed" ||
+    batch.status === "cancelled";
+  const notSent = Math.max(
+    0,
+    batch.totalRecipients - batch.processedRecipients
+  );
 
   return (
     <Card>
@@ -45,10 +54,40 @@ export function BatchStats({
           lastChunkAt={batch.lastChunkAt}
           pausedReason={batch.pausedReason}
           processedRecipients={batch.processedRecipients}
+          sent={batch.sent}
           startedAt={batch.startedAt}
           status={batch.status}
           totalRecipients={batch.totalRecipients}
         />
+        {!isDraft && (
+          <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+            <div>
+              <span className="font-semibold text-lg">
+                {batch.sent.toLocaleString("en-US")}
+              </span>{" "}
+              <span className="text-muted-foreground text-sm">Sent</span>
+            </div>
+            <div>
+              <span className="font-semibold text-lg">
+                {batch.failed.toLocaleString("en-US")}
+              </span>{" "}
+              <span className="text-muted-foreground text-sm">Failed</span>
+            </div>
+            <div>
+              <span className="font-semibold text-lg">
+                {notSent.toLocaleString("en-US")}
+              </span>{" "}
+              <span className="text-muted-foreground text-sm">Not sent</span>
+            </div>
+          </div>
+        )}
+        {isTerminal && batch.sent < batch.totalRecipients && (
+          <p className="text-muted-foreground text-sm">
+            {(batch.totalRecipients - batch.sent).toLocaleString("en-US")} of{" "}
+            {batch.totalRecipients.toLocaleString("en-US")} recipients were
+            never sent.
+          </p>
+        )}
         {unsubscribeCount != null && unsubscribeCount > 0 && (
           <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
             <span
