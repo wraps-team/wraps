@@ -3,13 +3,15 @@ import {
   desc,
   eq,
   exists,
+  ilike,
   inArray,
   isNotNull,
   lte,
+  or,
   type SQL,
   sql,
 } from "drizzle-orm";
-import { db } from "../index";
+import { db, escapeIlike } from "../index";
 import { awsAccount } from "../schema/app";
 import {
   batchSend,
@@ -243,15 +245,26 @@ export async function listBroadcasts(
     pageSize?: number;
     status?: BroadcastRecord["status"];
     channel?: Channel;
+    search?: string;
   },
   dbClient: DbClient = db
 ): Promise<{ batches: BroadcastWithMeta[]; total: number }> {
-  const { page = 1, pageSize = 20, status, channel } = options;
+  const { page = 1, pageSize = 20, status, channel, search } = options;
   const offset = (page - 1) * pageSize;
 
   const conditions = [eq(batchSend.organizationId, organizationId)];
   if (status) conditions.push(eq(batchSend.status, status));
   if (channel) conditions.push(eq(batchSend.channel, channel));
+  if (search) {
+    const pattern = `%${escapeIlike(search)}%`;
+    const match = or(
+      ilike(batchSend.name, pattern),
+      ilike(batchSend.subject, pattern)
+    );
+    if (match) {
+      conditions.push(match);
+    }
+  }
 
   const [totalResult] = await dbClient
     .select({ count: sql<number>`count(*)::int` })

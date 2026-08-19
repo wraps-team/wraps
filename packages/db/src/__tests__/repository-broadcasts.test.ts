@@ -6,6 +6,7 @@ import {
   countBroadcastRecipients,
   getSampleRecipientsWithProperties,
   listBroadcastRecipients,
+  listBroadcasts,
 } from "../repositories/broadcasts";
 import {
   awsAccount,
@@ -563,5 +564,229 @@ describe("Repository: listBroadcastRecipients", () => {
         "sent3@example.com",
       ].sort()
     );
+  });
+});
+
+describe("Repository: listBroadcasts", () => {
+  const listOrgId = `repo-list-org-${crypto.randomUUID().slice(0, 8)}`;
+  const listCrossOrgId = `repo-list-crossorg-${crypto.randomUUID().slice(0, 8)}`;
+  const listEscapeOrgId = `repo-list-escorg-${crypto.randomUUID().slice(0, 8)}`;
+
+  const batch1Id = `repo-list-batch1-${crypto.randomUUID().slice(0, 8)}`;
+  const batch2Id = `repo-list-batch2-${crypto.randomUUID().slice(0, 8)}`;
+  const batch3Id = `repo-list-batch3-${crypto.randomUUID().slice(0, 8)}`;
+  const batch4Id = `repo-list-batch4-${crypto.randomUUID().slice(0, 8)}`;
+  const batch5Id = `repo-list-batch5-${crypto.randomUUID().slice(0, 8)}`;
+  const crossRowId = `repo-list-crossrow-${crypto.randomUUID().slice(0, 8)}`;
+  const escTargetId = `repo-list-esctarget-${crypto.randomUUID().slice(0, 8)}`;
+  const escDistractorId = `repo-list-escdistractor-${crypto.randomUUID().slice(0, 8)}`;
+
+  beforeAll(async () => {
+    await db
+      .insert(organization)
+      .values([
+        {
+          id: listOrgId,
+          name: "List Broadcasts Test Org",
+          slug: `list-repo-test-${listOrgId.slice(-8)}`,
+          createdAt: new Date(),
+        },
+        {
+          id: listCrossOrgId,
+          name: "List Broadcasts Cross Org",
+          slug: `list-repo-cross-${listCrossOrgId.slice(-8)}`,
+          createdAt: new Date(),
+        },
+        {
+          id: listEscapeOrgId,
+          name: "List Broadcasts Escape Org",
+          slug: `list-repo-esc-${listEscapeOrgId.slice(-8)}`,
+          createdAt: new Date(),
+        },
+      ])
+      .onConflictDoNothing();
+
+    const baseCreatedAt = new Date("2026-03-01T00:00:00Z");
+    const at = (offsetSeconds: number) =>
+      new Date(baseCreatedAt.getTime() + offsetSeconds * 1000);
+
+    await db
+      .insert(batchSend)
+      .values([
+        {
+          id: batch1Id,
+          organizationId: listOrgId,
+          channel: "email",
+          status: "completed",
+          name: "Spring Sale Blast",
+          subject: "Everything must go",
+          createdAt: at(1),
+        },
+        {
+          id: batch2Id,
+          organizationId: listOrgId,
+          channel: "email",
+          status: "completed",
+          name: "Weekly Newsletter",
+          subject: "This week in review",
+          createdAt: at(2),
+        },
+        {
+          id: batch3Id,
+          organizationId: listOrgId,
+          channel: "email",
+          status: "draft",
+          name: "Product Launch Update",
+          subject: "Announcing our new product",
+          createdAt: at(3),
+        },
+        {
+          id: batch4Id,
+          organizationId: listOrgId,
+          channel: "email",
+          status: "scheduled",
+          name: "Autumn Product Drop",
+          subject: "Cozy season is here",
+          createdAt: at(4),
+        },
+        {
+          id: batch5Id,
+          organizationId: listOrgId,
+          channel: "email",
+          status: "completed",
+          name: "October Digest",
+          subject: "Fall favorites",
+          createdAt: at(5),
+        },
+        // Same distinctive term as batch1's name, but under a different org —
+        // the org-scoping guard case.
+        {
+          id: crossRowId,
+          organizationId: listCrossOrgId,
+          channel: "email",
+          status: "completed",
+          name: "Spring Sale Blast",
+          subject: "Copycat",
+          createdAt: at(6),
+        },
+        // escapeIlike guard: escDistractor's name ("Save 50Xoff today")
+        // matches the UNESCAPED ilike pattern for "50%_off" (% and _ act as
+        // SQL wildcards: 50 + <any-seq> + <any-single-char> + off), so it
+        // must NOT come back once escaping is applied.
+        {
+          id: escTargetId,
+          organizationId: listEscapeOrgId,
+          channel: "email",
+          status: "completed",
+          name: "Save 50%_off today",
+          subject: "promo",
+          createdAt: at(7),
+        },
+        {
+          id: escDistractorId,
+          organizationId: listEscapeOrgId,
+          channel: "email",
+          status: "completed",
+          name: "Save 50Xoff today",
+          subject: "promo",
+          createdAt: at(8),
+        },
+      ])
+      .onConflictDoNothing();
+  });
+
+  afterAll(async () => {
+    await db.delete(batchSend).where(eq(batchSend.organizationId, listOrgId));
+    await db
+      .delete(batchSend)
+      .where(eq(batchSend.organizationId, listCrossOrgId));
+    await db
+      .delete(batchSend)
+      .where(eq(batchSend.organizationId, listEscapeOrgId));
+    await db.delete(organization).where(eq(organization.id, listOrgId));
+    await db.delete(organization).where(eq(organization.id, listCrossOrgId));
+    await db.delete(organization).where(eq(organization.id, listEscapeOrgId));
+  });
+
+  it("total is the unfiltered count, not the page size", async () => {
+    const { batches, total } = await listBroadcasts(listOrgId, {
+      page: 1,
+      pageSize: 2,
+    });
+
+    expect(batches).toHaveLength(2);
+    expect(total).toBe(5);
+  });
+
+  it("page 2 returns different rows than page 1", async () => {
+    const page1 = await listBroadcasts(listOrgId, { page: 1, pageSize: 2 });
+    const page2 = await listBroadcasts(listOrgId, { page: 2, pageSize: 2 });
+
+    const page1Ids = new Set(page1.batches.map((b) => b.id));
+    for (const b of page2.batches) {
+      expect(page1Ids.has(b.id)).toBe(false);
+    }
+  });
+
+  it("search matches on name", async () => {
+    const { batches, total } = await listBroadcasts(listOrgId, {
+      search: "Spring Sale",
+    });
+
+    expect(total).toBe(1);
+    expect(batches.map((b) => b.id)).toEqual([batch1Id]);
+  });
+
+  it("search matches on subject", async () => {
+    const { batches, total } = await listBroadcasts(listOrgId, {
+      search: "Announcing our",
+    });
+
+    expect(total).toBe(1);
+    expect(batches.map((b) => b.id)).toEqual([batch3Id]);
+  });
+
+  it("search narrows total to the filtered count, not the org's full count", async () => {
+    // "Product" matches batch3's and batch4's names only — asserting a count
+    // strictly between 0 and the org's full 5 rows is the guard against a
+    // count query that silently ignores the search filter.
+    const { batches, total } = await listBroadcasts(listOrgId, {
+      search: "Product",
+    });
+
+    expect(total).toBe(2);
+    expect(batches).toHaveLength(2);
+    expect(batches.map((b) => b.id).sort()).toEqual(
+      [batch3Id, batch4Id].sort()
+    );
+  });
+
+  it("status filter composes with search", async () => {
+    const { batches, total } = await listBroadcasts(listOrgId, {
+      search: "Product",
+      status: "draft",
+    });
+
+    expect(total).toBe(1);
+    expect(batches.map((b) => b.id)).toEqual([batch3Id]);
+  });
+
+  it("search is org-scoped — a matching row in another org is excluded", async () => {
+    const { batches, total } = await listBroadcasts(listOrgId, {
+      search: "Spring Sale",
+    });
+
+    expect(total).toBe(1);
+    expect(batches.some((b) => b.id === crossRowId)).toBe(false);
+  });
+
+  it("escapes % and _ in the search term instead of treating them as SQL wildcards", async () => {
+    const { batches, total } = await listBroadcasts(listEscapeOrgId, {
+      search: "50%_off",
+    });
+
+    expect(total).toBe(1);
+    expect(batches.map((b) => b.id)).toEqual([escTargetId]);
+    expect(batches.some((b) => b.id === escDistractorId)).toBe(false);
   });
 });

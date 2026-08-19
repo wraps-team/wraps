@@ -7,8 +7,10 @@ import {
   type EventFilters,
   escapeIlike,
   exportContactEvents,
+  listBroadcasts,
 } from "@wraps/db";
 import { and, desc, eq, ilike, sql } from "drizzle-orm";
+import type { BatchSendWithMeta, BatchStatus } from "@/lib/batch";
 import type {
   ContactStatus,
   ContactWithMeta,
@@ -155,6 +157,76 @@ export const exportAllContacts = orgAction(
         complainedAt: c.complainedAt,
       })),
       total: contacts.length,
+    };
+  }
+);
+
+export const exportAllBroadcasts = orgAction(
+  {
+    name: "exportAllBroadcasts",
+    resource: "broadcasts",
+    permission: ["read"],
+    orgId: (
+      organizationId: string,
+      _options?: { search?: string; status?: BatchStatus }
+    ) => organizationId,
+    onError: "Failed to export broadcasts",
+  },
+  async (
+    ctx,
+    organizationId: string,
+    options: { search?: string; status?: BatchStatus } = {}
+  ): Promise<
+    | {
+        success: true;
+        batches: BatchSendWithMeta[];
+        total: number;
+        truncated: boolean;
+      }
+    | { success: false; error: string }
+  > => {
+    const { batches, total } = await listBroadcasts(organizationId, {
+      search: options.search,
+      status: options.status,
+      page: 1,
+      pageSize: MAX_EXPORT_ROWS,
+    });
+
+    return {
+      success: true,
+      batches: batches.map((b) => ({
+        id: b.id,
+        name: b.name,
+        channel: b.channel as BatchSendWithMeta["channel"],
+        status: b.status as BatchStatus,
+        subject: b.subject,
+        previewText: b.previewText,
+        from: b.from,
+        fromName: b.fromName,
+        replyTo: b.replyTo,
+        templateId: b.emailTemplateId,
+        templateName: b.emailTemplate?.name,
+        totalRecipients: b.totalRecipients,
+        processedRecipients: b.processedRecipients,
+        sent: b.sent,
+        delivered: b.delivered,
+        failed: b.failed,
+        opened: b.opened,
+        clicked: b.clicked,
+        bounced: b.bounced,
+        complained: b.complained,
+        errorMessage: b.errorMessage,
+        pausedReason: b.pausedReason,
+        lastChunkAt: b.lastChunkAt,
+        scheduledFor: b.scheduledFor,
+        startedAt: b.startedAt,
+        completedAt: b.completedAt,
+        createdAt: b.createdAt,
+        createdBy: b.createdByUser,
+        awsAccount: b.awsAccount,
+      })),
+      total,
+      truncated: total > batches.length,
     };
   }
 );

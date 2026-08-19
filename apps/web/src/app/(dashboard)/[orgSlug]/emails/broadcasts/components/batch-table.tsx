@@ -4,7 +4,6 @@ import {
   type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   type RowSelectionState,
@@ -22,6 +21,13 @@ import {
   DropdownMenuTrigger,
 } from "@wraps/ui/components/ui/dropdown-menu";
 import { Progress } from "@wraps/ui/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@wraps/ui/components/ui/select";
 import {
   Table,
   TableBody,
@@ -69,13 +75,16 @@ import {
   deleteDraftBatchSend,
   duplicateBatchSend,
 } from "@/actions/batch";
+import { exportAllBroadcasts } from "@/actions/export";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import {
   BATCH_STATUS_COLORS,
   BATCH_STATUS_LABELS,
+  BATCH_STATUSES,
   type BatchSendWithMeta,
+  type BatchStatus,
   calculateProgress,
   getPausedPresentation,
 } from "@/lib/batch";
@@ -86,6 +95,11 @@ type BatchTableProps = {
   batches: BatchSendWithMeta[];
   organizationId: string;
   orgSlug: string;
+  page: number;
+  pageSize: number;
+  search?: string;
+  status?: string;
+  total: number;
   userRole: string;
 };
 
@@ -93,6 +107,11 @@ export function BatchTable({
   batches,
   organizationId,
   orgSlug,
+  page,
+  pageSize,
+  search,
+  status,
+  total,
   userRole,
 }: BatchTableProps) {
   const router = useRouter();
@@ -106,9 +125,9 @@ export function BatchTable({
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [globalFilter, setGlobalFilter] = useState(
-    searchParams.get("search") || ""
-  );
+  // Controlled search input only — search is server-side (see updateSearchParams
+  // below), so this no longer feeds a client-side table filter.
+  const [searchInput, setSearchInput] = useState(search ?? "");
   const [isExporting, setIsExporting] = useState(false);
 
   // Ref for search input to enable keyboard shortcut
@@ -179,13 +198,37 @@ export function BatchTable({
     [router, orgSlug, searchParams]
   );
 
-  const handleSearch = useCallback(
+  // Debounce the search commit — pushing a route on every keystroke would
+  // refetch on every character. Only pushes when the input actually differs
+  // from the URL's current search value, so mount and unrelated param changes
+  // (status, page) never trigger a redundant navigation.
+  useEffect(() => {
+    const currentSearch = searchParams.get("search") || "";
+    if (searchInput === currentSearch) {
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      updateSearchParams({ search: searchInput || undefined, page: "1" });
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchInput, searchParams, updateSearchParams]);
+
+  const handleStatusChange = useCallback(
     (value: string) => {
-      setGlobalFilter(value);
-      updateSearchParams({ search: value || undefined });
+      updateSearchParams({
+        status: value === "all" ? undefined : value,
+        page: "1",
+      });
     },
     [updateSearchParams]
   );
+
+  const hasActiveFilters = !!(search || status);
+
+  const clearFilters = useCallback(() => {
+    setSearchInput("");
+    updateSearchParams({ search: undefined, status: undefined, page: "1" });
+  }, [updateSearchParams]);
 
   const columns = useMemo(
     () => [
@@ -497,15 +540,19 @@ export function BatchTable({
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    manualPagination: true,
+    pageCount: Math.ceil(total / pageSize),
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
-      globalFilter,
+      pagination: {
+        pageIndex: page - 1,
+        pageSize,
+      },
     },
     getRowId: (row) => row.id,
   });
@@ -514,20 +561,38 @@ export function BatchTable({
     <div className="w-full space-y-4">
       {/* Filters Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 items-center space-x-2">
+        <div className="flex flex-1 items-center gap-2">
           <div className="relative max-w-sm flex-1">
             <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               className="pl-9 pr-16"
-              onChange={(event) => handleSearch(event.target.value)}
+              onChange={(event) => setSearchInput(event.target.value)}
               placeholder="Search broadcasts"
               ref={searchInputRef}
-              value={globalFilter}
+              value={searchInput}
             />
             <Kbd className="absolute top-1/2 right-2 -translate-y-1/2 hidden sm:flex">
               ⌘F
             </Kbd>
           </div>
+          <Select onValueChange={handleStatusChange} value={status || "all"}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {BATCH_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {BATCH_STATUS_LABELS[s]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {hasActiveFilters && (
+            <Button onClick={clearFilters} size="sm" variant="ghost">
+              Clear filters
+            </Button>
+          )}
         </div>
         {/* Button Group: Export | New Broadcast */}
         <div className="flex w-full sm:w-auto">
@@ -540,25 +605,45 @@ export function BatchTable({
                     : "focus:z-10"
                 }
                 disabled={isExporting}
-                onClick={() => {
+                onClick={async () => {
                   setIsExporting(true);
                   try {
                     const selectedRows = table.getSelectedRowModel().rows;
-                    const rows =
-                      selectedRows.length > 0
-                        ? selectedRows.map((r) => r.original)
-                        : table
-                            .getFilteredRowModel()
-                            .rows.map((r) => r.original);
-                    exportTableToCSV(
-                      rows,
-                      broadcastCSVColumns,
-                      `broadcasts-${new Date().toISOString().slice(0, 10)}.csv`
-                    );
-                    if (rows.length > 0) {
+                    if (selectedRows.length > 0) {
+                      // Export selected rows as-is — the user picked them, so
+                      // this is honest even though it is only the loaded page.
+                      const rows = selectedRows.map((r) => r.original);
+                      exportTableToCSV(
+                        rows,
+                        broadcastCSVColumns,
+                        `broadcasts-${new Date().toISOString().slice(0, 10)}.csv`
+                      );
                       toast.success(
                         `Exported ${rows.length} broadcasts to CSV`
                       );
+                      return;
+                    }
+
+                    // Nothing selected: fetch everything matching the current
+                    // filters server-side, so the export is never silently
+                    // limited to the loaded page.
+                    const result = await exportAllBroadcasts(organizationId, {
+                      search,
+                      status: status as BatchStatus | undefined,
+                    });
+                    if (result.success) {
+                      exportTableToCSV(
+                        result.batches,
+                        broadcastCSVColumns,
+                        `broadcasts-${new Date().toISOString().slice(0, 10)}.csv`
+                      );
+                      toast.success(
+                        result.truncated
+                          ? `Exported the first ${result.batches.length.toLocaleString()} of ${result.total.toLocaleString()} broadcasts`
+                          : `Exported ${result.batches.length.toLocaleString()} broadcasts to CSV`
+                      );
+                    } else {
+                      toast.error(result.error);
                     }
                   } finally {
                     setIsExporting(false);
@@ -612,7 +697,7 @@ export function BatchTable({
             ))}
           </TableHeader>
           <TableBody>
-            {batches.length > 0 ? (
+            {table.getRowModel().rows.length > 0 ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   className="cursor-pointer hover:bg-muted/50"
@@ -643,14 +728,28 @@ export function BatchTable({
                 >
                   <div className="flex flex-col items-center gap-2">
                     <Mail className="h-8 w-8 text-muted-foreground" />
-                    <p className="text-muted-foreground">No broadcasts yet</p>
-                    {canManage && (
-                      <Button asChild size="sm" variant="outline">
-                        <Link href={`/${orgSlug}/emails/broadcasts/new`}>
-                          <Plus className="mr-2 h-4 w-4" />
-                          Create your first broadcast
-                        </Link>
+                    <p className="text-muted-foreground">
+                      {hasActiveFilters
+                        ? "No broadcasts match your filters"
+                        : "No broadcasts yet"}
+                    </p>
+                    {hasActiveFilters ? (
+                      <Button
+                        onClick={clearFilters}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Clear filters
                       </Button>
+                    ) : (
+                      canManage && (
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/${orgSlug}/emails/broadcasts/new`}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create your first broadcast
+                          </Link>
+                        </Button>
+                      )
                     )}
                   </div>
                 </TableCell>
@@ -661,23 +760,26 @@ export function BatchTable({
       </div>
 
       {/* Pagination */}
-      {batches.length > 0 && (
+      {total > 0 && (
         <div className="flex items-center justify-end space-x-2 py-4">
           <div className="flex-1 text-muted-foreground text-sm">
-            {table.getFilteredRowModel().rows.length} broadcast(s)
+            Showing {batches.length} of {total} broadcast(s)
           </div>
           <div className="flex items-center space-x-2">
             <Button
-              disabled={!table.getCanPreviousPage()}
-              onClick={() => table.previousPage()}
+              disabled={page <= 1}
+              onClick={() => updateSearchParams({ page: `${page - 1}` })}
               size="sm"
               variant="outline"
             >
               Previous
             </Button>
+            <div className="text-sm">
+              Page {page} of {Math.ceil(total / pageSize) || 1}
+            </div>
             <Button
-              disabled={!table.getCanNextPage()}
-              onClick={() => table.nextPage()}
+              disabled={page >= Math.ceil(total / pageSize)}
+              onClick={() => updateSearchParams({ page: `${page + 1}` })}
               size="sm"
               variant="outline"
             >

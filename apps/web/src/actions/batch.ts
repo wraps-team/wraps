@@ -103,6 +103,7 @@ export const listBatchSends = orgAction(
         pageSize?: number;
         status?: BatchStatus;
         channel?: Channel;
+        search?: string;
       } = {}
     ) => organizationId,
     onError: "Failed to fetch batch sends",
@@ -115,6 +116,7 @@ export const listBatchSends = orgAction(
       pageSize?: number;
       status?: BatchStatus;
       channel?: Channel;
+      search?: string;
     } = {}
   ): Promise<ListBatchesResult> => {
     const { batches, total } = await listBroadcasts(organizationId, options);

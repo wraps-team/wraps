@@ -1,5 +1,5 @@
 import { auth } from "@wraps/auth";
-import { Send } from "lucide-react";
+import { AlertTriangle, Send } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listBatchSends } from "@/actions/batch";
@@ -12,6 +12,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import type { BatchStatus } from "@/lib/batch";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { BatchTable } from "./components/batch-table";
 
@@ -32,7 +33,7 @@ export default async function SendPage({
   searchParams,
 }: SendPageProps) {
   const { orgSlug } = await params;
-  const { page = "1", pageSize = "20" } = await searchParams;
+  const { page = "1", pageSize = "20", search, status } = await searchParams;
 
   const session = await auth.api.getSession({
     headers: await import("next/headers").then((mod) => mod.headers()),
@@ -51,19 +52,46 @@ export default async function SendPage({
     redirect("/");
   }
 
+  const canManage =
+    orgWithMembership.userRole === "owner" ||
+    orgWithMembership.userRole === "admin";
+
   // Fetch batch sends
   const batchesResult = await listBatchSends(orgWithMembership.id, {
     page: Number.parseInt(page, 10),
     pageSize: Number.parseInt(pageSize, 10),
+    search,
+    status: status as BatchStatus | undefined,
   });
 
   const batches = batchesResult.success ? batchesResult.batches : [];
+  const total = batchesResult.success ? batchesResult.total : 0;
 
-  if (batches.length === 0) {
-    const canManage =
-      orgWithMembership.userRole === "owner" ||
-      orgWithMembership.userRole === "admin";
+  const hasFilters = !!(search || status);
+  const isEmpty = total === 0 && !hasFilters;
 
+  if (!batchesResult.success) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-4 lg:p-6">
+        <Empty className="max-w-2xl border border-destructive/30">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <AlertTriangle className="size-6 text-destructive" />
+            </EmptyMedia>
+            <EmptyTitle>We couldn't load your broadcasts.</EmptyTitle>
+            <EmptyDescription>{batchesResult.error}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button asChild variant="outline">
+              <Link href={`/${orgSlug}/emails/broadcasts`}>Try again</Link>
+            </Button>
+          </EmptyContent>
+        </Empty>
+      </div>
+    );
+  }
+
+  if (isEmpty) {
     return (
       <div className="flex flex-1 items-center justify-center p-4 lg:p-6">
         <Empty className="max-w-2xl border">
@@ -108,6 +136,11 @@ export default async function SendPage({
           batches={batches}
           organizationId={orgWithMembership.id}
           orgSlug={orgSlug}
+          page={Number.parseInt(page, 10)}
+          pageSize={Number.parseInt(pageSize, 10)}
+          search={search}
+          status={status}
+          total={total}
           userRole={orgWithMembership.userRole}
         />
       </div>

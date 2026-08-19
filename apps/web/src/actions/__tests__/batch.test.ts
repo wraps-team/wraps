@@ -21,12 +21,14 @@ import {
   it,
   vi,
 } from "vitest";
+import { exportAllBroadcasts } from "@/actions/export";
 import { publishTemplateToSES } from "@/actions/templates";
 import { checkFeatureAccess } from "@/lib/plan-limits";
 import {
   deleteDraftBatchSend,
   duplicateBatchSend,
   exportBroadcastRecipients,
+  listBatchSends,
   listBroadcastRecipientOutcomes,
   promoteDraftToSend,
   saveDraftBatchSend,
@@ -195,13 +197,15 @@ vi.mock("@/lib/plan-limits", () => ({
   checkFeatureAccess: vi.fn(async () => ({ allowed: true })),
 }));
 
-// listBroadcastRecipients: passthrough to the real (real-DB) implementation
-// by default — every test except the truncation test below hits the real
-// repository function against the real DB, same as the rest of this file.
-// Only the truncation test overrides this for one call, to avoid seeding
-// 50,000+ rows to observe MAX_RECIPIENT_EXPORT_ROWS truncation.
-const { mockListBroadcastRecipients } = vi.hoisted(() => ({
+// listBroadcastRecipients / listBroadcasts: passthrough to the real (real-DB)
+// implementation by default — every test except the two truncation tests
+// below hits the real repository function against the real DB, same as the
+// rest of this file. The truncation tests override one call each, to avoid
+// seeding 50,000+ rows to observe MAX_RECIPIENT_EXPORT_ROWS / MAX_EXPORT_ROWS
+// truncation.
+const { mockListBroadcastRecipients, mockListBroadcasts } = vi.hoisted(() => ({
   mockListBroadcastRecipients: vi.fn(),
+  mockListBroadcasts: vi.fn(),
 }));
 
 vi.mock("@wraps/db", async (importOriginal) => {
@@ -209,9 +213,11 @@ vi.mock("@wraps/db", async (importOriginal) => {
   mockListBroadcastRecipients.mockImplementation(
     actual.listBroadcastRecipients
   );
+  mockListBroadcasts.mockImplementation(actual.listBroadcasts);
   return {
     ...actual,
     listBroadcastRecipients: mockListBroadcastRecipients,
+    listBroadcasts: mockListBroadcasts,
   };
 });
 
@@ -1194,6 +1200,109 @@ describe("listBroadcastRecipientOutcomes / exportBroadcastRecipients", () => {
     if (!result.success) return;
     expect(result.total).toBe(2);
     expect(result.recipients).toHaveLength(2);
+    expect(result.truncated).toBe(false);
+  });
+});
+
+describe("listBatchSends / exportAllBroadcasts", () => {
+  afterEach(async () => {
+    await db
+      .delete(batchSend)
+      .where(eq(batchSend.organizationId, testOrganization.id));
+  });
+
+  async function seedListBatches() {
+    const [batchA] = await db
+      .insert(batchSend)
+      .values({
+        organizationId: testOrganization.id,
+        channel: "email",
+        status: "completed",
+        name: "Action Test Alpha",
+        subject: "alpha subject",
+        createdBy: testUser.id,
+      })
+      .returning();
+    const [batchB] = await db
+      .insert(batchSend)
+      .values({
+        organizationId: testOrganization.id,
+        channel: "email",
+        status: "draft",
+        name: "Action Test Beta",
+        subject: "beta subject",
+        createdBy: testUser.id,
+      })
+      .returning();
+    if (!(batchA && batchB)) {
+      throw new Error("failed to seed batches for listBatchSends test");
+    }
+    return { batchA, batchB };
+  }
+
+  it("listBatchSends forwards search to the repository and total reflects the filter", async () => {
+    await seedListBatches();
+
+    const result = await listBatchSends(testOrganization.id, {
+      search: "Alpha",
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.total).toBe(1);
+    expect(result.batches.map((b) => b.name)).toEqual(["Action Test Alpha"]);
+  });
+
+  it("listBatchSends forwards status to the repository", async () => {
+    await seedListBatches();
+
+    const result = await listBatchSends(testOrganization.id, {
+      status: "draft",
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.total).toBe(1);
+    expect(result.batches.map((b) => b.name)).toEqual(["Action Test Beta"]);
+  });
+
+  it("exportAllBroadcasts sets truncated: true when total exceeds the returned row count", async () => {
+    await seedListBatches();
+
+    // Override for this one call so we can observe the truncation math
+    // (`total > batches.length`) without seeding more than MAX_EXPORT_ROWS
+    // (50,000) real rows.
+    mockListBroadcasts.mockImplementationOnce(async () => ({
+      batches: [
+        {
+          id: "truncation-test-batch-1",
+          name: "Fake truncated batch",
+          channel: "email",
+          status: "completed",
+          createdAt: new Date(),
+        },
+      ],
+      total: 5,
+    }));
+
+    const result = await exportAllBroadcasts(testOrganization.id, {});
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.total).toBe(5);
+    expect(result.batches).toHaveLength(1);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("exportAllBroadcasts sets truncated: false when every matching row is returned", async () => {
+    await seedListBatches();
+
+    const result = await exportAllBroadcasts(testOrganization.id, {});
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.total).toBe(2);
+    expect(result.batches).toHaveLength(2);
     expect(result.truncated).toBe(false);
   });
 });
