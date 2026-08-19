@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { BatchStats } from "./components/batch-stats";
 import { CancelBatchButton } from "./components/cancel-button";
+import { RecipientsPanel } from "./components/recipients-panel";
 import { isUnsubscribeUrl } from "./components/sankey-utils";
 
 type BatchDetailPageProps = {
@@ -176,6 +177,13 @@ export default async function BatchDetailPage({
         organizationId={orgWithMembership.id}
         unsubscribeCount={unsubscribeCount}
       />
+
+      {batch.status !== "draft" && (
+        <RecipientsPanel
+          batchId={batch.id}
+          organizationId={orgWithMembership.id}
+        />
+      )}
 
       {/* Email Details */}
       {batch.channel === "email" && (

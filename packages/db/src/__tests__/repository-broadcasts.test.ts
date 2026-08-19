@@ -5,8 +5,16 @@ import {
   checkSegmentUsable,
   countBroadcastRecipients,
   getSampleRecipientsWithProperties,
+  listBroadcastRecipients,
 } from "../repositories/broadcasts";
-import { contact, organization, segment } from "../schema";
+import {
+  awsAccount,
+  batchSend,
+  contact,
+  messageSend,
+  organization,
+  segment,
+} from "../schema";
 
 const orgId = `repo-broadcast-test-org-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -304,5 +312,256 @@ describe("Repository: countBroadcastRecipients fails closed on bad segments", ()
     });
 
     expect(count).toBe(0);
+  });
+});
+
+describe("Repository: listBroadcastRecipients", () => {
+  const recipOrgId = `repo-recip-org-${crypto.randomUUID().slice(0, 8)}`;
+  const crossOrgId = `repo-recip-crossorg-${crypto.randomUUID().slice(0, 8)}`;
+  const recipAwsAccountId = `repo-recip-aws-${crypto.randomUUID().slice(0, 8)}`;
+  const crossAwsAccountId = `repo-recip-cross-aws-${crypto.randomUUID().slice(0, 8)}`;
+  const recipBatchId = `repo-recip-batch-${crypto.randomUUID().slice(0, 8)}`;
+
+  const failed1Id = `repo-recip-msg-failed1-${crypto.randomUUID().slice(0, 8)}`;
+  const failed2Id = `repo-recip-msg-failed2-${crypto.randomUUID().slice(0, 8)}`;
+  const sent1Id = `repo-recip-msg-sent1-${crypto.randomUUID().slice(0, 8)}`;
+  const sent2Id = `repo-recip-msg-sent2-${crypto.randomUUID().slice(0, 8)}`;
+  const sent3Id = `repo-recip-msg-sent3-${crypto.randomUUID().slice(0, 8)}`;
+  const crossOrgRowId = `repo-recip-msg-crossorg-${crypto.randomUUID().slice(0, 8)}`;
+
+  beforeAll(async () => {
+    await db
+      .insert(organization)
+      .values([
+        {
+          id: recipOrgId,
+          name: "Recipients Repo Test Org",
+          slug: `recip-repo-test-${recipOrgId.slice(-8)}`,
+          createdAt: new Date(),
+        },
+        {
+          id: crossOrgId,
+          name: "Recipients Repo Cross Org",
+          slug: `recip-repo-cross-${crossOrgId.slice(-8)}`,
+          createdAt: new Date(),
+        },
+      ])
+      .onConflictDoNothing();
+
+    await db
+      .insert(awsAccount)
+      .values([
+        {
+          id: recipAwsAccountId,
+          organizationId: recipOrgId,
+          name: "Recip Test AWS Account",
+          accountId: "111111111111",
+          region: "us-east-1",
+          roleArn: "arn:aws:iam::111111111111:role/recip-test-role",
+          externalId: `recip-ext-id-${recipOrgId.slice(-8)}`,
+        },
+        {
+          id: crossAwsAccountId,
+          organizationId: crossOrgId,
+          name: "Recip Cross Test AWS Account",
+          accountId: "222222222222",
+          region: "us-east-1",
+          roleArn: "arn:aws:iam::222222222222:role/recip-cross-test-role",
+          externalId: `recip-cross-ext-id-${crossOrgId.slice(-8)}`,
+        },
+      ])
+      .onConflictDoNothing();
+
+    await db
+      .insert(batchSend)
+      .values({
+        id: recipBatchId,
+        organizationId: recipOrgId,
+        channel: "email",
+        status: "completed",
+      })
+      .onConflictDoNothing();
+
+    const baseCreatedAt = new Date("2026-02-01T00:00:00Z");
+    const at = (offsetSeconds: number) =>
+      new Date(baseCreatedAt.getTime() + offsetSeconds * 1000);
+
+    await db
+      .insert(messageSend)
+      .values([
+        {
+          id: failed1Id,
+          organizationId: recipOrgId,
+          awsAccountId: recipAwsAccountId,
+          channel: "email",
+          sourceType: "batch",
+          batchSendId: recipBatchId,
+          recipient: "failed1@example.com",
+          status: "failed",
+          error: "Message rejected by recipient server",
+          bounceType: "Permanent",
+          bounceSubType: "General",
+          createdAt: at(1),
+        },
+        {
+          id: failed2Id,
+          organizationId: recipOrgId,
+          awsAccountId: recipAwsAccountId,
+          channel: "email",
+          sourceType: "batch",
+          batchSendId: recipBatchId,
+          recipient: "failed2@example.com",
+          status: "failed",
+          error: "Mailbox full",
+          bounceType: "Transient",
+          bounceSubType: "MailboxFull",
+          createdAt: at(2),
+        },
+        {
+          id: sent1Id,
+          organizationId: recipOrgId,
+          awsAccountId: recipAwsAccountId,
+          channel: "email",
+          sourceType: "batch",
+          batchSendId: recipBatchId,
+          recipient: "sent1@example.com",
+          status: "sent",
+          createdAt: at(3),
+        },
+        {
+          id: sent2Id,
+          organizationId: recipOrgId,
+          awsAccountId: recipAwsAccountId,
+          channel: "email",
+          sourceType: "batch",
+          batchSendId: recipBatchId,
+          recipient: "sent2@example.com",
+          status: "sent",
+          createdAt: at(4),
+        },
+        {
+          id: sent3Id,
+          organizationId: recipOrgId,
+          awsAccountId: recipAwsAccountId,
+          channel: "email",
+          sourceType: "batch",
+          batchSendId: recipBatchId,
+          recipient: "sent3@example.com",
+          status: "sent",
+          createdAt: at(5),
+        },
+        // Same batchSendId, DIFFERENT organizationId — the IDOR guard case.
+        {
+          id: crossOrgRowId,
+          organizationId: crossOrgId,
+          awsAccountId: crossAwsAccountId,
+          channel: "email",
+          sourceType: "batch",
+          batchSendId: recipBatchId,
+          recipient: "attacker-visible@example.com",
+          status: "failed",
+          error: "Should never be visible to recipOrgId",
+          createdAt: at(6),
+        },
+      ])
+      .onConflictDoNothing();
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(messageSend)
+      .where(eq(messageSend.batchSendId, recipBatchId));
+    await db.delete(batchSend).where(eq(batchSend.id, recipBatchId));
+    await db
+      .delete(awsAccount)
+      .where(eq(awsAccount.organizationId, recipOrgId));
+    await db
+      .delete(awsAccount)
+      .where(eq(awsAccount.organizationId, crossOrgId));
+    await db.delete(organization).where(eq(organization.id, recipOrgId));
+    await db.delete(organization).where(eq(organization.id, crossOrgId));
+  });
+
+  it("filters to failures", async () => {
+    const { rows, total } = await listBroadcastRecipients(
+      recipBatchId,
+      recipOrgId,
+      { status: "failed" }
+    );
+
+    expect(total).toBe(2);
+    const recipients = rows.map((r) => r.recipient).sort();
+    expect(recipients).toEqual(["failed1@example.com", "failed2@example.com"]);
+  });
+
+  it("returns the error and bounce fields with their exact seeded values", async () => {
+    const { rows } = await listBroadcastRecipients(recipBatchId, recipOrgId, {
+      status: "failed",
+    });
+
+    const row = rows.find((r) => r.recipient === "failed1@example.com");
+    expect(row).toBeDefined();
+    expect(row?.error).toBe("Message rejected by recipient server");
+    expect(row?.bounceType).toBe("Permanent");
+    expect(row?.bounceSubType).toBe("General");
+  });
+
+  it("never returns another org's row for the same batchSendId (IDOR guard)", async () => {
+    const { rows, total } = await listBroadcastRecipients(
+      recipBatchId,
+      recipOrgId
+    );
+
+    expect(total).toBe(5);
+    expect(rows.some((r) => r.id === crossOrgRowId)).toBe(false);
+    expect(
+      rows.some((r) => r.recipient === "attacker-visible@example.com")
+    ).toBe(false);
+
+    // Confirm the cross-org row really was inserted under the other org, so a
+    // 0-row result above proves scoping, not a seeding mistake.
+    const crossOrgSeeded = await db.query.messageSend.findFirst({
+      where: (fields, { eq: eqOp }) => eqOp(fields.id, crossOrgRowId),
+    });
+    expect(crossOrgSeeded?.organizationId).toBe(crossOrgId);
+  });
+
+  it("paginates with limit/offset and a stable total", async () => {
+    const firstPage = await listBroadcastRecipients(recipBatchId, recipOrgId, {
+      limit: 2,
+      offset: 0,
+    });
+    const secondPage = await listBroadcastRecipients(recipBatchId, recipOrgId, {
+      limit: 2,
+      offset: 2,
+    });
+
+    expect(secondPage.rows).toHaveLength(2);
+    expect(secondPage.total).toBe(5);
+
+    const firstPageIds = new Set(firstPage.rows.map((r) => r.id));
+    const secondPageIds = secondPage.rows.map((r) => r.id);
+    for (const id of secondPageIds) {
+      expect(firstPageIds.has(id)).toBe(false);
+    }
+  });
+
+  it("returns everything for the batch when unfiltered", async () => {
+    const { rows, total } = await listBroadcastRecipients(
+      recipBatchId,
+      recipOrgId
+    );
+
+    expect(total).toBe(5);
+    expect(rows).toHaveLength(5);
+    expect(rows.map((r) => r.recipient).sort()).toEqual(
+      [
+        "failed1@example.com",
+        "failed2@example.com",
+        "sent1@example.com",
+        "sent2@example.com",
+        "sent3@example.com",
+      ].sort()
+    );
   });
 });

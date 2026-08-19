@@ -1,3 +1,4 @@
+import type { BroadcastRecipientRow } from "@wraps/db";
 import type { EmailListItem } from "@/app/(dashboard)/[orgSlug]/emails/types";
 import type { SMSListItem } from "@/app/(dashboard)/[orgSlug]/sms/types";
 import type { BatchSendWithMeta } from "@/lib/batch";
@@ -65,6 +66,19 @@ export const broadcastCSVColumns: CSVColumnDef<BatchSendWithMeta>[] = [
     accessor: (r) => (r.createdAt ? new Date(r.createdAt).toISOString() : ""),
   },
 ];
+
+export const broadcastRecipientCSVColumns: CSVColumnDef<BroadcastRecipientRow>[] =
+  [
+    { header: "Recipient", accessor: (r) => r.recipient },
+    { header: "Status", accessor: (r) => r.status },
+    { header: "Error", accessor: (r) => r.error },
+    { header: "Bounce Type", accessor: (r) => r.bounceType },
+    { header: "Bounce Subtype", accessor: (r) => r.bounceSubType },
+    {
+      header: "Sent At",
+      accessor: (r) => (r.sentAt ? new Date(r.sentAt).toISOString() : ""),
+    },
+  ];
 
 export const eventCSVColumns: CSVColumnDef<EventWithContact>[] = [
   { header: "Event Name", accessor: (r) => r.eventName },

@@ -4,6 +4,7 @@ import {
   contact,
   db,
   member,
+  messageSend,
   organization,
   organizationExtension,
   subscription,
@@ -25,6 +26,8 @@ import { checkFeatureAccess } from "@/lib/plan-limits";
 import {
   deleteDraftBatchSend,
   duplicateBatchSend,
+  exportBroadcastRecipients,
+  listBroadcastRecipientOutcomes,
   promoteDraftToSend,
   saveDraftBatchSend,
   updateDraftBatchSend,
@@ -191,6 +194,26 @@ vi.mock("@wraps/auth", () => ({
 vi.mock("@/lib/plan-limits", () => ({
   checkFeatureAccess: vi.fn(async () => ({ allowed: true })),
 }));
+
+// listBroadcastRecipients: passthrough to the real (real-DB) implementation
+// by default — every test except the truncation test below hits the real
+// repository function against the real DB, same as the rest of this file.
+// Only the truncation test overrides this for one call, to avoid seeding
+// 50,000+ rows to observe MAX_RECIPIENT_EXPORT_ROWS truncation.
+const { mockListBroadcastRecipients } = vi.hoisted(() => ({
+  mockListBroadcastRecipients: vi.fn(),
+}));
+
+vi.mock("@wraps/db", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@wraps/db")>();
+  mockListBroadcastRecipients.mockImplementation(
+    actual.listBroadcastRecipients
+  );
+  return {
+    ...actual,
+    listBroadcastRecipients: mockListBroadcastRecipients,
+  };
+});
 
 // templates action — spy on publishTemplateToSES
 vi.mock("@/actions/templates", () => ({
@@ -1022,5 +1045,155 @@ describe("duplicateBatchSend", () => {
     });
     expect(stillThere?.name).toBe("Secret broadcast");
     expect(stillThere?.organizationId).toBe(testSecondaryOrganization.id);
+  });
+});
+
+describe("listBroadcastRecipientOutcomes / exportBroadcastRecipients", () => {
+  afterEach(async () => {
+    await db
+      .delete(messageSend)
+      .where(eq(messageSend.organizationId, testOrganization.id));
+    await db
+      .delete(messageSend)
+      .where(eq(messageSend.organizationId, testSecondaryOrganization.id));
+  });
+
+  async function seedBatchWithRecipients() {
+    const [batch] = await db
+      .insert(batchSend)
+      .values({
+        organizationId: testOrganization.id,
+        channel: "email",
+        status: "completed",
+        createdBy: testUser.id,
+      })
+      .returning();
+    if (!batch) {
+      throw new Error("failed to seed batch for recipients test");
+    }
+
+    await db.insert(messageSend).values([
+      {
+        organizationId: testOrganization.id,
+        awsAccountId: testAwsAccount.id,
+        channel: "email",
+        sourceType: "batch",
+        batchSendId: batch.id,
+        recipient: "recip-outcome-1@example.com",
+        status: "failed",
+        error: "Message rejected",
+      },
+      {
+        organizationId: testOrganization.id,
+        awsAccountId: testAwsAccount.id,
+        channel: "email",
+        sourceType: "batch",
+        batchSendId: batch.id,
+        recipient: "recip-outcome-2@example.com",
+        status: "sent",
+      },
+    ]);
+
+    return batch;
+  }
+
+  it("listBroadcastRecipientOutcomes returns the seeded recipients for the owning org", async () => {
+    const batch = await seedBatchWithRecipients();
+
+    const result = await listBroadcastRecipientOutcomes(
+      batch.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.total).toBe(2);
+    expect(result.recipients.map((r) => r.recipient).sort()).toEqual([
+      "recip-outcome-1@example.com",
+      "recip-outcome-2@example.com",
+    ]);
+  });
+
+  it("listBroadcastRecipientOutcomes returns nothing when called with a different org's id (IDOR guard)", async () => {
+    const batch = await seedBatchWithRecipients();
+
+    // The batch and its recipients belong to testOrganization. Call as if the
+    // caller resolved to testSecondaryOrganization instead — the repository
+    // scopes by both batchSendId AND organizationId, so this must come back
+    // empty even though the batchId is valid and the caller has real access
+    // to testSecondaryOrganization.
+    const result = await listBroadcastRecipientOutcomes(
+      batch.id,
+      testSecondaryOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.total).toBe(0);
+    expect(result.recipients).toEqual([]);
+  });
+
+  it("exportBroadcastRecipients returns nothing when called with a different org's id (IDOR guard)", async () => {
+    const batch = await seedBatchWithRecipients();
+
+    const result = await exportBroadcastRecipients(
+      batch.id,
+      testSecondaryOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.total).toBe(0);
+    expect(result.recipients).toEqual([]);
+    expect(result.truncated).toBe(false);
+  });
+
+  it("exportBroadcastRecipients sets truncated: true when total exceeds the returned row count", async () => {
+    const batch = await seedBatchWithRecipients();
+
+    // Override the repository call for this one export so we can observe the
+    // truncation math (`total > rows.length`) without seeding more than
+    // MAX_RECIPIENT_EXPORT_ROWS (50,000) real rows.
+    mockListBroadcastRecipients.mockImplementationOnce(async () => ({
+      rows: [
+        {
+          id: "truncation-test-row-1",
+          recipient: "recip-outcome-1@example.com",
+          status: "failed",
+          error: "Message rejected",
+          bounceType: null,
+          bounceSubType: null,
+          sentAt: null,
+          createdAt: new Date(),
+        },
+      ],
+      total: 5,
+    }));
+
+    const result = await exportBroadcastRecipients(
+      batch.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.total).toBe(5);
+    expect(result.recipients).toHaveLength(1);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("exportBroadcastRecipients sets truncated: false when every matching row is returned", async () => {
+    const batch = await seedBatchWithRecipients();
+
+    const result = await exportBroadcastRecipients(
+      batch.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.total).toBe(2);
+    expect(result.recipients).toHaveLength(2);
+    expect(result.truncated).toBe(false);
   });
 });

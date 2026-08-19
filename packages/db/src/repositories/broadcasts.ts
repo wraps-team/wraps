@@ -176,6 +176,66 @@ export async function getBroadcastSendOutcomes(
   return result ?? { total: 0, accepted: 0, failed: 0 };
 }
 
+export const MAX_RECIPIENT_EXPORT_ROWS = 50_000;
+
+export type BroadcastRecipientRow = {
+  id: string;
+  recipient: string;
+  status: string;
+  error: string | null;
+  bounceType: string | null;
+  bounceSubType: string | null;
+  sentAt: Date | null;
+  createdAt: Date;
+};
+
+/**
+ * Per-recipient outcomes for one broadcast. Scoped by BOTH batchSendId and
+ * organizationId — never by batch id alone. Backed by the existing
+ * message_send_status_idx (batch_send_id, status) index.
+ */
+export async function listBroadcastRecipients(
+  batchId: string,
+  organizationId: string,
+  options: { status?: string; limit?: number; offset?: number } = {},
+  dbClient: DbClient = db
+): Promise<{ rows: BroadcastRecipientRow[]; total: number }> {
+  const limit = Math.min(options.limit ?? 50, MAX_RECIPIENT_EXPORT_ROWS);
+  const offset = Math.max(0, options.offset ?? 0);
+
+  const conditions = [
+    eq(messageSend.batchSendId, batchId),
+    eq(messageSend.organizationId, organizationId),
+  ];
+  if (options.status) {
+    conditions.push(eq(messageSend.status, options.status as never));
+  }
+
+  const [totalResult] = await dbClient
+    .select({ count: sql<number>`count(*)::int` })
+    .from(messageSend)
+    .where(and(...conditions));
+
+  const rows = await dbClient
+    .select({
+      id: messageSend.id,
+      recipient: messageSend.recipient,
+      status: messageSend.status,
+      error: messageSend.error,
+      bounceType: messageSend.bounceType,
+      bounceSubType: messageSend.bounceSubType,
+      sentAt: messageSend.sentAt,
+      createdAt: messageSend.createdAt,
+    })
+    .from(messageSend)
+    .where(and(...conditions))
+    .orderBy(desc(messageSend.createdAt), desc(messageSend.id))
+    .limit(limit)
+    .offset(offset);
+
+  return { rows, total: totalResult?.count ?? 0 };
+}
+
 export async function listBroadcasts(
   organizationId: string,
   options: {

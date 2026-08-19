@@ -22,10 +22,12 @@ import {
   getSampleBroadcastRecipients,
   getSampleRecipientsWithProperties,
   insertDraftBroadcast,
+  listBroadcastRecipients,
   listBroadcasts,
   listPublishedTemplates,
   listSegmentsForBroadcast,
   listTopicsWithSubscriberCounts,
+  MAX_RECIPIENT_EXPORT_ROWS,
   sumInFlightBroadcastRecipients,
   updateDraftBroadcast,
 } from "@wraps/db";
@@ -1619,6 +1621,65 @@ export const getRecipientCount = orgAction(
         : undefined
     );
     return { success: true, count };
+  }
+);
+
+export const listBroadcastRecipientOutcomes = orgAction(
+  {
+    name: "listBroadcastRecipientOutcomes",
+    resource: "broadcasts",
+    permission: ["read"],
+    orgId: (
+      _batchId: string,
+      organizationId: string,
+      _options?: { status?: string; limit?: number; offset?: number }
+    ) => organizationId,
+    onError: "Failed to load recipient outcomes",
+  },
+  async (
+    ctx,
+    batchId: string,
+    organizationId: string,
+    options: { status?: string; limit?: number; offset?: number } = {}
+  ) => {
+    const { rows, total } = await listBroadcastRecipients(
+      batchId,
+      organizationId,
+      options
+    );
+    return { success: true as const, recipients: rows, total };
+  }
+);
+
+export const exportBroadcastRecipients = orgAction(
+  {
+    name: "exportBroadcastRecipients",
+    resource: "broadcasts",
+    permission: ["read"],
+    orgId: (
+      _batchId: string,
+      organizationId: string,
+      _options?: { status?: string }
+    ) => organizationId,
+    onError: "Failed to export recipient outcomes",
+  },
+  async (
+    ctx,
+    batchId: string,
+    organizationId: string,
+    options: { status?: string } = {}
+  ) => {
+    const { rows, total } = await listBroadcastRecipients(
+      batchId,
+      organizationId,
+      { status: options.status, limit: MAX_RECIPIENT_EXPORT_ROWS, offset: 0 }
+    );
+    return {
+      success: true as const,
+      recipients: rows,
+      total,
+      truncated: total > rows.length,
+    };
   }
 );
 
