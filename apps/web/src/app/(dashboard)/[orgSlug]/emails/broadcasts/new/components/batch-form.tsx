@@ -14,6 +14,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@wraps/ui/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@wraps/ui/components/ui/dialog";
 import { Label } from "@wraps/ui/components/ui/label";
 import {
   Popover,
@@ -24,6 +31,7 @@ import {
   RadioGroup,
   RadioGroupItem,
 } from "@wraps/ui/components/ui/radio-group";
+import { ScrollArea } from "@wraps/ui/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -1333,6 +1341,254 @@ function ContentStep({
   );
 }
 
+// How many recipients the "View all recipients" dialog will load. Enough to
+// answer "did I pick the right audience?" without pulling a whole list into
+// the browser; larger audiences fall back to the contacts page.
+const RECIPIENT_LIST_LIMIT = 200;
+
+function ContactRow({ contact }: { contact: SampleContact }) {
+  const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ");
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground">{contact.email}</span>
+      {(name || contact.company) && (
+        <span className="text-muted-foreground/70">
+          ({[name, contact.company].filter(Boolean).join(", ")})
+        </span>
+      )}
+    </div>
+  );
+}
+
+function AllRecipientsDialog({
+  filter,
+  onOpenChange,
+  open,
+  organizationId,
+  orgSlug,
+  recipientCount,
+}: {
+  filter: RecipientFilter;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  organizationId: string;
+  orgSlug: string;
+  recipientCount: number | null;
+}) {
+  const [contacts, setContacts] = useState<SampleContact[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // The full list is only worth fetching once someone opens it, and it is
+  // re-fetched whenever the audience changes so an open dialog can never show
+  // recipients from a filter the user has already moved off.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    let cancelled = false;
+    const fetchAll = async () => {
+      setLoading(true);
+      const result = await getSampleContacts(
+        organizationId,
+        "email",
+        filter,
+        RECIPIENT_LIST_LIMIT
+      );
+      if (cancelled) {
+        return;
+      }
+      if (result.success) {
+        setContacts(result.contacts);
+      }
+      setLoading(false);
+    };
+    fetchAll();
+    return () => {
+      cancelled = true;
+    };
+  }, [filter, open, organizationId]);
+
+  const truncated = recipientCount !== null && recipientCount > contacts.length;
+
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Recipients</DialogTitle>
+          <DialogDescription>
+            {recipientCount === null
+              ? "Everyone this broadcast will be sent to."
+              : `Everyone this broadcast will be sent to (${recipientCount.toLocaleString()}).`}
+          </DialogDescription>
+        </DialogHeader>
+        {loading ? (
+          <p className="text-muted-foreground text-sm">Loading...</p>
+        ) : (
+          <ScrollArea className="max-h-80">
+            <div className="space-y-1 pr-4">
+              {contacts.map((contact) => (
+                <ContactRow contact={contact} key={contact.id} />
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+        {truncated && (
+          <p className="text-muted-foreground text-xs">
+            Showing the first {contacts.length.toLocaleString()} of{" "}
+            {recipientCount.toLocaleString()}.{" "}
+            <Link
+              className="text-primary hover:underline"
+              href={`/${orgSlug}/contacts`}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open all contacts in a new tab
+            </Link>
+          </p>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RecipientPreviewCard({
+  countError,
+  data,
+  loadingCount,
+  organizationId,
+  orgSlug,
+  recipientCount,
+}: {
+  countError: string | null;
+  data: CampaignData;
+  loadingCount: boolean;
+  organizationId: string;
+  orgSlug: string;
+  recipientCount: number | null;
+}) {
+  const [sampleContacts, setSampleContacts] = useState<SampleContact[]>([]);
+  const [loadingSamples, setLoadingSamples] = useState(false);
+  const [showAllRecipients, setShowAllRecipients] = useState(false);
+
+  const filter: RecipientFilter = useMemo(
+    () => ({
+      audienceType: data.audienceType,
+      topicId: data.audienceType === "topic" ? data.topicId : undefined,
+      segmentId: data.audienceType === "segment" ? data.segmentId : undefined,
+    }),
+    [data.audienceType, data.topicId, data.segmentId]
+  );
+
+  const hasValidSelection =
+    data.audienceType === "all" ||
+    (data.audienceType === "topic" && Boolean(data.topicId)) ||
+    (data.audienceType === "segment" && Boolean(data.segmentId));
+
+  // Fetch sample contacts when audience selection changes
+  useEffect(() => {
+    let cancelled = false;
+    const fetchSamples = async () => {
+      if (!hasValidSelection) {
+        setSampleContacts([]);
+        return;
+      }
+
+      setLoadingSamples(true);
+      const result = await getSampleContacts(
+        organizationId,
+        "email",
+        filter,
+        5
+      );
+      if (cancelled) {
+        return;
+      }
+      if (result.success) {
+        setSampleContacts(result.contacts);
+      }
+      setLoadingSamples(false);
+    };
+
+    fetchSamples();
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId, filter, hasValidSelection]);
+
+  const hasMoreThanPreview =
+    recipientCount !== null && recipientCount > sampleContacts.length;
+
+  return (
+    <>
+      {/* Recipient Count & Sample Preview */}
+      <Card className="bg-muted/50">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+              <Users className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-muted-foreground text-sm">
+                Estimated Recipients
+              </p>
+              <p className="font-semibold text-2xl">
+                {loadingCount
+                  ? "..."
+                  : countError || recipientCount === null
+                    ? "Unknown"
+                    : recipientCount.toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          {/* Sample Contacts Preview */}
+          {sampleContacts.length > 0 && (
+            <div className="mt-4 border-t pt-4">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="font-medium text-muted-foreground text-sm">
+                  {recipientCount === null
+                    ? `Preview (${sampleContacts.length})`
+                    : `Preview (${sampleContacts.length} of ${recipientCount.toLocaleString()})`}
+                </p>
+                {hasMoreThanPreview && (
+                  <Button
+                    className="h-auto p-0 text-xs"
+                    onClick={() => setShowAllRecipients(true)}
+                    type="button"
+                    variant="link"
+                  >
+                    View all recipients
+                  </Button>
+                )}
+              </div>
+              <div className="space-y-1">
+                {loadingSamples ? (
+                  <p className="text-muted-foreground text-sm">Loading...</p>
+                ) : (
+                  sampleContacts.map((contact) => (
+                    <ContactRow contact={contact} key={contact.id} />
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Leaving the wizard to inspect the audience used to discard the whole
+          draft, so the full list opens here instead of on the contacts page. */}
+      <AllRecipientsDialog
+        filter={filter}
+        onOpenChange={setShowAllRecipients}
+        open={showAllRecipients}
+        organizationId={organizationId}
+        orgSlug={orgSlug}
+        recipientCount={recipientCount}
+      />
+    </>
+  );
+}
+
 // Audience Step Component
 function AudienceStep({
   data,
@@ -1359,46 +1615,6 @@ function AudienceStep({
   topics: Topic[];
   topicsEnabled: boolean;
 }) {
-  const [sampleContacts, setSampleContacts] = useState<SampleContact[]>([]);
-  const [loadingSamples, setLoadingSamples] = useState(false);
-
-  // Fetch sample contacts when audience selection changes
-  useEffect(() => {
-    async function fetchSamples() {
-      // Build the filter based on current selection
-      const filter: RecipientFilter = {
-        audienceType: data.audienceType,
-        topicId: data.audienceType === "topic" ? data.topicId : undefined,
-        segmentId: data.audienceType === "segment" ? data.segmentId : undefined,
-      };
-
-      // Only fetch if we have a valid selection
-      const hasValidSelection =
-        data.audienceType === "all" ||
-        (data.audienceType === "topic" && data.topicId) ||
-        (data.audienceType === "segment" && data.segmentId);
-
-      if (!hasValidSelection) {
-        setSampleContacts([]);
-        return;
-      }
-
-      setLoadingSamples(true);
-      const result = await getSampleContacts(
-        organizationId,
-        "email",
-        filter,
-        5
-      );
-      if (result.success) {
-        setSampleContacts(result.contacts);
-      }
-      setLoadingSamples(false);
-    }
-
-    fetchSamples();
-  }, [organizationId, data.audienceType, data.topicId, data.segmentId]);
-
   return (
     <div className="space-y-6">
       <Card>
@@ -1536,72 +1752,14 @@ function AudienceStep({
         </CardContent>
       </Card>
 
-      {/* Recipient Count & Sample Preview */}
-      <Card className="bg-muted/50">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-              <Users className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-muted-foreground text-sm">
-                Estimated Recipients
-              </p>
-              <p className="font-semibold text-2xl">
-                {loadingCount
-                  ? "..."
-                  : countError || recipientCount === null
-                    ? "Unknown"
-                    : recipientCount.toLocaleString()}
-              </p>
-            </div>
-          </div>
-
-          {/* Sample Contacts Preview */}
-          {sampleContacts.length > 0 && (
-            <div className="mt-4 border-t pt-4">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="font-medium text-muted-foreground text-sm">
-                  {recipientCount === null
-                    ? `Preview (${sampleContacts.length})`
-                    : `Preview (${sampleContacts.length} of ${recipientCount.toLocaleString()})`}
-                </p>
-                <Link
-                  className="text-primary text-xs hover:underline"
-                  href={`/${orgSlug}/contacts`}
-                >
-                  View all contacts
-                </Link>
-              </div>
-              <div className="space-y-1">
-                {loadingSamples ? (
-                  <p className="text-muted-foreground text-sm">Loading...</p>
-                ) : (
-                  sampleContacts.map((contact) => (
-                    <div
-                      className="flex items-center gap-2 text-sm"
-                      key={contact.id}
-                    >
-                      <span className="text-muted-foreground">
-                        {contact.email}
-                      </span>
-                      {(contact.firstName || contact.lastName) && (
-                        <span className="text-muted-foreground/70">
-                          (
-                          {[contact.firstName, contact.lastName]
-                            .filter(Boolean)
-                            .join(" ")}
-                          {contact.company && `, ${contact.company}`})
-                        </span>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <RecipientPreviewCard
+        countError={countError}
+        data={data}
+        loadingCount={loadingCount}
+        organizationId={organizationId}
+        orgSlug={orgSlug}
+        recipientCount={recipientCount}
+      />
     </div>
   );
 }
