@@ -78,7 +78,15 @@ vi.mock("@/lib/aws/dynamodb", () => ({
     queryEventsByMessageIdsMock(...args),
 }));
 
-const findAwsAccountsMock = vi.fn(async () => [
+/** Only the fields `fetchEmail` reads off a connected account. */
+type AwsAccountRow = {
+  id: string;
+  accountId: string;
+  organizationId: string;
+  features?: { email?: { archivingEnabled?: boolean } };
+};
+
+const findAwsAccountsMock = vi.fn<() => Promise<AwsAccountRow[]>>(async () => [
   { id: "acc-1", accountId: "123456789012", organizationId: ORG_ID },
 ]);
 const selectMessageSendMock = vi.fn(async () => [] as unknown[]);
@@ -129,8 +137,12 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 // Heavy interactive children are not under test here.
+// Rendered only when `archivingEnabled` is true, so its presence is how a test
+// observes which account the flag was read from.
 vi.mock("@/components/email-archive-viewer", () => ({
-  EmailArchiveViewer: () => null,
+  EmailArchiveViewer: ({ messageId }: { messageId: string }) => (
+    <div data-messageid={messageId} data-testid="archive-viewer" />
+  ),
 }));
 
 vi.mock("../components/email-fields", () => ({
@@ -139,10 +151,13 @@ vi.mock("../components/email-fields", () => ({
 
 type ListFilters = { days?: string; q?: string; status?: string };
 
-async function renderDetailPage(listFilters: ListFilters = {}) {
+async function renderDetailPage(
+  listFilters: ListFilters = {},
+  emailId: string = EMAIL_ID
+) {
   const { default: EmailDetailPage } = await import("../page");
   const element = await EmailDetailPage({
-    params: Promise.resolve({ orgSlug: ORG_SLUG, emailId: EMAIL_ID }),
+    params: Promise.resolve({ orgSlug: ORG_SLUG, emailId }),
     searchParams: Promise.resolve(listFilters),
   });
   return render(element as React.ReactElement);
@@ -362,5 +377,195 @@ describe("Email detail page — back link", () => {
     expect(
       screen.getByRole("link", { name: /back to emails/i })
     ).toHaveAttribute("href", `/${ORG_SLUG}/emails`);
+  });
+});
+
+/**
+ * Resolution order.
+ *
+ * `fetchEmail` used to open with the 90-day windowed DynamoDB query — limit
+ * 1000, fanned across every connected account — so the most expensive read ran
+ * on every open, including for the messages the two cheap reads resolve
+ * instantly. Row clicks registered as PostHog `$dead_click` at ~2s.
+ *
+ * The order is now Postgres -> direct DynamoDB PK read -> windowed scan. The
+ * scan stays because it is the only path that finds a message DynamoDB has and
+ * Postgres doesn't; these tests pin both halves — that it no longer runs for the
+ * common case, and that everything it used to resolve still resolves.
+ */
+describe("Email detail page — resolution order", () => {
+  const RAW_MESSAGE_ID = SENT_PG_RECORD.messageId;
+  const SENT_AT = Date.parse("2026-08-18T18:06:00.000Z");
+
+  function sendEvent(messageId: string, subject = "Your invoice") {
+    return {
+      messageId,
+      eventType: "Send",
+      sentAt: 1,
+      createdAt: SENT_AT,
+      mailSentAt: SENT_AT,
+      from: "billing@acme.test",
+      to: ["customer@example.com"],
+      subject,
+      additionalData: null,
+    };
+  }
+
+  it("resolves a Postgres-known message without ever running the window scan", async () => {
+    selectMessageSendMock.mockResolvedValue([SENT_PG_RECORD]);
+    queryEventsByMessageIdsMock.mockResolvedValue([
+      sendEvent(RAW_MESSAGE_ID, "Your invoice"),
+    ]);
+
+    await renderDetailPage();
+
+    // The whole point of the reorder: the expensive call is never made.
+    expect(queryEmailEventsMock).not.toHaveBeenCalled();
+    expect(queryEventsByMessageIdsMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Your invoice")).toBeInTheDocument();
+    expect(screen.queryByText("Event timeline unavailable")).toBeNull();
+  });
+
+  it("passes the canonical messageId to the PK read when the URL carries a UUID", async () => {
+    selectMessageSendMock.mockResolvedValue([SENT_PG_RECORD]);
+    queryEventsByMessageIdsMock.mockResolvedValue([sendEvent(RAW_MESSAGE_ID)]);
+
+    // EMAIL_ID is the `message_send.id`; only Postgres can turn it into the SES
+    // messageId the PK read needs.
+    await renderDetailPage({}, EMAIL_ID);
+
+    expect(queryEventsByMessageIdsMock).toHaveBeenCalledWith({
+      awsAccountId: "acc-1",
+      messageIds: [RAW_MESSAGE_ID],
+    });
+    expect(screen.getByText(RAW_MESSAGE_ID)).toBeInTheDocument();
+  });
+
+  it("resolves a raw SES messageId in the URL, still without the window scan", async () => {
+    selectMessageSendMock.mockResolvedValue([SENT_PG_RECORD]);
+    queryEventsByMessageIdsMock.mockResolvedValue([sendEvent(RAW_MESSAGE_ID)]);
+
+    await renderDetailPage({}, RAW_MESSAGE_ID);
+
+    expect(queryEmailEventsMock).not.toHaveBeenCalled();
+    expect(queryEventsByMessageIdsMock).toHaveBeenCalledWith({
+      awsAccountId: "acc-1",
+      messageIds: [RAW_MESSAGE_ID],
+    });
+    expect(screen.getByText(RAW_MESSAGE_ID)).toBeInTheDocument();
+  });
+
+  it("still finds a message DynamoDB has and Postgres doesn't, via the window scan", async () => {
+    selectMessageSendMock.mockResolvedValue([]);
+    queryEmailEventsMock.mockResolvedValue([
+      sendEvent(EMAIL_ID, "Sent outside Wraps"),
+    ]);
+
+    await renderDetailPage();
+
+    expect(notFoundMock).not.toHaveBeenCalled();
+    expect(screen.getByText("Sent outside Wraps")).toBeInTheDocument();
+    expect(queryEmailEventsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 1000 })
+    );
+  });
+
+  it("searches every connected account for a Postgres-less message", async () => {
+    findAwsAccountsMock.mockResolvedValue([
+      { id: "acc-1", accountId: "123456789012", organizationId: ORG_ID },
+      { id: "acc-2", accountId: "210987654321", organizationId: ORG_ID },
+    ]);
+    selectMessageSendMock.mockResolvedValue([]);
+    queryEmailEventsMock.mockImplementation(
+      async ({ awsAccountId }: { awsAccountId: string }) =>
+        awsAccountId === "acc-2" ? [sendEvent(EMAIL_ID, "Second account")] : []
+    );
+
+    await renderDetailPage();
+
+    expect(screen.getByText("Second account")).toBeInTheDocument();
+  });
+
+  it("reads the archiving flag from the account the PK read found the message in", async () => {
+    findAwsAccountsMock.mockResolvedValue([
+      { id: "acc-1", accountId: "123456789012", organizationId: ORG_ID },
+      {
+        id: "acc-2",
+        accountId: "210987654321",
+        organizationId: ORG_ID,
+        features: { email: { archivingEnabled: true } },
+      },
+    ]);
+    selectMessageSendMock.mockResolvedValue([
+      { ...SENT_PG_RECORD, awsAccountId: "acc-2" },
+    ]);
+    queryEventsByMessageIdsMock.mockResolvedValue([sendEvent(RAW_MESSAGE_ID)]);
+
+    await renderDetailPage();
+
+    expect(screen.getByTestId("archive-viewer")).toHaveAttribute(
+      "data-messageid",
+      RAW_MESSAGE_ID
+    );
+  });
+
+  it("reads the archiving flag from the account the window scan found the message in", async () => {
+    findAwsAccountsMock.mockResolvedValue([
+      { id: "acc-1", accountId: "123456789012", organizationId: ORG_ID },
+      {
+        id: "acc-2",
+        accountId: "210987654321",
+        organizationId: ORG_ID,
+        features: { email: { archivingEnabled: true } },
+      },
+    ]);
+    selectMessageSendMock.mockResolvedValue([]);
+    queryEmailEventsMock.mockImplementation(
+      async ({ awsAccountId }: { awsAccountId: string }) =>
+        awsAccountId === "acc-2" ? [sendEvent(EMAIL_ID)] : []
+    );
+
+    await renderDetailPage();
+
+    expect(screen.getByTestId("archive-viewer")).toHaveAttribute(
+      "data-messageid",
+      EMAIL_ID
+    );
+  });
+
+  it("reports a thrown Postgres lookup as a failed lookup, never as not found", async () => {
+    selectMessageSendMock.mockRejectedValue(
+      new Error("Failed query: select from message_send")
+    );
+
+    await renderDetailPage();
+
+    expect(notFoundMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(screen.getByText("We couldn't load this message")).toBeVisible();
+  });
+
+  it("keeps a thrown PK read distinguishable from an empty history, and names its account", async () => {
+    selectMessageSendMock.mockResolvedValue([SENT_PG_RECORD]);
+    queryEventsByMessageIdsMock.mockRejectedValue(
+      new Error("Failed to query DynamoDB: connection reset")
+    );
+
+    await renderDetailPage();
+
+    // The cheap read is now the first one that can throw, so the failure it
+    // remembers is what the timeline must report.
+    expect(screen.getByText("Event timeline unavailable")).toBeInTheDocument();
+    expect(screen.getByText(/1234\.\.\.9012/)).toBeInTheDocument();
+    expect(screen.queryByText("No events recorded")).toBeNull();
+  });
+
+  it("calls the timeline empty when both reads come back empty", async () => {
+    selectMessageSendMock.mockResolvedValue([SENT_PG_RECORD]);
+
+    await renderDetailPage();
+
+    expect(screen.getByText("No events recorded")).toBeInTheDocument();
+    expect(screen.queryByText("Event timeline unavailable")).toBeNull();
   });
 });

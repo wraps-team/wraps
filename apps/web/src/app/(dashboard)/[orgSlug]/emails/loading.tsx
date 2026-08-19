@@ -1,40 +1,34 @@
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
-import { EmailsTableSkeleton } from "./components/emails-table-skeleton";
 
 /**
- * Segment loading state for the emails list (audit finding F16).
+ * Segment loading state for everything under `/emails`.
  *
- * There was no `loading.tsx` and no Suspense boundary anywhere between the
- * dashboard layout and this page, so clicking "Emails" in the nav left the
- * previous screen sitting there, unchanged and unexplained, for roughly two
- * seconds of server render before anything moved. Shared layouts stay
- * interactive while a segment loads, but only if the segment has a boundary.
+ * A `loading.tsx` wraps its own `page.tsx` *and every child segment below it*,
+ * so this file is what fourteen routes show while they render — the setup
+ * wizard, brand kits, the template editor, agents, broadcasts, inbound, and
+ * analytics, not just the message list. It used to render the list's shape (a
+ * chart card, a filter bar, five table rows, pagination), which meant opening
+ * the Monaco template editor promised a table that was never coming.
+ *
+ * So this boundary stays generic: a page heading and one content block, the
+ * two things every route below actually has. The specific shapes live at the
+ * specific boundaries that own them — the list's table skeleton hangs off the
+ * `<Suspense>` in `emails/page.tsx`, and the message detail has its own
+ * `[emailId]/loading.tsx`.
  */
-export default function EmailsLoading() {
+export default function EmailsSegmentLoading() {
   return (
-    <>
-      <div className="px-4 lg:px-6">
-        <div className="rounded-xl border bg-card p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-2">
-              <Skeleton className="h-5 w-36" />
-              <Skeleton className="h-4 w-64" />
-            </div>
-            <Skeleton className="h-8 w-56" />
-          </div>
-          <div className="mt-6 grid grid-cols-1 gap-6 @[540px]/card:grid-cols-[1fr_200px]">
-            <Skeleton className="h-[280px] w-full" />
-            <div className="flex flex-col gap-3">
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
-            </div>
-          </div>
-        </div>
+    <div className="space-y-6 px-4 lg:px-6">
+      {/* Page heading: an h1 plus, on most routes, a line of description. */}
+      <div className="space-y-2">
+        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-4 w-full max-w-sm" />
       </div>
-      <div className="@container/main px-4 lg:px-6">
-        <EmailsTableSkeleton />
-      </div>
-    </>
+
+      {/* One neutral content block. Deliberately shapeless — it must not
+          promise a chart, a table, a toolbar or pagination to the routes that
+          have none of them. */}
+      <Skeleton className="h-64 w-full" />
+    </div>
   );
 }

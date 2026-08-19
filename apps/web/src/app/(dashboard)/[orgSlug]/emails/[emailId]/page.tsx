@@ -180,9 +180,6 @@ async function fetchEmail(
   };
 
   try {
-    const endTime = new Date();
-    const startTime = new Date(endTime.getTime() - 90 * 24 * 60 * 60 * 1000);
-
     const accounts = await db.query.awsAccount.findMany({
       where: eq(awsAccount.organizationId, organizationId),
     });
@@ -191,57 +188,10 @@ async function fetchEmail(
       return { ok: false, reason: "no-aws-account" };
     }
 
-    // Step 1: time-windowed DynamoDB query (fast path for recent emails)
-    const allEventsWithAccount = await Promise.all(
-      accounts.map(async (account) => {
-        try {
-          const events = await queryEmailEvents({
-            awsAccountId: account.id,
-            startTime,
-            endTime,
-            limit: 1000,
-          });
-          return { account, events };
-        } catch (error) {
-          rememberFailure(error, account.accountId);
-          logger.warn(
-            { err: error, awsAccountId: account.id, organizationId },
-            "email detail: windowed DynamoDB query failed"
-          );
-          return { account, events: [] };
-        }
-      })
-    );
-
-    let emailAccount: (typeof accounts)[0] | null = null;
-    let emailEvents: any[] = [];
-
-    for (const { account, events } of allEventsWithAccount) {
-      const matchingEvents = events.filter((e) => e.messageId === emailId);
-      if (matchingEvents.length > 0) {
-        emailAccount = account;
-        emailEvents = matchingEvents;
-        break;
-      }
-    }
-
-    if (emailEvents.length > 0 && emailAccount) {
-      emailEvents.sort((a, b) => a.sentAt - b.sentAt);
-      return {
-        ok: true,
-        email: buildEmailFromEvents(
-          emailId,
-          emailEvents,
-          emailAccount.features?.email?.archivingEnabled ?? false
-        ),
-        timeline: { status: "ok", accountId: emailAccount.accountId },
-      };
-    }
-
-    // Step 2: look up the PG record to get the canonical messageId and account.
-    // Handles two cases:
-    //  a) emailId is the PG UUID (old emails whose messageId wasn't set)
-    //  b) emailId is the SES messageId but the email is older than 90 days
+    // Step 1: the cheap lookup first. Postgres is authoritative for the list, it
+    // resolves a `message_send.id` to the canonical SES messageId, and it names
+    // the account that sent the message - which is what lets step 2 be a
+    // single-key read instead of a scan.
     const pgRecord = await db
       .select({
         id: messageSend.id,
@@ -264,23 +214,17 @@ async function fetchEmail(
       .limit(1)
       .then((rows) => rows[0] ?? null);
 
-    if (!pgRecord) {
-      // Nothing in Postgres either. If DynamoDB blew up on the way here we
-      // cannot claim the message doesn't exist — say the lookup failed.
-      if (lookupError) {
-        return {
-          ok: false,
-          reason: "lookup-failed",
-          kind: classifyLookupError(lookupError),
-        };
-      }
-      return { ok: false, reason: "not-found" };
-    }
+    // `emailId` is either a `message_send.id` (UUID) or a raw SES messageId;
+    // only Postgres can turn the first form into the second, and the direct PK
+    // read below needs the real messageId.
+    const realMessageId = pgRecord?.messageId ?? emailId;
+    const pgAccount = pgRecord
+      ? (accounts.find((a) => a.id === pgRecord.awsAccountId) ?? null)
+      : null;
 
-    // Step 3: try a direct DynamoDB PK lookup (no time window) using the real messageId
-    const realMessageId = pgRecord.messageId ?? emailId;
-    const pgAccount = accounts.find((a) => a.id === pgRecord.awsAccountId);
-
+    // Step 2: direct DynamoDB PK read (no time window) in the account Postgres
+    // named. This is the common case - a message we have a record of - and it
+    // returns without the windowed scan below ever running.
     if (pgAccount) {
       try {
         const dynEvents = await queryEventsByMessageIds({
@@ -300,8 +244,8 @@ async function fetchEmail(
           };
         }
       } catch (error) {
-        // Non-fatal: fall through to the PG-only view, but remember why the
-        // event history is missing.
+        // Non-fatal: another account may hold the message, and the PG-only view
+        // is still worth rendering. Remember why the history is missing.
         rememberFailure(error, pgAccount.accountId);
         logger.warn(
           { err: error, awsAccountId: pgAccount.id, organizationId },
@@ -310,7 +254,68 @@ async function fetchEmail(
       }
     }
 
-    // Step 4: PG-only fallback — show whatever metadata we have
+    // Step 3: last resort - a 90-day windowed query fanned across every
+    // connected account. It is the only path that finds a message DynamoDB has
+    // and Postgres does not, or one whose events landed in an account other
+    // than the one the record names, so it stays. It just no longer runs on
+    // every open.
+    const endTime = new Date();
+    const startTime = new Date(endTime.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+    const allEventsWithAccount = await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          const events = await queryEmailEvents({
+            awsAccountId: account.id,
+            startTime,
+            endTime,
+            limit: 1000,
+          });
+          return { account, events };
+        } catch (error) {
+          rememberFailure(error, account.accountId);
+          logger.warn(
+            { err: error, awsAccountId: account.id, organizationId },
+            "email detail: windowed DynamoDB query failed"
+          );
+          return { account, events: [] };
+        }
+      })
+    );
+
+    for (const { account, events } of allEventsWithAccount) {
+      // Matched on the id exactly as given: a `message_send.id` is never a
+      // DynamoDB messageId, so a UUID falls through to the Postgres view below
+      // - the same message this step resolved before it was moved.
+      const matchingEvents = events.filter((e) => e.messageId === emailId);
+      if (matchingEvents.length > 0) {
+        matchingEvents.sort((a, b) => a.sentAt - b.sentAt);
+        return {
+          ok: true,
+          email: buildEmailFromEvents(
+            emailId,
+            matchingEvents,
+            account.features?.email?.archivingEnabled ?? false
+          ),
+          timeline: { status: "ok", accountId: account.accountId },
+        };
+      }
+    }
+
+    if (!pgRecord) {
+      // Nothing in Postgres, nothing in DynamoDB. If a read blew up on the way
+      // here we cannot claim the message doesn't exist - say the lookup failed.
+      if (lookupError) {
+        return {
+          ok: false,
+          reason: "lookup-failed",
+          kind: classifyLookupError(lookupError),
+        };
+      }
+      return { ok: false, reason: "not-found" };
+    }
+
+    // Step 4: PG-only fallback - show whatever metadata we have
     if (!pgRecord.sentAt) {
       return {
         ok: false,
@@ -321,7 +326,7 @@ async function fetchEmail(
       };
     }
     /**
-     * No events to show. Whether that is because the read threw or because the
+     * No events to show. Whether that is because a read threw or because the
      * history genuinely holds nothing for this message is the whole of F11 - the
      * two used to render the same sentence.
      */
