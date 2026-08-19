@@ -27,15 +27,13 @@ import * as React from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { SERIES_COLOR } from "@/lib/chart-series";
 import { useSuppressionData } from "../hooks/use-analytics";
 
 const chartConfig = {
   suppressionRate: {
     label: "Suppression Rate",
-    theme: {
-      light: "oklch(0.55 0.15 75)", // Amber-700
-      dark: "oklch(0.75 0.15 85)", // Amber-400
-    },
+    color: SERIES_COLOR.attention,
   },
 } satisfies ChartConfig;
 

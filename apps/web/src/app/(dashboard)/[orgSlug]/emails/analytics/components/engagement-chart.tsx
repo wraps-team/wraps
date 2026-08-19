@@ -27,20 +27,23 @@ import * as React from "react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { SERIES_COLOR } from "@/lib/chart-series";
 import { useEngagementData } from "../hooks/use-analytics";
 
 const chartConfig = {
+  // `hsl(var(--primary))` was not a colour at all: --primary is an oklch()
+  // value, so the declaration was invalid and this series rendered unpainted.
   openRate: {
     label: "Open Rate",
-    color: "hsl(var(--primary))",
+    color: SERIES_COLOR.attention,
   },
   clickRate: {
     label: "Click Rate",
-    color: "hsl(217 91% 60%)",
+    color: SERIES_COLOR.engagement,
   },
   ctr: {
     label: "Click-to-Open Rate",
-    color: "hsl(142 76% 36%)",
+    color: SERIES_COLOR.success,
   },
 } satisfies ChartConfig;
 

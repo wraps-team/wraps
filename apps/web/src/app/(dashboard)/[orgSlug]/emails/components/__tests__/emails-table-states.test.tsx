@@ -240,9 +240,28 @@ describe("EmailsTable pagination and search ergonomics (F2, F13)", () => {
     expect(
       screen.getByPlaceholderText("Search the last 30 days")
     ).toBeInTheDocument();
+  });
+
+  it("explains what search matches once there is something to match", async () => {
+    // The sentence used to sit under the toolbar permanently, describing a
+    // control nobody was using.
+    render(<EmailsTable {...baseProps} days={30} hasEverSent />);
+
+    expect(
+      screen.queryByText(
+        "Matches recipient, subject, and sender within the selected range."
+      )
+    ).not.toBeInTheDocument();
+
+    await userEvent.type(
+      screen.getByPlaceholderText("Search the last 30 days"),
+      "ab"
+    );
+
     expect(
       screen.getByText(
-        "Matches recipient, subject, and sender within the selected range."
+        "Matches recipient, subject, and sender within the selected range.",
+        { exact: false }
       )
     ).toBeInTheDocument();
   });

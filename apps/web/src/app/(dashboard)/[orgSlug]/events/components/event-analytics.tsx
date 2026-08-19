@@ -44,24 +44,16 @@ import { Button } from "@/components/ui/button";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { countYAxisProps } from "@/lib/chart-axis";
+import { SERIES_CATEGORICAL, SERIES_COLOR } from "@/lib/chart-series";
 
 const areaChartConfig = {
   count: {
     label: "Events",
-    theme: {
-      light: "oklch(0.45 0.15 250)", // Blue
-      dark: "oklch(0.65 0.15 250)",
-    },
+    color: SERIES_COLOR.volume,
   },
 } satisfies ChartConfig;
 
-const pieColors = [
-  "oklch(0.55 0.15 250)", // Blue
-  "oklch(0.55 0.15 160)", // Green
-  "oklch(0.55 0.15 30)", // Orange
-  "oklch(0.55 0.12 280)", // Purple
-  "oklch(0.55 0.15 340)", // Pink
-];
+const pieColors = SERIES_CATEGORICAL;
 
 type EventAnalyticsProps = {
   organizationId: string;
@@ -139,7 +131,7 @@ export function EventAnalytics({ organizationId }: EventAnalyticsProps) {
               aria-pressed={timeRange === "30d"}
               className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
               onClick={() => setTimeRange("30d")}
-              size="sm"
+              size="touch"
               variant="outline"
             >
               30 days
@@ -148,7 +140,7 @@ export function EventAnalytics({ organizationId }: EventAnalyticsProps) {
               aria-pressed={timeRange === "7d"}
               className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
               onClick={() => setTimeRange("7d")}
-              size="sm"
+              size="touch"
               variant="outline"
             >
               7 days
@@ -159,7 +151,7 @@ export function EventAnalytics({ organizationId }: EventAnalyticsProps) {
             <SelectTrigger
               aria-label="Select time range"
               className="flex @[767px]/card:hidden w-32 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
-              size="sm"
+              size="touch"
             >
               <SelectValue placeholder="30 days" />
             </SelectTrigger>

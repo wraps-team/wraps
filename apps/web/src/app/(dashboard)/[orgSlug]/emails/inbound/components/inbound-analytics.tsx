@@ -40,25 +40,17 @@ import { Button } from "@/components/ui/button";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { countYAxisProps } from "@/lib/chart-axis";
+import { SERIES_CATEGORICAL, SERIES_COLOR } from "@/lib/chart-series";
 import type { InboundEmailListItem } from "../types";
 
 const areaChartConfig = {
   count: {
     label: "Received",
-    theme: {
-      light: "oklch(0.45 0.12 200)",
-      dark: "oklch(0.65 0.12 200)",
-    },
+    color: SERIES_COLOR.secondary,
   },
 } satisfies ChartConfig;
 
-const pieColors = [
-  "oklch(0.55 0.15 200)", // Teal
-  "oklch(0.55 0.15 130)", // Green
-  "oklch(0.55 0.15 60)", // Yellow
-  "oklch(0.55 0.12 300)", // Purple
-  "oklch(0.55 0.15 20)", // Red-orange
-];
+const pieColors = SERIES_CATEGORICAL;
 
 // Format a Date as YYYY-MM-DD in local time (avoids UTC offset issues)
 function toLocalDateStr(date: Date): string {
@@ -200,7 +192,7 @@ export function InboundAnalytics({
               aria-pressed={timeRange === "30d"}
               className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
               onClick={() => setTimeRange("30d")}
-              size="sm"
+              size="touch"
               variant="outline"
             >
               30 days
@@ -209,7 +201,7 @@ export function InboundAnalytics({
               aria-pressed={timeRange === "7d"}
               className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
               onClick={() => setTimeRange("7d")}
-              size="sm"
+              size="touch"
               variant="outline"
             >
               7 days
@@ -220,7 +212,7 @@ export function InboundAnalytics({
             <SelectTrigger
               aria-label="Select time range"
               className="flex @[767px]/card:hidden w-32 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
-              size="sm"
+              size="touch"
             >
               <SelectValue placeholder="30 days" />
             </SelectTrigger>

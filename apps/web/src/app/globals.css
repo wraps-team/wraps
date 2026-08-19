@@ -114,6 +114,27 @@
   --color-3: oklch(69.6% 0.165 251);
   --color-4: oklch(80.2% 0.134 225);
   --color-5: oklch(90.7% 0.231 133);
+
+  /*
+   * Chart series palette.
+   *
+   * Hue is fixed per series and only lightness moves between themes, so a line
+   * keeps its identity when the theme flips and when the reader moves between
+   * pages. Before this existed every chart hand-wrote its own oklch() pair and
+   * they drifted: "sent" was blue at 250 on one page and green at 160 on the
+   * next, and two charts still carried hsl() literals - one of them
+   * `hsl(var(--primary))`, which is invalid CSS because --primary is oklch.
+   *
+   * Named by role rather than by metric so a new chart has somewhere to land:
+   * attention covers opens and suppression, secondary covers inbound and the
+   * second channel in a two-channel chart.
+   */
+  --series-volume: oklch(0.5 0.15 250);
+  --series-success: oklch(0.48 0.15 160);
+  --series-attention: oklch(0.55 0.15 80);
+  --series-engagement: oklch(0.48 0.2 320);
+  --series-failure: oklch(0.52 0.19 25);
+  --series-secondary: oklch(0.5 0.11 200);
 }
 
 .dark {
@@ -159,6 +180,14 @@
   --color-3: oklch(69.6% 0.165 251);
   --color-4: oklch(80.2% 0.134 225);
   --color-5: oklch(90.7% 0.231 133);
+
+  /* Same hues as :root, lifted for a dark surface. */
+  --series-volume: oklch(0.7 0.13 250);
+  --series-success: oklch(0.68 0.14 160);
+  --series-attention: oklch(0.75 0.14 80);
+  --series-engagement: oklch(0.72 0.16 320);
+  --series-failure: oklch(0.7 0.17 25);
+  --series-secondary: oklch(0.72 0.1 200);
 }
 
 @layer base {
@@ -301,4 +330,32 @@ html {
 /* Auto-layout transition animation */
 .wraps-layout-animating {
   transition: transform 300ms ease-out;
+}
+
+/*
+ * Reduced motion.
+ *
+ * The dashboard had no `prefers-reduced-motion` handling at all, so a user who
+ * had asked the OS to stop animation still got spinning refresh icons, a
+ * scrolling logo strip and smooth scroll-behavior. Last in the file so it wins
+ * over anything above it without needing !important on every rule.
+ *
+ * Kept to a near-zero duration rather than `none`: animations that carry state
+ * (a spinner that stops when a fetch finishes, a transition whose `end` event
+ * something listens for) must still run and complete, just not visibly move.
+ * Chart animation is JS, not CSS - `useReducedMotion` turns that off.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
 }

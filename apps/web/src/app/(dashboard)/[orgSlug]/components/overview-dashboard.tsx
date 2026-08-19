@@ -87,7 +87,7 @@ export function OverviewDashboard({
                 className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
                 key={opt.value}
                 onClick={() => setTimeRange(opt.value)}
-                size="sm"
+                size="touch"
                 variant="outline"
               >
                 {opt.label}
@@ -102,7 +102,7 @@ export function OverviewDashboard({
             <SelectTrigger
               aria-label="Select time range"
               className="flex sm:hidden w-28"
-              size="sm"
+              size="touch"
             >
               <SelectValue />
             </SelectTrigger>

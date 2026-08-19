@@ -16,6 +16,11 @@ import {
   DialogTitle,
 } from "@wraps/ui/components/ui/dialog";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@wraps/ui/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -35,7 +40,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@wraps/ui/components/ui/tooltip";
-import { Download, Loader2, Search, UserPlus } from "lucide-react";
+import { Download, Info, Loader2, Search, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -527,12 +532,30 @@ export function EmailsTable({
 
   return (
     <div className="w-full space-y-4">
-      {/* What this list is - the same sentence the chart above states. */}
-      <div className="space-y-1">
+      {/*
+        The coverage caveat is real - mail this AWS account sent outside Wraps
+        genuinely is not here - but it is reference material, not something to
+        re-read on every visit, and as a paragraph it also stated the same 200
+        characters the chart above used to state. Same disclosure the Activity
+        card gives its reputation scope.
+      */}
+      <div className="flex items-center gap-1">
         <h2 className="font-semibold text-base">Messages</h2>
-        <p className="max-w-3xl text-muted-foreground text-sm">
-          {EMAIL_COVERAGE_EXPLAINER}
-        </p>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              aria-label="What this list covers"
+              className="-my-2 text-muted-foreground"
+              size="icon-sm"
+              variant="ghost"
+            >
+              <Info className="size-3.5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-80 text-sm">
+            {EMAIL_COVERAGE_EXPLAINER}
+          </PopoverContent>
+        </Popover>
       </div>
 
       <EmailFeedBanners feed={feed} />
@@ -560,7 +583,6 @@ export function EmailsTable({
           {selectedEmailIds.length > 0 && (
             <Button
               onClick={() => setCreateContactsDialogOpen(true)}
-              size="sm"
               variant="outline"
             >
               <UserPlus className="mr-2 h-4 w-4" />
@@ -568,32 +590,16 @@ export function EmailsTable({
             </Button>
           )}
 
-          {/* Button Group: Time Range | Status | Sort | Export */}
+          {/*
+            Button Group: Status | Sort | Export.
+
+            No time range here. `?days` governs the chart and this list
+            together, and it had two controls on one screen - this one and the
+            range group in the Activity card header - roughly 500px apart, both
+            writing the same parameter. One page-level filter, one place to set
+            it; the search placeholder still names the window it is searching.
+          */}
           <div className="flex w-full sm:w-auto">
-            <Select
-              onValueChange={(value) => {
-                captureEmailsFilterChanged({
-                  control: "days",
-                  from: String(days),
-                  to: value,
-                });
-                pushFilters({ days: Number(value) });
-              }}
-              value={String(days)}
-            >
-              <SelectTrigger
-                aria-label="Time range"
-                className="min-w-0 flex-1 sm:flex-initial sm:w-[150px] rounded-r-none border-r-0 focus:z-10"
-              >
-                <SelectValue placeholder="Time range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">Last 24 hours</SelectItem>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="90">Last 90 days</SelectItem>
-              </SelectContent>
-            </Select>
             <Select
               onValueChange={(value) => {
                 captureEmailsFilterChanged({
@@ -607,7 +613,7 @@ export function EmailsTable({
             >
               <SelectTrigger
                 aria-label="Status filter"
-                className="min-w-0 flex-1 sm:flex-initial sm:w-[140px] rounded-none border-r-0 focus:z-10"
+                className="min-w-0 flex-1 sm:flex-initial sm:w-[140px] rounded-r-none border-r-0 focus:z-10"
               >
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -668,15 +674,17 @@ export function EmailsTable({
         </div>
       </div>
 
-      <p className="text-muted-foreground text-sm">
-        Matches recipient, subject, and sender within the selected range.
-        {searchTooShort ? (
-          <span className="text-foreground">
-            {" "}
-            Type at least {EMAIL_SEARCH_MIN_LENGTH} characters to search.
-          </span>
-        ) : null}
-      </p>
+      {searchInput ? (
+        <p className="text-muted-foreground text-sm">
+          Matches recipient, subject, and sender within the selected range.
+          {searchTooShort ? (
+            <span className="text-foreground">
+              {" "}
+              Type at least {EMAIL_SEARCH_MIN_LENGTH} characters to search.
+            </span>
+          ) : null}
+        </p>
+      ) : null}
 
       {/* Table */}
       <div
@@ -780,7 +788,7 @@ export function EmailsTable({
             <Button
               disabled={isFetchingNextPage}
               onClick={handleLoadMore}
-              size="sm"
+              size="touch"
               variant="outline"
             >
               {isFetchingNextPage ? (

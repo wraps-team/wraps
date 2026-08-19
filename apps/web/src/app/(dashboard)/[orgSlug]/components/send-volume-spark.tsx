@@ -16,6 +16,7 @@ import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { ArrowRightIcon, MailIcon, MessageSquareIcon } from "lucide-react";
 import Link from "next/link";
 import { Area, AreaChart } from "recharts";
+import { SERIES_COLOR } from "@/lib/chart-series";
 import { useProductsStore } from "@/stores/products-store";
 import { useVolumeData } from "../emails/analytics/hooks/use-analytics";
 import { useSMSVolumeData } from "../sms/analytics/hooks/use-sms-analytics";
@@ -23,17 +24,11 @@ import { useSMSVolumeData } from "../sms/analytics/hooks/use-sms-analytics";
 const chartConfig = {
   email: {
     label: "Email",
-    theme: {
-      light: "oklch(0.45 0.15 250)",
-      dark: "oklch(0.65 0.15 250)",
-    },
+    color: SERIES_COLOR.volume,
   },
   sms: {
     label: "SMS",
-    theme: {
-      light: "oklch(0.55 0.18 155)",
-      dark: "oklch(0.65 0.18 155)",
-    },
+    color: SERIES_COLOR.secondary,
   },
 } satisfies ChartConfig;
 
@@ -137,12 +132,18 @@ export function SendVolumeSpark({
             {showBothChannels && (
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[oklch(0.45_0.15_250)] dark:bg-[oklch(0.65_0.15_250)]" />
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: SERIES_COLOR.volume }}
+                  />
                   <MailIcon className="h-3 w-3" />
                   {emailTotal.toLocaleString()}
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[oklch(0.55_0.18_155)] dark:bg-[oklch(0.65_0.18_155)]" />
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: SERIES_COLOR.secondary }}
+                  />
                   <MessageSquareIcon className="h-3 w-3" />
                   {smsTotal.toLocaleString()}
                 </span>

@@ -2,6 +2,7 @@
 
 import { Card, CardContent } from "@wraps/ui/components/ui/card";
 import { useEffect, useRef, useState } from "react";
+import { SERIES_COLOR } from "@/lib/chart-series";
 import {
   calculateFunnelStages,
   type FunnelStage,
@@ -29,12 +30,15 @@ function formatRate(rate: number): string {
 
 const FUNNEL_HEIGHT = 120;
 
-// One color per stage — sections blend between adjacent stage colors
+// One color per stage - sections blend between adjacent stage colors.
+// These are the same four stages the emails chart plots, so they take the same
+// four colours: this funnel used to draw Delivered violet and Opened pink while
+// the emails card drew them green and amber.
 const STAGE_COLORS = [
-  "hsl(221 83% 53%)", // blue-500: Sent
-  "hsl(262 83% 58%)", // violet-500: Delivered
-  "hsl(330 81% 60%)", // pink-500: Opened
-  "hsl(25 95% 53%)", // orange-500: Clicked
+  SERIES_COLOR.volume, // Sent
+  SERIES_COLOR.success, // Delivered
+  SERIES_COLOR.attention, // Opened
+  SERIES_COLOR.engagement, // Clicked
 ];
 
 export function FunnelChart(props: FunnelChartProps) {

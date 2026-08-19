@@ -28,20 +28,21 @@ import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { countYAxisProps } from "@/lib/chart-axis";
+import { SERIES_COLOR } from "@/lib/chart-series";
 import { useVolumeData } from "../hooks/use-analytics";
 
 const chartConfig = {
   delivered: {
     label: "Delivered",
-    color: "hsl(142 76% 36%)",
+    color: SERIES_COLOR.success,
   },
   bounced: {
     label: "Bounced",
-    color: "hsl(45 93% 47%)",
+    color: SERIES_COLOR.attention,
   },
   rejected: {
     label: "Rejected",
-    color: "hsl(0 84% 60%)",
+    color: SERIES_COLOR.failure,
   },
 } satisfies ChartConfig;
 

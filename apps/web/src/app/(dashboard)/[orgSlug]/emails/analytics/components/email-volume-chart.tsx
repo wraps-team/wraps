@@ -28,15 +28,13 @@ import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { countYAxisProps } from "@/lib/chart-axis";
+import { SERIES_COLOR } from "@/lib/chart-series";
 import { useVolumeData } from "../hooks/use-analytics";
 
 const chartConfig = {
   sent: {
     label: "Sent",
-    theme: {
-      light: "oklch(0.45 0.15 250)", // Deep blue (like blue-700)
-      dark: "oklch(0.65 0.15 250)", // Light blue (like blue-400)
-    },
+    color: SERIES_COLOR.volume,
   },
 } satisfies ChartConfig;
 

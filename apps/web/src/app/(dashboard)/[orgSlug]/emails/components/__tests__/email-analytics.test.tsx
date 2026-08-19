@@ -10,7 +10,8 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // recharts' ResponsiveContainer observes its box; jsdom has no ResizeObserver.
@@ -26,6 +27,17 @@ globalThis.ResizeObserver ??= class {
   }
 } as unknown as typeof ResizeObserver;
 
+globalThis.matchMedia ??= ((query: string) => ({
+  matches: false,
+  media: query,
+  addEventListener() {
+    // no OS preference changes in jsdom
+  },
+  removeEventListener() {
+    // no-op
+  },
+})) as unknown as typeof matchMedia;
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
   usePathname: () => "/acme/emails",
@@ -36,8 +48,10 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
+const refreshEmailChart = vi.fn();
+
 vi.mock("@/actions/analytics", () => ({
-  refreshEmailChart: vi.fn(),
+  refreshEmailChart: (...args: unknown[]) => refreshEmailChart(...args),
 }));
 
 vi.mock("../lib/analytics", () => ({
@@ -64,9 +78,10 @@ vi.mock("../../analytics/hooks/use-analytics", () => ({
   useEmailChartData: () => queryResult,
 }));
 
+import type { EmailChartMeta } from "@/lib/analytics-scope";
 import { EmailAnalytics } from "../email-analytics";
 
-function payload(volume: VolumePoint[]) {
+function payload(volume: VolumePoint[], meta?: Partial<EmailChartMeta>) {
   return {
     volume,
     engagement: [],
@@ -77,12 +92,24 @@ function payload(volume: VolumePoint[]) {
       bounceRate: 0.04,
       complaintRate: 0,
     },
+    meta: meta
+      ? {
+          reputationScope: "ses-account",
+          awsAccountCount: 1,
+          awsAccountsUnavailable: 0,
+          reputationAsOf: Date.parse("2026-08-10T00:00:00Z"),
+          generatedAt: Date.parse("2026-08-18T00:00:00Z"),
+          ...meta,
+        }
+      : undefined,
   };
 }
 
 afterEach(cleanup);
 
 beforeEach(() => {
+  refreshEmailChart.mockReset();
+  refreshEmailChart.mockResolvedValue({ ok: true });
   queryResult.data = undefined;
   queryResult.isError = false;
   queryResult.isFetching = false;
@@ -156,5 +183,96 @@ describe("EmailAnalytics", () => {
       screen.queryByText(/no email activity in this period/i)
     ).not.toBeInTheDocument();
     expect(screen.getByText(/couldn't load email activity/i)).toBeTruthy();
+  });
+  it("leaves the coverage explainer to the list it describes", () => {
+    // The chart card printed the same 200 characters the Messages table prints
+    // a few hundred pixels below it - and opened "This list shows every
+    // message...", on a card that holds no list.
+    queryResult.data = payload([
+      { date: "2026-08-17", sent: 5, delivered: 5, opens: 1, clicks: 0 },
+    ]);
+
+    render(<EmailAnalytics orgSlug="acme" />);
+
+    expect(
+      screen.queryByText(/this list shows every message/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the reputation scope prose out of the layout until asked", async () => {
+    // Three or four lines of 12px prose in a 176px column were what made the
+    // summary taller than the chart beside it.
+    queryResult.data = payload(
+      [{ date: "2026-08-17", sent: 5, delivered: 5, opens: 1, clicks: 0 }],
+      {}
+    );
+
+    render(<EmailAnalytics orgSlug="acme" />);
+
+    expect(
+      screen.queryByText(/SES all-time rate for this AWS account/i)
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /measures/i }));
+
+    expect(
+      await screen.findByText(/SES all-time rate for this AWS account/i)
+    ).toBeInTheDocument();
+  });
+
+  it("keeps a partial-reputation warning on the surface, not in the popover", () => {
+    // A rate computed from an incomplete set of AWS accounts is a caveat about
+    // the number itself, not background reading.
+    queryResult.data = payload(
+      [{ date: "2026-08-17", sent: 5, delivered: 5, opens: 1, clicks: 0 }],
+      { awsAccountCount: 3, awsAccountsUnavailable: 1 }
+    );
+
+    render(<EmailAnalytics orgSlug="acme" />);
+
+    expect(
+      screen.getByText(/1 of 3 AWS accounts did not report reputation/i)
+    ).toBeInTheDocument();
+  });
+
+  it("stays focusable through a refresh and announces the outcome", async () => {
+    // `disabled` while pending removed the focused button from the tab order,
+    // which drops focus to <body> - a keyboard user pressed Refresh and was
+    // returned to the top of the document with nothing announced.
+    queryResult.data = payload([
+      { date: "2026-08-17", sent: 5, delivered: 5, opens: 1, clicks: 0 },
+    ]);
+
+    render(<EmailAnalytics orgSlug="acme" />);
+
+    const [refresh] = screen.getAllByRole("button", {
+      name: "Refresh email activity",
+    });
+
+    await userEvent.click(refresh);
+
+    expect(refresh).not.toBeDisabled();
+    await waitFor(() =>
+      expect(screen.getByText("Email activity refreshed.")).toBeInTheDocument()
+    );
+  });
+
+  it("says so when the refresh itself failed", async () => {
+    refreshEmailChart.mockResolvedValue({ ok: false, reason: "error" });
+    queryResult.data = payload([
+      { date: "2026-08-17", sent: 5, delivered: 5, opens: 1, clicks: 0 },
+    ]);
+
+    render(<EmailAnalytics orgSlug="acme" />);
+
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "Refresh email activity" })[0]
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Could not refresh email activity.")
+      ).toBeInTheDocument()
+    );
   });
 });

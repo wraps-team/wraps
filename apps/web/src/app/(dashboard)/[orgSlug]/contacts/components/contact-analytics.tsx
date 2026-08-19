@@ -34,14 +34,12 @@ import { Button } from "@/components/ui/button";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { countYAxisProps } from "@/lib/chart-axis";
+import { SERIES_COLOR } from "@/lib/chart-series";
 
 const chartConfig = {
   count: {
     label: "New Contacts",
-    theme: {
-      light: "oklch(0.45 0.15 160)", // Green
-      dark: "oklch(0.65 0.15 160)",
-    },
+    color: SERIES_COLOR.success,
   },
 } satisfies ChartConfig;
 
@@ -107,7 +105,7 @@ export function ContactAnalytics({ organizationId }: ContactAnalyticsProps) {
               aria-pressed={timeRange === "30d"}
               className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
               onClick={() => setTimeRange("30d")}
-              size="sm"
+              size="touch"
               variant="outline"
             >
               30 days
@@ -116,7 +114,7 @@ export function ContactAnalytics({ organizationId }: ContactAnalyticsProps) {
               aria-pressed={timeRange === "7d"}
               className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
               onClick={() => setTimeRange("7d")}
-              size="sm"
+              size="touch"
               variant="outline"
             >
               7 days
@@ -127,7 +125,7 @@ export function ContactAnalytics({ organizationId }: ContactAnalyticsProps) {
             <SelectTrigger
               aria-label="Select time range"
               className="flex @[767px]/card:hidden w-32 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
-              size="sm"
+              size="touch"
             >
               <SelectValue placeholder="30 days" />
             </SelectTrigger>

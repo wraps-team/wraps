@@ -98,12 +98,13 @@ export default async function EmailsPage({
   return (
     <>
       {/*
-        The page had no heading at all (audit F14), so assistive tech had no
-        page identity and every message tab read "{Org} | Wraps".
+        The page needs a heading - without one assistive tech has no page
+        identity and every message tab reads "{Org} | Wraps" (audit F14) - but
+        it does not need to occupy a block of its own. The sidebar already says
+        Emails, and the two sections below name themselves, so on screen this
+        was a third label for something nobody was unsure about.
       */}
-      <div className="px-4 lg:px-6">
-        <h1 className="font-bold text-3xl text-foreground">Emails</h1>
-      </div>
+      <h1 className="sr-only">Emails</h1>
 
       {/* Email Analytics */}
       <div className="px-4 lg:px-6">

@@ -29,22 +29,17 @@ import * as React from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { SERIES_COLOR } from "@/lib/chart-series";
 import { useSMSVolumeData } from "../hooks/use-sms-analytics";
 
 const chartConfig = {
   delivered: {
     label: "Delivered",
-    theme: {
-      light: "oklch(0.55 0.15 145)", // Green
-      dark: "oklch(0.65 0.15 145)",
-    },
+    color: SERIES_COLOR.success,
   },
   failed: {
     label: "Failed",
-    theme: {
-      light: "oklch(0.55 0.2 25)", // Red
-      dark: "oklch(0.65 0.2 25)",
-    },
+    color: SERIES_COLOR.failure,
   },
 } satisfies ChartConfig;
 

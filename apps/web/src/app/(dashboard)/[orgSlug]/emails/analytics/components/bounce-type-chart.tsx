@@ -34,15 +34,13 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { SERIES_COLOR } from "@/lib/chart-series";
 import { useBounceData } from "../hooks/use-analytics";
 
 const chartConfig = {
   bounceRate: {
     label: "Bounce Rate",
-    theme: {
-      light: "oklch(0.5 0.15 50)", // Deep orange (like orange-700)
-      dark: "oklch(0.7 0.15 35)", // Light orange (like orange-400)
-    },
+    color: SERIES_COLOR.attention,
   },
 } satisfies ChartConfig;
 

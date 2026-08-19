@@ -1,3 +1,4 @@
+import { Slot } from "@radix-ui/react-slot";
 import { cn } from "@wraps/ui/lib/utils";
 import type * as React from "react";
 
@@ -27,9 +28,22 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+/**
+ * `asChild` so a card that is a real section of the page can render its title
+ * as a real heading. The default <div> keeps a card out of the document
+ * outline, which is right for a card that is only a container - but a card the
+ * page is actually made of was reaching for `role="heading" aria-level={2}`
+ * instead, which is the same outline entry with none of the semantics.
+ */
+function CardTitle({
+  asChild = false,
+  className,
+  ...props
+}: React.ComponentProps<"div"> & { asChild?: boolean }) {
+  const Comp = asChild ? Slot : "div";
+
   return (
-    <div
+    <Comp
       className={cn("font-semibold leading-none", className)}
       data-slot="card-title"
       {...props}
