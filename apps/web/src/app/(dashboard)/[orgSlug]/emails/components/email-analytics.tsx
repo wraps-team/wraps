@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import {
   EMAIL_COVERAGE_EXPLAINER,
+  type ReputationLabel,
   reputationPartialLabel,
   reputationScopeLabel,
 } from "@/lib/analytics-scope";
@@ -99,7 +100,7 @@ type MetricsSidebarProps = {
       }
     | undefined;
   rangeLabel: string;
-  reputation: { title: string; detail: string } | null;
+  reputation: ReputationLabel | null;
   reputationPartial: string | null;
   updatedLabel: string | null;
   refreshFailed: boolean;
@@ -164,6 +165,11 @@ function MetricsSidebar({
           {reputation ? (
             <div className="mt-1 text-muted-foreground text-xs">
               {reputation.detail}
+            </div>
+          ) : null}
+          {reputation?.note ? (
+            <div className="mt-1 text-muted-foreground text-xs">
+              {reputation.note}
             </div>
           ) : null}
           {reputationPartial ? (
@@ -291,9 +297,7 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
   );
 
   const range = TIME_RANGES.find((r) => r.days === days) ?? TIME_RANGES[1];
-  const reputation = meta
-    ? reputationScopeLabel(meta.reputationScope, meta.awsAccountCount)
-    : null;
+  const reputation = meta ? reputationScopeLabel(meta) : null;
   const reputationPartial = meta ? reputationPartialLabel(meta) : null;
 
   const updatedLabel =

@@ -4,6 +4,7 @@ import {
   type GetMetricDataCommandOutput,
 } from "@aws-sdk/client-cloudwatch";
 import { db } from "@wraps/db";
+import { REPUTATION_LOOKBACK_DAYS } from "../analytics-scope";
 import { getOrAssumeRole } from "./credential-cache";
 
 /**
@@ -114,6 +115,22 @@ export const SES_METRICS = {
   REPUTATION_COMPLAINT_RATE: "Reputation.ComplaintRate",
 } as const;
 
+export type SESReputationMetrics = {
+  /** Decimal rate (0-1), or null when SES has published none in the lookback. */
+  bounceRate: number | null;
+  /** Decimal rate (0-1), or null when SES has published none in the lookback. */
+  complaintRate: number | null;
+  /**
+   * When SES actually published the newest rate above, straight off the
+   * CloudWatch datapoint. Null when it published nothing in the lookback.
+   *
+   * Never stamped with "now": the whole point is that SES stops republishing
+   * when an account stops sending, so the age of the number is the one thing
+   * the caller cannot infer from the value.
+   */
+  asOf: Date | null;
+};
+
 /**
  * Fetches SES account-level reputation rates from CloudWatch.
  *
@@ -122,12 +139,21 @@ export const SES_METRICS = {
  * SES console and used for enforcement decisions. They cover the account's
  * full send history, not just a user-selected period.
  *
- * Returns decimal rates (0–1). Multiply by 100 for percentages.
- * Returns null for each metric if SES hasn't published data yet (new accounts).
+ * SES only publishes them WHILE THE ACCOUNT IS SENDING, so the lookback has to
+ * outlast an ordinary sending pause. It used to be 7 days, which meant an org
+ * that stopped sending for a week reported no rate at all and the dashboard
+ * quietly relabelled its tile onto window arithmetic — a different population
+ * behind the same heading. See `REPUTATION_LOOKBACK_DAYS` for the current value
+ * and why.
+ *
+ * Returns decimal rates (0–1) plus `asOf`, the timestamp of the newest
+ * datapoint used. Multiply the rates by 100 for percentages.
+ * Rates and `asOf` are null if SES hasn't published data (new accounts, or an
+ * account that has not sent for the whole lookback).
  */
 export async function getSESReputationMetrics(
   awsAccountId: string
-): Promise<{ bounceRate: number | null; complaintRate: number | null }> {
+): Promise<SESReputationMetrics> {
   const account = await db.query.awsAccount.findFirst({
     where: (a, { eq }) => eq(a.id, awsAccountId),
   });
@@ -151,10 +177,13 @@ export async function getSESReputationMetrics(
     },
   });
 
-  // Query the last 7 days to ensure we get a data point even if SES publishes
-  // infrequently. Use Average because these are rate values (0–1), not counts.
+  // Use Average because these are rate values (0–1), not counts. One datapoint
+  // per day over the lookback is ~90 points per metric, far under the
+  // per-request datapoint ceiling, so this never needs paging.
   const endTime = new Date();
-  const startTime = new Date(endTime.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const startTime = new Date(
+    endTime.getTime() - REPUTATION_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+  );
 
   const command = new GetMetricDataCommand({
     MetricDataQueries: [
@@ -183,6 +212,9 @@ export async function getSESReputationMetrics(
     ],
     StartTime: startTime,
     EndTime: endTime,
+    // Explicit rather than relying on the default: if CloudWatch ever truncates
+    // the series it drops the far end, and the far end must be the OLD points.
+    ScanBy: "TimestampDescending",
   });
 
   let response: GetMetricDataCommandOutput;
@@ -193,14 +225,39 @@ export async function getSESReputationMetrics(
   }
   const results = response.MetricDataResults || [];
 
-  const latestValue = (id: string): number | null => {
+  // Pick by timestamp rather than by array position. `Values` and `Timestamps`
+  // are parallel arrays, and taking `Values[0]` on faith would silently return
+  // the OLDEST rate if the scan order were ever anything but descending.
+  const latest = (id: string): { value: number; timestamp: Date } | null => {
     const result = results.find((r) => r.Id === id);
-    const values = result?.Values;
-    return values && values.length > 0 ? (values[0] ?? null) : null;
+    const values = result?.Values ?? [];
+    const timestamps = result?.Timestamps ?? [];
+    let newest: { value: number; timestamp: Date } | null = null;
+    for (const [index, value] of values.entries()) {
+      const timestamp = timestamps[index];
+      if (value == null || !timestamp) {
+        continue;
+      }
+      if (newest === null || timestamp.getTime() > newest.timestamp.getTime()) {
+        newest = { value, timestamp };
+      }
+    }
+    return newest;
   };
 
+  const bounce = latest("bounce_rate");
+  const complaint = latest("complaint_rate");
+
+  const publishedAt = [bounce?.timestamp, complaint?.timestamp]
+    .filter((t): t is Date => t != null)
+    .reduce<Date | null>(
+      (newest, t) => (newest === null || t > newest ? t : newest),
+      null
+    );
+
   return {
-    bounceRate: latestValue("bounce_rate"),
-    complaintRate: latestValue("complaint_rate"),
+    bounceRate: bounce?.value ?? null,
+    complaintRate: complaint?.value ?? null,
+    asOf: publishedAt,
   };
 }

@@ -124,7 +124,7 @@ export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
   const meta = data.meta;
   const reputation =
     meta && meta.reputationScope === "ses-account"
-      ? reputationScopeLabel(meta.reputationScope, meta.awsAccountCount)
+      ? reputationScopeLabel(meta)
       : null;
   const reputationPartial = meta ? reputationPartialLabel(meta) : null;
 
@@ -147,6 +147,9 @@ export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
               </span>
             </div>
             <p className="text-muted-foreground text-xs">{reputation.detail}</p>
+            {reputation.note ? (
+              <p className="text-muted-foreground text-xs">{reputation.note}</p>
+            ) : null}
             {reputationPartial ? (
               <p className="text-muted-foreground text-xs">
                 {reputationPartial}

@@ -174,10 +174,28 @@ export async function GET(request: Request, context: RouteContext) {
 
     const hasReputation =
       reputationBounceRate !== null || reputationComplaintRate !== null;
+    // Which publish time to quote when several AWS accounts contribute: the
+    // OLDEST, so the freshness claim on the tile is true of every number
+    // shown - including the worst-of-N rate, which may well come from the
+    // account that stopped sending first.
+    const reputationAsOf = reputationResults.reduce<number | null>(
+      (oldest, r) => {
+        if (!r || r.asOf == null) {
+          return oldest;
+        }
+        if (r.bounceRate == null && r.complaintRate == null) {
+          return oldest;
+        }
+        const publishedAt = r.asOf.getTime();
+        return oldest === null ? publishedAt : Math.min(oldest, publishedAt);
+      },
+      null
+    );
     const meta: EmailChartMeta = {
       reputationScope: resolveReputationScope(hasReputation, effectiveSent),
       awsAccountCount: accounts.length,
       awsAccountsUnavailable,
+      reputationAsOf,
       generatedAt: Date.now(),
     };
 

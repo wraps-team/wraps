@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { reputationAgeDays, reputationScopeLabel } from "@/lib/analytics-scope";
 
 vi.mock("next/headers", () => ({
   headers: () => new Headers(),
@@ -94,7 +95,8 @@ vi.mock("@/lib/analytics-utils", () => ({
   validateTimezone: (tz: string | null | undefined) => tz || "UTC",
 }));
 
-const RECENT = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+const DAY_MS = 24 * 60 * 60 * 1000;
+const RECENT = new Date(Date.now() - 2 * DAY_MS);
 const RECENT_DAY = RECENT.toISOString().slice(0, 10);
 
 function postgresDay(overrides: Partial<Record<string, number>> = {}) {
@@ -133,6 +135,7 @@ describe("Email chart volume source (F4)", () => {
     mockGetSESReputationMetrics.mockResolvedValue({
       bounceRate: null,
       complaintRate: null,
+      asOf: null,
     });
     mockGetEmailMetricsFromPostgres.mockResolvedValue(new Map());
   });
@@ -242,6 +245,7 @@ describe("Email chart reputation scope (F4)", () => {
     mockGetSESReputationMetrics.mockResolvedValue({
       bounceRate: null,
       complaintRate: null,
+      asOf: null,
     });
     mockGetEmailMetricsFromPostgres.mockResolvedValue(new Map());
   });
@@ -253,6 +257,7 @@ describe("Email chart reputation scope (F4)", () => {
     mockGetSESReputationMetrics.mockResolvedValue({
       bounceRate: 0.0002,
       complaintRate: 0.0003,
+      asOf: new Date(),
     });
 
     const data = await callRoute();
@@ -269,8 +274,16 @@ describe("Email chart reputation scope (F4)", () => {
       { id: "acc-2", organizationId: "org-1" },
     ]);
     mockGetSESReputationMetrics
-      .mockResolvedValueOnce({ bounceRate: 0.001, complaintRate: 0.0001 })
-      .mockResolvedValueOnce({ bounceRate: 0.05, complaintRate: 0.0002 });
+      .mockResolvedValueOnce({
+        bounceRate: 0.001,
+        complaintRate: 0.0001,
+        asOf: new Date(Date.now() - 9 * DAY_MS),
+      })
+      .mockResolvedValueOnce({
+        bounceRate: 0.05,
+        complaintRate: 0.0002,
+        asOf: new Date(),
+      });
 
     const data = await callRoute();
 
@@ -296,7 +309,11 @@ describe("Email chart reputation scope (F4)", () => {
       { id: "acc-2", organizationId: "org-1" },
     ]);
     mockGetSESReputationMetrics
-      .mockResolvedValueOnce({ bounceRate: 0.001, complaintRate: 0.0001 })
+      .mockResolvedValueOnce({
+        bounceRate: 0.001,
+        complaintRate: 0.0001,
+        asOf: new Date(),
+      })
       .mockRejectedValueOnce(new Error("AccessDenied"));
 
     const data = await callRoute();
@@ -324,5 +341,151 @@ describe("Email chart reputation scope (F4)", () => {
       (endTime.getTime() - startTime.getTime()) / (24 * 60 * 60 * 1000)
     );
     expect(spanDays).toBe(7);
+  });
+});
+
+describe("Reputation staleness does not swap populations (passumo)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFindMany.mockResolvedValue([{ id: "acc-1", organizationId: "org-1" }]);
+    mockGetEmailMetricsFromPostgres.mockResolvedValue(new Map());
+  });
+
+  /**
+   * The measured shape: SES last published 0.15% bounce, then the org stopped
+   * sending. Their window-scoped rate over the same range is 10.25%. Under the
+   * old 7-day lookback the tile silently traded one number for the other on the
+   * eighth quiet day - same card, no user action, a ~70x jump.
+   */
+  function passumo(daysSinceLastPublish: number) {
+    mockGetSESReputationMetrics.mockResolvedValue({
+      bounceRate: 0.00147,
+      complaintRate: 0.0002,
+      asOf: new Date(Date.now() - daysSinceLastPublish * DAY_MS),
+    });
+    // 10.25% bounce / 1.12% complaint inside the window.
+    mockGetEmailMetricsFromPostgres.mockResolvedValue(
+      postgresDay({ sent: 10_000, bounced: 1025, complaints: 112 })
+    );
+  }
+
+  it("keeps reporting the SES account rate once sending stops", async () => {
+    passumo(10);
+
+    const data = await callRoute();
+
+    expect(data.meta.reputationScope).toBe("ses-account");
+    expect(data.overview.bounceRate).toBeCloseTo(0.15, 2);
+    // The window number for the very same range, which must NOT surface here.
+    expect(data.overview.bounceRate).not.toBeCloseTo(10.25, 1);
+    expect(data.overview.complaintRate).toBeCloseTo(0.02, 2);
+  });
+
+  it("does not move the number at all as the pause lengthens", async () => {
+    passumo(1);
+    const fresh = await callRoute();
+    passumo(10);
+    const stale = await callRoute();
+
+    // Same population before and after the old 7-day cliff.
+    expect(stale.overview.bounceRate).toBe(fresh.overview.bounceRate);
+    expect(stale.meta.reputationScope).toBe(fresh.meta.reputationScope);
+    const jump = stale.overview.bounceRate / fresh.overview.bounceRate;
+    expect(jump).toBe(1);
+  });
+
+  it("carries the real publish time so the tile can date the number", async () => {
+    passumo(10);
+
+    const data = await callRoute();
+
+    expect(data.meta.reputationAsOf).not.toBeNull();
+    expect(reputationAgeDays(data.meta)).toBe(10);
+    // Not stamped with the read time.
+    expect(data.meta.reputationAsOf).toBeLessThan(data.meta.generatedAt);
+  });
+
+  it("labels the stale rate as an account rate, dated - not as the window", async () => {
+    passumo(10);
+
+    const data = await callRoute();
+    const label = reputationScopeLabel(data.meta);
+
+    expect(label.title).toBe("Account reputation");
+    expect(label.detail).toBe(
+      "SES all-time rate for this AWS account, last published 10 days ago"
+    );
+    expect(label.note).toBe(
+      "SES publishes this rate only while the account is sending."
+    );
+  });
+
+  it("still falls back to the window when SES never rated the account", async () => {
+    // The one case the fallback is for: no rate has ever existed, so there is
+    // no population to swap away from.
+    mockGetSESReputationMetrics.mockResolvedValue({
+      bounceRate: null,
+      complaintRate: null,
+      asOf: null,
+    });
+    mockGetEmailMetricsFromPostgres.mockResolvedValue(
+      postgresDay({ sent: 10_000, bounced: 1025 })
+    );
+
+    const data = await callRoute();
+
+    expect(data.meta.reputationScope).toBe("window");
+    expect(data.meta.reputationAsOf).toBeNull();
+    expect(data.overview.bounceRate).toBeCloseTo(10.25, 2);
+    expect(reputationScopeLabel(data.meta).title).toBe(
+      "Bounces and complaints"
+    );
+  });
+
+  it("dates a multi-account rate by its oldest contributor", async () => {
+    // Worst-of-N may come from the account that stopped sending first, so the
+    // freshness claim has to hold for every number on the tile.
+    mockFindMany.mockResolvedValue([
+      { id: "acc-1", organizationId: "org-1" },
+      { id: "acc-2", organizationId: "org-1" },
+    ]);
+    mockGetSESReputationMetrics
+      .mockResolvedValueOnce({
+        bounceRate: 0.02,
+        complaintRate: 0.0001,
+        asOf: new Date(Date.now() - 12 * DAY_MS),
+      })
+      .mockResolvedValueOnce({
+        bounceRate: 0.001,
+        complaintRate: 0.0001,
+        asOf: new Date(),
+      });
+
+    const data = await callRoute();
+
+    expect(data.overview.bounceRate).toBeCloseTo(2, 2);
+    expect(reputationAgeDays(data.meta)).toBe(12);
+  });
+
+  it("ignores the publish time of an account that reported no rate", async () => {
+    mockFindMany.mockResolvedValue([
+      { id: "acc-1", organizationId: "org-1" },
+      { id: "acc-2", organizationId: "org-1" },
+    ]);
+    mockGetSESReputationMetrics
+      .mockResolvedValueOnce({
+        bounceRate: 0.001,
+        complaintRate: 0.0001,
+        asOf: new Date(Date.now() - 5 * DAY_MS),
+      })
+      .mockResolvedValueOnce({
+        bounceRate: null,
+        complaintRate: null,
+        asOf: new Date(Date.now() - 40 * DAY_MS),
+      });
+
+    const data = await callRoute();
+
+    expect(reputationAgeDays(data.meta)).toBe(5);
   });
 });

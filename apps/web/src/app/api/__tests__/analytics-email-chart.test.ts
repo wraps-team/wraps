@@ -146,6 +146,7 @@ describe("Email Chart API", () => {
     mockGetSESReputationMetrics.mockResolvedValue({
       bounceRate: null,
       complaintRate: null,
+      asOf: null,
     });
     mockGetEmailMetricsFromPostgres.mockResolvedValue(new Map());
   });
@@ -173,6 +174,7 @@ describe("Email Chart API", () => {
     mockGetSESReputationMetrics.mockResolvedValue({
       bounceRate: 0.0002,
       complaintRate: 0.0003,
+      asOf: new Date(),
     });
 
     const data = await callRoute();

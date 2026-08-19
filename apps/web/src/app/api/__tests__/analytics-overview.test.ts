@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { reputationAgeDays, reputationScopeLabel } from "@/lib/analytics-scope";
 
 vi.mock("next/headers", () => ({
   headers: () => new Headers(),
@@ -109,6 +110,7 @@ describe("Analytics Overview API", () => {
     mockGetSESReputationMetrics.mockResolvedValue({
       bounceRate: null,
       complaintRate: null,
+      asOf: null,
     });
   });
 
@@ -186,6 +188,7 @@ describe("Analytics Overview API", () => {
     mockGetSESReputationMetrics.mockResolvedValueOnce({
       bounceRate: 0.0002,
       complaintRate: 0.001,
+      asOf: new Date(),
     });
 
     const { data } = await callOverview();
@@ -282,5 +285,69 @@ describe("Analytics Overview API", () => {
     const { response } = await callOverview();
 
     expect(response.status).toBe(401);
+  });
+});
+
+describe("Overview reputation labelling matches the emails chart", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetSESReputationMetrics.mockResolvedValue({
+      bounceRate: null,
+      complaintRate: null,
+      asOf: null,
+    });
+  });
+
+  it("keeps a stale SES rate as the account rate here too", async () => {
+    // The analytics page and the emails page read the same two sources. If one
+    // route swaps to window arithmetic while the other does not, the same
+    // account reads as 0.15% on one page and 10.25% on the other.
+    mockGetEmailMetricsFromPostgres.mockResolvedValueOnce(
+      makeDay({
+        sent: 10_000,
+        delivered: 8000,
+        bounced: 1025,
+        complaints: 112,
+        renderingFailures: 0,
+      })
+    );
+    mockGetSESReputationMetrics.mockResolvedValueOnce({
+      bounceRate: 0.00147,
+      complaintRate: 0.0002,
+      asOf: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+    });
+
+    const { data } = await callOverview();
+
+    expect(data.meta.reputationScope).toBe("ses-account");
+    expect(data.bounceRate).toBeCloseTo(0.15, 2);
+    expect(data.bounceRate).not.toBeCloseTo(10.25, 1);
+    expect(reputationAgeDays(data.meta)).toBe(10);
+    expect(reputationScopeLabel(data.meta).detail).toBe(
+      "SES all-time rate for this AWS account, last published 10 days ago"
+    );
+  });
+
+  it("carries the publish time in meta like the chart route does", async () => {
+    mockGetEmailMetricsFromPostgres.mockResolvedValueOnce(
+      makeDay({
+        sent: 10,
+        delivered: 10,
+        bounced: 0,
+        complaints: 0,
+        renderingFailures: 0,
+      })
+    );
+    mockGetSESReputationMetrics.mockResolvedValueOnce({
+      bounceRate: 0.001,
+      complaintRate: 0.0001,
+      asOf: new Date(),
+    });
+
+    const { data } = await callOverview();
+
+    expect(data.meta).toHaveProperty("reputationAsOf");
+    expect(reputationAgeDays(data.meta)).toBe(0);
+    expect(reputationScopeLabel(data.meta).note).toBeNull();
   });
 });
