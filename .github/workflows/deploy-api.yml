@@ -36,12 +36,49 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
+  # Migrate BEFORE deploying, not after. `sst deploy` publishes each Lambda's
+  # new code the moment that function updates — well before the command returns
+  # — so migrating afterwards leaves a window where new code runs against the
+  # old schema. Any read or write touching a column the migration has not added
+  # yet throws, and for the queue workers that means burned SQS retries and
+  # dead-lettered chunks on a live broadcast.
+  #
+  # Safe because migrations are expected to be backward compatible: the
+  # still-running old code ignores columns it does not know about. A migration
+  # that REMOVES or renames still has to be split expand/contract across two
+  # releases — no ordering makes that safe on its own.
+  #
+  # Failing this way round is also the better failure: a migration that dies
+  # leaves old code on the old schema, which works. The other order leaves new
+  # code on the old schema, which does not.
+  #
+  # This lives in its own workflow rather than a step below so that a broken
+  # api build or an expired AWS role cannot stop the migration from running —
+  # apps/web ships on the same commit through Vercel whether this job runs or
+  # not, so the migration must not be hostage to anything but itself. See
+  # migrate.yml, which also carries the repo-wide serialisation.
+  migrate:
+    if: github.repository == 'wraps-team/wraps'
+    uses: ./.github/workflows/migrate.yml
+    with:
+      stage: ${{ github.event.inputs.stage || 'production' }}
+    secrets: inherit
+
   deploy:
     # Only runs upstream — forks lack the Blacksmith runners and AWS secrets,
     # so this job would queue forever on a self-hosted customer's fork
     if: github.repository == 'wraps-team/wraps'
+    needs: migrate
     runs-on: blacksmith-2vcpu-ubuntu-2404
     environment: ${{ github.event.inputs.stage || 'production' }}
+
+    # Two `sst deploy` runs against one Pulumi stack fight over the state lock.
+    # Nothing serialised this before; two pushes to main inside a few minutes
+    # was enough. cancel-in-progress: false so a deploy is never killed halfway
+    # through updating live Lambdas.
+    concurrency:
+      group: deploy-sst-${{ github.event.inputs.stage || 'production' }}
+      cancel-in-progress: false
 
     steps:
       - name: Checkout code
@@ -70,31 +107,6 @@ jobs:
 
       - name: Remove system Pulumi (SST compatibility fix)
         run: sudo rm -f /usr/local/bin/pulumi-language-nodejs
-
-      # Migrate BEFORE deploying, not after. `sst deploy` publishes each
-      # Lambda's new code the moment that function updates — well before the
-      # command returns — so migrating afterwards leaves a window where new code
-      # runs against the old schema. Any read or write touching a column the
-      # migration has not added yet throws, and for the queue workers that means
-      # burned SQS retries and dead-lettered chunks on a live broadcast.
-      #
-      # Until now this step did not exist at all and every schema change relied
-      # on someone running db:migrate by hand: batch_send.paused_at shipped in
-      # the same commit as the broadcast-reaper query that reads it, nobody ran
-      # it, and the reaper threw on every run against production.
-      #
-      # Safe because migrations are expected to be backward compatible: the
-      # still-running old code ignores columns it does not know about. A
-      # migration that REMOVES or renames still has to be split expand/contract
-      # across two releases — no ordering makes that safe on its own.
-      #
-      # Failing this way round is also the better failure: a migration that dies
-      # leaves old code on the old schema, which works. The other order leaves
-      # new code on the old schema, which does not.
-      - name: Run database migrations
-        run: pnpm --filter @wraps/db db:migrate
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Deploy SST
         run: pnpm exec sst deploy --stage ${{ github.event.inputs.stage || 'production' }}

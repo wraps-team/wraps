@@ -1,0 +1,116 @@
+name: Migrate database
+
+# The single owner of production schema migrations.
+#
+# Every production consumer of the database has to be behind this: the API
+# Lambdas (deploy-api.yml calls this workflow, then deploys) and apps/web
+# (deployed by Vercel's git integration — see the note at the bottom of this
+# file, which this workflow cannot order and does not pretend to).
+#
+# Kept as its own workflow rather than a step inside deploy-api.yml for three
+# reasons:
+#
+#   1. It must not depend on anything unrelated. As a step it sat behind
+#      `pnpm install`, `pnpm --filter "@wraps/api^..." build` and the AWS OIDC
+#      handshake — an api build break or an expired role meant the migration
+#      silently never ran, while Vercel shipped apps/web on the same commit
+#      regardless. Nothing here can fail for a reason that isn't the migration.
+#
+#   2. Two migrations must never run at once. `concurrency` on the job below
+#      serialises every caller repo-wide; the group name is what does the work,
+#      so any future caller must reuse it rather than invent its own.
+#
+#   3. Applying a migration out of band needs a button. 49ddfeaa left production
+#      missing 0073_dazzling_puma with no way to apply it except a laptop and a
+#      production DATABASE_URL. `workflow_dispatch` is that button.
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        description: 'Stage whose database to migrate'
+        required: false
+        default: 'production'
+        type: string
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Stage whose database to migrate'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    # Only runs upstream — forks (self-hosted customers) have neither the
+    # Blacksmith runners nor a production DATABASE_URL, and self-host migrates
+    # through scripts/selfhost/upgrade.ts instead.
+    if: github.repository == 'wraps-team/wraps'
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # Supplies DATABASE_URL, which is an environment secret on `Production`,
+    # not a repository secret. A job without this line gets an empty URL.
+    environment: ${{ inputs.stage || 'production' }}
+    # A migration that hangs holds the concurrency lock and blocks every deploy
+    # behind it, so bound it. Well above the ~2s a normal run takes.
+    timeout-minutes: 10
+
+    # Repo-wide serialisation. Concurrency groups are shared across workflows,
+    # so this one string is what guarantees a second caller waits rather than
+    # running a second `drizzle-kit migrate` against Neon alongside the first.
+    #
+    # cancel-in-progress: false because a half-applied migration is the worst
+    # outcome available. GitHub still cancels an older *pending* run when a
+    # newer one queues behind the same group — that is safe here and desirable:
+    # the newer commit's migration set is a superset of the older one's.
+    concurrency:
+      group: db-migrate-${{ inputs.stage || 'production' }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # drizzle-kit reads DATABASE_URL from the environment: drizzle.config.ts
+      # points dotenv at apps/web/.env.local, which does not exist on a runner,
+      # and dotenv does not override an already-set variable anyway.
+      - name: Run database migrations
+        run: pnpm --filter @wraps/db db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+# What this workflow does NOT cover, stated plainly so the next person does not
+# assume it is closed:
+#
+# apps/web deploys through Vercel's git integration (evidence: every
+# `Production – wraps-web` GitHub deployment is created by vercel[bot], and no
+# web deploy workflow has ever existed in this repo). Vercel builds and promotes
+# on push, on its own clock, with no dependency on GitHub Actions. Nothing in
+# .github/workflows can make it wait.
+#
+# In practice the migration lands well before Vercel promotes — measured on
+# 1cd949d1 (2026-08-19): push 19:35:42Z, migration applied 19:37:02Z, web live
+# 19:39:48Z — but that is a margin, not a guarantee, and on 2026-07-30 the same
+# race with no migration step at all produced
+# `column "preference_center_theme" does not exist` on /topics.
+#
+# Closing it needs a Vercel-side decision (an Ignored Build Step that gates on
+# the migration journal, or disabling git auto-deploy on main and deploying web
+# from Actions behind this workflow). Both need access this repo does not have.
