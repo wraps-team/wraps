@@ -245,6 +245,25 @@ describe("Contact Growth card — health buckets as filter links", () => {
     const link = await screen.findByRole("link", { name: /^80 bounced$/ });
     expect(link).toHaveAttribute("aria-current", "true");
 
+    // "Current" only means anything against the buckets that are not. Asserted
+    // on every other link, so marking them all current — the ambiguity this
+    // affordance exists to remove — cannot pass.
+    const others = [
+      screen.getByRole("link", { name: /^1,800 active$/ }),
+      screen.getByRole("link", { name: /^100 unsubscribed$/ }),
+      screen.getByRole("link", { name: /^13 complained$/ }),
+    ];
+    for (const other of others) {
+      expect(other).not.toHaveAttribute("aria-current");
+    }
+
+    // The visual half of the same affordance. jsdom computes no styles, so the
+    // selected treatment can only be asserted as the variant class encoding it.
+    expect(link.className).toContain("bg-secondary");
+    for (const other of others) {
+      expect(other.className).not.toContain("bg-secondary");
+    }
+
     await user.click(link);
 
     // Scoped to the event name rather than `not.toHaveBeenCalled()`, so an
