@@ -14,6 +14,22 @@ export const EMAIL_STATUSES = [
 
 export type EmailStatus = (typeof EMAIL_STATUSES)[number];
 
+/**
+ * Is this raw query-string value one of the five statuses the filter can serve?
+ *
+ * `emailStatus` arrives from the URL and reaches `eq(contact.emailStatus, …)`
+ * with nothing in between: the column is `text()` with TS-only typing, so an
+ * unknown value is a silent zero-row result rather than an error, and the
+ * status `<Select>` ends up on a value matching no `SelectItem`. The health
+ * buckets on the analytics card write this param, so a bad value has to be
+ * dropped rather than trusted.
+ */
+export function isEmailStatus(
+  value: string | null | undefined
+): value is EmailStatus {
+  return value != null && (EMAIL_STATUSES as readonly string[]).includes(value);
+}
+
 export const EMAIL_STATUS_LABELS: Record<EmailStatus, string> = {
   active: "Active",
   unsubscribed: "Unsubscribed",
@@ -31,6 +47,16 @@ export const EMAIL_STATUS_COLORS: Record<EmailStatus, string> = {
   complained: "bg-destructive/15 text-destructive",
   suppressed: "bg-warning/15 text-warning",
 };
+
+/**
+ * The contacts table's programmatic focus target.
+ *
+ * The analytics card's health buckets link into this page's own `?emailStatus=`
+ * filter, and a filter link that leaves focus on the card leaves a keyboard
+ * user nowhere near the rows they just asked for. The id is the seam between
+ * the two components so neither has to import the other.
+ */
+export const CONTACTS_TABLE_HEADING_ID = "contacts-table-heading";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SMS STATUS

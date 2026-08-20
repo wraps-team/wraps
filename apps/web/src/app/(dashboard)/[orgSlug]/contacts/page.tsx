@@ -13,6 +13,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { isEmailStatus } from "@/lib/contacts";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkFeatureAccess } from "@/lib/plan-limits";
 import { ContactAnalytics } from "./components/contact-analytics";
@@ -49,6 +50,13 @@ export default async function ContactsPage({
     sortDir,
   } = await searchParams;
 
+  // Straight from the URL, so it is not necessarily one of the five statuses
+  // the filter can serve. An unknown value is dropped rather than passed down:
+  // the column is plain `text()`, so `WHERE email_status = 'bogus'` is a silent
+  // zero-row result, not an error. `sortBy`/`sortDir` below are different —
+  // `listContacts` validates those itself (audit F14).
+  const validEmailStatus = isEmailStatus(emailStatus) ? emailStatus : undefined;
+
   const session = await auth.api.getSession({
     headers: await import("next/headers").then((mod) => mod.headers()),
   });
@@ -72,13 +80,7 @@ export default async function ContactsPage({
       page: Number.parseInt(page, 10),
       pageSize: Number.parseInt(pageSize, 10),
       search,
-      emailStatus: emailStatus as
-        | "active"
-        | "unsubscribed"
-        | "bounced"
-        | "complained"
-        | "suppressed"
-        | undefined,
+      emailStatus: validEmailStatus,
       topicId,
       // Raw strings straight from the URL — `listContacts` validates them
       // against the real sortable-column set before they reach the query
@@ -131,7 +133,7 @@ export default async function ContactsPage({
   const contacts = contactsResult.contacts;
   const total = contactsResult.total;
 
-  const hasFilters = !!(search || emailStatus || topicId);
+  const hasFilters = !!(search || validEmailStatus || topicId);
   const isEmpty = total === 0 && !hasFilters;
 
   if (isEmpty) {
@@ -142,6 +144,7 @@ export default async function ContactsPage({
           <ContactsEmptyState
             organizationId={orgWithMembership.id}
             orgSlug={orgSlug}
+            proFeaturesEnabled={proFeaturesEnabled}
             topics={topics}
           />
         </div>

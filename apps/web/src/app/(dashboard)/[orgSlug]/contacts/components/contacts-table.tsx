@@ -82,11 +82,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import {
+  CONTACTS_TABLE_HEADING_ID,
   type ContactStatus,
   type ContactWithMeta,
   EMAIL_STATUS_LABELS,
   EMAIL_STATUSES,
   type EmailStatus,
+  isEmailStatus,
   type SmsStatus,
 } from "@/lib/contacts";
 import { contactCSVColumns } from "@/lib/csv-columns";
@@ -115,6 +117,41 @@ const SEARCH_COMMIT_DELAY_MS = 400;
 const MIN_SEARCH_LENGTH = 2;
 /** The sortable headers `columns.tsx` renders — kept in sync with it by hand, since it lives outside this file. */
 const SORTABLE_FIELDS = new Set(["email", "emailsSent", "createdAt"]);
+const SEARCH_INPUT_ID = "contacts-search";
+const SEARCH_HINT_ID = "contacts-search-hint";
+/**
+ * audit H4 (WCAG 2.5.8 Target Size (Minimum), AA, WCAG 2.2): the select-all
+ * and the 50 row checkboxes were 16 x 16px controls — the right visual box for
+ * the design, and two thirds short of the 24px minimum. The inline-text
+ * exception does not apply; each one stands alone in its own cell. The
+ * pseudo-element grows the hit area by 4px on every side (16 + 8 = 24) without
+ * moving a pixel of the box you can see. Worth being exact about because the
+ * row underneath is itself clickable: a missed tap did not no-op, it opened
+ * the contact detail sheet the user never asked for.
+ */
+const CHECKBOX_HIT_AREA =
+  "relative before:absolute before:-inset-1 before:content-['']";
+
+/**
+ * audit H6 (WCAG 1.3.1, Level A): no `<th>` on the page carried any sort
+ * state, so a screen-reader user had no way to learn the list arrives sorted
+ * `createdAt desc`, let alone which header changed it. Read from the same
+ * `SORTABLE_FIELDS` the URL parser trusts, so a column that gains or loses its
+ * sortable header in `columns.tsx` cannot end up announcing the opposite.
+ */
+function ariaSortFor(
+  columnId: string,
+  sorting: SortingState
+): "ascending" | "descending" | "none" | undefined {
+  if (!SORTABLE_FIELDS.has(columnId)) {
+    return;
+  }
+  const active = sorting.find((entry) => entry.id === columnId);
+  if (!active) {
+    return "none";
+  }
+  return active.desc ? "descending" : "ascending";
+}
 
 type ContactsTableProps = {
   contacts: ContactWithMeta[];
@@ -417,6 +454,7 @@ export function ContactsTable({
               table.getIsAllPageRowsSelected() ||
               (table.getIsSomePageRowsSelected() && "indeterminate")
             }
+            className={CHECKBOX_HIT_AREA}
             onCheckedChange={(value) =>
               table.toggleAllPageRowsSelected(!!value)
             }
@@ -433,6 +471,7 @@ export function ContactsTable({
           <Checkbox
             aria-label="Select row"
             checked={row.getIsSelected()}
+            className={CHECKBOX_HIT_AREA}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
             onClick={(e) => e.stopPropagation()}
           />
@@ -737,21 +776,66 @@ export function ContactsTable({
     });
   };
 
+  /*
+   * audit M11: this row read "Showing {contacts.length} of {total}" — the
+   * identical sentence on page 1 and page 30, so the one control that could
+   * tell you where you are in 1,993 contacts told you nothing. `/emails` says
+   * "Showing 1-N of N" (emails-table.tsx). `total` was also the only number in
+   * this footer without `toLocaleString()`, four lines from one that has it.
+   */
+  const firstRowOnPage = (page - 1) * pageSize + 1;
+  const lastRowOnPage = (page - 1) * pageSize + contacts.length;
+  const rangeLabel =
+    contacts.length === 0
+      ? `Showing 0 of ${total.toLocaleString()} contacts`
+      : `Showing ${firstRowOnPage.toLocaleString()}-${lastRowOnPage.toLocaleString()} of ${total.toLocaleString()} contacts`;
+
   const canEdit = userRole === "owner" || userRole === "admin";
-  const statusFilter = searchParams.get("emailStatus");
+  // Same reason as page.tsx: an unknown value would leave this <Select> on a
+  // value matching no <SelectItem>, and the CSV export below would pass it to
+  // the server.
+  const rawStatusFilter = searchParams.get("emailStatus");
+  const statusFilter = isEmailStatus(rawStatusFilter) ? rawStatusFilter : null;
   const topicFilter = searchParams.get("topicId");
 
   return (
     <div className="w-full space-y-4">
+      {/*
+       * The focus target for the analytics card's health-bucket links. Visually
+       * redundant with the page's own <h1> and the table itself, so it is
+       * sr-only; `tabIndex={-1}` makes it focusable programmatically without
+       * putting it in the tab order. Focusing a heading both moves the keyboard
+       * user and announces where they landed, which is why the card writes
+       * nothing to its live region on the same click — two announcements are
+       * worse than one (import-contacts-dialog.tsx).
+       */}
+      <h2 className="sr-only" id={CONTACTS_TABLE_HEADING_ID} tabIndex={-1}>
+        Contacts list
+      </h2>
       {/* Filters Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 items-center space-x-2">
-          <div className="relative max-w-sm flex-1">
+        {/*
+         * audit H8 (WCAG 3.3.2, Level A): the placeholder was this field's
+         * only name and its only instruction, and a placeholder is gone the
+         * moment a character is typed. The "2+ characters" half is
+         * load-bearing — MIN_SEARCH_LENGTH silently refuses anything shorter —
+         * so the rule disappeared exactly when the user started breaking it.
+         * The label names the field permanently; the hint is always rendered
+         * and always associated through aria-describedby, and only changes
+         * tone once the term actually is too short.
+         */}
+        <div className="flex flex-1 flex-col gap-1">
+          <div className="relative max-w-sm">
+            <label className="sr-only" htmlFor={SEARCH_INPUT_ID}>
+              Search contacts by email address
+            </label>
             <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
+              aria-describedby={SEARCH_HINT_ID}
               className="pl-9 pr-16"
+              id={SEARCH_INPUT_ID}
               onChange={(event) => handleSearch(event.target.value)}
-              placeholder="Search by email (2+ characters)"
+              placeholder="Search by email"
               ref={searchInputRef}
               value={searchInput}
             />
@@ -759,6 +843,16 @@ export function ContactsTable({
               /
             </Kbd>
           </div>
+          <p
+            className={
+              searchTooShort
+                ? "max-w-sm text-destructive text-xs"
+                : "max-w-sm text-muted-foreground text-xs"
+            }
+            id={SEARCH_HINT_ID}
+          >
+            Type at least {MIN_SEARCH_LENGTH} characters to search.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Filter Group: Status | Topic */}
@@ -825,11 +919,22 @@ export function ContactsTable({
             )}
           </div>
 
-          {/* Bulk Actions - shown when contacts are selected */}
+          {/*
+            Bulk actions - shown when contacts are selected.
+
+            audit M14: 90abeddf moved the analytics card directly above this
+            toolbar to `size="touch"` (40px on mobile, 36px from md) and
+            missed everything below it - this menu, the two icon buttons
+            beside it, Add Contact, the empty-state CTA, and both pagination
+            controls, every one of them explicitly downgraded to `sm`/`icon`
+            even though `@/components/ui/button` already defaults to `touch`.
+            Above the 24px AA floor, under the comfort target, and visibly out
+            of step with the card directly above them.
+          */}
           {selectedContactIds.length > 0 && canEdit && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline">
+                <Button size="touch" variant="outline">
                   <Tags className="mr-2 h-4 w-4" />
                   Actions ({selectedContactIds.length})
                 </Button>
@@ -872,7 +977,7 @@ export function ContactsTable({
                       captureContactsImportStarted();
                       setImportDialogOpen(true);
                     }}
-                    size="icon"
+                    size="touch"
                     variant="outline"
                   >
                     <Upload className="h-4 w-4" />
@@ -893,7 +998,7 @@ export function ContactsTable({
                           : "rounded-r-none border-r-0 focus:z-10"
                       }
                       disabled={isExporting}
-                      size="icon"
+                      size="touch"
                       variant="outline"
                     >
                       {isExporting ? (
@@ -938,7 +1043,7 @@ export function ContactsTable({
                     try {
                       const result = await exportAllContacts(organizationId, {
                         search: trimmedSearchInput || undefined,
-                        emailStatus: (statusFilter as EmailStatus) || undefined,
+                        emailStatus: statusFilter ?? undefined,
                         topicId: topicFilter || undefined,
                       });
                       if (result.success) {
@@ -986,7 +1091,7 @@ export function ContactsTable({
               <Button
                 className="rounded-l-none focus:z-10"
                 onClick={() => setCreateDialogOpen(true)}
-                size="default"
+                size="touch"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Contact
@@ -995,12 +1100,6 @@ export function ContactsTable({
           </div>
         </div>
       </div>
-
-      {searchTooShort && (
-        <p className="text-muted-foreground text-sm">
-          Type at least {MIN_SEARCH_LENGTH} characters to search.
-        </p>
-      )}
 
       {/*
        * audit F23: bulk actions are page-scoped with no "select all N
@@ -1027,7 +1126,13 @@ export function ContactsTable({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  // audit H6: `aria-sort` is the only thing that states the
+                  // order to a screen reader; `columns.tsx` states the same
+                  // thing visually by swapping the glyph for a direction.
+                  <TableHead
+                    aria-sort={ariaSortFor(header.column.id, sorting)}
+                    key={header.id}
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -1084,7 +1189,7 @@ export function ContactsTable({
                     {canEdit && (
                       <Button
                         onClick={() => setCreateDialogOpen(true)}
-                        size="sm"
+                        size="touch"
                         variant="outline"
                       >
                         <Plus className="mr-2 h-4 w-4" />
@@ -1124,13 +1229,13 @@ export function ContactsTable({
           </Select>
         </div>
         <div className="flex-1 text-center text-muted-foreground text-sm">
-          Showing {contacts.length} of {total} contacts
+          {rangeLabel}
         </div>
         <div className="flex items-center space-x-2">
           <Button
             disabled={page <= 1}
             onClick={() => updateSearchParams({ page: `${page - 1}` })}
-            size="sm"
+            size="touch"
             variant="outline"
           >
             Previous
@@ -1141,7 +1246,7 @@ export function ContactsTable({
           <Button
             disabled={page >= Math.ceil(total / pageSize)}
             onClick={() => updateSearchParams({ page: `${page + 1}` })}
-            size="sm"
+            size="touch"
             variant="outline"
           >
             Next

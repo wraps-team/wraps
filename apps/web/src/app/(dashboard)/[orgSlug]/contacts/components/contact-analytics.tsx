@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { ButtonGroup } from "@wraps/ui/components/ui/button-group";
 import {
   Card,
@@ -16,6 +17,11 @@ import {
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@wraps/ui/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -23,8 +29,11 @@ import {
   SelectValue,
 } from "@wraps/ui/components/ui/select";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
-import { useRouter } from "next/navigation";
-import * as React from "react";
+import { formatDistance } from "date-fns";
+import { CircleAlert, Info, Loader2, RotateCw } from "lucide-react";
+import Link from "next/link";
+import { useParams, useSearchParams } from "next/navigation";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
   type ContactAnalytics as ContactAnalyticsData,
@@ -36,6 +45,14 @@ import { RefreshButton } from "@/components/ui/refresh-button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { countYAxisProps } from "@/lib/chart-axis";
 import { SERIES_COLOR } from "@/lib/chart-series";
+import {
+  CONTACTS_TABLE_HEADING_ID,
+  type EmailStatus,
+  isEmailStatus,
+} from "@/lib/contacts";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
+import { cn } from "@/lib/utils";
+import { captureContactsFilterChanged } from "./lib/analytics";
 
 const chartConfig = {
   count: {
@@ -44,52 +61,355 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-type ContactAnalyticsProps = {
-  organizationId: string;
-};
+const TIME_RANGES = [
+  { value: "30d", days: 30, label: "30 days", long: "Last 30 days" },
+  { value: "7d", days: 7, label: "7 days", long: "Last 7 days" },
+] as const;
+
+type TimeRangeValue = (typeof TIME_RANGES)[number]["value"];
+
+/**
+ * One height for the plot, the skeleton and the error state.
+ *
+ * The plot was pinned at 250px beside a 200px text column whose height is
+ * data-dependent — `ListHealth` grows a row when anything is suppressed and a
+ * line when anything has no email status, and the period tile grows a chip when
+ * growth is non-zero — so the column ran roughly 400-500px and left up to 222px
+ * of the chart's own grid cell empty. No single height could have fixed that
+ * (audit H1); the summary is a horizontal rail now, so the chart owns the full
+ * width and this is the only height in play.
+ *
+ * Shrunk from 260/320: a chart is a supporting figure on a page whose subject is
+ * the table underneath it, and on a phone the old height pushed the first
+ * contact row well below the fold. The no-activity notice does not use this at
+ * all — see NOTICE_HEIGHT.
+ */
+const PLOT_HEIGHT = "h-[200px] @[540px]/card:h-[280px]";
+
+/**
+ * The no-activity notice is one sentence. It used to sit in a full PLOT_HEIGHT
+ * box, which made "No new contacts in this period" the largest element on the
+ * card. A legible band is enough; there is nothing here to plot.
+ */
+const NOTICE_HEIGHT = "h-24 @[540px]/card:h-28";
+
+/**
+ * "Updated N minutes ago", in a leaf of its own so a clock tick repaints one
+ * line of text rather than the whole card. Starting at null keeps the server
+ * and first client render identical.
+ */
+function UpdatedAgo({ generatedAt }: { generatedAt: number }) {
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (now === null) {
+    return null;
+  }
+
+  return (
+    <>
+      Updated{" "}
+      {formatDistance(new Date(generatedAt), new Date(now), {
+        addSuffix: true,
+      })}
+    </>
+  );
+}
+
+/**
+ * Which population the figures after the divider describe, behind a disclosure.
+ *
+ * The card mixes two scopes under one time-range toggle: the chart and "New in
+ * the last N days" move with the toggle, while the totals, list health and
+ * engagement are all-time and organization-wide and do not (audit M4) — pressing
+ * "7 days" and watching `Engagement 38.8% opens` sit still reads as a bug. This
+ * is reference material rather than a caveat about any one number, so it lives
+ * behind a trigger.
+ *
+ * A popover rather than a tooltip: a tooltip cannot be opened by touch.
+ */
+function AllTimeScope() {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          aria-label="What these figures cover"
+          className="-my-2 text-muted-foreground"
+          size="icon-sm"
+          variant="ghost"
+        >
+          <Info className="size-3.5" />
+        </Button>
+      </PopoverTrigger>
+      {/* Opens upward, into the header's whitespace: anchored below, the panel
+          covered the figures it exists to explain. */}
+      <PopoverContent align="start" className="w-72 text-sm" side="top">
+        <p>
+          Contact totals, list health and engagement are all-time figures for
+          every contact in this organization.
+        </p>
+        <p className="mt-2 text-muted-foreground">
+          They do not change when you switch the time range — only the chart and
+          the new-contact count above are scoped to the selected window.
+        </p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function Figure({
+  label,
+  value,
+  aside,
+  caption,
+}: {
+  label: ReactNode;
+  value: string;
+  aside?: ReactNode;
+  caption?: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1 text-muted-foreground text-xs">
+        {label}
+      </div>
+      <div className="mt-1.5 flex items-baseline gap-1.5">
+        <span className="font-semibold text-2xl leading-none tabular-nums">
+          {value}
+        </span>
+        {aside ? <span className="text-sm leading-none">{aside}</span> : null}
+      </div>
+      {caption ? (
+        <p className="mt-1.5 text-muted-foreground text-xs">{caption}</p>
+      ) : null}
+    </div>
+  );
+}
+
+/** A `value label` pair on one line, matching the rates row on the emails card. */
+function InlineStat({
+  value,
+  label,
+  tone,
+}: {
+  value: number | string;
+  label: string;
+  tone?: string;
+}) {
+  return (
+    <span className={cn("font-medium tabular-nums", tone)}>
+      {typeof value === "number" ? value.toLocaleString() : value}{" "}
+      <span className="font-normal text-muted-foreground">{label}</span>
+    </span>
+  );
+}
+
+/**
+ * The contacts URL with one health bucket applied as the table's filter.
+ *
+ * Copies `updateSearchParams`' clone-set-delete shape (contacts-table.tsx) rather
+ * than concatenating an href: a hand-built `?emailStatus=` drops `sortBy`,
+ * `sortDir` and `pageSize` and throws away the view the reader was in.
+ *
+ * `search`, `topicId` and `contactId` are cleared on purpose. These buckets are
+ * organization-wide counts; inheriting a search term would land "78 bounced" on
+ * a table showing three rows, which is the contradiction these links exist to
+ * remove. `page` resets for the same reason the status <Select> resets it —
+ * page 5 of the old result set is not page 5 of this one.
+ */
+function healthFilterHref(
+  orgSlug: string,
+  searchParams: URLSearchParams,
+  status: EmailStatus
+): string {
+  const params = new URLSearchParams(searchParams.toString());
+  params.set("emailStatus", status);
+  params.set("page", "1");
+  params.delete("search");
+  params.delete("topicId");
+  params.delete("contactId");
+  return `/${orgSlug}/contacts?${params.toString()}`;
+}
+
+/**
+ * One health bucket: a link into the table's own status filter when there is
+ * something to look at, plain text when there is not.
+ *
+ * A zero-count bucket deliberately does not link. The table's filtered-empty
+ * state is a bare "No contacts found" with no filter context and no way back,
+ * so a link that can only ever land there is worse than no link.
+ *
+ * `Button asChild` over a hand-styled anchor: it inherits the 40px touch target
+ * and the focus ring from `buttonVariants`, and the <Link> inside keeps Enter,
+ * cmd-click and middle-click.
+ *
+ * The `{" "}` between the two spans is load-bearing, not formatting. JSX strips
+ * the newline between adjacent elements, so without it the accessible name is
+ * "80bounced" — the link still looks right (the `gap-2` from `buttonVariants`
+ * draws the space) but every name-based query misses it and the zero-count
+ * branch has no space at all. `InlineStat` above carries the same separator for
+ * the same reason.
+ *
+ * `scroll={false}`: the destination change this click intends is the focus move
+ * onto the table's sr-only heading. Next's default scroll handling re-scrolls to
+ * the top of the first Page element whenever that Page is not visible in the
+ * viewport — on a phone that throws the reader back above the card they just
+ * clicked in, undoing the focus move's whole point.
+ *
+ * The bucket matching the status already on the URL gets `aria-current` and the
+ * `secondary` variant. Without it, five identical links sit on a card whose
+ * whole claim is that these numbers are filters, with nothing saying which one
+ * is applied.
+ */
+function HealthStat({
+  href,
+  isCurrent,
+  onNavigate,
+  status,
+  tone,
+  value,
+}: {
+  href?: string;
+  isCurrent?: boolean;
+  onNavigate?: () => void;
+  status: EmailStatus;
+  tone: string;
+  value: number;
+}) {
+  const body = (
+    <>
+      <span className={cn("font-medium tabular-nums", tone)}>
+        {value.toLocaleString()}
+      </span>{" "}
+      <span className="text-muted-foreground">{status}</span>
+    </>
+  );
+
+  if (href === undefined) {
+    return (
+      <span className="inline-flex h-10 items-center gap-2 px-2 text-sm md:h-9">
+        {body}
+      </span>
+    );
+  }
+
+  return (
+    <Button
+      asChild
+      className="px-2 font-normal"
+      size="touch"
+      variant={isCurrent ? "secondary" : "ghost"}
+    >
+      <Link
+        aria-current={isCurrent ? "true" : undefined}
+        href={href}
+        onClick={onNavigate}
+        scroll={false}
+      >
+        {body}
+      </Link>
+    </Button>
+  );
+}
 
 /**
  * Contacts by email status.
  *
  * For someone who owns the SES account this is the most useful number on the
- * page — bounces and complaints are what cost them their sending reputation —
- * and the card carried no version of it at all.
+ * page — bounces and complaints are what cost them their sending reputation.
+ * It used to be a bordered tile inside the card, which is a card nested in a
+ * card, and its conditional rows are half of why the column out-grew the chart
+ * (audit H1). Unboxed and horizontal now; the hierarchy is type size, not a
+ * border.
  */
-function ListHealth({ health }: { health: ContactListHealth }) {
-  const rows: Array<{ label: string; value: number; tone: string }> = [
-    { label: "Active", value: health.active, tone: "text-success" },
+function ListHealth({
+  health,
+  orgSlug,
+  searchParams,
+}: {
+  health: ContactListHealth;
+  orgSlug: string;
+  searchParams: URLSearchParams;
+}) {
+  const stats: Array<{ status: EmailStatus; value: number; tone: string }> = [
+    { status: "active", value: health.active, tone: "text-success" },
     {
-      label: "Unsubscribed",
+      status: "unsubscribed",
       value: health.unsubscribed,
       tone: "text-muted-foreground",
     },
-    { label: "Bounced", value: health.bounced, tone: "text-destructive" },
-    { label: "Complained", value: health.complained, tone: "text-destructive" },
+    { status: "bounced", value: health.bounced, tone: "text-destructive" },
+    {
+      status: "complained",
+      value: health.complained,
+      tone: "text-destructive",
+    },
   ];
 
   if (health.suppressed > 0) {
-    rows.push({
-      label: "Suppressed",
+    stats.push({
+      status: "suppressed",
       value: health.suppressed,
       tone: "text-warning",
     });
   }
 
+  const rawStatus = searchParams.get("emailStatus");
+  const currentStatus = isEmailStatus(rawStatus) ? rawStatus : "all";
+
   return (
-    <div className="rounded-lg border bg-card p-3">
+    <div>
       <div className="text-muted-foreground text-xs">List health</div>
-      <dl className="mt-1 space-y-0.5">
-        {rows.map((row) => (
-          <div className="flex items-baseline justify-between" key={row.label}>
-            <dt className="text-muted-foreground text-xs">{row.label}</dt>
-            <dd className={`font-medium text-sm tabular-nums ${row.tone}`}>
-              {row.value.toLocaleString()}
-            </dd>
-          </div>
+      {/*
+       * Two columns, not one: five buckets in a single column is a tall block
+       * on a phone, and the counts are short enough to pair. Above 540px the
+       * card is wide enough for the row it has always been.
+       */}
+      <div className="-mx-2 mt-1 grid grid-cols-2 gap-x-1 gap-y-0.5 text-sm @[540px]/card:flex @[540px]/card:flex-wrap @[540px]/card:items-center">
+        {stats.map((stat) => (
+          <HealthStat
+            href={
+              stat.value > 0
+                ? healthFilterHref(orgSlug, searchParams, stat.status)
+                : undefined
+            }
+            isCurrent={currentStatus === stat.status}
+            key={stat.status}
+            onNavigate={() => {
+              // Re-clicking the bucket already applied is not a filter change.
+              // Reporting it would put `from === to` rows into the very funnel
+              // the widened `control` union exists to keep single.
+              if (currentStatus !== stat.status) {
+                // Capture before the navigation, in the same handler, exactly
+                // as the table's status <Select> does.
+                captureContactsFilterChanged({
+                  control: "health_bucket",
+                  from: currentStatus,
+                  to: stat.status,
+                });
+              }
+              // Focusing the table's heading both moves the keyboard user onto
+              // the rows this number describes and announces the destination —
+              // which is why nothing is written to the card's live region here.
+              document.getElementById(CONTACTS_TABLE_HEADING_ID)?.focus();
+            }}
+            status={stat.status}
+            tone={stat.tone}
+            value={stat.value}
+          />
         ))}
-      </dl>
+      </div>
+      {/* Stays on the surface rather than going into the popover: contacts the
+          buckets above cannot account for is a caveat about those numbers, not
+          background reading. Not a link — there is no `?emailStatus=` value for
+          "no status" and the repository's filter builders have no isNull branch. */}
       {health.noEmailStatus > 0 && (
-        <p className="mt-1 text-muted-foreground text-xs">
+        <p className="mt-1.5 text-muted-foreground text-xs">
           {health.noEmailStatus.toLocaleString()} without an email status
         </p>
       )}
@@ -97,130 +417,355 @@ function ListHealth({ health }: { health: ContactListHealth }) {
   );
 }
 
+/**
+ * The card's numbers, as one horizontal rail above the plot.
+ *
+ * They were a 200px column of four bordered tiles beside the chart, with
+ * nothing distinguishing the window-scoped figure from the three all-time ones
+ * (audit M4). Here the split is carried by a rule and by type size, and nothing
+ * is boxed.
+ */
+function ContactSummary({
+  analytics,
+  rangeLabel,
+  generatedAt,
+  orgSlug,
+  searchParams,
+}: {
+  analytics: ContactAnalyticsData;
+  rangeLabel: string;
+  generatedAt: number | undefined;
+  orgSlug: string;
+  searchParams: URLSearchParams;
+}) {
+  const growth = analytics.growthPercent;
+
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b pb-5">
+      <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
+        <Figure
+          aside={
+            growth === 0 ? undefined : (
+              <span
+                className={growth > 0 ? "text-success" : "text-destructive"}
+              >
+                {growth > 0 ? "+" : ""}
+                {growth}%
+              </span>
+            )
+          }
+          label={`New in the last ${rangeLabel}`}
+          value={`+${analytics.newContactsThisPeriod.toLocaleString()}`}
+        />
+
+        {/* A different population starts here: everything after this rule is
+            all-time and organization-wide (audit M4). */}
+        <div
+          aria-hidden="true"
+          className="@[540px]/card:block hidden h-10 w-px bg-border"
+        />
+
+        <Figure
+          // The number is organization-wide while the table below is filtered,
+          // so it read "1,993" over a table saying "Showing 50 of 173". Say
+          // which one it is, on the surface.
+          caption="Whole organization, not the filtered list below"
+          label={
+            <>
+              All contacts
+              <AllTimeScope />
+            </>
+          }
+          value={analytics.totalContacts.toLocaleString()}
+        />
+
+        <ListHealth
+          health={analytics.listHealth}
+          orgSlug={orgSlug}
+          searchParams={searchParams}
+        />
+
+        <div>
+          <div className="text-muted-foreground text-xs">Engagement</div>
+          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm leading-none">
+            <InlineStat label="opens" value={`${analytics.avgOpenRate}%`} />
+            <InlineStat label="clicks" value={`${analytics.avgClickRate}%`} />
+          </div>
+        </div>
+      </div>
+
+      {generatedAt === undefined ? null : (
+        <p className="text-muted-foreground text-xs">
+          <UpdatedAgo generatedAt={generatedAt} />
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A failed chart fetch used to render "Failed to load analytics" in a 250px box
+ * with no retry and no hint at whose fault it was (audit M3) — a dead end on
+ * the only surface that could recover itself.
+ */
+function ChartErrorState({
+  isRetrying,
+  onRetry,
+}: {
+  isRetrying: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center gap-3 text-center",
+        PLOT_HEIGHT
+      )}
+    >
+      <CircleAlert className="size-6 text-muted-foreground" />
+      <div className="space-y-1">
+        <p className="font-medium text-sm">Couldn't load contact growth</p>
+        <p className="max-w-sm text-muted-foreground text-sm">
+          The request for your chart data failed. This is a problem reaching
+          Wraps, not a change in your contacts.
+        </p>
+      </div>
+      <Button disabled={isRetrying} onClick={onRetry} size="touch">
+        {isRetrying ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <RotateCw className="mr-2 h-4 w-4" />
+        )}
+        {isRetrying ? "Retrying..." : "Retry"}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Mirrors the loaded card block for block, so nothing jumps when data lands —
+ * with one deliberate exception. The skeleton cannot know in advance whether the
+ * window has any activity, so it keeps PLOT_HEIGHT; a no-activity load therefore
+ * settles ~100px shorter when the NOTICE_HEIGHT branch renders instead. Sizing
+ * the skeleton for that case would make every ordinary load jump, which is the
+ * commoner event.
+ */
+function ChartSkeleton() {
+  return (
+    <div>
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b pb-5">
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
+          <Skeleton className="h-11 w-32" />
+          <Skeleton className="h-14 w-40" />
+          <Skeleton className="h-11 w-56" />
+          <Skeleton className="h-11 w-36" />
+        </div>
+        <Skeleton className="h-4 w-32" />
+      </div>
+      <Skeleton className={cn("mt-6 w-full", PLOT_HEIGHT)} />
+    </div>
+  );
+}
+
+type ContactAnalyticsProps = {
+  organizationId: string;
+};
+
 export function ContactAnalytics({ organizationId }: ContactAnalyticsProps) {
   const isMobile = useIsMobile();
-  const router = useRouter();
-  const [timeRange, setTimeRange] = React.useState("30d");
-  const [refreshKey, setRefreshKey] = React.useState(0);
-  const [analytics, setAnalytics] = React.useState<ContactAnalyticsData | null>(
-    null
+  const reducedMotion = useReducedMotion();
+  const { orgSlug } = useParams<{ orgSlug: string }>();
+  const searchParams = useSearchParams();
+
+  /**
+   * `null` means "the reader has not chosen", so the viewport picks. This was an
+   * effect that force-set 7d whenever `isMobile` went true, which overrode an
+   * explicit 30-day choice on every resize across the breakpoint (audit L6).
+   */
+  const [chosenRange, setChosenRange] = useState<TimeRangeValue | null>(null);
+  const rangeValue: TimeRangeValue = chosenRange ?? (isMobile ? "7d" : "30d");
+  const range =
+    TIME_RANGES.find((r) => r.value === rangeValue) ?? TIME_RANGES[0];
+
+  /**
+   * Spoken once per refresh, never on a timer. "Updated N minutes ago" rewrites
+   * itself every minute and would interrupt the reader each time, so it cannot
+   * be the live region (audit M2).
+   */
+  const [refreshStatus, setRefreshStatus] = useState("");
+
+  // The SQL buckets by the reader's local date, so the browser owns the
+  // timezone. Read once: it cannot change without a reload.
+  const timeZone = useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    []
   );
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (isMobile) {
-      setTimeRange("7d");
-    }
-  }, [isMobile]);
-
-  React.useEffect(() => {
-    async function fetchAnalytics() {
-      setIsLoading(true);
-      setError(null);
-      const days = timeRange === "30d" ? 30 : 7;
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const result = await getContactAnalytics(organizationId, days, tz);
-      if (result.success) {
-        setAnalytics(result.analytics);
-      } else {
-        setError(result.error);
+  /**
+   * React Query rather than a `useEffect` + `setAnalytics` pair.
+   *
+   * The effect called `setAnalytics` unconditionally with whatever landed, so
+   * toggling 30d → 7d quickly let a slow 30-day response arrive last and sit
+   * under a pressed "7 days" button (audit M1). Keying the cache on the window
+   * makes that structurally impossible: a late 30-day response can only ever
+   * resolve the 30-day entry.
+   */
+  const {
+    data: analytics,
+    dataUpdatedAt,
+    isError,
+    isFetching,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["contact-analytics", organizationId, range.days, timeZone],
+    queryFn: async () => {
+      const result = await getContactAnalytics(
+        organizationId,
+        range.days,
+        timeZone
+      );
+      if (!result.success) {
+        throw new Error(result.error);
       }
-      setIsLoading(false);
-    }
-    fetchAnalytics();
-  }, [organizationId, timeRange, refreshKey]);
+      return result.analytics;
+    },
+  });
 
-  function handleRefresh() {
-    setRefreshKey((k) => k + 1);
-    router.refresh();
+  /**
+   * `async`, so `RefreshButton`'s transition — and the `aria-busy` it drives —
+   * stays open until the fetch actually settles. It used to be synchronous, so
+   * the spinner cleared while the request was still in flight, and the button's
+   * contract puts the "refreshed" announcement on the caller (audit M2).
+   *
+   * No `router.refresh()`: re-running the whole RSC page (contacts list, topics,
+   * plan check) to reload one chart is work nobody asked for.
+   */
+  async function handleRefresh() {
+    const result = await refetch();
+    setRefreshStatus(
+      result.isError
+        ? "Could not refresh contact growth."
+        : "Contact growth refreshed."
+    );
   }
 
-  const chartData = analytics?.dailyGrowth || [];
-  const maxValue = Math.max(...chartData.map((d) => d.count || 0));
+  const chartData = analytics?.dailyGrowth ?? [];
+  const hasActivity = chartData.some((d) => d.count > 0);
+  // Seeded with 0: `Math.max(...[])` is -Infinity, which reached the axis
+  // whenever the series was empty (audit L8).
+  const maxValue = Math.max(0, ...chartData.map((d) => d.count || 0));
+
+  // The SVG conveys none of this to a screen reader, and recharts' keyboard
+  // layer announces individual days, not the shape of the period.
+  const chartSummary = `Contact growth, ${range.long.toLowerCase()}: ${
+    analytics?.newContactsThisPeriod ?? 0
+  } new contacts.`;
+
+  const rangeControls = (
+    <>
+      <ButtonGroup
+        aria-label="Time range"
+        className="@[767px]/card:flex hidden"
+      >
+        {TIME_RANGES.map((r) => (
+          <Button
+            aria-pressed={rangeValue === r.value}
+            className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+            key={r.value}
+            onClick={() => setChosenRange(r.value)}
+            size="touch"
+            variant="outline"
+          >
+            {r.label}
+          </Button>
+        ))}
+        <RefreshButton
+          label="Refresh contact growth"
+          onRefresh={handleRefresh}
+        />
+      </ButtonGroup>
+      <ButtonGroup className="@[767px]/card:hidden flex">
+        <Select
+          onValueChange={(next) => setChosenRange(next as TimeRangeValue)}
+          value={rangeValue}
+        >
+          <SelectTrigger
+            aria-label="Select time range"
+            className="w-32 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
+            size="touch"
+          >
+            <SelectValue placeholder="30 days" />
+          </SelectTrigger>
+          <SelectContent className="rounded-xl">
+            {TIME_RANGES.map((r) => (
+              <SelectItem className="rounded-lg" key={r.value} value={r.value}>
+                {r.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <RefreshButton
+          label="Refresh contact growth"
+          onRefresh={handleRefresh}
+        />
+      </ButtonGroup>
+    </>
+  );
 
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Contact Growth</CardTitle>
+        {/* A real <h2>: the card is a section of the page, so it belongs in the
+            heading outline. */}
+        <CardTitle asChild>
+          <h2>Contact Growth</h2>
+        </CardTitle>
         <CardDescription>
           <span className="@[540px]/card:block hidden">
             New contacts added over time
           </span>
           <span className="@[540px]/card:hidden">New contacts</span>
         </CardDescription>
-        <CardAction className="self-center">
-          <ButtonGroup className="@[767px]/card:flex hidden">
-            <Button
-              aria-pressed={timeRange === "30d"}
-              className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
-              onClick={() => setTimeRange("30d")}
-              size="touch"
-              variant="outline"
-            >
-              30 days
-            </Button>
-            <Button
-              aria-pressed={timeRange === "7d"}
-              className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
-              onClick={() => setTimeRange("7d")}
-              size="touch"
-              variant="outline"
-            >
-              7 days
-            </Button>
-            <RefreshButton onRefresh={handleRefresh} />
-          </ButtonGroup>
-          <Select onValueChange={setTimeRange} value={timeRange}>
-            <SelectTrigger
-              aria-label="Select time range"
-              className="flex @[767px]/card:hidden w-32 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
-              size="touch"
-            >
-              <SelectValue placeholder="30 days" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl">
-              <SelectItem className="rounded-lg" value="30d">
-                30 days
-              </SelectItem>
-              <SelectItem className="rounded-lg" value="7d">
-                7 days
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <RefreshButton
-            className="@[767px]/card:hidden"
-            onRefresh={handleRefresh}
-          />
-        </CardAction>
+        <CardAction className="self-center">{rangeControls}</CardAction>
       </CardHeader>
-      <CardContent className="px-2 pt-2 sm:px-6 sm:pt-3">
-        {isLoading ? (
-          <div className="grid grid-cols-1 gap-6 @[540px]/card:grid-cols-[1fr_200px]">
-            <Skeleton className="h-[250px] w-full" />
-            <div className="flex flex-col gap-3">
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
-            </div>
-          </div>
-        ) : error ? (
-          <div className="flex h-[250px] items-center justify-center text-muted-foreground text-sm">
-            Failed to load analytics
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-6 @[540px]/card:grid-cols-[1fr_200px]">
-            {/* Chart */}
-            <div className="min-w-0">
-              {chartData.length === 0 ||
-              chartData.every((d) => d.count === 0) ? (
-                <div className="flex h-[250px] items-center justify-center text-muted-foreground text-sm">
-                  No new contacts in this period
-                </div>
-              ) : (
+      <CardContent>
+        <p aria-live="polite" className="sr-only">
+          {refreshStatus}
+        </p>
+
+        {isLoading && <ChartSkeleton />}
+
+        {!isLoading && isError && (
+          <ChartErrorState isRetrying={isFetching} onRetry={() => refetch()} />
+        )}
+
+        {!(isLoading || isError) && analytics && (
+          <div>
+            <ContactSummary
+              analytics={analytics}
+              // React Query stamps this when the response landed. The action
+              // returns no server-side `generatedAt`, and claiming one we do
+              // not have would be worse than reporting when this tab last
+              // heard back.
+              generatedAt={dataUpdatedAt || undefined}
+              orgSlug={orgSlug}
+              rangeLabel={range.label}
+              searchParams={searchParams}
+            />
+
+            <div className="mt-6 min-w-0">
+              {hasActivity ? (
+                /*
+                  role="figure", not "img": accessibilityLayer puts a focusable
+                  role="application" surface inside, and role="img" would make
+                  its subtree presentational — hiding the keyboard path.
+                */
                 <ChartContainer
-                  className="aspect-auto h-[250px] w-full"
+                  aria-label={chartSummary}
+                  className={cn("aspect-auto w-full", PLOT_HEIGHT)}
                   config={chartConfig}
+                  role="figure"
                 >
                   <AreaChart accessibilityLayer data={chartData}>
                     <defs>
@@ -273,74 +818,28 @@ export function ContactAnalytics({ organizationId }: ContactAnalyticsProps) {
                         />
                       }
                     />
+                    {/* isAnimationActive is JS-driven, so the reduced-motion
+                        rules in globals.css cannot reach it (audit M5). */}
                     <Area
                       dataKey="count"
                       fill="url(#fillCount)"
+                      isAnimationActive={!reducedMotion}
                       stroke="var(--color-count)"
                       strokeWidth={2}
                       type="monotone"
                     />
                   </AreaChart>
                 </ChartContainer>
-              )}
-            </div>
-
-            {/* Metrics */}
-            <div className="flex flex-col gap-3">
-              <div className="rounded-lg border bg-card p-3">
-                <div className="text-muted-foreground text-xs">
-                  All contacts
-                </div>
-                <div className="font-semibold text-2xl tabular-nums">
-                  {analytics?.totalContacts.toLocaleString()}
-                </div>
-                {/* This card is organization-wide and the table below is
-                    filtered, so the number said "Total Contacts 1,993" over a
-                    table reading "Showing 50 of 173". Say which one it is. */}
-                <div className="text-muted-foreground text-xs">
-                  Whole organization, not the filtered list below
-                </div>
-              </div>
-              {analytics && <ListHealth health={analytics.listHealth} />}
-              <div className="rounded-lg border bg-card p-3">
-                <div className="text-muted-foreground text-xs">
-                  New This Period
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="font-semibold text-2xl tabular-nums">
-                    +{analytics?.newContactsThisPeriod.toLocaleString()}
-                  </span>
-                  {analytics && analytics.growthPercent !== 0 && (
-                    <span
-                      className={`text-sm ${
-                        analytics.growthPercent > 0
-                          ? "text-success"
-                          : "text-destructive"
-                      }`}
-                    >
-                      {analytics.growthPercent > 0 ? "+" : ""}
-                      {analytics.growthPercent}%
-                    </span>
+              ) : (
+                <div
+                  className={cn(
+                    "flex items-center justify-center text-muted-foreground text-sm",
+                    NOTICE_HEIGHT
                   )}
+                >
+                  No new contacts in this period
                 </div>
-              </div>
-              <div className="rounded-lg border bg-card p-3">
-                <div className="text-muted-foreground text-xs">Engagement</div>
-                <div className="flex items-baseline gap-3 text-sm">
-                  <span>
-                    <span className="font-medium">
-                      {analytics?.avgOpenRate}%
-                    </span>{" "}
-                    <span className="text-muted-foreground">opens</span>
-                  </span>
-                  <span>
-                    <span className="font-medium">
-                      {analytics?.avgClickRate}%
-                    </span>{" "}
-                    <span className="text-muted-foreground">clicks</span>
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}

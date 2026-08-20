@@ -228,3 +228,67 @@ describe('Contacts page — a failed fetch is not "no contacts yet"', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("Contacts page — the emailStatus param", () => {
+  it("drops an unknown emailStatus rather than filtering on it", async () => {
+    listContactsMock.mockResolvedValue({
+      success: true,
+      contacts: [],
+      total: 5,
+      page: 1,
+      pageSize: 50,
+    });
+
+    await renderContactsPage({ emailStatus: "noEmailStatus" });
+
+    expect(listContactsMock.mock.calls[0][1].emailStatus).toBeUndefined();
+  });
+
+  it("passes a known emailStatus through unchanged", async () => {
+    listContactsMock.mockResolvedValue({
+      success: true,
+      contacts: [],
+      total: 5,
+      page: 1,
+      pageSize: 50,
+    });
+
+    await renderContactsPage({ emailStatus: "bounced" });
+
+    expect(listContactsMock.mock.calls[0][1].emailStatus).toBe("bounced");
+  });
+
+  it("shows a never-created org the onboarding state, not a filtered dead end", async () => {
+    listContactsMock.mockResolvedValue({
+      success: true,
+      contacts: [],
+      total: 0,
+      page: 1,
+      pageSize: 50,
+    });
+
+    await renderContactsPage({ emailStatus: "noEmailStatus" });
+
+    expect(screen.getByTestId("contacts-empty-state")).toBeInTheDocument();
+  });
+
+  it("shows the table, not onboarding, when a known emailStatus matches nothing", async () => {
+    listContactsMock.mockResolvedValue({
+      success: true,
+      contacts: [],
+      total: 0,
+      page: 1,
+      pageSize: 50,
+    });
+
+    await renderContactsPage({ emailStatus: "bounced" });
+
+    // The other half of the test above: `hasFilters` has to count a *valid*
+    // emailStatus, or an org filtered to a bucket it has none of gets the
+    // full-page "import a CSV" onboarding screen instead of an empty table.
+    expect(screen.getByTestId("contacts-table")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("contacts-empty-state")
+    ).not.toBeInTheDocument();
+  });
+});

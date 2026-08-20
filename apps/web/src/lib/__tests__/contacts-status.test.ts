@@ -18,6 +18,7 @@ import {
   EMAIL_STATUS_COLORS,
   EMAIL_STATUSES,
   engagementRate,
+  isEmailStatus,
   SMS_STATUS_COLORS,
   SMS_STATUSES,
 } from "../contacts";
@@ -114,5 +115,31 @@ describe("engagementRate", () => {
   it("refuses negative inputs", () => {
     expect(engagementRate(-1, 10)).toBeNull();
     expect(engagementRate(1, -10)).toBeNull();
+  });
+});
+
+describe("isEmailStatus", () => {
+  it("accepts every status the filter can serve", () => {
+    for (const status of EMAIL_STATUSES) {
+      expect(isEmailStatus(status)).toBe(true);
+    }
+  });
+
+  it("rejects a value that is not one of them", () => {
+    // `noEmailStatus` is a bucket on the analytics card, not a filterable
+    // status — there is no `?emailStatus=` value for "no status".
+    expect(isEmailStatus("noEmailStatus")).toBe(false);
+    expect(isEmailStatus("BOUNCED")).toBe(false);
+    expect(isEmailStatus("")).toBe(false);
+    // `all` is the sentinel the status <Select> itself writes for "no filter",
+    // so it is the one lowercase non-member that a shape-only guard would let
+    // through and straight into `eq(contact.emailStatus, "all")`.
+    expect(isEmailStatus("all")).toBe(false);
+    expect(isEmailStatus("deleted")).toBe(false);
+  });
+
+  it("rejects an absent value", () => {
+    expect(isEmailStatus(null)).toBe(false);
+    expect(isEmailStatus(undefined)).toBe(false);
   });
 });

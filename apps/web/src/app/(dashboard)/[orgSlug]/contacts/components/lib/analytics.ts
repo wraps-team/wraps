@@ -115,7 +115,8 @@ export function captureContactsSearched(props: {
 }
 
 export function captureContactsFilterChanged(props: {
-  control: "email_status" | "topic";
+  /** `health_bucket` is the analytics card's list-health links, not the table's Select. */
+  control: "email_status" | "health_bucket" | "topic";
   from: string;
   to: string;
 }) {
