@@ -102,16 +102,13 @@ export default async function ContactsPage({
   // Every page state below - error, never-created, filtered-empty, populated -
   // gets the same heading, so assistive tech and tab-switching always have a
   // page identity (audit F19) regardless of which state renders.
-  const heading = (
-    <div className="px-4 lg:px-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="font-bold text-2xl tracking-tight">Contacts</h1>
-        <p className="text-muted-foreground">
-          Manage the people you can reach by email and SMS
-        </p>
-      </div>
-    </div>
-  );
+  // The <h1> stays, sr-only. The visual header was two lines of chrome above a
+  // card that already says "Contact Growth" and a table that already says
+  // "Contacts" — the page announced itself three times before showing a number.
+  // Dropping the element instead of hiding it would cost the page its identity
+  // for assistive tech and the document outline, which is the whole point of
+  // F19, so it is hidden rather than removed.
+  const heading = <h1 className="sr-only">Contacts</h1>;
 
   // A failed fetch must never fall through to "no contacts yet" - that is
   // audit finding F6. Read the result before deciding anything about

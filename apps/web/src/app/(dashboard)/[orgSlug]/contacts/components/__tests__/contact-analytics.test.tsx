@@ -173,7 +173,7 @@ describe("ContactAnalytics — proportions on a narrow card", () => {
     expect(notice.className).not.toContain("h-[200px]");
   });
 
-  it("stacks the health buckets in two columns until the card is wide enough for a row", async () => {
+  it("runs the health buckets as one wrapping row, not a fixed-column grid", async () => {
     getContactAnalytics.mockResolvedValue({
       success: true,
       analytics: analytics(),
@@ -181,11 +181,37 @@ describe("ContactAnalytics — proportions on a narrow card", () => {
 
     renderCard();
 
-    // Same reason as above: jsdom evaluates no container query, so the only
-    // thing this environment can assert is the class that encodes the contract.
+    // Same reason as above: jsdom computes no layout, so the only thing this
+    // environment can assert is the class that encodes the contract. The
+    // negative is the load-bearing half — the buckets previously sat in a
+    // `grid-cols-2` slot inside the hero rail, which is what made five short
+    // counts wrap into ragged two-per-line stacks.
     const row = (await screen.findByText("List health")).nextElementSibling;
-    expect(row?.className).toContain("grid-cols-2");
-    expect(row?.className).toContain("@[540px]/card:flex");
+    expect(row?.className).toContain("flex-wrap");
+    expect(row?.className).not.toContain("grid-cols-2");
+  });
+
+  it("gives the health buckets their own band rather than a slot in the hero rail", async () => {
+    getContactAnalytics.mockResolvedValue({
+      success: true,
+      analytics: analytics(),
+    });
+
+    renderCard();
+
+    // The defect this pins: when List health was a sibling of the two hero
+    // Figures inside one `items-end` flex row, it took only the leftover width.
+    // Its block must not share a parent with the "All contacts" figure.
+    const label = await screen.findByText("List health");
+    const allContacts = screen.getByText("All contacts");
+
+    // The hero row is the flex row the "All contacts" figure lives in. The
+    // health band must be outside it — a sibling under the summary wrapper —
+    // so it is laid out against the full card width instead of the remainder.
+    const heroRow = allContacts.closest("div.flex.flex-wrap.items-end");
+    expect(heroRow).not.toBeNull();
+    expect(heroRow?.contains(allContacts)).toBe(true);
+    expect(heroRow?.contains(label)).toBe(false);
   });
 });
 

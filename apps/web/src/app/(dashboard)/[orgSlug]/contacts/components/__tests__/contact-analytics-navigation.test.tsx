@@ -263,7 +263,7 @@ describe("Contact Growth card — health buckets as filter links", () => {
     await waitFor(() => expect(anchor).toHaveFocus());
   });
 
-  it("marks the bucket already on the URL as current and reports no change when it is re-clicked", async () => {
+  it("marks the bucket already on the URL as current and clears the filter when it is re-clicked", async () => {
     const user = userEvent.setup();
     currentSearchParams = new URLSearchParams({ emailStatus: "bounced" });
     getContactAnalytics.mockResolvedValue({
@@ -290,18 +290,30 @@ describe("Contact Growth card — health buckets as filter links", () => {
 
     // The visual half of the same affordance. jsdom computes no styles, so the
     // selected treatment can only be asserted as the variant class encoding it.
-    expect(link.className).toContain("bg-secondary");
+    expect(link.className).toContain("bg-background");
     for (const other of others) {
-      expect(other.className).not.toContain("bg-secondary");
+      expect(other.className).not.toContain("bg-background");
     }
+
+    // The applied bucket is the way back to the unfiltered list. Its href must
+    // REMOVE emailStatus rather than re-set it — otherwise the control links to
+    // the URL it is already on and the filter can only be cleared from the
+    // table's <Select>, a different control somewhere else on the page.
+    const cleared = new URLSearchParams(
+      link.getAttribute("href")?.split("?")[1]
+    );
+    expect(cleared.get("emailStatus")).toBeNull();
+    expect(cleared.get("page")).toBe("1");
 
     await user.click(link);
 
-    // Scoped to the event name rather than `not.toHaveBeenCalled()`, so an
-    // unrelated capture elsewhere in the card cannot fail this.
-    expect(capture).not.toHaveBeenCalledWith(
-      "contacts_filter_changed",
-      expect.anything()
-    );
+    // Clearing is a real filter change, so it is reported — as `to: "all"`,
+    // the same value the table's <Select> sends when it returns to "All
+    // Statuses", so one funnel covers both controls.
+    expect(capture).toHaveBeenCalledWith("contacts_filter_changed", {
+      control: "health_bucket",
+      from: "bounced",
+      to: "all",
+    });
   });
 });

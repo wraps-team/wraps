@@ -225,10 +225,23 @@ function InlineStat({
 function healthFilterHref(
   orgSlug: string,
   searchParams: URLSearchParams,
-  status: EmailStatus
+  status: EmailStatus,
+  /**
+   * The bucket already applied links back to the unfiltered list, so the
+   * affordance that switched the filter on is the one that switches it off.
+   * Without this, clicking the current bucket navigated to the URL it was
+   * already on — a control that looks interactive, is announced as current,
+   * and does nothing. Clearing was only reachable from the table's "All
+   * Statuses" <Select>, which is a different control in a different place.
+   */
+  clears = false
 ): string {
   const params = new URLSearchParams(searchParams.toString());
-  params.set("emailStatus", status);
+  if (clears) {
+    params.delete("emailStatus");
+  } else {
+    params.set("emailStatus", status);
+  }
   params.set("page", "1");
   params.delete("search");
   params.delete("topicId");
@@ -303,7 +316,12 @@ function HealthStat({
       asChild
       className="px-2 font-normal"
       size="touch"
-      variant={isCurrent ? "secondary" : "ghost"}
+      // `outline`, not `secondary`: the filled secondary surface measures 1.09:1
+      // against the card, so on an ordinary screen the applied filter was
+      // indistinguishable from the four that were not. `outline` keeps
+      // bg-background and carries a border at --border — a non-colour affordance
+      // that clears 3:1 and reads at a glance in both themes.
+      variant={isCurrent ? "outline" : "ghost"}
     >
       <Link
         aria-current={isCurrent ? "true" : undefined}
@@ -363,36 +381,43 @@ function ListHealth({
   const currentStatus = isEmailStatus(rawStatus) ? rawStatus : "all";
 
   return (
-    <div>
+    <div className="mt-4">
       <div className="text-muted-foreground text-xs">List health</div>
       {/*
-       * Two columns, not one: five buckets in a single column is a tall block
-       * on a phone, and the counts are short enough to pair. Above 540px the
-       * card is wide enough for the row it has always been.
+       * One wrapping row, not a grid. The buckets own the card's full width
+       * here, so on any ordinary viewport all five sit on one line and wrap
+       * only when the card genuinely runs out of room. The 2-column grid this
+       * replaced existed to tame the ragged wrapping the old rail slot caused,
+       * which is a layout problem better solved by giving the series its width
+       * back than by imposing a shape on it.
        */}
-      <div className="-mx-2 mt-1 grid grid-cols-2 gap-x-1 gap-y-0.5 text-sm @[540px]/card:flex @[540px]/card:flex-wrap @[540px]/card:items-center">
+      <div className="-mx-2 mt-1 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm">
         {stats.map((stat) => (
           <HealthStat
             href={
               stat.value > 0
-                ? healthFilterHref(orgSlug, searchParams, stat.status)
+                ? healthFilterHref(
+                    orgSlug,
+                    searchParams,
+                    stat.status,
+                    currentStatus === stat.status
+                  )
                 : undefined
             }
             isCurrent={currentStatus === stat.status}
             key={stat.status}
             onNavigate={() => {
-              // Re-clicking the bucket already applied is not a filter change.
-              // Reporting it would put `from === to` rows into the very funnel
-              // the widened `control` union exists to keep single.
-              if (currentStatus !== stat.status) {
-                // Capture before the navigation, in the same handler, exactly
-                // as the table's status <Select> does.
-                captureContactsFilterChanged({
-                  control: "health_bucket",
-                  from: currentStatus,
-                  to: stat.status,
-                });
-              }
+              // Capture before the navigation, in the same handler, exactly as
+              // the table's status <Select> does. Re-clicking the applied
+              // bucket clears the filter, so it reports `to: "all"` — the same
+              // transition the <Select> reports when it returns to "All
+              // Statuses". It is a real filter change, not a no-op, so the
+              // funnel must see it.
+              captureContactsFilterChanged({
+                control: "health_bucket",
+                from: currentStatus,
+                to: currentStatus === stat.status ? "all" : stat.status,
+              });
               // Focusing the table's heading both moves the keyboard user onto
               // the rows this number describes and announces the destination —
               // which is why nothing is written to the card's live region here.
@@ -441,64 +466,74 @@ function ContactSummary({
   const growth = analytics.growthPercent;
 
   return (
-    <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b pb-5">
-      <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
-        <Figure
-          aside={
-            growth === 0 ? undefined : (
-              <span
-                className={growth > 0 ? "text-success" : "text-destructive"}
-              >
-                {growth > 0 ? "+" : ""}
-                {growth}%
-              </span>
-            )
-          }
-          label={`New in the last ${rangeLabel}`}
-          value={`+${analytics.newContactsThisPeriod.toLocaleString()}`}
-        />
+    <div className="border-b pb-5">
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
+          <Figure
+            aside={
+              growth === 0 ? undefined : (
+                <span
+                  className={growth > 0 ? "text-success" : "text-destructive"}
+                >
+                  {growth > 0 ? "+" : ""}
+                  {growth}%
+                </span>
+              )
+            }
+            label={`New in the last ${rangeLabel}`}
+            value={`+${analytics.newContactsThisPeriod.toLocaleString()}`}
+          />
 
-        {/* A different population starts here: everything after this rule is
+          {/* A different population starts here: everything after this rule is
             all-time and organization-wide (audit M4). */}
-        <div
-          aria-hidden="true"
-          className="@[540px]/card:block hidden h-10 w-px bg-border"
-        />
+          <div
+            aria-hidden="true"
+            className="@[540px]/card:block hidden h-10 w-px bg-border"
+          />
 
-        <Figure
-          // The number is organization-wide while the table below is filtered,
-          // so it read "1,993" over a table saying "Showing 50 of 173". Say
-          // which one it is, on the surface.
-          caption="Whole organization, not the filtered list below"
-          label={
-            <>
-              All contacts
-              <AllTimeScope />
-            </>
-          }
-          value={analytics.totalContacts.toLocaleString()}
-        />
+          <Figure
+            // The number is organization-wide while the table below is filtered,
+            // so it read "1,993" over a table saying "Showing 50 of 173". Say
+            // which one it is, on the surface.
+            caption="Whole organization, not the filtered list below"
+            label={
+              <>
+                All contacts
+                <AllTimeScope />
+              </>
+            }
+            value={analytics.totalContacts.toLocaleString()}
+          />
 
-        <ListHealth
-          health={analytics.listHealth}
-          orgSlug={orgSlug}
-          searchParams={searchParams}
-        />
-
-        <div>
-          <div className="text-muted-foreground text-xs">Engagement</div>
-          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm leading-none">
-            <InlineStat label="opens" value={`${analytics.avgOpenRate}%`} />
-            <InlineStat label="clicks" value={`${analytics.avgClickRate}%`} />
+          <div>
+            <div className="text-muted-foreground text-xs">Engagement</div>
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm leading-none">
+              <InlineStat label="opens" value={`${analytics.avgOpenRate}%`} />
+              <InlineStat label="clicks" value={`${analytics.avgClickRate}%`} />
+            </div>
           </div>
         </div>
+
+        {generatedAt === undefined ? null : (
+          <p className="text-muted-foreground text-xs">
+            <UpdatedAgo generatedAt={generatedAt} />
+          </p>
+        )}
       </div>
 
-      {generatedAt === undefined ? null : (
-        <p className="text-muted-foreground text-xs">
-          <UpdatedAgo generatedAt={generatedAt} />
-        </p>
-      )}
+      {/*
+       * List health gets its own band rather than a slot in the rail above.
+       * Five small categorical counts and a hero number are different kinds of
+       * thing: sharing one `items-end` flex row, the buckets took whatever
+       * width was left over, wrapped into ragged two-per-line stacks, and
+       * bottom-aligned a tall block against short ones. On its own full-width
+       * line they read as one horizontal series, which is what they are.
+       */}
+      <ListHealth
+        health={analytics.listHealth}
+        orgSlug={orgSlug}
+        searchParams={searchParams}
+      />
     </div>
   );
 }
