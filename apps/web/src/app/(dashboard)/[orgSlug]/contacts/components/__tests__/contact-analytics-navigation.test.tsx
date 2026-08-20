@@ -210,6 +210,30 @@ describe("Contact Growth card — health buckets as filter links", () => {
     }
   });
 
+  it("reports the status actually in effect as the `from` of the transition", async () => {
+    const user = userEvent.setup();
+    // The only interesting `from` is one that is not the "all" fallback: with a
+    // bucket already applied, `from` has to be that bucket. Pinned separately
+    // because `currentStatus` does two jobs in the handler — this one and the
+    // re-click suppression — and a mutation that hard-codes `from: "all"`
+    // leaves the suppression check, and every other unit here, green.
+    currentSearchParams = new URLSearchParams({ emailStatus: "active" });
+    getContactAnalytics.mockResolvedValue({
+      success: true,
+      analytics: analytics(),
+    });
+
+    renderCard();
+
+    await user.click(await screen.findByRole("link", { name: /^80 bounced$/ }));
+
+    expect(capture).toHaveBeenCalledWith("contacts_filter_changed", {
+      control: "health_bucket",
+      from: "active",
+      to: "bounced",
+    });
+  });
+
   it("moves keyboard focus onto the contacts table's heading", async () => {
     const user = userEvent.setup();
     // The table is not rendered by this suite, so stand its focus anchor up by
