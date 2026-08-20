@@ -2,12 +2,12 @@
 set -euo pipefail
 
 # Build standalone CLI distributions with bundled Node.js runtime
-# Usage: ./scripts/build-standalone.sh --platform darwin --arch arm64 [--node-version 20.19.2]
+# Usage: ./scripts/build-standalone.sh --platform darwin --arch arm64 [--node-version 22.22.0]
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CLI_DIR="$ROOT_DIR/packages/cli"
-NODE_VERSION="20.19.2"
+NODE_VERSION="22.22.0"
 PLATFORM=""
 ARCH=""
 
