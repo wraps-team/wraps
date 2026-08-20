@@ -8,6 +8,7 @@ import {
 } from "@wraps/ui/components/ui/tooltip";
 import {
   AlertTriangle,
+  Archive,
   CheckCircle2,
   ChevronRight,
   Clock,
@@ -27,9 +28,11 @@ import {
   type MessageStatusTimestamps,
   type TimelineEvent,
   type TimelineEventType,
+  type TimelineHistory,
 } from "@/actions/contacts-analytics";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { captureContactTimelineLoadMore } from "./lib/analytics";
 
 type ContactTimelineProps = {
   contactId: string;
@@ -50,64 +53,77 @@ const EVENT_CONFIG: Record<
   workflow_started: {
     icon: Play,
     label: "Automation started",
-    color: "text-amber-600",
-    bgColor: "bg-amber-100",
+    color: "text-warning",
+    bgColor: "bg-warning/15",
   },
   workflow_completed: {
     icon: CheckCircle2,
     label: "Automation completed",
-    color: "text-green-600",
-    bgColor: "bg-green-100",
+    color: "text-success",
+    bgColor: "bg-success/15",
   },
   workflow_failed: {
     icon: XCircle,
     label: "Automation failed",
-    color: "text-red-600",
-    bgColor: "bg-red-100",
+    color: "text-destructive",
+    bgColor: "bg-destructive/15",
   },
   contact_created: {
     icon: UserPlus,
     label: "Contact created",
-    color: "text-slate-600",
-    bgColor: "bg-slate-100",
+    color: "text-muted-foreground",
+    bgColor: "bg-muted",
   },
   custom_event: {
     icon: Zap,
     label: "Event",
-    color: "text-purple-600",
-    bgColor: "bg-purple-100",
+    color: "text-info",
+    bgColor: "bg-info/15",
   },
 };
 
-// Status dot configuration for message events
+// Status dot configuration for message events.
+//
+// Colour is a second channel here, never the only one: the dots are labelled in
+// text beside them (see StatusDots) because a delivery state that exists only
+// as a hue in a hover tooltip is unreadable to touch, keyboard and colour-blind
+// users. `failure: true` marks the states that outrank progress when picking
+// which one to name.
 const STATUS_DOT_CONFIG = {
   sent: {
-    color: "bg-blue-500",
+    color: "bg-info",
     label: "Sent",
+    failure: false,
   },
   delivered: {
-    color: "bg-green-500",
+    color: "bg-success",
     label: "Delivered",
+    failure: false,
   },
   opened: {
-    color: "bg-purple-500",
+    color: "bg-warning",
     label: "Opened",
+    failure: false,
   },
   clicked: {
-    color: "bg-indigo-500",
+    color: "bg-foreground",
     label: "Clicked",
+    failure: false,
   },
   bounced: {
-    color: "bg-red-500",
+    color: "bg-destructive",
     label: "Bounced",
+    failure: true,
   },
   complained: {
-    color: "bg-orange-500",
+    color: "bg-destructive",
     label: "Spam complaint",
+    failure: true,
   },
   optedOut: {
-    color: "bg-red-500",
+    color: "bg-muted-foreground",
     label: "Opted out",
+    failure: true,
   },
 } as const;
 
@@ -125,24 +141,24 @@ function getMessageDisplay(event: TimelineEvent): {
     return {
       icon: Megaphone,
       label: "Broadcast",
-      color: "text-violet-600",
-      bgColor: "bg-violet-100",
+      color: "text-foreground",
+      bgColor: "bg-muted",
     };
   }
   if (event.sourceType === "workflow") {
     return {
       icon: Workflow,
       label: `Automation ${channelLabel.toLowerCase()}`,
-      color: "text-amber-600",
-      bgColor: "bg-amber-100",
+      color: "text-warning",
+      bgColor: "bg-warning/15",
     };
   }
   // Transactional
   return {
     icon: isEmail ? Mail : MessageSquare,
     label: channelLabel,
-    color: isEmail ? "text-blue-600" : "text-emerald-600",
-    bgColor: isEmail ? "bg-blue-100" : "bg-emerald-100",
+    color: isEmail ? "text-info" : "text-success",
+    bgColor: isEmail ? "bg-info/15" : "bg-success/15",
   };
 }
 
@@ -187,31 +203,65 @@ function StatusDots({
     return null;
   }
 
+  // The state worth naming in text: a failure if one happened, otherwise the
+  // furthest the message got. It is rendered as a visible word so the delivery
+  // state survives colour-blindness, a touch screen and a keyboard — none of
+  // which can reach a hover tooltip. The full trail goes to assistive tech as
+  // one sentence rather than as several focus stops of coloured dot.
+  const headline =
+    activeStatuses.filter((s) => STATUS_DOT_CONFIG[s.key].failure).at(-1) ??
+    activeStatuses.at(-1);
+
+  const spokenTrail = activeStatuses
+    .map(({ key, timestamp }) => {
+      const config = STATUS_DOT_CONFIG[key];
+      return timestamp
+        ? `${config.label} ${formatTimestampShort(new Date(timestamp))}`
+        : config.label;
+    })
+    .join(", ");
+
   return (
-    <div className="flex items-center gap-1">
-      {activeStatuses.map(({ key, timestamp }) => {
-        const config = STATUS_DOT_CONFIG[key];
-        return (
-          <Tooltip key={key}>
-            <TooltipTrigger asChild>
-              <span
-                className={cn(
-                  "inline-block h-2 w-2 rounded-full",
-                  config.color
+    <div className="flex items-center gap-1.5">
+      <span className="sr-only">{spokenTrail}</span>
+      <div aria-hidden="true" className="flex items-center gap-1">
+        {activeStatuses.map(({ key, timestamp }) => {
+          const config = STATUS_DOT_CONFIG[key];
+          return (
+            <Tooltip key={key}>
+              <TooltipTrigger asChild>
+                <span
+                  className={cn(
+                    "inline-block h-2 w-2 rounded-full",
+                    config.color
+                  )}
+                />
+              </TooltipTrigger>
+              <TooltipContent className="text-xs" side="top">
+                <span className="font-medium">{config.label}</span>
+                {timestamp && (
+                  <span className="ml-1 text-muted-foreground">
+                    {formatTimestampShort(new Date(timestamp))}
+                  </span>
                 )}
-              />
-            </TooltipTrigger>
-            <TooltipContent className="text-xs" side="top">
-              <span className="font-medium">{config.label}</span>
-              {timestamp && (
-                <span className="ml-1 text-muted-foreground">
-                  {formatTimestampShort(new Date(timestamp))}
-                </span>
-              )}
-            </TooltipContent>
-          </Tooltip>
-        );
-      })}
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+      {headline && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "text-xs",
+            STATUS_DOT_CONFIG[headline.key].failure
+              ? "font-medium text-destructive"
+              : "text-muted-foreground"
+          )}
+        >
+          {STATUS_DOT_CONFIG[headline.key].label}
+        </span>
+      )}
     </div>
   );
 }
@@ -390,9 +440,7 @@ function TimelineEventRow({
               <Zap
                 className={cn(
                   "h-3 w-3",
-                  event.type === "custom_event"
-                    ? "text-purple-500"
-                    : "text-amber-500"
+                  event.type === "custom_event" ? "text-info" : "text-warning"
                 )}
               />
               <span className="truncate text-muted-foreground text-xs">
@@ -409,6 +457,61 @@ function TimelineEventRow({
   );
 }
 
+/**
+ * "No activity yet" used to cover two very different situations. For a contact
+ * whose events had aged out it was a confident false statement, so the two now
+ * read differently and the second one says what it knows.
+ */
+function EmptyActivity({ history }: { history: TimelineHistory | null }) {
+  if (history?.hasUnshowableHistory) {
+    const sent = history.recordedEmailsSent + history.recordedSmsSent;
+    return (
+      <div className="space-y-1 rounded-md border border-dashed p-3">
+        <div className="flex items-center gap-2 font-medium text-sm">
+          <Archive className="h-4 w-4 text-muted-foreground" />
+          <span>Older activity, no longer stored</span>
+        </div>
+        <p className="text-muted-foreground text-sm">
+          {sent > 0
+            ? `This contact's counters record ${sent.toLocaleString()} message${
+                sent === 1 ? "" : "s"
+              }, but none of them are still in stored history.`
+            : "This contact has recorded activity, but none of it is still in stored history."}
+          {history.agedOutEvents > 0 &&
+            ` ${history.agedOutEvents.toLocaleString()} event${
+              history.agedOutEvents === 1 ? " has" : "s have"
+            } passed their retention date.`}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+      <Clock className="h-4 w-4" />
+      <span>Nothing sent to this contact yet</span>
+    </div>
+  );
+}
+
+/** Shown under a timeline that has rows but is still missing older ones. */
+function AgedOutNote({ history }: { history: TimelineHistory }) {
+  return (
+    <p className="flex items-start gap-2 text-muted-foreground text-xs">
+      <Archive className="mt-0.5 h-3 w-3 shrink-0" />
+      <span>
+        {history.agedOutEvents > 0
+          ? `${history.agedOutEvents.toLocaleString()} older event${
+              history.agedOutEvents === 1 ? " has" : "s have"
+            } passed their retention date and aren't shown.`
+          : `This contact's counters record ${(
+              history.recordedEmailsSent + history.recordedSmsSent
+            ).toLocaleString()} messages — more than the history below still holds.`}
+      </span>
+    </p>
+  );
+}
+
 export function ContactTimeline({
   contactId,
   organizationId,
@@ -416,9 +519,11 @@ export function ContactTimeline({
 }: ContactTimelineProps) {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [hasMore, setHasMore] = useState(false);
+  const [history, setHistory] = useState<TimelineHistory | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
   // Load timeline on mount or when contactId changes
   useEffect(() => {
@@ -438,6 +543,7 @@ export function ContactTimeline({
         if (result.success) {
           setEvents(result.events);
           setHasMore(result.hasMore);
+          setHistory(result.history);
         } else {
           setError(result.error);
         }
@@ -461,14 +567,24 @@ export function ContactTimeline({
 
   // Load more handler
   const handleLoadMore = () => {
+    setLoadMoreError(null);
+    captureContactTimelineLoadMore({ events_loaded: events.length });
     startTransition(async () => {
-      const result = await getContactTimeline(contactId, organizationId, {
-        offset: events.length,
-      });
+      try {
+        const result = await getContactTimeline(contactId, organizationId, {
+          offset: events.length,
+        });
 
-      if (result.success) {
-        setEvents((prev) => [...prev, ...result.events]);
-        setHasMore(result.hasMore);
+        if (result.success) {
+          setEvents((prev) => [...prev, ...result.events]);
+          setHasMore(result.hasMore);
+          setHistory(result.history);
+        } else {
+          // Swallowing this left the button looking like it had done nothing.
+          setLoadMoreError(result.error);
+        }
+      } catch {
+        setLoadMoreError("Couldn't load more activity. Try again.");
       }
     });
   };
@@ -504,14 +620,15 @@ export function ContactTimeline({
     );
   }
 
-  if (events.length === 0) {
+  // Only the synthesised "Contact created" row survives, so there is nothing
+  // real to show. Which of the two reasons that is decides what we say.
+  const isEmpty = events.every((e) => e.type === "contact_created");
+
+  if (isEmpty) {
     return (
       <div className="space-y-3">
         <h3 className="font-medium text-sm">Activity</h3>
-        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          <Clock className="h-4 w-4" />
-          <span>No activity yet</span>
-        </div>
+        <EmptyActivity history={history} />
       </div>
     );
   }
@@ -531,6 +648,18 @@ export function ContactTimeline({
           ))}
         </div>
       </div>
+
+      {history?.hasUnshowableHistory && <AgedOutNote history={history} />}
+
+      {loadMoreError && (
+        <div
+          className="flex items-center gap-2 text-destructive text-sm"
+          role="alert"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{loadMoreError}</span>
+        </div>
+      )}
 
       {/* Load more */}
       {hasMore && (

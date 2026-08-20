@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseCSV } from "../csv-parse";
+import {
+  describeParseFailure,
+  MAX_CSV_BYTES,
+  parseCSV,
+  validateCSVFile,
+} from "../csv-parse";
 
 describe("parseCSV", () => {
   it("parses simple CSV", () => {
@@ -119,5 +124,100 @@ describe("parseCSV", () => {
       Email: "alice@example.com",
       Phone: "",
     });
+  });
+
+  it("drops extra fields beyond the header count instead of misaligning columns", () => {
+    const result = parseCSV(
+      "Name,Email\nAlice,alice@example.com,extra-unmapped-field"
+    );
+    expect(result.rows[0]).toEqual({
+      Name: "Alice",
+      Email: "alice@example.com",
+    });
+    expect(Object.keys(result.rows[0])).toHaveLength(2);
+  });
+
+  it("keeps the last column's value when a header name repeats", () => {
+    // Two "Email" columns: a row object can only carry one value per key, so
+    // the second column's value is what survives. Pinning this so a future
+    // change to the assignment order doesn't silently start using the first
+    // occurrence instead.
+    const result = parseCSV(
+      "Email,Email\nfirst@example.com,second@example.com"
+    );
+    expect(result.headers).toEqual(["Email", "Email"]);
+    expect(result.rows[0]).toEqual({ Email: "second@example.com" });
+  });
+});
+
+// ─── Import-file guards (audit finding F11) ────────────────────────────────
+// The upload step used to `return` silently when a file was unreadable, so a
+// bad pick left the dialog on step 1 with nothing said. These are the two pure
+// checks that decide what it says.
+
+describe("validateCSVFile", () => {
+  it("accepts an ordinary csv", () => {
+    expect(validateCSVFile({ name: "contacts.csv", size: 4096 })).toBeNull();
+  });
+
+  it("accepts an uppercase extension", () => {
+    expect(validateCSVFile({ name: "CONTACTS.CSV", size: 4096 })).toBeNull();
+  });
+
+  it("rejects an empty file", () => {
+    expect(validateCSVFile({ name: "contacts.csv", size: 0 })).toMatch(
+      /empty/i
+    );
+  });
+
+  it("rejects a file over the byte ceiling and names both sizes", () => {
+    const message = validateCSVFile({
+      name: "contacts.csv",
+      size: MAX_CSV_BYTES + 1,
+    });
+    expect(message).toContain("10 MB");
+    expect(message).toMatch(/split/i);
+  });
+
+  it("accepts a file exactly at the ceiling", () => {
+    expect(
+      validateCSVFile({ name: "contacts.csv", size: MAX_CSV_BYTES })
+    ).toBeNull();
+  });
+
+  it("rejects a non-csv and names the file", () => {
+    const message = validateCSVFile({ name: "contacts.xlsx", size: 4096 });
+    expect(message).toContain("contacts.xlsx");
+  });
+});
+
+describe("describeParseFailure", () => {
+  it("says nothing about a file with a header and rows", () => {
+    expect(
+      describeParseFailure(parseCSV("Email\nalice@example.com"))
+    ).toBeNull();
+  });
+
+  it("explains an empty file instead of failing silently", () => {
+    expect(describeParseFailure(parseCSV(""))).toMatch(/header row/i);
+  });
+
+  it("explains a header-only file", () => {
+    const message = describeParseFailure(parseCSV("Email,Name"));
+    expect(message).toMatch(/no contacts/i);
+  });
+});
+
+describe("truncation reporting", () => {
+  it("reports the real total so the notice can say how many are dropped", () => {
+    const csv = `Email\n${Array.from(
+      { length: 12 },
+      (_, i) => `person${i}@example.com`
+    ).join("\n")}`;
+    const result = parseCSV(csv, { maxRows: 10 });
+    expect(result.truncated).toBe(true);
+    expect(result.totalRows).toBe(12);
+    expect(result.rows).toHaveLength(10);
+    expect(result.totalRows - result.rows.length).toBe(2);
   });
 });

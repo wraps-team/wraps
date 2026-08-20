@@ -28,6 +28,7 @@ import * as React from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
   type ContactAnalytics as ContactAnalyticsData,
+  type ContactListHealth,
   getContactAnalytics,
 } from "@/actions/contacts-analytics";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,55 @@ const chartConfig = {
 type ContactAnalyticsProps = {
   organizationId: string;
 };
+
+/**
+ * Contacts by email status.
+ *
+ * For someone who owns the SES account this is the most useful number on the
+ * page — bounces and complaints are what cost them their sending reputation —
+ * and the card carried no version of it at all.
+ */
+function ListHealth({ health }: { health: ContactListHealth }) {
+  const rows: Array<{ label: string; value: number; tone: string }> = [
+    { label: "Active", value: health.active, tone: "text-success" },
+    {
+      label: "Unsubscribed",
+      value: health.unsubscribed,
+      tone: "text-muted-foreground",
+    },
+    { label: "Bounced", value: health.bounced, tone: "text-destructive" },
+    { label: "Complained", value: health.complained, tone: "text-destructive" },
+  ];
+
+  if (health.suppressed > 0) {
+    rows.push({
+      label: "Suppressed",
+      value: health.suppressed,
+      tone: "text-warning",
+    });
+  }
+
+  return (
+    <div className="rounded-lg border bg-card p-3">
+      <div className="text-muted-foreground text-xs">List health</div>
+      <dl className="mt-1 space-y-0.5">
+        {rows.map((row) => (
+          <div className="flex items-baseline justify-between" key={row.label}>
+            <dt className="text-muted-foreground text-xs">{row.label}</dt>
+            <dd className={`font-medium text-sm tabular-nums ${row.tone}`}>
+              {row.value.toLocaleString()}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {health.noEmailStatus > 0 && (
+        <p className="mt-1 text-muted-foreground text-xs">
+          {health.noEmailStatus.toLocaleString()} without an email status
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function ContactAnalytics({ organizationId }: ContactAnalyticsProps) {
   const isMobile = useIsMobile();
@@ -239,12 +289,19 @@ export function ContactAnalytics({ organizationId }: ContactAnalyticsProps) {
             <div className="flex flex-col gap-3">
               <div className="rounded-lg border bg-card p-3">
                 <div className="text-muted-foreground text-xs">
-                  Total Contacts
+                  All contacts
                 </div>
                 <div className="font-semibold text-2xl tabular-nums">
                   {analytics?.totalContacts.toLocaleString()}
                 </div>
+                {/* This card is organization-wide and the table below is
+                    filtered, so the number said "Total Contacts 1,993" over a
+                    table reading "Showing 50 of 173". Say which one it is. */}
+                <div className="text-muted-foreground text-xs">
+                  Whole organization, not the filtered list below
+                </div>
               </div>
+              {analytics && <ListHealth health={analytics.listHealth} />}
               <div className="rounded-lg border bg-card p-3">
                 <div className="text-muted-foreground text-xs">
                   New This Period
@@ -257,8 +314,8 @@ export function ContactAnalytics({ organizationId }: ContactAnalyticsProps) {
                     <span
                       className={`text-sm ${
                         analytics.growthPercent > 0
-                          ? "text-green-600"
-                          : "text-red-600"
+                          ? "text-success"
+                          : "text-destructive"
                       }`}
                     >
                       {analytics.growthPercent > 0 ? "+" : ""}

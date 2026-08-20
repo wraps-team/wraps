@@ -34,6 +34,7 @@ import {
   EMAIL_STATUS_LABELS,
   EMAIL_STATUSES,
   type EmailStatus,
+  engagementRate,
   SMS_STATUS_COLORS,
   SMS_STATUS_LABELS,
   SMS_STATUSES,
@@ -309,19 +310,18 @@ export function ContactDetailsSheet({
   const subscribedTopics =
     contact.topics?.filter((t) => t.status === "subscribed") || [];
 
-  // Calculate engagement rates
-  const emailOpenRate =
-    contact.emailsSent > 0
-      ? ((contact.emailsOpened / contact.emailsSent) * 100).toFixed(0)
-      : "0";
-  const emailClickRate =
-    contact.emailsSent > 0
-      ? ((contact.emailsClicked / contact.emailsSent) * 100).toFixed(0)
-      : "0";
-  const smsClickRate =
-    contact.smsSent > 0
-      ? ((contact.smsClicked / contact.smsSent) * 100).toFixed(0)
-      : "0";
+  // Engagement rates. engagementRate() returns null when the counters can't
+  // produce an honest percentage — see the note on the helper — and the labels
+  // below fall back to the raw count rather than printing an impossible rate.
+  const emailOpenRate = engagementRate(
+    contact.emailsOpened,
+    contact.emailsSent
+  );
+  const emailClickRate = engagementRate(
+    contact.emailsClicked,
+    contact.emailsSent
+  );
+  const smsClickRate = engagementRate(contact.smsClicked, contact.smsSent);
 
   const toggleTopic = (topicId: string) => {
     setSelectedTopicIds((prev) =>
@@ -678,7 +678,9 @@ export function ContactDetailsSheet({
                       {contact.emailsOpened}
                     </div>
                     <div className="text-muted-foreground text-xs">
-                      Opens ({emailOpenRate}%)
+                      {emailOpenRate === null
+                        ? "Opens"
+                        : `Opens (${emailOpenRate.toFixed(0)}%)`}
                     </div>
                   </div>
                   <div className="rounded-lg border bg-muted/30 p-3 text-center">
@@ -686,7 +688,9 @@ export function ContactDetailsSheet({
                       {contact.emailsClicked}
                     </div>
                     <div className="text-muted-foreground text-xs">
-                      Clicks ({emailClickRate}%)
+                      {emailClickRate === null
+                        ? "Clicks"
+                        : `Clicks (${emailClickRate.toFixed(0)}%)`}
                     </div>
                   </div>
                 </div>
@@ -709,7 +713,9 @@ export function ContactDetailsSheet({
                       {contact.smsClicked}
                     </div>
                     <div className="text-muted-foreground text-xs">
-                      Clicks ({smsClickRate}%)
+                      {smsClickRate === null
+                        ? "Clicks"
+                        : `Clicks (${smsClickRate.toFixed(0)}%)`}
                     </div>
                   </div>
                 </div>

@@ -9,7 +9,7 @@ import {
   workflow,
   workflowExecution,
 } from "@wraps/db";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { orgAction } from "./shared/org-action";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -56,9 +56,47 @@ export type TimelineEvent = {
   eventData?: Record<string, unknown> | null;
 };
 
+/**
+ * What the timeline can and cannot account for.
+ *
+ * Without this the timeline had one empty state — "No activity yet" — for two
+ * very different situations: a contact nothing has ever been sent to, and a
+ * contact whose events have aged out of stored history. The second one is a
+ * confident false statement, so the shape below lets the UI tell them apart.
+ */
+export type TimelineHistory = {
+  /** `contact_event` rows past their `expires_at` — recorded, no longer shown. */
+  agedOutEvents: number;
+  /**
+   * The contact's own counters record engagement the timeline has no rows for.
+   * Means "there is history we can't show", not "nothing happened".
+   */
+  hasUnshowableHistory: boolean;
+  /** Emails the contact's counters say were sent, whatever survives as events. */
+  recordedEmailsSent: number;
+  /** SMS the contact's counters say were sent. */
+  recordedSmsSent: number;
+};
+
 export type GetContactTimelineResult =
-  | { success: true; events: TimelineEvent[]; hasMore: boolean }
+  | {
+      success: true;
+      events: TimelineEvent[];
+      hasMore: boolean;
+      history: TimelineHistory;
+    }
   | { success: false; error: string };
+
+/**
+ * Ceiling on rows pulled from any one timeline source per request.
+ *
+ * Each source is fetched `offset + limit + 1` deep rather than a fixed 50/20/50,
+ * because a k-way merge of three descending lists only needs the top
+ * `offset + limit` of each to be globally correct. The old fixed caps made
+ * `hasMore` go false at roughly 120 events no matter how chatty the contact
+ * was, and everything older became unreachable.
+ */
+const MAX_SOURCE_ROWS = 500;
 
 /**
  * Get timeline events for a contact
@@ -83,6 +121,11 @@ export const getContactTimeline = orgAction(
   ): Promise<GetContactTimelineResult> => {
     const { limit = 20, offset = 0 } = options;
     const events: TimelineEvent[] = [];
+    const now = new Date();
+
+    // Top-(offset+limit+1) of each source is enough for a correct merge.
+    const depth = Math.min(offset + limit + 1, MAX_SOURCE_ROWS);
+    let sourceTruncated = false;
 
     // Verify contact exists and get created date
     const contactRecord = await db.query.contact.findFirst({
@@ -131,7 +174,9 @@ export const getContactTimeline = orgAction(
         )
       )
       .orderBy(desc(messageSend.createdAt))
-      .limit(50);
+      .limit(depth);
+
+    sourceTruncated ||= messages.length >= depth;
 
     // Convert messages to consolidated timeline events (one event per message)
     for (const msg of messages) {
@@ -184,7 +229,9 @@ export const getContactTimeline = orgAction(
         )
       )
       .orderBy(desc(workflowExecution.createdAt))
-      .limit(20);
+      .limit(depth);
+
+    sourceTruncated ||= executions.length >= depth;
 
     // Convert workflow executions to timeline events
     for (const exec of executions) {
@@ -238,11 +285,32 @@ export const getContactTimeline = orgAction(
       .where(
         and(
           eq(contactEvent.contactId, contactId),
-          eq(contactEvent.organizationId, organizationId)
+          eq(contactEvent.organizationId, organizationId),
+          // An event past its expires_at is gone as far as the product is
+          // concerned — it is counted below and reported, never rendered as if
+          // it were still part of the history.
+          or(isNull(contactEvent.expiresAt), gt(contactEvent.expiresAt, now))
         )
       )
       .orderBy(desc(contactEvent.createdAt))
-      .limit(50);
+      .limit(depth);
+
+    sourceTruncated ||= customEvents.length >= depth;
+
+    // Events that have aged out. The timeline can't show them, but it can say
+    // they existed instead of claiming nothing ever happened.
+    const [agedOutResult] = await db
+      .select({ count: count() })
+      .from(contactEvent)
+      .where(
+        and(
+          eq(contactEvent.contactId, contactId),
+          eq(contactEvent.organizationId, organizationId),
+          sql`${contactEvent.expiresAt} IS NOT NULL`,
+          sql`${contactEvent.expiresAt} <= ${now}`
+        )
+      );
+    const agedOutEvents = Number(agedOutResult?.count ?? 0);
 
     // Convert custom events to timeline events
     for (const customEvent of customEvents) {
@@ -260,12 +328,27 @@ export const getContactTimeline = orgAction(
 
     // Apply pagination
     const paginatedEvents = events.slice(offset, offset + limit);
-    const hasMore = events.length > offset + limit;
+    const hasMore = events.length > offset + limit || sourceTruncated;
+
+    const recordedEmailsSent = contactRecord.emailsSent ?? 0;
+    const recordedSmsSent = contactRecord.smsSent ?? 0;
 
     return {
       success: true,
       events: paginatedEvents,
       hasMore,
+      history: {
+        agedOutEvents,
+        // Counters say messages went out but no message row survives to show
+        // them. Sends recorded before this contact's history was retained, or
+        // rows cleaned up since — either way, "no activity" would be a lie.
+        hasUnshowableHistory:
+          agedOutEvents > 0 ||
+          ((recordedEmailsSent > 0 || recordedSmsSent > 0) &&
+            messages.length === 0),
+        recordedEmailsSent,
+        recordedSmsSent,
+      },
     };
   }
 );
@@ -274,13 +357,34 @@ export const getContactTimeline = orgAction(
 // ANALYTICS
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Contacts by email status, organization-wide.
+ *
+ * The card above the contacts table reported one number — total contacts — and
+ * nothing about whether that list is healthy. For someone who owns their SES
+ * account this is the figure that matters: bounces and complaints are what
+ * costs them their sending reputation, and they were nowhere on this surface.
+ */
+export type ContactListHealth = {
+  active: number;
+  unsubscribed: number;
+  bounced: number;
+  complained: number;
+  suppressed: number;
+  /** Contacts with no email status yet — SMS-only contacts included. */
+  noEmailStatus: number;
+};
+
 export type ContactAnalytics = {
+  /** Organization-wide, never scoped to the table's filters. */
   totalContacts: number;
   newContactsThisPeriod: number;
   growthPercent: number;
   avgOpenRate: number;
   avgClickRate: number;
   dailyGrowth: Array<{ date: string; count: number }>;
+  /** Organization-wide, same scope as totalContacts. */
+  listHealth: ContactListHealth;
 };
 
 export type GetContactAnalyticsResult =
@@ -333,13 +437,14 @@ export const getContactAnalytics = orgAction(
     const tzLiteral = sql.raw(`'${tz}'`);
     const createdAtLocal = sql`${contact.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE ${tzLiteral}`;
 
-    // Run all five independent queries concurrently
+    // Run all six independent queries concurrently
     const [
       [totalResult],
       [newContactsResult],
       [previousPeriodResult],
       [engagementResult],
       dailyGrowthData,
+      statusRows,
     ] = await Promise.all([
       // Total contacts
       db
@@ -400,7 +505,33 @@ export const getContactAnalytics = orgAction(
         )
         .groupBy(sql`DATE(${createdAtLocal})`)
         .orderBy(sql`DATE(${createdAtLocal})`),
+
+      // List health: contacts per email status, organization-wide
+      db
+        .select({ status: contact.emailStatus, count: count() })
+        .from(contact)
+        .where(eq(contact.organizationId, organizationId))
+        .groupBy(contact.emailStatus),
     ]);
+
+    const listHealth: ContactListHealth = {
+      active: 0,
+      unsubscribed: 0,
+      bounced: 0,
+      complained: 0,
+      suppressed: 0,
+      noEmailStatus: 0,
+    };
+    for (const row of statusRows) {
+      const bucket = row.status ?? "noEmailStatus";
+      if (bucket in listHealth) {
+        listHealth[bucket as keyof ContactListHealth] += Number(row.count);
+      } else {
+        // An email_status the UI doesn't have a bucket for still belongs in a
+        // total the operator can see, rather than silently vanishing.
+        listHealth.noEmailStatus += Number(row.count);
+      }
+    }
 
     const totalContacts = totalResult?.count ?? 0;
     const newContactsThisPeriod = newContactsResult?.count ?? 0;
@@ -456,6 +587,7 @@ export const getContactAnalytics = orgAction(
         avgOpenRate: Math.round(avgOpenRate * 10) / 10,
         avgClickRate: Math.round(avgClickRate * 10) / 10,
         dailyGrowth,
+        listHealth,
       },
     };
   }

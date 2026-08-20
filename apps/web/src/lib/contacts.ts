@@ -22,12 +22,14 @@ export const EMAIL_STATUS_LABELS: Record<EmailStatus, string> = {
   suppressed: "Suppressed",
 };
 
+// Semantic theme tokens only. The raw Tailwind palette these carried rendered
+// identically in light and dark, so a near-white badge glared off a dark card.
 export const EMAIL_STATUS_COLORS: Record<EmailStatus, string> = {
-  active: "bg-green-100 text-green-800",
-  unsubscribed: "bg-gray-100 text-gray-800",
-  bounced: "bg-red-100 text-red-800",
-  complained: "bg-red-100 text-red-800",
-  suppressed: "bg-amber-100 text-amber-800",
+  active: "bg-success/15 text-success",
+  unsubscribed: "bg-muted text-muted-foreground",
+  bounced: "bg-destructive/15 text-destructive",
+  complained: "bg-destructive/15 text-destructive",
+  suppressed: "bg-warning/15 text-warning",
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -51,10 +53,10 @@ export const SMS_STATUS_LABELS: Record<SmsStatus, string> = {
 };
 
 export const SMS_STATUS_COLORS: Record<SmsStatus, string> = {
-  pending_consent: "bg-yellow-100 text-yellow-800",
-  opted_in: "bg-green-100 text-green-800",
-  opted_out: "bg-gray-100 text-gray-800",
-  invalid: "bg-red-100 text-red-800",
+  pending_consent: "bg-warning/15 text-warning",
+  opted_in: "bg-success/15 text-success",
+  opted_out: "bg-muted text-muted-foreground",
+  invalid: "bg-destructive/15 text-destructive",
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -97,13 +99,47 @@ export const CONTACT_STATUS_LABELS: Record<ContactStatus, string> = {
 
 /** @deprecated Use EMAIL_STATUS_COLORS instead */
 export const CONTACT_STATUS_COLORS: Record<ContactStatus, string> = {
-  pending_confirmation: "bg-yellow-100 text-yellow-800",
-  active: "bg-green-100 text-green-800",
-  unsubscribed: "bg-gray-100 text-gray-800",
-  bounced: "bg-red-100 text-red-800",
-  complained: "bg-red-100 text-red-800",
-  suppressed: "bg-amber-100 text-amber-800",
+  pending_confirmation: "bg-warning/15 text-warning",
+  active: "bg-success/15 text-success",
+  unsubscribed: "bg-muted text-muted-foreground",
+  bounced: "bg-destructive/15 text-destructive",
+  complained: "bg-destructive/15 text-destructive",
+  suppressed: "bg-warning/15 text-warning",
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENGAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Percentage for an engagement counter pair, or null when the pair can't
+ * honestly produce one.
+ *
+ * A contact's counters are maintained by different writers: `emailsSent` is
+ * incremented by the broadcast sender and the workflow email step, while
+ * `emailsOpened`/`emailsClicked` are incremented by the SES webhook for *any*
+ * message with a contact — transactional sends included, which never touch
+ * `emailsSent`. `smsClicked` has no production writer at all. So the numerator
+ * can outrun the denominator, and the contacts table rendered the result
+ * verbatim: "400% click" was on screen in a real org.
+ *
+ * A rate above 100% is not a rate, it's a sign the two counters disagree. Show
+ * the raw counts instead of a number that cannot be true.
+ */
+export function engagementRate(
+  numerator: number,
+  denominator: number
+): number | null {
+  if (
+    !(Number.isFinite(numerator) && Number.isFinite(denominator)) ||
+    denominator <= 0 ||
+    numerator < 0 ||
+    numerator > denominator
+  ) {
+    return null;
+  }
+  return (numerator / denominator) * 100;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONTACT TYPE

@@ -286,3 +286,212 @@ describe("importContacts — topicId cross-org IDOR", () => {
     }
   });
 });
+
+// ─── Duplicate handling (audit F20) ────────────────────────────────────────
+// import-contacts.test.ts previously covered only the row cap and the topic
+// IDOR case. Nothing pinned what "skip" vs "update" actually do to the
+// existing row, or the returned counters a caller renders in the import
+// summary toast.
+
+describe("importContacts — duplicate handling", () => {
+  it("skip strategy leaves the existing contact untouched and counts it skipped, not created or updated", async () => {
+    const email = "dup-skip-1@example.com";
+
+    const first = await importContacts(testOrg.id, {
+      contacts: [{ email, firstName: "Original" }],
+      duplicateStrategy: "skip",
+    });
+    expect(first.success).toBe(true);
+
+    const second = await importContacts(testOrg.id, {
+      contacts: [{ email, firstName: "Changed" }],
+      duplicateStrategy: "skip",
+    });
+
+    expect(second.success).toBe(true);
+    if (second.success) {
+      expect(second.created).toBe(0);
+      expect(second.updated).toBe(0);
+      expect(second.skipped).toBe(1);
+    }
+
+    const rows = await db
+      .select({ firstName: contact.firstName })
+      .from(contact)
+      .where(
+        and(eq(contact.organizationId, testOrg.id), eq(contact.email, email))
+      );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].firstName).toBe("Original");
+  });
+
+  it("update strategy updates the existing contact and counts it updated, not created or skipped", async () => {
+    const email = "dup-update-1@example.com";
+
+    await importContacts(testOrg.id, {
+      contacts: [{ email, firstName: "Original" }],
+      duplicateStrategy: "skip",
+    });
+
+    const second = await importContacts(testOrg.id, {
+      contacts: [{ email, firstName: "Changed" }],
+      duplicateStrategy: "update",
+    });
+
+    expect(second.success).toBe(true);
+    if (second.success) {
+      expect(second.created).toBe(0);
+      expect(second.updated).toBe(1);
+      expect(second.skipped).toBe(0);
+    }
+
+    const rows = await db
+      .select({ firstName: contact.firstName })
+      .from(contact)
+      .where(
+        and(eq(contact.organizationId, testOrg.id), eq(contact.email, email))
+      );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].firstName).toBe("Changed");
+  });
+
+  it("processes a mixed batch of new and duplicate rows with correct counts for each", async () => {
+    const existingEmail = "dup-mixed-existing@example.com";
+
+    await importContacts(testOrg.id, {
+      contacts: [{ email: existingEmail, firstName: "Before" }],
+      duplicateStrategy: "skip",
+    });
+
+    const result = await importContacts(testOrg.id, {
+      contacts: [
+        { email: existingEmail, firstName: "After" },
+        { email: "dup-mixed-new-1@example.com" },
+        { email: "dup-mixed-new-2@example.com" },
+      ],
+      duplicateStrategy: "update",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.created).toBe(2);
+      expect(result.updated).toBe(1);
+      expect(result.skipped).toBe(0);
+    }
+  });
+});
+
+// ─── Per-row error reporting (audit F20) ───────────────────────────────────
+// No prior test asserted anything about `result.errors` — the array a bad
+// row's index and message land in for the importer's per-row report.
+
+describe("importContacts — per-row error reporting", () => {
+  it("reports an invalid-email row by its 1-based row index and skips only that row", async () => {
+    const result = await importContacts(testOrg.id, {
+      contacts: [
+        { email: "err-good-row-1@example.com" },
+        { email: "not-an-email" },
+        { email: "err-good-row-2@example.com" },
+      ],
+      duplicateStrategy: "skip",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.created).toBe(2);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].row).toBe(2);
+      expect(result.errors[0].error).toMatch(/invalid email/i);
+    }
+  });
+
+  it("reports a row with neither email nor phone as an error and creates nothing for it", async () => {
+    const result = await importContacts(testOrg.id, {
+      contacts: [{ firstName: "No Contact Info" }],
+      duplicateStrategy: "skip",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.created).toBe(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].row).toBe(1);
+      expect(result.errors[0].error).toMatch(/email or phone/i);
+    }
+  });
+
+  it("keeps row indices aligned to the input array when good and bad rows are interleaved", async () => {
+    const result = await importContacts(testOrg.id, {
+      contacts: [
+        { email: "err-interleave-1@example.com" },
+        { email: "bad-1" },
+        { email: "err-interleave-2@example.com" },
+        { email: "bad-2" },
+      ],
+      duplicateStrategy: "skip",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.created).toBe(2);
+      expect(result.errors.map((e) => e.row)).toEqual([2, 4]);
+    }
+  });
+});
+
+// ─── emailStatus / emailVerifiedAt assignment (audit F11, F20) ─────────────
+// The importer hard-codes `emailStatus: "active"` for a brand-new email
+// contact — there is nothing to un-suppress since the row doesn't exist yet.
+// The resurrection risk is on the *update* path, which
+// import-contacts-properties-db.test.ts already pins does not touch
+// emailStatus. These tests pin what a fresh insert actually writes.
+
+describe("importContacts — emailStatus and emailVerifiedAt on new contacts", () => {
+  it("sets a new email contact to active with a verified timestamp", async () => {
+    const email = "status-active@example.com";
+
+    await importContacts(testOrg.id, {
+      contacts: [{ email }],
+      duplicateStrategy: "skip",
+    });
+
+    const [row] = await db
+      .select({
+        emailStatus: contact.emailStatus,
+        emailVerifiedAt: contact.emailVerifiedAt,
+      })
+      .from(contact)
+      .where(
+        and(eq(contact.organizationId, testOrg.id), eq(contact.email, email))
+      );
+
+    expect(row.emailStatus).toBe("active");
+    expect(row.emailVerifiedAt).toBeInstanceOf(Date);
+  });
+
+  it("leaves emailStatus and emailVerifiedAt null for a phone-only contact", async () => {
+    const phone = "+15551239999";
+
+    await importContacts(testOrg.id, {
+      contacts: [{ phone }],
+      duplicateStrategy: "skip",
+    });
+
+    const [row] = await db
+      .select({
+        emailStatus: contact.emailStatus,
+        emailVerifiedAt: contact.emailVerifiedAt,
+        smsStatus: contact.smsStatus,
+      })
+      .from(contact)
+      .where(
+        and(eq(contact.organizationId, testOrg.id), eq(contact.phone, phone))
+      );
+
+    expect(row.emailStatus).toBeNull();
+    expect(row.emailVerifiedAt).toBeNull();
+    expect(row.smsStatus).toBe("pending_consent");
+  });
+});

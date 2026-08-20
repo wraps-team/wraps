@@ -20,6 +20,59 @@ export type ParseCSVResult = {
 };
 
 /**
+ * The importer reads the whole file into browser memory before parsing, so it
+ * needs a ceiling. 10 MB is roughly 100k contact rows — well past the 10,000-row
+ * import cap, so a file this large is already going to be truncated.
+ */
+export const MAX_CSV_BYTES = 10 * 1024 * 1024;
+
+/** Rows kept per import. Mirrors MAX_IMPORT_SIZE in actions/import-contacts.ts. */
+export const MAX_CSV_ROWS = 10_000;
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) {
+    return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
+  }
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/**
+ * Reject a file before reading it. Returns the sentence to show the operator,
+ * or null when the file is worth reading.
+ */
+export function validateCSVFile(file: {
+  name: string;
+  size: number;
+}): string | null {
+  if (file.size === 0) {
+    return "That file is empty.";
+  }
+  if (file.size > MAX_CSV_BYTES) {
+    return `That file is ${formatBytes(file.size)}. The importer reads the whole file in your browser, so it stops at ${formatBytes(MAX_CSV_BYTES)} — split it into smaller files and import them one at a time.`;
+  }
+  if (!/\.csv$/i.test(file.name)) {
+    return `Wraps reads CSV files, and "${file.name}" isn't one. Export it as CSV and try again.`;
+  }
+  return null;
+}
+
+/**
+ * Explain why a parsed file can't be imported, or null when it can.
+ *
+ * The upload step used to `return` silently on both of these, so picking a
+ * malformed file left the dialog sitting on step 1 with nothing said.
+ */
+export function describeParseFailure(result: ParseCSVResult): string | null {
+  if (result.headers.length === 0) {
+    return "Couldn't read any columns from that file. The first line needs to be a header row.";
+  }
+  if (result.rows.length === 0) {
+    return "That file has a header row but no contacts under it.";
+  }
+  return null;
+}
+
+/**
  * Auto-detect the delimiter by counting occurrences in the first few lines.
  */
 function detectDelimiter(text: string): string {

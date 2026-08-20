@@ -52,8 +52,21 @@ import {
   FIELD_LABELS,
 } from "@/lib/csv-column-mapping";
 import { downloadCSV, toCSV } from "@/lib/csv-export";
-import { type ParseCSVResult, parseCSV } from "@/lib/csv-parse";
+import {
+  describeParseFailure,
+  MAX_CSV_ROWS,
+  type ParseCSVResult,
+  parseCSV,
+  validateCSVFile,
+} from "@/lib/csv-parse";
 import type { TopicWithMeta } from "@/lib/topics";
+import {
+  captureContactsImportColumnsMapped,
+  captureContactsImportCompleted,
+  captureContactsImportFailed,
+  captureContactsImportFileParsed,
+  captureContactsImportSubmitted,
+} from "./lib/analytics";
 
 type ImportContactsDialogProps = {
   organizationId: string;
@@ -64,6 +77,19 @@ type ImportContactsDialogProps = {
 };
 
 type Step = "upload" | "map" | "preview" | "results";
+
+/** Says how many rows are being dropped, not just that some are. */
+function TruncationNotice({ csvData }: { csvData: ParseCSVResult }) {
+  const dropped = csvData.totalRows - csvData.rows.length;
+  return (
+    <p className="text-warning text-xs" role="alert">
+      This file has {csvData.totalRows.toLocaleString()} rows. Wraps imports{" "}
+      {MAX_CSV_ROWS.toLocaleString()} at a time, so the last{" "}
+      {dropped.toLocaleString()} will be left out. Split the file to import the
+      rest.
+    </p>
+  );
+}
 
 export function ImportContactsDialog({
   organizationId,
@@ -82,6 +108,7 @@ export function ImportContactsDialog({
   );
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);
   const [result, setResult] = useState<ImportContactsResult | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,6 +119,7 @@ export function ImportContactsDialog({
     setDuplicateStrategy("skip");
     setSelectedTopicIds([]);
     setResult(null);
+    setUploadError(null);
   }, []);
 
   const handleOpenChange = useCallback(
@@ -113,21 +141,43 @@ export function ImportContactsDialog({
         return;
       }
 
+      setUploadError(null);
+
+      const fileError = validateCSVFile(file);
+      if (fileError) {
+        setUploadError(fileError);
+        e.target.value = "";
+        return;
+      }
+
       const reader = new FileReader();
+      reader.onerror = () => {
+        setUploadError(
+          `Your browser couldn't read "${file.name}". If it's open in another program, close it and try again.`
+        );
+      };
       reader.onload = (event) => {
         const text = event.target?.result;
         if (typeof text !== "string") {
+          setUploadError(`Your browser couldn't read "${file.name}" as text.`);
           return;
         }
 
         const parsed = parseCSV(text);
-        if (parsed.headers.length === 0 || parsed.rows.length === 0) {
+        const parseError = describeParseFailure(parsed);
+        if (parseError) {
+          setUploadError(parseError);
           return;
         }
 
         setCsvData(parsed);
         setColumnMappings(autoMapColumns(parsed.headers));
         setStep("map");
+        captureContactsImportFileParsed({
+          row_count: parsed.rows.length,
+          total_rows: parsed.totalRows,
+          was_truncated: parsed.truncated,
+        });
       };
       reader.readAsText(file);
 
@@ -224,6 +274,12 @@ export function ImportContactsDialog({
   const previewRows = mappedContacts.slice(0, 5);
 
   const handleImport = useCallback(() => {
+    captureContactsImportSubmitted({
+      contact_count: mappedContacts.length,
+      duplicate_strategy: duplicateStrategy,
+      topic_count: selectedTopicIds.length,
+      was_truncated: csvData?.truncated ?? false,
+    });
     startTransition(async () => {
       const res = await importContacts(organizationId, {
         contacts: mappedContacts,
@@ -233,7 +289,16 @@ export function ImportContactsDialog({
       setResult(res);
       setStep("results");
       if (res.success) {
+        captureContactsImportCompleted({
+          contact_count: mappedContacts.length,
+          created: res.created,
+          failed: res.errors.length,
+          skipped: res.skipped,
+          updated: res.updated,
+        });
         onImportComplete();
+      } else {
+        captureContactsImportFailed({ contact_count: mappedContacts.length });
       }
     });
   }, [
@@ -241,6 +306,7 @@ export function ImportContactsDialog({
     mappedContacts,
     selectedTopicIds,
     duplicateStrategy,
+    csvData,
     onImportComplete,
   ]);
 
@@ -272,7 +338,7 @@ export function ImportContactsDialog({
                   Click to upload a CSV file
                 </p>
                 <p className="text-muted-foreground text-xs">
-                  .csv files up to 10,000 rows
+                  .csv files up to 10,000 rows and 10 MB
                 </p>
               </div>
             </div>
@@ -283,6 +349,15 @@ export function ImportContactsDialog({
               ref={fileInputRef}
               type="file"
             />
+            {uploadError && (
+              <div
+                className="flex w-full items-start gap-2 rounded-md bg-destructive/10 p-3 text-destructive"
+                role="alert"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span className="text-sm">{uploadError}</span>
+              </div>
+            )}
             <Button
               className="text-xs"
               onClick={handleDownloadTemplate}
@@ -361,12 +436,7 @@ export function ImportContactsDialog({
               </p>
             )}
 
-            {csvData.truncated && (
-              <p className="text-amber-600 text-xs">
-                File has more than 10,000 rows. Only the first 10,000 will be
-                imported.
-              </p>
-            )}
+            {csvData.truncated && <TruncationNotice csvData={csvData} />}
 
             <DialogFooter>
               <Button onClick={() => setStep("upload")} variant="outline">
@@ -374,7 +444,26 @@ export function ImportContactsDialog({
               </Button>
               <Button
                 disabled={!canProceedToPreview}
-                onClick={() => setStep("preview")}
+                onClick={() => {
+                  const mappings = Object.values(columnMappings);
+                  const hasEmail = mappings.includes("email");
+                  const hasPhone = mappings.includes("phone");
+                  let identifierField: "both" | "email" | "phone" = "phone";
+                  if (hasEmail && hasPhone) {
+                    identifierField = "both";
+                  } else if (hasEmail) {
+                    identifierField = "email";
+                  }
+                  captureContactsImportColumnsMapped({
+                    identifier_field: identifierField,
+                    mapped_field_count: mappings.filter((m) => m !== "skip")
+                      .length,
+                    property_field_count: mappings.filter(
+                      (m) => m === "property"
+                    ).length,
+                  });
+                  setStep("preview");
+                }}
               >
                 Continue
               </Button>
@@ -503,6 +592,8 @@ export function ImportContactsDialog({
               </span>
             </div>
 
+            {csvData.truncated && <TruncationNotice csvData={csvData} />}
+
             <DialogFooter>
               <Button onClick={() => setStep("map")} variant="outline">
                 Back
@@ -526,7 +617,7 @@ export function ImportContactsDialog({
           <div className="space-y-4">
             {result.success ? (
               <>
-                <div className="flex items-center gap-2 rounded-md bg-green-50 p-3 text-green-800 dark:bg-green-950/50 dark:text-green-200">
+                <div className="flex items-center gap-2 rounded-md bg-success/10 p-3 text-success">
                   <CheckCircle2 className="h-5 w-5" />
                   <span className="font-medium text-sm">
                     Import completed successfully
@@ -534,12 +625,12 @@ export function ImportContactsDialog({
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {result.created > 0 && (
-                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    <Badge className="bg-success/15 text-success">
                       {result.created} created
                     </Badge>
                   )}
                   {result.updated > 0 && (
-                    <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    <Badge className="bg-info/15 text-info">
                       {result.updated} updated
                     </Badge>
                   )}

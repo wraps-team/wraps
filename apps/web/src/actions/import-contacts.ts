@@ -8,7 +8,7 @@ import {
   notifyUser,
   topic,
 } from "@wraps/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { trackContactsImported } from "@/lib/activation-tracking";
 import { auditLogEntry, getAuditContext } from "@/lib/audit";
 import type { ImportContactsResult } from "@/lib/contacts";
@@ -292,8 +292,10 @@ export async function importContacts(
                 jobTitle: row.jobTitle,
                 properties: row.properties,
                 createdBy: access.userId,
-                status: "active" as const,
-                confirmedAt: new Date(),
+                // The deprecated `status`/`confirmedAt` columns are not written
+                // here. `status` keeps its schema default; `confirmedAt` stays
+                // null because nobody confirmed anything — an import is not an
+                // opt-in. Read sendability from `emailStatus`.
                 ...(row.createdAt ? { createdAt: row.createdAt } : {}),
               }))
             )
@@ -320,8 +322,13 @@ export async function importContacts(
               updateData.jobTitle = row.jobTitle;
             }
             if (row.properties && Object.keys(row.properties).length > 0) {
-              // Merge properties using SQL jsonb concat
-              updateData.properties = row.properties;
+              // Merge, never replace. A CSV carries only the columns the
+              // operator exported; assigning the object wholesale deleted every
+              // custom property the file happened not to mention — including
+              // the ones segments filter on, with no undo.
+              // `properties` is a `json` column and `||` is jsonb-only, so the
+              // merge round-trips through jsonb.
+              updateData.properties = sql`(COALESCE(${contact.properties}, '{}'::json)::jsonb || ${JSON.stringify(row.properties)}::jsonb)::json`;
             }
 
             if (Object.keys(updateData).length > 0) {
