@@ -115,6 +115,34 @@ vi.mock("@aws-sdk/client-sesv2", () => ({
   GetEmailIdentityCommand: vi.fn(),
 }));
 
+/**
+ * Mock SQS.
+ *
+ * When destroy fails — which is the whole point of every test in this file —
+ * `emailDestroy` runs a best-effort SQS cleanup that dynamically imports this
+ * client and calls GetQueueUrl for the events queue and its DLQ. Unmocked, that
+ * is real network I/O: two SDK calls that reach for credentials, fail, retry on
+ * the SDK's own backoff, and get swallowed by the `catch {}` around them. It
+ * cost ~1.4s here and blew past vitest's 5s limit whenever the suite ran under
+ * load alongside the other packages, which is why this file failed only in
+ * `pnpm check:all` and never on its own.
+ *
+ * GetQueueUrl rejecting is the ordinary case in production too — the queue is
+ * usually already gone by the time this runs — so rejecting is the honest
+ * default, and it keeps the swallowing `catch` on the path it really takes.
+ */
+const mockSqsSend = vi.fn().mockRejectedValue(
+  Object.assign(new Error("AWS.SimpleQueueService.NonExistentQueue"), {
+    name: "QueueDoesNotExist",
+  })
+);
+
+vi.mock("@aws-sdk/client-sqs", () => ({
+  SQSClient: vi.fn().mockImplementation(() => ({ send: mockSqsSend })),
+  GetQueueUrlCommand: vi.fn(),
+  DeleteQueueCommand: vi.fn(),
+}));
+
 // Track whether stack methods were called and mock Pulumi automation
 const mockStackDestroy = vi.fn();
 const mockStackRefresh = vi.fn().mockResolvedValue(undefined);
