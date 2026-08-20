@@ -1805,3 +1805,110 @@ describe("clickable table rows are reachable by keyboard", () => {
     ).toEqual([]);
   });
 });
+
+// ─────────────────────────────────────────────────────────
+// Agent briefing files stay true to the repo
+//
+// CLAUDE.md and AGENTS.md are loaded before every agent task, and agents answer
+// from them without re-checking. Keeping them accurate competes with real work
+// and quietly loses — packages/cdk sat unmentioned for seven months. These tests
+// make the drift fail CI instead of surfacing as a confidently wrong answer.
+// ─────────────────────────────────────────────────────────
+
+describe("agent briefing files stay true", () => {
+  const claudeMd = readFile("CLAUDE.md");
+  const agentsMd = readFile("AGENTS.md");
+  const rootPkg = JSON.parse(readFile("package.json"));
+
+  function workspaceDirs(parent: string): string[] {
+    return globSync(`${parent}/*/package.json`, { cwd: ROOT })
+      .map((f) => f.toString().split("/").slice(0, 2).join("/"))
+      .sort();
+  }
+
+  test("every app and package is named in CLAUDE.md", () => {
+    const missing = [
+      ...workspaceDirs("apps"),
+      ...workspaceDirs("packages"),
+    ].filter((dir) => !claudeMd.includes(dir));
+
+    expect(
+      missing,
+      `CLAUDE.md never mentions these workspaces, so agents answer as if they do not exist:\n${missing.join("\n")}`
+    ).toEqual([]);
+  });
+
+  test("packages without a CLAUDE.md are named as exceptions", () => {
+    const undocumented = workspaceDirs("packages").filter(
+      (dir) => !existsSync(resolve(ROOT, dir, "CLAUDE.md"))
+    );
+    const unacknowledged = undocumented.filter(
+      (dir) => !claudeMd.includes(`except \`${dir}\``)
+    );
+
+    expect(
+      unacknowledged,
+      "CLAUDE.md claims every package has its own CLAUDE.md. These do not, and are not " +
+        `listed as exceptions — either add the file or update the claim:\n${unacknowledged.join("\n")}`
+    ).toEqual([]);
+  });
+
+  test("every CLI service directory is named in CLAUDE.md", () => {
+    const services = globSync("packages/cli/src/commands/*/", { cwd: ROOT })
+      .map((f) => f.toString().replace(/\/$/, "").split("/").pop() as string)
+      .filter((name) => name !== "__tests__" && name !== "shared")
+      .sort();
+
+    const missing = services.filter(
+      (name) => !claudeMd.includes(`\`${name}\``)
+    );
+
+    expect(
+      missing,
+      `CLAUDE.md lists the CLI services but omits these, which exist in packages/cli/src/commands:\n${missing.join("\n")}`
+    ).toEqual([]);
+  });
+
+  test("the Node and pnpm versions the briefings claim match package.json", () => {
+    const nodeMajor = (rootPkg.engines?.node ?? "").match(/(\d+)/)?.[1];
+    const pnpmMajor = (rootPkg.packageManager ?? "").match(/pnpm@(\d+)/)?.[1];
+    expect(nodeMajor, "package.json has no engines.node").toBeTruthy();
+    expect(pnpmMajor, "package.json has no packageManager").toBeTruthy();
+
+    const violations: string[] = [];
+    for (const [name, source] of [
+      ["CLAUDE.md", claudeMd],
+      ["AGENTS.md", agentsMd],
+    ] as const) {
+      for (const claimed of source.matchAll(/Node\.js (\d+)\+/g)) {
+        if (claimed[1] !== nodeMajor) {
+          violations.push(
+            `${name} claims Node.js ${claimed[1]}+ but engines.node is ${rootPkg.engines.node}`
+          );
+        }
+      }
+      for (const claimed of source.matchAll(/pnpm (\d+)\+? /g)) {
+        if (claimed[1] !== pnpmMajor) {
+          violations.push(
+            `${name} claims pnpm ${claimed[1]} but packageManager is ${rootPkg.packageManager}`
+          );
+        }
+      }
+    }
+
+    expect(violations, violations.join("\n")).toEqual([]);
+  });
+
+  test("every pnpm script CLAUDE.md tells agents to run exists", () => {
+    const scripts = new Set(Object.keys(rootPkg.scripts ?? {}));
+    const missing = [...claudeMd.matchAll(/`?pnpm ([\w:]+)/g)]
+      .map((m) => m[1])
+      .filter((name) => !(scripts.has(name) || /^\d/.test(name)))
+      .filter((name) => !["install", "dlx", "add", "exec"].includes(name));
+
+    expect(
+      [...new Set(missing)],
+      `CLAUDE.md tells agents to run these, but they are not scripts in the root package.json:\n${[...new Set(missing)].join("\n")}`
+    ).toEqual([]);
+  });
+});

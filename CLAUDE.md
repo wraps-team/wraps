@@ -20,9 +20,46 @@ When implementing multi-step features (e.g., create resource -> save state -> us
 
 ## Architecture Overview
 
-Turborepo monorepo with pnpm 10 workspaces. Each package has its own CLAUDE.md with detailed context — read it before working in that package.
+Turborepo monorepo with pnpm 11 workspaces. Every package below except `packages/ai`
+has its own CLAUDE.md with detailed context — read it before working in that package.
 
-Multi-service CLI architecture: `wraps <service> <command>` (email, sms, cdn, auth). See `cli-commands` skill for detailed reference.
+**Apps**
+
+| Path | What it is |
+|---|---|
+| `apps/web` | Dashboard (Next.js App Router) — `app.wraps.dev` |
+| `apps/website` | Marketing site + docs — `wraps.dev` |
+| `apps/api` | Elysia API on AWS Lambda — `api.wraps.dev` |
+
+**Packages**
+
+| Path | What it is |
+|---|---|
+| `packages/ai` | `@wraps/ai` — AI SDK wiring for template generation and chat |
+| `packages/auth` | better-auth setup, SSO/SCIM, org + session handling |
+| `packages/cdk` | `@wraps.dev/cdk` — AWS CDK L3 construct for email infra (mirrors `pulumi`) |
+| `packages/cli` | `@wraps.dev/cli` — the `wraps` command |
+| `packages/console` | Local web console served by `wraps console` |
+| `packages/core` | Shared config types + `applyDefaults()` — the source of truth for both IaC packages |
+| `packages/db` | Drizzle schema, migrations, repositories |
+| `packages/email` | Internal email primitives |
+| `packages/email-check` | Deliverability auditing (DKIM/SPF/DMARC/blacklists) behind `wraps email check` |
+| `packages/email-send` | Send path shared by API and Lambda |
+| `packages/mail-audit` | Mailbox auditing |
+| `packages/pulumi` | Pulumi provider for email infra (mirrors `cdk`) |
+| `packages/template-render` | React Email → HTML rendering |
+| `packages/tui` | Terminal UI components for the CLI |
+| `packages/ui` | Shared React component library |
+| `packages/unsubscribe-token` | Signed unsubscribe token mint/verify |
+
+`packages/cdk` and `packages/pulumi` deploy the same infrastructure two ways and share
+types from `packages/core`. **Change a default in one, change it in both.**
+
+Multi-service CLI architecture: `wraps <service> <command>`. Services are `email`, `sms`,
+`cdn`, `auth`, `aws`, `platform`, `selfhost`, `workflow`, and `license`, plus global
+commands (`status`, `destroy`, `console`, `permissions`, `completion`, `telemetry`,
+`update`, `news`, `support`). The whole tree is dispatched from `packages/cli/src/cli.ts`.
+See `cli-commands` skill for the detailed reference.
 
 ## Critical Design Principles
 
@@ -61,7 +98,7 @@ See package-level CLAUDE.md files for specific enforcement patterns.
 
 ## Environment Setup
 
-Prerequisites: Node.js 22+, pnpm 10+, AWS CLI configured. Standard scripts (`install`, `build`, `dev`, `test`, `check`, `fix`) are in the root `package.json`. The non-obvious ones:
+Prerequisites: Node.js 22+, pnpm 11+, AWS CLI configured. Standard scripts (`install`, `build`, `dev`, `test`, `check`, `fix`) are in the root `package.json`. The non-obvious ones:
 
 ```bash
 pnpm sst:dev           # Run SST dev (API Lambda + linked resources)
@@ -89,7 +126,7 @@ and the design system inventory live in the `design-context` skill. Read it befo
 visual, or marketing-copy work in `apps/web` or `apps/website`.
 
 <!-- NEXT-AGENTS-MD-START -->
-Next.js docs live in `./.next-docs` (gitignored, 378 files). STOP — what you remember
+Next.js docs live in `./.next-docs` (gitignored, generated). STOP — what you remember
 about Next.js is WRONG for this project; search and read those docs before any Next.js task.
 If the directory is missing: `npx @next/codemod agents-md --output CLAUDE.md`
 <!-- NEXT-AGENTS-MD-END -->

@@ -1,10 +1,10 @@
 # AGENTS.md - Wraps
 
-Wraps is a CLI and TypeScript SDK that deploys production-ready email, SMS, and CDN infrastructure to a user's AWS account. Zero credentials stored. OIDC authentication. The user owns everything.
+Wraps is a CLI, web dashboard, and TypeScript SDK that deploys production-ready email, SMS, and CDN infrastructure to a user's AWS account. Zero credentials stored. OIDC authentication. The user owns everything.
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - AWS credentials configured (`aws configure` or environment variables)
 - A verified domain (for email)
 
@@ -73,6 +73,40 @@ wraps email destroy       Remove all email infrastructure
   -f, --force             Force without confirmation
   -r, --region            AWS region
   --preview               Preview changes
+
+wraps email doctor        Diagnose email infrastructure problems
+  -r, --region            AWS region
+  --cleanup               Clean up orphaned resources
+  -j, --json              Output as JSON
+
+wraps email plan          Show or change the SES plan for an account
+  --account               AWS account ID
+  -r, --region            AWS region
+  --set                   Plan to switch to
+  --volume                Monthly email volume for the estimate
+  -y, --yes               Skip confirmation
+
+wraps email logs list     List recent sends
+  --status                Filter by delivery status
+  --limit                 Page size
+  --cursor                Pagination cursor
+  -j, --json              Output as JSON
+
+wraps email logs get <message-id>   Show the event timeline for one message
+  -j, --json              Output as JSON
+```
+
+### Email Agents
+
+Agent mailboxes — alias-bound identities with an approval queue.
+
+```
+wraps email agent create  Create an agent mailbox
+  --name                  Agent name
+  -r, --region            AWS region
+
+wraps email agent list    List agent mailboxes
+wraps email agent kill    Revoke an agent mailbox
 ```
 
 ### Email Domains
@@ -208,6 +242,36 @@ wraps platform update-role  Update platform IAM permissions
   -f, --force             Force
 ```
 
+### Auth
+
+```
+wraps auth login          Sign in to wraps.dev (device flow)
+wraps auth status         Show current auth state
+wraps auth logout         Sign out and remove the stored token
+```
+
+### Workflow
+
+```
+wraps workflow init       Scaffold a workflow definition file
+```
+
+### Selfhost
+
+```
+wraps selfhost login      Sign in to a self-hosted deployment
+wraps selfhost status     Show self-hosted deployment status
+wraps selfhost env        Manage self-hosted environment config
+wraps selfhost logs       Tail self-hosted logs
+wraps selfhost logout     Sign out of the self-hosted deployment
+```
+
+### License
+
+```
+wraps license generate    Generate an enterprise license key
+```
+
 ### Global
 
 ```
@@ -227,6 +291,7 @@ wraps permissions         Show required AWS IAM permissions
   --preset                Config preset
   --service               Service type (email, sms, cdn)
 
+wraps update              Update the CLI to the latest version
 wraps completion          Generate shell completion script
 wraps telemetry           Manage telemetry (enable|disable|status)
 wraps news                Show recent updates
@@ -528,7 +593,8 @@ Agents should **never**:
 | production | ~$2-10 | Toll-free number, event tracking |
 | enterprise | ~$10-50 | Full features, link tracking |
 
-Email sending: $0.10 per 1,000 emails (AWS SES pricing).
+Email sending: ~$0.10 per 1,000 emails a la carte, or ~$0.16 on AWS's default
+Essentials plan (AWS SES pricing). SES no longer has a perpetual free tier.
 SMS sending: ~$0.00849/segment + carrier fees (AWS pricing).
 
 ## Links
