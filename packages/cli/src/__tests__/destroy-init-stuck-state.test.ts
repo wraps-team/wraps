@@ -20,6 +20,78 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // ---- Mocks ----
 
 // Mock clack prompts
+/**
+ * Mock the S3 state module.
+ *
+ * `metadata.ts` mirrors connection metadata into an S3 backend through this
+ * module, which constructs a real S3Client. Unmocked, the SDK's credential
+ * chain runs before any request — on a machine with AWS SSO configured that is
+ * a live call to the SSO portal for federated credentials on every test. Slow,
+ * non-deterministic, and dependent on whose laptop is running the suite.
+ */
+/**
+ * The destroy -> init round trip touches IAM, Lambda, SNS and DynamoDB. Each was
+ * constructing a real client and talking to AWS from a unit test.
+ */
+/**
+ * SES v1, which is a different client from the sesv2 mock above — the preflight
+ * scanner uses it, and the endpoint tells them apart: v1 posts to
+ * email.<region>.amazonaws.com/ while v2 uses /v2/email/*.
+ */
+vi.mock("@aws-sdk/client-ses", () => ({
+  SESClient: vi.fn().mockImplementation(function () {
+    return { send: vi.fn().mockResolvedValue({}) };
+  }),
+  ListIdentitiesCommand: vi.fn(),
+  ListConfigurationSetsCommand: vi.fn(),
+  ListReceiptRuleSetsCommand: vi.fn(),
+}));
+
+vi.mock("@aws-sdk/client-iam", () => ({
+  IAMClient: vi.fn().mockImplementation(function () {
+    return { send: vi.fn().mockResolvedValue({}) };
+  }),
+  GetRoleCommand: vi.fn(),
+  PutRolePolicyCommand: vi.fn(),
+}));
+
+vi.mock("@aws-sdk/client-lambda", () => ({
+  LambdaClient: vi.fn().mockImplementation(function () {
+    return { send: vi.fn().mockResolvedValue({}) };
+  }),
+  ListFunctionsCommand: vi.fn(),
+  GetFunctionCommand: vi.fn(),
+}));
+
+vi.mock("@aws-sdk/client-sns", () => ({
+  SNSClient: vi.fn().mockImplementation(function () {
+    return { send: vi.fn().mockResolvedValue({}) };
+  }),
+  ListTopicsCommand: vi.fn(),
+  DeleteTopicCommand: vi.fn(),
+}));
+
+vi.mock("@aws-sdk/client-dynamodb", () => ({
+  DynamoDBClient: vi.fn().mockImplementation(function () {
+    return { send: vi.fn().mockResolvedValue({}) };
+  }),
+  DescribeTableCommand: vi.fn(),
+  DeleteTableCommand: vi.fn(),
+}));
+
+vi.mock("../utils/shared/s3-state.js", () => ({
+  getStateBucketName: vi.fn(() => "wraps-state-123456789012-us-east-1"),
+  getS3BackendUrl: vi.fn(() => "s3://wraps-state-123456789012-us-east-1"),
+  stateBucketExists: vi.fn().mockResolvedValue(false),
+  ensureStateBucket: vi.fn().mockResolvedValue(undefined),
+  uploadMetadata: vi.fn().mockResolvedValue(undefined),
+  deleteMetadata: vi.fn().mockResolvedValue(undefined),
+  clearS3StackLocks: vi.fn().mockResolvedValue(undefined),
+  downloadMetadata: vi.fn().mockResolvedValue(null),
+  needsMigration: vi.fn().mockResolvedValue(false),
+  migrateLocalPulumiState: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@clack/prompts", () => ({
   intro: vi.fn(),
   outro: vi.fn(),
@@ -114,6 +186,17 @@ vi.mock("@aws-sdk/client-sesv2", () => {
 });
 
 // Mock the timeout wrapper
+// See email-destroy.test.ts: a failing destroy runs a best-effort SQS cleanup
+// that dynamically imports this client. Unmocked it is real network I/O on the
+// swallowed-error path, which is invisible until the suite runs under load.
+vi.mock("@aws-sdk/client-sqs", () => ({
+  SQSClient: vi.fn().mockImplementation(() => ({
+    send: vi.fn().mockRejectedValue(new Error("QueueDoesNotExist")),
+  })),
+  GetQueueUrlCommand: vi.fn(),
+  DeleteQueueCommand: vi.fn(),
+}));
+
 vi.mock("../utils/shared/timeout.js", () => ({
   DEFAULT_PULUMI_TIMEOUT_MS: 600_000,
   withTimeout: vi.fn(async (promise: Promise<any>) => promise),

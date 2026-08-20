@@ -2,6 +2,40 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setJsonMode } from "../../utils/shared/json-output.js";
 
 // Mock all external dependencies
+/**
+ * Mock the S3 state module.
+ *
+ * `metadata.ts` mirrors connection metadata into an S3 backend through this
+ * module, which constructs a real S3Client. Unmocked, the SDK's credential
+ * chain runs before any request — on a machine with AWS SSO configured that is
+ * a live call to the SSO portal for federated credentials on every test. Slow,
+ * non-deterministic, and dependent on whose laptop is running the suite.
+ */
+/**
+ * Tracking-domain setup looks up the hosted zone through Route53. Unmocked the
+ * suite made live route53.amazonaws.com calls on every tracking-domain test.
+ */
+vi.mock("@aws-sdk/client-route-53", () => ({
+  Route53Client: vi.fn().mockImplementation(function () {
+    return { send: vi.fn().mockResolvedValue({}) };
+  }),
+  ListHostedZonesByNameCommand: vi.fn(),
+  ChangeResourceRecordSetsCommand: vi.fn(),
+}));
+
+vi.mock("../../utils/shared/s3-state.js", () => ({
+  getStateBucketName: vi.fn(() => "wraps-state-123456789012-us-east-1"),
+  getS3BackendUrl: vi.fn(() => "s3://wraps-state-123456789012-us-east-1"),
+  stateBucketExists: vi.fn().mockResolvedValue(false),
+  ensureStateBucket: vi.fn().mockResolvedValue(undefined),
+  uploadMetadata: vi.fn().mockResolvedValue(undefined),
+  deleteMetadata: vi.fn().mockResolvedValue(undefined),
+  clearS3StackLocks: vi.fn().mockResolvedValue(undefined),
+  downloadMetadata: vi.fn().mockResolvedValue(null),
+  needsMigration: vi.fn().mockResolvedValue(false),
+  migrateLocalPulumiState: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@pulumi/pulumi", () => ({
   automation: {
     LocalWorkspace: {
