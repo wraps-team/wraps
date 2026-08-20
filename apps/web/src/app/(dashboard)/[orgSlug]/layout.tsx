@@ -142,7 +142,14 @@ export async function generateMetadata({
   }
 
   return {
-    title: `${orgWithMembership.name} | Wraps`,
+    // A plain string here augments the root layout's own `%s | Wraps`
+    // template (see .next-docs generate-metadata.mdx, "title" > "template");
+    // this segment must not add its own "| Wraps" suffix or every page in
+    // the org that doesn't set its own title reads "{org} | Wraps | Wraps"
+    // in the tab (audit F19). Pages that DO set their own title (contacts,
+    // segments, topics, emails, ...) are unaffected either way - they
+    // augment the same root template directly.
+    title: orgWithMembership.name,
     description: `${orgWithMembership.name} dashboard on Wraps`,
   };
 }

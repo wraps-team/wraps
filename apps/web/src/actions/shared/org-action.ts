@@ -32,7 +32,20 @@ export type OrgActionCtx = {
 
 type Failure = { success: false; error: string };
 
-const UNAUTHORIZED = "You don't have access to this organization";
+/**
+ * The exact string `orgAction` returns when `verifyOrgAccess` finds no
+ * membership. Exported so callers that need to tell "you can't see this" from
+ * "the query failed" can compare against it instead of duplicating the
+ * literal — see contacts/segments/topics `page.tsx` (audit finding F6).
+ *
+ * Deliberately not a discriminated `kind` field on `Failure`: every caller of
+ * an `orgAction`-wrapped action today expects the failure shape to be
+ * exactly `{ success: false, error: string }`, and several tests assert that
+ * with `toEqual` (exact match) across files this change does not own. Adding
+ * a field to `Failure` would have been silently breaking for every one of
+ * them. This constant is additive only — no return shape changes.
+ */
+export const UNAUTHORIZED = "You don't have access to this organization";
 
 export function orgAction<TArgs extends unknown[], TResult>(
   opts: {
