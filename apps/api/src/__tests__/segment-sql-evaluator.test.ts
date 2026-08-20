@@ -76,7 +76,7 @@ describe("contactMatchesCondition", () => {
     expect(result).toBe(false);
   });
 
-  it("returns true for empty condition (no groups)", async () => {
+  it("returns false for empty condition (no groups) — fails closed", async () => {
     const condition: FilterCondition = {
       logic: "AND",
       groups: [],
@@ -89,11 +89,11 @@ describe("contactMatchesCondition", () => {
       condition
     );
 
-    expect(result).toBe(true);
+    expect(result).toBe(false);
     expect(mocks.mockSelect).not.toHaveBeenCalled();
   });
 
-  it("returns true when condition has only unknown fields (buildConditionSQL returns null)", async () => {
+  it("returns false when condition has only unknown fields (buildConditionSQL returns null)", async () => {
     const condition: FilterCondition = {
       logic: "AND",
       groups: [
@@ -112,7 +112,7 @@ describe("contactMatchesCondition", () => {
       condition
     );
 
-    expect(result).toBe(true);
+    expect(result).toBe(false);
     expect(mocks.mockSelect).not.toHaveBeenCalled();
   });
 });
@@ -171,7 +171,7 @@ describe("contactIdsMatchingCondition", () => {
     expect(result).toEqual([]);
   });
 
-  it("returns all IDs for empty condition", async () => {
+  it("returns no IDs for empty condition — fails closed", async () => {
     const condition: FilterCondition = {
       logic: "AND",
       groups: [],
@@ -184,7 +184,7 @@ describe("contactIdsMatchingCondition", () => {
       condition
     );
 
-    expect(result).toEqual(["contact-1", "contact-2", "contact-3"]);
+    expect(result).toEqual([]);
     expect(mocks.mockSelect).not.toHaveBeenCalled();
   });
 

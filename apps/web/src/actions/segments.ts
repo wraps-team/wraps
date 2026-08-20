@@ -3,12 +3,16 @@
 import {
   bucketIndexSQL,
   buildConditionSQL,
+  channelEligibilitySQL,
   contact,
+  countRecipientsBySegment,
   db,
+  previewConditionAudience,
   segment,
 } from "@wraps/db";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { serializeError } from "@/lib/logger";
 import { checkFeatureAccess } from "@/lib/plan-limits";
 import {
   type CreateSegmentResult,
@@ -25,6 +29,31 @@ import {
   withPartitionFilter,
 } from "@/lib/segments";
 import { orgAction } from "./shared/org-action";
+
+// A condition that compiles to no SQL cannot be evaluated. Every send path
+// treats that as "matches nobody", so a segment must never be saved or previewed
+// in that state — and the user needs to be told which filter is at fault rather
+// than orgAction's catch-all string.
+const UNEVALUABLE_CONDITION =
+  "These filters can't be evaluated. Check that every filter has a value its operator accepts.";
+
+const COUNT_FAILED =
+  "The filters are valid, but counting the matching contacts failed. Try again.";
+
+/**
+ * Every count this file returns is the number of contacts a broadcast to the
+ * segment would actually send to — counted now, through the send path's own
+ * predicate (`countRecipientsBySegment` / `previewConditionAudience`), not read
+ * from `segment.member_count`.
+ *
+ * The cached column is still written on create/update/split as a snapshot, but
+ * nothing displays it: it was six months stale on the only segment in
+ * production, it counted contacts with no email address and contacts who had
+ * unsubscribed, and the broadcast picker rendered it one card above the real
+ * recipient count. A cache that must agree with the sender is a cache that will
+ * eventually disagree with the sender.
+ */
+const CHANNEL = "email" as const;
 
 // Re-export types for convenience
 export type {
@@ -55,6 +84,14 @@ export const listSegments = orgAction(
       .where(eq(segment.organizationId, organizationId))
       .orderBy(desc(segment.createdAt));
 
+    // One grouped scan for the whole list, so the table costs the same as it
+    // did reading the cached column.
+    const counts = await countRecipientsBySegment(
+      organizationId,
+      CHANNEL,
+      segments.map((s) => s.id)
+    );
+
     return {
       success: true,
       segments: segments.map((s) => ({
@@ -63,7 +100,7 @@ export const listSegments = orgAction(
         description: s.description,
         condition: s.condition,
         trackMembership: s.trackMembership,
-        memberCount: s.memberCount,
+        memberCount: counts.get(s.id) ?? 0,
         lastComputedAt: s.lastComputedAt,
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,
@@ -104,6 +141,10 @@ export const getSegment = orgAction(
       return { success: false, error: "Segment not found" };
     }
 
+    const counts = await countRecipientsBySegment(organizationId, CHANNEL, [
+      s.id,
+    ]);
+
     return {
       success: true,
       segment: {
@@ -112,7 +153,7 @@ export const getSegment = orgAction(
         description: s.description,
         condition: s.condition,
         trackMembership: s.trackMembership,
-        memberCount: s.memberCount,
+        memberCount: counts.get(s.id) ?? 0,
         lastComputedAt: s.lastComputedAt,
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,
@@ -171,17 +212,17 @@ export const createSegment = orgAction(
       return { success: false, error: conditionError };
     }
 
-    // Compute initial member count
-    const conditionSQL = buildConditionSQL(data.condition);
-    let memberCount = 0;
-
-    if (conditionSQL) {
-      const [countResult] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(contact)
-        .where(and(eq(contact.organizationId, organizationId), conditionSQL));
-      memberCount = countResult?.count ?? 0;
+    // Snapshot the sendable count. Nothing renders it, but a stored number that
+    // disagrees with the sender is how F3 happened.
+    const audience = await previewConditionAudience(
+      organizationId,
+      CHANNEL,
+      data.condition
+    );
+    if (!audience) {
+      return { success: false, error: UNEVALUABLE_CONDITION };
     }
+    const memberCount = audience.sendable;
 
     // Create segment
     const [newSegment] = await ctx.audited(
@@ -306,7 +347,15 @@ export const splitSegment = orgAction(
         count: sql<number>`count(*)::int`,
       })
       .from(contact)
-      .where(and(eq(contact.organizationId, organizationId), sourceSQL))
+      // Same eligibility predicate the send applies, so a partition's stated
+      // size is the size of the broadcast it will become.
+      .where(
+        and(
+          eq(contact.organizationId, organizationId),
+          channelEligibilitySQL(CHANNEL),
+          sourceSQL
+        )
+      )
       // Group by ordinal: Postgres matches GROUP BY expressions syntactically,
       // and a second copy of the hash expression binds different parameter
       // placeholders, so it would not be recognised as the same expression.
@@ -426,17 +475,18 @@ export const updateSegment = orgAction(
       if (conditionError) {
         return { success: false, error: conditionError };
       }
-      updateData.condition = data.condition;
-
-      // Recompute member count
-      const conditionSQL = buildConditionSQL(data.condition);
-      if (conditionSQL) {
-        const [countResult] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(contact)
-          .where(and(eq(contact.organizationId, organizationId), conditionSQL));
-        updateData.memberCount = countResult?.count ?? 0;
+      // Recompute the snapshot count
+      const audience = await previewConditionAudience(
+        organizationId,
+        CHANNEL,
+        data.condition
+      );
+      if (!audience) {
+        return { success: false, error: UNEVALUABLE_CONDITION };
       }
+
+      updateData.condition = data.condition;
+      updateData.memberCount = audience.sendable;
       updateData.lastComputedAt = new Date();
     }
 
@@ -555,34 +605,35 @@ export const previewSegment = orgAction(
       return { success: false, error: conditionError };
     }
 
-    const conditionSQL = buildConditionSQL(condition);
+    try {
+      // The preview answers "who would this send to", not "how many rows match
+      // the filters" — so it counts, and samples, through the send predicate.
+      const audience = await previewConditionAudience(
+        organizationId,
+        CHANNEL,
+        condition
+      );
 
-    if (!conditionSQL) {
-      return { success: true, count: 0, sampleEmails: [] };
+      // Reporting 0 here would be a measurement the query never made — the same
+      // "count that lies" the send paths refuse to produce.
+      if (!audience) {
+        return { success: false, error: UNEVALUABLE_CONDITION };
+      }
+
+      return {
+        success: true,
+        count: audience.sendable,
+        sampleEmails: audience.sampleEmails,
+      };
+    } catch (error) {
+      // Postgres rejected the compiled filter. Say so instead of letting
+      // orgAction flatten it to "Failed to preview segment".
+      ctx.log.error(
+        { err: serializeError(error) },
+        "Segment preview query failed"
+      );
+      return { success: false, error: COUNT_FAILED };
     }
-
-    // Get count
-    const [countResult] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(contact)
-      .where(and(eq(contact.organizationId, organizationId), conditionSQL));
-
-    const count = countResult?.count ?? 0;
-
-    // Get sample emails (up to 5)
-    const samples = await db
-      .select({ email: contact.email })
-      .from(contact)
-      .where(and(eq(contact.organizationId, organizationId), conditionSQL))
-      .limit(5);
-
-    return {
-      success: true,
-      count,
-      sampleEmails: samples
-        .map((s) => s.email)
-        .filter((e): e is string => e !== null),
-    };
   }
 );
 
@@ -612,53 +663,5 @@ export const getPropertyKeys = orgAction(
     const keys = rows.rows.map((r) => r.key).sort();
 
     return { success: true, keys };
-  }
-);
-
-/**
- * Recompute segment member counts (can be called periodically or on-demand)
- */
-export const recomputeSegmentCounts = orgAction(
-  {
-    name: "recomputeSegmentCounts",
-    resource: "segments",
-    permission: ["read"],
-    orgId: (organizationId: string) => organizationId,
-    onError: "Failed to recompute segment counts",
-  },
-  async (
-    ctx,
-    organizationId: string
-  ): Promise<{ success: boolean; error?: string }> => {
-    // Get all segments for org
-    const segments = await db
-      .select()
-      .from(segment)
-      .where(eq(segment.organizationId, organizationId));
-
-    // Recompute counts for each segment
-    for (const seg of segments) {
-      const conditionSQL = buildConditionSQL(seg.condition);
-
-      if (conditionSQL) {
-        const [countResult] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(contact)
-          .where(and(eq(contact.organizationId, organizationId), conditionSQL));
-
-        await db
-          .update(segment)
-          .set({
-            memberCount: countResult?.count ?? 0,
-            lastComputedAt: new Date(),
-          })
-          .where(eq(segment.id, seg.id));
-      }
-    }
-
-    // Revalidate
-    revalidatePath(`/${ctx.access.orgSlug}/segments`, "page");
-
-    return { success: true };
   }
 );

@@ -43,7 +43,7 @@ describe("buildConditionSQL", () => {
     expect(query).not.toBeNull();
     // Should contain both conditions joined by AND
     expect(query!.sql).toContain('"emails_sent"');
-    expect(query!.sql).toContain('"status"');
+    expect(query!.sql).toContain('"email_status"');
   });
 
   it("combines filters across groups with OR logic", () => {
@@ -66,7 +66,7 @@ describe("buildConditionSQL", () => {
     expect(query).not.toBeNull();
     // Should contain both conditions
     expect(query!.sql).toContain('"emails_sent"');
-    expect(query!.sql).toContain('"status"');
+    expect(query!.sql).toContain('"email_status"');
     // OR logic should produce OR between groups (not just AND)
     expect(query!.sql).toContain(" or ");
   });
@@ -110,7 +110,7 @@ describe("buildFilterSQL", () => {
     expect(result).not.toBeNull();
 
     const query = toSQL(result);
-    expect(query!.sql).toContain('"status"');
+    expect(query!.sql).toContain('"email_status"');
     expect(query!.params).toContain("active");
   });
 
@@ -663,7 +663,7 @@ describe("buildFilterSQL - partition buckets", () => {
     };
     const query = toSQL(buildConditionSQL(condition));
     expect(query!.sql).toContain("md5");
-    expect(query!.sql).toContain("status");
+    expect(query!.sql).toContain("email_status");
     expect(query!.params).toContain("active");
   });
 });
@@ -758,7 +758,7 @@ describe("buildConditionSQL - nested groups", () => {
     expect(result).not.toBeNull();
 
     const query = toSQL(result);
-    expect(query!.sql).toContain('"status"');
+    expect(query!.sql).toContain('"email_status"');
     expect(query!.sql).toContain('"emails_sent"');
     expect(query!.sql).toContain('"emails_opened"');
     // The nested OR should be present

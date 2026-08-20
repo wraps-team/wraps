@@ -18,7 +18,13 @@ type DB = NodePgDatabase<any>;
  * Check if a single contact matches a segment condition via SQL.
  *
  * Returns true if the contact row satisfies the condition WHERE clause.
- * For empty/null conditions (no valid filters), returns true (matches all).
+ *
+ * Fails closed: a condition that compiles to no SQL — empty, or using an
+ * operator this build doesn't know — matches nobody. This mirrors the send
+ * paths (`buildRecipientConditions` in repositories/broadcasts.ts and
+ * `getContactsChunk` in batch-sender.ts), which both refuse rather than fall
+ * through to the whole organization. A segment that blocks a broadcast must
+ * not simultaneously admit every contact to a workflow.
  */
 export async function contactMatchesCondition(
   database: DB,
@@ -28,9 +34,9 @@ export async function contactMatchesCondition(
 ): Promise<boolean> {
   const conditionSQL = buildConditionSQL(condition);
 
-  // No valid filters = matches everything
+  // No valid filters = matches nobody (fail closed, as the senders do)
   if (!conditionSQL) {
-    return true;
+    return false;
   }
 
   const whereClause = and(
@@ -52,7 +58,9 @@ export async function contactMatchesCondition(
  * Filter a batch of contact IDs to only those matching a segment condition via SQL.
  *
  * Returns the subset of contactIds that satisfy the condition WHERE clause.
- * For empty/null conditions (no valid filters), returns all provided IDs.
+ *
+ * Fails closed for the same reason as `contactMatchesCondition`: a condition
+ * that compiles to no SQL selects nobody, never everybody.
  */
 export async function contactIdsMatchingCondition(
   database: DB,
@@ -66,9 +74,9 @@ export async function contactIdsMatchingCondition(
 
   const conditionSQL = buildConditionSQL(condition);
 
-  // No valid filters = matches everything
+  // No valid filters = matches nobody (fail closed, as the senders do)
   if (!conditionSQL) {
-    return contactIds;
+    return [];
   }
 
   const whereClause = and(

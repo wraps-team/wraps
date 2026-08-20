@@ -102,6 +102,15 @@ function buildBucketSQL(value: unknown): SQL | null {
   return sql`${bucketIndexSQL(buckets)} = ${index}`;
 }
 
+/**
+ * List operators bind their value as a single array param. A scalar reaching
+ * `= ANY($1)` makes Postgres throw `malformed array literal`, so a value that
+ * isn't an array compiles to no SQL — the callers all fail closed on null.
+ */
+function asList(value: unknown): string[] | null {
+  return Array.isArray(value) ? value.map((v) => String(v)) : null;
+}
+
 function validateInterval(
   value: unknown,
   unit: string | undefined
@@ -118,7 +127,11 @@ function validateInterval(
 }
 
 const COLUMN_MAP: Record<string, string> = {
-  status: "status",
+  // "status" is the filter field id the UI has always emitted; it resolves to
+  // email_status, the column the product actually writes. contact.status is
+  // deprecated, defaults to 'active', and is never set to anything else — a
+  // filter on it matched every contact in the org, unsubscribed included.
+  status: "email_status",
   email: "email",
   lastActivityAt: "last_activity_at",
   lastEmailSentAt: "last_email_sent_at",
@@ -140,7 +153,14 @@ export function buildFilterSQL(filter: SegmentFilter): SQL | null {
     operator === "triggeredWithin" ||
     operator === "notTriggered"
   ) {
-    const eventName = field;
+    // The UI namespaces the field as "event.<name>" so the field picker can
+    // recognise it; stored conditions and the API accept a bare name too.
+    const eventName = field.startsWith("event.")
+      ? field.slice("event.".length)
+      : field;
+    if (!eventName) {
+      return null;
+    }
     if (operator === "triggered") {
       return sql`EXISTS (SELECT 1 FROM "contact_event" WHERE "contact_id" = "contact"."id" AND "event_name" = ${eventName})`;
     }
@@ -209,14 +229,20 @@ export function buildFilterSQL(filter: SegmentFilter): SQL | null {
       case "notExists":
         return sql`NOT (properties ? ${propertyKey})`;
       case "inList": {
-        const values = value as string[];
+        const values = asList(value);
+        if (!values) {
+          return null;
+        }
         if (values.length === 0) {
           return sql`FALSE`;
         }
         return sql`properties->>${propertyKey} = ANY(${sql.param(values)})`;
       }
       case "notInList": {
-        const values = value as string[];
+        const values = asList(value);
+        if (!values) {
+          return null;
+        }
         if (values.length === 0) {
           return sql`TRUE`;
         }
@@ -261,14 +287,20 @@ export function buildFilterSQL(filter: SegmentFilter): SQL | null {
     case "notExists":
       return sql`${col} IS NULL`;
     case "inList": {
-      const values = value as string[];
+      const values = asList(value);
+      if (!values) {
+        return null;
+      }
       if (values.length === 0) {
         return sql`FALSE`;
       }
       return sql`${col} = ANY(${sql.param(values)})`;
     }
     case "notInList": {
-      const values = value as string[];
+      const values = asList(value);
+      if (!values) {
+        return null;
+      }
       if (values.length === 0) {
         return sql`TRUE`;
       }
@@ -286,6 +318,18 @@ export function buildFilterSQL(filter: SegmentFilter): SQL | null {
   }
 }
 
+/**
+ * Compile a whole condition, or nothing.
+ *
+ * A filter that compiles to `null` used to be dropped while the rest of its
+ * group survived. That is a silent widening: the send path reads a *stored*
+ * condition, so a segment written by an older build — or through the API with,
+ * say, a scalar where a list operator expects an array — would lose its
+ * narrowing filter at send time and mail more people than the segment says.
+ * The action layer validates on create/update/preview; the send path has no
+ * such gate, so refusing the whole condition here is what makes it fail closed.
+ * Callers already treat `null` as "matches nobody".
+ */
 export function buildConditionSQL(condition: FilterCondition): SQL | null {
   const groupConditions: SQL[] = [];
 
@@ -294,16 +338,20 @@ export function buildConditionSQL(condition: FilterCondition): SQL | null {
 
     for (const filter of group.filters) {
       const filterSQL = buildFilterSQL(filter);
-      if (filterSQL) {
-        filterConditions.push(filterSQL);
+      if (!filterSQL) {
+        return null;
       }
+      filterConditions.push(filterSQL);
     }
 
-    if (group.nested) {
+    // An empty nested block carries no intent and is skipped, as before. One
+    // that holds filters and still compiles to nothing is the widening case.
+    if (group.nested && group.nested.groups.length > 0) {
       const nestedSQL = buildConditionSQL(group.nested);
-      if (nestedSQL) {
-        filterConditions.push(nestedSQL);
+      if (!nestedSQL) {
+        return null;
       }
+      filterConditions.push(nestedSQL);
     }
 
     if (filterConditions.length > 0) {

@@ -10,6 +10,7 @@ export type {
 
 // Import types for local use via namespace to avoid lint warning
 import type * as DbTypes from "@wraps/db";
+import { EMAIL_STATUS_LABELS, EMAIL_STATUSES } from "@/lib/contacts";
 
 type FilterCondition = DbTypes.FilterCondition;
 type FilterGroup = DbTypes.FilterGroup;
@@ -84,10 +85,11 @@ export type FilterFieldDefinition = {
 
 // Define available filter fields
 export const FILTER_FIELDS: FilterFieldDefinition[] = [
-  // Contact status
+  // Email status — compiles to contact.email_status, the column the product
+  // writes and every send path filters on.
   {
     id: "status",
-    label: "Status",
+    label: "Email Status",
     type: "string",
     operators: ["equals", "notEquals", "inList", "notInList"],
   },
@@ -236,6 +238,14 @@ export const FILTER_FIELDS: FilterFieldDefinition[] = [
     type: "topic",
     operators: ["hasTopic", "notHasTopic"],
   },
+  // Behavioural filters. The field carries the event name as "event.<name>";
+  // the SQL builder strips the prefix before matching contact_event.
+  {
+    id: "event",
+    label: "Event",
+    type: "event",
+    operators: ["triggered", "notTriggered", "triggeredWithin"],
+  },
   // Deterministic partitioning — splits a large audience into even cohorts
   {
     id: "bucket",
@@ -288,14 +298,14 @@ export const OPERATOR_LABELS: Record<FilterOperator, string> = {
   inBucket: "is in partition",
 };
 
-// Contact status options
-export const CONTACT_STATUS_OPTIONS = [
-  { value: "pending_confirmation", label: "Pending Confirmation" },
-  { value: "active", label: "Active" },
-  { value: "unsubscribed", label: "Unsubscribed" },
-  { value: "bounced", label: "Bounced" },
-  { value: "complained", label: "Complained" },
-];
+// Email status options — derived from the contacts vocabulary so the segment
+// builder and the contacts filter can never drift apart. "pending_confirmation"
+// used to be offered here; it is a topic-subscription state, not an email
+// status, and no contact could ever match it.
+export const EMAIL_STATUS_OPTIONS = EMAIL_STATUSES.map((value) => ({
+  value,
+  label: EMAIL_STATUS_LABELS[value],
+}));
 
 // Helper to create an empty filter condition
 export function createEmptyCondition(): FilterCondition {
@@ -421,6 +431,40 @@ export function withPartitionFilter(
   };
 }
 
+// Operators that carry no value of their own.
+const VALUELESS_OPERATORS = new Set<FilterOperator>([
+  "exists",
+  "notExists",
+  "triggered",
+  "notTriggered",
+]);
+
+const EVENT_OPERATORS = new Set<FilterOperator>([
+  "triggered",
+  "notTriggered",
+  "triggeredWithin",
+]);
+
+const LIST_OPERATORS = new Set<FilterOperator>(["inList", "notInList"]);
+
+// The event name lives in the field, not the value.
+function validateEventName(field: string): string | null {
+  const eventName = field.startsWith("event.")
+    ? field.slice("event.".length)
+    : field;
+  return eventName.trim() && eventName !== "event"
+    ? null
+    : "Event name is required";
+}
+
+// List operators bind their value as an array param. A scalar compiles to SQL
+// Postgres refuses to run, so catch it here rather than at send time.
+function validateListValue(value: unknown): string | null {
+  return Array.isArray(value) && value.length > 0
+    ? null
+    : "Select one or more values for this filter";
+}
+
 function validateFilter(filter: SegmentFilter): string | null {
   if (!filter.field) {
     return "Filter field is required";
@@ -435,10 +479,19 @@ function validateFilter(filter: SegmentFilter): string | null {
     return validateBucketValue(filter.value);
   }
 
-  // Value is optional for exists/notExists operators
+  if (EVENT_OPERATORS.has(filter.operator)) {
+    const nameError = validateEventName(filter.field);
+    if (nameError) {
+      return nameError;
+    }
+  }
+
+  if (LIST_OPERATORS.has(filter.operator)) {
+    return validateListValue(filter.value);
+  }
+
   if (
-    filter.operator !== "exists" &&
-    filter.operator !== "notExists" &&
+    !VALUELESS_OPERATORS.has(filter.operator) &&
     (filter.value === undefined || filter.value === "")
   ) {
     return "Filter value is required";

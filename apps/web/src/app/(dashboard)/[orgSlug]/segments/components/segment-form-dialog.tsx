@@ -1,6 +1,5 @@
 "use client";
 
-import { Checkbox } from "@wraps/ui/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +22,7 @@ import {
   validateCondition,
 } from "@/lib/segments";
 import type { TopicWithMeta } from "@/lib/topics";
+import { captureSegmentPreview, countConditionFilters } from "./lib/analytics";
 import { SegmentBuilder } from "./segment-builder";
 
 type SegmentFormDialogProps = {
@@ -58,7 +58,6 @@ export function SegmentFormDialog({
   const [condition, setCondition] = useState<FilterCondition>(
     createEmptyCondition()
   );
-  const [trackMembership, setTrackMembership] = useState(false);
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [previewSamples, setPreviewSamples] = useState<string[]>([]);
   const [isPreviewPending, startPreviewTransition] = useTransition();
@@ -71,14 +70,12 @@ export function SegmentFormDialog({
         setName(segment.name);
         setDescription(segment.description || "");
         setCondition(segment.condition);
-        setTrackMembership(segment.trackMembership);
         setPreviewCount(segment.memberCount);
         setPreviewSamples([]);
       } else {
         setName("");
         setDescription("");
         setCondition(createEmptyCondition());
-        setTrackMembership(false);
         setPreviewCount(null);
         setPreviewSamples([]);
       }
@@ -86,11 +83,30 @@ export function SegmentFormDialog({
     }
   }, [open, mode, segment]);
 
+  // A count belongs to the filters it was measured against. Editing them
+  // invalidates it — leaving the old number on screen is how a failed preview
+  // ends up looking like a successful one.
+  const handleConditionChange = useCallback((next: FilterCondition) => {
+    setCondition(next);
+    setPreviewCount(null);
+    setPreviewSamples([]);
+    setValidationError(null);
+  }, []);
+
   // Preview handler
   const handlePreview = useCallback(() => {
+    const filterCount = countConditionFilters(condition);
     const error = validateCondition(condition);
     if (error) {
+      setPreviewCount(null);
+      setPreviewSamples([]);
       setValidationError(error);
+      captureSegmentPreview({
+        filter_count: filterCount,
+        match_count: null,
+        mode,
+        result: "validation_error",
+      });
       return;
     }
     setValidationError(null);
@@ -100,11 +116,25 @@ export function SegmentFormDialog({
       if (result.success) {
         setPreviewCount(result.count);
         setPreviewSamples(result.sampleEmails);
+        captureSegmentPreview({
+          filter_count: filterCount,
+          match_count: result.count,
+          mode,
+          result: "success",
+        });
       } else {
+        setPreviewCount(null);
+        setPreviewSamples([]);
         setValidationError(result.error);
+        captureSegmentPreview({
+          filter_count: filterCount,
+          match_count: null,
+          mode,
+          result: "error",
+        });
       }
     });
-  }, [condition, organizationId]);
+  }, [condition, mode, organizationId]);
 
   // Submit handler
   const handleSubmit = async () => {
@@ -124,7 +154,6 @@ export function SegmentFormDialog({
       name: name.trim(),
       description: description.trim() || undefined,
       condition,
-      trackMembership,
     });
   };
 
@@ -171,7 +200,7 @@ export function SegmentFormDialog({
             <Label>Conditions</Label>
             <SegmentBuilder
               condition={condition}
-              onChange={setCondition}
+              onChange={handleConditionChange}
               propertyKeys={propertyKeys}
               topics={topics}
             />
@@ -221,20 +250,6 @@ export function SegmentFormDialog({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Track Membership */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              checked={trackMembership}
-              id="trackMembership"
-              onCheckedChange={(checked) =>
-                setTrackMembership(checked === true)
-              }
-            />
-            <Label className="font-normal" htmlFor="trackMembership">
-              Track membership changes (useful for automation triggers)
-            </Label>
           </div>
 
           {/* Validation Error */}

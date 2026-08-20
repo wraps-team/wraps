@@ -7,14 +7,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wraps/ui/components/ui/select";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@wraps/ui/components/ui/toggle-group";
 import { Plus, Trash2, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  CONTACT_STATUS_OPTIONS,
   createEmptyFilter,
   createEmptyGroup,
+  EMAIL_STATUS_OPTIONS,
   FILTER_FIELDS,
   type FilterCondition,
   type FilterGroup,
@@ -23,6 +27,10 @@ import {
   type SegmentFilter,
 } from "@/lib/segments";
 import type { TopicWithMeta } from "@/lib/topics";
+import {
+  captureSegmentFilterFieldChanged,
+  captureSegmentFilterOperatorChanged,
+} from "./lib/analytics";
 
 const ORDERED_OPERATORS = new Set([
   "greaterThan",
@@ -32,6 +40,31 @@ const ORDERED_OPERATORS = new Set([
 ]);
 
 const DATE_LIKE_VALUE = /^\d{4}-\d{2}-\d{2}/;
+
+const LIST_OPERATORS = new Set<FilterOperator>(["inList", "notInList"]);
+
+const EVENT_OPERATORS = new Set<FilterOperator>([
+  "triggered",
+  "notTriggered",
+  "triggeredWithin",
+]);
+
+// List operators bind their value as an array. Older conditions (and the
+// single-select this control replaced) hold a scalar, so widen rather than
+// drop it — the SQL builder refuses anything that is not an array.
+function asStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v));
+  }
+  if (value === undefined || value === null || value === "") {
+    return [];
+  }
+  return [String(value)];
+}
+
+function eventNameOf(field: string): string {
+  return field.startsWith("event.") ? field.slice("event.".length) : "";
+}
 
 // Custom properties are untyped JSON, so an ordered comparison could mean
 // either a number or a date. Seed the picker from whatever is already stored.
@@ -286,10 +319,12 @@ function FilterRow({
     (fieldId: string) => {
       const newFieldDef = FILTER_FIELDS.find((f) => f.id === fieldId);
       const defaultOperator = newFieldDef?.operators[0] || "equals";
+      captureSegmentFilterFieldChanged({ field: fieldId });
       onChange({
-        field: fieldId,
+        // Event filters carry the event name in the field itself.
+        field: newFieldDef?.type === "event" ? "event." : fieldId,
         operator: defaultOperator,
-        value: undefined,
+        value: LIST_OPERATORS.has(defaultOperator) ? [] : undefined,
       });
     },
     [onChange]
@@ -298,17 +333,24 @@ function FilterRow({
   // Handle operator change
   const handleOperatorChange = useCallback(
     (operator: string) => {
-      onChange({
-        ...filter,
-        operator: operator as FilterOperator,
-        // Clear value for exists/notExists operators
-        value:
-          operator === "exists" || operator === "notExists"
-            ? undefined
-            : filter.value,
+      const next = operator as FilterOperator;
+      let value = filter.value;
+      if (next === "exists" || next === "notExists") {
+        value = undefined;
+      } else if (LIST_OPERATORS.has(next)) {
+        // Switching into "is one of" must widen the scalar the previous
+        // operator held, not carry it through as a string.
+        value = asStringList(filter.value);
+      } else if (LIST_OPERATORS.has(filter.operator)) {
+        value = asStringList(filter.value)[0];
+      }
+      captureSegmentFilterOperatorChanged({
+        field: fieldDef?.id ?? filter.field,
+        operator: next,
       });
+      onChange({ ...filter, operator: next, value });
     },
-    [filter, onChange]
+    [fieldDef, filter, onChange]
   );
 
   // Handle value change
@@ -350,26 +392,25 @@ function FilterRow({
       );
     }
 
-    // Status selector
+    // Email status selector
     if (filter.field === "status") {
-      if (filter.operator === "inList" || filter.operator === "notInList") {
-        // Multi-select for list operators (simplified as single select for now)
+      if (LIST_OPERATORS.has(filter.operator)) {
         return (
-          <Select
+          <ToggleGroup
+            aria-label="Email Status values"
+            className="flex-1 flex-wrap justify-start"
             onValueChange={handleValueChange}
-            value={(filter.value as string) || ""}
+            size="sm"
+            type="multiple"
+            value={asStringList(filter.value)}
+            variant="outline"
           >
-            <SelectTrigger className="flex-1">
-              <SelectValue placeholder="Select status" />
-            </SelectTrigger>
-            <SelectContent>
-              {CONTACT_STATUS_OPTIONS.map((status) => (
-                <SelectItem key={status.value} value={status.value}>
-                  {status.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {EMAIL_STATUS_OPTIONS.map((status) => (
+              <ToggleGroupItem key={status.value} value={status.value}>
+                {status.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         );
       }
       return (
@@ -381,13 +422,67 @@ function FilterRow({
             <SelectValue placeholder="Select status" />
           </SelectTrigger>
           <SelectContent>
-            {CONTACT_STATUS_OPTIONS.map((status) => (
+            {EMAIL_STATUS_OPTIONS.map((status) => (
               <SelectItem key={status.value} value={status.value}>
                 {status.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+      );
+    }
+
+    // Event filters: the name is free text because contact_event names are
+    // caller-defined and an org can emit one the dashboard has never seen.
+    if (EVENT_OPERATORS.has(filter.operator)) {
+      return (
+        <div className="flex flex-1 items-center gap-2">
+          <Input
+            aria-label="Event name"
+            className="flex-1"
+            onChange={(e) =>
+              onChange({ ...filter, field: `event.${e.target.value}` })
+            }
+            placeholder="event name"
+            value={eventNameOf(filter.field)}
+          />
+          {filter.operator === "triggeredWithin" && (
+            <>
+              <span className="text-muted-foreground text-sm">in the last</span>
+              <Input
+                aria-label="Duration"
+                className="w-20"
+                min={1}
+                onChange={(e) =>
+                  handleValueChange(
+                    Number.parseInt(e.target.value, 10) || undefined
+                  )
+                }
+                placeholder="30"
+                type="number"
+                value={filter.value?.toString() || ""}
+              />
+              <Select
+                onValueChange={(unit) =>
+                  onChange({
+                    ...filter,
+                    unit: unit as "days" | "hours" | "minutes",
+                  })
+                }
+                value={filter.unit || "days"}
+              >
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="days">days</SelectItem>
+                  <SelectItem value="hours">hours</SelectItem>
+                  <SelectItem value="minutes">minutes</SelectItem>
+                </SelectContent>
+              </Select>
+            </>
+          )}
+        </div>
       );
     }
 
@@ -621,7 +716,7 @@ function FilterRow({
       {/* Field selector */}
       <Select
         onValueChange={handleFieldChange}
-        value={filter.field.split(".")[0]}
+        value={fieldDef?.id ?? filter.field.split(".")[0]}
       >
         <SelectTrigger className="w-40">
           <SelectValue placeholder="Select field" />

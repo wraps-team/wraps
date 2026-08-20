@@ -1,5 +1,6 @@
 import {
   contact,
+  countBroadcastRecipients,
   db,
   member,
   organization,
@@ -481,6 +482,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("active1@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: {},
         },
@@ -492,6 +494,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("active2@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: {},
         },
@@ -503,6 +506,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("bounced@example.com")
             .digest("hex"),
+          emailStatus: "bounced",
           status: "bounced",
           properties: {},
         },
@@ -563,6 +567,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("high-spend@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: { monthly_spend: "500" },
         },
@@ -574,6 +579,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("low-spend@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: { monthly_spend: "50" },
         },
@@ -585,6 +591,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("string-plan@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: { monthly_spend: "enterprise" },
         },
@@ -623,6 +630,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("score-10@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: { score: "10" },
         },
@@ -634,6 +642,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("score-50@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: { score: "50" },
         },
@@ -645,6 +654,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("score-100@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: { score: "100" },
         },
@@ -693,6 +703,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("user1@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: {},
         },
@@ -704,6 +715,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("user2@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: {},
         },
@@ -741,6 +753,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("active@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: {},
         },
@@ -752,6 +765,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("bounced@example.com")
             .digest("hex"),
+          emailStatus: "bounced",
           status: "bounced",
           properties: {},
         },
@@ -798,7 +812,10 @@ describe("Segments Server Actions", () => {
 
       expect(updateResult.success).toBe(true);
       if (updateResult.success) {
-        expect(updateResult.segment.memberCount).toBe(1);
+        // One contact is bounced, and a bounced contact cannot be emailed.
+        // Every count on this surface is the count that sends, so the answer
+        // here is 0 — not "1 row matches the filters".
+        expect(updateResult.segment.memberCount).toBe(0);
       }
     });
   });
@@ -816,6 +833,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("active@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: {},
         },
@@ -827,6 +845,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("bounced@example.com")
             .digest("hex"),
+          emailStatus: "bounced",
           status: "bounced",
           properties: {},
         },
@@ -838,6 +857,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("unsubscribed@example.com")
             .digest("hex"),
+          emailStatus: "unsubscribed",
           status: "unsubscribed",
           properties: {},
         },
@@ -865,7 +885,9 @@ describe("Segments Server Actions", () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.segment.memberCount).toBe(2);
+        // Three contacts, two match the filters (active, bounced) — but only
+        // the active one is reachable.
+        expect(result.segment.memberCount).toBe(1);
       }
     });
   });
@@ -881,6 +903,7 @@ describe("Segments Server Actions", () => {
             organizationId: testOrganization.id,
             email,
             emailHash: crypto.createHash("sha256").update(email).digest("hex"),
+            emailStatus: "active" as const,
             status: "active" as const,
             properties: {},
           };
@@ -1069,6 +1092,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("props1@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: { plan: "pro", country: "US" },
         },
@@ -1080,6 +1104,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("props2@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: { role: "admin", country: "UK" },
         },
@@ -1104,6 +1129,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("dup1@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: { plan: "pro", source: "web" },
         },
@@ -1115,6 +1141,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("dup2@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: { plan: "free", source: "api" },
         },
@@ -1126,6 +1153,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("dup3@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: { plan: "enterprise" },
         },
@@ -1159,6 +1187,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("empty1@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: {},
         },
@@ -1170,6 +1199,7 @@ describe("Segments Server Actions", () => {
             .createHash("sha256")
             .update("empty2@example.com")
             .digest("hex"),
+          emailStatus: "active",
           status: "active",
           properties: {},
         },
@@ -1182,5 +1212,135 @@ describe("Segments Server Actions", () => {
         expect(result.keys).toEqual([]);
       }
     });
+  });
+});
+
+/**
+ * The assertion the audit found nowhere in the repo (F20): the number a
+ * surface shows for a segment is the number a broadcast to that segment would
+ * send to. Everything else about counts is downstream of this.
+ */
+describe("segment counts equal what a broadcast to the segment would send", () => {
+  const seedMixedAudience = async () => {
+    const crypto = await import("node:crypto");
+    const row = (email: string | null, emailStatus: string | null) => ({
+      id: crypto.randomUUID(),
+      organizationId: testOrganization.id,
+      email,
+      emailHash: email
+        ? crypto.createHash("sha256").update(email).digest("hex")
+        : null,
+      emailStatus: emailStatus as never,
+      properties: {},
+    });
+
+    await db
+      .insert(contact)
+      .values([
+        row("reachable@example.com", "active"),
+        row("no-status@example.com", null),
+        row("gone@example.com", "unsubscribed"),
+        row("hard-bounce@example.com", "bounced"),
+        row(null, null),
+      ]);
+  };
+
+  // Matches every contact in the org: emails_sent is NOT NULL and defaults to 0.
+  const everyone = {
+    logic: "AND" as const,
+    groups: [
+      {
+        filters: [
+          {
+            field: "emailsSent",
+            operator: "greaterThanOrEqual" as const,
+            value: 0,
+          },
+        ],
+      },
+    ],
+  };
+
+  it("the segments list shows the send-path count", async () => {
+    await seedMixedAudience();
+    const created = await createSegment(testOrganization.id, {
+      name: "Everyone",
+      condition: everyone,
+    });
+    if (!created.success) {
+      throw new Error("Failed to create segment");
+    }
+
+    const sendCount = await countBroadcastRecipients(
+      testOrganization.id,
+      "email",
+      { audienceType: "segment", segmentId: created.segment.id }
+    );
+    const listed = await listSegments(testOrganization.id);
+
+    expect(sendCount).toBe(2);
+    if (listed.success) {
+      expect(
+        listed.segments.find((s) => s.id === created.segment.id)?.memberCount
+      ).toBe(sendCount);
+    }
+  });
+
+  it("the preview shows the same number as the send", async () => {
+    await seedMixedAudience();
+    const created = await createSegment(testOrganization.id, {
+      name: "Everyone",
+      condition: everyone,
+    });
+    if (!created.success) {
+      throw new Error("Failed to create segment");
+    }
+
+    const preview = await previewSegment(testOrganization.id, everyone);
+    const sendCount = await countBroadcastRecipients(
+      testOrganization.id,
+      "email",
+      { audienceType: "segment", segmentId: created.segment.id }
+    );
+
+    expect(preview.success).toBe(true);
+    if (preview.success) {
+      expect(preview.count).toBe(sendCount);
+      // The sample is drawn from the same predicate, so it never shows an
+      // address the broadcast would skip.
+      expect(preview.sampleEmails).not.toContain("gone@example.com");
+    }
+  });
+
+  it("follows the audience when a contact unsubscribes, with no recompute", async () => {
+    await seedMixedAudience();
+    const created = await createSegment(testOrganization.id, {
+      name: "Everyone",
+      condition: everyone,
+    });
+    if (!created.success) {
+      throw new Error("Failed to create segment");
+    }
+
+    // Nothing calls a recompute action — there isn't one any more. The list
+    // counts live, so it cannot go stale the way `member_count` did.
+    await db
+      .update(contact)
+      .set({ emailStatus: "unsubscribed" })
+      .where(eq(contact.email, "reachable@example.com"));
+
+    const listed = await listSegments(testOrganization.id);
+    const sendCount = await countBroadcastRecipients(
+      testOrganization.id,
+      "email",
+      { audienceType: "segment", segmentId: created.segment.id }
+    );
+
+    expect(sendCount).toBe(1);
+    if (listed.success) {
+      expect(
+        listed.segments.find((s) => s.id === created.segment.id)?.memberCount
+      ).toBe(sendCount);
+    }
   });
 });

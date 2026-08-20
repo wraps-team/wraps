@@ -80,7 +80,7 @@ describe("contactIdsMatchingCondition — list operators (real DB)", () => {
           organizationId: fx.ids.org,
           email: `${TEST_PREFIX}-bronze@example.com`,
           emailHash: `${TEST_PREFIX}-h-bronze`,
-          emailStatus: "active",
+          emailStatus: "unsubscribed",
           status: "unsubscribed",
           properties: { tier: "bronze" },
           createdAt: now,
