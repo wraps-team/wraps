@@ -186,7 +186,14 @@ describe("Contact Growth card — health buckets as filter links", () => {
 
     await screen.findByRole("link", { name: /^80 bounced$/ });
     expect(screen.queryByRole("link", { name: /complained/ })).toBeNull();
-    expect(screen.getByText("0")).toBeInTheDocument();
+    // Anchored on the pair, not on a bare "0": the behaviour is that the bucket
+    // still *says what it counts*. Dropping the label leaves a stray digit
+    // sitting between "unsubscribed" and the next bucket, which a lone
+    // `getByText("0")` is happy with. The link branch is held to the same bar by
+    // its `/^80 bounced$/` name query.
+    expect(screen.getByText("complained").parentElement).toHaveTextContent(
+      /^0 complained$/
+    );
   });
 
   it("reports the click as a health_bucket filter change, with no contact details", async () => {
