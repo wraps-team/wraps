@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, ilike, inArray, or, sql } from "drizzle-orm";
 import { db, eq, escapeIlike } from "../index";
 import { contact, contactTopic, topic } from "../schema/contacts";
 
@@ -482,11 +482,51 @@ export type ContactWebFilters = {
   search?: string;
 };
 
+/** Columns the contacts table's headers can sort by (`columns.tsx`'s three sortable headers). */
+export type ContactSortField = "createdAt" | "email" | "emailsSent";
+export type ContactSort = {
+  field: ContactSortField;
+  direction: "asc" | "desc";
+};
+
+/**
+ * Exported so callers validating a URL-supplied `sortBy` (the actions layer,
+ * the table's client bundle) check against the one list this file actually
+ * understands, rather than keeping their own copy that can drift from it.
+ */
+export const CONTACT_SORT_FIELDS: ContactSortField[] = [
+  "createdAt",
+  "email",
+  "emailsSent",
+];
+
+/**
+ * OFFSET pagination ordered by a single non-unique column can skip or repeat
+ * rows across pages when two rows tie on it (audit F25) — `id` is appended as
+ * a tiebreaker on every sort, not just the default, so page boundaries stay
+ * stable regardless of which column the caller sorts by.
+ */
+function resolveContactOrderBy(sort?: ContactSort) {
+  const direction = sort?.direction === "asc" ? asc : desc;
+  const field: ContactSortField =
+    sort && CONTACT_SORT_FIELDS.includes(sort.field) ? sort.field : "createdAt";
+
+  switch (field) {
+    case "email":
+      return [direction(contact.email), direction(contact.id)];
+    case "emailsSent":
+      return [direction(contact.emailsSent), direction(contact.id)];
+    default:
+      return [direction(contact.createdAt), direction(contact.id)];
+  }
+}
+
 export async function listContactsWithRelations(
   organizationId: string,
   filters: ContactWebFilters,
   pagination: { page: number; pageSize: number },
-  topicId?: string
+  topicId?: string,
+  sort?: ContactSort
 ) {
   const { page, pageSize } = pagination;
   const offset = (page - 1) * pageSize;
@@ -540,7 +580,7 @@ export async function listContactsWithRelations(
         },
       },
     },
-    orderBy: [desc(contact.createdAt)],
+    orderBy: resolveContactOrderBy(sort),
     limit: pageSize,
     offset,
   });

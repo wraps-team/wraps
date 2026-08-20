@@ -10,12 +10,14 @@ import {
   DropdownMenuTrigger,
 } from "@wraps/ui/components/ui/dropdown-menu";
 import { ArrowUpDown, Mail, MoreHorizontal, Phone } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/shadcn-io/copy-button";
 import {
   type ContactWithMeta,
   EMAIL_STATUS_COLORS,
   EMAIL_STATUS_LABELS,
+  engagementRate,
   SMS_STATUS_COLORS,
   SMS_STATUS_LABELS,
 } from "@/lib/contacts";
@@ -26,8 +28,20 @@ type ColumnActions = {
   onViewDetails: (contact: ContactWithMeta) => void;
 };
 
+type ColumnsOptions = {
+  orgSlug: string;
+  /**
+   * The list's current filters as a query string (page, search, emailStatus,
+   * topicId, sortBy, sortDir — everything except contactId), carried onto
+   * the link so opening a contact doesn't drop them (matches the pattern
+   * `/emails/components/columns.tsx` uses for `listQuery`).
+   */
+  contactsQuery: string;
+};
+
 export function createColumns(
-  actions: ColumnActions
+  actions: ColumnActions,
+  { orgSlug, contactsQuery }: ColumnsOptions
 ): ColumnDef<ContactWithMeta>[] {
   return [
     {
@@ -47,13 +61,33 @@ export function createColumns(
         const phone = row.original.phone;
         const emailStatus = row.original.emailStatus;
         const smsStatus = row.original.smsStatus;
+        const detailParams = new URLSearchParams(contactsQuery);
+        detailParams.set("contactId", row.original.id);
+        const detailHref = `/${orgSlug}/contacts?${detailParams.toString()}`;
 
         return (
           <div className="space-y-1">
             {email && (
               <div className="group flex items-center gap-2">
                 <Mail className="h-3 w-3 text-muted-foreground" />
-                <span className="font-medium">{email}</span>
+                {/*
+                 * audit F9 (WCAG 2.1.1, Level A): the row itself used to be
+                 * the only way in, mouse-only. A real link gets keyboard
+                 * focus, Enter activation, cmd-click, and middle-click for
+                 * free - the row's onClick (contacts-table.tsx) stays as a
+                 * mouse-only convenience and would otherwise double-navigate,
+                 * hence stopPropagation. `replace` matches openContactDetail's
+                 * router.replace so opening contacts doesn't pile up history
+                 * entries the way a plain Link push would.
+                 */}
+                <Link
+                  className="rounded-sm font-medium outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  href={detailHref}
+                  onClick={(e) => e.stopPropagation()}
+                  replace
+                >
+                  {email}
+                </Link>
                 <CopyButton
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
                   content={email}
@@ -137,14 +171,20 @@ export function createColumns(
           return <span className="text-muted-foreground">-</span>;
         }
 
-        const openRate = ((opened / sent) * 100).toFixed(0);
-        const clickRate = ((clicked / sent) * 100).toFixed(0);
+        const openRate = engagementRate(opened, sent);
+        const clickRate = engagementRate(clicked, sent);
 
         return (
           <div className="text-sm">
             <div>{sent} sent</div>
             <div className="text-muted-foreground text-xs">
-              {openRate}% open, {clickRate}% click
+              {openRate === null || clickRate === null ? (
+                `${opened} opened, ${clicked} clicked`
+              ) : (
+                <>
+                  {openRate.toFixed(0)}% open, {clickRate.toFixed(0)}% click
+                </>
+              )}
             </div>
           </div>
         );
@@ -161,13 +201,15 @@ export function createColumns(
           return <span className="text-muted-foreground">-</span>;
         }
 
-        const clickRate = ((clicked / sent) * 100).toFixed(0);
+        const clickRate = engagementRate(clicked, sent);
 
         return (
           <div className="text-sm">
             <div>{sent} sent</div>
             <div className="text-muted-foreground text-xs">
-              {clickRate}% click
+              {clickRate === null
+                ? `${clicked} clicked`
+                : `${clickRate.toFixed(0)}% click`}
             </div>
           </div>
         );

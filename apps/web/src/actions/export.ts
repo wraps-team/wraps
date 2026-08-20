@@ -47,7 +47,12 @@ export const exportAllContacts = orgAction(
       topicId?: string;
     } = {}
   ): Promise<
-    | { success: true; contacts: ContactWithMeta[]; total: number }
+    | {
+        success: true;
+        contacts: ContactWithMeta[];
+        total: number;
+        truncated: boolean;
+      }
     | { success: false; error: string }
   > => {
     const { search, emailStatus, topicId } = options;
@@ -81,6 +86,15 @@ export const exportAllContacts = orgAction(
     const whereClause = topicFilter
       ? and(...conditions, topicFilter)
       : and(...conditions);
+
+    // The real count of everything matching, independent of MAX_EXPORT_ROWS,
+    // so `total` below can be honest instead of reporting the truncated
+    // fetch's own length as if it were the whole match (audit F23 — this was
+    // the same "count that lies" class the broadcast wave removed downstream).
+    const [{ value: matchingCount }] = await db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(contact)
+      .where(whereClause);
 
     // Get contacts without pagination, with safety cap
     const contacts = await db.query.contact.findMany({
@@ -156,7 +170,8 @@ export const exportAllContacts = orgAction(
         bouncedAt: c.bouncedAt,
         complainedAt: c.complainedAt,
       })),
-      total: contacts.length,
+      total: matchingCount,
+      truncated: matchingCount > contacts.length,
     };
   }
 );

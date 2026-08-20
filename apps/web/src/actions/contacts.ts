@@ -1,6 +1,9 @@
 "use server";
 
 import {
+  CONTACT_SORT_FIELDS,
+  type ContactSort,
+  type ContactSortField,
   deleteContact as dbDeleteContact,
   fetchTopicsForSubscription,
   findContactByEmailHash,
@@ -59,7 +62,31 @@ type ListContactsOptions = {
   /** @deprecated Use emailStatus instead */
   status?: ContactStatus;
   topicId?: string;
+  /**
+   * Raw, URL-supplied sort — audit F14. Untrusted: validated below against
+   * `CONTACT_SORT_FIELDS` before it ever reaches `listContactsWithRelations`.
+   * An unrecognized `sortBy` (a stale bookmark, a hand-edited URL, a future
+   * caller that isn't this page) falls back to the default rather than
+   * reaching the query builder — this action is a server boundary other
+   * callers can hit directly, not just `contacts/page.tsx`.
+   */
+  sortBy?: string;
+  sortDir?: string;
 };
+
+/** Narrows an untrusted `sortBy`/`sortDir` pair to a real `ContactSort`, or `undefined` for the default. */
+function resolveContactSort(
+  sortBy: string | undefined,
+  sortDir: string | undefined
+): ContactSort | undefined {
+  const field = CONTACT_SORT_FIELDS.find(
+    (candidate): candidate is ContactSortField => candidate === sortBy
+  );
+  if (!field) {
+    return;
+  }
+  return { field, direction: sortDir === "asc" ? "asc" : "desc" };
+}
 
 type CreateContactData = {
   email?: string;
@@ -116,13 +143,16 @@ export const listContacts = orgAction(
       emailStatus,
       status,
       topicId,
+      sortBy,
+      sortDir,
     } = options;
 
     const { contacts, total } = await listContactsWithRelations(
       organizationId,
       { emailStatus, status, search },
       { page, pageSize },
-      topicId
+      topicId,
+      resolveContactSort(sortBy, sortDir)
     );
 
     return {

@@ -47,6 +47,16 @@ import {
 } from "@/lib/segments";
 import type { TopicWithMeta } from "@/lib/topics";
 import { createColumns } from "./columns";
+import {
+  captureCreateSegmentOpened,
+  captureSegmentCreated,
+  captureSegmentDeleted,
+  captureSegmentDetailOpened,
+  captureSegmentSplit,
+  captureSegmentUpdated,
+  collectConditionFieldIds,
+  countConditionFilters,
+} from "./lib/analytics";
 import { SegmentDetailsSheet } from "./segment-details-sheet";
 import { SegmentFormDialog } from "./segment-form-dialog";
 
@@ -81,13 +91,40 @@ export function SegmentsTable({
   // Ref for search input to enable keyboard shortcut
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Keyboard shortcut: Cmd+F to focus search
+  /**
+   * "/" focuses the search box (audit F22). This used to intercept Cmd/Ctrl+F
+   * globally with an unconditional `preventDefault()`, which took away the
+   * browser's own find-in-page — including while a dialog or the segment
+   * details sheet was open — and the `<Kbd>` badge showed the Mac glyph on
+   * every platform. "/" is the convention `/emails` moved to; it collides
+   * with nothing and needs no glyph.
+   */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
-        e.preventDefault();
-        searchInputRef.current?.focus();
+      if (
+        e.key !== "/" ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.altKey ||
+        e.defaultPrevented
+      ) {
+        return;
       }
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.isContentEditable ||
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT"
+      ) {
+        return;
+      }
+      // Any open dialog or sheet owns the keyboard until it closes.
+      if (document.querySelector('[role="dialog"][data-state="open"]')) {
+        return;
+      }
+      e.preventDefault();
+      searchInputRef.current?.focus();
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -153,6 +190,11 @@ export function SegmentsTable({
     startTransition(async () => {
       const result = await createSegment(organizationId, data);
       if (result.success) {
+        captureSegmentCreated({
+          fields: collectConditionFieldIds(data.condition),
+          filter_count: countConditionFilters(data.condition),
+          track_membership: Boolean(data.trackMembership),
+        });
         toast.success("Segment created", {
           description: `${data.name} has been created.`,
         });
@@ -183,6 +225,12 @@ export function SegmentsTable({
         data
       );
       if (result.success) {
+        captureSegmentUpdated({
+          condition_changed: data.condition !== undefined,
+          fields: Object.entries(data)
+            .filter(([, v]) => v !== undefined)
+            .map(([k]) => k),
+        });
         toast.success("Segment updated", {
           description: "The segment has been updated.",
         });
@@ -217,6 +265,7 @@ export function SegmentsTable({
         count
       );
       if (result.success) {
+        captureSegmentSplit({ partition_count: result.segments.length });
         const sizes = result.segments.map((s) => s.memberCount);
         toast.success(`Created ${result.segments.length} partitions`, {
           description: `Sizes range from ${Math.min(...sizes).toLocaleString()} to ${Math.max(...sizes).toLocaleString()} contacts.`,
@@ -240,6 +289,7 @@ export function SegmentsTable({
     startTransition(async () => {
       const result = await deleteSegment(selectedSegment.id, organizationId);
       if (result.success) {
+        captureSegmentDeleted();
         toast.success("Segment deleted", {
           description: "The segment has been removed.",
         });
@@ -271,14 +321,20 @@ export function SegmentsTable({
               value={globalFilter}
             />
             <Kbd className="absolute top-1/2 right-2 -translate-y-1/2 hidden sm:flex">
-              ⌘F
+              /
             </Kbd>
           </div>
         </div>
         <div className="flex items-center space-x-2">
           {/* Add Segment Button */}
           {canEdit && (
-            <Button onClick={() => setCreateDialogOpen(true)} size="sm">
+            <Button
+              onClick={() => {
+                captureCreateSegmentOpened({ source: "toolbar" });
+                setCreateDialogOpen(true);
+              }}
+              size="sm"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Create Segment
             </Button>
@@ -307,26 +363,49 @@ export function SegmentsTable({
           </TableHeader>
           <TableBody>
             {segments.length > 0 && table.getRowModel().rows.length > 0 ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  className="cursor-pointer hover:bg-muted/50"
-                  data-state={row.getIsSelected() && "selected"}
-                  key={row.id}
-                  onClick={() => {
-                    setSelectedSegment(row.original);
-                    setDetailsSheetOpen(true);
-                  }}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.map((row) => {
+                const openDetails = () => {
+                  captureSegmentDetailOpened();
+                  setSelectedSegment(row.original);
+                  setDetailsSheetOpen(true);
+                };
+                return (
+                  // audit F9 (WCAG 2.1.1, Level A): this row opened a details
+                  // sheet only on onClick, with no tabIndex, role, or key
+                  // handler — mouse only. There is no URL for a segment to
+                  // link to, so the row itself becomes the operable control.
+                  // The e.target === e.currentTarget guard stops a keydown
+                  // bubbling from the row's own "..." menu from re-triggering
+                  // the row's own action.
+                  <TableRow
+                    aria-label={`View details for ${row.original.name}`}
+                    className="cursor-pointer outline-none hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    data-state={row.getIsSelected() && "selected"}
+                    key={row.id}
+                    onClick={openDetails}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) {
+                        return;
+                      }
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openDetails();
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell
@@ -337,7 +416,12 @@ export function SegmentsTable({
                     <p className="text-muted-foreground">No segments found</p>
                     {canEdit && (
                       <Button
-                        onClick={() => setCreateDialogOpen(true)}
+                        onClick={() => {
+                          captureCreateSegmentOpened({
+                            source: "empty_state",
+                          });
+                          setCreateDialogOpen(true);
+                        }}
                         size="sm"
                         variant="outline"
                       >
@@ -412,7 +496,7 @@ export function SegmentsTable({
                   selectedSegment.memberCount /
                     Math.max(Number.parseInt(partitionCount, 10) || 1, 1)
                 ).toLocaleString()}{" "}
-                contacts each. Sizes vary slightly — partitions are even, not
+                recipients each. Sizes vary slightly — partitions are even, not
                 exact.
               </p>
             )}

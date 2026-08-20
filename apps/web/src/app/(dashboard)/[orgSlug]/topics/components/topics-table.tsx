@@ -31,13 +31,19 @@ import {
   TableHeader,
   TableRow,
 } from "@wraps/ui/components/ui/table";
-import { Eye, EyeOff, MoreHorizontal, Plus, Users } from "lucide-react";
+import { Clock, Eye, EyeOff, MoreHorizontal, Plus, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { createTopic, deleteTopic, updateTopic } from "@/actions/topics";
 import { Button } from "@/components/ui/button";
 import type { TopicWithMeta } from "@/lib/topics";
+import {
+  captureTopicCreated,
+  captureTopicDeleted,
+  captureTopicSubscribersOpened,
+  captureTopicUpdated,
+} from "./lib/analytics";
 import { TopicFormDialog } from "./topic-form-dialog";
 import { TopicSubscribersSheet } from "./topic-subscribers-sheet";
 
@@ -95,14 +101,39 @@ export function TopicsTable({
         ),
       },
       {
+        // Two numbers, because they answer two questions. "Subscribers" is who
+        // opted in; the line beneath is who a broadcast would actually reach —
+        // they differ by everyone who has since bounced, complained, been
+        // suppressed, or unsubscribed globally.
         accessorKey: "subscriberCount",
         header: "Subscribers",
         cell: ({ row }: { row: { original: TopicWithMeta } }) => (
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span>{row.original.subscriberCount.toLocaleString()}</span>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span>{row.original.subscriberCount.toLocaleString()}</span>
+            </div>
+            <span className="text-muted-foreground text-xs">
+              {row.original.sendableCount.toLocaleString()} can be emailed
+            </span>
           </div>
         ),
+      },
+      {
+        // Double opt-in parks people here until they confirm, and broadcasts
+        // skip them. Before this column they were invisible: the list looked
+        // like it had stopped growing and no screen said why.
+        accessorKey: "pendingCount",
+        header: "Pending",
+        cell: ({ row }: { row: { original: TopicWithMeta } }) =>
+          row.original.pendingCount > 0 ? (
+            <Badge variant="secondary">
+              <Clock className="mr-1 h-3 w-3" />
+              {row.original.pendingCount.toLocaleString()} unconfirmed
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
       },
       {
         accessorKey: "public",
@@ -143,6 +174,7 @@ export function TopicsTable({
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
                   onClick={() => {
+                    captureTopicSubscribersOpened({ source: "menu" });
                     setSelectedTopic(topic);
                     setSubscribersSheetOpen(true);
                   }}
@@ -214,6 +246,10 @@ export function TopicsTable({
         doubleOptIn: data.doubleOptIn,
       });
       if (result.success) {
+        captureTopicCreated({
+          double_opt_in: Boolean(data.doubleOptIn),
+          public: data.public ?? true,
+        });
         toast.success("Topic created", {
           description: `${name} has been created.`,
         });
@@ -241,6 +277,12 @@ export function TopicsTable({
     startTransition(async () => {
       const result = await updateTopic(selectedTopic.id, organizationId, data);
       if (result.success) {
+        captureTopicUpdated({
+          double_opt_in: data.doubleOptIn ?? null,
+          fields: Object.entries(data)
+            .filter(([, v]) => v !== undefined)
+            .map(([k]) => k),
+        });
         toast.success("Topic updated", {
           description: "The topic has been updated.",
         });
@@ -263,6 +305,7 @@ export function TopicsTable({
     startTransition(async () => {
       const result = await deleteTopic(selectedTopic.id, organizationId);
       if (result.success) {
+        captureTopicDeleted();
         toast.success("Topic deleted", {
           description: "The topic has been removed.",
         });
@@ -310,33 +353,57 @@ export function TopicsTable({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  className="cursor-pointer hover:bg-muted/50"
-                  data-state={row.getIsSelected() && "selected"}
-                  key={row.id}
-                  onClick={() => {
-                    setSelectedTopic(row.original);
-                    setSubscribersSheetOpen(true);
-                  }}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      onClick={
-                        cell.column.id === "actions"
-                          ? (e) => e.stopPropagation()
-                          : undefined
+              table.getRowModel().rows.map((row) => {
+                const openSubscribers = () => {
+                  captureTopicSubscribersOpened({ source: "row" });
+                  setSelectedTopic(row.original);
+                  setSubscribersSheetOpen(true);
+                };
+                return (
+                  // audit F9 (WCAG 2.1.1, Level A): this row opened the
+                  // subscribers sheet only on onClick, with no tabIndex,
+                  // role, or key handler — mouse only, with the "..." menu as
+                  // the only keyboard-reachable escape hatch. There is no URL
+                  // for a topic to link to, so the row itself becomes the
+                  // operable control. The e.target === e.currentTarget guard
+                  // stops a keydown bubbling from the row's own "..." menu
+                  // from re-triggering the row's own action.
+                  <TableRow
+                    aria-label={`View subscribers for ${row.original.name}`}
+                    className="cursor-pointer outline-none hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    data-state={row.getIsSelected() && "selected"}
+                    key={row.id}
+                    onClick={openSubscribers}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) {
+                        return;
                       }
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openSubscribers();
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        onClick={
+                          cell.column.id === "actions"
+                            ? (e) => e.stopPropagation()
+                            : undefined
+                        }
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell
@@ -395,7 +462,11 @@ export function TopicsTable({
             <DialogDescription>
               Are you sure you want to delete &quot;{selectedTopic?.name}&quot;?
               This will remove all {selectedTopic?.subscriberCount || 0}{" "}
-              subscriptions. This action cannot be undone.
+              subscriptions
+              {selectedTopic?.pendingCount
+                ? ` and ${selectedTopic.pendingCount.toLocaleString()} unconfirmed sign-ups.`
+                : "."}{" "}
+              This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

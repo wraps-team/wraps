@@ -1,12 +1,9 @@
 "use client";
 
 import {
-  type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
   getPaginationRowModel,
-  getSortedRowModel,
   type RowSelectionState,
   type SortingState,
   useReactTable,
@@ -99,6 +96,25 @@ import { createColumns } from "./columns";
 import { ContactDetailsSheet } from "./contact-details-sheet";
 import { ContactFormDialog } from "./contact-form-dialog";
 import { ImportContactsDialog } from "./import-contacts-dialog";
+import {
+  captureContactDeleted,
+  captureContactDetailOpened,
+  captureContactsBulkDeleted,
+  captureContactsExportedCsv,
+  captureContactsFilterChanged,
+  captureContactsImportStarted,
+  captureContactTopicSubscribed,
+  captureContactTopicUnsubscribed,
+  captureContactUpdated,
+} from "./lib/analytics";
+import { useContactsSearchTelemetry } from "./lib/use-contacts-search-telemetry";
+
+/** Matches `/emails`' debounce (audit F8) — one request per settled pause in typing, not per keystroke. */
+const SEARCH_COMMIT_DELAY_MS = 400;
+/** A 1-character term has no useful selectivity against `contact.email`, which has no trigram index (audit F8). */
+const MIN_SEARCH_LENGTH = 2;
+/** The sortable headers `columns.tsx` renders — kept in sync with it by hand, since it lives outside this file. */
+const SORTABLE_FIELDS = new Set(["email", "emailsSent", "createdAt"]);
 
 type ContactsTableProps = {
   contacts: ContactWithMeta[];
@@ -127,27 +143,64 @@ export function ContactsTable({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  // Table state
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "createdAt", desc: true },
-  ]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  // Table state. Sorting and paging are both server-driven (audit F14) — the
+  // URL is the source of truth for sort the same way it already is for page,
+  // pageSize, search, emailStatus, and topicId. There is deliberately no
+  // getSortedRowModel/getFilteredRowModel here: those would sort or filter
+  // only the current page's rows and present the result as if it covered all
+  // `total` contacts, which is exactly the lie the memo flags.
+  const sortByParam = searchParams.get("sortBy");
+  const sortDirParam = searchParams.get("sortDir");
+  const sorting: SortingState = SORTABLE_FIELDS.has(sortByParam ?? "")
+    ? [{ id: sortByParam as string, desc: sortDirParam !== "asc" }]
+    : [{ id: "createdAt", desc: true }];
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [globalFilter, setGlobalFilter] = useState(
+  const [searchInput, setSearchInput] = useState(
     searchParams.get("search") || ""
   );
+  const trimmedSearchInput = searchInput.trim();
+  const searchTooShort =
+    trimmedSearchInput.length > 0 &&
+    trimmedSearchInput.length < MIN_SEARCH_LENGTH;
 
   // Ref for search input to enable keyboard shortcut
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Keyboard shortcut: Cmd+F to focus search
+  /**
+   * "/" focuses the search box (audit F22). This used to intercept Cmd/Ctrl+F
+   * globally with an unconditional `preventDefault()`, which took away the
+   * browser's own find-in-page — including while a dialog or the contact
+   * detail sheet was open — and the `<Kbd>` badge showed the Mac glyph on
+   * every platform. "/" is the convention `/emails` moved to; it collides
+   * with nothing and needs no glyph.
+   */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
-        e.preventDefault();
-        searchInputRef.current?.focus();
+      if (
+        e.key !== "/" ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.altKey ||
+        e.defaultPrevented
+      ) {
+        return;
       }
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.isContentEditable ||
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT"
+      ) {
+        return;
+      }
+      // Any open dialog or sheet owns the keyboard until it closes.
+      if (document.querySelector('[role="dialog"][data-state="open"]')) {
+        return;
+      }
+      e.preventDefault();
+      searchInputRef.current?.focus();
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -172,8 +225,10 @@ export function ContactsTable({
   const urlContactId = searchParams.get("contactId");
 
   // Sync selectedContact from table data when URL has a contactId
+  const lastOpenedContactId = useRef<string | null>(null);
   useEffect(() => {
     if (!urlContactId) {
+      lastOpenedContactId.current = null;
       return;
     }
     const existing = contacts.find((c) => c.id === urlContactId);
@@ -181,7 +236,19 @@ export function ContactsTable({
       setSelectedContact(existing);
     }
     setDetailsSheetOpen(true);
+    // Fires once per contactId regardless of entry path - row click,
+    // command palette, or a shared/direct link all land here (audit F16).
+    if (lastOpenedContactId.current !== urlContactId) {
+      lastOpenedContactId.current = urlContactId;
+      captureContactDetailOpened();
+    }
   }, [urlContactId, contacts]);
+
+  useContactsSearchTelemetry({
+    contactCount: contacts.length,
+    search: searchParams.get("search"),
+    total,
+  });
 
   const openContactDetail = useCallback(
     (contact: ContactWithMeta) => {
@@ -209,7 +276,10 @@ export function ContactsTable({
 
   // Navigation helpers
   const updateSearchParams = useCallback(
-    (updates: Record<string, string | undefined>) => {
+    (
+      updates: Record<string, string | undefined>,
+      mode: "push" | "replace" = "push"
+    ) => {
       const params = new URLSearchParams(searchParams.toString());
       for (const [key, value] of Object.entries(updates)) {
         if (value === undefined || value === "") {
@@ -218,17 +288,75 @@ export function ContactsTable({
           params.set(key, value);
         }
       }
-      router.push(`/${orgSlug}/contacts?${params.toString()}`);
+      const href = `/${orgSlug}/contacts?${params.toString()}`;
+      if (mode === "replace") {
+        // Typing must not push one history entry per settled keystroke — Back
+        // should land on the pre-search view in one press (audit F8).
+        router.replace(href, { scroll: false });
+      } else {
+        router.push(href);
+      }
     },
     [router, orgSlug, searchParams]
   );
 
+  /**
+   * Commits the search box to the URL 400ms after typing stops, instead of on
+   * every keystroke (audit F8) — each keystroke used to be a full RSC
+   * round-trip and a fresh `ilike '%term%'` scan of `contact.email`. A term
+   * under `MIN_SEARCH_LENGTH` is never committed; `searchTooShort` above
+   * drives the inline hint until enough is typed.
+   */
+  const searchCommitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (searchCommitTimer.current) {
+        clearTimeout(searchCommitTimer.current);
+      }
+    },
+    []
+  );
+
   const handleSearch = useCallback(
     (value: string) => {
-      setGlobalFilter(value);
-      updateSearchParams({ search: value || undefined, page: "1" });
+      setSearchInput(value);
+      if (searchCommitTimer.current) {
+        clearTimeout(searchCommitTimer.current);
+      }
+      searchCommitTimer.current = setTimeout(() => {
+        const trimmed = value.trim();
+        if (trimmed.length > 0 && trimmed.length < MIN_SEARCH_LENGTH) {
+          return;
+        }
+        updateSearchParams(
+          { search: trimmed || undefined, page: "1" },
+          "replace"
+        );
+      }, SEARCH_COMMIT_DELAY_MS);
     },
     [updateSearchParams]
+  );
+
+  /**
+   * Server-driven sort (audit F14). Pushes the clicked column into the URL
+   * instead of sorting the current page's 50 rows client-side and presenting
+   * that as sorted. `contacts-table.tsx` cannot itself apply the sort — that
+   * happens in `listContactsWithRelations` (packages/db) via the `sort` param
+   * this pushes as `sortBy`/`sortDir` — see the handoff note in this wave's
+   * report for the two-file change needed in `page.tsx` and
+   * `actions/contacts.ts` to complete the wiring.
+   */
+  const handleSortingChange = useCallback(
+    (updater: SortingState | ((old: SortingState) => SortingState)) => {
+      const next = typeof updater === "function" ? updater(sorting) : updater;
+      const [primary] = next;
+      updateSearchParams({
+        sortBy: primary?.id,
+        sortDir: primary ? (primary.desc ? "desc" : "asc") : undefined,
+        page: "1",
+      });
+    },
+    [sorting, updateSearchParams]
   );
 
   // Column actions
@@ -249,9 +377,19 @@ export function ContactsTable({
     [openContactDetail]
   );
 
+  // Carried onto the email link in columns.tsx so opening a contact doesn't
+  // drop the active search/status/topic/sort/page state (audit F9). Built
+  // from the same searchParams openContactDetail already uses, minus
+  // contactId since the link itself sets that.
+  const contactsQuery = useMemo(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("contactId");
+    return params.toString();
+  }, [searchParams]);
+
   const baseColumns = useMemo(
-    () => createColumns(columnActions),
-    [columnActions]
+    () => createColumns(columnActions, { orgSlug, contactsQuery }),
+    [columnActions, orgSlug, contactsQuery]
   );
 
   // Add selection column at the start
@@ -301,22 +439,18 @@ export function ContactsTable({
   const table = useReactTable({
     data: contacts,
     columns,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    onSortingChange: handleSortingChange,
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     manualPagination: true,
+    manualSorting: true,
     pageCount: Math.ceil(total / pageSize),
     state: {
       sorting,
-      columnFilters,
       columnVisibility,
       rowSelection,
-      globalFilter,
       pagination: {
         pageIndex: page - 1,
         pageSize,
@@ -448,6 +582,10 @@ export function ContactsTable({
             toast.error("Error", { description: subResult.error });
             return;
           }
+          captureContactTopicSubscribed({
+            contact_count: 1,
+            source: "single",
+          });
         }
 
         if (toUnsubscribe.length > 0) {
@@ -460,9 +598,19 @@ export function ContactsTable({
             toast.error("Error", { description: unsubResult.error });
             return;
           }
+          captureContactTopicUnsubscribed({
+            contact_count: 1,
+            source: "single",
+          });
         }
       }
 
+      captureContactUpdated({
+        fields: Object.entries(contactData)
+          .filter(([, v]) => v !== undefined)
+          .map(([k]) => k),
+        topics_changed: topicIds !== undefined,
+      });
       toast.success("Contact updated", {
         description: "The contact has been updated.",
       });
@@ -482,6 +630,7 @@ export function ContactsTable({
     startTransition(async () => {
       const result = await deleteContact(selectedContact.id, organizationId);
       if (result.success) {
+        captureContactDeleted();
         toast.success("Contact deleted", {
           description: "The contact has been removed.",
         });
@@ -509,6 +658,10 @@ export function ContactsTable({
         [selectedTopicId]
       );
       if (result.success) {
+        captureContactTopicSubscribed({
+          contact_count: result.count,
+          source: "bulk",
+        });
         toast.success("Contacts subscribed", {
           description: `${result.count} contacts subscribed to topic.`,
         });
@@ -534,6 +687,10 @@ export function ContactsTable({
         [selectedTopicId]
       );
       if (result.success) {
+        captureContactTopicUnsubscribed({
+          contact_count: result.count,
+          source: "bulk",
+        });
         toast.success("Contacts unsubscribed", {
           description: `${result.count} contacts unsubscribed from topic.`,
         });
@@ -558,6 +715,7 @@ export function ContactsTable({
         selectedContactIds
       );
       if (result.success) {
+        captureContactsBulkDeleted({ count: result.count });
         toast.success("Contacts deleted", {
           description: `${result.count} contact${result.count === 1 ? "" : "s"} deleted.`,
         });
@@ -584,12 +742,12 @@ export function ContactsTable({
             <Input
               className="pl-9 pr-16"
               onChange={(event) => handleSearch(event.target.value)}
-              placeholder="Search by email"
+              placeholder="Search by email (2+ characters)"
               ref={searchInputRef}
-              value={globalFilter}
+              value={searchInput}
             />
             <Kbd className="absolute top-1/2 right-2 -translate-y-1/2 hidden sm:flex">
-              ⌘F
+              /
             </Kbd>
           </div>
         </div>
@@ -598,6 +756,11 @@ export function ContactsTable({
           <div className="flex w-full sm:w-auto">
             <Select
               onValueChange={(value) => {
+                captureContactsFilterChanged({
+                  control: "email_status",
+                  from: statusFilter || "all",
+                  to: value,
+                });
                 updateSearchParams({
                   emailStatus: value === "all" ? undefined : value,
                   page: "1",
@@ -626,6 +789,11 @@ export function ContactsTable({
             {topics.length > 0 && (
               <Select
                 onValueChange={(value) => {
+                  captureContactsFilterChanged({
+                    control: "topic",
+                    from: topicFilter || "all",
+                    to: value,
+                  });
                   updateSearchParams({
                     topicId: value === "all" ? undefined : value,
                     page: "1",
@@ -691,7 +859,10 @@ export function ContactsTable({
                 <TooltipTrigger asChild>
                   <Button
                     className="rounded-r-none border-r-0 focus:z-10"
-                    onClick={() => setImportDialogOpen(true)}
+                    onClick={() => {
+                      captureContactsImportStarted();
+                      setImportDialogOpen(true);
+                    }}
                     size="icon"
                     variant="outline"
                   >
@@ -739,6 +910,11 @@ export function ContactsTable({
                         contactCSVColumns,
                         `contacts-${new Date().toISOString().slice(0, 10)}.csv`
                       );
+                      captureContactsExportedCsv({
+                        row_count: rows.length,
+                        selection_only: true,
+                        was_truncated: false,
+                      });
                       toast.success(
                         `Exported ${rows.length} selected contacts to CSV`
                       );
@@ -752,7 +928,7 @@ export function ContactsTable({
                     setIsExporting(true);
                     try {
                       const result = await exportAllContacts(organizationId, {
-                        search: globalFilter || undefined,
+                        search: trimmedSearchInput || undefined,
                         emailStatus: (statusFilter as EmailStatus) || undefined,
                         topicId: topicFilter || undefined,
                       });
@@ -762,9 +938,29 @@ export function ContactsTable({
                           contactCSVColumns,
                           `contacts-${new Date().toISOString().slice(0, 10)}.csv`
                         );
-                        toast.success(
-                          `Exported ${result.contacts.length} contacts to CSV`
-                        );
+                        captureContactsExportedCsv({
+                          row_count: result.contacts.length,
+                          selection_only: false,
+                          was_truncated: result.truncated,
+                        });
+                        // audit F23: the export used to report the truncated
+                        // fetch's own length as "total", which reads as the
+                        // whole match even when it silently dropped rows past
+                        // MAX_EXPORT_ROWS. `total` is now the real matching
+                        // count, so a truncated export says so explicitly.
+                        if (result.truncated) {
+                          toast.warning(
+                            `Exported ${result.contacts.length} of ${result.total.toLocaleString()} matching contacts`,
+                            {
+                              description:
+                                "This export is capped and left some contacts out. Narrow your filters to export the rest.",
+                            }
+                          );
+                        } else {
+                          toast.success(
+                            `Exported ${result.contacts.length} contacts to CSV`
+                          );
+                        }
                       } else {
                         toast.error("Failed to export contacts");
                       }
@@ -791,6 +987,30 @@ export function ContactsTable({
         </div>
       </div>
 
+      {searchTooShort && (
+        <p className="text-muted-foreground text-sm">
+          Type at least {MIN_SEARCH_LENGTH} characters to search.
+        </p>
+      )}
+
+      {/*
+       * audit F23: bulk actions are page-scoped with no "select all N
+       * matching" — deliberately not built this pass (it needs the bulk
+       * mutation actions to accept a filter instead of an id list, which is
+       * outside this file's ownership). This at least stops the selection
+       * from silently implying more than it covers.
+       */}
+      {selectedContactIds.length > 0 &&
+        selectedContactIds.length === contacts.length &&
+        total > contacts.length && (
+          <p className="text-muted-foreground text-sm">
+            All {contacts.length} contacts on this page are selected — there is
+            no "select all {total.toLocaleString()} matching" yet, so actions
+            only apply to this page. Repeat on the other pages to cover
+            everyone.
+          </p>
+        )}
+
       {/* Table */}
       <div className="rounded-md border">
         <Table>
@@ -813,6 +1033,21 @@ export function ContactsTable({
           <TableBody>
             {contacts.length > 0 ? (
               table.getRowModel().rows.map((row) => (
+                // audit F9 (WCAG 2.1.1, Level A): this row used to open only
+                // on onClick with no keyboard path at all. It briefly grew
+                // role="button" + tabIndex + onKeyDown, but that overrides
+                // the <tr>'s implicit `row` role and breaks the table's
+                // structure in the accessibility tree (WCAG 1.3.1) - a
+                // screen-reader user navigating by table semantics loses the
+                // row/cell relationships, and aria-label replaces the cells'
+                // own content in announcement. The real fix, matching
+                // /emails: a genuine <Link> in columns.tsx's email cell
+                // (wired via contactsQuery/baseColumns above) carries
+                // keyboard focus, Enter/Space activation, cmd-click, and
+                // middle-click, while this row stays a plain <tr> with only a
+                // mouse-click convenience handler. The Link's own onClick
+                // calls stopPropagation so this handler doesn't
+                // double-navigate.
                 <TableRow
                   className="cursor-pointer hover:bg-muted/50"
                   data-state={row.getIsSelected() && "selected"}
