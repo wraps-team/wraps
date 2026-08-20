@@ -5,6 +5,9 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // Fails any test that opens a real socket. See the file for why this is a
+    // runtime guard rather than a lint rule.
+    setupFiles: ["src/__tests__/setup/no-real-network.ts"],
     exclude: ["**/node_modules/**", "**/dist/**"],
     coverage: {
       provider: "v8",
