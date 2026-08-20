@@ -193,9 +193,8 @@ export function ContactsTable({
     : [{ id: "createdAt", desc: true }];
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [searchInput, setSearchInput] = useState(
-    searchParams.get("search") || ""
-  );
+  const searchParam = searchParams.get("search") || "";
+  const [searchInput, setSearchInput] = useState(searchParam);
   const trimmedSearchInput = searchInput.trim();
   const searchTooShort =
     trimmedSearchInput.length > 0 &&
@@ -360,6 +359,12 @@ export function ContactsTable({
     []
   );
 
+  // The last `search` value this component itself put into the URL, and the
+  // last value it has seen there. Together they tell a URL change we caused
+  // apart from one someone else caused — see the re-sync effect below.
+  const committedSearch = useRef(searchParam);
+  const observedSearchParam = useRef(searchParam);
+
   const handleSearch = useCallback(
     (value: string) => {
       setSearchInput(value);
@@ -367,13 +372,16 @@ export function ContactsTable({
         clearTimeout(searchCommitTimer.current);
       }
       searchCommitTimer.current = setTimeout(() => {
+        searchCommitTimer.current = null;
         const trimmed = value.trim();
         if (trimmed.length > 0 && trimmed.length < MIN_SEARCH_LENGTH) {
+          committedSearch.current = "";
           if (searchParams.get("search")) {
             updateSearchParams({ search: undefined, page: "1" }, "replace");
           }
           return;
         }
+        committedSearch.current = trimmed;
         updateSearchParams(
           { search: trimmed || undefined, page: "1" },
           "replace"
@@ -382,6 +390,35 @@ export function ContactsTable({
     },
     [updateSearchParams, searchParams]
   );
+
+  /**
+   * Follows `?search=` when something other than this box changes it.
+   *
+   * `searchInput` is seeded once from the URL, and a search-params-only
+   * navigation re-renders the page segment without remounting it (Next keys
+   * the segment with search params excluded — the debounce above depends on
+   * that same fact, or typing would be wiped every 400ms). So a link that
+   * drops `search` — the health-bucket links in contact-analytics.tsx are the
+   * only ones that do — used to leave the box showing a term the rows were no
+   * longer filtered by: the same input/hint/rows contradiction as the
+   * below-minimum case above.
+   *
+   * Two guards keep this from fighting the person typing. A pending commit
+   * timer means the box is mid-edit and owns itself; and a URL value equal to
+   * what we last committed means we caused this change, which is what stops
+   * the below-minimum clear from eating the character still in the box.
+   */
+  useEffect(() => {
+    if (searchParam === observedSearchParam.current) {
+      return;
+    }
+    observedSearchParam.current = searchParam;
+    if (searchCommitTimer.current || searchParam === committedSearch.current) {
+      return;
+    }
+    committedSearch.current = searchParam;
+    setSearchInput(searchParam);
+  }, [searchParam]);
 
   /**
    * Server-driven sort (audit F14). Pushes the clicked column into the URL
@@ -1042,7 +1079,11 @@ export function ContactsTable({
                     setIsExporting(true);
                     try {
                       const result = await exportAllContacts(organizationId, {
-                        search: trimmedSearchInput || undefined,
+                        // The URL, not `searchInput`. Every other filter here
+                        // reads from the URL, and mixing the two sources let a
+                        // not-yet-committed (or stale) term into an export of
+                        // a list that was never filtered by it.
+                        search: searchParam || undefined,
                         emailStatus: statusFilter ?? undefined,
                         topicId: topicFilter || undefined,
                       });
