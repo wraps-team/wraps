@@ -115,7 +115,14 @@ export const subscribeContactToTopics = orgAction(
   }
 );
 
-type BulkTopicResult = { success: boolean; error?: string; count?: number };
+// Discriminated, so `count` is guaranteed present on success rather than
+// optional on both branches. The loose shape forced callers to write
+// `result.count ?? 0`, which reports "we didn't compute it" as a confident
+// zero — the defect the 2026-08-19 audience audit exists to remove — while the
+// adjacent toast interpolated the same value unguarded.
+type BulkTopicResult =
+  | { success: true; count: number; error?: never }
+  | { success: false; error: string; count?: never };
 
 /**
  * Bulk subscribe multiple contacts to topics
@@ -141,7 +148,7 @@ export const bulkSubscribeContactsToTopics: (
     organizationId: string,
     contactIds: string[],
     topicIds: string[]
-  ): Promise<{ success: boolean; error?: string; count?: number }> => {
+  ): Promise<BulkTopicResult> => {
     // Filter topicIds to only those owned by this org (silently drop foreign topics)
     const ownedTopics = await fetchTopicsForSubscription(
       topicIds,
@@ -255,7 +262,7 @@ export const bulkUnsubscribeContactsFromTopics: (
     organizationId: string,
     contactIds: string[],
     topicIds: string[]
-  ): Promise<{ success: boolean; error?: string; count?: number }> => {
+  ): Promise<BulkTopicResult> => {
     const existingSubscriptions = await db
       .selectDistinct({ contactId: contactTopic.contactId })
       .from(contactTopic)

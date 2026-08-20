@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { parseThemeCss } from "@/lib/preference-theme/parse";
 import { themeToScopedCss } from "@/lib/preference-theme/serialize";
+import { captureThemeImportCssApplied } from "../lib/analytics";
 import type { ThemeDraft } from "./use-theme-draft";
 
 const DEBOUNCE_MS = 200;
@@ -67,6 +68,10 @@ export function ImportCssDialog({
   const extraWarnings = result.warnings.length - shownWarnings.length;
 
   const handleApply = () => {
+    captureThemeImportCssApplied({
+      dark_token_count: darkCount,
+      light_token_count: lightCount,
+    });
     onApply(result.theme);
     onOpenChange(false);
     setCss("");

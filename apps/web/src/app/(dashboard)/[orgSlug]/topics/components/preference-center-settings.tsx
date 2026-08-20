@@ -54,6 +54,15 @@ import {
   generatePreferenceCenterPreviewUrl,
   updateTopicSettings,
 } from "../actions";
+import {
+  capturePreferenceCenterDiscarded,
+  capturePreferenceCenterPreviewBlocked,
+  capturePreferenceCenterPreviewOpened,
+  capturePreferenceCenterSaveBlocked,
+  capturePreferenceCenterSettingsSaved,
+  captureThemeContrastCheckOpened,
+  captureThemeEditorControlChanged,
+} from "./lib/analytics";
 import { ContrastDialog } from "./theme-editor/contrast-dialog";
 import { ImportCssDialog } from "./theme-editor/import-css-dialog";
 import { Preview } from "./theme-editor/preview";
@@ -214,6 +223,10 @@ export function PreferenceCenterSettings({
       });
 
       if (result.success) {
+        capturePreferenceCenterSettingsSaved({
+          color_scheme: draft.colorScheme,
+          has_logo: Boolean(logo),
+        });
         toast.success("Preference center updated");
         router.refresh();
       } else {
@@ -225,6 +238,7 @@ export function PreferenceCenterSettings({
   const handleSaveClick = () => {
     const failing = countFailingContrastPairs(draft);
     if (failing.total > 0) {
+      capturePreferenceCenterSaveBlocked({ failing_pairs: failing.total });
       setSaveWarning(failing);
       return;
     }
@@ -236,6 +250,7 @@ export function PreferenceCenterSettings({
     try {
       const result = await generatePreferenceCenterPreviewUrl(organizationId);
       if (result.success) {
+        capturePreferenceCenterPreviewOpened();
         window.open(result.url, "_blank");
       } else {
         toast.error(result.error);
@@ -243,6 +258,25 @@ export function PreferenceCenterSettings({
     } finally {
       setIsPreviewLoading(false);
     }
+  };
+
+  /**
+   * The button underneath is `disabled` while `isDirty`, so a native click
+   * on it fires no click event at all - the only feedback was a hover
+   * tooltip (audit F16 recorded 4 dead clicks on this control across 2
+   * sessions). This handler lives on the wrapping `<span>` instead: because
+   * a disabled button gets `pointer-events: none`, clicks land on the span
+   * underneath it, so it sees blocked attempts the button itself never
+   * would. Captures the attempt AND gives on-click feedback so a click
+   * without a preceding hover isn't silent.
+   */
+  const handlePreviewButtonClick = () => {
+    if (isDirty) {
+      capturePreferenceCenterPreviewBlocked();
+      toast.info("Save your changes to see them on the live page.");
+      return;
+    }
+    handlePreview();
   };
 
   const previewTitle =
@@ -351,10 +385,15 @@ export function PreferenceCenterSettings({
               <FieldLabel>What subscribers see</FieldLabel>
               <FieldContent>
                 <ToggleGroup
-                  onValueChange={(value) =>
-                    value &&
-                    setColorScheme(value as "light" | "dark" | "system")
-                  }
+                  onValueChange={(value) => {
+                    if (!value) {
+                      return;
+                    }
+                    captureThemeEditorControlChanged({
+                      control: "color_scheme",
+                    });
+                    setColorScheme(value as "light" | "dark" | "system");
+                  }}
                   type="single"
                   value={draft.colorScheme}
                   variant="outline"
@@ -376,20 +415,44 @@ export function PreferenceCenterSettings({
         draft={draft}
         isDirty={isDirty || logoDirty}
         isSaving={isPending}
-        onOpenContrastCheck={() => setContrastOpen(true)}
+        onOpenContrastCheck={() => {
+          captureThemeContrastCheckOpened();
+          setContrastOpen(true);
+        }}
         onOpenImportCss={() => setImportCssOpen(true)}
-        onPreviewModeChange={setPreviewMode}
-        onPreviewStateChange={setPreviewState}
-        onPreviewWidthChange={setPreviewWidth}
+        onPreviewModeChange={(mode) => {
+          captureThemeEditorControlChanged({ control: "preview_mode" });
+          setPreviewMode(mode);
+        }}
+        onPreviewStateChange={(state) => {
+          captureThemeEditorControlChanged({ control: "preview_state" });
+          setPreviewState(state);
+        }}
+        onPreviewWidthChange={(width) => {
+          captureThemeEditorControlChanged({ control: "preview_width" });
+          setPreviewWidth(width);
+        }}
         onSave={handleSaveClick}
         previewMode={previewMode}
         previewModeNote={previewModeNote}
         previewState={previewState}
         previewWidth={previewWidth}
-        setAccent={setAccent}
-        setFont={setFont}
-        setFontsLinked={setFontsLinked}
-        setRadius={setRadius}
+        setAccent={(accent) => {
+          captureThemeEditorControlChanged({ control: "accent" });
+          setAccent(accent);
+        }}
+        setFont={(slot, id) => {
+          captureThemeEditorControlChanged({ control: "font" });
+          setFont(slot, id);
+        }}
+        setFontsLinked={(linked) => {
+          captureThemeEditorControlChanged({ control: "fonts_linked" });
+          setFontsLinked(linked);
+        }}
+        setRadius={(value) => {
+          captureThemeEditorControlChanged({ control: "radius" });
+          setRadius(value);
+        }}
       />
 
       <Preview
@@ -406,10 +469,21 @@ export function PreferenceCenterSettings({
       <div className="flex gap-3">
         <Tooltip>
           <TooltipTrigger asChild>
-            <span>
+            {/* onClick lives here, not on the Button: a disabled button
+                fires no click event at all, but `pointer-events: none` on
+                the disabled child means clicks land on this span instead -
+                see handlePreviewButtonClick. Mouse/pointer-only by design:
+                a disabled button is never keyboard-focusable, so there is no
+                keyboard path onto this span for the blocked-click case this
+                exists to catch - a key handler here would be dead code. The
+                enabled case is a real <button> underneath, which already
+                gets native keyboard activation. */}
+            {/** biome-ignore lint/a11y/noStaticElementInteractions: see comment above - the interactive child handles keyboard, this span only catches otherwise-invisible mouse clicks on its disabled sibling */}
+            {/** biome-ignore lint/a11y/useKeyWithClickEvents: mouse/pointer-only click target, see comment above */}
+            {/** biome-ignore lint/a11y/noNoninteractiveElementInteractions: mouse/pointer-only click target, see comment above */}
+            <span onClick={handlePreviewButtonClick}>
               <Button
                 disabled={isPreviewLoading || isDirty}
-                onClick={handlePreview}
                 type="button"
                 variant="outline"
               >
@@ -469,6 +543,7 @@ export function PreferenceCenterSettings({
             <AlertDialogCancel>Keep editing</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
+                capturePreferenceCenterDiscarded();
                 reset();
                 setLogo(settings?.preferenceCenterLogo ?? null);
                 setDiscardConfirmOpen(false);
