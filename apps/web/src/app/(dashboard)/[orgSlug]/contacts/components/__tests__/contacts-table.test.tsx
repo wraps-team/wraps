@@ -182,6 +182,41 @@ describe("search is debounced and minimum-length gated (F8)", () => {
       screen.getByText(/type at least 2 characters to search/i)
     ).toBeInTheDocument();
   });
+
+  // Deleting back under the minimum used to `return` before committing, which
+  // left the previous term applied: the input read "j", the hint asked for more
+  // characters, and the rows were still filtered by "john". Three parts of the
+  // page disagreeing, and an operator acting on a list they think they cleared.
+  it("clears an already-committed term when deleted back under the minimum", async () => {
+    currentSearchParams = new URLSearchParams({ search: "john", page: "3" });
+    renderTable(
+      <ContactsTable {...baseProps} contacts={[makeContact()]} total={1} />
+    );
+
+    const box = screen.getByPlaceholderText(/search by email/i);
+    await userEvent.clear(box);
+    await userEvent.type(box, "j");
+
+    await waitFor(
+      () => {
+        expect(replace).toHaveBeenCalledWith("/acme/contacts?page=1", {
+          scroll: false,
+        });
+      },
+      { timeout: 2000 }
+    );
+  });
+
+  it("does not thrash the URL when a short term was never committed", async () => {
+    renderTable(
+      <ContactsTable {...baseProps} contacts={[makeContact()]} total={1} />
+    );
+
+    await userEvent.type(screen.getByPlaceholderText(/search by email/i), "j");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    expect(replace).not.toHaveBeenCalled();
+  });
 });
 
 describe("'/' focuses search instead of hijacking Cmd/Ctrl+F (F22)", () => {

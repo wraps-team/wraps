@@ -306,6 +306,12 @@ export function ContactsTable({
    * round-trip and a fresh `ilike '%term%'` scan of `contact.email`. A term
    * under `MIN_SEARCH_LENGTH` is never committed; `searchTooShort` above
    * drives the inline hint until enough is typed.
+   *
+   * Falling under the minimum also *clears* an already-committed term. Skipping
+   * the commit outright left the previous search applied, so deleting "john"
+   * down to "j" showed an input reading `j`, a hint asking for more characters,
+   * and rows still filtered by `john` — three parts of the page disagreeing,
+   * and an operator acting on a list they believe they unfiltered.
    */
   const searchCommitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -326,6 +332,9 @@ export function ContactsTable({
       searchCommitTimer.current = setTimeout(() => {
         const trimmed = value.trim();
         if (trimmed.length > 0 && trimmed.length < MIN_SEARCH_LENGTH) {
+          if (searchParams.get("search")) {
+            updateSearchParams({ search: undefined, page: "1" }, "replace");
+          }
           return;
         }
         updateSearchParams(
@@ -334,7 +343,7 @@ export function ContactsTable({
         );
       }, SEARCH_COMMIT_DELAY_MS);
     },
-    [updateSearchParams]
+    [updateSearchParams, searchParams]
   );
 
   /**
