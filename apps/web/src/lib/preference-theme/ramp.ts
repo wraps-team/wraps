@@ -38,6 +38,14 @@ const DEFAULT_RADIUS = "0.625rem";
  * `destructive`/`success`/`warning` keep globals.css's own lightness+chroma —
  * FIXED_HUES below overrides their hue so they stay red/green/amber
  * regardless of the accent.
+ *
+ * That coupling is load-bearing and easy to break: when globals.css retuned
+ * light-mode success/warning as text colours to clear WCAG AA (they measured
+ * 2.37:1 and 3.75:1 as text on the tinted badge ground), these copies had to
+ * move with them or a customer's preference centre would keep rendering the
+ * failing pair while the dashboard rendered the passing one. `contrast.test.ts`
+ * pins both sides now — the light values here are deliberately at the edge of
+ * two opposing limits, so change them only with those numbers in hand.
  */
 export const NEUTRAL_RAMP: Record<
   Mode,
@@ -60,9 +68,9 @@ export const NEUTRAL_RAMP: Record<
     "accent-foreground": { l: 0.205, c: 0 },
     destructive: { l: 0.577, c: 0.245 },
     "destructive-foreground": { l: 0.985, c: 0 },
-    success: { l: 0.59, c: 0.2 },
+    success: { l: 0.5, c: 0.15 },
     "success-foreground": { l: 0.985, c: 0 },
-    warning: { l: 0.75, c: 0.18 },
+    warning: { l: 0.52, c: 0.125 },
     "warning-foreground": { l: 0.205, c: 0 },
     border: { l: 0.922, c: 0.006 },
     input: { l: 0.922, c: 0.006 },

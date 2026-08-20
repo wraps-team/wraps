@@ -419,13 +419,30 @@ export const getContactAnalytics = orgAction(
       tz = "UTC";
     }
 
-    // Compute date boundaries in user's timezone
+    // Compute date boundaries in user's timezone.
+    //
+    // INVARIANT — both windows span exactly `days` calendar days, and
+    // `dailyGrowth.length === days`:
+    //   current  = [startStr, todayStr]     inclusive at both ends
+    //   previous = [prevStartStr, startStr) half-open at the top
+    //
+    // `startStr` is the FIRST day *inside* the current window, so it is
+    // `today - (days - 1)`. It used to be `today - days`, which — against
+    // queries inclusive of both endpoints — made the current window `days + 1`
+    // days long while the previous window stayed `days`, so `growthPercent`
+    // divided a 31-day count by a 30-day one and overstated growth by roughly
+    // one day of signups.
+    //
+    // Four consumers depend on these two boundaries: `newContactsThisPeriod`,
+    // `previousPeriodContacts`, the `dailyGrowth` query, and the gap-fill walk
+    // at the bottom of this function. They must agree on the conventions above
+    // — changing one alone re-introduces the mismatch.
     const todayStr = now.toLocaleDateString("en-CA", { timeZone: tz });
     const [y, m, d] = todayStr.split("-").map(Number);
-    const startStr = new Date(Date.UTC(y, m - 1, d - days))
+    const startStr = new Date(Date.UTC(y, m - 1, d - (days - 1)))
       .toISOString()
       .split("T")[0];
-    const prevStartStr = new Date(Date.UTC(y, m - 1, d - days * 2))
+    const prevStartStr = new Date(Date.UTC(y, m - 1, d - (days * 2 - 1)))
       .toISOString()
       .split("T")[0];
 
@@ -452,18 +469,19 @@ export const getContactAnalytics = orgAction(
         .from(contact)
         .where(eq(contact.organizationId, organizationId)),
 
-      // New contacts in this period
+      // New contacts in this period: [startStr, todayStr], `days` days
       db
         .select({ count: count() })
         .from(contact)
         .where(
           and(
             eq(contact.organizationId, organizationId),
-            sql`DATE(${createdAtLocal}) >= ${startStr}::date`
+            sql`DATE(${createdAtLocal}) >= ${startStr}::date`,
+            sql`DATE(${createdAtLocal}) <= ${todayStr}::date`
           )
         ),
 
-      // New contacts in previous period for growth calculation
+      // Previous period for growth: [prevStartStr, startStr), also `days` days
       db
         .select({ count: count() })
         .from(contact)
@@ -490,7 +508,8 @@ export const getContactAnalytics = orgAction(
           )
         ),
 
-      // Daily growth data for chart, grouped by user's local date
+      // Daily growth data for chart, grouped by user's local date. Same
+      // window as newContactsThisPeriod, so the chart sums to that number.
       db
         .select({
           date: sql<string>`DATE(${createdAtLocal})::text`,
@@ -500,7 +519,8 @@ export const getContactAnalytics = orgAction(
         .where(
           and(
             eq(contact.organizationId, organizationId),
-            sql`DATE(${createdAtLocal}) >= ${startStr}::date`
+            sql`DATE(${createdAtLocal}) >= ${startStr}::date`,
+            sql`DATE(${createdAtLocal}) <= ${todayStr}::date`
           )
         )
         .groupBy(sql`DATE(${createdAtLocal})`)
@@ -563,7 +583,8 @@ export const getContactAnalytics = orgAction(
       ])
     );
 
-    // Walk from startStr to todayStr (both in user's timezone)
+    // Walk from startStr to todayStr inclusive (both in user's timezone).
+    // startStr is today - (days - 1), so this emits exactly `days` points.
     const [sy, sm, sd] = startStr.split("-").map(Number);
     const [ey, em, ed] = todayStr.split("-").map(Number);
     const cursor = new Date(Date.UTC(sy, sm - 1, sd));

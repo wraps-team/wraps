@@ -1,5 +1,7 @@
 "use client";
 
+import { useForm } from "@tanstack/react-form";
+import { useStore } from "@tanstack/react-store";
 import { Checkbox } from "@wraps/ui/components/ui/checkbox";
 import {
   Dialog,
@@ -21,6 +23,12 @@ import { Lock, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldContent,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   type ContactStatus,
@@ -32,6 +40,12 @@ import {
   SMS_STATUSES,
   type SmsStatus,
 } from "@/lib/contacts";
+import {
+  type ContactFormInput,
+  contactFormOpts,
+  contactFormSchema,
+  emptyContactFormValues,
+} from "@/lib/forms/contact-form";
 import type { TopicWithMeta } from "@/lib/topics";
 
 type PropertyEntry = {
@@ -40,29 +54,164 @@ type PropertyEntry = {
   value: string;
 };
 
+const SUBMIT_LABELS = {
+  create: { idle: "Add Contact", pending: "Creating..." },
+  edit: { idle: "Save Changes", pending: "Saving..." },
+} as const;
+
+/**
+ * What the parents receive. In `edit` mode `undefined` means "this field did
+ * not change" and the parent's update action skips it; `null` means "clear
+ * this column". That three-way distinction is load-bearing — collapsing it
+ * silently drops edits — so `buildEditPayload` below is the only place that
+ * decides it, and `__tests__/contact-form-dialog.test.tsx` pins it.
+ */
+type ContactSubmitPayload = {
+  email?: string;
+  phone?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  company?: string | null;
+  jobTitle?: string | null;
+  emailStatus?: EmailStatus;
+  smsStatus?: SmsStatus;
+  status?: ContactStatus;
+  properties?: Record<string, unknown>;
+  topicIds?: string[];
+};
+
 type ContactFormDialogProps = {
   contact?: ContactWithMeta | null;
   isPending: boolean;
   mode: "create" | "edit";
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: {
-    email?: string;
-    phone?: string;
-    firstName?: string | null;
-    lastName?: string | null;
-    company?: string | null;
-    jobTitle?: string | null;
-    emailStatus?: EmailStatus;
-    smsStatus?: SmsStatus;
-    status?: ContactStatus;
-    properties?: Record<string, unknown>;
-    topicIds?: string[];
-  }) => void;
+  onSubmit: (data: ContactSubmitPayload) => void;
   open: boolean;
   orgSlug: string;
   proFeaturesEnabled?: boolean;
   topics: TopicWithMeta[];
 };
+
+/** Key/value rows collapse to an object, dropping rows with a blank key. */
+function toPropertiesObject(entries: PropertyEntry[]): Record<string, string> {
+  return entries.reduce(
+    (acc, { key, value }) => {
+      if (key.trim()) {
+        acc[key.trim()] = value;
+      }
+      return acc;
+    },
+    {} as Record<string, string>
+  );
+}
+
+function subscribedTopicIds(contact?: ContactWithMeta | null): string[] {
+  return (
+    contact?.topics
+      ?.filter((t) => t.status === "subscribed")
+      .map((t) => t.topicId) || []
+  );
+}
+
+/**
+ * A text field that changed: the new string, or `null` when it was cleared.
+ * Unchanged fields are `undefined` so the update action leaves them alone.
+ */
+function changedTextOrNull(
+  next: string,
+  previous: string | null | undefined
+): string | null | undefined {
+  if (next === (previous || "")) {
+    return;
+  }
+  return next || null;
+}
+
+/** Create sends everything the user filled in; there is nothing to diff against. */
+function buildCreatePayload({
+  properties,
+  topicIds,
+  values,
+}: {
+  properties: PropertyEntry[];
+  topicIds: string[];
+  values: ContactFormInput;
+}): ContactSubmitPayload {
+  const propertiesObj = toPropertiesObject(properties);
+
+  return {
+    email: values.email || undefined,
+    phone: values.phone || undefined,
+    firstName: values.firstName || undefined,
+    lastName: values.lastName || undefined,
+    company: values.company || undefined,
+    jobTitle: values.jobTitle || undefined,
+    emailStatus: values.email ? values.emailStatus : undefined,
+    smsStatus: values.phone ? values.smsStatus : undefined,
+    properties:
+      Object.keys(propertiesObj).length > 0 ? propertiesObj : undefined,
+    topicIds,
+  };
+}
+
+/** Edit sends only what moved — see the note on `ContactSubmitPayload`. */
+function buildEditPayload({
+  contact,
+  properties,
+  topicIds,
+  values,
+}: {
+  contact?: ContactWithMeta | null;
+  properties: PropertyEntry[];
+  topicIds: string[];
+  values: ContactFormInput;
+}): ContactSubmitPayload {
+  const propertiesObj = toPropertiesObject(properties);
+
+  // JSON comparison is enough here because both sides are flat string maps
+  // built the same way, in the same insertion order.
+  const propertiesChanged =
+    JSON.stringify(contact?.properties || {}) !== JSON.stringify(propertiesObj);
+
+  const currentTopicIds = new Set(subscribedTopicIds(contact));
+  const nextTopicIds = new Set(topicIds);
+  const topicsChanged =
+    currentTopicIds.size !== nextTopicIds.size ||
+    [...currentTopicIds].some((id) => !nextTopicIds.has(id));
+
+  return {
+    email: values.email !== (contact?.email || "") ? values.email : undefined,
+    phone: values.phone !== (contact?.phone || "") ? values.phone : undefined,
+    firstName: changedTextOrNull(values.firstName, contact?.firstName),
+    lastName: changedTextOrNull(values.lastName, contact?.lastName),
+    company: changedTextOrNull(values.company, contact?.company),
+    jobTitle: changedTextOrNull(values.jobTitle, contact?.jobTitle),
+    emailStatus:
+      values.emailStatus !== contact?.emailStatus
+        ? values.emailStatus
+        : undefined,
+    smsStatus:
+      values.smsStatus !== contact?.smsStatus ? values.smsStatus : undefined,
+    properties: propertiesChanged ? propertiesObj : undefined,
+    topicIds: topicsChanged ? topicIds : undefined,
+  };
+}
+
+function valuesForContact(contact?: ContactWithMeta | null): ContactFormInput {
+  if (!contact) {
+    return emptyContactFormValues;
+  }
+  return {
+    email: contact.email || "",
+    phone: contact.phone || "",
+    firstName: contact.firstName || "",
+    lastName: contact.lastName || "",
+    company: contact.company || "",
+    jobTitle: contact.jobTitle || "",
+    emailStatus: contact.emailStatus || "active",
+    smsStatus: contact.smsStatus || "pending_consent",
+  };
+}
 
 export function ContactFormDialog({
   contact,
@@ -75,123 +224,54 @@ export function ContactFormDialog({
   proFeaturesEnabled = true,
   topics,
 }: ContactFormDialogProps) {
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [company, setCompany] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
-  const [emailStatus, setEmailStatus] = useState<EmailStatus>("active");
-  const [smsStatus, setSmsStatus] = useState<SmsStatus>("pending_consent");
+  // Topics and custom properties stay outside the form store, matching
+  // contact-details-sheet.tsx — they are list editors, not scalar fields.
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);
   const [properties, setProperties] = useState<PropertyEntry[]>([]);
 
-  // Reset form when dialog opens
-  useEffect(() => {
-    if (open) {
-      if (mode === "edit" && contact) {
-        setEmail(contact.email || "");
-        setPhone(contact.phone || "");
-        setFirstName(contact.firstName || "");
-        setLastName(contact.lastName || "");
-        setCompany(contact.company || "");
-        setJobTitle(contact.jobTitle || "");
-        setEmailStatus(contact.emailStatus || "active");
-        setSmsStatus(contact.smsStatus || "pending_consent");
-        setSelectedTopicIds(
-          contact.topics
-            ?.filter((t) => t.status === "subscribed")
-            .map((t) => t.topicId) || []
-        );
-        // Convert properties object to array
-        setProperties(
-          Object.entries(contact.properties || {}).map(([key, value]) => ({
-            id: crypto.randomUUID(),
-            key,
-            value: String(value),
-          }))
-        );
-      } else {
-        setEmail("");
-        setPhone("");
-        setFirstName("");
-        setLastName("");
-        setCompany("");
-        setJobTitle("");
-        setEmailStatus("active");
-        setSmsStatus("pending_consent");
-        setSelectedTopicIds([]);
-        setProperties([]);
+  const form = useForm({
+    ...contactFormOpts,
+    defaultValues:
+      mode === "edit" ? valuesForContact(contact) : emptyContactFormValues,
+    validators: { onChange: contactFormSchema },
+    onSubmit: ({ value }) => {
+      // Belt and braces with the disabled submit button: a contact with
+      // neither email nor phone is unreachable and must never be created.
+      if (!(value.email || value.phone)) {
+        return;
       }
-    }
-  }, [open, mode, contact]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Convert properties array back to object
-    const propertiesObj = properties.reduce(
-      (acc, { key, value }) => {
-        if (key.trim()) {
-          acc[key.trim()] = value;
-        }
-        return acc;
-      },
-      {} as Record<string, string>
-    );
-
-    if (mode === "create") {
-      onSubmit({
-        email: email || undefined,
-        phone: phone || undefined,
-        firstName: firstName || undefined,
-        lastName: lastName || undefined,
-        company: company || undefined,
-        jobTitle: jobTitle || undefined,
-        emailStatus: email ? emailStatus : undefined,
-        smsStatus: phone ? smsStatus : undefined,
-        properties:
-          Object.keys(propertiesObj).length > 0 ? propertiesObj : undefined,
+      const args = {
+        properties,
         topicIds: selectedTopicIds,
-      });
-    } else {
-      // For edit, only include properties if they've changed
-      const oldPropertiesStr = JSON.stringify(contact?.properties || {});
-      const newPropertiesStr = JSON.stringify(propertiesObj);
-      const propertiesChanged = oldPropertiesStr !== newPropertiesStr;
-
-      // Check if topic subscriptions changed
-      const currentTopicIds = new Set(
-        contact?.topics
-          ?.filter((t) => t.status === "subscribed")
-          .map((t) => t.topicId) || []
+        values: value,
+      };
+      onSubmit(
+        mode === "create"
+          ? buildCreatePayload(args)
+          : buildEditPayload({ ...args, contact })
       );
-      const newTopicIds = new Set(selectedTopicIds);
-      const topicsChanged =
-        currentTopicIds.size !== newTopicIds.size ||
-        [...currentTopicIds].some((id) => !newTopicIds.has(id));
+    },
+  });
 
-      onSubmit({
-        email: email !== (contact?.email || "") ? email : undefined,
-        phone: phone !== (contact?.phone || "") ? phone : undefined,
-        firstName:
-          firstName !== (contact?.firstName || "")
-            ? firstName || null
-            : undefined,
-        lastName:
-          lastName !== (contact?.lastName || "") ? lastName || null : undefined,
-        company:
-          company !== (contact?.company || "") ? company || null : undefined,
-        jobTitle:
-          jobTitle !== (contact?.jobTitle || "") ? jobTitle || null : undefined,
-        emailStatus:
-          emailStatus !== contact?.emailStatus ? emailStatus : undefined,
-        smsStatus: smsStatus !== contact?.smsStatus ? smsStatus : undefined,
-        properties: propertiesChanged ? propertiesObj : undefined,
-        topicIds: topicsChanged ? selectedTopicIds : undefined,
-      });
+  // Reload the form whenever the dialog opens on a (possibly different) contact.
+  useEffect(() => {
+    if (!open) {
+      return;
     }
-  };
+    const source = mode === "edit" ? contact : null;
+    form.reset(valuesForContact(source));
+    setSelectedTopicIds(subscribedTopicIds(source));
+    setProperties(
+      Object.entries(source?.properties || {}).map(([key, value]) => ({
+        id: crypto.randomUUID(),
+        key,
+        value: String(value),
+      }))
+    );
+  }, [open, mode, contact, form]);
+
+  const emailValue = useStore(form.store, (state) => state.values.email);
+  const phoneValue = useStore(form.store, (state) => state.values.phone);
 
   const toggleTopic = (topicId: string) => {
     setSelectedTopicIds((prev) =>
@@ -224,12 +304,17 @@ export function ContactFormDialog({
     );
   };
 
-  const isValid = email || phone;
-
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="sm:max-w-[500px]">
-        <form onSubmit={handleSubmit}>
+        <form
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            form.handleSubmit();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>
               {mode === "create" ? "Add Contact" : "Edit Contact"}
@@ -243,125 +328,203 @@ export function ContactFormDialog({
 
           <div className="grid gap-4 py-4">
             {/* Email */}
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email address</Label>
-              <Input
-                id="email"
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="contact@example.com"
-                type="email"
-                value={email}
-              />
-              {email && (
-                <div className="flex items-center gap-2">
-                  <Label
-                    className="text-muted-foreground text-xs"
-                    htmlFor="emailStatus"
-                  >
-                    Email status:
-                  </Label>
-                  <Select
-                    onValueChange={(value) =>
-                      setEmailStatus(value as EmailStatus)
-                    }
-                    value={emailStatus}
-                  >
-                    <SelectTrigger className="h-7 w-[140px]" id="emailStatus">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EMAIL_STATUSES.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {EMAIL_STATUS_LABELS[s]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
+            <form.Field name="email">
+              {(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid;
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel htmlFor={field.name}>Email address</FieldLabel>
+                    <FieldContent>
+                      <Input
+                        aria-invalid={isInvalid}
+                        id={field.name}
+                        name={field.name}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        placeholder="contact@example.com"
+                        type="email"
+                        value={field.state.value}
+                      />
+                      {isInvalid && (
+                        <FieldError errors={field.state.meta.errors} />
+                      )}
+                    </FieldContent>
+                  </Field>
+                );
+              }}
+            </form.Field>
+
+            {emailValue && (
+              <form.Field name="emailStatus">
+                {(field) => (
+                  <div className="flex items-center gap-2">
+                    <Label
+                      className="text-muted-foreground text-xs"
+                      htmlFor={field.name}
+                    >
+                      Email status:
+                    </Label>
+                    <Select
+                      onValueChange={(value) =>
+                        field.handleChange(value as EmailStatus)
+                      }
+                      value={field.state.value}
+                    >
+                      <SelectTrigger
+                        className="w-[140px]"
+                        id={field.name}
+                        size="touch"
+                      >
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EMAIL_STATUSES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {EMAIL_STATUS_LABELS[s]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </form.Field>
+            )}
 
             {/* Phone */}
-            <div className="grid gap-2">
-              <Label htmlFor="phone">Phone number</Label>
-              <Input
-                id="phone"
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+1 555 123 4567"
-                type="tel"
-                value={phone}
-              />
-              {phone && (
-                <div className="flex items-center gap-2">
-                  <Label
-                    className="text-muted-foreground text-xs"
-                    htmlFor="smsStatus"
-                  >
-                    SMS status:
-                  </Label>
-                  <Select
-                    onValueChange={(value) => setSmsStatus(value as SmsStatus)}
-                    value={smsStatus}
-                  >
-                    <SelectTrigger className="h-7 w-[160px]" id="smsStatus">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SMS_STATUSES.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {SMS_STATUS_LABELS[s]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <form.Field name="phone">
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor={field.name}>Phone number</FieldLabel>
+                  <FieldContent>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      placeholder="+1 555 123 4567"
+                      type="tel"
+                      value={field.state.value}
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      Use E.164 format (e.g., +15551234567)
+                    </p>
+                  </FieldContent>
+                </Field>
               )}
-              <p className="text-muted-foreground text-xs">
-                Use E.164 format (e.g., +15551234567)
-              </p>
-            </div>
+            </form.Field>
+
+            {phoneValue && (
+              <form.Field name="smsStatus">
+                {(field) => (
+                  <div className="flex items-center gap-2">
+                    <Label
+                      className="text-muted-foreground text-xs"
+                      htmlFor={field.name}
+                    >
+                      SMS status:
+                    </Label>
+                    <Select
+                      onValueChange={(value) =>
+                        field.handleChange(value as SmsStatus)
+                      }
+                      value={field.state.value}
+                    >
+                      <SelectTrigger
+                        className="w-[160px]"
+                        id={field.name}
+                        size="touch"
+                      >
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SMS_STATUSES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {SMS_STATUS_LABELS[s]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </form.Field>
+            )}
 
             {/* Contact Details */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="firstName">First name</Label>
-                <Input
-                  id="firstName"
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="John"
-                  value={firstName}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="lastName">Last name</Label>
-                <Input
-                  id="lastName"
-                  onChange={(e) => setLastName(e.target.value)}
-                  placeholder="Doe"
-                  value={lastName}
-                />
-              </div>
+              <form.Field name="firstName">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor={field.name}>First name</FieldLabel>
+                    <FieldContent>
+                      <Input
+                        id={field.name}
+                        name={field.name}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        placeholder="John"
+                        value={field.state.value}
+                      />
+                    </FieldContent>
+                  </Field>
+                )}
+              </form.Field>
+
+              <form.Field name="lastName">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor={field.name}>Last name</FieldLabel>
+                    <FieldContent>
+                      <Input
+                        id={field.name}
+                        name={field.name}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        placeholder="Doe"
+                        value={field.state.value}
+                      />
+                    </FieldContent>
+                  </Field>
+                )}
+              </form.Field>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="company">Company</Label>
-                <Input
-                  id="company"
-                  onChange={(e) => setCompany(e.target.value)}
-                  placeholder="Acme Inc."
-                  value={company}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="jobTitle">Job title</Label>
-                <Input
-                  id="jobTitle"
-                  onChange={(e) => setJobTitle(e.target.value)}
-                  placeholder="Software Engineer"
-                  value={jobTitle}
-                />
-              </div>
+              <form.Field name="company">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor={field.name}>Company</FieldLabel>
+                    <FieldContent>
+                      <Input
+                        id={field.name}
+                        name={field.name}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        placeholder="Acme Inc."
+                        value={field.state.value}
+                      />
+                    </FieldContent>
+                  </Field>
+                )}
+              </form.Field>
+
+              <form.Field name="jobTitle">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor={field.name}>Job title</FieldLabel>
+                    <FieldContent>
+                      <Input
+                        id={field.name}
+                        name={field.name}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        placeholder="Software Engineer"
+                        value={field.state.value}
+                      />
+                    </FieldContent>
+                  </Field>
+                )}
+              </form.Field>
             </div>
 
             {/* Topics */}
@@ -476,15 +639,23 @@ export function ContactFormDialog({
             >
               Cancel
             </Button>
-            <Button disabled={isPending || !isValid} type="submit">
-              {isPending
-                ? mode === "create"
-                  ? "Creating..."
-                  : "Saving..."
-                : mode === "create"
-                  ? "Add Contact"
-                  : "Save Changes"}
-            </Button>
+            <form.Subscribe
+              selector={(state) => ({
+                canSubmit: state.canSubmit,
+                hasContactMethod: Boolean(
+                  state.values.email || state.values.phone
+                ),
+              })}
+            >
+              {({ canSubmit, hasContactMethod }) => (
+                <Button
+                  disabled={isPending || !canSubmit || !hasContactMethod}
+                  type="submit"
+                >
+                  {SUBMIT_LABELS[mode][isPending ? "pending" : "idle"]}
+                </Button>
+              )}
+            </form.Subscribe>
           </DialogFooter>
         </form>
       </DialogContent>

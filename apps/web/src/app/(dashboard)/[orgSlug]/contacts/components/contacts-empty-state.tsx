@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Code2, Plus, Upload, Users } from "lucide-react";
+import { BookOpen, Code2, Plus, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -30,12 +30,19 @@ const { data } = await client.POST('/v1/contacts/', {
 type ContactsEmptyStateProps = {
   organizationId: string;
   orgSlug: string;
+  /**
+   * Whether this org's plan includes topic assignment. The dialog below used
+   * to be hard-coded to `false`, so a paying org was shown an upgrade prompt it
+   * had already paid past (audit M13).
+   */
+  proFeaturesEnabled: boolean;
   topics: TopicWithMeta[];
 };
 
 export function ContactsEmptyState({
   organizationId,
   orgSlug,
+  proFeaturesEnabled,
   topics,
 }: ContactsEmptyStateProps) {
   const router = useRouter();
@@ -87,13 +94,16 @@ export function ContactsEmptyState({
   };
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center">
-      <div className="w-full max-w-lg text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-          <Users className="h-7 w-7 text-primary" />
-        </div>
-        <h2 className="mb-2 font-semibold text-xl">No contacts yet</h2>
-        <p className="mx-auto mb-8 max-w-sm text-muted-foreground text-sm">
+    // Left-aligned, and no icon medallion above the heading. A 56px tinted
+    // circle over a centred column is the stock "empty state" template; it
+    // adds nothing a reader needs and the centring makes the copy, the code
+    // sample and the buttons all fight for the same axis.
+    <div className="flex min-h-[60vh] items-start justify-center pt-12">
+      <div className="w-full max-w-lg">
+        <h2 className="mb-2 font-semibold text-xl tracking-tight">
+          No contacts yet
+        </h2>
+        <p className="mb-8 max-w-sm text-muted-foreground text-sm">
           Add contacts manually, import a CSV, or use the Platform SDK to manage
           contacts programmatically.
         </p>
@@ -110,7 +120,7 @@ export function ContactsEmptyState({
           </pre>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Button asChild variant="outline">
             <Link
               href="https://wraps.dev/docs/quickstart/platform"
@@ -139,8 +149,11 @@ export function ContactsEmptyState({
         onSubmit={handleCreateContact}
         open={createDialogOpen}
         orgSlug={orgSlug}
-        proFeaturesEnabled={false}
-        topics={[]}
+        // Real values, not `false` and `[]`: this is the dialog that creates an
+        // org's very first contact, and hard-coding them meant that contact
+        // could never be assigned a topic (audit M13).
+        proFeaturesEnabled={proFeaturesEnabled}
+        topics={topics}
       />
 
       <ImportContactsDialog

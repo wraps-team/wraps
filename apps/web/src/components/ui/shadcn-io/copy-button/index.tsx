@@ -9,6 +9,7 @@ import {
   useReducedMotion,
 } from "motion/react";
 import * as React from "react";
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 
@@ -99,8 +100,19 @@ function CopyButton({
             handleIsCopied(true);
             setTimeout(() => handleIsCopied(false), delay);
           })
-          .catch((error) => {
-            console.error("Error copying command", error);
+          .catch(() => {
+            /*
+             * audit L4: this was a `console.error` in a production code path
+             * (the repo logs through Pino, and a client component has no
+             * Pino), and the user was told nothing at all - the icon simply
+             * never became a checkmark. A denied clipboard permission or a
+             * non-secure origin is the common cause and neither is something
+             * the user can act on without being told it happened.
+             */
+            toast.error("Couldn't copy to clipboard", {
+              description:
+                "Your browser blocked clipboard access. Select the text and copy it manually.",
+            });
           });
       }
       onClick?.(e);
@@ -108,28 +120,57 @@ function CopyButton({
     [isCopied, content, delay, onClick, onCopy, handleIsCopied]
   );
 
+  /*
+   * audit H3 (WCAG 4.1.2, Level A): the button's only child is an SVG, so
+   * without a name of its own it had none at all - a screen reader announced
+   * "button", once per instance, and the contacts table renders 50 of them.
+   * The name belongs to the caller, which is the only side that knows what is
+   * being copied ("Copy ada@example.com"); this generic fallback is the floor,
+   * not the goal, and is applied after the prop spread so a caller's own
+   * `aria-label` always wins.
+   */
+  const accessibleName = props["aria-label"] ?? "Copy";
+
   return (
-    <motion.button
-      className={cn(buttonVariants({ variant, size }), className)}
-      data-slot="copy-button"
-      onClick={handleCopy}
-      whileHover={shouldReduceMotion ? undefined : { scale: 1.05 }}
-      whileTap={shouldReduceMotion ? undefined : { scale: 0.95 }}
-      {...(props as any)}
-    >
-      <AnimatePresence mode="wait">
-        <motion.span
-          animate={{ scale: 1 }}
-          data-slot="copy-button-icon"
-          exit={{ scale: 0 }}
-          initial={{ scale: 0 }}
-          key={localIsCopied ? "check" : "copy"}
-          transition={{ duration: shouldReduceMotion ? 0 : 0.15 }}
-        >
-          <Icon />
-        </motion.span>
-      </AnimatePresence>
-    </motion.button>
+    <>
+      <motion.button
+        className={cn(buttonVariants({ variant, size }), className)}
+        data-slot="copy-button"
+        onClick={handleCopy}
+        whileHover={shouldReduceMotion ? undefined : { scale: 1.05 }}
+        whileTap={shouldReduceMotion ? undefined : { scale: 0.95 }}
+        {...(props as any)}
+        aria-label={accessibleName}
+      >
+        <AnimatePresence mode="wait">
+          <motion.span
+            animate={{ scale: 1 }}
+            data-slot="copy-button-icon"
+            exit={{ scale: 0 }}
+            initial={{ scale: 0 }}
+            key={localIsCopied ? "check" : "copy"}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.15 }}
+          >
+            <Icon />
+          </motion.span>
+        </AnimatePresence>
+      </motion.button>
+      {/*
+        audit H3: success was conveyed only by the icon swapping to a
+        checkmark, which is nothing to a screen reader - the copy either
+        happened or it didn't and there was no way to tell. A sibling rather
+        than a child of the button: `sr-only` is absolutely positioned, so it
+        stays out of the caller's flex layout, and a live region inside a
+        control is not reliably announced.
+      */}
+      <span
+        aria-live="polite"
+        className="sr-only"
+        data-slot="copy-button-status"
+      >
+        {localIsCopied ? "Copied" : ""}
+      </span>
+    </>
   );
 }
 

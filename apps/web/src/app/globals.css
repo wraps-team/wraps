@@ -103,11 +103,40 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --success: oklch(0.59 0.2 145);
+  /*
+   * Semantic status colours, tuned as TEXT rather than as fill.
+   *
+   * That is how they are actually used: `text-success` / `text-warning` carry
+   * the list-health figures and the status badges, while only a handful of
+   * call sites use a solid `bg-*`. The original values were picked as fills
+   * and then reused as text, and on this near-white ground they failed WCAG
+   * AA badly - warning measured 2.37:1 and success 3.75:1 against --card,
+   * where 1.4.3 requires 4.5:1.
+   *
+   * Text on white needs roughly L <= 0.55 at this chroma. The binding ground
+   * is not the card but the tinted badge (`bg-warning/15` composited over the
+   * card), which is always worse than the card behind it; these clear 4.5:1
+   * there - success 4.54:1, warning 4.64:1, info 4.62:1 - and land at
+   * 5.6-5.8:1 against plain --card / --background.
+   *
+   * --warning is the tight one, pinned in a narrow band from both sides:
+   * lighter than L 0.52 and the badge text fails, darker and the near-black
+   * checkmark on a solid `bg-warning` drops under the 3:1 that 1.4.11 asks of
+   * non-text. Its chroma stops at 0.125 because 0.13 at this lightness falls
+   * outside sRGB and the browser silently clips it.
+   *
+   * --warning-foreground stays near-black deliberately: lib/preference-theme/
+   * ramp.ts hardcodes the same pair for customer-authored preference-centre
+   * themes, so flipping one without the other would split the two.
+   *
+   * The dark theme is a separate and already-passing set - do not copy these
+   * values down to it.
+   */
+  --success: oklch(0.5 0.15 145);
   --success-foreground: oklch(0.985 0 0);
-  --warning: oklch(0.75 0.18 55);
+  --warning: oklch(0.52 0.125 55);
   --warning-foreground: oklch(0.205 0 0);
-  --info: oklch(0.62 0.15 250);
+  --info: oklch(0.51 0.14 250);
   --info-foreground: oklch(0.985 0 0);
   --color-1: oklch(66.2% 0.225 25.9);
   --color-2: oklch(60.4% 0.26 302);

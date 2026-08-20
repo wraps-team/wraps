@@ -21,7 +21,15 @@ export function countYAxisProps(maxValue: number) {
   // distortion once the range is wide enough to have spikes. Under 100 it
   // compresses nothing and only makes evenly-valued gridlines sit at uneven
   // heights, which reads as a broken axis.
-  const scale: YAxisProps["scale"] = maxValue >= 100 ? "sqrt" : "linear";
+  // "auto", never "linear": recharts turns a string scale into "scale" +
+  // upperFirst(scale), so "linear" becomes "scaleLinear", and getTicksOfScale
+  // bails on anything that is not exactly "auto" or "linear". That bail skipped
+  // nice-tick generation entirely, so allowDecimals was never read and a
+  // max of 2 drew d3's 0/0.5/1/1.5/2, which the formatter rounded to
+  // "2, 2, 1, 1, 0". "auto" resolves to realScaleType "linear" and passes.
+  // The sqrt branch below hits that same bail by design — counts of 100+ still
+  // get raw d3 ticks, where whole numbers make the rounding harmless.
+  const scale: YAxisProps["scale"] = maxValue >= 100 ? "sqrt" : "auto";
 
   return {
     allowDecimals: false,

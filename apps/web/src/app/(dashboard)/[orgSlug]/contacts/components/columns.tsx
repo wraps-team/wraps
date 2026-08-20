@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { Column, ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
   DropdownMenu,
@@ -9,7 +9,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@wraps/ui/components/ui/dropdown-menu";
-import { ArrowUpDown, Mail, MoreHorizontal, Phone } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Mail,
+  MoreHorizontal,
+  Phone,
+} from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/shadcn-io/copy-button";
@@ -39,6 +46,55 @@ type ColumnsOptions = {
   contactsQuery: string;
 };
 
+/**
+ * audit L1: this was `new Date(...).toLocaleDateString()` with no locale and
+ * no options, in a client component - so the SSR pass formatted with the
+ * server's locale and the client re-formatted with the visitor's, and the
+ * result was unpredictable per user either way. Explicit locale + options is
+ * what `/emails` already does (`emails/components/lib/timestamps.ts`); the
+ * `<time>` element carries the machine-readable value the text elides.
+ */
+const CREATED_DATE_FORMAT: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+};
+
+/**
+ * audit H6 (WCAG 1.3.1, Level A): every sortable header rendered the same
+ * `ArrowUpDown` glyph whether its column was sorted ascending, descending, or
+ * not at all. The list ships sorted `createdAt desc`, so the default view was
+ * ordered by something no part of the page named. The glyph now states the
+ * direction, and `contacts-table.tsx` puts the same state on the `<th>` as
+ * `aria-sort` for anyone who cannot see it. (`/emails` deliberately has no
+ * `aria-sort`, but only because it sorts through a labelled toolbar control
+ * and none of its headers are interactive - these are.)
+ */
+function SortableHeader({
+  column,
+  label,
+}: {
+  column: Column<ContactWithMeta, unknown>;
+  label: string;
+}) {
+  const direction = column.getIsSorted();
+
+  return (
+    <Button
+      className="-ml-4"
+      onClick={() => column.toggleSorting(direction === "asc")}
+      variant="ghost"
+    >
+      {label}
+      {direction === "asc" && <ArrowUp className="ml-2 h-4 w-4" />}
+      {direction === "desc" && <ArrowDown className="ml-2 h-4 w-4" />}
+      {direction === false && (
+        <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />
+      )}
+    </Button>
+  );
+}
+
 export function createColumns(
   actions: ColumnActions,
   { orgSlug, contactsQuery }: ColumnsOptions
@@ -47,14 +103,7 @@ export function createColumns(
     {
       accessorKey: "email",
       header: ({ column }) => (
-        <Button
-          className="-ml-4"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          variant="ghost"
-        >
-          Contact
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
+        <SortableHeader column={column} label="Contact" />
       ),
       cell: ({ row }) => {
         const email = row.original.email;
@@ -88,16 +137,32 @@ export function createColumns(
                 >
                   {email}
                 </Link>
+                {/*
+                 * audit H3: two failures that compounded. The button's only
+                 * child is an SVG, so it had no accessible name (WCAG 4.1.2,
+                 * Level A) and a screen reader announced "button" once per
+                 * row, 50 times a page - the name has to be built here
+                 * because this is the only place that knows which address is
+                 * being copied. And `opacity-0` with a hover-only reveal put
+                 * a keyboard user's focus on something completely invisible
+                 * (WCAG 2.4.7, AA), so focus reveals it too.
+                 */}
                 <CopyButton
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label={`Copy ${email}`}
+                  className="opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
                   content={email}
                   onClick={(e) => e.stopPropagation()}
                   size="sm"
                   variant="ghost"
                 />
+                {/*
+                 * audit L2: these badges were `text-[10px]`, below the type
+                 * scale's smallest step and the only arbitrary values in a
+                 * directory that is otherwise entirely token-driven.
+                 */}
                 {emailStatus && (
                   <Badge
-                    className={`${EMAIL_STATUS_COLORS[emailStatus]} px-1.5 py-0 text-[10px]`}
+                    className={`${EMAIL_STATUS_COLORS[emailStatus]} px-1.5 py-0 text-xs`}
                     variant="secondary"
                   >
                     {EMAIL_STATUS_LABELS[emailStatus]}
@@ -111,7 +176,7 @@ export function createColumns(
                 <span className="text-muted-foreground text-sm">{phone}</span>
                 {smsStatus && (
                   <Badge
-                    className={`${SMS_STATUS_COLORS[smsStatus]} px-1.5 py-0 text-[10px]`}
+                    className={`${SMS_STATUS_COLORS[smsStatus]} px-1.5 py-0 text-xs`}
                     variant="secondary"
                   >
                     {SMS_STATUS_LABELS[smsStatus]}
@@ -152,16 +217,7 @@ export function createColumns(
     },
     {
       accessorKey: "emailsSent",
-      header: ({ column }) => (
-        <Button
-          className="-ml-4"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          variant="ghost"
-        >
-          Emails
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
+      header: ({ column }) => <SortableHeader column={column} label="Emails" />,
       cell: ({ row }) => {
         const sent = row.original.emailsSent;
         const opened = row.original.emailsOpened;
@@ -218,21 +274,14 @@ export function createColumns(
     {
       accessorKey: "createdAt",
       header: ({ column }) => (
-        <Button
-          className="-ml-4"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          variant="ghost"
-        >
-          Created
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
+        <SortableHeader column={column} label="Created" />
       ),
       cell: ({ row }) => {
         const date = new Date(row.getValue("createdAt"));
         return (
-          <div className="text-muted-foreground">
-            {date.toLocaleDateString()}
-          </div>
+          <time className="text-muted-foreground" dateTime={date.toISOString()}>
+            {date.toLocaleDateString("en-US", CREATED_DATE_FORMAT)}
+          </time>
         );
       },
     },

@@ -32,13 +32,15 @@ import {
 } from "@wraps/ui/components/ui/table";
 import {
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   Download,
   FileSpreadsheet,
   Loader2,
   Upload,
 } from "lucide-react";
-import { useCallback, useRef, useState, useTransition } from "react";
+import type { RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   type ImportContactInput,
   importContacts,
@@ -78,6 +80,59 @@ type ImportContactsDialogProps = {
 
 type Step = "upload" | "map" | "preview" | "results";
 
+/** The wizard's four steps, in the order they run (audit M7). */
+const STEP_ORDER: Step[] = ["upload", "map", "preview", "results"];
+
+const STEP_LABELS: Record<Step, string> = {
+  upload: "Upload CSV",
+  map: "Map columns",
+  preview: "Review",
+  results: "Results",
+};
+
+const FILE_INPUT_ID = "import-contacts-csv-file";
+
+/**
+ * States where the user is, rather than leaving them to infer it (audit M7).
+ *
+ * The heading is also the focus target for every step change: the content
+ * swaps under an unchanged dialog title and the button that had focus
+ * unmounts, so without this focus fell to `<body>`. Focusing a heading both
+ * moves the keyboard user into the new step and announces it, which is why
+ * there is no live region here as well — two announcements are worse than one.
+ */
+function StepIndicator({
+  headingRef,
+  step,
+}: {
+  headingRef: RefObject<HTMLHeadingElement | null>;
+  step: Step;
+}) {
+  const index = STEP_ORDER.indexOf(step);
+  return (
+    <div className="space-y-2 border-b pb-3">
+      <h3
+        className="font-medium text-foreground text-sm"
+        ref={headingRef}
+        tabIndex={-1}
+      >
+        Step {index + 1} of {STEP_ORDER.length}: {STEP_LABELS[step]}
+      </h3>
+      {/* Decoration only — the heading above already carries the position. */}
+      <ol aria-hidden="true" className="flex items-center gap-1.5">
+        {STEP_ORDER.map((s, i) => (
+          <li
+            className={`h-1 flex-1 rounded-full ${
+              i <= index ? "bg-primary" : "bg-muted"
+            }`}
+            key={s}
+          />
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 /** Says how many rows are being dropped, not just that some are. */
 function TruncationNotice({ csvData }: { csvData: ParseCSVResult }) {
   const dropped = csvData.totalRows - csvData.rows.length;
@@ -88,6 +143,97 @@ function TruncationNotice({ csvData }: { csvData: ParseCSVResult }) {
       {dropped.toLocaleString()} will be left out. Split the file to import the
       rest.
     </p>
+  );
+}
+
+/**
+ * Headlines the outcome, not the intent (audit M8).
+ *
+ * This used to render "Import completed successfully" in the success colour
+ * and then a destructive "412 errors" badge directly underneath — two
+ * contradictory claims about the same import. A partial import now says how
+ * many of how many landed, and only an import with no failed rows gets the
+ * success treatment.
+ */
+function ImportOutcome({
+  result,
+}: {
+  result: Extract<ImportContactsResult, { success: true }>;
+}) {
+  const imported = result.created + result.updated;
+  const failed = result.errors.length;
+  // Every submitted row lands in exactly one of these buckets, so they sum to
+  // what the operator asked us to import.
+  const total = imported + result.skipped + failed;
+  const isPartial = failed > 0;
+
+  return (
+    <>
+      <div
+        className={
+          isPartial
+            ? "flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 p-3"
+            : "flex items-start gap-2 rounded-md bg-success/10 p-3 text-success"
+        }
+      >
+        {isPartial ? (
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+        ) : (
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+        )}
+        <div className="space-y-1">
+          <p className="font-medium text-sm">
+            Imported {imported.toLocaleString()} of {total.toLocaleString()}{" "}
+            contact{total === 1 ? "" : "s"}
+          </p>
+          {isPartial && (
+            <p className="text-muted-foreground text-xs">
+              {failed.toLocaleString()} row{failed === 1 ? "" : "s"} couldn't be
+              imported. Fix {failed === 1 ? "it" : "them"} in your file and
+              import that file again.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {result.created > 0 && (
+          <Badge className="bg-success/15 text-success">
+            {result.created.toLocaleString()} created
+          </Badge>
+        )}
+        {result.updated > 0 && (
+          <Badge className="bg-info/15 text-info">
+            {result.updated.toLocaleString()} updated
+          </Badge>
+        )}
+        {result.skipped > 0 && (
+          <Badge variant="secondary">
+            {result.skipped.toLocaleString()} skipped
+          </Badge>
+        )}
+        {failed > 0 && (
+          <Badge variant="destructive">
+            {failed.toLocaleString()} error{failed === 1 ? "" : "s"}
+          </Badge>
+        )}
+      </div>
+
+      {failed > 0 && (
+        <div className="max-h-[150px] space-y-1 overflow-y-auto rounded-md border p-3">
+          {result.errors.map((err) => (
+            // Keyed by the row the failure belongs to (audit L3) — a row fails
+            // at most once, so this is stable where the array index was not.
+            <p
+              className="text-destructive text-xs"
+              key={`${err.row}-${err.error}`}
+            >
+              Row {err.row}: {err.error}
+            </p>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -109,8 +255,25 @@ export function ImportContactsDialog({
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);
   const [result, setResult] = useState<ImportContactsResult | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const announcedStepRef = useRef<Step | null>(null);
+
+  // Move focus into the step that just replaced the one the user was in
+  // (audit M7). Skipped on the first render of a session so the dialog's own
+  // opening focus is left alone; when the dialog is closed its content is
+  // unmounted and the ref is null, so a reset is a no-op here.
+  useEffect(() => {
+    if (announcedStepRef.current === step) {
+      return;
+    }
+    const isFirstStep = announcedStepRef.current === null;
+    announcedStepRef.current = step;
+    if (!isFirstStep) {
+      stepHeadingRef.current?.focus();
+    }
+  }, [step]);
 
   const reset = useCallback(() => {
     setStep("upload");
@@ -120,12 +283,14 @@ export function ImportContactsDialog({
     setSelectedTopicIds([]);
     setResult(null);
     setUploadError(null);
+    setIsDraggingFile(false);
   }, []);
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (!open) {
         reset();
+        announcedStepRef.current = null;
       }
       onOpenChange(open);
     },
@@ -134,58 +299,84 @@ export function ImportContactsDialog({
 
   // ─── Step 1: Upload ─────────────────────────────────────────────────────
 
+  /** One path for a picked file and a dropped one, so both fail identically. */
+  const processFile = useCallback((file: File) => {
+    setUploadError(null);
+
+    const fileError = validateCSVFile(file);
+    if (fileError) {
+      setUploadError(fileError);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => {
+      setUploadError(
+        `Your browser couldn't read "${file.name}". If it's open in another program, close it and try again.`
+      );
+    };
+    reader.onload = (event) => {
+      const text = event.target?.result;
+      if (typeof text !== "string") {
+        setUploadError(`Your browser couldn't read "${file.name}" as text.`);
+        return;
+      }
+
+      const parsed = parseCSV(text);
+      const parseError = describeParseFailure(parsed);
+      if (parseError) {
+        setUploadError(parseError);
+        return;
+      }
+
+      setCsvData(parsed);
+      setColumnMappings(autoMapColumns(parsed.headers));
+      setStep("map");
+      captureContactsImportFileParsed({
+        row_count: parsed.rows.length,
+        total_rows: parsed.totalRows,
+        was_truncated: parsed.truncated,
+      });
+    };
+    reader.readAsText(file);
+  }, []);
+
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) {
         return;
       }
-
-      setUploadError(null);
-
-      const fileError = validateCSVFile(file);
-      if (fileError) {
-        setUploadError(fileError);
-        e.target.value = "";
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onerror = () => {
-        setUploadError(
-          `Your browser couldn't read "${file.name}". If it's open in another program, close it and try again.`
-        );
-      };
-      reader.onload = (event) => {
-        const text = event.target?.result;
-        if (typeof text !== "string") {
-          setUploadError(`Your browser couldn't read "${file.name}" as text.`);
-          return;
-        }
-
-        const parsed = parseCSV(text);
-        const parseError = describeParseFailure(parsed);
-        if (parseError) {
-          setUploadError(parseError);
-          return;
-        }
-
-        setCsvData(parsed);
-        setColumnMappings(autoMapColumns(parsed.headers));
-        setStep("map");
-        captureContactsImportFileParsed({
-          row_count: parsed.rows.length,
-          total_rows: parsed.totalRows,
-          was_truncated: parsed.truncated,
-        });
-      };
-      reader.readAsText(file);
-
+      processFile(file);
       // Reset input so same file can be re-selected
       e.target.value = "";
     },
-    []
+    [processFile]
   );
+
+  // The dropzone is styled as one, so it accepts a drop (audit L7) — dashed
+  // borders that do nothing are a promise the surface can't keep.
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLLabelElement>) => {
+      e.preventDefault();
+      setIsDraggingFile(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) {
+        return;
+      }
+      processFile(file);
+    },
+    [processFile]
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    setIsDraggingFile(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setIsDraggingFile(false);
+  }, []);
 
   const handleDownloadTemplate = useCallback(() => {
     const headers = [
@@ -271,7 +462,12 @@ export function ImportContactsDialog({
       return contact;
     }) ?? [];
 
-  const previewRows = mappedContacts.slice(0, 5);
+  // Each preview row carries the line it came from in the source file, which is
+  // its identity and never moves — unlike its index in this array (audit L3).
+  const previewRows = mappedContacts.slice(0, 5).map((contact, index) => ({
+    contact,
+    line: index + 2,
+  }));
 
   const handleImport = useCallback(() => {
     captureContactsImportSubmitted({
@@ -321,34 +517,54 @@ export function ImportContactsDialog({
             {step === "upload" && "Upload a CSV file to import contacts."}
             {step === "map" && "Map CSV columns to contact fields."}
             {step === "preview" && "Review and configure your import."}
-            {step === "results" && "Import complete."}
+            {step === "results" && "What the import did."}
           </DialogDescription>
         </DialogHeader>
+
+        <StepIndicator headingRef={stepHeadingRef} step={step} />
 
         {/* Step 1: Upload */}
         {step === "upload" && (
           <div className="flex flex-col items-center gap-4 py-8">
-            <div
-              className="flex w-full cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed p-8 transition-colors hover:border-primary/50 hover:bg-muted/50"
-              onClick={() => fileInputRef.current?.click()}
+            {/*
+              A real <label> wrapping a visually-hidden-but-focusable input
+              (audit C1). This was a bare <div onClick> over an input with
+              `display: none`, so nothing in the step could be focused at all
+              and the only way into the product's bulk-import path was a mouse.
+              The label gives back focus, Enter/Space activation and an
+              accessible name with no key handling of our own.
+            */}
+            {/** biome-ignore lint/a11y/noNoninteractiveElementInteractions: the drag handlers are an addition to a natively activatable control (the file input this label owns), not a substitute for one - there is nothing here for a keyboard user to miss */}
+            <label
+              className={`flex w-full cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed p-8 transition-colors hover:border-primary/50 hover:bg-muted/50 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring ${
+                isDraggingFile ? "border-primary bg-muted/50" : ""
+              }`}
+              htmlFor={FILE_INPUT_ID}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
             >
               <Upload className="h-10 w-10 text-muted-foreground" />
               <div className="text-center">
                 <p className="font-medium text-sm">
-                  Click to upload a CSV file
+                  Choose a CSV file, or drag one here
                 </p>
                 <p className="text-muted-foreground text-xs">
                   .csv files up to 10,000 rows and 10 MB
                 </p>
               </div>
-            </div>
-            <input
-              accept=".csv"
-              className="hidden"
-              onChange={handleFileSelect}
-              ref={fileInputRef}
-              type="file"
-            />
+              {/*
+                `sr-only` clips the input instead of removing it from the tab
+                order the way `hidden` (display: none) did.
+              */}
+              <input
+                accept=".csv"
+                className="sr-only"
+                id={FILE_INPUT_ID}
+                onChange={handleFileSelect}
+                type="file"
+              />
+            </label>
             {uploadError && (
               <div
                 className="flex w-full items-start gap-2 rounded-md bg-destructive/10 p-3 text-destructive"
@@ -395,7 +611,16 @@ export function ImportContactsDialog({
                           }
                           value={columnMappings[header] ?? "property"}
                         >
-                          <SelectTrigger className="h-8 text-xs">
+                          {/*
+                            Named after the column it maps (audit M7): the
+                            table header is a visual association only, so
+                            without this a screen reader announced the selected
+                            value with no idea which column it belonged to.
+                          */}
+                          <SelectTrigger
+                            aria-label={`Map CSV column ${header}`}
+                            className="h-8 text-xs"
+                          >
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -499,15 +724,15 @@ export function ImportContactsDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {previewRows.map((row, i) => (
-                      <TableRow key={i}>
+                    {previewRows.map(({ contact, line }) => (
+                      <TableRow key={`csv-line-${line}`}>
                         {Object.entries(columnMappings)
                           .filter(([, v]) => v !== "skip")
                           .map(([header, mapping]) => {
                             const value =
                               mapping === "property"
-                                ? row.properties?.[header]
-                                : row[mapping as keyof ImportContactInput];
+                                ? contact.properties?.[header]
+                                : contact[mapping as keyof ImportContactInput];
                             return (
                               <TableCell
                                 className="max-w-[180px] truncate whitespace-nowrap text-xs"
@@ -616,45 +841,7 @@ export function ImportContactsDialog({
         {step === "results" && result && (
           <div className="space-y-4">
             {result.success ? (
-              <>
-                <div className="flex items-center gap-2 rounded-md bg-success/10 p-3 text-success">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span className="font-medium text-sm">
-                    Import completed successfully
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {result.created > 0 && (
-                    <Badge className="bg-success/15 text-success">
-                      {result.created} created
-                    </Badge>
-                  )}
-                  {result.updated > 0 && (
-                    <Badge className="bg-info/15 text-info">
-                      {result.updated} updated
-                    </Badge>
-                  )}
-                  {result.skipped > 0 && (
-                    <Badge variant="secondary">{result.skipped} skipped</Badge>
-                  )}
-                  {result.errors.length > 0 && (
-                    <Badge variant="destructive">
-                      {result.errors.length} error
-                      {result.errors.length === 1 ? "" : "s"}
-                    </Badge>
-                  )}
-                </div>
-
-                {result.errors.length > 0 && (
-                  <div className="max-h-[150px] space-y-1 overflow-y-auto rounded-md border p-3">
-                    {result.errors.map((err, i) => (
-                      <p className="text-destructive text-xs" key={i}>
-                        Row {err.row}: {err.error}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </>
+              <ImportOutcome result={result} />
             ) : (
               <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-destructive">
                 <AlertCircle className="h-5 w-5" />
