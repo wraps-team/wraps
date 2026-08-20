@@ -125,15 +125,21 @@ type AwsAccount = {
   region: string;
 };
 
+// Both counts arrive already narrowed to the send predicate (see
+// `countTopicAudience` / `countRecipientsBySegment`), so the picker and the
+// "Estimated Recipients" card below it cannot show two different numbers for
+// the same audience.
 type Topic = {
   id: string;
   name: string;
+  /** Subscribers this broadcast would actually reach. */
   subscriberCount: number;
 };
 
 type Segment = {
   id: string;
   name: string;
+  /** Contacts this broadcast would actually reach. */
   memberCount: number;
 };
 
@@ -1688,7 +1694,7 @@ function AudienceStep({
                       {topics.map((topic) => (
                         <SelectItem key={topic.id} value={topic.id}>
                           {topic.name} ({topic.subscriberCount.toLocaleString()}{" "}
-                          subscribers)
+                          can be emailed)
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1740,7 +1746,7 @@ function AudienceStep({
                       {segments.map((segment) => (
                         <SelectItem key={segment.id} value={segment.id}>
                           {segment.name} ({segment.memberCount.toLocaleString()}{" "}
-                          contacts)
+                          can be emailed)
                         </SelectItem>
                       ))}
                     </SelectContent>

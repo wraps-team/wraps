@@ -29,6 +29,10 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { updateTopicSettings } from "../actions";
+import {
+  captureDoubleOptInSettingsSaved,
+  captureDoubleOptInTemplateChanged,
+} from "./lib/analytics";
 
 type TopicSettingsType = typeof topicSettings.$inferSelect;
 
@@ -72,6 +76,7 @@ export function DoubleOptInSettings({
         });
 
         if (result.success) {
+          captureDoubleOptInSettingsSaved({ template_mode: templateMode });
           toast.success("Settings saved successfully");
           router.refresh();
         } else {
@@ -83,6 +88,7 @@ export function DoubleOptInSettings({
 
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplateId(templateId);
+    captureDoubleOptInTemplateChanged();
     startTransition(async () => {
       await updateTopicSettings(organizationId, {
         confirmationTemplateId: templateId,
@@ -98,7 +104,9 @@ export function DoubleOptInSettings({
         <CardDescription>
           Configure the sender details and email template for double opt-in
           confirmation emails. These settings apply to all topics that have
-          double opt-in enabled.
+          double opt-in enabled. New sign-ups on those topics stay pending — and
+          are skipped by every broadcast — until they click the confirmation
+          link, so they show as Pending on the topics table until they do.
         </CardDescription>
       </CardHeader>
       <CardContent>

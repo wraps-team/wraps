@@ -1,6 +1,7 @@
 import {
   contact,
   contactTopic,
+  countBroadcastRecipients,
   db,
   member,
   organization,
@@ -736,5 +737,200 @@ describe("Topics Server Actions", () => {
         expect(result.error).toContain("not found");
       }
     });
+  });
+});
+
+/**
+ * A topic's subscriber count used to be a count of `contact_topic` rows with no
+ * join to `contact` at all, so it counted people no send could reach — measured
+ * at 60% too high on one production topic — and it never showed the `pending`
+ * cohort double opt-in creates. Both halves are pinned here against the send
+ * path itself (audit F5, F10, F20).
+ */
+describe("topic counts equal what a broadcast to the topic would send", () => {
+  const seedTopicAudience = async () => {
+    const crypto = await import("node:crypto");
+    const row = (
+      suffix: string,
+      email: string | null,
+      emailStatus: string | null
+    ) => ({
+      id: `test-topic-audience-${suffix}`,
+      organizationId: testOrganization.id,
+      email,
+      emailHash: email
+        ? crypto.createHash("sha256").update(email).digest("hex")
+        : null,
+      emailStatus: emailStatus as never,
+      properties: {},
+    });
+
+    await db
+      .insert(contact)
+      .values([
+        row("reachable", "reachable@example.com", "active"),
+        row("bounced", "bounced@example.com", "bounced"),
+        row("gone", "gone@example.com", "unsubscribed"),
+        row("emailless", null, null),
+        row("pending", "pending@example.com", "active"),
+      ]);
+
+    const created = await createTopic(testOrganization.id, {
+      name: "Product Updates",
+      slug: "audience-product-updates",
+      doubleOptIn: true,
+    });
+    if (!created.success) {
+      throw new Error("Failed to create topic");
+    }
+
+    await db.insert(contactTopic).values([
+      {
+        contactId: "test-topic-audience-reachable",
+        topicId: created.topic.id,
+        status: "subscribed",
+      },
+      {
+        contactId: "test-topic-audience-bounced",
+        topicId: created.topic.id,
+        status: "subscribed",
+      },
+      {
+        contactId: "test-topic-audience-gone",
+        topicId: created.topic.id,
+        status: "subscribed",
+      },
+      {
+        contactId: "test-topic-audience-emailless",
+        topicId: created.topic.id,
+        status: "subscribed",
+      },
+      {
+        contactId: "test-topic-audience-pending",
+        topicId: created.topic.id,
+        status: "pending",
+      },
+    ]);
+
+    return created.topic.id;
+  };
+
+  it("reports subscribed, sendable and pending as three different numbers", async () => {
+    const topicId = await seedTopicAudience();
+
+    const listed = await listTopics(testOrganization.id);
+    expect(listed.success).toBe(true);
+    if (listed.success) {
+      const row = listed.topics.find((t) => t.id === topicId);
+      expect(row?.subscriberCount).toBe(4);
+      expect(row?.sendableCount).toBe(1);
+      expect(row?.pendingCount).toBe(1);
+    }
+  });
+
+  it("the sendable count is the send-path count", async () => {
+    const topicId = await seedTopicAudience();
+
+    const sendCount = await countBroadcastRecipients(
+      testOrganization.id,
+      "email",
+      { audienceType: "topic", topicId }
+    );
+    const listed = await listTopics(testOrganization.id);
+    const single = await getTopic(topicId, testOrganization.id);
+
+    expect(sendCount).toBe(1);
+    if (listed.success) {
+      expect(listed.topics.find((t) => t.id === topicId)?.sendableCount).toBe(
+        sendCount
+      );
+    }
+    if (single.success) {
+      expect(single.topic.sendableCount).toBe(sendCount);
+    }
+  });
+
+  it("a bounced subscriber leaves the sendable count without leaving the topic", async () => {
+    const topicId = await seedTopicAudience();
+
+    await db
+      .update(contact)
+      .set({ emailStatus: "bounced" })
+      .where(eq(contact.id, "test-topic-audience-reachable"));
+
+    const listed = await listTopics(testOrganization.id);
+    const sendCount = await countBroadcastRecipients(
+      testOrganization.id,
+      "email",
+      { audienceType: "topic", topicId }
+    );
+
+    expect(sendCount).toBe(0);
+    if (listed.success) {
+      const row = listed.topics.find((t) => t.id === topicId);
+      // Still 4 people opted in; none of them can be mailed.
+      expect(row?.subscriberCount).toBe(4);
+      expect(row?.sendableCount).toBe(sendCount);
+    }
+  });
+
+  it("lists the pending cohort the drawer used to hide", async () => {
+    const topicId = await seedTopicAudience();
+
+    const result = await getTopicSubscribers(topicId, testOrganization.id, {
+      status: "pending",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.total).toBe(1);
+      expect(result.subscribers[0]?.email).toBe("pending@example.com");
+    }
+  });
+
+  it("excludes a topic-level unsubscribe from subscriberCount, sendableCount and pendingCount", async () => {
+    const crypto = await import("node:crypto");
+    const email = "topic-unsub@example.com";
+
+    await db.insert(contact).values({
+      id: "test-topic-unsub-contact",
+      organizationId: testOrganization.id,
+      email,
+      emailHash: crypto.createHash("sha256").update(email).digest("hex"),
+      emailStatus: "active" as const,
+      properties: {},
+    });
+
+    const created = await createTopic(testOrganization.id, {
+      name: "Unsub Test Topic",
+      slug: "unsub-test-topic",
+    });
+    expect(created.success).toBe(true);
+    if (!created.success) {
+      return;
+    }
+
+    // This contact left the topic — status is 'unsubscribed', not deleted.
+    // They must not be counted as if they were still on it.
+    await db.insert(contactTopic).values({
+      contactId: "test-topic-unsub-contact",
+      topicId: created.topic.id,
+      status: "unsubscribed",
+    });
+
+    const listed = await listTopics(testOrganization.id);
+    expect(listed.success).toBe(true);
+    if (listed.success) {
+      const row = listed.topics.find((t) => t.id === created.topic.id);
+      expect(row?.subscriberCount).toBe(0);
+      expect(row?.sendableCount).toBe(0);
+      expect(row?.pendingCount).toBe(0);
+    }
+
+    const single = await getTopic(created.topic.id, testOrganization.id);
+    expect(single.success).toBe(true);
+    if (single.success) {
+      expect(single.topic.subscriberCount).toBe(0);
+    }
   });
 });

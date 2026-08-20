@@ -41,8 +41,11 @@ export function createColumns(
       },
     },
     {
+      // Counted live through the send path, so this is the number a broadcast
+      // to the segment would go to — not the count of rows the filters match,
+      // and not the cached `member_count` that used to sit here going stale.
       accessorKey: "memberCount",
-      header: "Contacts",
+      header: "Can be emailed",
       cell: ({ row }) => {
         const segment = row.original;
         return (
@@ -66,23 +69,9 @@ export function createColumns(
         );
       },
     },
-    {
-      accessorKey: "lastComputedAt",
-      header: "Last Updated",
-      cell: ({ row }) => {
-        const segment = row.original;
-        if (!segment.lastComputedAt) {
-          return <span className="text-muted-foreground">Never</span>;
-        }
-        return (
-          <span className="text-muted-foreground">
-            {formatDistanceToNow(new Date(segment.lastComputedAt), {
-              addSuffix: true,
-            })}
-          </span>
-        );
-      },
-    },
+    // There is deliberately no "Last Updated" column any more. It rendered
+    // `lastComputedAt` — the age of a cached count that no longer exists on
+    // this screen — beside a number it did not describe.
     {
       accessorKey: "createdAt",
       header: "Created",

@@ -1,7 +1,7 @@
 "use server";
 
-import { contactTopic, db, topic } from "@wraps/db";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { contactTopic, countTopicAudience, db, topic } from "@wraps/db";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { checkFeatureAccess } from "@/lib/plan-limits";
 import {
@@ -23,6 +23,37 @@ export type {
   TopicWithMeta,
   UpdateTopicResult,
 } from "@/lib/topics";
+
+/**
+ * `pending` is a real cohort, not a transient: double opt-in leaves every new
+ * subscriber here until they click the confirmation link, and broadcasts skip
+ * them. The drawer has to be able to list them or they are invisible.
+ */
+type SubscriberStatus = "subscribed" | "pending" | "unsubscribed";
+
+type TopicSubscriber = {
+  contactId: string;
+  email: string;
+  status: string;
+  subscribedAt: Date | null;
+  unsubscribedAt: Date | null;
+};
+
+/**
+ * A discriminated result, not a bag of optionals. Every field used to be
+ * optional on both branches, so a caller could read `total` off a failure and
+ * get `undefined` — which renders as a number nobody computed. The success
+ * branch either carries the page and its count, or it isn't the success branch.
+ */
+export type GetTopicSubscribersResult =
+  | {
+      success: true;
+      subscribers: TopicSubscriber[];
+      total: number;
+      page: number;
+      pageSize: number;
+    }
+  | { success: false; error: string };
 
 type CreateTopicData = {
   name: string;
@@ -66,26 +97,15 @@ export const listTopics = orgAction(
       orderBy: [desc(topic.createdAt)],
     });
 
-    // Get subscriber counts scoped to this org's topics
-    const topicIds = topics.map((t) => t.id);
-    const subscriberCounts =
-      topicIds.length > 0
-        ? await db
-            .select({
-              topicId: contactTopic.topicId,
-              count: sql<number>`count(*)::int`,
-            })
-            .from(contactTopic)
-            .where(
-              and(
-                inArray(contactTopic.topicId, topicIds),
-                eq(contactTopic.status, "subscribed")
-              )
-            )
-            .groupBy(contactTopic.topicId)
-        : [];
-
-    const countMap = new Map(subscriberCounts.map((c) => [c.topicId, c.count]));
+    // Subscribed / pending / sendable in one grouped scan, joined to `contact`
+    // so a subscriber who has since bounced, complained, been suppressed, or
+    // unsubscribed globally is not counted as reachable. Pending is its own
+    // number: double opt-in parks people there, and before this nothing in the
+    // product showed them at all.
+    const audience = await countTopicAudience(
+      organizationId,
+      topics.map((t) => t.id)
+    );
 
     return {
       success: true,
@@ -96,7 +116,9 @@ export const listTopics = orgAction(
         description: t.description,
         public: t.public,
         doubleOptIn: t.doubleOptIn,
-        subscriberCount: countMap.get(t.id) ?? 0,
+        subscriberCount: audience.get(t.id)?.subscribed ?? 0,
+        sendableCount: audience.get(t.id)?.sendable ?? 0,
+        pendingCount: audience.get(t.id)?.pending ?? 0,
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
         createdBy: t.createdByUser,
@@ -142,16 +164,9 @@ export const getTopic = orgAction(
       return { success: false, error: "Topic not found" };
     }
 
-    // Get subscriber count using SQL COUNT
-    const [countResult] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(contactTopic)
-      .where(
-        and(
-          eq(contactTopic.topicId, topicId),
-          eq(contactTopic.status, "subscribed")
-        )
-      );
+    const audience = (
+      await countTopicAudience(ctx.organizationId, [topicId])
+    ).get(topicId);
 
     return {
       success: true,
@@ -162,7 +177,9 @@ export const getTopic = orgAction(
         description: t.description,
         public: t.public,
         doubleOptIn: t.doubleOptIn,
-        subscriberCount: countResult?.count ?? 0,
+        subscriberCount: audience?.subscribed ?? 0,
+        sendableCount: audience?.sendable ?? 0,
+        pendingCount: audience?.pending ?? 0,
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
         createdBy: t.createdByUser,
@@ -425,7 +442,7 @@ export const getTopicSubscribers = orgAction(
       _options?: {
         page?: number;
         pageSize?: number;
-        status?: "subscribed" | "unsubscribed";
+        status?: SubscriberStatus;
       }
     ) => organizationId,
     onError: "Failed to fetch subscribers",
@@ -437,22 +454,9 @@ export const getTopicSubscribers = orgAction(
     options: {
       page?: number;
       pageSize?: number;
-      status?: "subscribed" | "unsubscribed";
+      status?: SubscriberStatus;
     } = {}
-  ): Promise<{
-    success: boolean;
-    subscribers?: Array<{
-      contactId: string;
-      email: string;
-      status: string;
-      subscribedAt: Date | null;
-      unsubscribedAt: Date | null;
-    }>;
-    total?: number;
-    page?: number;
-    pageSize?: number;
-    error?: string;
-  }> => {
+  ): Promise<GetTopicSubscribersResult> => {
     const { page = 1, pageSize = 50, status } = options;
     const offset = (page - 1) * pageSize;
 

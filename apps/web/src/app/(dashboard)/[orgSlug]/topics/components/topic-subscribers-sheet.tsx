@@ -21,12 +21,17 @@ import {
   TableHeader,
   TableRow,
 } from "@wraps/ui/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@wraps/ui/components/ui/tabs";
 import { ChevronRight, Code2, Pencil, Trash2, Users } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { getTopicSubscribers } from "@/actions/topics";
 import { Button } from "@/components/ui/button";
 import { CodeTabs } from "@/components/ui/shadcn-io/code-tabs";
 import type { TopicWithMeta } from "@/lib/topics";
+import {
+  captureTopicSubscribersFilterChanged,
+  captureTopicSubscribersPageChanged,
+} from "./lib/analytics";
 
 type Subscriber = {
   contactId: string;
@@ -34,6 +39,36 @@ type Subscriber = {
   status: string;
   subscribedAt: Date | null;
   unsubscribedAt: Date | null;
+};
+
+/**
+ * The drawer used to hard-code `subscribed`, so a topic whose sign-ups were all
+ * waiting on a double opt-in confirmation rendered "No subscribers yet" over a
+ * cohort that existed and could be chased.
+ */
+const STATUS_TABS = [
+  { value: "subscribed", label: "Subscribed" },
+  { value: "pending", label: "Pending" },
+  { value: "unsubscribed", label: "Unsubscribed" },
+] as const;
+
+type SubscriberStatus = (typeof STATUS_TABS)[number]["value"];
+
+function formatDate(value: Date | null): string {
+  return value ? new Date(value).toLocaleDateString() : "—";
+}
+
+// A pending row's `subscribedAt` is when they asked, not when they joined.
+const DATE_HEADER: Record<SubscriberStatus, string> = {
+  subscribed: "Subscribed",
+  pending: "Requested",
+  unsubscribed: "Unsubscribed",
+};
+
+const EMPTY_COPY: Record<SubscriberStatus, string> = {
+  subscribed: "Nobody is subscribed to this topic yet",
+  pending: "Nobody is waiting to confirm",
+  unsubscribed: "Nobody has unsubscribed from this topic",
 };
 
 type TopicSubscribersSheetProps = {
@@ -59,6 +94,7 @@ export function TopicSubscribersSheet({
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [status, setStatus] = useState<SubscriberStatus>("subscribed");
   const pageSize = 20;
 
   // Stable reference for dependency arrays
@@ -69,27 +105,28 @@ export function TopicSubscribersSheet({
     if (open && topicId) {
       // Reset pagination and clear stale data
       setPage(1);
+      setStatus("subscribed");
       setSubscribers([]);
       setTotal(0);
     }
   }, [open, topicId]);
 
-  // Load subscribers when sheet opens or page changes
+  // Load subscribers when sheet opens, the cohort changes, or the page changes
   useEffect(() => {
     if (open && topic) {
       startTransition(async () => {
         const result = await getTopicSubscribers(topic.id, organizationId, {
           page,
           pageSize,
-          status: "subscribed",
+          status,
         });
-        if (result.success && result.subscribers) {
-          setSubscribers(result.subscribers as Subscriber[]);
-          setTotal(result.total || 0);
+        if (result.success) {
+          setSubscribers(result.subscribers);
+          setTotal(result.total);
         }
       });
     }
-  }, [open, organizationId, page, topic]);
+  }, [open, organizationId, page, status, topic]);
 
   if (!topic) {
     return null;
@@ -106,7 +143,11 @@ export function TopicSubscribersSheet({
             {topic.name}
           </SheetTitle>
           <SheetDescription>
-            {topic.subscriberCount.toLocaleString()} subscribers
+            {topic.subscriberCount.toLocaleString()} subscribed ·{" "}
+            {topic.sendableCount.toLocaleString()} can be emailed
+            {topic.pendingCount > 0
+              ? ` · ${topic.pendingCount.toLocaleString()} pending confirmation`
+              : ""}
           </SheetDescription>
         </SheetHeader>
 
@@ -128,12 +169,35 @@ export function TopicSubscribersSheet({
           <QuickStartSnippets slug={topic.slug} />
 
           {/* Subscribers List */}
+          <Tabs
+            onValueChange={(value) => {
+              captureTopicSubscribersFilterChanged({
+                from: status,
+                to: value,
+              });
+              setStatus(value as SubscriberStatus);
+              setPage(1);
+            }}
+            value={status}
+          >
+            <TabsList>
+              {STATUS_TABS.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value}>
+                  {tab.label}
+                  {tab.value === "pending" && topic.pendingCount > 0
+                    ? ` (${topic.pendingCount.toLocaleString()})`
+                    : ""}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Email</TableHead>
-                  <TableHead>Subscribed</TableHead>
+                  <TableHead>{DATE_HEADER[status]}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -150,11 +214,11 @@ export function TopicSubscribersSheet({
                         {subscriber.email}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {subscriber.subscribedAt
-                          ? new Date(
-                              subscriber.subscribedAt
-                            ).toLocaleDateString()
-                          : "—"}
+                        {formatDate(
+                          status === "unsubscribed"
+                            ? subscriber.unsubscribedAt
+                            : subscriber.subscribedAt
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -164,7 +228,7 @@ export function TopicSubscribersSheet({
                       className="text-center text-muted-foreground"
                       colSpan={2}
                     >
-                      No subscribers yet
+                      {EMPTY_COPY[status]}
                     </TableCell>
                   </TableRow>
                 )}
@@ -177,7 +241,13 @@ export function TopicSubscribersSheet({
             <div className="flex items-center justify-between">
               <Button
                 disabled={page <= 1 || isPending}
-                onClick={() => setPage((p) => p - 1)}
+                onClick={() => {
+                  captureTopicSubscribersPageChanged({
+                    direction: "previous",
+                    page: page - 1,
+                  });
+                  setPage((p) => p - 1);
+                }}
                 size="sm"
                 variant="outline"
               >
@@ -188,7 +258,13 @@ export function TopicSubscribersSheet({
               </span>
               <Button
                 disabled={page >= totalPages || isPending}
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => {
+                  captureTopicSubscribersPageChanged({
+                    direction: "next",
+                    page: page + 1,
+                  });
+                  setPage((p) => p + 1);
+                }}
                 size="sm"
                 variant="outline"
               >

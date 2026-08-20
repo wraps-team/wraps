@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@wraps/ui/components/ui/badge";
 import {
   Sheet,
   SheetContent,
@@ -16,7 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from "@wraps/ui/components/ui/table";
-import { formatDistanceToNow } from "date-fns";
 import { Pencil, RefreshCw, Trash2, Users } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { previewSegment } from "@/actions/segments";
@@ -28,6 +26,7 @@ import {
   type SegmentWithMeta,
 } from "@/lib/segments";
 import type { TopicWithMeta } from "@/lib/topics";
+import { captureSegmentPreview, countConditionFilters } from "./lib/analytics";
 
 type SegmentDetailsSheetProps = {
   onClose: () => void;
@@ -53,6 +52,7 @@ export function SegmentDetailsSheet({
   const [isPending, startTransition] = useTransition();
   const [sampleEmails, setSampleEmails] = useState<string[]>([]);
   const [previewCount, setPreviewCount] = useState<number | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   // Stable reference for dependency arrays
   const segmentId = segment?.id ?? null;
@@ -61,6 +61,7 @@ export function SegmentDetailsSheet({
   useEffect(() => {
     if (open && segmentId) {
       setSampleEmails([]);
+      setPreviewError(null);
       setPreviewCount(segment?.memberCount ?? null);
     }
   }, [open, segmentId, segment?.memberCount]);
@@ -73,6 +74,13 @@ export function SegmentDetailsSheet({
         if (result.success) {
           setSampleEmails(result.sampleEmails);
           setPreviewCount(result.count);
+          setPreviewError(null);
+        } else {
+          // A failed refresh used to leave the previous number on screen with
+          // nothing to say it was not the answer to this question.
+          setPreviewCount(null);
+          setSampleEmails([]);
+          setPreviewError(result.error);
         }
       });
     }
@@ -83,11 +91,29 @@ export function SegmentDetailsSheet({
   }
 
   const handleRefresh = () => {
+    const filterCount = countConditionFilters(segment.condition);
     startTransition(async () => {
       const result = await previewSegment(organizationId, segment.condition);
       if (result.success) {
         setSampleEmails(result.sampleEmails);
         setPreviewCount(result.count);
+        setPreviewError(null);
+        captureSegmentPreview({
+          filter_count: filterCount,
+          match_count: result.count,
+          mode: "details",
+          result: "success",
+        });
+      } else {
+        setPreviewCount(null);
+        setSampleEmails([]);
+        setPreviewError(result.error);
+        captureSegmentPreview({
+          filter_count: filterCount,
+          match_count: null,
+          mode: "details",
+          result: "error",
+        });
       }
     });
   };
@@ -101,27 +127,18 @@ export function SegmentDetailsSheet({
             {segment.name}
           </SheetTitle>
           <SheetDescription>
-            {previewCount !== null
-              ? `${previewCount.toLocaleString()} contacts match`
-              : `${segment.memberCount.toLocaleString()} contacts`}
+            {previewCount === null
+              ? "Count unavailable"
+              : `${previewCount.toLocaleString()} can be emailed`}
           </SheetDescription>
         </SheetHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4">
-          {/* Segment Info */}
-          <div className="flex flex-wrap items-center gap-2">
-            {segment.trackMembership && (
-              <Badge variant="secondary">Tracking Changes</Badge>
-            )}
-            {segment.lastComputedAt && (
-              <span className="text-muted-foreground text-xs">
-                Last computed{" "}
-                {formatDistanceToNow(new Date(segment.lastComputedAt), {
-                  addSuffix: true,
-                })}
-              </span>
-            )}
-          </div>
+          {/* The count is computed on open, so there is no "last computed"
+              age to report — and no second, older number to contradict it. */}
+          {previewError && (
+            <p className="text-destructive text-sm">{previewError}</p>
+          )}
 
           {segment.description && (
             <p className="text-muted-foreground text-sm">
@@ -176,7 +193,7 @@ export function SegmentDetailsSheet({
                   ) : (
                     <TableRow>
                       <TableCell className="text-center text-muted-foreground">
-                        No contacts match this segment
+                        No contacts in this segment can be emailed
                       </TableCell>
                     </TableRow>
                   )}

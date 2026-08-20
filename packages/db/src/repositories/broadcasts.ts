@@ -20,6 +20,7 @@ import {
   messageSend,
 } from "../schema/batch";
 import { contact, contactTopic } from "../schema/contacts";
+import type { FilterCondition } from "../schema/segments";
 import { template } from "../schema/templates";
 import { buildConditionSQL } from "../segment-filter";
 
@@ -564,23 +565,36 @@ export async function checkSegmentUsable(
   return buildConditionSQL(seg.condition) ? "ok" : "no-valid-filters";
 }
 
+/**
+ * Whether a contact can be reached on this channel at all — the predicate the
+ * sender applies before anything else.
+ *
+ * Exported because every count the dashboard shows has to be this same
+ * predicate. Segment and topic counts used to omit it and so reported an
+ * audience larger than any send could reach: a segment counted unsubscribed
+ * and email-less contacts, a topic counted subscribers who had since bounced.
+ * The fix is one predicate, not four copies of it.
+ *
+ * Self-contained (parenthesised) so it can be dropped into a `count(*) FILTER
+ * (WHERE …)` as readily as into a `WHERE`.
+ */
+export function channelEligibilitySQL(channel: Channel): SQL {
+  if (channel === "email") {
+    return sql`(${contact.email} IS NOT NULL AND (${contact.emailStatus} = 'active' OR ${contact.emailStatus} IS NULL))`;
+  }
+  return sql`(${contact.phone} IS NOT NULL AND ${contact.smsStatus} = 'opted_in')`;
+}
+
 async function buildRecipientConditions(
   organizationId: string,
   channel: Channel,
   filter?: BroadcastRecipientFilter,
   dbClient: DbClient = db
 ): Promise<SQL[]> {
-  const conditions: SQL[] = [eq(contact.organizationId, organizationId)];
-
-  if (channel === "email") {
-    conditions.push(isNotNull(contact.email));
-    conditions.push(
-      sql`(${contact.emailStatus} = 'active' OR ${contact.emailStatus} IS NULL)`
-    );
-  } else {
-    conditions.push(isNotNull(contact.phone));
-    conditions.push(eq(contact.smsStatus, "opted_in" as never));
-  }
+  const conditions: SQL[] = [
+    eq(contact.organizationId, organizationId),
+    channelEligibilitySQL(channel),
+  ];
 
   if (filter?.createdBefore) {
     conditions.push(lte(contact.createdAt, filter.createdBefore));
@@ -632,6 +646,120 @@ export async function countBroadcastRecipients(
     .where(and(...conditions));
 
   return result?.count ?? 0;
+}
+
+/**
+ * How many contacts each of these segments would actually send to.
+ *
+ * One scan for N segments: each segment becomes a `count(*) FILTER (WHERE …)`
+ * over the org's eligible contacts, so listing a page of segments costs the
+ * same as counting one. A segment that is missing, or whose filters do not all
+ * compile, counts nobody — identical to `countBroadcastRecipients`, which is
+ * the point: the list and the send must not be able to disagree.
+ */
+export async function countRecipientsBySegment(
+  organizationId: string,
+  channel: Channel,
+  segmentIds: string[],
+  dbClient: DbClient = db
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (segmentIds.length === 0) {
+    return counts;
+  }
+
+  const rows = await dbClient.query.segment.findMany({
+    where: (s, { and: a, eq: e, inArray: ia }) =>
+      a(e(s.organizationId, organizationId), ia(s.id, segmentIds)),
+    columns: { id: true, condition: true },
+  });
+  const conditionById = new Map(rows.map((r) => [r.id, r.condition]));
+
+  // Alias by position: a segment id is not a legal SQL identifier.
+  const selection: Record<string, SQL<number>> = {};
+  const idByAlias = new Map<string, string>();
+  segmentIds.forEach((segmentId, index) => {
+    const alias = `s${index}`;
+    idByAlias.set(alias, segmentId);
+    const condition = conditionById.get(segmentId);
+    const segmentSQL = condition ? buildConditionSQL(condition) : null;
+    selection[alias] =
+      sql<number>`count(*) FILTER (WHERE ${segmentSQL ?? sql`FALSE`})::int`;
+  });
+
+  const [result] = await dbClient
+    .select(selection)
+    .from(contact)
+    .where(
+      and(
+        eq(contact.organizationId, organizationId),
+        channelEligibilitySQL(channel)
+      )
+    );
+
+  for (const [alias, segmentId] of idByAlias) {
+    counts.set(segmentId, result?.[alias] ?? 0);
+  }
+
+  return counts;
+}
+
+export type ConditionAudience = {
+  /** Contacts the filters match, reachable or not. */
+  matched: number;
+  /** Of those, the ones a broadcast on this channel would actually reach. */
+  sendable: number;
+  sampleEmails: string[];
+};
+
+/**
+ * The audience of an unsaved condition — what the segment builder's preview
+ * needs, since there is no segment id to count against yet.
+ *
+ * Returns `null` when the condition does not compile, so callers report why
+ * rather than reporting a zero the query never measured.
+ */
+export async function previewConditionAudience(
+  organizationId: string,
+  channel: Channel,
+  condition: FilterCondition,
+  sampleLimit = 5,
+  dbClient: DbClient = db
+): Promise<ConditionAudience | null> {
+  const conditionSQL = buildConditionSQL(condition);
+  if (!conditionSQL) {
+    return null;
+  }
+
+  const eligible = channelEligibilitySQL(channel);
+  const matchWhere = and(
+    eq(contact.organizationId, organizationId),
+    conditionSQL
+  );
+
+  const [counts] = await dbClient
+    .select({
+      matched: sql<number>`count(*)::int`,
+      sendable: sql<number>`count(*) FILTER (WHERE ${eligible})::int`,
+    })
+    .from(contact)
+    .where(matchWhere);
+
+  // Sampling the reachable rows, not the matching ones: a sample drawn from
+  // contacts that cannot be mailed is not a sample of the send.
+  const samples = await dbClient
+    .select({ email: contact.email })
+    .from(contact)
+    .where(and(matchWhere, eligible))
+    .limit(sampleLimit);
+
+  return {
+    matched: counts?.matched ?? 0,
+    sendable: counts?.sendable ?? 0,
+    sampleEmails: samples
+      .map((s) => s.email)
+      .filter((e): e is string => e !== null),
+  };
 }
 
 /**
@@ -842,8 +970,72 @@ export async function listPublishedTemplates(
 export type TopicWithSubscriberCount = {
   id: string;
   name: string;
+  /** Subscribers a broadcast on this topic would actually reach. */
   subscriberCount: number;
 };
+
+export type TopicAudienceCounts = {
+  /** Opted in — the number the preference centre and the operator think of. */
+  subscribed: number;
+  /** Waiting on a double opt-in confirmation. Not subscribers, not nobody. */
+  pending: number;
+  unsubscribed: number;
+  /** Of the subscribed, the ones a broadcast would actually reach. */
+  sendable: number;
+};
+
+/**
+ * Subscribed / pending / unsubscribed / sendable per topic, in one grouped
+ * scan.
+ *
+ * The join to `contact` is what makes `sendable` possible: a subscription row
+ * carries no idea whether the person behind it has since bounced, complained,
+ * been suppressed, or unsubscribed globally. Counting subscriptions alone
+ * reported an audience the sender would never reach — measured at 60% too high
+ * on one production topic.
+ */
+export async function countTopicAudience(
+  organizationId: string,
+  topicIds: string[],
+  channel: Channel = "email",
+  dbClient: DbClient = db
+): Promise<Map<string, TopicAudienceCounts>> {
+  if (topicIds.length === 0) {
+    return new Map();
+  }
+
+  const eligible = channelEligibilitySQL(channel);
+
+  const rows = await dbClient
+    .select({
+      topicId: contactTopic.topicId,
+      subscribed: sql<number>`count(*) FILTER (WHERE ${contactTopic.status} = 'subscribed')::int`,
+      pending: sql<number>`count(*) FILTER (WHERE ${contactTopic.status} = 'pending')::int`,
+      unsubscribed: sql<number>`count(*) FILTER (WHERE ${contactTopic.status} = 'unsubscribed')::int`,
+      sendable: sql<number>`count(*) FILTER (WHERE ${contactTopic.status} = 'subscribed' AND ${eligible})::int`,
+    })
+    .from(contactTopic)
+    .innerJoin(contact, eq(contact.id, contactTopic.contactId))
+    .where(
+      and(
+        inArray(contactTopic.topicId, topicIds),
+        eq(contact.organizationId, organizationId)
+      )
+    )
+    .groupBy(contactTopic.topicId);
+
+  return new Map(
+    rows.map((r) => [
+      r.topicId,
+      {
+        subscribed: r.subscribed,
+        pending: r.pending,
+        unsubscribed: r.unsubscribed,
+        sendable: r.sendable,
+      },
+    ])
+  );
+}
 
 export async function listTopicsWithSubscriberCounts(
   organizationId: string,
@@ -854,31 +1046,21 @@ export async function listTopicsWithSubscriberCounts(
     columns: { id: true, name: true },
   });
 
-  const topicIds = topics.map((t) => t.id);
-  const subscriberCounts =
-    topicIds.length > 0
-      ? await dbClient
-          .select({
-            topicId: contactTopic.topicId,
-            count: sql<number>`count(*)::int`,
-          })
-          .from(contactTopic)
-          .where(
-            and(
-              eq(contactTopic.status, "subscribed"),
-              inArray(contactTopic.topicId, topicIds)
-            )
-          )
-          .groupBy(contactTopic.topicId)
-      : [];
+  const audience = await countTopicAudience(
+    organizationId,
+    topics.map((t) => t.id),
+    "email",
+    dbClient
+  );
 
-  const countMap = new Map(subscriberCounts.map((c) => [c.topicId, c.count]));
-
+  // The picker sits one click from a send, so it shows the sendable figure —
+  // the subscribed total belongs on /topics, where the distinction is the
+  // point.
   return topics
     .map((t) => ({
       id: t.id,
       name: t.name,
-      subscriberCount: countMap.get(t.id) ?? 0,
+      subscriberCount: audience.get(t.id)?.sendable ?? 0,
     }))
     .sort((a, b) => b.subscriberCount - a.subscriberCount);
 }
@@ -888,22 +1070,38 @@ export async function listTopicsWithSubscriberCounts(
 export type SegmentSummary = {
   id: string;
   name: string;
+  /** Contacts a broadcast to this segment would actually send to, counted now. */
   memberCount: number;
 };
 
+/**
+ * `segment.member_count` is not read here on purpose. It is written at create,
+ * update and split and never again — production's only segment carried a count
+ * six months stale — and it counted matching rows rather than reachable ones.
+ * Counting live through the same predicate the send uses removes the
+ * divergence by construction instead of by synchronisation.
+ */
 export async function listSegmentsForBroadcast(
   organizationId: string,
   dbClient: DbClient = db
 ): Promise<SegmentSummary[]> {
   const segments = await dbClient.query.segment.findMany({
     where: (s, { eq: e }) => e(s.organizationId, organizationId),
-    columns: { id: true, name: true, memberCount: true },
-    orderBy: (s, { desc: d }) => [d(s.memberCount)],
+    columns: { id: true, name: true },
   });
 
-  return segments.map((s) => ({
-    id: s.id,
-    name: s.name,
-    memberCount: s.memberCount,
-  }));
+  const counts = await countRecipientsBySegment(
+    organizationId,
+    "email",
+    segments.map((s) => s.id),
+    dbClient
+  );
+
+  return segments
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      memberCount: counts.get(s.id) ?? 0,
+    }))
+    .sort((a, b) => b.memberCount - a.memberCount);
 }

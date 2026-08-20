@@ -8,7 +8,12 @@ export type TopicWithMeta = {
   description: string | null;
   public: boolean;
   doubleOptIn: boolean;
+  /** Opted in. Not all of them are reachable — see `sendableCount`. */
   subscriberCount: number;
+  /** Of the subscribed, the ones a broadcast to this topic would reach. */
+  sendableCount: number;
+  /** Waiting on a double opt-in confirmation. Broadcasts skip these. */
+  pendingCount: number;
   createdAt: Date;
   updatedAt: Date;
   createdBy: {
