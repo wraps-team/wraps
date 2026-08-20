@@ -22,6 +22,21 @@ import {
   type ContactWithMeta,
 } from "@/lib/contacts";
 
+// Radix's DropdownMenu content measures its trigger via
+// @radix-ui/react-use-size, which jsdom has no ResizeObserver for. Matches
+// contacts-table-analytics.test.tsx's setup.
+globalThis.ResizeObserver ??= class {
+  observe() {
+    // no layout in jsdom, so nothing to report
+  }
+  unobserve() {
+    // no-op
+  }
+  disconnect() {
+    // no-op
+  }
+} as unknown as typeof ResizeObserver;
+
 const push = vi.fn();
 const replace = vi.fn();
 let currentSearchParams = new URLSearchParams();
@@ -54,8 +69,9 @@ vi.mock("@/actions/contacts-topics", () => ({
   subscribeContactToTopics: vi.fn(),
   unsubscribeContactFromTopics: vi.fn(),
 }));
+const exportAllContacts = vi.fn();
 vi.mock("@/actions/export", () => ({
-  exportAllContacts: vi.fn(),
+  exportAllContacts: (...args: unknown[]) => exportAllContacts(...args),
 }));
 
 import { ContactsTable } from "../contacts-table";
@@ -137,6 +153,13 @@ beforeEach(() => {
   push.mockClear();
   replace.mockClear();
   toastError.mockClear();
+  exportAllContacts.mockReset();
+  exportAllContacts.mockResolvedValue({
+    success: true,
+    contacts: [makeContact()],
+    total: 1,
+    truncated: false,
+  });
   currentSearchParams = new URLSearchParams();
 });
 
@@ -400,13 +423,53 @@ describe("the status filter refuses a URL value it cannot serve", () => {
 
     // The other half of the test above: dropping every value, not just the
     // unservable ones, would leave the control reading "All Statuses" while
-    // the URL says `?emailStatus=bounced` — and "Export all" would silently
-    // export the unfiltered list.
+    // the URL says `?emailStatus=bounced`.
     const statusFilter = screen
       .getAllByRole("combobox")
       .find((element) => element.id !== "page-size");
 
     expect(statusFilter).toHaveTextContent("Bounced");
+  });
+
+  // The guard has two consumers, and the control is only the visible one.
+  // "Export all" reads the same URL value and hands it to the server action,
+  // so guarding the <Select> alone leaves a user on `?emailStatus=noEmailStatus`
+  // reading "All Statuses" and then downloading a CSV built from
+  // `WHERE email_status = 'noEmailStatus'` — an empty file, with no error.
+  it("exports the unfiltered list for an emailStatus no option matches", async () => {
+    currentSearchParams = new URLSearchParams({ emailStatus: "noEmailStatus" });
+
+    renderTable(
+      <ContactsTable {...baseProps} contacts={[makeContact()]} total={1} />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /export/i }));
+    await userEvent.click(await screen.findByText(/^export all$/i));
+
+    await waitFor(() => {
+      expect(exportAllContacts).toHaveBeenCalledWith(
+        "org-1",
+        expect.objectContaining({ emailStatus: undefined })
+      );
+    });
+  });
+
+  it("exports the filtered list for an emailStatus it can serve", async () => {
+    currentSearchParams = new URLSearchParams({ emailStatus: "bounced" });
+
+    renderTable(
+      <ContactsTable {...baseProps} contacts={[makeContact()]} total={1} />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /export/i }));
+    await userEvent.click(await screen.findByText(/^export all$/i));
+
+    await waitFor(() => {
+      expect(exportAllContacts).toHaveBeenCalledWith(
+        "org-1",
+        expect.objectContaining({ emailStatus: "bounced" })
+      );
+    });
   });
 });
 
