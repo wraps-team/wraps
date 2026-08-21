@@ -11,6 +11,7 @@ import {
   KeyRound,
   Mail,
   Network,
+  Receipt,
   Send,
   Server,
   Shield,
@@ -35,6 +36,18 @@ type BlogPost = {
 };
 
 const posts: BlogPost[] = [
+  {
+    slug: "reduce-transactional-email-costs",
+    title: "At 100K Emails a Month, the Send Rate Is the Small Number",
+    description:
+      "Sending 100,000 transactional emails on SES costs $10. A dedicated IP costs $24.95, attachments cost $24, and SES Pro costs $127. The full bill at 100K, the 17x spread across providers, and why cutting 30,000 sends saves $3.00.",
+    category: "Research",
+    date: "August 2026",
+    readTime: "11 min read",
+    author: "Wraps Team",
+    featured: true,
+    icon: <Receipt className="h-6 w-6" />,
+  },
   {
     slug: "ses-pricing-plans-2026",
     title: "AWS SES Pricing Plans: What Actually Changed",
