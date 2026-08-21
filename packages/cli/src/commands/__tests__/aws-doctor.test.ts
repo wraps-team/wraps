@@ -33,6 +33,12 @@ import {
 } from "../../utils/shared/doctor-remediation.js";
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 
+// GitHub Actions sets FORCE_COLOR, so picocolors emits ANSI escapes on CI even
+// though a local vitest run (stdout is not a TTY) emits none. Assertions below
+// pin what a line says and where it sits, never how it is coloured, so strip
+// the escapes rather than depending on the environment to omit them.
+const stripAnsi = (s: string) => s.replace(/\u001B\[[0-9;]*m/g, "");
+
 const mockDetectAWSState = detectAWSState as ReturnType<typeof vi.fn>;
 const mockHasCredentialsFile = hasCredentialsFile as ReturnType<typeof vi.fn>;
 const mockIsSESSandbox = isSESSandbox as ReturnType<typeof vi.fn>;
@@ -286,7 +292,7 @@ describe("aws doctor", () => {
       await doctor();
 
       const lines = consoleLogSpy.mock.calls
-        .map((c) => c.join(" "))
+        .map((c) => stripAnsi(c.join(" ")))
         .join("\n")
         .split("\n");
 
@@ -390,7 +396,7 @@ describe("aws doctor", () => {
       await doctor();
 
       const lines = consoleLogSpy.mock.calls
-        .map((c) => c.join(" "))
+        .map((c) => stripAnsi(c.join(" ")))
         .join("\n")
         .split("\n");
 
