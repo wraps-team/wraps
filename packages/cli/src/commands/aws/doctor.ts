@@ -17,32 +17,37 @@ import {
   hasConfigFile,
   hasCredentialsFile,
 } from "../../utils/shared/aws-detection.js";
+import {
+  collectRemediations,
+  type DoctorFinding,
+  formatRemediation,
+  remediations,
+} from "../../utils/shared/doctor-remediation.js";
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 
-type DoctorResult = {
-  status: "pass" | "warn" | "fail" | "info";
-  message: string;
-  details?: string;
-};
+const CATEGORY = "AWS Setup";
 
 /**
  * Run all diagnostic checks
  */
-async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
-  const results: DoctorResult[] = [];
+async function runDiagnostics(state: AWSSetupState): Promise<DoctorFinding[]> {
+  const results: DoctorFinding[] = [];
 
   // Check AWS CLI
   if (state.cliInstalled) {
     results.push({
       status: "pass",
-      message: `AWS CLI v${state.cliVersion} installed`,
+      category: CATEGORY,
+      name: `AWS CLI v${state.cliVersion} installed`,
     });
   } else {
     results.push({
       status: "fail",
-      message: "AWS CLI not installed",
+      category: CATEGORY,
+      name: "AWS CLI not installed",
       details:
         "Install: brew install awscli (macOS) or https://aws.amazon.com/cli/",
+      remediation: remediations.installAwsCli(),
     });
   }
 
@@ -50,7 +55,8 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
   if (hasCredentialsFile()) {
     results.push({
       status: "pass",
-      message: "Credentials file exists (~/.aws/credentials)",
+      category: CATEGORY,
+      name: "Credentials file exists (~/.aws/credentials)",
     });
   } else if (
     state.credentialSource === "environment" ||
@@ -58,13 +64,16 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
   ) {
     results.push({
       status: "info",
-      message: `Using ${state.credentialSource} credentials (no file needed)`,
+      category: CATEGORY,
+      name: `Using ${state.credentialSource} credentials (no file needed)`,
     });
   } else {
     results.push({
       status: "warn",
-      message: "No credentials file (~/.aws/credentials)",
+      category: CATEGORY,
+      name: "No credentials file (~/.aws/credentials)",
       details: "Run: aws configure",
+      remediation: remediations.configureAwsCredentials(),
     });
   }
 
@@ -72,12 +81,14 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
   if (hasConfigFile()) {
     results.push({
       status: "pass",
-      message: "Config file exists (~/.aws/config)",
+      category: CATEGORY,
+      name: "Config file exists (~/.aws/config)",
     });
   } else {
     results.push({
       status: "info",
-      message: "No config file (~/.aws/config)",
+      category: CATEGORY,
+      name: "No config file (~/.aws/config)",
       details: "Optional: stores default region and output format",
     });
   }
@@ -86,15 +97,33 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
   if (state.sso.configured) {
     results.push({
       status: "pass",
-      message: `SSO configured (${state.sso.profiles.length} profile${state.sso.profiles.length > 1 ? "s" : ""})`,
+      category: CATEGORY,
+      name: `SSO configured (${state.sso.profiles.length} profile${state.sso.profiles.length > 1 ? "s" : ""})`,
       details: state.sso.profiles.map((p) => p.name).join(", "),
     });
+
+    // A suggestion, not a finding, until now — but the CLI genuinely cannot
+    // tell which profile was meant, so nothing it does will use the right one.
+    // Hanging this off the pass row above would filter it out of the remedy
+    // set, which only collects fail/warn findings.
+    if (state.sso.profiles.length > 1 && !state.sso.activeProfile) {
+      results.push({
+        status: "warn",
+        category: CATEGORY,
+        name: `${state.sso.profiles.length} SSO profiles configured, none active`,
+        details: state.sso.profiles.map((p) => p.name).join(", "),
+        remediation: remediations.setAwsProfile(
+          state.sso.profiles.map((p) => p.name)
+        ),
+      });
+    }
 
     // Show SSO sessions if any
     if (state.sso.sessions.length > 0) {
       results.push({
         status: "info",
-        message: `SSO sessions: ${state.sso.sessions.map((s) => s.name).join(", ")}`,
+        category: CATEGORY,
+        name: `SSO sessions: ${state.sso.sessions.map((s) => s.name).join(", ")}`,
       });
     }
 
@@ -102,13 +131,15 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
     if (state.sso.activeProfile) {
       results.push({
         status: "pass",
-        message: `Active SSO profile: ${formatSSOProfile(state.sso.activeProfile)}`,
+        category: CATEGORY,
+        name: `Active SSO profile: ${formatSSOProfile(state.sso.activeProfile)}`,
       });
     } else if (state.credentialSource === "sso") {
       // Using SSO but not a named profile
       results.push({
         status: "info",
-        message: "Using SSO credentials",
+        category: CATEGORY,
+        name: "Using SSO credentials",
       });
     }
 
@@ -120,25 +151,35 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
           const hours = Math.floor(minutes / 60);
           results.push({
             status: "pass",
-            message: `SSO session valid (${hours}h ${minutes % 60}m remaining)`,
+            category: CATEGORY,
+            name: `SSO session valid (${hours}h ${minutes % 60}m remaining)`,
           });
         } else if (minutes > 15) {
           results.push({
             status: "pass",
-            message: `SSO session valid (${minutes}m remaining)`,
+            category: CATEGORY,
+            name: `SSO session valid (${minutes}m remaining)`,
           });
         } else if (minutes > 0) {
           results.push({
             status: "warn",
-            message: `SSO session expiring soon (${minutes}m remaining)`,
+            category: CATEGORY,
+            name: `SSO session expiring soon (${minutes}m remaining)`,
             details: getSSOLoginCommand(state.sso.activeProfile?.name),
+            remediation: remediations.ssoLogin(
+              getSSOLoginCommand(state.sso.activeProfile?.name)
+            ),
           });
         }
       } else if (state.sso.tokenStatus.expired) {
         results.push({
           status: "fail",
-          message: "SSO session expired",
+          category: CATEGORY,
+          name: "SSO session expired",
           details: `Run: ${getSSOLoginCommand(state.sso.activeProfile?.name)}`,
+          remediation: remediations.ssoLogin(
+            getSSOLoginCommand(state.sso.activeProfile?.name)
+          ),
         });
       }
     }
@@ -148,7 +189,8 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
   if (state.credentialsConfigured) {
     results.push({
       status: "pass",
-      message: `Can connect to AWS (account: ${state.accountId})`,
+      category: CATEGORY,
+      name: `Can connect to AWS (account: ${state.accountId})`,
     });
 
     // Check credential source (if not already shown for SSO)
@@ -156,13 +198,15 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
       if (state.credentialSource === "environment") {
         results.push({
           status: "pass",
-          message: "Using environment variable credentials",
+          category: CATEGORY,
+          name: "Using environment variable credentials",
         });
       } else if (state.credentialSource === "profile") {
         const profileName = state.profileName || "default";
         results.push({
           status: "pass",
-          message: `Using profile: ${profileName}`,
+          category: CATEGORY,
+          name: `Using profile: ${profileName}`,
         });
       }
     }
@@ -171,20 +215,32 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
     if (state.sso.configured && state.sso.tokenStatus?.expired) {
       results.push({
         status: "fail",
-        message: "Cannot connect to AWS (SSO session expired)",
+        category: CATEGORY,
+        name: "Cannot connect to AWS (SSO session expired)",
         details: `Run: ${getSSOLoginCommand(state.sso.activeProfile?.name)}`,
+        remediation: remediations.ssoLogin(
+          getSSOLoginCommand(state.sso.activeProfile?.name)
+        ),
       });
     } else if (state.sso.configured) {
       results.push({
         status: "fail",
-        message: "Cannot connect to AWS (SSO login required)",
+        category: CATEGORY,
+        name: "Cannot connect to AWS (SSO login required)",
         details: `Run: ${getSSOLoginCommand(state.sso.activeProfile?.name || state.sso.profiles[0]?.name)}`,
+        remediation: remediations.ssoLogin(
+          getSSOLoginCommand(
+            state.sso.activeProfile?.name || state.sso.profiles[0]?.name
+          )
+        ),
       });
     } else {
       results.push({
         status: "fail",
-        message: "Cannot connect to AWS",
-        details: "Run: wraps aws setup",
+        category: CATEGORY,
+        name: "Cannot connect to AWS",
+        details: "No working credentials were found",
+        remediation: remediations.configureAwsCredentials(),
       });
     }
     return results; // Can't do more checks without credentials
@@ -194,13 +250,16 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
   if (state.region) {
     results.push({
       status: "pass",
-      message: `Region set: ${state.region}`,
+      category: CATEGORY,
+      name: `Region set: ${state.region}`,
     });
   } else {
     results.push({
       status: "warn",
-      message: "Region not set",
+      category: CATEGORY,
+      name: "Region not set",
       details: "Will default to us-east-1. Set AWS_REGION for faster commands.",
+      remediation: remediations.setAwsRegion(),
     });
   }
 
@@ -210,7 +269,8 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
     if (profiles.length > 1) {
       results.push({
         status: "info",
-        message: `${profiles.length} profiles configured`,
+        category: CATEGORY,
+        name: `${profiles.length} profiles configured`,
         details: profiles.join(", "),
       });
     }
@@ -230,13 +290,16 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
       if (sandbox) {
         results.push({
           status: "warn",
-          message: "SES is in sandbox mode",
+          category: CATEGORY,
+          name: "SES is in sandbox mode",
           details: `You can only send to verified emails. Request production access in AWS console.\n${regionNote}`,
+          remediation: remediations.requestSesProductionAccess(),
         });
       } else {
         results.push({
           status: "pass",
-          message: "SES has production access",
+          category: CATEGORY,
+          name: "SES has production access",
           details: regionNote,
         });
       }
@@ -244,7 +307,8 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
     } catch {
       results.push({
         status: "info",
-        message: "Could not check SES status",
+        category: CATEGORY,
+        name: "Could not check SES status",
         details: `SES may not be enabled in this region.\n${regionNote}`,
       });
     }
@@ -254,16 +318,20 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
   if (process.env.AWS_ACCESS_KEY_ID && !process.env.AWS_SECRET_ACCESS_KEY) {
     results.push({
       status: "fail",
-      message: "AWS_ACCESS_KEY_ID set but AWS_SECRET_ACCESS_KEY missing",
+      category: CATEGORY,
+      name: "AWS_ACCESS_KEY_ID set but AWS_SECRET_ACCESS_KEY missing",
       details: "Both environment variables are required",
+      remediation: remediations.awsEnvVarsIncomplete(),
     });
   }
 
   if (process.env.AWS_SECRET_ACCESS_KEY && !process.env.AWS_ACCESS_KEY_ID) {
     results.push({
       status: "fail",
-      message: "AWS_SECRET_ACCESS_KEY set but AWS_ACCESS_KEY_ID missing",
+      category: CATEGORY,
+      name: "AWS_SECRET_ACCESS_KEY set but AWS_ACCESS_KEY_ID missing",
       details: "Both environment variables are required",
+      remediation: remediations.awsEnvVarsIncomplete(),
     });
   }
 
@@ -273,7 +341,7 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorResult[]> {
 /**
  * Display diagnostic results
  */
-function displayResults(results: DoctorResult[]): void {
+function displayResults(results: DoctorFinding[]): void {
   console.log();
 
   for (const result of results) {
@@ -299,9 +367,14 @@ function displayResults(results: DoctorResult[]): void {
         break;
     }
 
-    console.log(`  ${color(`[${icon}]`)} ${result.message}`);
+    console.log(`  ${color(`[${icon}]`)} ${result.name}`);
     if (result.details) {
       console.log(`      ${pc.dim(result.details)}`);
+    }
+    if (result.remediation?.command) {
+      console.log(
+        `      ${pc.dim("fix:")} ${pc.cyan(result.remediation.command)}`
+      );
     }
   }
 
@@ -309,78 +382,27 @@ function displayResults(results: DoctorResult[]): void {
 }
 
 /**
- * Generate suggestions based on results
+ * Suggestions are now derived from the remediations the findings carry, not by
+ * grepping this file's own copy. Renaming a finding can no longer silently
+ * delete its suggestion.
  */
-function generateSuggestions(
-  results: DoctorResult[],
-  state: AWSSetupState
-): string[] {
-  const suggestions: string[] = [];
+function suggestionsFor(results: DoctorFinding[]): string[] {
+  return collectRemediations(
+    results.filter((r) => r.status === "fail" || r.status === "warn")
+  ).map(formatRemediation);
+}
 
-  const hasCredentialsFail = results.some(
-    (r) => r.status === "fail" && r.message.includes("Cannot connect")
-  );
-  const hasCLIFail = results.some(
-    (r) => r.status === "fail" && r.message.includes("CLI not installed")
-  );
-  const hasRegionWarn = results.some(
-    (r) => r.status === "warn" && r.message.includes("Region not set")
-  );
-  const hasSandboxWarn = results.some(
-    (r) => r.status === "warn" && r.message.includes("sandbox mode")
-  );
-  const hasSSOExpired = results.some(
-    (r) => r.status === "fail" && r.message.includes("SSO session expired")
-  );
-  const hasSSOExpiring = results.some(
-    (r) => r.status === "warn" && r.message.includes("SSO session expiring")
-  );
-
-  if (hasCLIFail) {
-    suggestions.push("Install AWS CLI: brew install awscli (macOS)");
-  }
-
-  if (hasSSOExpired) {
-    const loginCmd = getSSOLoginCommand(
-      state.sso.activeProfile?.name || state.sso.profiles[0]?.name
-    );
-    suggestions.push(`Refresh SSO session: ${loginCmd}`);
-  } else if (hasSSOExpiring) {
-    const loginCmd = getSSOLoginCommand(state.sso.activeProfile?.name);
-    suggestions.push(`Session expiring soon, refresh with: ${loginCmd}`);
-  } else if (hasCredentialsFail) {
-    if (state.sso.configured) {
-      const loginCmd = getSSOLoginCommand(
-        state.sso.activeProfile?.name || state.sso.profiles[0]?.name
-      );
-      suggestions.push(`SSO login required: ${loginCmd}`);
-    } else {
-      suggestions.push("Run `wraps aws setup` to configure credentials");
-    }
-  }
-
-  if (hasRegionWarn) {
-    suggestions.push("Set AWS_REGION environment variable for faster commands");
-  }
-
-  if (hasSandboxWarn) {
-    suggestions.push(
-      "Request SES production access: wraps email check --domain yourdomain.com"
-    );
-  }
-
-  // Additional SSO suggestions
-  if (
-    state.sso.configured &&
-    state.sso.profiles.length > 1 &&
-    !state.sso.activeProfile
-  ) {
-    suggestions.push(
-      `Set AWS_PROFILE to use one of: ${state.sso.profiles.map((p) => p.name).join(", ")}`
-    );
-  }
-
-  return suggestions;
+/**
+ * The AWS findings with no rendering — for `wraps doctor`. Returns the state
+ * too, because the aggregate needs `credentialsConfigured` before deciding
+ * whether the email leg can run at all.
+ */
+export async function collectAwsFindings(): Promise<{
+  findings: DoctorFinding[];
+  state: AWSSetupState;
+}> {
+  const state = await detectAWSState();
+  return { findings: await runDiagnostics(state), state };
 }
 
 /**
@@ -396,8 +418,7 @@ export async function doctor(): Promise<void> {
   const spinner = isJsonMode() ? null : clack.spinner();
   spinner?.start("Running diagnostics...");
 
-  const state = await detectAWSState();
-  const results = await runDiagnostics(state);
+  const { findings: results } = await collectAwsFindings();
 
   spinner?.stop("Diagnostics complete");
 
@@ -407,15 +428,15 @@ export async function doctor(): Promise<void> {
   const passCount = results.filter((r) => r.status === "pass").length;
 
   if (isJsonMode()) {
-    const suggestions = generateSuggestions(results, state);
     jsonSuccess("aws.doctor", {
       checks: results.map((r) => ({
-        name: r.message,
+        name: r.name,
         status: r.status,
         ...(r.details ? { details: r.details } : {}),
+        ...(r.remediation ? { remediation: r.remediation } : {}),
       })),
       summary: { pass: passCount, warn: warnCount, fail: failCount },
-      suggestions,
+      suggestions: suggestionsFor(results),
     });
     return;
   }
@@ -433,7 +454,7 @@ export async function doctor(): Promise<void> {
   }
 
   // Suggestions
-  const suggestions = generateSuggestions(results, state);
+  const suggestions = suggestionsFor(results);
   if (suggestions.length > 0) {
     console.log();
     clack.log.info(pc.bold("Suggestions:"));
@@ -452,8 +473,6 @@ export async function doctor(): Promise<void> {
 
   console.log();
   clack.outro(
-    failCount > 0
-      ? pc.dim("Run `wraps aws setup` to fix issues")
-      : pc.dim("Ready to deploy: wraps email init")
+    pc.dim(failCount > 0 ? "See suggested fixes above" : "Ready to deploy")
   );
 }

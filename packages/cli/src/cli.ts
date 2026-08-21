@@ -18,6 +18,8 @@ import { cdnStatus } from "./commands/cdn/status.js";
 import { cdnSync } from "./commands/cdn/sync.js";
 import { cdnUpgrade } from "./commands/cdn/upgrade.js";
 import { cdnVerify } from "./commands/cdn/verify.js";
+// Aggregate diagnostics
+import { wrapsDoctor } from "./commands/doctor.js";
 import { agentCreate, agentKill, agentList } from "./commands/email/agent.js";
 import { check } from "./commands/email/check.js";
 import { config } from "./commands/email/config.js";
@@ -106,6 +108,7 @@ import {
   printCompletionScript,
   setupTabCompletion,
 } from "./utils/shared/completion.js";
+import { suggestCommand } from "./utils/shared/did-you-mean.js";
 import { handleCLIError } from "./utils/shared/errors.js";
 import { isJsonMode, setJsonMode } from "./utils/shared/json-output.js";
 
@@ -328,6 +331,9 @@ function showHelp() {
   );
   console.log("Global Commands:");
   console.log(`  ${pc.cyan("status")}       Show overview of all services`);
+  console.log(
+    `  ${pc.cyan("doctor")}       Diagnose AWS + email infrastructure`
+  );
   console.log(`  ${pc.cyan("destroy")}      Remove deployed infrastructure`);
   console.log(`  ${pc.cyan("permissions")} Show required AWS IAM permissions`);
   console.log(`  ${pc.cyan("completion")}   Generate shell completion script`);
@@ -1599,6 +1605,13 @@ async function run() {
         });
         break;
 
+      case "doctor":
+        await wrapsDoctor({
+          region: flags.region,
+          json: flags.json,
+        });
+        break;
+
       case "console":
         await dashboard({
           port: flags.port,
@@ -1687,12 +1700,17 @@ async function run() {
         showHelp();
         break;
 
-      default:
+      default: {
         clack.log.error(`Unknown command: ${primaryCommand}`);
+        const suggestion = suggestCommand(primaryCommand);
+        if (suggestion) {
+          console.log(`\nDid you mean ${pc.cyan(`wraps ${suggestion}`)}?`);
+        }
         console.log(
           `\nRun ${pc.cyan("wraps --help")} for available commands.\n`
         );
         throw new Error(`Unknown command: ${primaryCommand}`);
+      }
     }
     // Track successful command execution
     const duration = Date.now() - startTime;

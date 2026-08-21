@@ -22,9 +22,22 @@ vi.mock("../../utils/shared/aws.js", () => ({
 vi.mock("../../utils/shared/metadata.js", () => ({
   loadConnectionMetadata: vi.fn().mockResolvedValue(null),
   findConnectionsWithService: vi.fn().mockResolvedValue([]),
+  // Mirrors the real getAllTrackedDomains (metadata.ts:990-1025): the primary
+  // domain first, then each additional domain carrying its own configSetName.
   getAllTrackedDomains: vi.fn((metadata) => {
-    const domain = metadata?.services?.email?.config?.domain;
-    return domain ? [{ domain, isPrimary: true, managed: true }] : [];
+    const config = metadata?.services?.email?.config;
+    const primary = config?.domain
+      ? [{ domain: config.domain, isPrimary: true, managed: true }]
+      : [];
+    const additional = (config?.additionalDomains ?? []).map(
+      (d: { domain: string; configSetName?: string }) => ({
+        domain: d.domain,
+        isPrimary: false,
+        managed: true,
+        configSetName: d.configSetName,
+      })
+    );
+    return [...primary, ...additional];
   }),
 }));
 vi.mock("../../utils/shared/pulumi.js", () => ({
@@ -152,6 +165,7 @@ vi.mock("@aws-sdk/client-sqs", () => ({
 
 import * as prompts from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
+import { trackCommand } from "../../telemetry/events.js";
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 import { findConnectionsWithService } from "../../utils/shared/metadata.js";
 import type { AWSResourceScan } from "../../utils/shared/scanner.js";
@@ -167,6 +181,7 @@ const mockFindConnections = findConnectionsWithService as ReturnType<
 >;
 const mockIsJsonMode = isJsonMode as ReturnType<typeof vi.fn>;
 const mockJsonSuccess = jsonSuccess as ReturnType<typeof vi.fn>;
+const mockTrackCommand = trackCommand as ReturnType<typeof vi.fn>;
 
 describe("emailDoctor", () => {
   let mockSpinner: {
@@ -214,6 +229,26 @@ describe("emailDoctor", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
+
+  /**
+   * The summary verdict and the remedy block land on different sinks: rows go
+   * through `console.log`, the one-line verdict through `clack.log.*`. Asking
+   * "did the user see this string?" has to read both.
+   */
+  function allUserFacingOutput(): string {
+    const consoleOutput = consoleLogSpy.mock.calls
+      .map((c) => c.join(" "))
+      .join("\n");
+    const clackOutput = [
+      ...vi.mocked(prompts.log.error).mock.calls,
+      ...vi.mocked(prompts.log.warn).mock.calls,
+      ...vi.mocked(prompts.log.info).mock.calls,
+      ...vi.mocked(prompts.log.success).mock.calls,
+    ]
+      .map((c) => c.join(" "))
+      .join("\n");
+    return `${consoleOutput}\n${clackOutput}`;
+  }
 
   it("should display found wraps-* resources with pass status", async () => {
     const filteredScan: AWSResourceScan = {
@@ -565,6 +600,461 @@ describe("emailDoctor", () => {
           expect.objectContaining({ category: "Event Pipeline" }),
         ]),
       })
+    );
+  });
+  it("does not offer --cleanup when the only failures are event pipeline findings", async () => {
+    // `--cleanup` only ever deletes orphaned wraps-* resources. An empty scan
+    // means there is nothing for it to delete, so recommending it here is a
+    // guaranteed no-op.
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: { email: { config: { domain: "example.com" } } },
+      },
+    ]);
+
+    const emptyScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(emptyScan);
+    mockFilterFn.mockReturnValue(emptyScan);
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({});
+
+    expect(allUserFacingOutput()).not.toContain("--cleanup");
+  });
+  it("offers wraps email doctor --cleanup when orphaned resources exist", async () => {
+    // The mirror of the test above: an orphan finding is the one case where
+    // `--cleanup` genuinely has work to do, so the remedy must still surface.
+    const filteredScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [
+        { name: "wraps-email-config-set", eventDestinations: [] },
+      ],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(filteredScan);
+    mockFilterFn.mockReturnValue(filteredScan);
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({});
+
+    expect(allUserFacingOutput()).toContain("wraps email doctor --cleanup");
+  });
+  it("does not prompt for --cleanup when only a finding's free text mentions orphans", async () => {
+    // The gate asks which findings declared the cleanup remedy, not which
+    // findings happen to spell the word. A pipeline hop that reports an AWS
+    // error mentioning orphans has nothing for --cleanup to delete.
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: { email: { config: { domain: "example.com" } } },
+      },
+    ]);
+
+    const emptyScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(emptyScan);
+    mockFilterFn.mockReturnValue(emptyScan);
+
+    mockEventBridgeSend.mockImplementation(
+      (cmd: { constructor: { name: string } }) => {
+        switch (cmd.constructor.name) {
+          case "DescribeRuleCommand":
+            return Promise.resolve({ State: "ENABLED" });
+          case "ListTargetsByRuleCommand":
+            return Promise.resolve({
+              Targets: [
+                {
+                  Id: "sqs-target",
+                  Arn: "arn:aws:sqs:us-east-1:123456789012:wraps-email-events",
+                },
+              ],
+            });
+          default:
+            return Promise.resolve({});
+        }
+      }
+    );
+    mockSqsSend.mockRejectedValue(
+      new Error("AccessDenied: sqs:GetQueueUrl denied on orphan-events probe")
+    );
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({ cleanup: true });
+
+    expect(vi.mocked(prompts.confirm)).not.toHaveBeenCalled();
+  });
+  it("prints each failing row's own repairing command directly under that row", async () => {
+    // Scrolling to a summary block to learn what a specific row needs is the
+    // friction this replaces: the row carries its own fix. Two domains with
+    // two different remedies, so a fix line that ignored its row's data —
+    // hardcoded, or read off the first finding — lands on the wrong row.
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: {
+          email: {
+            config: {
+              domain: "example.com",
+              additionalDomains: [
+                { domain: "extra.com", configSetName: "wraps-email-extra-com" },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const emptyScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(emptyScan);
+    mockFilterFn.mockReturnValue(emptyScan);
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({});
+
+    const rowLines = consoleLogSpy.mock.calls
+      .map((c) => c.join(" "))
+      .join("\n")
+      .split("\n");
+
+    // A row renders as three lines: header, symptom, fix. Anchoring on the
+    // header index pins the fix to the row it belongs to, not to "somewhere
+    // in the report" — the Suggested-fixes block lists both commands too.
+    const primaryRow = rowLines.findIndex((line) =>
+      line.includes("SES config set wraps-email-example-com")
+    );
+    expect(primaryRow).toBeGreaterThan(-1);
+    expect(rowLines[primaryRow + 1]).toContain("SES emits no events");
+    expect(rowLines[primaryRow + 2]).toBe(
+      "      fix: wraps email sync --region us-east-1"
+    );
+
+    // The additional domain's config set is not Pulumi-managed, so its own
+    // row must name the add flow instead.
+    const additionalRow = rowLines.findIndex((line) =>
+      line.includes("SES config set wraps-email-extra-com")
+    );
+    expect(additionalRow).toBeGreaterThan(-1);
+    expect(rowLines[additionalRow + 2]).toBe(
+      "      fix: wraps email domains add --domain extra.com --region us-east-1"
+    );
+
+    // A healthy row declares no remedy, so nothing is rendered under it: the
+    // line after its detail line is the next row's header.
+    const healthyRow = rowLines.findIndex((line) =>
+      line.includes("SQS DLQ wraps-email-events-dlq")
+    );
+    expect(healthyRow).toBeGreaterThan(-1);
+    expect(rowLines[healthyRow + 2]).not.toContain("fix:");
+  });
+  it("does not offer --cleanup for pipeline warnings when the stack owns every resource", async () => {
+    // The warning here is a DLQ backlog, and every wraps-* resource is under
+    // Pulumi management, so there is not one orphan to delete. A remedy block
+    // that keyed off "are there warnings?" instead of "did a finding declare
+    // this remedy?" would recommend a deletion that has nothing to delete.
+    vi.mocked(
+      pulumi.automation.LocalWorkspace.selectStack
+    ).mockResolvedValueOnce({} as never);
+
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: { email: { config: { domain: "example.com" } } },
+      },
+    ]);
+
+    const filteredScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [
+        { name: "wraps-email-example-com", eventDestinations: [] },
+      ],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(filteredScan);
+    mockFilterFn.mockReturnValue(filteredScan);
+
+    // Healthy everywhere except the dead-letter queue, which holds 3 events.
+    mockSesv2Send.mockResolvedValue({
+      EventDestinations: [{ Name: "wraps-email-eventbridge", Enabled: true }],
+    });
+    mockEventBridgeSend.mockImplementation(
+      (cmd: { constructor: { name: string } }) => {
+        switch (cmd.constructor.name) {
+          case "DescribeRuleCommand":
+            return Promise.resolve({ State: "ENABLED" });
+          case "ListTargetsByRuleCommand":
+            return Promise.resolve({
+              Targets: [
+                {
+                  Id: "sqs-target",
+                  Arn: "arn:aws:sqs:us-east-1:123456789012:wraps-email-events",
+                },
+              ],
+            });
+          default:
+            return Promise.resolve({});
+        }
+      }
+    );
+    mockSqsSend.mockResolvedValue({
+      QueueUrl:
+        "https://sqs.us-east-1.amazonaws.com/123456789012/wraps-email-events-dlq",
+      Attributes: { ApproximateNumberOfMessages: "3" },
+    });
+    mockLambdaSend.mockResolvedValue({
+      EventSourceMappings: [
+        {
+          EventSourceArn:
+            "arn:aws:sqs:us-east-1:123456789012:wraps-email-events",
+          State: "Enabled",
+        },
+      ],
+    });
+    mockDynamoSend.mockResolvedValue({ Table: { TableStatus: "ACTIVE" } });
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({});
+
+    const output = allUserFacingOutput();
+    // The DLQ finding's own remedy, which is not a command at all.
+    expect(output).toContain("nothing replays them automatically");
+    expect(output).not.toContain("--cleanup");
+    // Nothing here declares a runnable repair — the DLQ warning is manual and
+    // every other row passed — so no row may render a fix line. Dropping the
+    // `?.command` guard would stamp `fix: undefined` on all of them.
+    expect(output).not.toContain("fix:");
+  });
+  it("adds remediation to json resources without reshaping the fields run.sh reads", async () => {
+    mockIsJsonMode.mockReturnValue(true);
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: { email: { config: { domain: "example.com" } } },
+      },
+    ]);
+
+    const emptyScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(emptyScan);
+    mockFilterFn.mockReturnValue(emptyScan);
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({});
+
+    const payload = mockJsonSuccess.mock.calls[0][1];
+    // tests/deployment/cli/run.sh reads these three by name — additive only.
+    expect(payload.region).toBe("us-east-1");
+    expect(payload.totalResources).toBe(0);
+    const failing = payload.resources.find(
+      (r: { status: string }) => r.status === "fail"
+    );
+    expect(failing.remediation.command).toBe(
+      "wraps email sync --region us-east-1"
+    );
+    // One top-level key so a script can read the run's distinct remedies
+    // without walking every resource entry.
+    expect(payload.remediations.map((r: { id: string }) => r.id)).toContain(
+      "email.sync"
+    );
+  });
+  it("reports remediation ids to telemetry on a json run, carrying no domain names", async () => {
+    // Scripted/CI runs are exactly the ones worth counting remedies for, and
+    // they are the runs that take the --json early return.
+    mockIsJsonMode.mockReturnValue(true);
+    // The additional domain's remedy is `wraps email domains add --domain
+    // extra.com` — a command that embeds a customer domain. Without a
+    // domain-bearing remedy in the run, "carries no domain names" would be
+    // true of any payload at all.
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: {
+          email: {
+            config: {
+              domain: "example.com",
+              additionalDomains: [
+                { domain: "extra.com", configSetName: "wraps-email-extra-com" },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const emptyScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(emptyScan);
+    mockFilterFn.mockReturnValue(emptyScan);
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({});
+
+    const props = mockTrackCommand.mock.calls[0][1];
+    // The exact value, not a substring: sorted ids and nothing else. Sending
+    // the remediation objects instead would still "contain" the ids while
+    // shipping every command, domains included.
+    expect(props.remediation_ids).toBe("email.domains.add,email.sync");
+    expect(props.remediation_ids).not.toContain("extra.com");
+    expect(props.fail_count).toBeGreaterThan(0);
+  });
+  it("keeps the telemetry id list distinct when two domains need the same kind of repair", async () => {
+    // Remedies are deduped by id AND command, so both domains reach the
+    // report — but the telemetry key is the id, and repeating it would inflate
+    // the counted cardinality of a single remedy.
+    mockIsJsonMode.mockReturnValue(true);
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: {
+          email: {
+            config: {
+              domain: "example.com",
+              additionalDomains: [
+                { domain: "extra.com", configSetName: "wraps-email-extra-com" },
+                { domain: "other.com", configSetName: "wraps-email-other-com" },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const emptyScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(emptyScan);
+    mockFilterFn.mockReturnValue(emptyScan);
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({});
+
+    const props = mockTrackCommand.mock.calls[0][1];
+    expect(props.remediation_ids).toBe("email.domains.add,email.sync");
+
+    // Both domains are named in the report the user actually reads.
+    const payload = mockJsonSuccess.mock.calls[0][1] as {
+      remediations: Array<{ command?: string }>;
+    };
+    const commands = payload.remediations.map((r) => r.command);
+    expect(commands).toContain(
+      "wraps email domains add --domain extra.com --region us-east-1"
+    );
+    expect(commands).toContain(
+      "wraps email domains add --domain other.com --region us-east-1"
+    );
+  });
+  it("collects findings for a region without rendering anything", async () => {
+    // `wraps doctor` aggregates this; it must not print its own report or
+    // prompt while doing so.
+    const emptyScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(emptyScan);
+    mockFilterFn.mockReturnValue(emptyScan);
+
+    const { collectEmailFindings } = await import("../email/doctor.js");
+    const collected = await collectEmailFindings({
+      region: "us-east-1",
+      accountId: "123456789012",
+      connections: [
+        {
+          accountId: "123456789012",
+          region: "us-east-1",
+          services: { email: { config: { domain: "example.com" } } },
+        },
+      ] as never,
+    });
+
+    expect(collected.findings.some((f) => f.status === "fail")).toBe(true);
+    expect(collected.totalResources).toBe(0);
+    expect(consoleLogSpy).not.toHaveBeenCalled();
+    expect(vi.mocked(prompts.intro)).not.toHaveBeenCalled();
+  });
+  it("names the scanned region in the orphan cleanup command", async () => {
+    // The orphan case is by definition one where no connection metadata is
+    // found, so nothing downstream can re-derive the region: a bare
+    // `wraps email doctor --cleanup` re-resolves to the hardcoded us-east-1
+    // fallback and reports the other region clean while the orphans stay.
+    const filteredScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [
+        { name: "wraps-email-config-set", eventDestinations: [] },
+      ],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(filteredScan);
+    mockFilterFn.mockReturnValue(filteredScan);
+
+    const { collectEmailFindings } = await import("../email/doctor.js");
+    const collected = await collectEmailFindings({
+      region: "eu-west-1",
+      accountId: "123456789012",
+      connections: [],
+    });
+
+    const orphan = collected.findings.find(
+      (f) => f.remediation?.id === "email.doctor.cleanup-orphans"
+    );
+    expect(orphan?.remediation?.command).toBe(
+      "wraps email doctor --cleanup --region eu-west-1"
     );
   });
 });

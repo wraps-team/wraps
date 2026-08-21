@@ -57,7 +57,7 @@ types from `packages/core`. **Change a default in one, change it in both.**
 
 Multi-service CLI architecture: `wraps <service> <command>`. Services are `email`, `sms`,
 `cdn`, `auth`, `aws`, `platform`, `selfhost`, `workflow`, and `license`, plus global
-commands (`status`, `destroy`, `console`, `permissions`, `completion`, `telemetry`,
+commands (`status`, `doctor`, `destroy`, `console`, `permissions`, `completion`, `telemetry`,
 `update`, `news`, `support`). The whole tree is dispatched from `packages/cli/src/cli.ts`.
 See `cli-commands` skill for the detailed reference.
 

@@ -15,6 +15,10 @@ import {
   EVENTS_QUEUE_NAME,
   HISTORY_TABLE_NAME,
 } from "@wraps/core";
+import {
+  type Remediation,
+  remediations,
+} from "../shared/doctor-remediation.js";
 import { isAWSNotFoundError } from "../shared/errors.js";
 import { domainToConfigSetName } from "./config-set-slug.js";
 
@@ -26,17 +30,33 @@ const DLQ_NAME = EVENTS_DLQ_NAME;
 const LAMBDA_FUNCTION_NAME = "wraps-email-event-processor";
 const WEBHOOK_DESTINATION_NAME = "wraps-webhook-destination";
 const WEBHOOK_CONNECTION_NAME = "wraps-webhook-connection";
-const UPGRADE_HINT = "wraps email upgrade";
+/** Cap on simultaneous SESv2 configuration-set reads. See `checkConfigSets`. */
+const CONFIG_SET_PROBE_CONCURRENCY = 6;
 
 export type PipelineCheck = {
   hop: string;
   status: "pass" | "warn" | "fail";
+  /** The symptom only. The remedy lives in `remediation`, never in this string. */
   details: string;
+  remediation?: Remediation;
+};
+
+/**
+ * A domain to probe, carrying the state that decides its remedy. The bare
+ * `string[]` this replaced discarded `isPrimary`/`configSetName` — the exact
+ * fields that distinguish a Pulumi-managed config set from an imperatively
+ * managed one, and therefore `wraps email sync` from `wraps email domains add`.
+ */
+export type PipelineDomain = {
+  domain: string;
+  isPrimary: boolean;
+  /** Recorded in metadata for additional domains; absent for the primary. */
+  configSetName?: string;
 };
 
 export type CheckEventPipelineParams = {
   region: string;
-  domains: string[];
+  domains: PipelineDomain[];
   expectPlatformWebhook: boolean;
 };
 
@@ -51,26 +71,37 @@ function isQueueNotFoundError(error: unknown): boolean {
   );
 }
 
+/** Reads one configuration set's event destinations. One client, many reads. */
+type ConfigSetReader = (configSetName: string) => Promise<{
+  EventDestinations?: Array<{ Name?: string; Enabled?: boolean }>;
+}>;
+
+async function createConfigSetReader(region: string): Promise<ConfigSetReader> {
+  const { SESv2Client, GetConfigurationSetEventDestinationsCommand } =
+    await import("@aws-sdk/client-sesv2");
+  const client = new SESv2Client({ region });
+  return (configSetName) =>
+    client.send(
+      new GetConfigurationSetEventDestinationsCommand({
+        ConfigurationSetName: configSetName,
+      })
+    );
+}
+
 /**
  * Check a single SES configuration set for the wraps-email-eventbridge
  * event destination. When `optional` is true, a not-found result is not a
  * failure — it just means this config set isn't in use (returns null).
  */
 async function checkConfigSet(
+  read: ConfigSetReader,
   configSetName: string,
-  region: string,
-  optional: boolean
+  optional: boolean,
+  remediation: Remediation
 ): Promise<PipelineCheck | null> {
   const hop = `SES config set ${configSetName}`;
   try {
-    const { SESv2Client, GetConfigurationSetEventDestinationsCommand } =
-      await import("@aws-sdk/client-sesv2");
-    const client = new SESv2Client({ region });
-    const response = await client.send(
-      new GetConfigurationSetEventDestinationsCommand({
-        ConfigurationSetName: configSetName,
-      })
-    );
+    const response = await read(configSetName);
     const destination = response.EventDestinations?.find(
       (d) => d.Name === EVENT_DESTINATION_NAME
     );
@@ -84,7 +115,8 @@ async function checkConfigSet(
     return {
       hop,
       status: "fail",
-      details: `SES emits no events for ${configSetName} — redeploy with \`${UPGRADE_HINT}\``,
+      details: `SES emits no events for ${configSetName}`,
+      remediation,
     };
   } catch (error) {
     if (isAWSNotFoundError(error)) {
@@ -94,13 +126,15 @@ async function checkConfigSet(
       return {
         hop,
         status: "fail",
-        details: `Configuration set not found — redeploy with \`${UPGRADE_HINT}\``,
+        details: "Configuration set not found",
+        remediation,
       };
     }
     return {
       hop,
       status: "warn",
       details: `Could not check event destinations: ${summarizeError(error)}`,
+      remediation: remediations.reviewPermissions(),
     };
   }
 }
@@ -128,7 +162,8 @@ async function checkRule(
       check: {
         hop,
         status: "fail",
-        details: `Rule is ${response.State ?? "in an unknown state"} — run \`${UPGRADE_HINT}\` to re-enable`,
+        details: `Rule is ${response.State ?? "in an unknown state"}`,
+        remediation: remediations.syncStack(region),
       },
     };
   } catch (error) {
@@ -138,7 +173,8 @@ async function checkRule(
         check: {
           hop,
           status: "fail",
-          details: `Rule not found — SES events have nowhere to go; run \`${UPGRADE_HINT}\``,
+          details: "Rule not found — SES events have nowhere to go",
+          remediation: remediations.syncStack(region),
         },
       };
     }
@@ -148,6 +184,7 @@ async function checkRule(
         hop,
         status: "warn",
         details: `Could not check rule: ${summarizeError(error)}`,
+        remediation: remediations.reviewPermissions(),
       },
     };
   }
@@ -156,7 +193,8 @@ async function checkRule(
 async function checkQueueExists(
   queueName: string,
   region: string,
-  failDetails: string
+  failDetails: string,
+  remediation: Remediation
 ): Promise<PipelineCheck> {
   const hop = `SQS queue ${queueName}`;
   try {
@@ -168,12 +206,13 @@ async function checkQueueExists(
     return { hop, status: "pass", details: "Queue exists" };
   } catch (error) {
     if (isQueueNotFoundError(error)) {
-      return { hop, status: "fail", details: failDetails };
+      return { hop, status: "fail", details: failDetails, remediation };
     }
     return {
       hop,
       status: "warn",
       details: `Could not check queue: ${summarizeError(error)}`,
+      remediation: remediations.reviewPermissions(),
     };
   }
 }
@@ -202,6 +241,7 @@ function findDuplicateTargetChecks(
         hop: "EventBridge rule targets",
         status: "warn",
         details: `Duplicate targets for ${arn}: ${ids.join(", ")}`,
+        remediation: remediations.duplicateRuleTargets(),
       });
     }
   }
@@ -213,28 +253,37 @@ function checkSqsTargetOnRule(
   targets: Array<{ Arn?: string }>,
   region: string
 ): Promise<PipelineCheck> {
-  const failDetails = `events are being dropped — run \`${UPGRADE_HINT}\` to recreate the queue`;
+  const failDetails = "events are being dropped";
   const sqsTarget = targets.find((t) => t.Arn?.split(":")[2] === "sqs");
   if (!sqsTarget) {
     return Promise.resolve({
       hop: `SQS queue ${QUEUE_NAME}`,
       status: "fail",
       details: `No SQS target on rule — ${failDetails}`,
+      remediation: remediations.syncStack(region),
     });
   }
-  return checkQueueExists(QUEUE_NAME, region, failDetails);
+  return checkQueueExists(
+    QUEUE_NAME,
+    region,
+    failDetails,
+    remediations.syncStack(region)
+  );
 }
 
 /** Platform webhook target presence must match metadata expectations. */
 function checkPlatformWebhookTargetPresence(
   webhookTargetPresent: boolean,
-  expectPlatformWebhook: boolean
+  expectPlatformWebhook: boolean,
+  region: string
 ): PipelineCheck | null {
   if (expectPlatformWebhook && !webhookTargetPresent) {
     return {
       hop: "Platform webhook target",
       status: "fail",
-      details: `platform webhook target missing but metadata says connected — dashboard receives no events; run \`${UPGRADE_HINT}\``,
+      details:
+        "platform webhook target missing but metadata says connected — dashboard receives no events",
+      remediation: remediations.syncStack(region),
     };
   }
   if (!expectPlatformWebhook && webhookTargetPresent) {
@@ -243,6 +292,7 @@ function checkPlatformWebhookTargetPresence(
       status: "warn",
       details:
         "Webhook target exists on the rule but metadata has no webhookSecret — stack/metadata mismatch, possibly a lost metadata file",
+      remediation: remediations.metadataDivergence(),
     };
   }
   if (expectPlatformWebhook && webhookTargetPresent) {
@@ -282,7 +332,8 @@ async function checkRuleTargets(
     );
     const webhookCheck = checkPlatformWebhookTargetPresence(
       webhookTargetPresent,
-      expectPlatformWebhook
+      expectPlatformWebhook,
+      region
     );
     if (webhookCheck) {
       checks.push(webhookCheck);
@@ -296,6 +347,7 @@ async function checkRuleTargets(
           hop: "EventBridge rule targets",
           status: "warn",
           details: `Could not list rule targets: ${summarizeError(error)}`,
+          remediation: remediations.reviewPermissions(),
         },
       ],
       webhookTargetPresent: false,
@@ -319,20 +371,23 @@ async function checkWebhookDestination(region: string): Promise<PipelineCheck> {
     return {
       hop,
       status: "fail",
-      details: `API destination is ${response.ApiDestinationState ?? "in an unknown state"} — re-run \`${UPGRADE_HINT}\` to re-authorize`,
+      details: `API destination is ${response.ApiDestinationState ?? "in an unknown state"}`,
+      remediation: remediations.syncStack(region),
     };
   } catch (error) {
     if (isAWSNotFoundError(error)) {
       return {
         hop,
         status: "fail",
-        details: `API destination not found — re-run \`${UPGRADE_HINT}\``,
+        details: "API destination not found",
+        remediation: remediations.syncStack(region),
       };
     }
     return {
       hop,
       status: "warn",
       details: `Could not check API destination: ${summarizeError(error)}`,
+      remediation: remediations.reviewPermissions(),
     };
   }
 }
@@ -347,26 +402,38 @@ async function checkWebhookConnection(region: string): Promise<PipelineCheck> {
     const response = await client.send(
       new DescribeConnectionCommand({ Name: WEBHOOK_CONNECTION_NAME })
     );
-    if (response.ConnectionState === "AUTHORIZED") {
+    // The EventBridge SDK's ConnectionState enum lists ACTIVE alongside
+    // AUTHORIZED (node_modules/@aws-sdk/client-eventbridge/dist-types/models/
+    // enums.d.ts:104-114). Nothing in this repo proves an API-key connection
+    // ever reports ACTIVE, so this is a defensive widening: treating a healthy
+    // state as a failure would tell the user to re-authorize a working
+    // connection.
+    if (
+      response.ConnectionState === "AUTHORIZED" ||
+      response.ConnectionState === "ACTIVE"
+    ) {
       return { hop, status: "pass", details: "Authorized" };
     }
     return {
       hop,
       status: "fail",
-      details: `Connection is ${response.ConnectionState ?? "in an unknown state"} — re-run \`${UPGRADE_HINT}\` to re-authorize`,
+      details: `Connection is ${response.ConnectionState ?? "in an unknown state"}`,
+      remediation: remediations.syncStack(region),
     };
   } catch (error) {
     if (isAWSNotFoundError(error)) {
       return {
         hop,
         status: "fail",
-        details: `Connection not found — re-run \`${UPGRADE_HINT}\``,
+        details: "Connection not found",
+        remediation: remediations.syncStack(region),
       };
     }
     return {
       hop,
       status: "warn",
       details: `Could not check connection: ${summarizeError(error)}`,
+      remediation: remediations.reviewPermissions(),
     };
   }
 }
@@ -393,7 +460,8 @@ async function checkDLQ(region: string): Promise<PipelineCheck> {
       return {
         hop,
         status: "warn",
-        details: `${count} dead-lettered event(s) — investigate before they age out`,
+        details: `${count} dead-lettered event(s)`,
+        remediation: remediations.dlqBacklog(),
       };
     }
     return { hop, status: "pass", details: "Empty" };
@@ -402,13 +470,15 @@ async function checkDLQ(region: string): Promise<PipelineCheck> {
       return {
         hop,
         status: "fail",
-        details: `Dead-letter queue missing — run \`${UPGRADE_HINT}\` to recreate it`,
+        details: "Dead-letter queue missing",
+        remediation: remediations.syncStack(region),
       };
     }
     return {
       hop,
       status: "warn",
       details: `Could not check DLQ: ${summarizeError(error)}`,
+      remediation: remediations.reviewPermissions(),
     };
   }
 }
@@ -430,7 +500,8 @@ async function checkEventSourceMapping(region: string): Promise<PipelineCheck> {
       return {
         hop,
         status: "fail",
-        details: `No event source mapping from ${QUEUE_NAME} — Lambda never runs; run \`${UPGRADE_HINT}\``,
+        details: `No event source mapping from ${QUEUE_NAME} — Lambda never runs`,
+        remediation: remediations.syncStack(region),
       };
     }
     if (mapping.State === "Enabled") {
@@ -439,20 +510,23 @@ async function checkEventSourceMapping(region: string): Promise<PipelineCheck> {
     return {
       hop,
       status: "fail",
-      details: `Mapping is ${mapping.State ?? "in an unknown state"} — run \`${UPGRADE_HINT}\` to re-enable`,
+      details: `Mapping is ${mapping.State ?? "in an unknown state"}`,
+      remediation: remediations.syncStack(region),
     };
   } catch (error) {
     if (isAWSNotFoundError(error)) {
       return {
         hop,
         status: "fail",
-        details: `Lambda function not found — run \`${UPGRADE_HINT}\``,
+        details: "Lambda function not found",
+        remediation: remediations.syncStack(region),
       };
     }
     return {
       hop,
       status: "warn",
       details: `Could not check event source mapping: ${summarizeError(error)}`,
+      remediation: remediations.reviewPermissions(),
     };
   }
 }
@@ -474,22 +548,125 @@ async function checkHistoryTable(region: string): Promise<PipelineCheck> {
     return {
       hop,
       status: "fail",
-      details: `Table status is ${status ?? "unknown"} — event log may be unavailable; run \`${UPGRADE_HINT}\``,
+      details: `Table status is ${status ?? "unknown"} — event log may be unavailable`,
+      remediation: remediations.syncStack(region),
     };
   } catch (error) {
     if (isAWSNotFoundError(error)) {
       return {
         hop,
         status: "fail",
-        details: `Table not found — event history is not being recorded; run \`${UPGRADE_HINT}\``,
+        details: "Table not found — event history is not being recorded",
+        remediation: remediations.syncStack(region),
       };
     }
     return {
       hop,
       status: "warn",
       details: `Could not check table: ${summarizeError(error)}`,
+      remediation: remediations.reviewPermissions(),
     };
   }
+}
+
+/**
+ * Three states, three remedies:
+ *  - primary domain            -> Pulumi owns the set -> `wraps email sync`
+ *  - additional, has a name    -> re-run the idempotent add flow
+ *  - additional, no name yet   -> never migrated -> the per-domain upgrade action
+ */
+function configSetRemediation(
+  domain: PipelineDomain,
+  region: string
+): Remediation {
+  if (domain.isPrimary) {
+    return remediations.syncStack(region);
+  }
+  return domain.configSetName
+    ? remediations.reAddDomain(domain.domain, region)
+    : remediations.migratePerDomainConfigSets(region);
+}
+
+/**
+ * One configuration-set check per tracked domain, deduped by the name that
+ * will actually be probed, plus an opportunistic probe of the domain-less
+ * fallback name.
+ *
+ * The probes are independent SESv2 reads, so they run concurrently — an
+ * agency tracking 25 domains would otherwise pay ~26 serial round trips on
+ * every doctor run. The fan-out is capped because SESv2 configuration-set
+ * reads are quota-limited per account, and a throttled probe would surface
+ * as a `warn` blaming IAM permissions.
+ *
+ * The probed name prefers the `configSetName` metadata recorded by
+ * `wraps email domains add` (domains.ts:662) over the derived one: the
+ * recorded name is the set that command actually created, so if the two ever
+ * diverge, probing the derived name would report a healthy set as missing.
+ */
+async function checkConfigSets(
+  domains: PipelineDomain[],
+  region: string
+): Promise<PipelineCheck[]> {
+  const targets = new Map<string, PipelineDomain>();
+  for (const d of domains) {
+    const name = d.configSetName ?? domainToConfigSetName(d.domain);
+    if (!targets.has(name)) {
+      targets.set(name, d);
+    }
+  }
+
+  const probes = [...targets].map(([name, domain]) => ({
+    name,
+    optional: false,
+    remediation: configSetRemediation(domain, region),
+  }));
+  probes.push({
+    name: CONFIG_SET_FALLBACK,
+    // With no tracked domains the fallback is the only set there is, so its
+    // absence is a real failure rather than "this set isn't in use".
+    optional: targets.size > 0,
+    remediation: remediations.syncStack(region),
+  });
+
+  let read: ConfigSetReader;
+  try {
+    read = await createConfigSetReader(region);
+  } catch (error) {
+    // Loading the SDK is the one failure that is not per-probe; report it the
+    // way a failed read would be reported, so this still never throws.
+    return probes.map((probe) => ({
+      hop: `SES config set ${probe.name}`,
+      status: "warn" as const,
+      details: `Could not check event destinations: ${summarizeError(error)}`,
+      remediation: remediations.reviewPermissions(),
+    }));
+  }
+
+  const results: (PipelineCheck | null)[] = probes.map(() => null);
+  let cursor = 0;
+  const runProbes = async (): Promise<void> => {
+    while (cursor < probes.length) {
+      const index = cursor;
+      cursor += 1;
+      const probe = probes[index];
+      if (probe) {
+        results[index] = await checkConfigSet(
+          read,
+          probe.name,
+          probe.optional,
+          probe.remediation
+        );
+      }
+    }
+  };
+  await Promise.all(
+    Array.from(
+      { length: Math.min(CONFIG_SET_PROBE_CONCURRENCY, probes.length) },
+      runProbes
+    )
+  );
+
+  return results.filter((check): check is PipelineCheck => check !== null);
 }
 
 /**
@@ -503,32 +680,11 @@ export async function checkEventPipeline(
   const { region, domains, expectPlatformWebhook } = params;
   const checks: PipelineCheck[] = [];
 
-  // 1. SES configuration set(s) — one per domain, plus an opportunistic
-  // probe of the domain-less fallback name when domains are configured.
-  const uniqueConfigSetNames = Array.from(
-    new Set(domains.map((d) => domainToConfigSetName(d)))
-  );
-  if (uniqueConfigSetNames.length === 0) {
-    const check = await checkConfigSet(CONFIG_SET_FALLBACK, region, false);
-    if (check) {
-      checks.push(check);
-    }
-  } else {
-    for (const name of uniqueConfigSetNames) {
-      const check = await checkConfigSet(name, region, false);
-      if (check) {
-        checks.push(check);
-      }
-    }
-    const fallbackCheck = await checkConfigSet(
-      CONFIG_SET_FALLBACK,
-      region,
-      true
-    );
-    if (fallbackCheck) {
-      checks.push(fallbackCheck);
-    }
-  }
+  // 1. SES configuration set(s). The remedy differs per domain and cannot be
+  // a property of the check: the primary domain's set is declared by Pulumi
+  // (resources/ses.ts:182-184, :230-235) so `sync` recreates it, while
+  // additional domains' sets are only ever created imperatively.
+  checks.push(...(await checkConfigSets(domains, region)));
 
   // 2. EventBridge rule.
   const ruleResult = await checkRule(region);

@@ -2599,7 +2599,11 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   // command — a checker crash or slow AWS call must not undo a successful
   // upgrade.
   try {
-    const domains = getAllTrackedDomains(metadata).map((d) => d.domain);
+    const domains = getAllTrackedDomains(metadata).map((d) => ({
+      domain: d.domain,
+      isPrimary: d.isPrimary,
+      configSetName: d.configSetName,
+    }));
     const pipelineChecks = await checkEventPipeline({
       region: outputs.region ?? region,
       domains,
@@ -2608,8 +2612,11 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     const issues = pipelineChecks.filter((check) => check.status !== "pass");
     if (issues.length > 0 && !isJsonMode()) {
       for (const issue of issues) {
+        const remedy = issue.remediation?.command
+          ? ` Fix: ${issue.remediation.command}`
+          : "";
         clack.log.warn(
-          `Post-deploy pipeline check: ${issue.hop} — ${issue.details}`
+          `Post-deploy pipeline check: ${issue.hop} — ${issue.details}.${remedy}`
         );
       }
     }

@@ -67,6 +67,14 @@ vi.mock("../../utils/shared/metadata.js", async () => {
 });
 vi.mock("../../utils/shared/prompts.js");
 vi.mock("../../infrastructure/email-stack.js");
+/**
+ * The post-deploy pipeline check is stubbed so a test can decide exactly which
+ * hops come back non-passing. Every other test keeps the empty default, which
+ * is the "nothing to warn about" path.
+ */
+vi.mock("../../utils/email/event-pipeline-check.js", () => ({
+  checkEventPipeline: vi.fn().mockResolvedValue([]),
+}));
 // Event-pipeline check clients (post-deploy warn-only check in upgrade.ts) —
 // mocked so the check resolves instantly instead of hitting real AWS.
 vi.mock("@aws-sdk/client-sesv2", () => ({
@@ -124,7 +132,9 @@ vi.mock("@aws-sdk/client-dynamodb", () => ({
 
 import * as prompts from "@clack/prompts";
 import { deployEmailStack } from "../../infrastructure/email-stack.js";
+import { checkEventPipeline } from "../../utils/email/event-pipeline-check.js";
 import * as aws from "../../utils/shared/aws.js";
+import { remediations } from "../../utils/shared/doctor-remediation.js";
 import * as fsUtils from "../../utils/shared/fs.js";
 import * as metadata from "../../utils/shared/metadata.js";
 import * as promptUtils from "../../utils/shared/prompts.js";
@@ -1486,6 +1496,64 @@ describe("upgrade command", () => {
           call[0]?.message?.includes("Proceed with upgrade")
         );
       expect(confirmCalls).toHaveLength(0);
+    });
+  });
+
+  /**
+   * The warn-only check that runs after a successful deploy. Its whole job is
+   * to hand back something the user can paste, so the ` Fix: ` suffix must
+   * carry `remediation.command` — never `remediation.summary`, the prose field
+   * sitting next to it on the same type.
+   */
+  describe("Post-deploy pipeline check", () => {
+    it("appends the runnable command for a remedied hop and nothing for an unremedied one", async () => {
+      await setupPulumiMock();
+      const syncStack = remediations.syncStack("us-east-1");
+      const dlqBacklog = remediations.dlqBacklog();
+      vi.mocked(checkEventPipeline).mockResolvedValueOnce([
+        {
+          hop: "EventBridge rule wraps-email-events",
+          status: "fail",
+          details: "Rule not found — SES events have nowhere to go",
+          remediation: syncStack,
+        },
+        {
+          hop: "Dead-letter queue wraps-email-events-dlq",
+          status: "warn",
+          details: "3 dead-lettered event(s)",
+          remediation: dlqBacklog,
+        },
+        {
+          hop: "DynamoDB table wraps-email-history",
+          status: "pass",
+          details: "Active",
+        },
+      ]);
+      vi.mocked(prompts.select)
+        .mockResolvedValueOnce("preset" as never)
+        .mockResolvedValueOnce("production" as never);
+      vi.mocked(prompts.confirm).mockResolvedValue(true as never);
+
+      await upgrade({});
+
+      expect(prompts.log.warn).toHaveBeenCalledWith(
+        "Post-deploy pipeline check: EventBridge rule wraps-email-events — Rule not found — SES events have nowhere to go. Fix: wraps email sync --region us-east-1"
+      );
+      expect(prompts.log.warn).toHaveBeenCalledWith(
+        "Post-deploy pipeline check: Dead-letter queue wraps-email-events-dlq — 3 dead-lettered event(s)."
+      );
+
+      const warnings = vi
+        .mocked(prompts.log.warn)
+        .mock.calls.map((call) => String(call[0]))
+        .filter((message) => message.startsWith("Post-deploy pipeline check:"));
+      // A passing hop is not a finding, and no warning promises a fix it then
+      // spells out as prose instead of a command.
+      expect(warnings).toHaveLength(2);
+      for (const message of warnings) {
+        expect(message).not.toContain(syncStack.summary);
+        expect(message).not.toContain(dlqBacklog.summary);
+      }
     });
   });
 

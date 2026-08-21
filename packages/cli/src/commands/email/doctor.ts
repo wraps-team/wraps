@@ -23,11 +23,17 @@ import {
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
 import {
+  collectRemediations,
+  type DoctorFinding,
+  remediations,
+} from "../../utils/shared/doctor-remediation.js";
+import {
   ensurePulumiWorkDir,
   getPulumiWorkDir,
 } from "../../utils/shared/fs.js";
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 import {
+  type ConnectionMetadata,
   findConnectionsWithService,
   getAllTrackedDomains,
 } from "../../utils/shared/metadata.js";
@@ -44,33 +50,37 @@ export type EmailDoctorOptions = {
   cleanup?: boolean;
 };
 
-type DoctorResult = {
-  status: "pass" | "warn" | "fail" | "info";
-  category: string;
-  name: string;
-  details?: string;
-};
-
-function pipelineChecksToDoctorResults(
+function pipelineChecksToFindings(
   pipelineChecks: PipelineCheck[]
-): DoctorResult[] {
+): DoctorFinding[] {
   return pipelineChecks.map((check) => ({
     status: check.status,
     category: "Event Pipeline",
     name: check.hop,
     details: check.details,
+    remediation: check.remediation,
   }));
 }
 
 function runResourceDiagnostics(
   wrapsResources: AWSResourceScan,
-  hasStack: boolean
-): DoctorResult[] {
-  const results: DoctorResult[] = [];
+  hasStack: boolean,
+  region: string
+): DoctorFinding[] {
+  const results: DoctorFinding[] = [];
 
   // When no Pulumi stack exists, all wraps-* resources are orphaned
   const orphanSuffix = hasStack ? undefined : " (orphan — no Pulumi state)";
   const orphanStatus = hasStack ? "pass" : "warn";
+  // Attached only to orphan rows. `--cleanup` deletes wraps-* resources with
+  // no Pulumi state and nothing else, so this is the only finding class that
+  // may ever recommend it. The scanned region is carried in the command: an
+  // orphan is by definition a region with no connection metadata, so nothing
+  // downstream can re-derive it and the bare command would target the
+  // hardcoded default instead.
+  const orphanRemediation = hasStack
+    ? undefined
+    : remediations.cleanupOrphans(region);
 
   for (const cs of wrapsResources.configurationSets) {
     results.push({
@@ -79,6 +89,7 @@ function runResourceDiagnostics(
       name: cs.name,
       details:
         orphanSuffix || `${cs.eventDestinations.length} event destination(s)`,
+      remediation: orphanRemediation,
     });
   }
 
@@ -88,6 +99,7 @@ function runResourceDiagnostics(
       category: "SNS Topic",
       name: topic.name,
       details: orphanSuffix,
+      remediation: orphanRemediation,
     });
   }
 
@@ -98,6 +110,7 @@ function runResourceDiagnostics(
       category: "DynamoDB Table",
       name: table.name,
       details: orphanSuffix || `Status: ${table.status}`,
+      remediation: orphanRemediation,
     });
   }
 
@@ -107,6 +120,7 @@ function runResourceDiagnostics(
       category: "Lambda Function",
       name: fn.name,
       details: orphanSuffix || fn.runtime,
+      remediation: orphanRemediation,
     });
   }
 
@@ -116,13 +130,14 @@ function runResourceDiagnostics(
       category: "IAM Role",
       name: role.name,
       details: orphanSuffix,
+      remediation: orphanRemediation,
     });
   }
 
   return results;
 }
 
-function displayDoctorResults(results: DoctorResult[]): void {
+function displayDoctorResults(results: DoctorFinding[]): void {
   console.log();
 
   if (results.length === 0) {
@@ -160,9 +175,142 @@ function displayDoctorResults(results: DoctorResult[]): void {
     if (result.details) {
       console.log(`      ${pc.dim(result.details)}`);
     }
+    if (result.remediation?.command) {
+      console.log(
+        `      ${pc.dim("fix:")} ${pc.cyan(result.remediation.command)}`
+      );
+    }
   }
 
   console.log();
+}
+
+/**
+ * The remedy block. Never recommends `wraps email doctor --cleanup` unless an
+ * orphan finding actually declared it: the old summary line fired on any fail,
+ * and since `runResourceDiagnostics` never emits a fail, it was wrong 100% of
+ * the time it appeared.
+ */
+function displayRemediations(results: DoctorFinding[]): void {
+  const actionable = collectRemediations(
+    results.filter((r) => r.status === "fail" || r.status === "warn")
+  );
+  if (actionable.length === 0) {
+    return;
+  }
+
+  console.log();
+  console.log(`  ${pc.bold("Suggested fixes:")}`);
+  for (const remediation of actionable) {
+    if (remediation.command) {
+      console.log(
+        `  ${pc.dim("-")} ${pc.cyan(remediation.command)}\n      ${pc.dim(remediation.summary)}`
+      );
+    } else {
+      console.log(`  ${pc.dim("-")} ${pc.dim(remediation.summary)}`);
+    }
+  }
+  console.log();
+}
+
+export type EmailFindings = {
+  findings: DoctorFinding[];
+  totalResources: number;
+  hasStack: boolean;
+  wrapsResources: AWSResourceScan;
+};
+
+/**
+ * Everything `wraps email doctor` knows, with no rendering, no prompting and
+ * no process exit — so `wraps doctor` can aggregate it. Region and accountId
+ * are resolved by the caller.
+ */
+export async function collectEmailFindings(params: {
+  region: string;
+  accountId: string;
+  /**
+   * Already fetched by the caller. `emailDoctor` needs it before this call for
+   * region auto-detection, and re-fetching here would read ~/.wraps twice per
+   * run and let the two reads disagree.
+   */
+  connections: ConnectionMetadata[];
+  /**
+   * Force the Pulumi/S3 stack probe even when the scan found nothing. Only
+   * `--cleanup` needs that: it reads `hasStack` to decide between "a stack
+   * exists, use destroy/upgrade" and the orphan sweep, and it has to be able
+   * to say so on an account with zero wraps-* resources.
+   */
+  probeStack?: boolean;
+}): Promise<EmailFindings> {
+  const { region, accountId, connections } = params;
+
+  const scan = await scanAWSResources(region);
+  const wrapsResources = filterWrapsResources(scan);
+
+  const totalResources =
+    wrapsResources.configurationSets.length +
+    wrapsResources.snsTopics.length +
+    wrapsResources.dynamoTables.length +
+    wrapsResources.lambdaFunctions.length +
+    wrapsResources.iamRoles.length;
+
+  // Try to load the Pulumi stack to detect orphaned resources. Skipped when
+  // its answer cannot matter: `hasStack` only labels orphan rows, and there
+  // are none to label when the scan came back empty. The probe is not cheap —
+  // `ensurePulumiWorkDir` resolves credentials and will CREATE the
+  // `wraps-state-*` bucket on a miss, then Pulumi is spawned against that S3
+  // backend — and `wraps doctor` runs this leg for every user with working
+  // credentials, including ones who have never deployed anything.
+  let hasStack = false;
+  if (totalResources > 0 || params.probeStack) {
+    try {
+      await ensurePulumiWorkDir({ accountId, region });
+      await pulumi.automation.LocalWorkspace.selectStack({
+        stackName: `wraps-${accountId}-${region}`,
+        workDir: getPulumiWorkDir(),
+      });
+      hasStack = true;
+      // baseline:allow-next-line no-swallowed-errors — stack may not exist, Pulumi may not be installed
+    } catch (_error) {
+      // Any failure (stack not found, Pulumi not installed, missing project file,
+      // S3 backend issues) means we can't confirm stack state — treat resources as
+      // potentially orphaned. Doctor is a diagnostic tool and must not fail here.
+      hasStack = false;
+    }
+  }
+
+  // If an email connection exists for this region, verify the SES ->
+  // EventBridge -> SQS -> Lambda -> DynamoDB pipeline can actually deliver
+  // events (see event-pipeline-check.ts for the hop-by-hop breakdown).
+  const emailConnection = connections.find((c) => c.region === region);
+  let pipelineResults: DoctorFinding[] = [];
+  if (emailConnection) {
+    const emailService = emailConnection.services.email;
+    // The full TrackedDomain is passed through, not just the name: isPrimary
+    // and configSetName are what decide the remedy for a missing config set.
+    const domains = emailService?.config
+      ? getAllTrackedDomains(emailConnection).map((d) => ({
+          domain: d.domain,
+          isPrimary: d.isPrimary,
+          configSetName: d.configSetName,
+        }))
+      : [];
+    const expectPlatformWebhook = Boolean(emailService?.webhookSecret);
+
+    pipelineResults = pipelineChecksToFindings(
+      await checkEventPipeline({ region, domains, expectPlatformWebhook })
+    );
+  }
+
+  return {
+    findings: [
+      ...runResourceDiagnostics(wrapsResources, hasStack, region),
+      ...pipelineResults,
+    ],
+    totalResources,
+    hasStack,
+    wrapsResources,
+  };
 }
 
 export async function emailDoctor(options: EmailDoctorOptions): Promise<void> {
@@ -217,64 +365,44 @@ export async function emailDoctor(options: EmailDoctorOptions): Promise<void> {
     }
   }
 
-  // 3. Scan AWS resources
-  const scan = await progress.execute("Scanning AWS resources", async () =>
-    scanAWSResources(region)
+  // 3-5. Everything that talks to AWS, in one collector so `wraps doctor` can
+  // reuse it. Two spinner labels ("Scanning AWS resources" and "Checking event
+  // pipeline") collapse into one here because the collector owns no progress.
+  const {
+    findings: results,
+    totalResources,
+    hasStack,
+    wrapsResources,
+  } = await progress.execute("Checking email infrastructure", async () =>
+    collectEmailFindings({
+      region,
+      accountId: identity.accountId,
+      connections: emailConnections,
+      // The `--cleanup` branch below reads `hasStack` even when the scan is
+      // empty, so it is the one caller that must pay for the probe regardless.
+      probeStack: Boolean(options.cleanup),
+    })
   );
-
-  // 4. Filter to wraps-* resources
-  const wrapsResources = filterWrapsResources(scan);
-
-  const totalResources =
-    wrapsResources.configurationSets.length +
-    wrapsResources.snsTopics.length +
-    wrapsResources.dynamoTables.length +
-    wrapsResources.lambdaFunctions.length +
-    wrapsResources.iamRoles.length;
-
-  // 5. Try to load Pulumi stack to detect orphaned resources
-  let hasStack = false;
-  try {
-    await ensurePulumiWorkDir({ accountId: identity.accountId, region });
-    await pulumi.automation.LocalWorkspace.selectStack({
-      stackName: `wraps-${identity.accountId}-${region}`,
-      workDir: getPulumiWorkDir(),
-    });
-    hasStack = true;
-    // baseline:allow-next-line no-swallowed-errors — stack may not exist, Pulumi may not be installed
-  } catch (_error) {
-    // Any failure (stack not found, Pulumi not installed, missing project file,
-    // S3 backend issues) means we can't confirm stack state — treat resources as
-    // potentially orphaned. Doctor is a diagnostic tool and must not fail here.
-    hasStack = false;
-  }
-
-  // 5.5. If an email connection exists for this region, verify the SES ->
-  // EventBridge -> SQS -> Lambda -> DynamoDB pipeline can actually deliver
-  // events (see event-pipeline-check.ts for the hop-by-hop breakdown).
-  const emailConnection = emailConnections.find((c) => c.region === region);
-  let pipelineResults: DoctorResult[] = [];
-  if (emailConnection) {
-    const emailService = emailConnection.services.email;
-    const domains = emailService?.config
-      ? getAllTrackedDomains(emailConnection).map((d) => d.domain)
-      : [];
-    const expectPlatformWebhook = Boolean(emailService?.webhookSecret);
-
-    const pipelineChecks = await progress.execute(
-      "Checking event pipeline",
-      async () => checkEventPipeline({ region, domains, expectPlatformWebhook })
-    );
-    pipelineResults = pipelineChecksToDoctorResults(pipelineChecks);
-  }
 
   progress.stop();
 
-  // 6. Run diagnostics
-  const results = [
-    ...runResourceDiagnostics(wrapsResources, hasStack),
-    ...pipelineResults,
-  ];
+  // Not the last statement any more, deliberately: it sits above the --json
+  // early return so scripted runs report the same events interactive ones do.
+  // Counting remedies is only useful if CI runs are counted too.
+  trackCommand("email:doctor", {
+    success: true,
+    duration_ms: Date.now() - startTime,
+    resource_count: totalResources,
+    region,
+    fail_count: results.filter((r) => r.status === "fail").length,
+    warn_count: results.filter((r) => r.status === "warn").length,
+    // ids only — `remediation.command` can embed a customer domain. Set:
+    // remedies are deduped by id AND command, so two domains needing the same
+    // kind of repair are two entries under one id.
+    remediation_ids: [...new Set(collectRemediations(results).map((r) => r.id))]
+      .sort()
+      .join(","),
+  });
 
   if (isJsonMode()) {
     jsonSuccess("email.doctor", {
@@ -285,8 +413,10 @@ export async function emailDoctor(options: EmailDoctorOptions): Promise<void> {
         name: r.name,
         status: r.status,
         details: r.details,
+        ...(r.remediation ? { remediation: r.remediation } : {}),
       })),
       totalResources,
+      remediations: collectRemediations(results),
     });
     return;
   }
@@ -305,24 +435,30 @@ export async function emailDoctor(options: EmailDoctorOptions): Promise<void> {
     const warnCount = results.filter((r) => r.status === "warn").length;
 
     if (failCount > 0) {
-      clack.log.error(
-        `${failCount} issue(s) found. Run ${pc.cyan("wraps email doctor --cleanup")} to fix.`
-      );
+      clack.log.error(`${failCount} issue(s) found`);
     } else if (warnCount > 0) {
       clack.log.warn(`${warnCount} warning(s)`);
     } else {
       clack.log.success("All resources look healthy!");
     }
 
+    displayRemediations(results);
+
     // 8. Cleanup orphaned resources if requested
     if (options.cleanup) {
       if (hasStack) {
         clack.log.warn(
+          // remediation:allow-literal — the --cleanup flag's own precondition message, not a finding's remedy
           `A Pulumi stack exists for this region. Use ${pc.cyan("wraps email destroy")} to remove managed resources, or ${pc.cyan("wraps email upgrade")} to reconcile.`
         );
       } else {
-        const orphanCount = results.filter((r) =>
-          r.details?.includes("orphan")
+        // Structural, not a substring test on free text: the old gate
+        // searched a finding's `details` for the word orphan, which could
+        // never match an Event Pipeline finding, so `--cleanup` was a
+        // guaranteed no-op every time the summary line recommended it.
+        const cleanupId = remediations.cleanupOrphans().id;
+        const orphanCount = results.filter(
+          (r) => r.remediation?.id === cleanupId
         ).length;
 
         if (orphanCount > 0) {
@@ -339,13 +475,6 @@ export async function emailDoctor(options: EmailDoctorOptions): Promise<void> {
 
     clack.outro(pc.dim("Done"));
   }
-
-  trackCommand("email:doctor", {
-    success: true,
-    duration_ms: Date.now() - startTime,
-    resource_count: totalResources,
-    region,
-  });
 }
 
 async function cleanupOrphanedResources(
