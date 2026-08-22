@@ -525,6 +525,13 @@ describe("aws doctor", () => {
     const { doctor } = await import("../aws/doctor.js");
     await doctor({ region: "eu-west-1" });
 
+    // One run, one event. `toHaveBeenCalledWith` alone is satisfied by a
+    // matching call among many, so a second `aws:doctor` emit — the shape this
+    // command had before the event moved above the JSON early return — would
+    // double-count every human-path run and inflate duration_ms on the copy
+    // that lands last, skewing the very region adoption this event exists to
+    // measure.
+    expect(mockTrackCommand).toHaveBeenCalledTimes(1);
     expect(mockTrackCommand).toHaveBeenCalledWith(
       "aws:doctor",
       expect.objectContaining({ region: "eu-west-1" })
@@ -538,6 +545,7 @@ describe("aws doctor", () => {
     const { doctor } = await import("../aws/doctor.js");
     await doctor({ region: "eu-west-1" });
 
+    expect(mockTrackCommand).toHaveBeenCalledTimes(1);
     expect(mockTrackCommand).toHaveBeenCalledWith(
       "aws:doctor",
       expect.objectContaining({ region: "eu-west-1" })
