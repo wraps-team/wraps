@@ -1,5 +1,9 @@
-import * as clack from "@clack/prompts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../telemetry/events.js", () => ({ trackError: vi.fn() }));
+
+import * as clack from "@clack/prompts";
+import { trackError } from "../../telemetry/events.js";
 import {
   awsErrorToWrapsError,
   errors,
@@ -401,6 +405,34 @@ describe("error factory functions", () => {
       expect(error.code).toBe("INVALID_REGION");
       expect(error.suggestion).toContain("us-east-1");
       expect(error.docsUrl).toContain("aws.amazon.com");
+    });
+  });
+
+  describe("unknownCommand", () => {
+    it("renders a missing subcommand as (none) rather than undefined", () => {
+      const error = errors.unknownCommand(
+        "inbound command",
+        undefined,
+        "Available: init, status"
+      );
+
+      expect(error.message).toBe("Unknown inbound command: (none)");
+    });
+  });
+
+  describe("missingInput", () => {
+    it("names the missing flag and hands back the usage line", () => {
+      const error = errors.missingInput(
+        "--domain",
+        "wraps email verify --domain yourapp.com"
+      );
+
+      expect(error).toBeInstanceOf(WrapsError);
+      expect(error.message).toContain("--domain");
+      expect(error.code).toBe("MISSING_REQUIRED_FLAG");
+      expect(error.suggestion).toContain(
+        "wraps email verify --domain yourapp.com"
+      );
     });
   });
 
@@ -1115,5 +1147,88 @@ describe("awsErrorToWrapsError — ResourceNotFoundException discrimination (COR
     );
 
     expect(result.code).toBe("LAMBDA_FUNCTION_NOT_FOUND");
+  });
+});
+
+describe("user-input errors render without crash furniture", () => {
+  let exitSpy: any;
+  let consoleErrorSpy: any;
+  let consoleLogSpy: any;
+  let clackErrorSpy: any;
+
+  beforeEach(() => {
+    vi.mocked(trackError).mockClear();
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as any);
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    clackErrorSpy = vi.spyOn(clack.log, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.exitCode = undefined;
+    exitSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
+    consoleLogSpy.mockRestore();
+    clackErrorSpy.mockRestore();
+  });
+
+  it("renders a mistyped command as a rejection, not as a crash", () => {
+    handleCLIError(
+      errors.unknownCommand(
+        "command",
+        "emial",
+        "Available commands: email, sms, cdn"
+      )
+    );
+
+    expect(clackErrorSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("An unexpected error occurred")
+    );
+    expect(consoleLogSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("https://github.com/wraps-team/wraps/issues")
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("reports a mistyped command under its own telemetry code", () => {
+    handleCLIError(
+      errors.unknownCommand(
+        "command",
+        "emial",
+        "Available commands: email, sms, cdn"
+      )
+    );
+
+    expect(trackError).toHaveBeenCalledWith("UNKNOWN_COMMAND", "unknown");
+    expect(
+      vi.mocked(trackError).mock.calls.map((call) => call[0])
+    ).not.toContain("UNHANDLED_ERROR");
+  });
+
+  describe("in --json mode", () => {
+    beforeEach(() => {
+      setJsonMode(true);
+    });
+
+    afterEach(() => {
+      setJsonMode(false);
+    });
+
+    it("emits one machine-readable envelope naming the command that failed", () => {
+      handleCLIError(
+        errors.unknownCommand(
+          "command",
+          "emial",
+          "Available commands: email, sms, cdn"
+        )
+      );
+
+      expect(consoleLogSpy).toHaveBeenCalledTimes(1);
+      const envelope = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+      expect(envelope.error.code).toBe("UNKNOWN_COMMAND");
+      expect(envelope.error.suggestion).toContain(
+        "Available commands: email, sms, cdn"
+      );
+    });
   });
 });

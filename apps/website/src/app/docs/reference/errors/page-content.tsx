@@ -580,6 +580,12 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         solution: "Pass the required flag, or run in an interactive terminal",
       },
       {
+        code: "UNKNOWN_COMMAND",
+        message: "Unknown <command kind>: <what was typed>",
+        solution:
+          "Run wraps --help, or use one of the commands listed in the error's suggestion",
+      },
+      {
         code: "MISSING_REQUIRED_FLAG",
         message: "A required flag is missing in JSON mode",
         solution: "Provide the flag named in the error message",

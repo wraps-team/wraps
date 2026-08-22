@@ -751,6 +751,45 @@ export const errors = {
       "https://wraps.dev/docs/reference/json-output"
     ),
 
+  // ── User-input rejections ──────────────────────────────────────────────────
+  // "The user gave us bad input and this message says exactly what was wrong."
+  // These are WrapsErrors on purpose: handleCLIError's WrapsError branch
+  // (errors.ts:424 human, :369 JSON) already renders the exact target shape —
+  // a specific telemetry code, the message, the suggestion, exit non-zero —
+  // whereas a bare `throw new Error(...)` falls through to the generic tail,
+  // which prints "An unexpected error occurred" plus a GitHub-issue link and
+  // reports the user's typo as UNHANDLED_ERROR.
+  //
+  // Callers throw these INSTEAD of printing their own clack.log.error and
+  // usage line. That is not tidiness: an unguarded clack.log.error writes to
+  // stdout ahead of the JSON envelope, so `--json` consumers were parsing the
+  // human text and the envelope out of one stream.
+  unknownCommand: (
+    what: string,
+    typed: string | undefined,
+    suggestion: string
+  ) =>
+    new WrapsError(
+      `Unknown ${what}: ${typed || "(none)"}`,
+      "UNKNOWN_COMMAND",
+      suggestion,
+      "https://wraps.dev/docs/cli-reference"
+    ),
+
+  // Code deliberately reuses MISSING_REQUIRED_FLAG rather than minting a new one:
+  // four commands already emit it inline (commands/sms/verify-number.ts:193,
+  // commands/sms/test.ts:71, commands/email/config-domain.ts:208,
+  // commands/email/test.ts:108), it is already on the errors reference page (:583),
+  // and domains.test.ts:1251 already asserts it. A second code for one condition is
+  // exactly the machine-readable inconsistency this feature exists to remove.
+  missingInput: (what: string, usage: string) =>
+    new WrapsError(
+      `${what} is required`,
+      "MISSING_REQUIRED_FLAG",
+      `Usage: ${usage}`,
+      "https://wraps.dev/docs/cli-reference"
+    ),
+
   pulumiError: (message: string) =>
     new WrapsError(
       `Infrastructure deployment failed: ${message}`,
