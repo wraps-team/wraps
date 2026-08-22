@@ -49,9 +49,19 @@ function findInteractiveCallSite(source: string): number {
 // this guard exists for. More is legitimate: a new error type with its own
 // render adds a sixth. Past twelve, handleCLIError has grown a dispatch layer
 // this guard has not been read against.
+const MIN_EXIT_CODE_ASSIGNMENTS = 5;
+const MAX_EXIT_CODE_ASSIGNMENTS = 12;
+
+function countExitCodeAssignments(body: string): number {
+  return countOccurrences(body, "process.exitCode = 1;");
+}
+
 function exitCodeAssignmentsAreInBand(body: string): boolean {
-  const assignments = countOccurrences(body, "process.exitCode = 1;");
-  return assignments >= 5 && assignments <= 12;
+  const assignments = countExitCodeAssignments(body);
+  return (
+    assignments >= MIN_EXIT_CODE_ASSIGNMENTS &&
+    assignments <= MAX_EXIT_CODE_ASSIGNMENTS
+  );
 }
 
 describe("error-path telemetry is drained before the process exits", () => {
@@ -121,7 +131,15 @@ describe("error-path telemetry is drained before the process exits", () => {
     const body = errorsSource.slice(start, end);
 
     expect(body).not.toContain("process.exit(");
-    expect(exitCodeAssignmentsAreInBand(body)).toBe(true);
+    // The count itself, not a boolean: collapsing it to
+    // `expect(inBand(body)).toBe(true)` reports only `expected false to be
+    // true`, naming neither the count nor the band it missed.
+    const assignments = countExitCodeAssignments(body);
+    expect(
+      assignments,
+      `handleCLIError sets process.exitCode ${assignments} time(s); expected ${MIN_EXIT_CODE_ASSIGNMENTS}-${MAX_EXIT_CODE_ASSIGNMENTS}`
+    ).toBeGreaterThanOrEqual(MIN_EXIT_CODE_ASSIGNMENTS);
+    expect(assignments).toBeLessThanOrEqual(MAX_EXIT_CODE_ASSIGNMENTS);
   });
 
   // The block below is the regression guard for a defect in the guards
@@ -159,6 +177,22 @@ describe("error-path telemetry is drained before the process exits", () => {
       const grown = `${body}\n  process.exitCode = 1;`;
       expect(exitCodeAssignmentsAreInBand(grown)).toBe(true);
       expect(exitCodeAssignmentsAreInBand("")).toBe(false);
+    });
+
+    // Literal counts, deliberately not the MIN/MAX constants: a test written
+    // in terms of the constants moves with them, so widening the band to
+    // `>= 1` stays green and a handleCLIError that lost one of its five
+    // exit-code assignments sails through — a failed Pulumi deploy printing
+    // its error and exiting 0. These four cases pin the band itself.
+    it.each([
+      [4, false],
+      [5, true],
+      [12, true],
+      [13, false],
+    ])("holds the band at 5-12: %i assignments -> %s", (count, expected) => {
+      expect(
+        exitCodeAssignmentsAreInBand("process.exitCode = 1;".repeat(count))
+      ).toBe(expected);
     });
   });
 });

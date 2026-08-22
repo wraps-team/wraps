@@ -204,6 +204,34 @@ describe("handleCLIError", () => {
     expect(process.exitCode).toBe(1);
   });
 
+  // The AWS and Pulumi branches of the human-readable chain used to be covered
+  // only by the JSON-mode tests below, which exit through the single JSON tail
+  // and never reach either branch. Deleting `process.exitCode = 1` from one of
+  // them failed nothing here — a `wraps email upgrade` that died on a Pulumi
+  // error printed the error and exited 0, so CI pipelines and `&&` chains read
+  // a failed deploy as a success.
+  it("sets a non-zero exit code for an AWS error on the human-readable path", () => {
+    const error = new Error("Token has expired");
+    error.name = "ExpiredTokenException";
+
+    handleCLIError(error, "email.init");
+
+    // Proves this went through the human chain, not the JSON tail.
+    expect(clackErrorSpy).toHaveBeenCalled();
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("sets a non-zero exit code for a Pulumi error on the human-readable path", () => {
+    const error = new Error("AccessDenied for sqs:CreateQueue");
+
+    handleCLIError(error, "email.upgrade");
+
+    expect(clackErrorSpy).toHaveBeenCalled();
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+  });
+
   describe("handleCLIError JSON mode", () => {
     let clackErrorSpy: any;
 
