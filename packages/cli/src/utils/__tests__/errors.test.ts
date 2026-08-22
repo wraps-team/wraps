@@ -109,8 +109,17 @@ describe("handleCLIError", () => {
 
     handleCLIError(error);
 
-    // Should log the error message (dimmed) not the full error object
-    expect(consoleErrorSpy).toHaveBeenCalled();
+    // The message is the ONLY surviving copy of what went wrong: telemetry
+    // sends `errorType` alone, and the clack line is the fixed string "An
+    // unexpected error occurred". A bare toHaveBeenCalled() here is satisfied
+    // by the blank line the same handler emits, so it has to name the text.
+    // stringContaining, not toBe: pc.dim is identity under NO_COLOR but wraps
+    // the message in ANSI under FORCE_COLOR.
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Unknown error")
+    );
+    // ...and the message, not the error object itself.
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith(error);
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining("https://github.com/wraps-team/wraps/issues")
     );
@@ -128,6 +137,9 @@ describe("handleCLIError", () => {
   it("should handle null/undefined errors", () => {
     handleCLIError(null);
     expect(process.exitCode).toBe(1);
+    // Mirror of the Error branch: a value that is neither Error nor string has
+    // no message to render, so the blank line is all console.error should see.
+    expect(consoleErrorSpy.mock.calls).toEqual([[""]]);
 
     // Sticky global: reset between calls or the second assertion just re-reads
     // the first call's value.
