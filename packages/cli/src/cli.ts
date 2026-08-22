@@ -109,7 +109,7 @@ import {
   setupTabCompletion,
 } from "./utils/shared/completion.js";
 import { suggestCommand } from "./utils/shared/did-you-mean.js";
-import { handleCLIError } from "./utils/shared/errors.js";
+import { errors, handleCLIError } from "./utils/shared/errors.js";
 import { isJsonMode, setJsonMode } from "./utils/shared/json-output.js";
 
 // Check Node.js version (requires 20+)
@@ -705,11 +705,10 @@ async function run() {
 
         case "verify": {
           if (!flags.domain) {
-            clack.log.error("--domain flag is required");
-            console.log(
-              `\nUsage: ${pc.cyan("wraps email verify --domain yourapp.com")}\n`
+            throw errors.missingInput(
+              "--domain",
+              "wraps email verify --domain yourapp.com"
             );
-            throw new Error("Missing required flag: --domain");
           }
           await verifyDomain({
             domain: flags.domain,
@@ -789,14 +788,10 @@ async function run() {
               break;
 
             default:
-              clack.log.error(
-                `Unknown inbound command: ${inboundSubCommand || "(none)"}`
-              );
-              console.log(
-                `\nAvailable commands: ${pc.cyan("init")}, ${pc.cyan("destroy")}, ${pc.cyan("status")}, ${pc.cyan("verify")}, ${pc.cyan("test")}, ${pc.cyan("add")}, ${pc.cyan("remove")}\n`
-              );
-              throw new Error(
-                `Unknown inbound command: ${inboundSubCommand || "(none)"}`
+              throw errors.unknownCommand(
+                "inbound command",
+                inboundSubCommand,
+                "Available commands: init, destroy, status, verify, test, add, remove"
               );
           }
           break;
@@ -835,14 +830,10 @@ async function run() {
               break;
 
             default:
-              clack.log.error(
-                `Unknown agent command: ${agentSubCommand || "(none)"}`
-              );
-              console.log(
-                `\nAvailable commands: ${pc.cyan("create")}, ${pc.cyan("list")}, ${pc.cyan("kill")}\n`
-              );
-              throw new Error(
-                `Unknown agent command: ${agentSubCommand || "(none)"}`
+              throw errors.unknownCommand(
+                "agent command",
+                agentSubCommand,
+                "Available commands: create, list, kill"
               );
           }
           break;
@@ -897,14 +888,10 @@ async function run() {
             }
 
             default:
-              clack.log.error(
-                `Unknown reply command: ${replySubCommand || "(none)"}`
-              );
-              console.log(
-                `\nAvailable commands: ${pc.cyan("init")}, ${pc.cyan("rotate")}, ${pc.cyan("status")}, ${pc.cyan("destroy")}, ${pc.cyan("decode")}\n`
-              );
-              throw new Error(
-                `Unknown reply command: ${replySubCommand || "(none)"}`
+              throw errors.unknownCommand(
+                "reply command",
+                replySubCommand,
+                "Available commands: init, rotate, status, destroy, decode"
               );
           }
           break;
@@ -930,11 +917,10 @@ async function run() {
 
             case "verify": {
               if (!flags.domain) {
-                clack.log.error("--domain flag is required");
-                console.log(
-                  `\nUsage: ${pc.cyan("wraps email domains verify --domain yourapp.com")}\n`
+                throw errors.missingInput(
+                  "--domain",
+                  "wraps email domains verify --domain yourapp.com"
                 );
-                throw new Error("Missing required flag: --domain");
               }
               await verifyDomain({ domain: flags.domain });
               break;
@@ -942,11 +928,10 @@ async function run() {
 
             case "get-dkim": {
               if (!flags.domain) {
-                clack.log.error("--domain flag is required");
-                console.log(
-                  `\nUsage: ${pc.cyan("wraps email domains get-dkim --domain yourapp.com")}\n`
+                throw errors.missingInput(
+                  "--domain",
+                  "wraps email domains get-dkim --domain yourapp.com"
                 );
-                throw new Error("Missing required flag: --domain");
               }
               await getDkim({ domain: flags.domain });
               break;
@@ -954,11 +939,10 @@ async function run() {
 
             case "remove": {
               if (!flags.domain) {
-                clack.log.error("--domain flag is required");
-                console.log(
-                  `\nUsage: ${pc.cyan("wraps email domains remove --domain yourapp.com --force")}\n`
+                throw errors.missingInput(
+                  "--domain",
+                  "wraps email domains remove --domain yourapp.com --force"
                 );
-                throw new Error("Missing required flag: --domain");
               }
               await removeDomain({
                 domain: flags.domain,
@@ -987,14 +971,10 @@ async function run() {
             }
 
             default:
-              clack.log.error(
-                `Unknown domains command: ${domainsSubCommand || "(none)"}`
-              );
-              console.log(
-                `\nAvailable commands: ${pc.cyan("add")}, ${pc.cyan("list")}, ${pc.cyan("verify")}, ${pc.cyan("get-dkim")}, ${pc.cyan("remove")}, ${pc.cyan("config")}\n`
-              );
-              throw new Error(
-                `Unknown domains command: ${domainsSubCommand || "(none)"}`
+              throw errors.unknownCommand(
+                "domains command",
+                domainsSubCommand,
+                "Available commands: add, list, verify, get-dkim, remove, config"
               );
           }
           break;
@@ -1037,14 +1017,10 @@ async function run() {
               break;
 
             default:
-              clack.log.error(
-                `Unknown templates command: ${templatesSubCommand || "(none)"}`
-              );
-              console.log(
-                `\nAvailable commands: ${pc.cyan("init")}, ${pc.cyan("push")}, ${pc.cyan("preview")}\n`
-              );
-              throw new Error(
-                `Unknown templates command: ${templatesSubCommand || "(none)"}`
+              throw errors.unknownCommand(
+                "templates command",
+                templatesSubCommand,
+                "Available commands: init, push, preview"
               );
           }
           break;
@@ -1084,14 +1060,10 @@ async function run() {
               break;
 
             default:
-              clack.log.error(
-                `Unknown workflows command: ${workflowsSubCommand || "(none)"}`
-              );
-              console.log(
-                `\nAvailable commands: ${pc.cyan("init")}, ${pc.cyan("validate")}, ${pc.cyan("push")}\n`
-              );
-              throw new Error(
-                `Unknown workflows command: ${workflowsSubCommand || "(none)"}`
+              throw errors.unknownCommand(
+                "workflows command",
+                workflowsSubCommand,
+                "Available commands: init, validate, push"
               );
           }
           break;
@@ -1115,8 +1087,10 @@ async function run() {
             case "get": {
               const messageId = sub[3];
               if (!messageId) {
-                clack.log.error("Usage: wraps email logs get <message-id>");
-                throw new Error("Missing required argument: <message-id>");
+                throw errors.missingInput(
+                  "<message-id>",
+                  "wraps email logs get <message-id>"
+                );
               }
               await emailLogsGet({
                 messageId,
@@ -1128,14 +1102,10 @@ async function run() {
             }
 
             default:
-              clack.log.error(
-                `Unknown logs command: ${logsSubCommand || "(none)"}`
-              );
-              console.log(
-                `\nAvailable commands: ${pc.cyan("list")}, ${pc.cyan("get <message-id>")}\n`
-              );
-              throw new Error(
-                `Unknown logs command: ${logsSubCommand || "(none)"}`
+              throw errors.unknownCommand(
+                "logs command",
+                logsSubCommand,
+                "Available commands: list, get <message-id>"
               );
           }
           break;
@@ -1159,11 +1129,11 @@ async function run() {
           break;
 
         default:
-          clack.log.error(`Unknown email command: ${subCommand}`);
-          console.log(
-            `\nRun ${pc.cyan("wraps --help")} for available commands.\n`
+          throw errors.unknownCommand(
+            "email command",
+            subCommand,
+            "Run wraps --help for available commands."
           );
-          throw new Error(`Unknown email command: ${subCommand}`);
       }
       // Track email commands (they return early, so track here)
       const emailDuration = Date.now() - startTime;
@@ -1189,11 +1159,11 @@ async function run() {
           break;
 
         default:
-          clack.log.error(`Unknown license command: ${subCommand}`);
-          console.log(
-            `\nRun ${pc.cyan("wraps --help")} for available commands.\n`
+          throw errors.unknownCommand(
+            "license command",
+            subCommand,
+            "Run wraps --help for available commands."
           );
-          throw new Error(`Unknown license command: ${subCommand}`);
       }
       trackCommand(`license:${subCommand}`, {
         success: true,
@@ -1270,11 +1240,11 @@ async function run() {
           break;
 
         default:
-          clack.log.error(`Unknown selfhost command: ${subCommand}`);
-          console.log(
-            `\nRun ${pc.cyan("wraps --help")} for available commands.\n`
+          throw errors.unknownCommand(
+            "selfhost command",
+            subCommand,
+            "Run wraps --help for available commands."
           );
-          throw new Error(`Unknown selfhost command: ${subCommand}`);
       }
       // Track selfhost commands
       const selfhostDuration = Date.now() - startTime;
@@ -1365,11 +1335,11 @@ async function run() {
           break;
 
         default:
-          clack.log.error(`Unknown sms command: ${subCommand}`);
-          console.log(
-            `\nRun ${pc.cyan("wraps --help")} for available commands.\n`
+          throw errors.unknownCommand(
+            "sms command",
+            subCommand,
+            "Run wraps --help for available commands."
           );
-          throw new Error(`Unknown sms command: ${subCommand}`);
       }
       // Track SMS commands
       const smsDuration = Date.now() - startTime;
@@ -1436,11 +1406,11 @@ async function run() {
           break;
 
         default:
-          clack.log.error(`Unknown cdn command: ${subCommand}`);
-          console.log(
-            `\nRun ${pc.cyan("wraps --help")} for available commands.\n`
+          throw errors.unknownCommand(
+            "cdn command",
+            subCommand,
+            "Run wraps --help for available commands."
           );
-          throw new Error(`Unknown cdn command: ${subCommand}`);
       }
       // Track CDN commands
       const cdnDuration = Date.now() - startTime;
@@ -1463,13 +1433,10 @@ async function run() {
           break;
 
         default:
-          clack.log.error(
-            `Unknown workflow command: ${subCommand || "(none)"}`
-          );
-          console.log(`\nAvailable commands: ${pc.cyan("init")}\n`);
-          console.log(`Run ${pc.cyan("wraps --help")} for more information.\n`);
-          throw new Error(
-            `Unknown workflow command: ${subCommand || "(none)"}`
+          throw errors.unknownCommand(
+            "workflow command",
+            subCommand,
+            "Available commands: init\n\nRun wraps --help for more information."
           );
       }
       // Track workflow commands
@@ -1515,14 +1482,11 @@ async function run() {
           break;
 
         default:
-          clack.log.error(`Unknown platform command: ${subCommand}`);
-          console.log(
-            `\nAvailable commands: ${pc.cyan("connect")}, ${pc.cyan("update-role")}\n`
+          throw errors.unknownCommand(
+            "platform command",
+            subCommand,
+            "Available commands: connect, update-role\n\nRun wraps platform for more information."
           );
-          console.log(
-            `Run ${pc.cyan("wraps platform")} for more information.\n`
-          );
-          throw new Error(`Unknown platform command: ${subCommand}`);
       }
       // Track platform commands (they return early, so track here)
       const platformDuration = Date.now() - startTime;
@@ -1550,11 +1514,11 @@ async function run() {
           break;
 
         default:
-          clack.log.error(`Unknown auth command: ${subCommand || "(none)"}`);
-          console.log(
-            `\nAvailable commands: ${pc.cyan("login")}, ${pc.cyan("status")}, ${pc.cyan("logout")}\n`
+          throw errors.unknownCommand(
+            "auth command",
+            subCommand,
+            "Available commands: login, status, logout"
           );
-          throw new Error(`Unknown auth command: ${subCommand || "(none)"}`);
       }
       return;
     }
@@ -1571,12 +1535,11 @@ async function run() {
           break;
 
         default:
-          clack.log.error(`Unknown aws command: ${subCommand}`);
-          console.log(
-            `\nAvailable commands: ${pc.cyan("setup")}, ${pc.cyan("doctor")}\n`
+          throw errors.unknownCommand(
+            "aws command",
+            subCommand,
+            "Available commands: setup, doctor\n\nRun wraps --help for more information."
           );
-          console.log(`Run ${pc.cyan("wraps --help")} for more information.\n`);
-          throw new Error(`Unknown aws command: ${subCommand}`);
       }
       // Track aws commands
       const awsDuration = Date.now() - startTime;
@@ -1682,11 +1645,11 @@ async function run() {
             break;
 
           default:
-            clack.log.error(`Unknown telemetry command: ${subCommand}`);
-            console.log(
-              `\nAvailable commands: ${pc.cyan("enable")}, ${pc.cyan("disable")}, ${pc.cyan("status")}\n`
+            throw errors.unknownCommand(
+              "telemetry command",
+              subCommand,
+              "Available commands: enable, disable, status"
             );
-            throw new Error(`Unknown telemetry command: ${subCommand}`);
         }
         break;
       }
@@ -1708,15 +1671,11 @@ async function run() {
         break;
 
       default: {
-        clack.log.error(`Unknown command: ${primaryCommand}`);
-        const suggestion = suggestCommand(primaryCommand);
-        if (suggestion) {
-          console.log(`\nDid you mean ${pc.cyan(`wraps ${suggestion}`)}?`);
-        }
-        console.log(
-          `\nRun ${pc.cyan("wraps --help")} for available commands.\n`
-        );
-        throw new Error(`Unknown command: ${primaryCommand}`);
+        const didYouMean = suggestCommand(primaryCommand);
+        const hint = didYouMean
+          ? `Did you mean: wraps ${didYouMean}\n\nRun wraps --help for available commands.`
+          : "Run wraps --help for available commands.";
+        throw errors.unknownCommand("command", primaryCommand, hint);
       }
     }
     // Track successful command execution

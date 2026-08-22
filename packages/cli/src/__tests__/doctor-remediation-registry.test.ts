@@ -379,10 +379,19 @@ describe("unknown-command branch asks the suggester (source guard)", () => {
   // cannot fail this.
   const collapsed = cliSource.replace(/\s+/g, " ");
 
-  const BRANCH_START = "clack.log.error(`Unknown command:";
-  const BRANCH_END = "throw new Error(`Unknown command:";
+  // The branch no longer prints its own error or throws a bare Error — it
+  // builds a suggestion and hands the whole rejection to the errors registry.
+  // BRANCH_START is anchored on the tail of the preceding `case`, which
+  // survives the change and sits ABOVE the suggester call — so the assertions
+  // below are not matching their own marker.
+  const BRANCH_START = "showHelp(); break; default: {";
+  const BRANCH_END =
+    'throw errors.unknownCommand("command", primaryCommand, hint);';
   const startIndex = collapsed.indexOf(BRANCH_START);
-  const endIndex = collapsed.indexOf(BRANCH_END);
+  // Search from startIndex: `throw errors.unknownCommand(` appears at
+  // seventeen earlier sites, and indexOf from 0 would find one of those and
+  // collapse the branch to an empty string.
+  const endIndex = collapsed.indexOf(BRANCH_END, startIndex);
   const branch =
     startIndex === -1 || endIndex <= startIndex
       ? ""
