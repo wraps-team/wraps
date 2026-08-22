@@ -563,8 +563,15 @@ if (!primaryCommand) {
   // Run interactive menu and exit when done
   interactiveMenu()
     .then(() => process.exit(0))
-    .catch((err) => {
+    .catch(async (err) => {
       handleCLIError(err);
+      // handleCLIError now sets process.exitCode and returns instead of
+      // exiting, so run()'s `finally { await telemetry.shutdown() }` can flush
+      // the error event. This path has no such finally left to run —
+      // interactiveMenu's own finally already shut telemetry down before this
+      // rejection arrived — so drain again here or the event dies with the
+      // process.exit below.
+      await getTelemetryClient().shutdown();
       process.exit(1);
     });
 }
@@ -1740,6 +1747,13 @@ async function run() {
   } finally {
     // Ensure telemetry events are sent before exit
     await telemetry.shutdown();
+    // handleCLIError now sets process.exitCode and returns so this finally can
+    // run. Exit explicitly once the drain is done: a command that threw with a
+    // live clack spinner leaves an un-unref'd setInterval behind, and without
+    // this the CLI would print the error and then hang instead of exiting 1.
+    if (process.exitCode) {
+      process.exit(process.exitCode as number);
+    }
   }
 }
 

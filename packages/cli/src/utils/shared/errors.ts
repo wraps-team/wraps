@@ -352,7 +352,7 @@ export function extractPulumiErrorSummary(pulumiOutput: string): string {
  * @param error - The error to handle
  * @param command - Optional command name for telemetry context
  */
-export function handleCLIError(error: unknown, command?: string): never {
+export function handleCLIError(error: unknown, command?: string): void {
   const cmdContext = command || "unknown";
   // Agent commands (e.g. "email:agent") opt into the agent-enforcement
   // resource-not-found mappings; every other command falls back to the generic
@@ -416,7 +416,11 @@ export function handleCLIError(error: unknown, command?: string): never {
     }
 
     jsonError(cmdContext, { code, message, suggestion, docsUrl });
-    process.exit(1);
+    // `process.exitCode`, not `process.exit`, so cli.ts's finally block still
+    // flushes telemetry. The `return` is load-bearing: without it execution
+    // falls out of this block into the human chain and prints the error twice.
+    process.exitCode = 1;
+    return;
   }
 
   console.error(""); // Blank line
@@ -442,7 +446,10 @@ export function handleCLIError(error: unknown, command?: string): never {
       console.log(`  ${pc.blue(error.docsUrl)}\n`);
     }
 
-    process.exit(1);
+    // `process.exitCode`, not `process.exit`, so cli.ts's finally block still
+    // flushes telemetry.
+    process.exitCode = 1;
+    return;
   }
 
   // Check for AWS SDK errors
@@ -470,7 +477,8 @@ export function handleCLIError(error: unknown, command?: string): never {
       console.log(`${pc.dim("Documentation:")}`);
       console.log(`  ${pc.blue(wrapsError.docsUrl)}\n`);
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   // Check for Pulumi errors
@@ -505,7 +513,8 @@ export function handleCLIError(error: unknown, command?: string): never {
       console.log(`${pc.dim("Documentation:")}`);
       console.log(`  ${pc.blue(wrapsError.docsUrl)}\n`);
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   // Unknown error - still track with sanitized context
@@ -522,7 +531,7 @@ export function handleCLIError(error: unknown, command?: string): never {
   }
   console.log(`\n${pc.dim("If this persists, please report at:")}`);
   console.log(`  ${pc.blue("https://github.com/wraps-team/wraps/issues")}\n`);
-  process.exit(1);
+  process.exitCode = 1;
 }
 
 /**

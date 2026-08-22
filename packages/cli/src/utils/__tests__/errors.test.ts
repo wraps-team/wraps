@@ -53,6 +53,7 @@ describe("handleCLIError", () => {
   });
 
   afterEach(() => {
+    process.exitCode = undefined;
     exitSpy.mockRestore();
     consoleErrorSpy.mockRestore();
     consoleLogSpy.mockRestore();
@@ -80,7 +81,7 @@ describe("handleCLIError", () => {
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining("https://wraps.dev/docs/credentials")
     );
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("should handle WrapsError without suggestion and docs", () => {
@@ -88,7 +89,7 @@ describe("handleCLIError", () => {
 
     handleCLIError(error);
 
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("should handle unknown errors", () => {
@@ -101,7 +102,7 @@ describe("handleCLIError", () => {
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining("https://github.com/wraps-team/wraps/issues")
     );
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("should handle string errors", () => {
@@ -109,15 +110,19 @@ describe("handleCLIError", () => {
 
     // Should log the string error
     expect(consoleErrorSpy).toHaveBeenCalledWith("String error message");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("should handle null/undefined errors", () => {
     handleCLIError(null);
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
+
+    // Sticky global: reset between calls or the second assertion just re-reads
+    // the first call's value.
+    process.exitCode = undefined;
 
     handleCLIError(undefined);
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("should handle WrapsError with only suggestion (no docsUrl)", () => {
@@ -135,7 +140,7 @@ describe("handleCLIError", () => {
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining("Try this fix")
     );
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("should handle WrapsError with only docsUrl (no suggestion)", () => {
@@ -154,7 +159,7 @@ describe("handleCLIError", () => {
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining("https://wraps.dev/docs/error")
     );
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("should print blank line before error message", () => {
@@ -162,6 +167,15 @@ describe("handleCLIError", () => {
     handleCLIError(error);
 
     expect(consoleErrorSpy).toHaveBeenCalledWith("");
+  });
+
+  it("sets process.exitCode and returns instead of exiting, so cli.ts's finally can flush telemetry", () => {
+    // process.exit(1) here jumped over run()'s `finally { await
+    // telemetry.shutdown() }`, so no error event has ever reached the server.
+    handleCLIError(new WrapsError("Test error", "TEST_ERROR"));
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
   });
 
   describe("handleCLIError JSON mode", () => {
@@ -320,12 +334,6 @@ describe("handleCLIError", () => {
     });
 
     it("should not call clack.log.error in JSON mode", () => {
-      // Make process.exit throw so execution stops at the JSON path
-      // and doesn't fall through to the clack code path
-      exitSpy.mockImplementation(() => {
-        throw new Error("process.exit");
-      });
-
       const error = new WrapsError(
         "Some error",
         "SOME_ERROR",
@@ -333,21 +341,19 @@ describe("handleCLIError", () => {
         "https://wraps.dev/docs"
       );
 
-      try {
-        handleCLIError(error);
-      } catch {
-        // Expected: process.exit throws
-      }
+      handleCLIError(error);
 
       expect(clackErrorSpy).not.toHaveBeenCalled();
+      // The JSON chain must `return`, not fall through into the human chain.
+      expect(exitSpy).not.toHaveBeenCalled();
     });
 
-    it("should still call process.exit(1) in JSON mode", () => {
+    it("sets a non-zero exit code in JSON mode instead of exiting, so cli.ts can flush telemetry", () => {
       const error = new WrapsError("Test error", "TEST_ERROR");
 
       handleCLIError(error);
 
-      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(process.exitCode).toBe(1);
     });
   });
 });
