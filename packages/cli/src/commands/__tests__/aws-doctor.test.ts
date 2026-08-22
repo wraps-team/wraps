@@ -482,9 +482,27 @@ describe("aws doctor", () => {
       (f) => f.name === "Could not confirm SES account status"
     );
     expect(uncertain?.status).toBe("info");
+    expect(uncertain?.details).toContain("Region: us-west-2");
     expect(findings.some((f) => f.name === "SES is in sandbox mode")).toBe(
       false
     );
+  });
+
+  it("names the run's own region on the uncertain SES row rather than calling it an unset-region default", async () => {
+    mockDetectAWSState.mockResolvedValue(baseState({ region: null }));
+    mockGetSESAccountStatus.mockResolvedValue({
+      isSandbox: true,
+      sandboxUncertain: true,
+    });
+
+    const { collectAwsFindings } = await import("../aws/doctor.js");
+    const { findings } = await collectAwsFindings({ region: "eu-west-1" });
+
+    const uncertain = findings.find(
+      (f) => f.name === "Could not confirm SES account status"
+    );
+    expect(uncertain?.details).toContain("Region: eu-west-1");
+    expect(uncertain?.details).not.toContain("No AWS_REGION set");
   });
 
   it("asks the SES probe about the ambient region and discloses nothing when no region is named", async () => {
@@ -510,6 +528,11 @@ describe("aws doctor", () => {
       (f) => f.name === "Checked region: eu-west-1"
     );
     expect(disclosure?.details).toContain("not the us-east-1 default");
+    // The environment warn above is about AWS_REGION; the SES row is about the
+    // region this run actually probed. It must not tell the user the region
+    // they just typed was a fallback the tool picked for them.
+    const sesRow = findings.find((f) => f.name === "SES has production access");
+    expect(sesRow?.details).toBe("Region: eu-west-1");
   });
   it("asks the SES probe about the region the command was given", async () => {
     mockDetectAWSState.mockResolvedValue(baseState({ region: "us-west-2" }));
