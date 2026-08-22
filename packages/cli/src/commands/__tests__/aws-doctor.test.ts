@@ -17,10 +17,10 @@ vi.mock("../../utils/shared/aws-detection.js", () => ({
   getConfiguredProfiles: vi.fn().mockReturnValue([]),
 }));
 vi.mock("../../utils/shared/aws.js", () => ({
-  isSESSandbox: vi.fn().mockResolvedValue(false),
+  getSESAccountStatus: vi.fn().mockResolvedValue({ isSandbox: false }),
 }));
 
-import { isSESSandbox } from "../../utils/shared/aws.js";
+import { getSESAccountStatus } from "../../utils/shared/aws.js";
 import {
   type AWSSetupState,
   detectAWSState,
@@ -41,7 +41,7 @@ const stripAnsi = (s: string) => s.replace(/\u001B\[[0-9;]*m/g, "");
 
 const mockDetectAWSState = detectAWSState as ReturnType<typeof vi.fn>;
 const mockHasCredentialsFile = hasCredentialsFile as ReturnType<typeof vi.fn>;
-const mockIsSESSandbox = isSESSandbox as ReturnType<typeof vi.fn>;
+const mockGetSESAccountStatus = getSESAccountStatus as ReturnType<typeof vi.fn>;
 const mockIsJsonMode = isJsonMode as ReturnType<typeof vi.fn>;
 const mockJsonSuccess = jsonSuccess as ReturnType<typeof vi.fn>;
 
@@ -104,7 +104,7 @@ describe("aws doctor", () => {
     vi.clearAllMocks();
     vi.resetModules();
     mockIsJsonMode.mockReturnValue(false);
-    mockIsSESSandbox.mockResolvedValue(false);
+    mockGetSESAccountStatus.mockResolvedValue({ isSandbox: false });
     mockHasCredentialsFile.mockReturnValue(true);
     mockDetectAWSState.mockResolvedValue(baseState());
   });
@@ -183,7 +183,7 @@ describe("aws doctor", () => {
 
   it("points a sandboxed SES account at the console, not at a command that cannot request access", async () => {
     mockIsJsonMode.mockReturnValue(true);
-    mockIsSESSandbox.mockResolvedValue(true);
+    mockGetSESAccountStatus.mockResolvedValue({ isSandbox: true });
 
     const { doctor } = await import("../aws/doctor.js");
     await doctor();
@@ -432,5 +432,81 @@ describe("aws doctor", () => {
     expect(payload.suggestions).toContain(
       formatRemediation(remediations.setAwsRegion())
     );
+  });
+
+  it("asks the SES probe about the region collectAwsFindings was given, not the ambient one", async () => {
+    mockDetectAWSState.mockResolvedValue(baseState({ region: "us-west-2" }));
+
+    const { collectAwsFindings } = await import("../aws/doctor.js");
+    await collectAwsFindings({ region: "eu-west-1" });
+
+    expect(mockGetSESAccountStatus).toHaveBeenCalledWith("eu-west-1");
+  });
+
+  it("discloses the checked region when it differs from the configured one", async () => {
+    mockDetectAWSState.mockResolvedValue(baseState({ region: "us-west-2" }));
+
+    const { collectAwsFindings } = await import("../aws/doctor.js");
+    const { findings } = await collectAwsFindings({ region: "eu-west-1" });
+
+    const disclosure = findings.find(
+      (f) => f.name === "Checked region: eu-west-1"
+    );
+    expect(disclosure?.status).toBe("info");
+    expect(disclosure?.details).toContain("us-west-2");
+  });
+
+  it("does not disclose a checked region when the override is the region the environment would have used anyway", async () => {
+    mockDetectAWSState.mockResolvedValue(baseState({ region: null }));
+
+    const { collectAwsFindings } = await import("../aws/doctor.js");
+    const { findings } = await collectAwsFindings({ region: "us-east-1" });
+
+    expect(
+      findings.filter((f) => f.name.startsWith("Checked region:"))
+    ).toEqual([]);
+  });
+
+  it("says it could not confirm SES status instead of inventing a sandbox verdict when the probe could not answer", async () => {
+    mockGetSESAccountStatus.mockResolvedValue({
+      isSandbox: true,
+      sandboxUncertain: true,
+    });
+
+    const { collectAwsFindings } = await import("../aws/doctor.js");
+    const { findings } = await collectAwsFindings();
+
+    const uncertain = findings.find(
+      (f) => f.name === "Could not confirm SES account status"
+    );
+    expect(uncertain?.status).toBe("info");
+    expect(findings.some((f) => f.name === "SES is in sandbox mode")).toBe(
+      false
+    );
+  });
+
+  it("asks the SES probe about the ambient region and discloses nothing when no region is named", async () => {
+    const { collectAwsFindings } = await import("../aws/doctor.js");
+    const { findings } = await collectAwsFindings();
+
+    expect(mockGetSESAccountStatus).toHaveBeenCalledWith("us-west-2");
+    expect(
+      findings.filter((f) => f.name.startsWith("Checked region:"))
+    ).toEqual([]);
+  });
+
+  it("still warns about the unset environment region when the run names a region of its own", async () => {
+    mockDetectAWSState.mockResolvedValue(baseState({ region: null }));
+
+    const { collectAwsFindings } = await import("../aws/doctor.js");
+    const { findings } = await collectAwsFindings({ region: "eu-west-1" });
+
+    const regionCheck = findings.find((f) => f.name === "Region not set");
+    expect(regionCheck?.status).toBe("warn");
+    expect(regionCheck?.remediation).toEqual(remediations.setAwsRegion());
+    const disclosure = findings.find(
+      (f) => f.name === "Checked region: eu-west-1"
+    );
+    expect(disclosure?.details).toContain("not the us-east-1 default");
   });
 });

@@ -7,7 +7,7 @@
 import * as clack from "@clack/prompts";
 import pc from "picocolors";
 import { trackCommand } from "../../telemetry/events.js";
-import { isSESSandbox } from "../../utils/shared/aws.js";
+import { getSESAccountStatus } from "../../utils/shared/aws.js";
 import {
   type AWSSetupState,
   detectAWSState,
@@ -28,9 +28,19 @@ import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 const CATEGORY = "AWS Setup";
 
 /**
- * Run all diagnostic checks
+ * Run all diagnostic checks.
+ *
+ * `regionOverride` is the region this whole report is about. `wraps doctor`
+ * resolves one region for both of its legs and passes it here; `wraps aws
+ * doctor --region` names one directly. Without it, the region row and the SES
+ * probe each read ambient config independently, so one report could name one
+ * region in its header and answer for another in its sandbox verdict — and
+ * SES sending status is per-region.
  */
-async function runDiagnostics(state: AWSSetupState): Promise<DoctorFinding[]> {
+async function runDiagnostics(
+  state: AWSSetupState,
+  regionOverride?: string
+): Promise<DoctorFinding[]> {
   const results: DoctorFinding[] = [];
 
   // Check AWS CLI
@@ -246,7 +256,20 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorFinding[]> {
     return results; // Can't do more checks without credentials
   }
 
-  // Check region
+  // Check region. The two rows below describe the ENVIRONMENT and are left
+  // exactly as they were; the disclosure row after them describes THIS RUN,
+  // and only appears when this run actually differs from what the environment
+  // would have used on its own.
+  //
+  // The comparison is against `configuredRegion`, NOT against a bare
+  // `state.region`. `wraps doctor` passes a resolved region on every run, and
+  // that region is "us-east-1" whenever nothing is configured — so comparing
+  // against an undefined `state.region` would fire on the single commonest run
+  // there is (credentials, no AWS_REGION, no deployments) and print "The SES
+  // check below is about us-east-1, not the us-east-1 default" directly
+  // beneath the `Region not set` warn.
+  const configuredRegion = state.region || "us-east-1";
+  const effectiveRegion = regionOverride || state.region;
   if (state.region) {
     results.push({
       status: "pass",
@@ -260,6 +283,17 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorFinding[]> {
       name: "Region not set",
       details: "Will default to us-east-1. Set AWS_REGION for faster commands.",
       remediation: remediations.setAwsRegion(),
+    });
+  }
+
+  if (regionOverride && regionOverride !== configuredRegion) {
+    results.push({
+      status: "info",
+      category: CATEGORY,
+      name: `Checked region: ${regionOverride}`,
+      details: state.region
+        ? `Overrides the configured region ${state.region}. The SES check below is about ${regionOverride}.`
+        : `The SES check below is about ${regionOverride}, not the us-east-1 default.`,
     });
   }
 
@@ -281,13 +315,27 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorFinding[]> {
   // none is set — but we annotate the result with the region used so the
   // user can see whether that matches their intended deployment.
   if (state.credentialsConfigured) {
-    const regionUsed = state.region || "us-east-1";
-    const regionNote = state.region
+    const regionUsed = effectiveRegion || "us-east-1";
+    const regionNote = effectiveRegion
       ? `Region: ${regionUsed}`
       : `No AWS_REGION set — defaulted to ${regionUsed}. Set AWS_REGION if your deployment lives elsewhere.`;
     try {
-      const sandbox = await isSESSandbox(regionUsed);
-      if (sandbox) {
+      const ses = await getSESAccountStatus(regionUsed);
+      if (ses.sandboxUncertain) {
+        // getSESAccountStatus returns { isSandbox: true, sandboxUncertain: true }
+        // for ANY failed GetAccount — a mistyped region, a region with no SES
+        // endpoint, an un-enabled opt-in region, a throttle, a missing
+        // ses:GetAccount permission. isSandbox is a safe default there, not an
+        // answer. Now that a user can name the region, printing it as
+        // "SES is in sandbox mode" would be a new confident lie, which is the
+        // thing this command exists to remove.
+        results.push({
+          status: "info",
+          category: CATEGORY,
+          name: "Could not confirm SES account status",
+          details: `SES may not be enabled in this region, or the account may lack ses:GetAccount.\n${regionNote}`,
+        });
+      } else if (ses.isSandbox) {
         results.push({
           status: "warn",
           category: CATEGORY,
@@ -305,10 +353,13 @@ async function runDiagnostics(state: AWSSetupState): Promise<DoctorFinding[]> {
       }
       // baseline:allow-next-line no-swallowed-errors — SES check is non-blocking diagnostic
     } catch {
+      // getSESAccountStatus swallows send errors itself, so this only fires if
+      // constructing the SESv2 client throws — e.g. a syntactically impossible
+      // region string. Same row, same honesty.
       results.push({
         status: "info",
         category: CATEGORY,
-        name: "Could not check SES status",
+        name: "Could not confirm SES account status",
         details: `SES may not be enabled in this region.\n${regionNote}`,
       });
     }
@@ -397,12 +448,28 @@ function suggestionsFor(results: DoctorFinding[]): string[] {
  * too, because the aggregate needs `credentialsConfigured` before deciding
  * whether the email leg can run at all.
  */
-export async function collectAwsFindings(): Promise<{
+export async function collectAwsFindings(
+  options: {
+    /**
+     * The region this report is about. Reaches both the region disclosure row
+     * and the SES sandbox probe, so the two cannot name different regions.
+     */
+    region?: string;
+    /**
+     * Already-detected state. `wraps doctor` detects first, because it needs
+     * `accountId` to resolve one region for BOTH legs before either runs;
+     * re-detecting here would shell out to `aws configure` and call STS twice
+     * per report and let the two reads disagree. The standalone command lets
+     * this default.
+     */
+    state?: AWSSetupState;
+  } = {}
+): Promise<{
   findings: DoctorFinding[];
   state: AWSSetupState;
 }> {
-  const state = await detectAWSState();
-  return { findings: await runDiagnostics(state), state };
+  const state = options.state ?? (await detectAWSState());
+  return { findings: await runDiagnostics(state, options.region), state };
 }
 
 /**
