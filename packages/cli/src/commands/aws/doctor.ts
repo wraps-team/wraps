@@ -472,10 +472,12 @@ export async function collectAwsFindings(
   return { findings: await runDiagnostics(state, options.region), state };
 }
 
+export type AwsDoctorOptions = { region?: string; json?: boolean };
+
 /**
  * AWS Doctor command entry point
  */
-export async function doctor(): Promise<void> {
+export async function doctor(options: AwsDoctorOptions = {}): Promise<void> {
   const startTime = Date.now();
 
   if (!isJsonMode()) {
@@ -485,7 +487,9 @@ export async function doctor(): Promise<void> {
   const spinner = isJsonMode() ? null : clack.spinner();
   spinner?.start("Running diagnostics...");
 
-  const { findings: results } = await collectAwsFindings();
+  const { findings: results, state } = await collectAwsFindings({
+    region: options.region,
+  });
 
   spinner?.stop("Diagnostics complete");
 
@@ -493,6 +497,23 @@ export async function doctor(): Promise<void> {
   const failCount = results.filter((r) => r.status === "fail").length;
   const warnCount = results.filter((r) => r.status === "warn").length;
   const passCount = results.filter((r) => r.status === "pass").length;
+
+  // One event on both paths, so it sits above the JSON early return — matching
+  // `wraps doctor` and `wraps email doctor`, which both report the region they
+  // checked. Ids and counts only.
+  //
+  // The fallback mirrors the probe's own in runDiagnostics: with nothing
+  // configured the report IS about us-east-1, so recording `undefined` here
+  // would under-report exactly the case this feature exists to make legible.
+  // `commands/doctor.ts` records a resolved region for the same reason.
+  trackCommand("aws:doctor", {
+    success: true,
+    duration_ms: Date.now() - startTime,
+    region: options.region || state.region || "us-east-1",
+    pass_count: passCount,
+    fail_count: failCount,
+    warn_count: warnCount,
+  });
 
   if (isJsonMode()) {
     jsonSuccess("aws.doctor", {
@@ -529,14 +550,6 @@ export async function doctor(): Promise<void> {
       console.log(`  ${pc.dim("-")} ${suggestion}`);
     }
   }
-
-  trackCommand("aws:doctor", {
-    success: true,
-    duration_ms: Date.now() - startTime,
-    pass_count: passCount,
-    fail_count: failCount,
-    warn_count: warnCount,
-  });
 
   console.log();
   clack.outro(

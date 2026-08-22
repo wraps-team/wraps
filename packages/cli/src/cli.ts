@@ -1531,7 +1531,7 @@ async function run() {
           break;
 
         case "doctor":
-          await awsDoctor();
+          await awsDoctor({ region: flags.region, json: flags.json });
           break;
 
         default:

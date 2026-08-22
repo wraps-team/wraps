@@ -144,6 +144,15 @@ export default function CLIReferenceAWSPageContent() {
           <CardContent>
             <div className="space-y-4">
               <div>
+                <code className="rounded bg-muted px-2 py-1">
+                  -r, --region &lt;region&gt;
+                </code>
+                <p className="mt-2 text-muted-foreground text-sm">
+                  AWS region to diagnose. The SES sending-status check is
+                  per-region, so this decides which region the report is about.
+                </p>
+              </div>
+              <div>
                 <code className="rounded bg-muted px-2 py-1">--json</code>
                 <p className="mt-2 text-muted-foreground text-sm">
                   Output diagnostic results as JSON for scripting and automation

@@ -20,6 +20,7 @@ vi.mock("../../utils/shared/aws.js", () => ({
   getSESAccountStatus: vi.fn().mockResolvedValue({ isSandbox: false }),
 }));
 
+import { trackCommand } from "../../telemetry/events.js";
 import { getSESAccountStatus } from "../../utils/shared/aws.js";
 import {
   type AWSSetupState,
@@ -42,6 +43,7 @@ const stripAnsi = (s: string) => s.replace(/\u001B\[[0-9;]*m/g, "");
 const mockDetectAWSState = detectAWSState as ReturnType<typeof vi.fn>;
 const mockHasCredentialsFile = hasCredentialsFile as ReturnType<typeof vi.fn>;
 const mockGetSESAccountStatus = getSESAccountStatus as ReturnType<typeof vi.fn>;
+const mockTrackCommand = trackCommand as ReturnType<typeof vi.fn>;
 const mockIsJsonMode = isJsonMode as ReturnType<typeof vi.fn>;
 const mockJsonSuccess = jsonSuccess as ReturnType<typeof vi.fn>;
 
@@ -508,5 +510,50 @@ describe("aws doctor", () => {
       (f) => f.name === "Checked region: eu-west-1"
     );
     expect(disclosure?.details).toContain("not the us-east-1 default");
+  });
+  it("asks the SES probe about the region the command was given", async () => {
+    mockDetectAWSState.mockResolvedValue(baseState({ region: "us-west-2" }));
+
+    const { doctor } = await import("../aws/doctor.js");
+    await doctor({ region: "eu-west-1" });
+
+    expect(mockGetSESAccountStatus).toHaveBeenCalledWith("eu-west-1");
+  });
+  it("reports the region it checked in telemetry", async () => {
+    mockDetectAWSState.mockResolvedValue(baseState({ region: "us-west-2" }));
+
+    const { doctor } = await import("../aws/doctor.js");
+    await doctor({ region: "eu-west-1" });
+
+    expect(mockTrackCommand).toHaveBeenCalledWith(
+      "aws:doctor",
+      expect.objectContaining({ region: "eu-west-1" })
+    );
+  });
+
+  it("reports the region it checked in telemetry on the JSON path too", async () => {
+    mockIsJsonMode.mockReturnValue(true);
+    mockDetectAWSState.mockResolvedValue(baseState({ region: "us-west-2" }));
+
+    const { doctor } = await import("../aws/doctor.js");
+    await doctor({ region: "eu-west-1" });
+
+    expect(mockTrackCommand).toHaveBeenCalledWith(
+      "aws:doctor",
+      expect.objectContaining({ region: "eu-west-1" })
+    );
+  });
+
+  it("records the region the SES probe actually used when nothing named one", async () => {
+    mockDetectAWSState.mockResolvedValue(baseState({ region: null }));
+
+    const { doctor } = await import("../aws/doctor.js");
+    await doctor();
+
+    expect(mockGetSESAccountStatus).toHaveBeenCalledWith("us-east-1");
+    expect(mockTrackCommand).toHaveBeenCalledWith(
+      "aws:doctor",
+      expect.objectContaining({ region: "us-east-1" })
+    );
   });
 });
