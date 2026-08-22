@@ -374,6 +374,21 @@ describe("doctor sources carry no hint text of their own", () => {
  * that pattern: read cli.ts's text, isolate the unknown-command branch, and
  * assert the suggestion is still wired into it.
  */
+// Structure, not a verbatim line: the first two arguments are load-bearing —
+// they are what makes this the unknown-*command* rejection for the command the
+// user typed — while the third is a local whose name carries no meaning.
+// Renaming `hint` must not fail a suggester guard.
+const BRANCH_END =
+  /throw errors\.unknownCommand\(\s*"command"\s*,\s*primaryCommand\s*,/;
+
+function findBranchEnd(source: string, from: number): number {
+  if (from === -1) {
+    return -1;
+  }
+  const offset = source.slice(from).search(BRANCH_END);
+  return offset === -1 ? -1 : from + offset;
+}
+
 describe("unknown-command branch asks the suggester (source guard)", () => {
   // Collapse whitespace so a reformat — different wrapping or indentation —
   // cannot fail this.
@@ -385,13 +400,11 @@ describe("unknown-command branch asks the suggester (source guard)", () => {
   // survives the change and sits ABOVE the suggester call — so the assertions
   // below are not matching their own marker.
   const BRANCH_START = "showHelp(); break; default: {";
-  const BRANCH_END =
-    'throw errors.unknownCommand("command", primaryCommand, hint);';
   const startIndex = collapsed.indexOf(BRANCH_START);
   // Search from startIndex: `throw errors.unknownCommand(` appears at
-  // seventeen earlier sites, and indexOf from 0 would find one of those and
+  // seventeen earlier sites, and a search from 0 would find one of those and
   // collapse the branch to an empty string.
-  const endIndex = collapsed.indexOf(BRANCH_END, startIndex);
+  const endIndex = findBranchEnd(collapsed, startIndex);
   const branch =
     startIndex === -1 || endIndex <= startIndex
       ? ""
@@ -419,5 +432,19 @@ describe("unknown-command branch asks the suggester (source guard)", () => {
     // Calling the suggester and dropping the answer would leave the user with
     // the same bare error the feature was built to replace.
     expect(branch).toContain("Did you mean");
+  });
+
+  it("still finds the branch end after the hint local is renamed", () => {
+    // Regression guard for the guard: BRANCH_END used to pin the third
+    // argument's name, so renaming a local variable failed this file for a
+    // refactor that changed no behaviour.
+    const renamed = collapsed.replace(
+      ", primaryCommand, hint);",
+      ", primaryCommand, suggestionHint);"
+    );
+    expect(renamed).not.toBe(collapsed);
+    expect(
+      findBranchEnd(renamed, renamed.indexOf(BRANCH_START))
+    ).toBeGreaterThan(startIndex);
   });
 });

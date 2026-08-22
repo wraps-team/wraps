@@ -32,6 +32,28 @@ function countOccurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
 }
 
+// The interactive `.catch` handler's call site. Anchored on structure, not on
+// the parameter's name: renaming `err` to `error` is a pure rename with no
+// behavioural effect, and must not fail a telemetry-drain guard. The two-arg
+// run() site (`handleCLIError(error, commandName)`) cannot match — this
+// requires the closing paren straight after a single identifier.
+const INTERACTIVE_CALL_SITE = /handleCLIError\(\s*\w+\s*\);/;
+
+function findInteractiveCallSite(source: string): number {
+  return source.search(INTERACTIVE_CALL_SITE);
+}
+
+// A band, not an exact count, matching every other count in this change set.
+// Five today, one per error-rendering path in handleCLIError. Fewer means a
+// path stopped setting the code and a failed command can exit 0 — the defect
+// this guard exists for. More is legitimate: a new error type with its own
+// render adds a sixth. Past twelve, handleCLIError has grown a dispatch layer
+// this guard has not been read against.
+function exitCodeAssignmentsAreInBand(body: string): boolean {
+  const assignments = countOccurrences(body, "process.exitCode = 1;");
+  return assignments >= 5 && assignments <= 12;
+}
+
 describe("error-path telemetry is drained before the process exits", () => {
   it.each([CLI_PATH, ERRORS_PATH])(
     "scans %s (a rename must not silence the scan)",
@@ -79,7 +101,7 @@ describe("error-path telemetry is drained before the process exits", () => {
     // file-wide toContain cannot tell this drain apart from the same call
     // sitting in an unrelated function, in dead code, or after the
     // process.exit that follows it — each of which loses the event.
-    const start = collapsed.indexOf("handleCLIError(err);");
+    const start = findInteractiveCallSite(collapsed);
     expect(start).toBeGreaterThan(-1);
     const tail = collapsed.slice(start, start + 700);
     expect(tail).toContain("await getTelemetryClient().shutdown();");
@@ -99,6 +121,37 @@ describe("error-path telemetry is drained before the process exits", () => {
     const body = errorsSource.slice(start, end);
 
     expect(body).not.toContain("process.exit(");
-    expect(countOccurrences(body, "process.exitCode = 1;")).toBe(5);
+    expect(exitCodeAssignmentsAreInBand(body)).toBe(true);
+  });
+
+  // The three assertions below are the regression guard for a defect in the
+  // guards themselves: they used to pin verbatim local identifiers and an
+  // exact statement count, so a pure refactor of cli.ts or errors.ts — one
+  // that changed no behaviour at all — failed a telemetry test and pointed the
+  // developer at telemetry code that nobody had touched.
+  describe("the source anchors survive pure refactors", () => {
+    it("finds the interactive call site after its catch parameter is renamed", () => {
+      const renamed = collapsed.replace(
+        "handleCLIError(err);",
+        "handleCLIError(error);"
+      );
+      expect(renamed).not.toBe(collapsed);
+      expect(findInteractiveCallSite(renamed)).toBeGreaterThan(-1);
+    });
+
+    it("still rejects a call site that is not a single-argument call", () => {
+      const removed = collapsed.replace("handleCLIError(err);", "");
+      expect(findInteractiveCallSite(removed)).toBe(-1);
+    });
+
+    it("accepts a sixth error branch with its own exit code", () => {
+      const errorsSource = readFileSync(ERRORS_PATH, "utf-8");
+      const start = errorsSource.indexOf("export function handleCLIError(");
+      const end = errorsSource.indexOf("\n}\n", start);
+      const body = errorsSource.slice(start, end);
+      const grown = `${body}\n  process.exitCode = 1;`;
+      expect(exitCodeAssignmentsAreInBand(grown)).toBe(true);
+      expect(exitCodeAssignmentsAreInBand("")).toBe(false);
+    });
   });
 });

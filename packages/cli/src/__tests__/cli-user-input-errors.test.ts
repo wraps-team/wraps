@@ -34,6 +34,22 @@ const SRC_DIR = join(import.meta.dirname, "..");
 const CLI_PATH = join(SRC_DIR, "cli.ts");
 const cliSource = readFileSync(CLI_PATH, "utf-8");
 
+/**
+ * The unknown-command branch's throw, located by structure rather than by a
+ * verbatim line: the first two arguments are pinned, the third is a local
+ * whose name carries no meaning.
+ */
+const UNKNOWN_COMMAND_THROW =
+  /throw errors\.unknownCommand\(\s*"command"\s*,\s*primaryCommand\s*,/;
+
+function findUnknownCommandThrow(source: string, from: number): number {
+  if (from === -1) {
+    return -1;
+  }
+  const offset = source.slice(from).search(UNKNOWN_COMMAND_THROW);
+  return offset === -1 ? -1 : from + offset;
+}
+
 const ANNOTATION = "cli-honest:allow-direct-error";
 
 /** Line comments explain hazards; only emitted code can mislead a user. */
@@ -96,13 +112,26 @@ describe("cli.ts rejects bad input through the errors registry", () => {
   it("converts the unknown-command branch and stops it printing its own error", () => {
     const collapsed = cliSource.replace(/\s+/g, " ");
     const start = collapsed.indexOf("showHelp(); break; default: {");
-    const end = collapsed.indexOf(
-      'throw errors.unknownCommand("command", primaryCommand, hint);',
-      start
-    );
+    const end = findUnknownCommandThrow(collapsed, start);
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
     expect(collapsed.slice(start, end)).not.toContain("clack.log.error(");
+  });
+
+  it("finds that branch's throw after the hint local is renamed", () => {
+    // Regression guard for the guard: the anchor used to pin the third
+    // argument's name, so renaming a local failed this file for a refactor
+    // that changed no behaviour. The first two arguments stay pinned — they
+    // are what identifies this as the unknown-command rejection.
+    const collapsed = cliSource
+      .replace(/\s+/g, " ")
+      .replace(
+        ", primaryCommand, hint);",
+        ", primaryCommand, suggestionHint);"
+      );
+    const start = collapsed.indexOf("showHelp(); break; default: {");
+    expect(start).toBeGreaterThan(-1);
+    expect(findUnknownCommandThrow(collapsed, start)).toBeGreaterThan(start);
   });
 
   it("throws no bare Error, which would be reported as a crash", () => {
