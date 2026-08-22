@@ -1,7 +1,7 @@
 ---
 name: error-telemetry-must-not-carry-raw-error-text
 severity: critical
-origin: cli-honest-failures — Newly-delivered error telemetry ships raw error messages, including home-directory paths and credential material
+origin: cli-honest-failures — Newly-delivered error telemetry ships raw error messages, including home-directory paths and credential material; widened by — Three of the ten frozen KNOWN_DEBT telemetry sites are newly on the wire because of this branch, and the rule that freezes them does not say so
 applies-to: "packages/cli/src/**/*.ts"
 ---
 
@@ -98,6 +98,26 @@ a note attached, and for a `throw`-terminated branch it is not even dormant.
 `commands/email/upgrade.ts` carry no budget, so the site the finding came from
 and the three delivered sites are all guarded with zero slack.
 
+**The exit-vs-throw split is now checked, not just described (2026-08-22).**
+Prose saying "these seven are dead-lettered" is a claim about code that can stop
+being true in one line, and it already had: when this rule was first written the
+freeze list also held `platform/connect.ts:968,1333` and
+`email/upgrade.ts:2142`, whose catches end in `throw`. Those three were
+*delivered* — `handleCLIError` now sets `process.exitCode` instead of calling
+`process.exit(1)`, so `run()`'s `finally { await telemetry.shutdown() }` drains
+the queue and POSTs them — and they were on the wire for the first time
+*because of this branch*, carrying the exact bytes the same branch removed from
+`errors.ts`. They were fixed and delisted; nothing in the check would have
+noticed had they not been.
+
+So the budget is no longer unconditional. Each `KNOWN_DEBT` hit is now honoured
+only if the innermost `catch` around it still reaches `process.exit(` before its
+closing brace. Turn one of those `process.exit(1)` calls into a `throw`, or lift
+a budgeted `trackError` out of its catch, and the site fails the rule with a
+message telling you it is delivered — because at that moment it is. The freeze
+is a stay of execution for a dormant leak, and the check now verifies dormancy
+instead of trusting a table.
+
 ## Check
 
 ```bash
@@ -122,7 +142,10 @@ const HAZARD_VALUE =
 // AND are dead-lettered behind a local process.exit(1), so nothing is
 // transmitted today. Frozen at their current count so the rule runs green
 // while they are burned down. This map may only shrink. A new hazard in a
-// listed file, or any hazard in a file not listed, fails.
+// listed file, or any hazard in a file not listed, fails. A budgeted entry is
+// also honoured only while catchDeadLetters() below still finds a
+// process.exit( in its enclosing catch: the moment that branch throws instead,
+// the event is delivered and the freeze no longer applies.
 //
 // platform/connect.ts and email/upgrade.ts were on this list and are NOT any
 // more: their branches end in `throw`, so they were delivered, and they were
@@ -241,6 +264,39 @@ function callsTo(code, fnName) {
   return found;
 }
 
+// True when the innermost `catch` around `index` ends the branch with its own
+// process.exit(...) - which kills the telemetry flush timer, so the queued
+// event is dead-lettered rather than POSTed. A catch that throws (or falls
+// through) reaches cli.ts -> handleCLIError -> process.exitCode, and run()s
+// `finally { await telemetry.shutdown() }` delivers the event. Returns null
+// when the call is not inside a catch at all.
+function catchDeadLetters(code, index) {
+  const pattern = /\bcatch\s*(?:\([^)]*\))?\s*\{/g;
+  let m;
+  let best = null;
+  while ((m = pattern.exec(code))) {
+    const open = m.index + m[0].length;
+    if (open > index) break;
+    let depth = 1, i = open, quote = "";
+    while (i < code.length && depth > 0) {
+      const c = code[i];
+      if (quote) {
+        if (c === "\\") { i += 2; continue; }
+        if (c === quote) quote = "";
+        i += 1; continue;
+      }
+      if (c === DQ || c === SQ || c === BQ) { quote = c; i += 1; continue; }
+      if (c === "{" || c === "(" || c === "[") depth += 1;
+      else if (c === "}" || c === ")" || c === "]") depth -= 1;
+      i += 1;
+    }
+    const close = i - 1;
+    if (index < close && (best === null || open > best.open)) best = { open, close };
+  }
+  if (best === null) return null;
+  return /\bprocess\s*\.\s*exit\s*\(/.test(code.slice(index, best.close));
+}
+
 let bad = false;
 for (const arg of process.argv.slice(1)) {
   const file = arg.replace(/^\.\//, "");
@@ -267,13 +323,30 @@ for (const arg of process.argv.slice(1)) {
     }
     for (const { key, value } of props) {
       if (!(HAZARD_KEY.test(key) || HAZARD_VALUE.test(withoutPlainStrings(value)))) continue;
-      hits.push({ line, key, value: value.replace(/\s+/g, " ").slice(0, 60) });
+      hits.push({ line, key, index: call.index, value: value.replace(/\s+/g, " ").slice(0, 60) });
     }
   }
 
   const budget = { ...(KNOWN_DEBT[file] || {}) };
   for (const hit of hits) {
-    if (budget[hit.key] > 0) { budget[hit.key] -= 1; continue; }
+    if (budget[hit.key] > 0) {
+      budget[hit.key] -= 1;
+      // The budget is only ever a stay of execution for a DEAD-LETTERED site.
+      // If the branch stopped exiting and now throws, the same bytes are on
+      // the wire and the freeze no longer applies - fix it, do not re-budget.
+      const deadLettered = catchDeadLetters(code, hit.index);
+      if (deadLettered === true) continue;
+      bad = true;
+      console.log(
+        file + ":" + hit.line + ": KNOWN_DEBT budgets `" + hit.key +
+        "` here as dead-lettered, but " +
+        (deadLettered === null
+          ? "this trackError is not inside a catch at all"
+          : "the enclosing catch ends in throw or fall-through, not process.exit(...)") +
+        " - run()s finally { await telemetry.shutdown() } drains the queue, so the event is POSTed. This site is delivered: fix it, do not budget it."
+      );
+      continue;
+    }
     bad = true;
     console.log(
       file + ":" + hit.line + ": trackError metadata field `" + hit.key +
@@ -283,6 +356,7 @@ for (const arg of process.argv.slice(1)) {
   }
 }
 process.exit(bad ? 1 : 0);
+
 ' -- "$@"
 ```
 
