@@ -56,21 +56,47 @@ under a different key — so the check reads the *value* expression, not only th
 key name.
 
 **Known debt, frozen in the check (2026-08-22).** Ten call sites already
-shipped this class when the rule was written. The check carries them in a
-`KNOWN_DEBT` map at their exact current counts so it can run green while they
+shipped this class when the rule was written. Being pre-existing is not the
+same as being dormant: what decides whether a site is *on the wire* is how its
+branch ends. A branch that ends in its own `process.exit(1)` still kills the
+flush timer, exactly as `handleCLIError` used to, so its event is dead-lettered
+and this branch did not change it. A branch that ends in `throw` propagates to
+`cli.ts` -> `handleCLIError` -> `process.exitCode`, and `run()`'s
+`finally { await telemetry.shutdown() }` delivers it — which is what this
+branch changed. Do not read the freeze list as one uniform class.
+
+**Delivered — burned down in this feature (2026-08-22), not frozen.** Three
+sites ended their branch with `throw`, so this branch put them on the wire with
+the same bytes it removed from `errors.ts`. They are fixed, not budgeted, and
+the check now carries no budget for them:
+
+| Site | Field, before | Now |
+|---|---|---|
+| `commands/platform/connect.ts:968,1333` | `message: sanitizeErrorMessage(error)` — the exact shape fixed in errors.ts; both catches end `throw error;` | `{ step: "authenticated" }` / `{ step: "unauthenticated" }` |
+| `commands/email/upgrade.ts:2142` | `error_detail: redactSensitiveValues(msg).slice(0, 3000)` — up to 3KB of Pulumi output, home paths and all; the catch ends `throw new Error(...)` with no outer catch in `upgrade()` | `{ step: "deploy" }` |
+
+`platform-connect-error-telemetry.test.ts` and
+`email-upgrade-error-telemetry.test.ts` drive all three branches through the
+real `events.ts -> client.ts` chain and assert the serialized body.
+
+**Dead-lettered — frozen in the check.** The remaining seven sites end their
+branch with a local `process.exit(1)` inside the command itself, so no drain
+runs and nothing is transmitted. They are still the same latent leak — one
+refactor from `exit` to `throw` publishes them — and the check carries them in
+a `KNOWN_DEBT` map at their exact current counts so it can run green while they
 are burned down:
 
 | Site | Field |
 |---|---|
-| `commands/platform/connect.ts:968,1333` | `message: sanitizeErrorMessage(error)` — the exact shape fixed in errors.ts |
 | `commands/email/test.ts:376` | `error: errorMessage` — raw, unredacted |
-| `commands/email/upgrade.ts:2142` | `error_detail: redactSensitiveValues(msg).slice(0, 3000)` — up to 3KB of Pulumi output, home paths and all |
 | `commands/sms/test.ts:248` | `error: errorMessage` |
 | `commands/sms/verify-number.ts:114,180,292,357,496` | `error: errorMessage` |
 
 That map may only shrink. Adding to it is not a fix — it is the same leak with
-a note attached. `utils/shared/errors.ts` carries no budget, so the site the
-finding came from is guarded with zero slack.
+a note attached, and for a `throw`-terminated branch it is not even dormant.
+`utils/shared/errors.ts`, `commands/platform/connect.ts` and
+`commands/email/upgrade.ts` carry no budget, so the site the finding came from
+and the three delivered sites are all guarded with zero slack.
 
 ## Check
 
@@ -92,14 +118,17 @@ const HAZARD_KEY =
 const HAZARD_VALUE =
   /\.message\b|\bString\s*\(\s*(?:error|err|e)\b|\bsanitizeErrorMessage\s*\(|\bredactSensitiveValues\s*\(|\bextractPulumiErrorSummary\s*\(|\b[\w$]*(?:[Mm]essage|Msg|msg|stderr|stdout)\b/;
 
-// Sites that already shipped this leak when the rule was written (2026-08-22),
-// frozen at their current count so the rule runs green while they are burned
-// down. This map may only shrink. A new hazard in a listed file, or any hazard
-// in a file not listed, fails.
+// Sites that already shipped this leak when the rule was written (2026-08-22)
+// AND are dead-lettered behind a local process.exit(1), so nothing is
+// transmitted today. Frozen at their current count so the rule runs green
+// while they are burned down. This map may only shrink. A new hazard in a
+// listed file, or any hazard in a file not listed, fails.
+//
+// platform/connect.ts and email/upgrade.ts were on this list and are NOT any
+// more: their branches end in `throw`, so they were delivered, and they were
+// fixed rather than frozen. Do not re-add them.
 const KNOWN_DEBT = {
-  "packages/cli/src/commands/platform/connect.ts": { message: 2 },
   "packages/cli/src/commands/email/test.ts": { error: 1 },
-  "packages/cli/src/commands/email/upgrade.ts": { error_detail: 1 },
   "packages/cli/src/commands/sms/test.ts": { error: 1 },
   "packages/cli/src/commands/sms/verify-number.ts": { error: 5 },
 };

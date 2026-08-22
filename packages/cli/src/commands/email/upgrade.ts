@@ -23,7 +23,6 @@ import { validateAWSCredentials } from "../../utils/shared/aws.js";
 import {
   errors,
   extractPulumiErrorSummary,
-  redactSensitiveValues,
 } from "../../utils/shared/errors.js";
 import {
   ensurePulumiWorkDir,
@@ -2139,10 +2138,11 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       throw errors.stackLocked();
     }
 
-    trackError("UPGRADE_FAILED", "email:upgrade", {
-      step: "deploy",
-      error_detail: redactSensitiveValues(msg).slice(0, 3000),
-    });
+    // Step only. `redactSensitiveValues` rewrites account IDs, addresses and
+    // domains but leaves absolute paths alone, so shipping up to 3KB of Pulumi
+    // output here put the OS username, the work directory and the customer's
+    // project name on the wire. The summary is still shown to the user below.
+    trackError("UPGRADE_FAILED", "email:upgrade", { step: "deploy" });
     throw new Error(`Pulumi upgrade failed: ${extractPulumiErrorSummary(msg)}`);
   }
 

@@ -40,7 +40,6 @@ import {
   resolveSelfhostToken,
   resolveTokenAsync,
 } from "../../utils/shared/config.js";
-import { sanitizeErrorMessage } from "../../utils/shared/errors.js";
 import {
   ensurePulumiWorkDir,
   getPulumiWorkDir,
@@ -965,9 +964,12 @@ async function authenticatedConnect(
 
     const duration = Date.now() - startTime;
     const errorCode = error instanceof Error ? error.name : "UNKNOWN_ERROR";
-    trackError(errorCode, "platform:connect", {
-      message: sanitizeErrorMessage(error),
-    });
+    // Code and flow only. `trackError` spreads its metadata straight into the
+    // `error:occurred` body POSTed to the telemetry endpoint, and this catch
+    // re-throws to `handleCLIError`, which now drains the queue instead of
+    // killing the process — so an error's own text would leave the machine.
+    // The message is still printed to the user locally.
+    trackError(errorCode, "platform:connect", { step: "authenticated" });
     trackCommand("platform:connect", {
       success: false,
       duration_ms: duration,
@@ -1330,9 +1332,8 @@ export async function connect(options: PlatformConnectOptions): Promise<void> {
 
     const duration = Date.now() - startTime;
     const errorCode = error instanceof Error ? error.name : "UNKNOWN_ERROR";
-    trackError(errorCode, "platform:connect", {
-      message: sanitizeErrorMessage(error),
-    });
+    // Code and flow only — see the note on the authenticated catch above.
+    trackError(errorCode, "platform:connect", { step: "unauthenticated" });
     trackCommand("platform:connect", {
       success: false,
       duration_ms: duration,
