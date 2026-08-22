@@ -118,20 +118,27 @@ describe("cli.ts rejects bad input through the errors registry", () => {
     expect(collapsed.slice(start, end)).not.toContain("clack.log.error(");
   });
 
-  it("finds that branch's throw after the hint local is renamed", () => {
-    // Regression guard for the guard: the anchor used to pin the third
-    // argument's name, so renaming a local failed this file for a refactor
-    // that changed no behaviour. The first two arguments stay pinned — they
-    // are what identifies this as the unknown-command rejection.
-    const collapsed = cliSource
-      .replace(/\s+/g, " ")
-      .replace(
-        ", primaryCommand, hint);",
-        ", primaryCommand, suggestionHint);"
-      );
-    const start = collapsed.indexOf("showHelp(); break; default: {");
-    expect(start).toBeGreaterThan(-1);
-    expect(findUnknownCommandThrow(collapsed, start)).toBeGreaterThan(start);
+  // Regression guard for the guard: the anchor used to pin the third
+  // argument's name, so renaming a local failed this file for a refactor that
+  // changed no behaviour. The first two arguments stay pinned — they are what
+  // identifies this as the unknown-command rejection. Driven off fixtures the
+  // test owns rather than a mutation of the real cli.ts: a `replace` of the
+  // real text stops mutating anything once the rename is actually performed,
+  // and the assertion then runs against unmutated source.
+  it.each(["hint", "suggestionHint", "didYouMeanHint"])(
+    "finds that branch's throw whatever the third argument's local is named (%s)",
+    (name) => {
+      const fixture = `showHelp(); break; default: { const ${name} = "Did you mean"; throw errors.unknownCommand("command", primaryCommand, ${name}); } }`;
+      const start = fixture.indexOf("showHelp(); break; default: {");
+      expect(findUnknownCommandThrow(fixture, start)).toBeGreaterThan(start);
+    }
+  );
+
+  it("rejects an unknown-command throw for a different surface (negative control)", () => {
+    const fixture =
+      'showHelp(); break; default: { throw errors.unknownCommand("email command", subCommand, hint); } }';
+    const start = fixture.indexOf("showHelp(); break; default: {");
+    expect(findUnknownCommandThrow(fixture, start)).toBe(-1);
   });
 
   it("throws no bare Error, which would be reported as a crash", () => {
@@ -370,6 +377,25 @@ function literal(arg: string | undefined): string | undefined {
 
 const CALLS = registryCalls(cliSource);
 
+const BARE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * The inventory row for one call. Literal arguments are pinned exactly — they
+ * are the user-visible strings this inventory exists to make somebody read.
+ * A third argument that is a bare identifier is rendered `<local>` instead: per
+ * the branch rule, the suggestion is either a string literal listing commands
+ * or a suggestion built into a local just above the throw, and which of those
+ * it is IS load-bearing while the local's spelling is not. Pinning the spelling
+ * failed this file for a pure rename of `hint`. `call.rendered` keeps the real
+ * text, so assertion labels still name the variable.
+ */
+function inventoryLine(call: RegistryCall): string {
+  const args = call.args.map((arg, index) =>
+    index === 2 && BARE_IDENTIFIER.test(arg) ? "<local>" : arg
+  );
+  return `${call.factory}(${args.join(", ")})`;
+}
+
 /**
  * Every rejection cli.ts can raise, as written. Renders as
  * `factory(arg, arg, ...)` with the source text of each argument, so a diff
@@ -398,7 +424,7 @@ const EXPECTED_REJECTIONS = [
   'unknownCommand("auth command", subCommand, "Available commands: login, status, logout")',
   'unknownCommand("aws command", subCommand, "Available commands: setup, doctor\\n\\nRun wraps --help for more information.")',
   'unknownCommand("telemetry command", subCommand, "Available commands: enable, disable, status")',
-  'unknownCommand("command", primaryCommand, hint)',
+  'unknownCommand("command", primaryCommand, <local>)',
 ];
 
 describe("cli.ts rejections say something usable", () => {
@@ -469,6 +495,22 @@ describe("cli.ts rejections say something usable", () => {
   });
 
   it("routes each command to the factory and message it was specified with", () => {
-    expect(CALLS.map((call) => call.rendered)).toEqual(EXPECTED_REJECTIONS);
+    expect(CALLS.map(inventoryLine)).toEqual(EXPECTED_REJECTIONS);
+  });
+
+  it("pins a literal suggestion but not a local's name (negative control)", () => {
+    const [built, literalSuggestion] = registryCalls(
+      [
+        'throw errors.unknownCommand("command", primaryCommand, renamedHint);',
+        'throw errors.unknownCommand("email command", subCommand, "Available commands: add");',
+      ].join("\n")
+    );
+
+    expect(inventoryLine(built as RegistryCall)).toBe(
+      'unknownCommand("command", primaryCommand, <local>)'
+    );
+    expect(inventoryLine(literalSuggestion as RegistryCall)).toBe(
+      'unknownCommand("email command", subCommand, "Available commands: add")'
+    );
   });
 });

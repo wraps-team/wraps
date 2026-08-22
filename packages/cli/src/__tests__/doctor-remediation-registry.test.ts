@@ -434,17 +434,26 @@ describe("unknown-command branch asks the suggester (source guard)", () => {
     expect(branch).toContain("Did you mean");
   });
 
-  it("still finds the branch end after the hint local is renamed", () => {
-    // Regression guard for the guard: BRANCH_END used to pin the third
-    // argument's name, so renaming a local variable failed this file for a
-    // refactor that changed no behaviour.
-    const renamed = collapsed.replace(
-      ", primaryCommand, hint);",
-      ", primaryCommand, suggestionHint);"
-    );
-    expect(renamed).not.toBe(collapsed);
-    expect(
-      findBranchEnd(renamed, renamed.indexOf(BRANCH_START))
-    ).toBeGreaterThan(startIndex);
+  // Regression guard for the guard: BRANCH_END used to pin the third
+  // argument's name, so renaming a local variable failed this file for a
+  // refactor that changed no behaviour. Driven off fixtures the test owns, not
+  // off a mutation of the real cli.ts — a mutation stops mutating anything the
+  // moment somebody actually performs the rename, and then asserts against
+  // unmutated source.
+  it.each(["hint", "suggestionHint", "didYouMeanHint"])(
+    "finds the branch end whatever the third argument's local is named (%s)",
+    (name) => {
+      const fixture = `${BRANCH_START} const didYouMean = suggestCommand(primaryCommand); const ${name} = "Did you mean"; throw errors.unknownCommand("command", primaryCommand, ${name}); } }`;
+      expect(
+        findBranchEnd(fixture, fixture.indexOf(BRANCH_START))
+      ).toBeGreaterThan(-1);
+    }
+  );
+
+  it("rejects an unknown-command throw for a different surface (negative control)", () => {
+    // The first two arguments stay load-bearing: a sibling site rejecting an
+    // `email` sub-command must not be mistaken for the top-level branch end.
+    const fixture = `${BRANCH_START} throw errors.unknownCommand("email command", subCommand, hint); } }`;
+    expect(findBranchEnd(fixture, fixture.indexOf(BRANCH_START))).toBe(-1);
   });
 });

@@ -124,24 +124,31 @@ describe("error-path telemetry is drained before the process exits", () => {
     expect(exitCodeAssignmentsAreInBand(body)).toBe(true);
   });
 
-  // The three assertions below are the regression guard for a defect in the
-  // guards themselves: they used to pin verbatim local identifiers and an
-  // exact statement count, so a pure refactor of cli.ts or errors.ts — one
-  // that changed no behaviour at all — failed a telemetry test and pointed the
+  // The block below is the regression guard for a defect in the guards
+  // themselves: they used to pin verbatim local identifiers and an exact
+  // statement count, so a pure refactor of cli.ts or errors.ts — one that
+  // changed no behaviour at all — failed a telemetry test and pointed the
   // developer at telemetry code that nobody had touched.
   describe("the source anchors survive pure refactors", () => {
-    it("finds the interactive call site after its catch parameter is renamed", () => {
-      const renamed = collapsed.replace(
-        "handleCLIError(err);",
-        "handleCLIError(error);"
-      );
-      expect(renamed).not.toBe(collapsed);
-      expect(findInteractiveCallSite(renamed)).toBeGreaterThan(-1);
-    });
+    // Fixtures the test owns, NOT a mutation of the real cli.ts. Mutating the
+    // real source only works while the source still says `err`: the moment
+    // somebody performs the very rename this guard licenses, the `replace`
+    // silently becomes a no-op and the assertion fails on unmutated text —
+    // reinstating the defect inside the test written to prevent it.
+    it.each(["err", "error", "e", "caught"])(
+      "finds the interactive call site whatever the catch parameter is named (%s)",
+      (name) => {
+        const fixture = `} .catch(async (${name}) => { handleCLIError(${name}); await getTelemetryClient().shutdown(); process.exit(1); });`;
+        expect(findInteractiveCallSite(fixture)).toBeGreaterThan(-1);
+      }
+    );
 
     it("still rejects a call site that is not a single-argument call", () => {
-      const removed = collapsed.replace("handleCLIError(err);", "");
-      expect(findInteractiveCallSite(removed)).toBe(-1);
+      // run()'s two-argument site must never satisfy the interactive locator,
+      // whatever cli.ts currently says.
+      const fixture =
+        "handleCLIError(error, commandName); await telemetry.shutdown();";
+      expect(findInteractiveCallSite(fixture)).toBe(-1);
     });
 
     it("accepts a sixth error branch with its own exit code", () => {
