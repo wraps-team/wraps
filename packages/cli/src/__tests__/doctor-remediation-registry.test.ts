@@ -334,6 +334,32 @@ describe("doctor remediation registry", () => {
 
     expect(unrouted, unrouted.join(", ")).toEqual([]);
   });
+
+  it("every command cli.ts routes is in TOP_LEVEL_COMMANDS", () => {
+    // The list has a second consumer: telemetryCommandName (telemetry/
+    // command-name.ts) gates the reported event name on membership, so the
+    // list is now load-bearing for telemetry identity, not just for
+    // did-you-mean. A `case "migrate":` added to cli.ts's global switch and
+    // not to the list reports `command:unknown` on every run, success and
+    // failure alike, and `error:occurred` carries `command: "unknown"` — the
+    // command reads as unused in the dashboard and nothing here goes red.
+    const unlisted = [...routed].filter(
+      (command) => !(TOP_LEVEL_COMMANDS as readonly string[]).includes(command)
+    );
+
+    expect(unlisted, unlisted.join(", ")).toEqual([]);
+  });
+
+  it("rejects a routed command missing from TOP_LEVEL_COMMANDS", () => {
+    // The assertion above is vacuously green while the two sets match, so this
+    // pins its catching power: the mutation it has to see is a new routed
+    // command that never reached did-you-mean.ts.
+    const unlisted = [...routed, "migrate"].filter(
+      (command) => !(TOP_LEVEL_COMMANDS as readonly string[]).includes(command)
+    );
+
+    expect(unlisted).toEqual(["migrate"]);
+  });
 });
 
 describe("doctor sources carry no hint text of their own", () => {

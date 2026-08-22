@@ -6,8 +6,12 @@
  * This is also the CLI's first machine-readable list of routed commands. There
  * is no other one: `printCompletionScript` (utils/shared/completion.ts) is a
  * stale hand-written comment block and `showHelp` is a wall of console.log.
- * `doctor-remediation-registry.test.ts` asserts every entry below is a command
- * cli.ts actually routes.
+ * `doctor-remediation-registry.test.ts` asserts the list and cli.ts's dispatch
+ * hold the same commands, in both directions.
+ *
+ * Suggestions are no longer the only consumer: `telemetryCommandName`
+ * (telemetry/command-name.ts) gates the reported event name on membership
+ * here, so a routed command missing below reports `command:unknown`.
  */
 export const TOP_LEVEL_COMMANDS = [
   "auth",
