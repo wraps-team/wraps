@@ -552,6 +552,27 @@ describe("aws doctor", () => {
     );
   });
 
+  it("records the ambient region when the run names none of its own", async () => {
+    // ap-southeast-2 is neither the us-east-1 fallback nor anything --region
+    // supplies, so only `state.region` can produce it — the most-travelled
+    // production path, a user with a configured region running plain
+    // `wraps aws doctor`. Asserting the probe's region alongside it pins the
+    // telemetry copy of the resolution to the one runDiagnostics performs, so
+    // the two cannot silently diverge.
+    mockDetectAWSState.mockResolvedValue(
+      baseState({ region: "ap-southeast-2" })
+    );
+
+    const { doctor } = await import("../aws/doctor.js");
+    await doctor();
+
+    expect(mockGetSESAccountStatus).toHaveBeenCalledWith("ap-southeast-2");
+    expect(mockTrackCommand).toHaveBeenCalledWith(
+      "aws:doctor",
+      expect.objectContaining({ region: "ap-southeast-2" })
+    );
+  });
+
   it("records the region the SES probe actually used when nothing named one", async () => {
     mockDetectAWSState.mockResolvedValue(baseState({ region: null }));
 
