@@ -66,10 +66,26 @@ describe("error-path telemetry is drained before the process exits", () => {
     // clack spinner keeps the event loop alive and the CLI hangs instead of
     // failing.
     expect(tail).toContain("process.exit(process.exitCode");
+    // Presence is not enough: swapping the two statements keeps every
+    // assertion above green while reinstating the exact defect this guard
+    // exists to catch — the process exits with the error event still queued.
+    expect(tail.indexOf("await telemetry.shutdown();")).toBeLessThan(
+      tail.indexOf("process.exit(process.exitCode")
+    );
   });
 
   it("drains again on the interactive path, which already shut down before the rejection arrived", () => {
-    expect(collapsed).toContain("await getTelemetryClient().shutdown();");
+    // Anchored on the interactive call site, like the run() test above: a
+    // file-wide toContain cannot tell this drain apart from the same call
+    // sitting in an unrelated function, in dead code, or after the
+    // process.exit that follows it — each of which loses the event.
+    const start = collapsed.indexOf("handleCLIError(err);");
+    expect(start).toBeGreaterThan(-1);
+    const tail = collapsed.slice(start, start + 700);
+    expect(tail).toContain("await getTelemetryClient().shutdown();");
+    expect(tail.indexOf("await getTelemetryClient().shutdown();")).toBeLessThan(
+      tail.indexOf("process.exit(1);")
+    );
   });
 
   it("no longer lets handleCLIError terminate the process itself", () => {
