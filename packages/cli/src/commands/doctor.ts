@@ -14,6 +14,7 @@ import * as clack from "@clack/prompts";
 import pc from "picocolors";
 import { trackCommand } from "../telemetry/events.js";
 import { getAWSRegion } from "../utils/shared/aws.js";
+import { detectAWSState } from "../utils/shared/aws-detection.js";
 import {
   collectRemediations,
   type DoctorFinding,
@@ -119,15 +120,16 @@ export async function wrapsDoctor(options: WrapsDoctorOptions): Promise<void> {
 
   const progress = new DeploymentProgress();
 
-  // AWS first and unconditionally: detectAWSState() reports missing
-  // credentials as findings rather than throwing, so a broken-credentials
-  // account still gets a report instead of a stack trace.
-  const { findings: awsFindings, state } = await progress.execute(
-    "Checking AWS setup",
-    async () => collectAwsFindings()
+  // Detect → resolve → diagnose. The AWS leg used to run first, before a
+  // region existed, so `wraps doctor` could scan the email stack in the
+  // deployment's region while answering the SES sandbox question for the
+  // ambient one — one report, one header, two regions, and SES sending status
+  // is per-region. detectAWSState() reports missing credentials as state
+  // rather than throwing, so a broken-credentials account still gets a report
+  // instead of a stack trace.
+  const state = await progress.execute("Detecting AWS setup", async () =>
+    detectAWSState()
   );
-
-  const findings: DoctorFinding[] = [...awsFindings];
 
   const emailConnections =
     state.credentialsConfigured && state.accountId
@@ -142,7 +144,11 @@ export async function wrapsDoctor(options: WrapsDoctorOptions): Promise<void> {
   const regionExplicit = Boolean(
     options.region || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION
   );
-  let region = options.region || (await getAWSRegion());
+  // state.region is preferred over getAWSRegion() because getAWSRegion() reads
+  // only the two env vars before returning the hardcoded us-east-1, whereas
+  // state.region also reflects `aws configure get region`. Detecting first is
+  // what makes it available here at all.
+  let region = options.region || state.region || (await getAWSRegion());
   if (!regionExplicit && emailConnections.length > 0) {
     // Any deployment region beats the fallback, including when there are
     // several: scanning the hardcoded default finds no wraps-* resources and
@@ -150,6 +156,15 @@ export async function wrapsDoctor(options: WrapsDoctorOptions): Promise<void> {
     // real deployment is reported clean.
     region = emailConnections[0].region;
   }
+
+  // Both legs get the same region, and the AWS leg gets the state we already
+  // detected rather than detecting a second time.
+  const { findings: awsFindings } = await progress.execute(
+    "Checking AWS setup",
+    async () => collectAwsFindings({ region, state })
+  );
+
+  const findings: DoctorFinding[] = [...awsFindings];
 
   if (state.credentialsConfigured && state.accountId) {
     if (!regionExplicit && emailConnections.length > 1) {

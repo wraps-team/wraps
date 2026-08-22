@@ -7,6 +7,9 @@ vi.mock("../email/doctor.js", () => ({ collectEmailFindings: vi.fn() }));
 vi.mock("../../utils/shared/aws.js", () => ({
   getAWSRegion: vi.fn().mockResolvedValue("us-west-2"),
 }));
+vi.mock("../../utils/shared/aws-detection.js", () => ({
+  detectAWSState: vi.fn(),
+}));
 vi.mock("../../utils/shared/metadata.js", () => ({
   findConnectionsWithService: vi.fn().mockResolvedValue([]),
 }));
@@ -18,7 +21,10 @@ vi.mock("../../utils/shared/json-output.js", () => ({
 
 import { trackCommand } from "../../telemetry/events.js";
 import { getAWSRegion } from "../../utils/shared/aws.js";
-import type { AWSSetupState } from "../../utils/shared/aws-detection.js";
+import {
+  type AWSSetupState,
+  detectAWSState,
+} from "../../utils/shared/aws-detection.js";
 import {
   type DoctorFinding,
   type Remediation,
@@ -36,6 +42,7 @@ const mockCollectEmailFindings = collectEmailFindings as ReturnType<
   typeof vi.fn
 >;
 const mockGetAWSRegion = getAWSRegion as ReturnType<typeof vi.fn>;
+const mockDetectAWSState = detectAWSState as ReturnType<typeof vi.fn>;
 const mockFindConnections = findConnectionsWithService as ReturnType<
   typeof vi.fn
 >;
@@ -43,16 +50,43 @@ const mockIsJsonMode = isJsonMode as ReturnType<typeof vi.fn>;
 const mockJsonSuccess = jsonSuccess as ReturnType<typeof vi.fn>;
 const mockTrackCommand = trackCommand as ReturnType<typeof vi.fn>;
 
+/** Every field runDiagnostics reads, so a test overrides only what it is about. */
+function baseState(overrides: Partial<AWSSetupState> = {}): AWSSetupState {
+  return {
+    cliInstalled: true,
+    cliVersion: "2.15.0",
+    // credentialsConfigured + accountId are what wrapsDoctor gates the email
+    // leg on. They must match what awsResult() used to supply (:46-58) or
+    // every existing test that expects the email leg to run goes red.
+    credentialsConfigured: true,
+    credentialSource: "profile",
+    profileName: "default",
+    accountId: "123456789012",
+    detectedProvider: null,
+    // Must be "us-west-2". wrapsDoctor puts `state.region` AHEAD of
+    // `getAWSRegion()` in the resolution chain, and this suite pins
+    // `getAWSRegion` to "us-west-2" below — any other value here silently
+    // changes the region every existing no-deployment test resolves to.
+    region: "us-west-2",
+    sso: {
+      configured: false,
+      profiles: [],
+      sessions: [],
+      tokenStatus: null,
+      activeProfile: null,
+    },
+    ...overrides,
+  };
+}
+
+// No `state` key: wrapsDoctor detects the state itself and passes it into the
+// AWS leg, so what this mock returns for `state` is never read. baseState() is
+// where the state a test cares about is set.
 function awsResult(overrides: Partial<{ findings: DoctorFinding[] }> = {}) {
   return {
     findings: overrides.findings ?? [
       { status: "pass", category: "AWS Setup", name: "AWS CLI installed" },
     ],
-    // only credentialsConfigured + accountId are read by wrapsDoctor
-    state: {
-      credentialsConfigured: true,
-      accountId: "123456789012",
-    } as AWSSetupState,
   };
 }
 
@@ -129,6 +163,7 @@ describe("wrapsDoctor", () => {
 
     mockIsJsonMode.mockReturnValue(false);
     mockGetAWSRegion.mockResolvedValue("us-west-2");
+    mockDetectAWSState.mockResolvedValue(baseState());
     mockFindConnections.mockResolvedValue([]);
     mockCollectAwsFindings.mockResolvedValue(awsResult());
     mockCollectEmailFindings.mockResolvedValue(emailResult());
@@ -233,6 +268,11 @@ describe("wrapsDoctor", () => {
   });
 
   it("skips the email leg when AWS credentials are not configured, still reporting the AWS findings", async () => {
+    // wrapsDoctor detects the state itself now and passes it down, so the leg
+    // gate is set here rather than through the mocked collectAwsFindings.
+    mockDetectAWSState.mockResolvedValue(
+      baseState({ credentialsConfigured: false, accountId: null })
+    );
     mockCollectAwsFindings.mockResolvedValue({
       findings: [
         {
@@ -241,10 +281,6 @@ describe("wrapsDoctor", () => {
           name: "Cannot connect to AWS",
         },
       ],
-      state: {
-        credentialsConfigured: false,
-        accountId: null,
-      } as unknown as AWSSetupState,
     });
     const { wrapsDoctor } = await import("../doctor.js");
 
@@ -354,6 +390,10 @@ describe("wrapsDoctor", () => {
     // there is no fallback to correct and nothing to warn about.
     process.env.AWS_REGION = "us-east-1";
     mockGetAWSRegion.mockResolvedValue("us-east-1");
+    // getCurrentRegion() (aws-detection.ts:238-245) reads AWS_REGION first in
+    // production, so state.region mirrors the env var here — otherwise the
+    // fixture would describe an account that cannot exist.
+    mockDetectAWSState.mockResolvedValue(baseState({ region: "us-east-1" }));
     mockFindConnections.mockResolvedValue([
       { region: "eu-west-1" },
       { region: "ap-south-1" },
@@ -454,6 +494,77 @@ describe("wrapsDoctor", () => {
     );
     expect(rowFor("Multiple email deployments")).toBe(
       "  [i] Email: Multiple email deployments"
+    );
+  });
+
+  it("checks the same region on the AWS leg as on the email leg", async () => {
+    // The AWS leg used to run before a region existed, so it answered the SES
+    // sandbox question for the ambient region while the email leg scanned the
+    // deployment's — one report, one header, two regions, and SES sending
+    // status is per-region.
+    mockFindConnections.mockResolvedValue([{ region: "eu-west-1" }]);
+    const { wrapsDoctor } = await import("../doctor.js");
+
+    await wrapsDoctor({});
+
+    expect(mockCollectAwsFindings).toHaveBeenCalledWith(
+      expect.objectContaining({ region: "eu-west-1" })
+    );
+    expect(mockCollectEmailFindings).toHaveBeenCalledWith(
+      expect.objectContaining({ region: "eu-west-1" })
+    );
+  });
+
+  it("sends the region given on the command line to the AWS leg too", async () => {
+    mockFindConnections.mockResolvedValue([{ region: "eu-west-1" }]);
+    const { wrapsDoctor } = await import("../doctor.js");
+
+    await wrapsDoctor({ region: "us-east-1" });
+
+    expect(mockCollectAwsFindings).toHaveBeenCalledWith(
+      expect.objectContaining({ region: "us-east-1" })
+    );
+  });
+
+  it("hands the AWS leg the state it already detected", async () => {
+    mockFindConnections.mockResolvedValue([{ region: "eu-west-1" }]);
+    const { wrapsDoctor } = await import("../doctor.js");
+
+    await wrapsDoctor({});
+
+    // The argument, not the call count: `../aws/doctor.js` is fully mocked, so
+    // a collectAwsFindings({ region }) that dropped `state` would still leave
+    // detectAWSState called exactly once here — while production paid a second
+    // `aws configure` / STS round trip and let the two reads disagree.
+    expect(mockCollectAwsFindings).toHaveBeenCalledWith({
+      region: "eu-west-1",
+      state: expect.objectContaining({
+        accountId: "123456789012",
+        credentialsConfigured: true,
+      }),
+    });
+    expect(mockDetectAWSState).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks the configured region, not getAWSRegion()'s hardcoded fallback, when nothing else supplies one", async () => {
+    // ap-southeast-2 is a region only `state.region` can supply here:
+    // getAWSRegion is mocked to "us-west-2", which is also baseState()'s
+    // region, so reusing baseState()'s value would make both branches of
+    // `state.region || (await getAWSRegion())` produce the same answer and the
+    // test could not fail. In production `state.region` is the one that
+    // reflects `aws configure get region`.
+    mockDetectAWSState.mockResolvedValue(
+      baseState({ region: "ap-southeast-2" })
+    );
+    const { wrapsDoctor } = await import("../doctor.js");
+
+    await wrapsDoctor({});
+
+    expect(mockCollectAwsFindings).toHaveBeenCalledWith(
+      expect.objectContaining({ region: "ap-southeast-2" })
+    );
+    expect(mockCollectEmailFindings).toHaveBeenCalledWith(
+      expect.objectContaining({ region: "ap-southeast-2" })
     );
   });
 
