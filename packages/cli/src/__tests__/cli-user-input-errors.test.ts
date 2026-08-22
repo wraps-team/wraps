@@ -131,3 +131,315 @@ describe("cli.ts rejects bad input through the errors registry", () => {
     expect(found).toEqual([]);
   });
 });
+
+/**
+ * Everything above counts rejections and proves absences. None of it reads the
+ * ARGUMENTS a site passes, and that hole is not theoretical: replacing
+ * `errors.missingInput("--domain", "wraps email verify --domain yourapp.com")`
+ * with `errors.unknownCommand("command", primaryCommand, "")`, and a second
+ * site's arguments with `errors.missingInput("", "")`, left all 1865 tests in
+ * this package green. `wraps email verify` with no --domain would have printed
+ * "Unknown command: email" with an empty suggestion block and reported
+ * UNKNOWN_COMMAND for a missing-flag condition, and `wraps email domains
+ * verify` would have printed " is required" / "Usage: ".
+ *
+ * The per-site messages ARE the deliverable of this feature, so they are read
+ * here two ways: a shape check that no site can pass a blank or non-runnable
+ * argument, and a full inventory that pins which factory each command reaches
+ * for. Adding a command means adding a row below — deliberately, because a new
+ * rejection message is a user-visible string someone should have read.
+ */
+
+type RegistryCall = {
+  factory: string;
+  args: string[];
+  line: number;
+  rendered: string;
+};
+
+/**
+ * Blanks comments while preserving offsets, so line numbers survive and a
+ * commented-out call cannot be mistaken for a live one. cli.ts contains no
+ * regex literals (checked); a `/`-delimited regex holding a quote would need
+ * this to grow a regex state.
+ */
+function stripComments(source: string): string {
+  let out = "";
+  let index = 0;
+  let state: "code" | "line" | "block" | "string" = "code";
+  let quote = "";
+
+  while (index < source.length) {
+    const char = source[index] as string;
+    const next = source[index + 1];
+
+    if (state === "code") {
+      if (char === "/" && next === "/") {
+        state = "line";
+        out += "  ";
+        index += 2;
+      } else if (char === "/" && next === "*") {
+        state = "block";
+        out += "  ";
+        index += 2;
+      } else {
+        if (char === '"' || char === "'" || char === "`") {
+          state = "string";
+          quote = char;
+        }
+        out += char;
+        index += 1;
+      }
+      continue;
+    }
+
+    if (state === "string") {
+      if (char === "\\") {
+        out += source.slice(index, index + 2);
+        index += 2;
+        continue;
+      }
+      if (char === quote) {
+        state = "code";
+      }
+      out += char;
+      index += 1;
+      continue;
+    }
+
+    if (state === "line") {
+      if (char === "\n") {
+        state = "code";
+        out += char;
+        index += 1;
+        continue;
+      }
+      out += " ";
+      index += 1;
+      continue;
+    }
+
+    if (char === "*" && next === "/") {
+      state = "code";
+      out += "  ";
+      index += 2;
+      continue;
+    }
+    out += char === "\n" ? char : " ";
+    index += 1;
+  }
+
+  return out;
+}
+
+/** Splits an argument list on commas that are not inside a string or nested call. */
+function splitArgs(body: string): string[] {
+  const args: string[] = [];
+  let current = "";
+  let depth = 0;
+  let quote = "";
+
+  for (let index = 0; index < body.length; index += 1) {
+    const char = body[index] as string;
+
+    if (quote) {
+      if (char === "\\") {
+        current += body.slice(index, index + 2);
+        index += 1;
+        continue;
+      }
+      if (char === quote) {
+        quote = "";
+      }
+      current += char;
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === "`") {
+      quote = char;
+      current += char;
+      continue;
+    }
+    if (char === "(" || char === "[" || char === "{") {
+      depth += 1;
+    }
+    if (char === ")" || char === "]" || char === "}") {
+      depth -= 1;
+    }
+    if (char === "," && depth === 0) {
+      args.push(current.trim().replace(/\s+/g, " "));
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+
+  if (current.trim()) {
+    args.push(current.trim().replace(/\s+/g, " "));
+  }
+  return args;
+}
+
+function registryCalls(source: string): RegistryCall[] {
+  const code = stripComments(source);
+  const pattern = /throw errors\.([A-Za-z0-9_]+)\(/g;
+  const calls: RegistryCall[] = [];
+  let match = pattern.exec(code);
+
+  while (match) {
+    let index = pattern.lastIndex;
+    let depth = 1;
+    let quote = "";
+    let body = "";
+
+    while (index < code.length) {
+      const char = code[index] as string;
+      if (quote) {
+        if (char === "\\") {
+          body += code.slice(index, index + 2);
+          index += 2;
+          continue;
+        }
+        if (char === quote) {
+          quote = "";
+        }
+      } else if (char === '"' || char === "'" || char === "`") {
+        quote = char;
+      } else if (char === "(") {
+        depth += 1;
+      } else if (char === ")") {
+        depth -= 1;
+        if (depth === 0) {
+          break;
+        }
+      }
+      body += char;
+      index += 1;
+    }
+
+    const args = splitArgs(body);
+    const factory = match[1] as string;
+    calls.push({
+      factory,
+      args,
+      line: code.slice(0, match.index).split("\n").length,
+      rendered: `${factory}(${args.join(", ")})`,
+    });
+    match = pattern.exec(code);
+  }
+
+  return calls;
+}
+
+/** The value of a plain double-quoted literal, or undefined for anything else. */
+function literal(arg: string | undefined): string | undefined {
+  if (arg === undefined || !(arg.startsWith('"') && arg.endsWith('"'))) {
+    return undefined;
+  }
+  return arg.slice(1, -1).replaceAll("\\n", "\n").replaceAll('\\"', '"');
+}
+
+const CALLS = registryCalls(cliSource);
+
+/**
+ * Every rejection cli.ts can raise, as written. Renders as
+ * `factory(arg, arg, ...)` with the source text of each argument, so a diff
+ * names the command whose message moved.
+ */
+const EXPECTED_REJECTIONS = [
+  'missingInput("--domain", "wraps email verify --domain yourapp.com")',
+  'unknownCommand("inbound command", inboundSubCommand, "Available commands: init, destroy, status, verify, test, add, remove")',
+  'unknownCommand("agent command", agentSubCommand, "Available commands: create, list, kill")',
+  'unknownCommand("reply command", replySubCommand, "Available commands: init, rotate, status, destroy, decode")',
+  'missingInput("--domain", "wraps email domains verify --domain yourapp.com")',
+  'missingInput("--domain", "wraps email domains get-dkim --domain yourapp.com")',
+  'missingInput("--domain", "wraps email domains remove --domain yourapp.com --force")',
+  'unknownCommand("domains command", domainsSubCommand, "Available commands: add, list, verify, get-dkim, remove, config")',
+  'unknownCommand("templates command", templatesSubCommand, "Available commands: init, push, preview")',
+  'unknownCommand("workflows command", workflowsSubCommand, "Available commands: init, validate, push")',
+  'missingInput("<message-id>", "wraps email logs get <message-id>")',
+  'unknownCommand("logs command", logsSubCommand, "Available commands: list, get <message-id>")',
+  'unknownCommand("email command", subCommand, "Run wraps --help for available commands.")',
+  'unknownCommand("license command", subCommand, "Run wraps --help for available commands.")',
+  'unknownCommand("selfhost command", subCommand, "Run wraps --help for available commands.")',
+  'unknownCommand("sms command", subCommand, "Run wraps --help for available commands.")',
+  'unknownCommand("cdn command", subCommand, "Run wraps --help for available commands.")',
+  'unknownCommand("workflow command", subCommand, "Available commands: init\\n\\nRun wraps --help for more information.")',
+  'unknownCommand("platform command", subCommand, "Available commands: connect, update-role\\n\\nRun wraps platform for more information.")',
+  'unknownCommand("auth command", subCommand, "Available commands: login, status, logout")',
+  'unknownCommand("aws command", subCommand, "Available commands: setup, doctor\\n\\nRun wraps --help for more information.")',
+  'unknownCommand("telemetry command", subCommand, "Available commands: enable, disable, status")',
+  'unknownCommand("command", primaryCommand, hint)',
+];
+
+describe("cli.ts rejections say something usable", () => {
+  it("reads arguments out of cli.ts at all (negative control)", () => {
+    const fixture = [
+      '// throw errors.missingInput("--commented", "wraps ignored");',
+      'throw errors.missingInput("--domain", "wraps email verify --domain x");',
+    ].join("\n");
+    const calls = registryCalls(fixture);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.factory).toBe("missingInput");
+    expect(calls[0]?.args).toEqual([
+      '"--domain"',
+      '"wraps email verify --domain x"',
+    ]);
+  });
+
+  it("finds every registry throw the counting guard counts", () => {
+    expect(CALLS.length).toBe(
+      countOccurrences(cliSource, "throw errors.") -
+        countOccurrences(
+          cliSource.split("\n").filter(isComment).join("\n"),
+          "throw errors."
+        )
+    );
+  });
+
+  it("names the flag and a runnable command at every missing-input site", () => {
+    const sites = CALLS.filter((call) => call.factory === "missingInput");
+    expect(sites.length).toBeGreaterThanOrEqual(5);
+
+    for (const site of sites) {
+      const what = literal(site.args[0]);
+      const usage = literal(site.args[1]);
+
+      // `${what} is required` — blank here prints " is required".
+      expect(what, `cli.ts:${site.line} ${site.rendered}`).toBeTruthy();
+      // `Usage: ${usage}` — must be a command the user can actually run.
+      expect(usage, `cli.ts:${site.line} ${site.rendered}`).toMatch(
+        /^wraps \S/
+      );
+      expect(site.args, `cli.ts:${site.line}`).toHaveLength(2);
+    }
+  });
+
+  it("names the surface and offers a way forward at every unknown-command site", () => {
+    const sites = CALLS.filter((call) => call.factory === "unknownCommand");
+    expect(sites.length).toBeGreaterThanOrEqual(15);
+
+    for (const site of sites) {
+      const where = `cli.ts:${site.line} ${site.rendered}`;
+      expect(site.args, where).toHaveLength(3);
+      // `Unknown ${what}: ${typed}` — blank here prints "Unknown : foo".
+      expect(literal(site.args[0]), where).toBeTruthy();
+
+      const suggestion = site.args[2] as string;
+      if (suggestion.startsWith('"')) {
+        expect(literal(suggestion), where).toMatch(
+          /Available commands:|--help/
+        );
+      } else {
+        // The only non-literal form allowed is a variable built just above the
+        // throw (the top-level `hint`); the tracer test covers that branch.
+        expect(suggestion, where).toMatch(/^[A-Za-z_][A-Za-z0-9_]*$/);
+      }
+    }
+  });
+
+  it("routes each command to the factory and message it was specified with", () => {
+    expect(CALLS.map((call) => call.rendered)).toEqual(EXPECTED_REJECTIONS);
+  });
+});
