@@ -409,6 +409,20 @@ describe("error factory functions", () => {
   });
 
   describe("unknownCommand", () => {
+    it("names the command the user actually typed", () => {
+      const error = errors.unknownCommand(
+        "command",
+        "emial",
+        "Available: init, status"
+      );
+
+      expect(error).toBeInstanceOf(WrapsError);
+      expect(error.message).toBe("Unknown command: emial");
+      expect(error.code).toBe("UNKNOWN_COMMAND");
+      expect(error.suggestion).toContain("Available: init, status");
+      expect(error.docsUrl).toBe("https://wraps.dev/docs/cli-reference");
+    });
+
     it("renders a missing subcommand as (none) rather than undefined", () => {
       const error = errors.unknownCommand(
         "inbound command",
@@ -433,6 +447,7 @@ describe("error factory functions", () => {
       expect(error.suggestion).toContain(
         "wraps email verify --domain yourapp.com"
       );
+      expect(error.docsUrl).toBe("https://wraps.dev/docs/cli-reference");
     });
   });
 
@@ -1226,6 +1241,7 @@ describe("user-input errors render without crash furniture", () => {
       expect(consoleLogSpy).toHaveBeenCalledTimes(1);
       const envelope = JSON.parse(consoleLogSpy.mock.calls[0][0]);
       expect(envelope.error.code).toBe("UNKNOWN_COMMAND");
+      expect(envelope.error.message).toBe("Unknown command: emial");
       expect(envelope.error.suggestion).toContain(
         "Available commands: email, sms, cdn"
       );
