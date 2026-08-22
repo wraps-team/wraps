@@ -49,11 +49,16 @@ describe("handleCLIError", () => {
   let exitSpy: any;
   let consoleErrorSpy: any;
   let consoleLogSpy: any;
+  // The message line goes through clack, not console.log. Without this spy the
+  // suggestion/docs assertions below still pass with the render deleted, so the
+  // one thing the user actually reads would be untested.
+  let clackErrorSpy: any;
 
   beforeEach(() => {
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as any);
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    clackErrorSpy = vi.spyOn(clack.log, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -61,6 +66,7 @@ describe("handleCLIError", () => {
     exitSpy.mockRestore();
     consoleErrorSpy.mockRestore();
     consoleLogSpy.mockRestore();
+    clackErrorSpy.mockRestore();
   });
 
   it("should handle WrapsError with all properties", () => {
@@ -73,6 +79,7 @@ describe("handleCLIError", () => {
 
     handleCLIError(error);
 
+    expect(clackErrorSpy).toHaveBeenCalledWith("AWS credentials not found");
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining("Suggestion:")
     );
@@ -93,6 +100,7 @@ describe("handleCLIError", () => {
 
     handleCLIError(error);
 
+    expect(clackErrorSpy).toHaveBeenCalledWith("Simple error");
     expect(process.exitCode).toBe(1);
   });
 
@@ -138,6 +146,7 @@ describe("handleCLIError", () => {
 
     handleCLIError(error);
 
+    expect(clackErrorSpy).toHaveBeenCalledWith("Error with suggestion");
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining("Suggestion:")
     );
@@ -157,6 +166,7 @@ describe("handleCLIError", () => {
 
     handleCLIError(error);
 
+    expect(clackErrorSpy).toHaveBeenCalledWith("Error with docs");
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining("Documentation:")
     );
@@ -1196,6 +1206,27 @@ describe("user-input errors render without crash furniture", () => {
       )
     );
 
+    // The rejection has to SAY something. Asserting only the absence of crash
+    // furniture passes just as happily when nothing is printed at all.
+    expect(clackErrorSpy).toHaveBeenCalledWith("Unknown command: emial");
+    expect(clackErrorSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("An unexpected error occurred")
+    );
+    expect(consoleLogSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("https://github.com/wraps-team/wraps/issues")
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("names the missing flag and the usage line, not a crash", () => {
+    handleCLIError(
+      errors.missingInput("--domain", "wraps email verify --domain <domain>")
+    );
+
+    expect(clackErrorSpy).toHaveBeenCalledWith("--domain is required");
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining("wraps email verify --domain <domain>")
+    );
     expect(clackErrorSpy).not.toHaveBeenCalledWith(
       expect.stringContaining("An unexpected error occurred")
     );
