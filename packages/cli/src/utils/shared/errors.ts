@@ -406,10 +406,12 @@ export function handleCLIError(error: unknown, command?: string): void {
       suggestion = wrapsErr.suggestion;
       docsUrl = wrapsErr.docsUrl;
     } else {
+      // Error type only, never the message: `trackError` spreads this
+      // metadata straight onto the wire, and a raw message carries home
+      // directory paths, project names, and credential material.
       trackError("UNHANDLED_ERROR", cmdContext, {
         errorType:
           error instanceof Error ? error.constructor.name : typeof error,
-        message: sanitizeErrorMessage(error),
       });
       message =
         error instanceof Error ? error.message : String(error || message);
@@ -517,10 +519,11 @@ export function handleCLIError(error: unknown, command?: string): void {
     return;
   }
 
-  // Unknown error - still track with sanitized context
+  // Unknown error - track the error type only, never the message. The message
+  // is shown locally below; sending it would put home directory paths, project
+  // names, and credential material into the `error:occurred` event.
   trackError("UNHANDLED_ERROR", cmdContext, {
     errorType: error instanceof Error ? error.constructor.name : typeof error,
-    message: sanitizeErrorMessage(error),
   });
 
   clack.log.error("An unexpected error occurred");
