@@ -534,6 +534,39 @@ describe("aws doctor", () => {
     const sesRow = findings.find((f) => f.name === "SES has production access");
     expect(sesRow?.details).toBe("Region: eu-west-1");
   });
+
+  it("tells a no-region run that us-east-1 was the tool's guess, not a verified answer", async () => {
+    mockDetectAWSState.mockResolvedValue(baseState({ region: null }));
+
+    const { collectAwsFindings } = await import("../aws/doctor.js");
+    const { findings } = await collectAwsFindings();
+
+    // The commonest real run: credentials configured, no AWS_REGION, no
+    // --region. A bare "Region: us-east-1" here reads as "your account is
+    // verified in us-east-1" when the tool picked us-east-1 itself.
+    const sesRow = findings.find((f) => f.name === "SES has production access");
+    expect(sesRow?.details).toBe(
+      "No AWS_REGION set — defaulted to us-east-1. Set AWS_REGION if your deployment lives elsewhere."
+    );
+  });
+
+  it("tells a no-region run the uncertain SES row is about a guessed region too", async () => {
+    mockDetectAWSState.mockResolvedValue(baseState({ region: null }));
+    mockGetSESAccountStatus.mockResolvedValue({
+      isSandbox: true,
+      sandboxUncertain: true,
+    });
+
+    const { collectAwsFindings } = await import("../aws/doctor.js");
+    const { findings } = await collectAwsFindings();
+
+    const uncertain = findings.find(
+      (f) => f.name === "Could not confirm SES account status"
+    );
+    expect(uncertain?.details).toContain(
+      "No AWS_REGION set — defaulted to us-east-1. Set AWS_REGION if your deployment lives elsewhere."
+    );
+  });
   it("asks the SES probe about the region the command was given", async () => {
     mockDetectAWSState.mockResolvedValue(baseState({ region: "us-west-2" }));
 
