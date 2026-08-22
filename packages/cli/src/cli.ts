@@ -102,6 +102,7 @@ import {
 // Workflow commands
 import { workflowInit } from "./commands/workflow/init.js";
 import { getTelemetryClient } from "./telemetry/client.js";
+import { telemetryCommandName } from "./telemetry/command-name.js";
 import { trackCommand } from "./telemetry/events.js";
 import { parseCliArgs } from "./utils/shared/arg-parser.js";
 import {
@@ -1680,9 +1681,7 @@ async function run() {
     }
     // Track successful command execution
     const duration = Date.now() - startTime;
-    const commandName = subCommand
-      ? `${primaryCommand}:${subCommand}`
-      : primaryCommand;
+    const commandName = telemetryCommandName(primaryCommand, subCommand);
 
     trackCommand(commandName, {
       success: true,
@@ -1691,9 +1690,7 @@ async function run() {
   } catch (error) {
     // Track failed command execution
     const duration = Date.now() - startTime;
-    const commandName = subCommand
-      ? `${primaryCommand}:${subCommand}`
-      : primaryCommand;
+    const commandName = telemetryCommandName(primaryCommand, subCommand);
 
     trackCommand(commandName, {
       success: false,
