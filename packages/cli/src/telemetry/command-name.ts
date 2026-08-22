@@ -22,6 +22,17 @@ const UNKNOWN = "unknown";
 const COMMAND_WORD = /^[a-z][a-z0-9-]{0,31}$/;
 
 /**
+ * Routed commands whose second positional is user data, not a subcommand.
+ *
+ * `case "push"` (cli.ts) is the alias for `email templates push`: it passes
+ * `sub[1]` to `templatesPush` as the template slug. Slugs are lowercase-hyphen
+ * by convention — exactly COMMAND_WORD's shape — so the shape guard above lets
+ * a customer's internal template name through verbatim, on the success path as
+ * well as the error path. These commands report under their bare name.
+ */
+const COMMANDS_WITH_DATA_SECOND_POSITIONAL: readonly string[] = ["push"];
+
+/**
  * Build the name a command is reported under, from the raw positionals.
  *
  * The tokens come straight off argv, so on the unknown-command path they are
@@ -48,7 +59,10 @@ export function telemetryCommandName(
     return UNKNOWN;
   }
 
-  if (!subCommand) {
+  if (
+    !subCommand ||
+    COMMANDS_WITH_DATA_SECOND_POSITIONAL.includes(primaryCommand)
+  ) {
     return primaryCommand;
   }
 

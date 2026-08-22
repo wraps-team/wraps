@@ -130,6 +130,25 @@ describe("telemetry identity never echoes raw argv", () => {
     }
   }, 30_000);
 
+  it("does not put a pushed template slug in the event name", () => {
+    const { events, commands, stdout } = runCli([
+      "push",
+      "northstar-onboarding",
+    ]);
+
+    expect(
+      events.length,
+      `no telemetry events captured in:\n${stdout}`
+    ).toBeGreaterThan(0);
+
+    for (const event of events) {
+      expect(event).not.toContain("northstar-onboarding");
+    }
+    for (const command of commands) {
+      expect(command).not.toContain("northstar-onboarding");
+    }
+  }, 30_000);
+
   it("still reports a real command pair verbatim", () => {
     // The scrub must not cost the dashboards their signal: a routed command
     // with a routed subcommand keeps the name it has always had.
@@ -158,6 +177,18 @@ describe("telemetryCommandName", () => {
     expect(telemetryCommandName("send", "alice@acme-corp.com")).toBe("unknown");
     expect(telemetryCommandName("acme-corp.com", undefined)).toBe("unknown");
     expect(telemetryCommandName(undefined, undefined)).toBe("unknown");
+  });
+
+  it("drops the template slug `wraps push <slug>` reads as data", () => {
+    // `push` is the one routed command whose second positional is not a
+    // subcommand: cli.ts passes `sub[1]` straight to `templatesPush` as the
+    // template slug. Slugs are lowercase-hyphen by convention, so the shape
+    // guard lets a customer's internal template name through verbatim.
+    expect(telemetryCommandName("push", "q4-layoffs-notice")).toBe("push");
+    expect(telemetryCommandName("push", "northstar-acquisition-invite")).toBe(
+      "push"
+    );
+    expect(telemetryCommandName("push", undefined)).toBe("push");
   });
 
   it("replaces a second positional that is not a command word", () => {
