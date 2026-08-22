@@ -131,6 +131,23 @@ Note that CI runs neither `check:all` nor `typecheck:infra`, so this gate is exe
 only locally — which is why the gap stayed invisible until a fresh worktree hit it.
 `pnpm typecheck` itself is fine anywhere: turbo declares `typecheck: dependsOn ["^build"]`.
 
+### A worktree owns a Neon branch — reclaim it after teardown
+
+Every git worktree gets its own Neon test-database branch (`wt-<sanitized-name>`) so
+parallel test runs cannot collide on the shared fixtures. Deleting the worktree does
+**not** delete the branch:
+
+```bash
+node scripts/test-db/reap-branches.mjs        # delete wt-* branches whose worktree is gone
+node scripts/test-db/reap-branches.mjs --all  # also delete LIVE wt-* branches — use after
+                                              # new Drizzle migrations, to force every
+                                              # worktree onto fresh schema
+```
+
+**Run it after removing the worktree, never before.** The reaper identifies orphans by
+the absence of the checkout, so reaping first finds nothing and leaves the branch live
+indefinitely.
+
 `pnpm dev` serves every app through `portless` (a global CLI) on HTTPS hostnames, not
 ports. Use these when checking local work in a browser — `localhost:3000` will not be listening:
 
