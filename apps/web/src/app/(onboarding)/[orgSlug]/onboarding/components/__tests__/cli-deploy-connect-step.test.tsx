@@ -20,10 +20,13 @@ import {
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockCapture, mockWriteText } = vi.hoisted(() => ({
-  mockCapture: vi.fn(),
-  mockWriteText: vi.fn(),
-}));
+const { mockCapture, mockWriteText, mockToastError, mockToastSuccess } =
+  vi.hoisted(() => ({
+    mockCapture: vi.fn(),
+    mockWriteText: vi.fn(),
+    mockToastError: vi.fn(),
+    mockToastSuccess: vi.fn(),
+  }));
 
 vi.mock("posthog-js", () => ({
   default: { capture: mockCapture },
@@ -31,8 +34,8 @@ vi.mock("posthog-js", () => ({
 
 vi.mock("sonner", () => ({
   toast: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
     info: vi.fn(),
   },
 }));
@@ -496,6 +499,73 @@ describe("CliDeployConnectStep — three-path layout", () => {
       organization_id: "org-123",
       method: "cli",
     });
+  });
+
+  /**
+   * The most common state on this screen: the user clicks check before the
+   * deploy has finished, so the check returns no connections. The remediation
+   * copy that appears names a connect command — the third and last place a
+   * self-hosted org could be handed the hosted one, and the only one that
+   * renders behind `checkFailed`.
+   */
+  it("names only the self-hosted connect command when the check finds nothing", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ connections: [] }),
+    });
+    const onConnected = vi.fn();
+    renderWithQueryClient(
+      <CliDeployConnectStep
+        {...defaultProps}
+        onConnected={onConnected}
+        selfHosted={true}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the cli/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /i've finished — check connection/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/no connection found\./i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/no connection found\./i)).toHaveTextContent(
+      SELFHOST_CLI_COMMAND
+    );
+    expect(renderedMarkup()).not.toContain(HOSTED_CLI_COMMAND);
+    expect(mockToastError).toHaveBeenCalledWith(
+      "No connection found yet. Make sure you've run all 4 commands."
+    );
+    expect(onConnected).not.toHaveBeenCalled();
+    expect(capturesOf("onboarding_step_completed")).toHaveLength(0);
+  });
+
+  it("surfaces the remediation copy when the connection request itself fails", async () => {
+    mockFetch.mockResolvedValue({ ok: false, json: async () => ({}) });
+    const onConnected = vi.fn();
+    renderWithQueryClient(
+      <CliDeployConnectStep
+        {...defaultProps}
+        onConnected={onConnected}
+        selfHosted={false}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the cli/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /i've finished — check connection/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/no connection found\./i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/no connection found\./i)).toHaveTextContent(
+      HOSTED_CLI_COMMAND
+    );
+    expect(onConnected).not.toHaveBeenCalled();
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+    expect(capturesOf("onboarding_step_completed")).toHaveLength(0);
   });
 
   it("keeps Back and Skip on the canonical step keys", () => {
