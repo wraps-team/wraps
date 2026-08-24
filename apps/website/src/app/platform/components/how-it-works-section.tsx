@@ -9,7 +9,7 @@ const items = [
   {
     icon: CloudUpload,
     title: "Connect your AWS",
-    description: "One-click CloudFormation. You own the infrastructure.",
+    description: "Four CLI commands, or CloudFormation from your browser.",
   },
   {
     icon: Sparkles,
