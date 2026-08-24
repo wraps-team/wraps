@@ -13,8 +13,6 @@ const readRepo = (relativePath: string) =>
 // and would sweep in the out-of-scope agent surfaces.
 const FILES = [
   "apps/web/src/app/(onboarding)/[orgSlug]/onboarding/components/billing-step.tsx",
-  "apps/web/src/app/(onboarding)/[orgSlug]/onboarding/components/deploy-infrastructure-step.tsx",
-  "apps/web/src/app/(onboarding)/[orgSlug]/onboarding/components/deploy-step.tsx",
   "apps/web/src/app/(subscription)/[orgSlug]/upgrade/page.tsx",
   "apps/web/src/app/page.tsx",
   "apps/web/src/components/organization-settings-billing.tsx",
