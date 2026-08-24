@@ -16,6 +16,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -87,6 +88,7 @@ const HOSTED_CLI_COMMAND = "wraps platform connect";
 const SELFHOST_LOGIN_COMMAND = "wraps selfhost login";
 const HOSTED_LOGIN_COMMAND = "wraps auth login";
 const INSTALL_CLI_COMMAND = "curl -fsSL https://get.wraps.dev | sh";
+const CAL_BOOKING_URL = "https://cal.com/wraps/get-started-with-wraps";
 
 const defaultProps = {
   onNext: vi.fn(),
@@ -436,6 +438,124 @@ describe("CliDeployConnectStep — three-path layout", () => {
     });
     const posted = JSON.parse(String(mockFetch.mock.calls.at(-1)?.[1]?.body));
     expect(posted.webhookSecret).toBe(openedSecret);
+  });
+
+  /**
+   * The CloudFormation arm of the funnel, past the request body. `onConnected`
+   * and `onboarding_step_completed{method:"cloudformation"}` are the only
+   * reasons a validated browser-path user ever leaves step 4 — drop them and
+   * the screen still says "connected" while the user sits on the step forever
+   * and the CFN funnel reads as 100% drop-off.
+   */
+  it("completes the step when the CloudFormation validation succeeds", async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+    const onConnected = vi.fn();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CliDeployConnectStep
+          {...defaultProps}
+          onConnected={onConnected}
+          selfHosted={false}
+        />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the browser/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /deploy with cloudformation/i })
+    );
+    fireEvent.change(screen.getByLabelText("Console Role ARN"), {
+      target: {
+        value: "arn:aws:iam::123456789012:role/wraps-console-access-role",
+      },
+    });
+    fireEvent.change(screen.getByLabelText("External ID"), {
+      target: { value: "wraps-0123456789abcdef0123456789abcdef" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /validate connection/i })
+    );
+
+    await waitFor(() => {
+      expect(onConnected).toHaveBeenCalled();
+    });
+    expect(mockCapture).toHaveBeenCalledWith("onboarding_step_completed", {
+      step: 4,
+      step_name: "Deploy & Connect",
+      organization_id: "org-123",
+      method: "cloudformation",
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["onboarding-status", "org-123"],
+    });
+    expect(mockToastSuccess).toHaveBeenCalledWith(
+      "Infrastructure connected successfully!"
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  /**
+   * The other half of the CloudFormation completion path. A failed validate is
+   * the one place the user learns what to fix, and `onboarding_connection_failed`
+   * carrying the API's own error code is what tells us which failure is eating
+   * the browser path.
+   */
+  it("surfaces the CloudFormation remediation panel and reports the error code", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      json: async () => ({
+        error: "Role not assumable",
+        code: "ASSUME_ROLE_FAILED",
+        remediation: "Check the trust policy on wraps-console-access-role.",
+      }),
+    });
+    const onConnected = vi.fn();
+    renderWithQueryClient(
+      <CliDeployConnectStep
+        {...defaultProps}
+        onConnected={onConnected}
+        selfHosted={false}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the browser/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /deploy with cloudformation/i })
+    );
+    fireEvent.change(screen.getByLabelText("Console Role ARN"), {
+      target: {
+        value: "arn:aws:iam::123456789012:role/wraps-console-access-role",
+      },
+    });
+    fireEvent.change(screen.getByLabelText("External ID"), {
+      target: { value: "wraps-0123456789abcdef0123456789abcdef" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /validate connection/i })
+    );
+
+    const alert = await waitFor(() => screen.getByRole("alert"));
+    expect(alert).toHaveTextContent("Role not assumable");
+    expect(alert).toHaveTextContent(
+      "Check the trust policy on wraps-console-access-role."
+    );
+    expect(
+      within(alert).getByRole("link", { name: /book a setup call/i })
+    ).toHaveAttribute("href", CAL_BOOKING_URL);
+    expect(mockToastError).toHaveBeenCalledWith("Role not assumable");
+    expect(mockCapture).toHaveBeenCalledWith("onboarding_connection_failed", {
+      step: 4,
+      step_name: "Deploy & Connect",
+      organization_id: "org-123",
+      method: "cloudformation",
+      error_code: "ASSUME_ROLE_FAILED",
+    });
+    expect(onConnected).not.toHaveBeenCalled();
+    expect(capturesOf("onboarding_step_completed")).toHaveLength(0);
   });
 
   it("offers no CloudFormation path at all when self-hosted", () => {
