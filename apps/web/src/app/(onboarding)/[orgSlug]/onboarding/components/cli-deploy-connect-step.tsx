@@ -10,30 +10,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@wraps/ui/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@wraps/ui/components/ui/collapsible";
 import { Label } from "@wraps/ui/components/ui/label";
 import {
   BotIcon,
   CalendarIcon,
   CheckCircle2Icon,
-  ChevronDownIcon,
   CloudIcon,
   CopyIcon,
   ExternalLinkIcon,
-  GlobeIcon,
   RefreshCwIcon,
-  ShieldCheckIcon,
   TerminalIcon,
-  ZapIcon,
 } from "lucide-react";
 import posthog from "posthog-js";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
+import { SelfhostConnectInstructions } from "@/components/selfhost-connect-instructions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AgentPromptOption } from "./agent-prompt-option";
@@ -46,7 +38,14 @@ type CliDeployConnectStepProps = {
   organizationId: string;
   orgName?: string;
   orgSlug?: string;
+  /**
+   * True on self-hosted deployments. Threaded down from page.tsx, which reads
+   * it from the onboarding-status payload — the license key is server-only.
+   */
+  selfHosted: boolean;
 };
+
+type DeployMethod = "cli" | "agent" | "cloudformation";
 
 const CLI_STEPS = [
   {
@@ -91,7 +90,7 @@ const CAL_BOOKING_URL = "https://cal.com/wraps/get-started-with-wraps";
  * here is one of CLI_STEPS — but calls out the interactive points an agent would
  * otherwise stall on (device code, region/preset prompts, org selection).
  */
-function buildAgentPrompt(orgName?: string): string {
+function buildAgentPrompt(orgName?: string, selfHosted = false): string {
   const orgLine = orgName
     ? `   If it asks which organization to connect, choose "${orgName}".`
     : "   If it asks which organization to connect, ask me which one to pick.";
@@ -102,11 +101,11 @@ function buildAgentPrompt(orgName?: string): string {
    If that fails, help me set up credentials before continuing — AWS SSO, access keys, environment variables, and AWS_PROFILE all work.
 2. Install the CLI: npm install -g @wraps.dev/cli
    (or: curl -fsSL https://get.wraps.dev | sh)
-3. Sign in: wraps auth login
+3. Sign in: ${selfHosted ? "wraps selfhost login" : "wraps auth login"}
    This is a device-code flow — it prints a code like XXXX-XXXX and tries to open a browser. Show me the code and wait for me to confirm I approved it before moving on.
 4. Deploy the infrastructure: wraps email init
    It prompts for an AWS region and a preset (starter / production / enterprise), then shows estimated monthly AWS cost. Show me those and let me choose — don't accept the deploy on my behalf.
-5. Connect the deployment to my dashboard: wraps platform connect
+5. Connect the deployment to my dashboard: ${selfHosted ? "wraps selfhost connect" : "wraps platform connect"}
 ${orgLine}
 6. Confirm it worked: wraps email status --json
    Report the region, the SES configuration set, and whether the account is still in the SES sandbox (sandbox means I can only send to verified addresses until AWS grants production access).
@@ -126,7 +125,10 @@ function generateSecureWebhookSecret(): string {
 }
 
 /**
- * Generate CloudFormation Quick Create URL
+ * Generate CloudFormation Quick Create URL for the hosted platform. Only called
+ * when `selfHosted` is false — the S3-hosted template grants assume-role to the
+ * Wraps platform account and posts events to api.wraps.dev, neither of which a
+ * self-hosted control plane can use.
  */
 function generateQuickCreateUrl(
   organizationId: string,
@@ -156,19 +158,31 @@ export function CliDeployConnectStep({
   onConnected,
   organizationId,
   orgName,
+  selfHosted,
 }: CliDeployConnectStepProps) {
   const queryClient = useQueryClient();
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [cfnDeployed, setCfnDeployed] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState<DeployMethod | null>(
+    null
+  );
+  // Both deduped per mount: a user copying three CLI commands started one
+  // deployment, and a user toggling between two cards chose each one once.
+  const selectedMethods = useRef<Set<DeployMethod>>(new Set());
+  const startedMethods = useRef<Set<DeployMethod>>(new Set());
 
-  const agentPrompt = useMemo(() => buildAgentPrompt(orgName), [orgName]);
+  const agentPrompt = useMemo(
+    () => buildAgentPrompt(orgName, selfHosted),
+    [orgName, selfHosted]
+  );
 
   // Generate a cryptographically secure webhook secret once on mount
   const [webhookSecret] = useState(() => generateSecureWebhookSecret());
 
   const quickCreateUrl = useMemo(
-    () => generateQuickCreateUrl(organizationId, webhookSecret),
-    [organizationId, webhookSecret]
+    () =>
+      selfHosted ? null : generateQuickCreateUrl(organizationId, webhookSecret),
+    [organizationId, selfHosted, webhookSecret]
   );
 
   // Manual connection check
@@ -300,7 +314,12 @@ export function CliDeployConnectStep({
   });
 
   const handleCopy = async (command: string, index: number) => {
-    await navigator.clipboard.writeText(command);
+    try {
+      await navigator.clipboard.writeText(command);
+    } catch {
+      // Clipboard unavailable (e.g. insecure context) — nothing to report.
+      return;
+    }
     setCopiedIndex(index);
     toast.success("Copied to clipboard");
     posthog.capture("onboarding_cli_command_copied", {
@@ -309,6 +328,7 @@ export function CliDeployConnectStep({
       organization_id: organizationId,
       command,
     });
+    trackDeploymentStarted("cli");
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
@@ -330,21 +350,39 @@ export function CliDeployConnectStep({
     onSkip();
   };
 
-  const handleCliExpanded = () => {
-    posthog.capture("onboarding_deployment_method_selected", {
+  // Fires once per method per mount, at the first action that actually starts a
+  // deployment on that path. Before this change only CloudFormation emitted it,
+  // so a shift toward the CLI would have read as a drop.
+  const trackDeploymentStarted = (method: DeployMethod) => {
+    if (startedMethods.current.has(method)) {
+      return;
+    }
+    startedMethods.current.add(method);
+    posthog.capture("onboarding_deployment_started", {
       step: 4,
       step_name: "Deploy & Connect",
       organization_id: organizationId,
-      method: "cli",
+      method,
+      layout: "three_path",
     });
   };
 
-  const handleAgentExpanded = () => {
+  // Deduped per method per mount, the same way trackDeploymentStarted is. A user
+  // who clicks CLI, reads the prerequisites, clicks Browser, then clicks CLI
+  // again has chosen two methods, not three — and this event is the denominator
+  // the whole chunk exists to rebuild.
+  const handleMethodSelected = (method: DeployMethod) => {
+    setSelectedMethod(method);
+    if (selectedMethods.current.has(method)) {
+      return;
+    }
+    selectedMethods.current.add(method);
     posthog.capture("onboarding_deployment_method_selected", {
       step: 4,
       step_name: "Deploy & Connect",
       organization_id: organizationId,
-      method: "agent",
+      method,
+      layout: "three_path",
     });
   };
 
@@ -355,20 +393,38 @@ export function CliDeployConnectStep({
       step_name: "Deploy & Connect",
       organization_id: organizationId,
     });
+    trackDeploymentStarted("agent");
   };
 
   const handleCloudFormationDeploy = () => {
-    posthog.capture("onboarding_deployment_started", {
-      step: 4,
-      step_name: "Deploy & Connect",
-      organization_id: organizationId,
-      method: "cloudformation",
-    });
+    if (!quickCreateUrl) {
+      return;
+    }
+    trackDeploymentStarted("cloudformation");
     window.open(quickCreateUrl, "_blank", "noopener,noreferrer");
     setCfnDeployed(true);
   };
 
-  // Shared by the CLI and agent paths — both finish with `wraps platform connect`
+  // Self-hosted deployments run a different CLI flow: `wraps selfhost login` and
+  // `wraps selfhost connect` point at the user's own control plane, while the
+  // hosted commands would connect their AWS account to the Wraps platform.
+  const cliSteps = selfHosted
+    ? CLI_STEPS.map((step) => {
+        if (step.command === "wraps auth login") {
+          return { ...step, command: "wraps selfhost login" };
+        }
+        if (step.command === "wraps platform connect") {
+          return {
+            ...step,
+            label: "Connect to your instance",
+            command: "wraps selfhost connect",
+          };
+        }
+        return step;
+      })
+    : CLI_STEPS;
+
+  // Shared by the CLI and agent paths — both finish with the connect command
   const checkConnectionBlock = (
     <div className="space-y-3">
       <Button
@@ -383,7 +439,7 @@ export function CliDeployConnectStep({
         <p className="text-center text-muted-foreground text-sm">
           No connection found. Make sure the deploy and{" "}
           <code className="rounded bg-muted px-1 py-0.5">
-            wraps platform connect
+            {selfHosted ? "wraps selfhost connect" : "wraps platform connect"}
           </code>{" "}
           both finished, then try again.
         </p>
@@ -409,329 +465,383 @@ export function CliDeployConnectStep({
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* CloudFormation — primary path */}
-        {cfnDeployed ? (
-          <div className="space-y-6">
-            <div className="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-green-600">
-              <CheckCircle2Icon className="h-5 w-5" />
-              <span className="font-medium text-sm">
-                CloudFormation deployment started
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="font-semibold text-sm">
-                Waiting for deployment to complete...
+        {cfnDeployed ? null : (
+          <div
+            className={
+              selfHosted
+                ? "grid gap-4 md:grid-cols-2"
+                : "grid gap-4 md:grid-cols-3"
+            }
+          >
+            <Card className="flex flex-col items-center space-y-3 p-6 text-center">
+              <TerminalIcon className="h-10 w-10 text-primary" />
+              <h3 className="flex items-center gap-2 font-semibold text-lg">
+                CLI
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary text-xs">
+                  Recommended
+                </span>
               </h3>
               <p className="text-muted-foreground text-sm">
-                Once CloudFormation finishes, copy the{" "}
-                <strong>ConsoleRoleArn</strong> and <strong>ExternalId</strong>{" "}
-                from the Outputs tab and paste them below.
+                Four commands in your terminal. Ends with a test email, so you
+                know sending works before you leave.
               </p>
-            </div>
-
-            <form
-              className="space-y-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                form.handleSubmit();
-              }}
-            >
-              <form.Field name="roleArn">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor={field.name}>Console Role ARN</Label>
-                    <Input
-                      id={field.name}
-                      name={field.name}
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      placeholder="arn:aws:iam::123456789012:role/wraps-console-access-role"
-                      value={field.state.value}
-                    />
-                    {field.state.meta.errors.map((error) => (
-                      <p
-                        className="text-destructive text-sm"
-                        key={error?.message}
-                      >
-                        {error?.message}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </form.Field>
-
-              <form.Field name="externalId">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor={field.name}>External ID</Label>
-                    <Input
-                      id={field.name}
-                      name={field.name}
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      placeholder="wraps-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                      value={field.state.value}
-                    />
-                    {field.state.meta.errors.map((error) => (
-                      <p
-                        className="text-destructive text-sm"
-                        key={error?.message}
-                      >
-                        {error?.message}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </form.Field>
-
-              {validationError && (
-                <div
-                  className="space-y-1 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm"
-                  role="alert"
-                >
-                  <p className="font-medium text-destructive">
-                    {validationError.error}
-                  </p>
-                  {validationError.remediation && (
-                    <p className="text-muted-foreground">
-                      {validationError.remediation}
-                    </p>
-                  )}
-                  <a
-                    className="inline-block text-primary text-xs underline underline-offset-4"
-                    href={CAL_BOOKING_URL}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    Book a setup call
-                  </a>
-                </div>
-              )}
-
-              <form.Subscribe>
-                {(state) => (
-                  <Button
-                    className="w-full"
-                    disabled={!state.canSubmit || validateAwsMutation.isPending}
-                    loading={
-                      state.isSubmitting || validateAwsMutation.isPending
-                    }
-                    type="submit"
-                  >
-                    Validate Connection
-                  </Button>
-                )}
-              </form.Subscribe>
-            </form>
-
-            <Button asChild className="w-full" variant="outline">
-              <a
-                href={quickCreateUrl}
-                rel="noopener noreferrer"
-                target="_blank"
+              <Button
+                aria-pressed={selectedMethod === "cli"}
+                className="mt-auto w-full"
+                onClick={() => handleMethodSelected("cli")}
+                size="lg"
+                variant={selectedMethod === "cli" ? "default" : "outline"}
               >
-                <CloudIcon className="mr-2 h-4 w-4" />
-                Open AWS Console
-              </a>
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-5">
-            {/* Why CloudFormation */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="flex flex-col items-center gap-1.5 rounded-lg bg-muted/50 p-3 text-center">
-                <GlobeIcon className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-xs">Browser-based</span>
-                <span className="text-muted-foreground text-xs">
-                  No CLI or local tooling needed
-                </span>
-              </div>
-              <div className="flex flex-col items-center gap-1.5 rounded-lg bg-muted/50 p-3 text-center">
-                <ZapIcon className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-xs">One-click deploy</span>
-                <span className="text-muted-foreground text-xs">
-                  Pre-configured and ready to go
-                </span>
-              </div>
-              <div className="flex flex-col items-center gap-1.5 rounded-lg bg-muted/50 p-3 text-center">
-                <ShieldCheckIcon className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-xs">
-                  Review before deploy
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  See every resource in the AWS Console
-                </span>
-              </div>
-            </div>
+                Use the CLI
+              </Button>
+            </Card>
 
-            {/* What Gets Deployed */}
-            <div className="space-y-2 rounded-lg bg-muted/50 p-4">
-              <h4 className="font-semibold text-sm">What gets deployed?</h4>
-              <ul className="list-inside list-disc space-y-1 text-muted-foreground text-sm">
-                <li>Vercel OIDC provider for secure authentication</li>
-                <li>IAM role with minimal required permissions</li>
-                <li>SES configuration set with open/click tracking</li>
-                <li>EventBridge for real-time event routing</li>
-                <li>DynamoDB table for email history</li>
-                <li>Lambda function for event processing</li>
-              </ul>
-            </div>
+            <Card className="flex flex-col items-center space-y-3 p-6 text-center">
+              <BotIcon className="h-10 w-10 text-primary" />
+              <h3 className="font-semibold text-lg">AI agent</h3>
+              <p className="text-muted-foreground text-sm">
+                The same four commands, driven by your coding agent. It still
+                needs AWS credentials on your machine and stops for the sign-in
+                code and the region choice.
+              </p>
+              <Button
+                aria-pressed={selectedMethod === "agent"}
+                className="mt-auto w-full"
+                onClick={() => handleMethodSelected("agent")}
+                size="lg"
+                variant={selectedMethod === "agent" ? "default" : "outline"}
+              >
+                Copy the agent prompt
+              </Button>
+            </Card>
 
-            <Button className="w-full" onClick={handleCloudFormationDeploy}>
-              <ExternalLinkIcon className="mr-2 h-4 w-4" />
-              Deploy with CloudFormation
-            </Button>
+            {selfHosted ? null : (
+              <Card className="flex flex-col items-center space-y-3 p-6 text-center">
+                <CloudIcon className="h-10 w-10 text-primary" />
+                <h3 className="font-semibold text-lg">Browser</h3>
+                <p className="text-muted-foreground text-sm">
+                  Deploy from your browser with CloudFormation — no Node.js and
+                  no local AWS credentials. Infrastructure only: you still
+                  verify your sending domain and request production access
+                  separately.
+                </p>
+                <Button
+                  aria-pressed={selectedMethod === "cloudformation"}
+                  className="mt-auto w-full"
+                  onClick={() => handleMethodSelected("cloudformation")}
+                  size="lg"
+                  variant={
+                    selectedMethod === "cloudformation" ? "default" : "outline"
+                  }
+                >
+                  Use the browser
+                </Button>
+              </Card>
+            )}
           </div>
         )}
 
-        {/* CLI — collapsible secondary path */}
-        {!cfnDeployed && (
-          <Collapsible onOpenChange={(open) => open && handleCliExpanded()}>
-            <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg border border-dashed p-3 text-muted-foreground text-sm hover:bg-muted/50 hover:text-foreground transition-colors [&[data-state=open]>svg:last-child]:rotate-180">
-              <TerminalIcon className="h-4 w-4" />
-              <span className="font-medium">
-                Need more control over your deployment?
-              </span>
-              <ChevronDownIcon className="ml-auto h-4 w-4 transition-transform" />
-            </CollapsibleTrigger>
+        {selfHosted && <SelfhostConnectInstructions />}
 
-            <CollapsibleContent className="space-y-6 pt-4">
-              <p className="text-muted-foreground text-sm">
-                If you have Node.js and the AWS CLI configured locally, you can
-                deploy and connect with four commands.
-              </p>
+        {!cfnDeployed && selectedMethod === "cli" && (
+          <div className="space-y-6">
+            <p className="text-muted-foreground text-sm">
+              Needs Node.js and AWS credentials on this machine. No local
+              credentials? Use the browser path instead.
+            </p>
 
-              {/* Prerequisites */}
-              <div className="space-y-2 rounded-lg bg-muted/50 p-4">
-                <h4 className="font-semibold text-sm">Prerequisites</h4>
-                <div className="space-y-1.5">
-                  {PREREQUISITES.map((prereq) => (
-                    <div key={prereq.label}>
-                      <label className="flex items-center gap-2">
-                        <input
-                          className="h-4 w-4 rounded border-muted-foreground/25"
-                          type="checkbox"
-                        />
-                        <span className="text-sm">{prereq.label}</span>
-                        <a
-                          className="text-primary text-xs underline underline-offset-4"
-                          href={prereq.href}
-                          rel="noopener noreferrer"
-                          target="_blank"
-                        >
-                          Guide
-                        </a>
-                      </label>
-                      {"hint" in prereq && (
-                        <p className="ml-6 mt-0.5 text-muted-foreground text-xs">
-                          Run{" "}
-                          <code className="rounded bg-muted px-1 py-0.5">
-                            aws configure
-                          </code>{" "}
-                          or{" "}
-                          <code className="rounded bg-muted px-1 py-0.5">
-                            aws sso login
-                          </code>
-                          , then{" "}
-                          <code className="rounded bg-muted px-1 py-0.5">
-                            wraps aws doctor
-                          </code>{" "}
-                          to verify
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* CLI Commands */}
-              <div className="space-y-3">
-                {CLI_STEPS.map((item, index) => (
-                  <div className="space-y-1.5" key={item.command}>
-                    <h3 className="flex items-center gap-2 font-semibold text-sm">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">
-                        {index + 1}
-                      </span>
-                      {item.label}
-                      <span className="font-normal text-muted-foreground text-xs">
-                        {item.time}
-                      </span>
-                    </h3>
-                    <div className="relative">
-                      <pre className="overflow-x-auto rounded-lg bg-secondary p-4 pr-12">
-                        <code className="text-sm">{item.command}</code>
-                      </pre>
-                      <Button
-                        aria-label={
-                          copiedIndex === index
-                            ? "Copied"
-                            : `Copy ${item.label} command`
-                        }
-                        className="absolute top-2 right-2"
-                        onClick={() => handleCopy(item.command, index)}
-                        size="icon"
-                        variant="ghost"
+            {/* Prerequisites */}
+            <div className="space-y-2 rounded-lg bg-muted/50 p-4">
+              <h4 className="font-semibold text-sm">Prerequisites</h4>
+              <div className="space-y-1.5">
+                {PREREQUISITES.map((prereq) => (
+                  <div key={prereq.label}>
+                    <label className="flex items-center gap-2">
+                      <input
+                        className="h-4 w-4 rounded border-muted-foreground/25"
+                        type="checkbox"
+                      />
+                      <span className="text-sm">{prereq.label}</span>
+                      <a
+                        className="text-primary text-xs underline underline-offset-4"
+                        href={prereq.href}
+                        rel="noopener noreferrer"
+                        target="_blank"
                       >
-                        {copiedIndex === index ? (
-                          <CheckCircle2Icon className="size-4 text-green-500" />
-                        ) : (
-                          <CopyIcon className="size-4" />
-                        )}
-                      </Button>
-                    </div>
-                    {"altCommand" in item && item.altCommand && (
-                      <p className="text-muted-foreground text-xs">
-                        Or via npm:{" "}
-                        <button
-                          className="font-mono underline underline-offset-2"
-                          onClick={() =>
-                            handleCopy(item.altCommand as string, index)
-                          }
-                          type="button"
-                        >
-                          {item.altCommand}
-                        </button>
+                        Guide
+                      </a>
+                    </label>
+                    {"hint" in prereq && (
+                      <p className="ml-6 mt-0.5 text-muted-foreground text-xs">
+                        Any of these work:{" "}
+                        <code className="rounded bg-muted px-1 py-0.5">
+                          aws configure sso
+                        </code>{" "}
+                        /{" "}
+                        <code className="rounded bg-muted px-1 py-0.5">
+                          aws sso login
+                        </code>
+                        ,{" "}
+                        <code className="rounded bg-muted px-1 py-0.5">
+                          aws configure
+                        </code>
+                        ,{" "}
+                        <code className="rounded bg-muted px-1 py-0.5">
+                          AWS_ACCESS_KEY_ID
+                        </code>{" "}
+                        +{" "}
+                        <code className="rounded bg-muted px-1 py-0.5">
+                          AWS_SECRET_ACCESS_KEY
+                        </code>
+                        , or{" "}
+                        <code className="rounded bg-muted px-1 py-0.5">
+                          AWS_PROFILE
+                        </code>
+                        . Then{" "}
+                        <code className="rounded bg-muted px-1 py-0.5">
+                          wraps aws doctor
+                        </code>{" "}
+                        to verify.
                       </p>
                     )}
                   </div>
                 ))}
               </div>
+            </div>
 
-              {/* Check Connection */}
-              {checkConnectionBlock}
-            </CollapsibleContent>
-          </Collapsible>
+            {/* CLI Commands */}
+            <div className="space-y-3">
+              {cliSteps.map((item, index) => (
+                <div className="space-y-1.5" key={item.command}>
+                  <h3 className="flex items-center gap-2 font-semibold text-sm">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">
+                      {index + 1}
+                    </span>
+                    {item.label}
+                    <span className="font-normal text-muted-foreground text-xs">
+                      {item.time}
+                    </span>
+                  </h3>
+                  <div className="relative">
+                    <pre className="overflow-x-auto rounded-lg bg-secondary p-4 pr-12">
+                      <code className="text-sm">{item.command}</code>
+                    </pre>
+                    <Button
+                      aria-label={
+                        copiedIndex === index
+                          ? "Copied"
+                          : `Copy ${item.label} command`
+                      }
+                      className="absolute top-2 right-2"
+                      onClick={() => handleCopy(item.command, index)}
+                      size="icon"
+                      variant="ghost"
+                    >
+                      {copiedIndex === index ? (
+                        <CheckCircle2Icon className="size-4 text-green-500" />
+                      ) : (
+                        <CopyIcon className="size-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {"altCommand" in item && item.altCommand && (
+                    <p className="text-muted-foreground text-xs">
+                      Or via npm:{" "}
+                      <button
+                        className="font-mono underline underline-offset-2"
+                        onClick={() =>
+                          handleCopy(item.altCommand as string, index)
+                        }
+                        type="button"
+                      >
+                        {item.altCommand}
+                      </button>
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {checkConnectionBlock}
+          </div>
         )}
 
-        {/* Agent — collapsible secondary path */}
-        {!cfnDeployed && (
-          <Collapsible onOpenChange={(open) => open && handleAgentExpanded()}>
-            <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg border border-dashed p-3 text-muted-foreground text-sm transition-colors hover:bg-muted/50 hover:text-foreground [&[data-state=open]>svg:last-child]:rotate-180">
-              <BotIcon className="h-4 w-4" />
-              <span className="font-medium">
-                Prefer to let your AI agent run it?
-              </span>
-              <ChevronDownIcon className="ml-auto h-4 w-4 transition-transform" />
-            </CollapsibleTrigger>
+        {!cfnDeployed && selectedMethod === "agent" && (
+          <div className="space-y-6">
+            <p className="text-muted-foreground text-sm">
+              Same CLI path as above, driven by your coding agent. It still
+              needs AWS credentials on your machine, and it will stop for the
+              sign-in code and the region/preset choices.
+            </p>
 
-            <CollapsibleContent className="space-y-6 pt-4">
+            <AgentPromptOption
+              onCopyPrompt={handleAgentPromptCopied}
+              prompt={agentPrompt}
+            />
+
+            {checkConnectionBlock}
+          </div>
+        )}
+
+        {selectedMethod === "cloudformation" &&
+          quickCreateUrl !== null &&
+          (cfnDeployed ? (
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-green-600 dark:text-green-400">
+                <CheckCircle2Icon className="h-5 w-5" />
+                <span className="font-medium text-sm">
+                  CloudFormation deployment started
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm">
+                  Waiting for deployment to complete...
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Once CloudFormation finishes, copy the{" "}
+                  <strong>ConsoleRoleArn</strong> and{" "}
+                  <strong>ExternalId</strong> from the Outputs tab and paste
+                  them below.
+                </p>
+              </div>
+
+              <form
+                className="space-y-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  form.handleSubmit();
+                }}
+              >
+                <form.Field name="roleArn">
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor={field.name}>Console Role ARN</Label>
+                      <Input
+                        id={field.name}
+                        name={field.name}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        placeholder="arn:aws:iam::123456789012:role/wraps-console-access-role"
+                        value={field.state.value}
+                      />
+                      {field.state.meta.errors.map((error) => (
+                        <p
+                          className="text-destructive text-sm"
+                          key={error?.message}
+                        >
+                          {error?.message}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </form.Field>
+
+                <form.Field name="externalId">
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor={field.name}>External ID</Label>
+                      <Input
+                        id={field.name}
+                        name={field.name}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        placeholder="wraps-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                        value={field.state.value}
+                      />
+                      {field.state.meta.errors.map((error) => (
+                        <p
+                          className="text-destructive text-sm"
+                          key={error?.message}
+                        >
+                          {error?.message}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </form.Field>
+
+                {validationError && (
+                  <div
+                    className="space-y-1 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm"
+                    role="alert"
+                  >
+                    <p className="font-medium text-destructive">
+                      {validationError.error}
+                    </p>
+                    {validationError.remediation && (
+                      <p className="text-muted-foreground">
+                        {validationError.remediation}
+                      </p>
+                    )}
+                    <a
+                      className="inline-block text-primary text-xs underline underline-offset-4"
+                      href={CAL_BOOKING_URL}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      Book a setup call
+                    </a>
+                  </div>
+                )}
+
+                <form.Subscribe>
+                  {(state) => (
+                    <Button
+                      className="w-full"
+                      disabled={
+                        !state.canSubmit || validateAwsMutation.isPending
+                      }
+                      loading={
+                        state.isSubmitting || validateAwsMutation.isPending
+                      }
+                      type="submit"
+                    >
+                      Validate Connection
+                    </Button>
+                  )}
+                </form.Subscribe>
+              </form>
+
+              <Button asChild className="w-full" variant="outline">
+                <a
+                  href={quickCreateUrl}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <CloudIcon className="mr-2 h-4 w-4" />
+                  Open AWS Console
+                </a>
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {/* What Gets Deployed */}
+              <div className="space-y-2 rounded-lg bg-muted/50 p-4">
+                <h4 className="font-semibold text-sm">What gets deployed?</h4>
+                <ul className="list-inside list-disc space-y-1 text-muted-foreground text-sm">
+                  <li>Vercel OIDC provider for secure authentication</li>
+                  <li>IAM role with minimal required permissions</li>
+                  <li>SES configuration set with open/click tracking</li>
+                  <li>EventBridge for real-time event routing</li>
+                  <li>DynamoDB table for email history</li>
+                  <li>Lambda function for event processing</li>
+                </ul>
+              </div>
+
               <p className="text-muted-foreground text-sm">
-                Same CLI path as above, driven by your coding agent. It still
-                needs AWS credentials on your machine, and it will stop for the
-                sign-in code and the region/preset choices.
+                If this AWS account already has SES resources with these names,
+                the stack can fail partway and leave resources behind. The CLI
+                path reports conflicts before it deploys.
               </p>
 
-              <AgentPromptOption
-                onCopyPrompt={handleAgentPromptCopied}
-                prompt={agentPrompt}
-              />
-
-              {checkConnectionBlock}
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+              <Button className="w-full" onClick={handleCloudFormationDeploy}>
+                <ExternalLinkIcon className="mr-2 h-4 w-4" />
+                Deploy with CloudFormation
+              </Button>
+            </div>
+          ))}
 
         {/* Need help? */}
         <div className="rounded-lg border border-dashed p-4">

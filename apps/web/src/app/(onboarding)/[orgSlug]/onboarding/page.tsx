@@ -374,6 +374,15 @@ export default function OnboardingPage({ params }: OnboardingPageProps) {
     return <Loader fullScreen />;
   }
 
+  // Never render Deploy & Connect before we know whether this deployment is
+  // self-hosted — `selfHosted={false}` renders the platform CloudFormation path,
+  // which a self-hosted control plane can never read. `!onboardingStatus` also
+  // covers the queryFn returning null on a failed status fetch; without it the
+  // gate fails open permanently rather than for one render.
+  if (currentStep === 4 && (isStatusLoading || !onboardingStatus)) {
+    return <Loader fullScreen />;
+  }
+
   // Self-hosted orgs never see the "Choose Plan" step, so drop it from the
   // progress indicator and shift the displayed step number accordingly.
   const visibleSteps = isSelfHosted ? STEPS.slice(1) : STEPS;
@@ -443,6 +452,7 @@ export default function OnboardingPage({ params }: OnboardingPageProps) {
         organizationId={currentOrg.id}
         orgName={currentOrg.name}
         orgSlug={orgSlug}
+        selfHosted={isSelfHosted}
       />
     </div>
   );
