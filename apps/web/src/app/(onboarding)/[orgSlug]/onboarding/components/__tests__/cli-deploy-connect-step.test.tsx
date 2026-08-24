@@ -81,6 +81,9 @@ const CFN_CONSOLE_HOST = "console.aws.amazon.com";
 const WRAPS_TEMPLATE_BUCKET = "wraps-assets";
 const SELFHOST_CLI_COMMAND = "wraps selfhost connect";
 const HOSTED_CLI_COMMAND = "wraps platform connect";
+const SELFHOST_LOGIN_COMMAND = "wraps selfhost login";
+const HOSTED_LOGIN_COMMAND = "wraps auth login";
+const INSTALL_CLI_COMMAND = "curl -fsSL https://get.wraps.dev | sh";
 
 const defaultProps = {
   onNext: vi.fn(),
@@ -230,6 +233,13 @@ describe("CliDeployConnectStep — three-path layout", () => {
     await waitFor(() => {
       expect(capturesOf("onboarding_cli_command_copied")).toHaveLength(1);
     });
+    expect(mockWriteText).toHaveBeenCalledWith(INSTALL_CLI_COMMAND);
+    expect(capturesOf("onboarding_cli_command_copied")[0][1]).toEqual({
+      step: 4,
+      step_name: "Deploy & Connect",
+      organization_id: "org-123",
+      command: INSTALL_CLI_COMMAND,
+    });
     expect(mockCapture).toHaveBeenCalledWith("onboarding_deployment_started", {
       step: 4,
       step_name: "Deploy & Connect",
@@ -243,7 +253,78 @@ describe("CliDeployConnectStep — three-path layout", () => {
     await waitFor(() => {
       expect(capturesOf("onboarding_cli_command_copied")).toHaveLength(2);
     });
+    expect(mockWriteText).toHaveBeenCalledWith(HOSTED_LOGIN_COMMAND);
+    expect(capturesOf("onboarding_cli_command_copied")[1][1]).toEqual({
+      step: 4,
+      step_name: "Deploy & Connect",
+      organization_id: "org-123",
+      command: HOSTED_LOGIN_COMMAND,
+    });
     expect(capturesOf("onboarding_deployment_started")).toHaveLength(1);
+  });
+
+  it("copies the hosted connect command on the hosted platform", async () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the cli/i }));
+
+    const copyButtons = screen.getAllByRole("button", {
+      name: /^copy .+ command$/i,
+    });
+    fireEvent.click(copyButtons[copyButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(capturesOf("onboarding_cli_command_copied")).toHaveLength(1);
+    });
+    expect(mockWriteText).toHaveBeenCalledWith(HOSTED_CLI_COMMAND);
+    expect(capturesOf("onboarding_cli_command_copied")[0][1]).toMatchObject({
+      command: HOSTED_CLI_COMMAND,
+    });
+  });
+
+  /**
+   * The clipboard is the artifact the user actually pastes into a terminal.
+   * A self-hosted user who copies `wraps platform connect` hands their AWS
+   * account to the hosted control plane — the exact failure the selfHosted
+   * gate exists to prevent — and the screen would still read correctly.
+   */
+  it("copies the self-hosted commands, never the hosted ones, when self-hosted", async () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={true} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the cli/i }));
+
+    const copyButtons = screen.getAllByRole("button", {
+      name: /^copy .+ command$/i,
+    });
+    fireEvent.click(copyButtons[copyButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(capturesOf("onboarding_cli_command_copied")).toHaveLength(1);
+    });
+    expect(mockWriteText).toHaveBeenCalledWith(SELFHOST_CLI_COMMAND);
+    expect(capturesOf("onboarding_cli_command_copied")[0][1]).toMatchObject({
+      command: SELFHOST_CLI_COMMAND,
+    });
+
+    fireEvent.click(copyButtons[1]);
+
+    await waitFor(() => {
+      expect(capturesOf("onboarding_cli_command_copied")).toHaveLength(2);
+    });
+    expect(mockWriteText).toHaveBeenCalledWith(SELFHOST_LOGIN_COMMAND);
+
+    for (const [command] of mockWriteText.mock.calls) {
+      expect(command).not.toContain(HOSTED_CLI_COMMAND);
+      expect(command).not.toContain(HOSTED_LOGIN_COMMAND);
+    }
+    for (const [, payload] of capturesOf("onboarding_cli_command_copied")) {
+      expect(payload.command).not.toContain(HOSTED_CLI_COMMAND);
+      expect(payload.command).not.toContain(HOSTED_LOGIN_COMMAND);
+    }
   });
 
   it("reports an agent deployment start when the prompt is copied", async () => {
