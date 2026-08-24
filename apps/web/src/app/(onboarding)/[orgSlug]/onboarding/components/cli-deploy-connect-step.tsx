@@ -22,7 +22,7 @@ import {
   TerminalIcon,
 } from "lucide-react";
 import posthog from "posthog-js";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 import { SelfhostConnectInstructions } from "@/components/selfhost-connect-instructions";
@@ -170,6 +170,21 @@ export function CliDeployConnectStep({
   // deployment, and a user toggling between two cards chose each one once.
   const selectedMethods = useRef<Set<DeployMethod>>(new Set());
   const startedMethods = useRef<Set<DeployMethod>>(new Set());
+
+  // The chosen path's panel renders after the whole card grid, so on a phone it
+  // opens a screen or two below the button that was tapped. Focusing it scrolls
+  // it into view and announces it; the button's pressed state alone does not.
+  const panelIdBase = useId();
+  const panelIdFor = (method: DeployMethod) => `${panelIdBase}-${method}`;
+  const panelRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (selectedMethod === null) {
+      return;
+    }
+    panelRef.current?.focus();
+    panelRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [selectedMethod]);
 
   const agentPrompt = useMemo(
     () => buildAgentPrompt(orgName, selfHosted),
@@ -486,6 +501,8 @@ export function CliDeployConnectStep({
                 know sending works before you leave.
               </p>
               <Button
+                aria-controls={panelIdFor("cli")}
+                aria-expanded={selectedMethod === "cli"}
                 aria-pressed={selectedMethod === "cli"}
                 className="mt-auto w-full"
                 onClick={() => handleMethodSelected("cli")}
@@ -505,6 +522,8 @@ export function CliDeployConnectStep({
                 code and the region choice.
               </p>
               <Button
+                aria-controls={panelIdFor("agent")}
+                aria-expanded={selectedMethod === "agent"}
                 aria-pressed={selectedMethod === "agent"}
                 className="mt-auto w-full"
                 onClick={() => handleMethodSelected("agent")}
@@ -526,6 +545,8 @@ export function CliDeployConnectStep({
                   separately.
                 </p>
                 <Button
+                  aria-controls={panelIdFor("cloudformation")}
+                  aria-expanded={selectedMethod === "cloudformation"}
                   aria-pressed={selectedMethod === "cloudformation"}
                   className="mt-auto w-full"
                   onClick={() => handleMethodSelected("cloudformation")}
@@ -544,7 +565,13 @@ export function CliDeployConnectStep({
         {selfHosted && <SelfhostConnectInstructions />}
 
         {!cfnDeployed && selectedMethod === "cli" && (
-          <div className="space-y-6">
+          <section
+            aria-label="CLI deployment steps"
+            className="space-y-6"
+            id={panelIdFor("cli")}
+            ref={panelRef}
+            tabIndex={-1}
+          >
             <p className="text-muted-foreground text-sm">
               Needs Node.js and AWS credentials on this machine. No local
               credentials?{" "}
@@ -674,11 +701,17 @@ export function CliDeployConnectStep({
             </div>
 
             {checkConnectionBlock}
-          </div>
+          </section>
         )}
 
         {!cfnDeployed && selectedMethod === "agent" && (
-          <div className="space-y-6">
+          <section
+            aria-label="AI agent deployment steps"
+            className="space-y-6"
+            id={panelIdFor("agent")}
+            ref={panelRef}
+            tabIndex={-1}
+          >
             <p className="text-muted-foreground text-sm">
               Same CLI path as above, driven by your coding agent. It still
               needs AWS credentials on your machine, and it will stop for the
@@ -691,13 +724,19 @@ export function CliDeployConnectStep({
             />
 
             {checkConnectionBlock}
-          </div>
+          </section>
         )}
 
         {selectedMethod === "cloudformation" &&
           quickCreateUrl !== null &&
           (cfnDeployed ? (
-            <div className="space-y-6">
+            <section
+              aria-label="Browser deployment steps"
+              className="space-y-6"
+              id={panelIdFor("cloudformation")}
+              ref={panelRef}
+              tabIndex={-1}
+            >
               <div className="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-green-600 dark:text-green-400">
                 <CheckCircle2Icon className="h-5 w-5" />
                 <span className="font-medium text-sm">
@@ -825,9 +864,15 @@ export function CliDeployConnectStep({
                   Open AWS Console
                 </a>
               </Button>
-            </div>
+            </section>
           ) : (
-            <div className="space-y-5">
+            <section
+              aria-label="Browser deployment steps"
+              className="space-y-5"
+              id={panelIdFor("cloudformation")}
+              ref={panelRef}
+              tabIndex={-1}
+            >
               {/* What Gets Deployed */}
               <div className="space-y-2 rounded-lg bg-muted/50 p-4">
                 <h4 className="font-semibold text-sm">What gets deployed?</h4>
@@ -851,7 +896,7 @@ export function CliDeployConnectStep({
                 <ExternalLinkIcon className="mr-2 h-4 w-4" />
                 Deploy with CloudFormation
               </Button>
-            </div>
+            </section>
           ))}
 
         {/* Need help? */}

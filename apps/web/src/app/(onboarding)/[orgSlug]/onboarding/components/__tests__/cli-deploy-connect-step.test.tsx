@@ -826,3 +826,93 @@ describe("CliDeployConnectStep — three-path layout", () => {
     expect(renderedMarkup()).not.toContain(HOSTED_CLI_COMMAND);
   });
 });
+
+/**
+ * The three path buttons are a disclosure: each reveals a panel that renders
+ * after the whole card grid, which below `md` puts it two stacked cards below
+ * the button that was tapped. Without wiring and a focus move, a phone user
+ * sees nothing change above the fold and a screen-reader user hears only
+ * "selected" — so the panel has to be addressable from its button and has to
+ * take focus when it appears.
+ */
+describe("CliDeployConnectStep — revealed panel is wired to its button", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockWriteText.mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: mockWriteText },
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("points each path button at the panel it reveals", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    const cliButton = screen.getByRole("button", { name: /use the cli/i });
+    const agentButton = screen.getByRole("button", {
+      name: /copy the agent prompt/i,
+    });
+    const browserButton = screen.getByRole("button", {
+      name: /use the browser/i,
+    });
+
+    for (const button of [cliButton, agentButton, browserButton]) {
+      expect(button).toHaveAttribute("aria-controls");
+      expect(button).toHaveAttribute("aria-expanded", "false");
+    }
+
+    expect(cliButton.getAttribute("aria-controls")).not.toBe(
+      agentButton.getAttribute("aria-controls")
+    );
+
+    fireEvent.click(cliButton);
+
+    expect(cliButton).toHaveAttribute("aria-expanded", "true");
+
+    const panelId = cliButton.getAttribute("aria-controls") as string;
+    const panel = document.getElementById(panelId);
+
+    expect(panel).not.toBeNull();
+    expect(panel).toContainElement(screen.getByText(INSTALL_CLI_COMMAND));
+  });
+
+  it("moves focus to the CLI panel so it is scrolled to and announced", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the cli/i }));
+
+    const panel = screen.getByRole("region", { name: /cli/i });
+
+    expect(panel).toHaveAttribute("tabindex", "-1");
+    expect(panel).toHaveFocus();
+  });
+
+  it("moves focus to the agent panel when the agent path is chosen", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /copy the agent prompt/i })
+    );
+
+    expect(screen.getByRole("region", { name: /agent/i })).toHaveFocus();
+  });
+
+  it("steals no focus before a path is chosen", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    expect(document.body).toHaveFocus();
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+  });
+});
