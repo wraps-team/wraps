@@ -33,8 +33,16 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => stableSearchParams,
 }));
 
+// The marker echoes the props it was handed: the one line that joins the
+// status query to the step — `selfHosted={isSelfHosted}` — is only observable
+// here, because the real step is behind next/dynamic.
 vi.mock("next/dynamic", () => ({
-  default: () => () => <div data-testid="deploy-connect-step" />,
+  default: () => (props: { selfHosted?: boolean }) => (
+    <div
+      data-self-hosted={String(props.selfHosted)}
+      data-testid="deploy-connect-step"
+    />
+  ),
 }));
 
 vi.mock("@/components/loader", () => ({
@@ -131,6 +139,55 @@ describe("OnboardingPage — step 4 self-hosted gate", () => {
 
     expect(screen.getByTestId("loader")).toBeInTheDocument();
     expect(screen.queryByTestId("deploy-connect-step")).not.toBeInTheDocument();
+  });
+});
+
+describe("OnboardingPage — step 4 hands the real status down", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("passes selfHosted=true down when the status says the org is self-hosted", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ hasActiveSubscription: true, selfHosted: true }),
+    });
+
+    renderWithQueryClient(
+      <OnboardingPage params={Promise.resolve({ orgSlug: "test-org" })} />
+    );
+    await settle();
+
+    // A hardcoded or mis-wired `selfHosted` here offers a self-hosted org the
+    // platform CloudFormation card, whose stack trusts platform account
+    // 905130073023 and posts to api.wraps.dev — an account their own control
+    // plane never sees.
+    expect(screen.getByTestId("deploy-connect-step")).toHaveAttribute(
+      "data-self-hosted",
+      "true"
+    );
+  });
+
+  it("passes selfHosted=false down when the status says the org is hosted", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ hasActiveSubscription: true, selfHosted: false }),
+    });
+
+    renderWithQueryClient(
+      <OnboardingPage params={Promise.resolve({ orgSlug: "test-org" })} />
+    );
+    await settle();
+
+    expect(screen.getByTestId("deploy-connect-step")).toHaveAttribute(
+      "data-self-hosted",
+      "false"
+    );
   });
 });
 
