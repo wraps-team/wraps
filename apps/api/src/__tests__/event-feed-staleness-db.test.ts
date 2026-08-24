@@ -45,6 +45,34 @@ vi.mock("@wraps/email", () => ({
     mockSendEventFeedStaleEmail(...args),
 }));
 
+// plan 195: mock only the CloudWatch/credentials boundary -- the DB stays
+// real, which is the whole point of this file. Defaults to a working role
+// reporting zero sends, so every pre-existing case whose account is old
+// enough to reach the fallback still resolves "not stale" without its own
+// setup; only the new SDK-sender case below overrides the metric.
+const mockGetCredentials = vi.fn().mockResolvedValue({
+  accessKeyId: "AKIA-test",
+  secretAccessKey: "secret",
+  sessionToken: "token",
+  expiration: new Date("2099-01-01"),
+  region: "us-east-1",
+});
+vi.mock("../services/credentials", () => ({
+  getCredentials: (...args: unknown[]) => mockGetCredentials(...args),
+}));
+
+const mockCloudWatchSend = vi
+  .fn()
+  .mockResolvedValue({ MetricDataResults: [{ Id: "sesSend", Values: [] }] });
+vi.mock("@aws-sdk/client-cloudwatch", () => ({
+  CloudWatchClient: class {
+    send = mockCloudWatchSend;
+  },
+  GetMetricDataCommand: class {
+    constructor(public input: unknown) {}
+  },
+}));
+
 const { handler } = await import("../workers/event-feed-staleness");
 
 const PREFIX = `feed-stale-db-${crypto.randomUUID().slice(0, 8)}`;
@@ -136,6 +164,18 @@ async function runSweep(): Promise<void> {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  // clearAllMocks preserves implementations, but re-assert explicitly so this
+  // file's default (working role, zero sends) can never drift silently.
+  mockGetCredentials.mockResolvedValue({
+    accessKeyId: "AKIA-test",
+    secretAccessKey: "secret",
+    sessionToken: "token",
+    expiration: new Date("2099-01-01"),
+    region: "us-east-1",
+  });
+  mockCloudWatchSend.mockResolvedValue({
+    MetricDataResults: [{ Id: "sesSend", Values: [] }],
+  });
   await db.delete(messageSend).where(eq(messageSend.organizationId, ids.org));
   await db.delete(notification).where(eq(notification.organizationId, ids.org));
   // The fixture's second account also carries a webhook secret, so the sweep
@@ -338,6 +378,24 @@ describe("event-feed-staleness detection (real DB)", () => {
 
     expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
     expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+  });
+
+  // ─── Plan 195: the SES send-metric fallback ───────────────────────────
+
+  it("[SDK sender, end-to-end] flags a genuinely-connected account with zero message_send rows once CloudWatch reports sends", async () => {
+    // The SDK sends straight from the customer's own AWS account to their
+    // own SES -- it never calls the Wraps API, so message_send rows only
+    // exist once an event has already arrived (the webhook's "message not
+    // found" branch). A broken feed for this population therefore produces
+    // real absence of rows, not fabricated ones -- no seedSend call here.
+    await setFeedState({ lastEventReceivedAt: ago(3 * HOUR) });
+    mockCloudWatchSend.mockResolvedValueOnce({
+      MetricDataResults: [{ Id: "sesSend", Values: [7, 5] }],
+    });
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeInstanceOf(Date);
   });
 
   // ─── Lifecycle coverage (unaffected by the predicate rewrite) ─────────

@@ -887,12 +887,16 @@ export default $config({
     //   the name this code actually reads. Still unset means the alert
     //   cannot deliver; that is documented in the self-hosted docs, not
     //   silent.
-    // - No sts:AssumeRole permission and no WRAPS_EMAIL_ROLE_ARN. This
-    //   worker calls no AWS API but the email send, and
-    //   WRAPS_EMAIL_ROLE_ARN is deliberately unset on self-host (see the
-    //   note on the web function above) — the customer's wraps-email-role
+    // - No WRAPS_EMAIL_ROLE_ARN. It is deliberately unset on self-host (see
+    //   the note on the web function above) — the customer's wraps-email-role
     //   has a Service-only trust policy that a role-principal AssumeRole
-    //   cannot satisfy. Sends with this function's own ses:SendEmail grant.
+    //   cannot satisfy. The alert email still sends with this function's own
+    //   ses:SendEmail grant. The worker DOES now call an AWS API beyond the
+    //   email send (plan 195): it assumes each connected account's own
+    //   customer role to read the SES Send metric, a fallback signal for SDK
+    //   senders whose message_send rows only exist once an event has already
+    //   arrived. Same sts:AssumeRole grant as SelfhostAccountHealth above —
+    //   the self-hosted console role is also wraps-*.
     new sst.aws.Cron("SelfhostEventFeedStaleness", {
       schedule: "cron(15 * * * ? *)",
       // Read from the env FILE — same maintainer-shell-leak reasoning as
@@ -902,7 +906,10 @@ export default $config({
       job: {
         handler: "../apps/api/src/workers/event-feed-staleness.handler",
         runtime: "nodejs24.x",
-        timeout: "5 minutes",
+        // The sweep now makes an STS + CloudWatch round trip per candidate
+        // account for the SES send-metric fallback (plan 195), matching why
+        // SelfhostAccountHealth above already needs 10 minutes.
+        timeout: "10 minutes",
         memory: "256 MB",
         environment: {
           NODE_ENV: "production",
@@ -918,6 +925,13 @@ export default $config({
           {
             actions: ["ses:SendEmail", "ses:SendRawEmail"],
             resources: ["*"],
+          },
+          // Assume cross-account customer roles to read the SES Send metric.
+          // The self-hosted console role is also wraps-* (see
+          // WRAPS_CONSOLE_ROLE_NAME above), so this pattern covers it too.
+          {
+            actions: ["sts:AssumeRole"],
+            resources: ["arn:aws:iam::*:role/wraps-*"],
           },
         ],
       },

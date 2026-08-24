@@ -37,6 +37,18 @@
  *      nothing. An infrequent-but-acknowledged sender is never flagged either
  *      — every one of its accepted sends already carries a post-'sent'
  *      status, however long the gaps between sends are.
+ *   3. sesStale (fallback, plan 195): consulted only when #2 found nothing.
+ *      The SDK sends straight from the customer's own AWS account to their
+ *      own SES — it never calls the Wraps API, so no message_send row exists
+ *      until an event materializes one (apps/api/src/routes/webhooks.ts's
+ *      "message not found" branch). That makes signal #2 circular for
+ *      exactly the senders it exists to protect: if their feed breaks, no
+ *      new rows appear, so #2 reports "nothing waiting" instead of "broken".
+ *      getSesSendCountSince asks SES itself via the account-and-region-wide
+ *      `Send` metric — coarser than #2 (it counts sends outside any Wraps
+ *      configuration set too), so it only ever adds a stale verdict, never
+ *      overrides a healthy one. `null` from the probe (no role, no
+ *      permission) means no evidence and must never be read as zero sends.
  *
  * Transitions:
  *   - stale && eventFeedStaleSince IS NULL -> set eventFeedStaleSince = now.
@@ -61,6 +73,10 @@
 import "../lib/sentry";
 
 import {
+  CloudWatchClient,
+  GetMetricDataCommand,
+} from "@aws-sdk/client-cloudwatch";
+import {
   captureException,
   captureMessage,
   wrapHandler,
@@ -79,6 +95,7 @@ import { sendEventFeedStaleEmail } from "@wraps/email";
 import type { Handler } from "aws-lambda";
 import { and, eq, gt, isNotNull, lt, sql } from "drizzle-orm";
 import { flushLogger, log } from "../lib/logger";
+import { getCredentials } from "../services/credentials";
 
 const RECENT_SEND_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h
 const EVENT_GRACE_MS = 15 * 60 * 1000; // 15m
@@ -91,6 +108,43 @@ const ALERT_DEBOUNCE_MS = 60 * 60 * 1000; // 1h
 // must not fire for. Only when every accepted send in the window is
 // unacknowledged does it mean the feed itself has gone dark.
 const UNACKNOWLEDGED_RATIO_THRESHOLD = 1;
+// The fallback probe's lookback (plan 195). Must comfortably exceed both the
+// metric's publication lag (minutes, not seconds) and the hourly cron
+// interval, so a real stall is observed with a full window of both sends
+// and silence rather than a sliver that could read either way.
+const SES_METRIC_WINDOW_MS = 3 * 60 * 60 * 1000; // 3h
+
+/**
+ * STS/CloudWatch codes that all mean the same thing operationally: the
+ * customer's console-access role is gone, its trust policy no longer admits
+ * this Lambda, or it lacks the cloudwatch:GetMetricData permission the probe
+ * needs. Copied from account-health.ts's isRoleAccessError rather than
+ * imported — three similar lines beat a premature shared module across two
+ * independently-scheduled workers, and account-health.ts is out of scope.
+ */
+const ROLE_ACCESS_ERROR_CODES = [
+  "AccessDenied",
+  "AccessDeniedException",
+  "NoSuchEntity",
+  "NoSuchEntityException",
+  "InvalidClientTokenId",
+  "ExpiredToken",
+  "ExpiredTokenException",
+  "UnrecognizedClientException",
+] as const;
+
+/**
+ * AWS SDK v3 error names are unreliable — some errors arrive as `name: "Error"`
+ * with the real code only in the message — so both are checked.
+ */
+function isRoleAccessError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return ROLE_ACCESS_ERROR_CODES.some(
+    (code) => error.name === code || error.message.includes(code)
+  );
+}
 
 /** Look up the org owner's email. Returns null if not found. */
 async function getOrgOwnerEmail(
@@ -165,6 +219,78 @@ async function hasUnacknowledgedSend(
   return { stale, total, unacknowledged };
 }
 
+/**
+ * Fallback evidence of sending for SDK/direct-SES senders (plan 195): their
+ * message_send rows are created by the webhook itself (see the module
+ * header), so hasUnacknowledgedSend finds nothing to judge while their feed
+ * is broken — the DB signal is circular for exactly the population it is
+ * meant to protect. This asks SES directly by summing the account-and-region-
+ * wide `Send` metric over the window. That scope makes it coarser than the
+ * per-message DB signal (it counts sends outside any Wraps configuration
+ * set too), which is why it is consulted only as a fallback, never a
+ * replacement — see the module header's "Detection" section.
+ *
+ * Returns `null` — meaning no evidence, never `0` — when the customer's
+ * console-access role cannot be assumed or CloudWatch refuses the call. A
+ * role that was never granted cloudwatch:GetMetricData never self-heals, so
+ * this is reported once via log.info and left alone; it is not exceptional
+ * the way an unexpected CloudWatch error is.
+ */
+async function getSesSendCountSince(
+  account: { id: string; organizationId: string },
+  since: Date,
+  until: Date
+): Promise<number | null> {
+  try {
+    const credentials = await getCredentials(
+      account.id,
+      account.organizationId
+    );
+    const cloudwatch = new CloudWatchClient({
+      region: credentials.region,
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+        sessionToken: credentials.sessionToken,
+      },
+    });
+    const response = await cloudwatch.send(
+      new GetMetricDataCommand({
+        StartTime: since,
+        EndTime: until,
+        MetricDataQueries: [
+          {
+            Id: "sesSend",
+            MetricStat: {
+              Metric: { Namespace: "AWS/SES", MetricName: "Send" },
+              Period: 3600,
+              Stat: "Sum",
+            },
+          },
+        ],
+      })
+    );
+    const values = response.MetricDataResults?.[0]?.Values ?? [];
+    return values.reduce((sum, value) => sum + value, 0);
+  } catch (error) {
+    if (isRoleAccessError(error)) {
+      log.info(
+        "[event-feed-staleness] Role unusable for SES send-metric probe, skipping",
+        { accountId: account.id, organizationId: account.organizationId }
+      );
+      return null;
+    }
+    captureException(error, {
+      tags: { worker: "event-feed-staleness", stage: "ses-send-metric" },
+      extra: {
+        accountId: account.id,
+        organizationId: account.organizationId,
+      },
+    });
+    return null;
+  }
+}
+
 async function clearStaleFlags(accountId: string): Promise<void> {
   await db
     .update(awsAccount)
@@ -203,6 +329,10 @@ async function alertOwner(account: {
   accountId: string;
   region: string;
   lastEventAt: Date;
+  /** From getSesSendCountSince (plan 195): set only when the CloudWatch
+   * fallback, not the precise message_send signal, is what flagged this
+   * account. Undefined otherwise -- the alert copy must not guess. */
+  observedSendCount?: number;
 }): Promise<void> {
   const now = new Date();
 
@@ -248,7 +378,15 @@ async function alertOwner(account: {
       orgSlug,
       awsAccountId: account.id,
       lastEventAt: account.lastEventAt,
+      observedSendCount: account.observedSendCount,
     });
+
+    // Same observation, same wording, in the inbox notification -- it must
+    // state what was actually seen (a metric sum), never a diagnosis of why.
+    const observedSentence =
+      account.observedSendCount === undefined
+        ? ""
+        : ` SES reports ${account.observedSendCount} send${account.observedSendCount === 1 ? "" : "s"} from this account in the last 3 hours, and no events reached Wraps for any of them.`;
 
     try {
       await notifyOrg({
@@ -256,7 +394,7 @@ async function alertOwner(account: {
         roles: ["owner", "admin"],
         type: "events.feed_stale",
         title: `Event feed stale for ${account.name}`,
-        body: `The last delivery event we received from AWS account ${account.accountId} (${account.region}) was ${account.lastEventAt.toISOString()}, but mail is still being sent. Delivery, bounce, and complaint tracking are blind until this is fixed.`,
+        body: `The last delivery event we received from AWS account ${account.accountId} (${account.region}) was ${account.lastEventAt.toISOString()}, but mail is still being sent.${observedSentence} Delivery, bounce, and complaint tracking are blind until this is fixed.`,
         href: `/${orgSlug}/settings/aws-accounts/${account.id}`,
         data: { awsAccountId: account.id, region: account.region },
       });
@@ -307,6 +445,7 @@ export const handler: Handler = wrapHandler(async () => {
 
   const now = new Date();
   const debounceCutoff = new Date(now.getTime() - ALERT_DEBOUNCE_MS);
+  const graceCutoff = new Date(now.getTime() - EVENT_GRACE_MS);
 
   const connectedAccounts = await db
     .select({
@@ -328,6 +467,8 @@ export const handler: Handler = wrapHandler(async () => {
   let unflaggedNeverConnectedCount = 0;
   let totalAcceptedSends = 0;
   let totalUnacknowledgedSends = 0;
+  let sesProbeCount = 0;
+  let sesFlaggedCount = 0;
 
   for (const account of connectedAccounts) {
     // "Stalled" is only a meaningful word for a feed that once worked. An
@@ -364,7 +505,34 @@ export const handler: Handler = wrapHandler(async () => {
     totalAcceptedSends += total;
     totalUnacknowledgedSends += unacknowledged;
 
-    if (feedStale) {
+    // Fallback for SDK/direct-SES senders (plan 195): message_send has no
+    // evidence either way for them until an event materializes its row, so
+    // an account whose feed just broke looks identical here to one with
+    // nothing to send. Ask SES itself, but only when the cheap DB signal
+    // already came back empty and the account isn't trivially alive — a
+    // recent event needs no further checking — so most accounts on most
+    // sweeps never make this call.
+    let sesSendCount: number | null = null;
+    let stale = feedStale;
+    if (!feedStale && lastEventAt < graceCutoff) {
+      const windowStart = new Date(
+        Math.max(lastEventAt.getTime(), now.getTime() - SES_METRIC_WINDOW_MS)
+      );
+      sesProbeCount++;
+      sesSendCount = await getSesSendCountSince(
+        account,
+        windowStart,
+        graceCutoff
+      );
+      // null means "couldn't check" (no role, no permission) — never treat
+      // it as "sent nothing". Only a positive count is evidence of a stall.
+      if (sesSendCount !== null && sesSendCount > 0) {
+        stale = true;
+        sesFlaggedCount++;
+      }
+    }
+
+    if (stale) {
       if (account.eventFeedStaleSince === null) {
         await markStaleSince(account.id, now);
         flaggedCount++;
@@ -373,6 +541,7 @@ export const handler: Handler = wrapHandler(async () => {
           organizationId: account.organizationId,
           total,
           unacknowledged,
+          sesSendCount,
         });
         continue;
       }
@@ -386,6 +555,7 @@ export const handler: Handler = wrapHandler(async () => {
           accountId: account.accountId,
           region: account.region,
           lastEventAt,
+          observedSendCount: sesSendCount ?? undefined,
         });
         alertedCount++;
       }
@@ -413,6 +583,8 @@ export const handler: Handler = wrapHandler(async () => {
     unflaggedNeverConnectedCount,
     totalAcceptedSends,
     totalUnacknowledgedSends,
+    sesProbeCount,
+    sesFlaggedCount,
   });
   await flushLogger();
 });

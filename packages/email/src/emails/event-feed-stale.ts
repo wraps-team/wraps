@@ -10,6 +10,11 @@ export type EventFeedStaleContent = {
   awsAccountId: string;
   /** The account's real last-received-event timestamp (aws_account.last_event_received_at). */
   lastEventAt: Date;
+  /** Set only when the SES send-metric fallback (plan 195), not the precise
+   * message_send signal, is what flagged this account -- undefined leaves
+   * the copy byte-identical to plan 194's. Never a diagnosis, only what SES
+   * itself reported over the fallback's 3-hour window. */
+  observedSendCount?: number;
 };
 
 export type SendEventFeedStaleEmailParams = EventFeedStaleContent & {
@@ -31,14 +36,29 @@ export function buildEventFeedStaleEmail({
   orgSlug,
   awsAccountId,
   lastEventAt,
+  observedSendCount,
 }: EventFeedStaleContent): { subject: string; html: string; text: string } {
   const settingsUrl = `${resolveAppUrl()}/${orgSlug}/settings/aws-accounts/${awsAccountId}`;
   const since = formatTimestamp(lastEventAt);
 
   const subject = `SES event feed stalled for ${accountName} (${awsAccountNumber})`;
 
+  // Absent when the precise message_send signal is what flagged the account
+  // -- the sentence must state what was actually observed, never a guess,
+  // so it appears only when there is a metric sum to name. Its absence must
+  // leave every other sentence exactly as plan 194 left them.
+  const sendUnit = observedSendCount === 1 ? "send" : "sends";
+  const observedSentenceText =
+    observedSendCount === undefined
+      ? ""
+      : ` SES reports ${observedSendCount} ${sendUnit} from this account in the last 3 hours, and no events reached Wraps for any of them.`;
+  const observedSentenceHtml =
+    observedSendCount === undefined
+      ? ""
+      : ` SES reports ${escapeHtml(String(observedSendCount))} ${sendUnit} from this account in the last 3 hours, and no events reached Wraps for any of them.`;
+
   const text = [
-    `Your AWS account "${accountName}" (${awsAccountNumber}, ${region}) is still sending email, but the last delivery event we received from it was ${since}.`,
+    `Your AWS account "${accountName}" (${awsAccountNumber}, ${region}) is still sending email, but the last delivery event we received from it was ${since}.${observedSentenceText}`,
     "",
     "Impact: the email timeline and analytics for this account are frozen, and bounce/complaint handling is blind until the feed recovers.",
     "",
@@ -47,7 +67,7 @@ export function buildEventFeedStaleEmail({
   ].join("\n");
 
   const html = [
-    `<p>Your AWS account <strong>${escapeHtml(accountName)}</strong> (${escapeHtml(awsAccountNumber)}, ${escapeHtml(region)}) is still sending email, but the last delivery event we received from it was <strong>${escapeHtml(since)}</strong>.</p>`,
+    `<p>Your AWS account <strong>${escapeHtml(accountName)}</strong> (${escapeHtml(awsAccountNumber)}, ${escapeHtml(region)}) is still sending email, but the last delivery event we received from it was <strong>${escapeHtml(since)}</strong>.${observedSentenceHtml}</p>`,
     "<p>Impact: the email timeline and analytics for this account are frozen, and bounce/complaint handling is blind until the feed recovers.</p>",
     `<p>To fix this, run <code>wraps email doctor</code> or visit your <a href="${escapeHtml(settingsUrl)}">account settings</a>.</p>`,
   ].join("\n");

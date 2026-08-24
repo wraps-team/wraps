@@ -32,6 +32,11 @@
  * - SES-capable credentials for @wraps/email are wired via
  *   WRAPS_EMAIL_ROLE_ARN + sts:AssumeRole on the dogfood email role
  *   (see the function definition below).
+ * - Also assumes each connected account's own customer role (sts:AssumeRole
+ *   on wraps-*) to read the SES Send metric as a fallback signal for SDK
+ *   senders, whose message_send rows only exist once an event has already
+ *   arrived — the precise DB signal is circular for exactly that population.
+ *   Consulted only when the DB signal found nothing (plan 195).
  *
  * AccountHealth:
  * - Runs hourly at :45 in production
@@ -131,7 +136,10 @@ export const eventFeedStalenessCron = new sst.aws.CronV2("EventFeedStaleness", {
   job: {
     handler: "apps/api/src/workers/event-feed-staleness.handler",
     runtime: "nodejs24.x",
-    timeout: "5 minutes",
+    // The sweep now makes an STS + CloudWatch round trip per candidate
+    // account for the SES send-metric fallback (plan 195), matching why
+    // accountHealthCron below already needs 10 minutes.
+    timeout: "10 minutes",
     memory: "256 MB",
     environment: {
       DATABASE_URL:
@@ -165,6 +173,11 @@ export const eventFeedStalenessCron = new sst.aws.CronV2("EventFeedStaleness", {
       {
         actions: ["sts:AssumeRole"],
         resources: ["arn:aws:iam::010836206701:role/wraps-email-role"],
+      },
+      // Assume cross-account customer roles to read the SES Send metric
+      {
+        actions: ["sts:AssumeRole"],
+        resources: ["arn:aws:iam::*:role/wraps-*"],
       },
     ],
   },

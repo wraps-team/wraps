@@ -43,6 +43,56 @@ vi.mock("@wraps/db", async () => {
   };
 });
 
+// plan 195: the SES send-metric fallback boundary. Mocked so no test makes a
+// real STS/CloudWatch call; captureException is mocked alongside so tests can
+// assert it is (or is not) called for the role-access-failure path.
+const mockGetCredentials = vi.fn();
+vi.mock("../services/credentials", () => ({
+  getCredentials: (...args: unknown[]) => mockGetCredentials(...args),
+}));
+
+const mockCloudWatchSend = vi.fn();
+vi.mock("@aws-sdk/client-cloudwatch", () => ({
+  CloudWatchClient: class {
+    send = mockCloudWatchSend;
+  },
+  GetMetricDataCommand: class {
+    constructor(public input: unknown) {}
+  },
+}));
+
+const mockCaptureException = vi.fn();
+const mockCaptureMessage = vi.fn();
+vi.mock("@sentry/aws-serverless", () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+  captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
+  wrapHandler: (handler: unknown) => handler,
+}));
+
+vi.mock("../lib/sentry", () => ({}));
+
+const DEFAULT_CREDENTIALS = {
+  accessKeyId: "AKIA-test",
+  secretAccessKey: "secret",
+  sessionToken: "token",
+  expiration: new Date("2099-01-01"),
+  region: "us-east-1",
+};
+
+/** Shape of the STS AccessDenied a deleted/drifted customer role produces. */
+function accessDeniedError(): Error {
+  const error = new Error(
+    "User: arn:aws:sts::905130073023:assumed-role/wraps-production-EventFeedStalenessHandlerRole/wraps-production-EventFeedStalenessHandlerFunction is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::123456789012:role/wraps-console-access-role"
+  );
+  error.name = "AccessDenied";
+  return error;
+}
+
+/** A GetMetricDataCommand response summing to the given total. */
+function metricResult(values: number[]) {
+  return { MetricDataResults: [{ Id: "sesSend", Values: values }] };
+}
+
 const { awsAccount, member, messageSend, organization } = await import(
   "@wraps/db"
 );
@@ -165,6 +215,12 @@ describe("event-feed-staleness worker", () => {
     // to NOW (e.g. "5 min ago" / "fresh") silently age past the grace period
     // once the real wall clock drifts.
     vi.useFakeTimers({ now: NOW });
+    // Safe defaults for the SES send-metric fallback (plan 195): a working
+    // role reporting zero sends, so any pre-existing test whose account is
+    // old enough to reach the fallback still resolves to "not stale" without
+    // needing its own CloudWatch setup.
+    mockGetCredentials.mockResolvedValue(DEFAULT_CREDENTIALS);
+    mockCloudWatchSend.mockResolvedValue(metricResult([]));
   });
 
   afterEach(() => {
@@ -386,6 +442,119 @@ describe("event-feed-staleness worker", () => {
 
     expect(updateCalls).toHaveLength(0);
     expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+  });
+
+  // ─── Plan 195: the SES send-metric fallback ───────────────────────────
+
+  it("[SDK sender regression] flags an account with zero message_send rows when CloudWatch reports sends (plan 195)", async () => {
+    // The headline case this plan exists for: an SDK sender's message_send
+    // rows are created by the webhook itself, so a broken feed produces zero
+    // rows -- hasUnacknowledgedSend finds nothing to judge, exactly as if
+    // the account were healthy and idle. Fails before this plan's Step 2.
+    setupSelects({
+      connectedAccounts: [{ ...BASE_ACCOUNT }],
+      unacknowledgedSend: false,
+    });
+    mockCloudWatchSend.mockResolvedValueOnce(metricResult([3, 2]));
+    const updateCalls = setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(updateCalls).toHaveLength(1);
+    expect(updateCalls[0].table).toBe(awsAccount);
+    expect(updateCalls[0].set).toHaveBeenCalledWith(
+      expect.objectContaining({ eventFeedStaleSince: expect.any(Date) })
+    );
+  });
+
+  it("leaves the account untouched when CloudWatch reports zero sends (plan 195)", async () => {
+    setupSelects({
+      connectedAccounts: [{ ...BASE_ACCOUNT }],
+      unacknowledgedSend: false,
+    });
+    mockCloudWatchSend.mockResolvedValueOnce(metricResult([]));
+    const updateCalls = setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(updateCalls).toHaveLength(0);
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+  });
+
+  it("leaves the account untouched, logs, and does not report to Sentry when the customer role cannot be assumed (plan 195)", async () => {
+    // null from the probe means "couldn't check" -- it must never be read as
+    // "sent nothing", and a role that was never granted the permission never
+    // self-heals, so this is not exceptional the way an unexpected
+    // CloudWatch error is (mirrors account-health.ts's role-unreachable
+    // handling).
+    setupSelects({
+      connectedAccounts: [{ ...BASE_ACCOUNT }],
+      unacknowledgedSend: false,
+    });
+    mockGetCredentials.mockRejectedValueOnce(accessDeniedError());
+    const updateCalls = setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(updateCalls).toHaveLength(0);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("never calls CloudWatch when the precise DB signal already found an unacknowledged send (plan 195)", async () => {
+    // Cost control: the fallback is consulted only when hasUnacknowledgedSend
+    // returns false. This proves the ordering, not just the outcome.
+    setupSelects({
+      connectedAccounts: [{ ...BASE_ACCOUNT }],
+      unacknowledgedSend: true,
+    });
+    const updateCalls = setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(mockCloudWatchSend).not.toHaveBeenCalled();
+    expect(updateCalls).toHaveLength(1);
+  });
+
+  it("never calls CloudWatch for an account whose last event is still inside the grace period (plan 195)", async () => {
+    setupSelects({
+      connectedAccounts: [
+        {
+          ...BASE_ACCOUNT,
+          lastEventReceivedAt: new Date(NOW.getTime() - 5 * 60 * 1000), // 5 min ago — fresh
+        },
+      ],
+      unacknowledgedSend: false,
+    });
+    const updateCalls = setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(mockCloudWatchSend).not.toHaveBeenCalled();
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  it("threads the observed SES send count into the alert email (plan 195)", async () => {
+    setupSelects({
+      connectedAccounts: [
+        {
+          ...BASE_ACCOUNT,
+          eventFeedStaleSince: TWO_HOURS_AGO,
+          eventFeedAlertedAt: null,
+        },
+      ],
+      unacknowledgedSend: false,
+      ownerEmail: OWNER_ROW.email,
+      orgSlug: ORG_ROW.slug,
+    });
+    mockCloudWatchSend.mockResolvedValueOnce(metricResult([4, 1]));
+    setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(mockSendEventFeedStaleEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendEventFeedStaleEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ observedSendCount: 5 })
+    );
   });
 
   it("continues the sweep when one org's email send throws, and does not set eventFeedAlertedAt for it", async () => {

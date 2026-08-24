@@ -76,4 +76,29 @@ describe("buildEventFeedStaleEmail", () => {
     expect(subject).toContain("Production");
     expect(subject).toContain("123456789012");
   });
+
+  it("adds the observed-send-count sentence when observedSendCount is supplied (plan 195)", () => {
+    const { html, text } = buildEventFeedStaleEmail({
+      ...BASE_PARAMS,
+      observedSendCount: 42,
+    });
+
+    for (const content of [html, text]) {
+      expect(content).toContain("42");
+      expect(content).toContain("SES reports");
+    }
+  });
+
+  it("leaves the body unchanged when observedSendCount is omitted (plan 195)", () => {
+    // BASE_PARAMS carries no observedSendCount at all -- this is plan 194's
+    // exact output, byte-identical.
+    const { html, text } = buildEventFeedStaleEmail(BASE_PARAMS);
+
+    expect(html).not.toContain("SES reports");
+    expect(text).not.toContain("SES reports");
+    expect(html).toBe(
+      buildEventFeedStaleEmail({ ...BASE_PARAMS, observedSendCount: undefined })
+        .html
+    );
+  });
 });
