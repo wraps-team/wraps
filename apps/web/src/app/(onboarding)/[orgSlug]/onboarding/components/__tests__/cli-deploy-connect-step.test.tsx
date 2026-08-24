@@ -583,6 +583,35 @@ describe("CliDeployConnectStep — three-path layout", () => {
     expect(screen.queryByText(SELFHOST_CLI_COMMAND)).not.toBeInTheDocument();
   });
 
+  /**
+   * The exact mirror of "never names the hosted connect command when
+   * self-hosted". `wraps selfhost login` points at a control plane a hosted
+   * org does not have, so a hosted user handed it can never authenticate and
+   * never connects their AWS account. Both surfaces that name the commands —
+   * the CLI panel and the agent prompt — have to be pinned in this direction
+   * too, or an inverted ternary in either one ships silently.
+   */
+  it("never names the self-hosted commands on the hosted platform", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the cli/i }));
+
+    expect(screen.getByText(HOSTED_LOGIN_COMMAND)).toBeInTheDocument();
+    expect(screen.getByText(HOSTED_CLI_COMMAND)).toBeInTheDocument();
+    expect(renderedMarkup()).not.toContain("wraps selfhost");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /copy the agent prompt/i })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "View" }));
+
+    expect(renderedMarkup()).toContain(HOSTED_LOGIN_COMMAND);
+    expect(renderedMarkup()).toContain(HOSTED_CLI_COMMAND);
+    expect(renderedMarkup()).not.toContain("wraps selfhost");
+  });
+
   it("completes the step when the CLI path reports a live connection", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
