@@ -465,8 +465,12 @@ describe("Emails API - event feed health", () => {
 
     expect(healthy.hasEverReceivedEvents).toBe(true);
     expect(healthy.eventFeedStaleSince).not.toBeNull();
+    expect(healthy.lastEventReceivedAt).toBe(
+      new Date(now - 60_000).toISOString()
+    );
     expect(silent.hasEverReceivedEvents).toBe(false);
     expect(silent.eventFeedStaleSince).toBeNull();
+    expect(silent.lastEventReceivedAt).toBeNull();
   });
 
   it("still reports the feed for a window with no rows in it", async () => {

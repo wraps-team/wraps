@@ -10,7 +10,15 @@
  * See apps/api/src/routes/webhooks.ts.
  *
  * Detection (per connected account):
- *   1. Candidate: webhookSecret IS NOT NULL (account claims to be connected).
+ *   1. Candidate: webhookSecret IS NOT NULL (account claims to be connected)
+ *      AND lastEventReceivedAt IS NOT NULL. A feed that has never delivered a
+ *      single event was never connected, not stalled — there is no
+ *      regression to report, the dashboard's "no events have ever arrived"
+ *      banner already covers it accurately (event-feed-banners.tsx's
+ *      `silent` filter), and these accounts never self-heal, so alerting
+ *      them forever buries the accounts that genuinely broke (plan 194;
+ *      mirrors the same gate on account-health.ts's aws.role_unreachable
+ *      alert). See the early-return at the top of the sweep loop.
  *   2. feedStale: every send in the grace-aged window (24h ago .. 15m ago)
  *      that SES accepted is still sitting at status 'sent' — i.e. nothing has
  *      come back about it. This is a per-message check against the row SES
@@ -194,7 +202,7 @@ async function alertOwner(account: {
   name: string;
   accountId: string;
   region: string;
-  eventFeedStaleSince: Date;
+  lastEventAt: Date;
 }): Promise<void> {
   const now = new Date();
 
@@ -239,7 +247,7 @@ async function alertOwner(account: {
       region: account.region,
       orgSlug,
       awsAccountId: account.id,
-      staleSince: account.eventFeedStaleSince,
+      lastEventAt: account.lastEventAt,
     });
 
     try {
@@ -248,7 +256,7 @@ async function alertOwner(account: {
         roles: ["owner", "admin"],
         type: "events.feed_stale",
         title: `Event feed stale for ${account.name}`,
-        body: `No SES events have arrived from AWS account ${account.accountId} (${account.region}) since ${account.eventFeedStaleSince.toISOString()} while mail is still being sent. Delivery, bounce, and complaint tracking are blind until this is fixed.`,
+        body: `The last delivery event we received from AWS account ${account.accountId} (${account.region}) was ${account.lastEventAt.toISOString()}, but mail is still being sent. Delivery, bounce, and complaint tracking are blind until this is fixed.`,
         href: `/${orgSlug}/settings/aws-accounts/${account.id}`,
         data: { awsAccountId: account.id, region: account.region },
       });
@@ -284,7 +292,7 @@ async function alertOwner(account: {
       extra: {
         accountId: account.id,
         organizationId: account.organizationId,
-        staleSince: account.eventFeedStaleSince.toISOString(),
+        lastEventAt: account.lastEventAt.toISOString(),
       },
     });
     log.error("[event-feed-staleness] Failed to alert org owner", error, {
@@ -317,10 +325,37 @@ export const handler: Handler = wrapHandler(async () => {
   let flaggedCount = 0;
   let alertedCount = 0;
   let recoveredCount = 0;
+  let unflaggedNeverConnectedCount = 0;
   let totalAcceptedSends = 0;
   let totalUnacknowledgedSends = 0;
 
   for (const account of connectedAccounts) {
+    // "Stalled" is only a meaningful word for a feed that once worked. An
+    // account whose lastEventReceivedAt has never been set has no regression
+    // to report — there is nothing to compare a stall against, the
+    // dashboard's "no events have ever arrived" banner already tells this
+    // customer the truth, and this state never self-heals on its own (no
+    // event is coming to prove recovery). Alerting it forever would bury the
+    // accounts that genuinely broke. Silence here is deliberate, in the
+    // spirit of account-health.ts's aws.role_unreachable gate.
+    if (account.lastEventReceivedAt === null) {
+      if (account.eventFeedStaleSince !== null) {
+        // A row the pre-plan-194 sweep mis-flagged before this gate existed.
+        // This is a one-time correction, not a "recovery" — it must not be
+        // counted as one — and it restores the accurate never-received
+        // banner (event-feed-banners.tsx's `silent` filter is suppressed by
+        // a non-null eventFeedStaleSince).
+        await clearStaleFlags(account.id);
+        unflaggedNeverConnectedCount++;
+      }
+      log.info("[event-feed-staleness] Never-connected account, skipping", {
+        accountId: account.id,
+        organizationId: account.organizationId,
+      });
+      continue;
+    }
+    const lastEventAt = account.lastEventReceivedAt;
+
     const {
       stale: feedStale,
       total,
@@ -350,14 +385,13 @@ export const handler: Handler = wrapHandler(async () => {
           name: account.name,
           accountId: account.accountId,
           region: account.region,
-          eventFeedStaleSince: account.eventFeedStaleSince,
+          lastEventAt,
         });
         alertedCount++;
       }
     } else if (
       account.eventFeedStaleSince !== null &&
-      account.lastEventReceivedAt !== null &&
-      account.lastEventReceivedAt > account.eventFeedStaleSince
+      lastEventAt > account.eventFeedStaleSince
     ) {
       // An event landed after the flag was raised — the feed is genuinely
       // back. Without this check an account that simply stopped sending
@@ -376,6 +410,7 @@ export const handler: Handler = wrapHandler(async () => {
     flaggedCount,
     alertedCount,
     recoveredCount,
+    unflaggedNeverConnectedCount,
     totalAcceptedSends,
     totalUnacknowledgedSends,
   });

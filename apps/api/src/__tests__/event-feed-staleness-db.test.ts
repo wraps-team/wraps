@@ -186,24 +186,14 @@ describe("event-feed-staleness detection (real DB)", () => {
     expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
   });
 
-  it("[FSI case] flags an account whose sends have never once been acknowledged", async () => {
+  it("[FSI case] never flags or alerts an account whose feed has never delivered a single event (plan 194)", async () => {
+    // FSI is the production account this plan is named for: 7,220 sends,
+    // every one stuck at 'sent', and lastEventReceivedAt has been NULL since
+    // the account connected. Plan 196's predicate alone would call this
+    // "stale" (it is 100% unacknowledged) — but a feed that has never once
+    // worked has no regression to report. This is plan 194's gate, not a
+    // staleness verdict, so it must short-circuit before the predicate runs.
     await seedSends(20, ago(6 * HOUR), 6 * HOUR - 20 * MINUTE, "fsi", "sent");
-    await setFeedState({ lastEventReceivedAt: null });
-
-    await runSweep();
-
-    expect((await readFeedState())?.eventFeedStaleSince).toBeInstanceOf(Date);
-  });
-
-  it("[TorBox residue] does not flag a permanent trickle of lost-event rows on an otherwise healthy account", async () => {
-    await seedSends(
-      197,
-      ago(6 * HOUR),
-      6 * HOUR - 20 * MINUTE,
-      "acked",
-      "delivered"
-    );
-    await seedSends(3, ago(5 * HOUR), 4 * HOUR, "residue", "sent");
     await setFeedState({ lastEventReceivedAt: null });
 
     await runSweep();
@@ -212,10 +202,63 @@ describe("event-feed-staleness detection (real DB)", () => {
     expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
   });
 
+  it("never flags or alerts a never-connected account even with a single recent send (plan 194)", async () => {
+    await seedSend(ago(3 * HOUR), "never-connected-recent-send", "sent");
+    await setFeedState({ lastEventReceivedAt: null });
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+  });
+
+  it("clears a previously-raised flag and any pending alert in one sweep once recognized as never-connected (plan 194)", async () => {
+    // Simulates a row the pre-plan-194 sweep mis-flagged: lastEventReceivedAt
+    // is (and, per the sole-writer invariant this gate rests on, always was)
+    // null, but an earlier sweep still stamped both flag columns. The very
+    // first sweep after the gate exists must correct both in one pass — this
+    // is a one-time correction, not a "recovery".
+    await setFeedState({
+      lastEventReceivedAt: null,
+      eventFeedStaleSince: ago(2 * HOUR),
+      eventFeedAlertedAt: ago(30 * MINUTE),
+    });
+
+    await runSweep();
+
+    const state = await readFeedState();
+    expect(state?.eventFeedStaleSince).toBeNull();
+    expect(state?.eventFeedAlertedAt).toBeNull();
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+  });
+
+  it("[TorBox residue] does not flag a permanent trickle of lost-event rows on an otherwise healthy account", async () => {
+    // Non-null, stale cursor: this case is about the residue guard in
+    // hasUnacknowledgedSend, not about plan 194's never-connected gate — a
+    // null cursor here would make the gate the reason it passes, silently
+    // dropping the coverage this test exists for.
+    await seedSends(
+      197,
+      ago(6 * HOUR),
+      6 * HOUR - 20 * MINUTE,
+      "acked",
+      "delivered"
+    );
+    await seedSends(3, ago(5 * HOUR), 4 * HOUR, "residue", "sent");
+    await setFeedState({ lastEventReceivedAt: ago(3 * HOUR) });
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+  });
+
   it("pre-acceptance statuses are owed no event and never flag the feed", async () => {
+    // Non-null cursor so this exercises hasUnacknowledgedSend, not the
+    // never-connected gate.
     await seedSend(ago(3 * HOUR), "never-accepted-queued", "queued");
     await seedSend(ago(2 * HOUR), "never-accepted-failed", "failed");
-    await setFeedState({ lastEventReceivedAt: null });
+    await setFeedState({ lastEventReceivedAt: ago(3 * HOUR) });
 
     await runSweep();
 
@@ -225,9 +268,12 @@ describe("event-feed-staleness detection (real DB)", () => {
   it("flags an account when the only sends inside the lookback window are unacknowledged, even if an older acked send sits outside it", async () => {
     // An acked send outside the 24h window must not give false comfort — the
     // predicate only judges what's actually inside the window it checks.
+    // Non-null, stale cursor: this is a detection case, not a never-connected
+    // one — a null cursor would make plan 194's gate the reason it flags,
+    // which is not what this test is proving.
     await seedSend(ago(25 * HOUR), "acked-outside-window", "delivered");
     await seedSend(ago(2 * HOUR), "unacked-inside-window", "sent");
-    await setFeedState({ lastEventReceivedAt: null });
+    await setFeedState({ lastEventReceivedAt: ago(3 * HOUR) });
 
     await runSweep();
 
@@ -235,8 +281,10 @@ describe("event-feed-staleness detection (real DB)", () => {
   });
 
   it("holds off on an all-'sent' send still inside the grace period", async () => {
+    // Non-null cursor so this exercises hasUnacknowledgedSend, not the
+    // never-connected gate.
     await seedSend(ago(5 * MINUTE), "just-sent", "sent");
-    await setFeedState({ lastEventReceivedAt: null });
+    await setFeedState({ lastEventReceivedAt: ago(3 * HOUR) });
 
     await runSweep();
 
@@ -244,8 +292,10 @@ describe("event-feed-staleness detection (real DB)", () => {
   });
 
   it("ignores all-'sent' sends older than the 24h lookback window", async () => {
+    // Non-null cursor so this exercises hasUnacknowledgedSend, not the
+    // never-connected gate.
     await seedSend(ago(30 * HOUR), "ancient", "sent");
-    await setFeedState({ lastEventReceivedAt: null });
+    await setFeedState({ lastEventReceivedAt: ago(3 * HOUR) });
 
     await runSweep();
 
@@ -266,7 +316,9 @@ describe("event-feed-staleness detection (real DB)", () => {
         status: "sent",
       })
     );
-    await setFeedState({ lastEventReceivedAt: null });
+    // Non-null cursor so this exercises hasUnacknowledgedSend, not the
+    // never-connected gate.
+    await setFeedState({ lastEventReceivedAt: ago(3 * HOUR) });
 
     await runSweep();
 
@@ -333,9 +385,12 @@ describe("event-feed-staleness detection (real DB)", () => {
   });
 
   it("alerts the org owner once the flag has aged past the debounce", async () => {
+    // Non-null, stale cursor: this account was connected and genuinely went
+    // stale — a null cursor would route it through plan 194's gate instead
+    // of the debounce/alert path this test exists to prove.
     await seedSend(ago(3 * HOUR), "alerting-send", "sent");
     await setFeedState({
-      lastEventReceivedAt: null,
+      lastEventReceivedAt: ago(3 * HOUR),
       eventFeedStaleSince: ago(2 * HOUR),
     });
 
@@ -359,9 +414,10 @@ describe("event-feed-staleness detection (real DB)", () => {
   });
 
   it("does not re-alert an account already alerted in this episode", async () => {
+    // Non-null, stale cursor — same reasoning as the debounce test above.
     await seedSend(ago(3 * HOUR), "already-alerted-send", "sent");
     await setFeedState({
-      lastEventReceivedAt: null,
+      lastEventReceivedAt: ago(3 * HOUR),
       eventFeedStaleSince: ago(2 * HOUR),
       eventFeedAlertedAt: ago(30 * MINUTE),
     });

@@ -27,7 +27,7 @@ const BASE_PARAMS = {
   region: "us-east-1",
   orgSlug: "acme",
   awsAccountId: "aws-account-1",
-  staleSince: new Date("2026-07-01T12:00:00.000Z"),
+  lastEventAt: new Date("2026-07-01T12:00:00.000Z"),
 };
 
 describe("buildEventFeedStaleEmail", () => {
@@ -41,7 +41,7 @@ describe("buildEventFeedStaleEmail", () => {
     }
   });
 
-  it("includes the staleSince timestamp", () => {
+  it("includes the formatted lastEventAt timestamp", () => {
     const { html, text } = buildEventFeedStaleEmail(BASE_PARAMS);
 
     expect(html).toContain("2026-07-01 12:00 UTC");

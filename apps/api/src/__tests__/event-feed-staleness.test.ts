@@ -24,6 +24,13 @@ vi.mock("@wraps/email", () => ({
     mockSendEventFeedStaleEmail(...args),
 }));
 
+// Real notifyOrg resolves its own `db` via a relative import inside
+// packages/db, not via the "@wraps/db" specifier, so mocking db.select/update
+// above does not reach it — it would otherwise attempt a real network call
+// from this mocked-only test file. Mock it explicitly so alert-copy
+// assertions (below) are deterministic and so no unmocked network call
+// happens here.
+const mockNotifyOrg = vi.fn().mockResolvedValue([]);
 vi.mock("@wraps/db", async () => {
   const actual = await vi.importActual<typeof import("@wraps/db")>("@wraps/db");
   return {
@@ -32,6 +39,7 @@ vi.mock("@wraps/db", async () => {
       select: (...args: unknown[]) => mockDbSelect(...args),
       update: (...args: unknown[]) => mockDbUpdate(...args),
     },
+    notifyOrg: (...args: unknown[]) => mockNotifyOrg(...args),
   };
 });
 
@@ -180,7 +188,11 @@ describe("event-feed-staleness worker", () => {
     expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
   });
 
-  it("alerts the owner once when flagged for over an hour and not yet alerted", async () => {
+  it("alerts the owner once when flagged for over an hour and not yet alerted, quoting the real last-event time (plan 194)", async () => {
+    // eventFeedStaleSince (2h ago, when the sweep noticed) and
+    // lastEventReceivedAt (7h ago, from BASE_ACCOUNT, when an event actually
+    // last arrived) are deliberately different values here — the email and
+    // the inbox notification must both quote the latter, never the former.
     setupSelects({
       connectedAccounts: [
         {
@@ -206,9 +218,14 @@ describe("event-feed-staleness worker", () => {
         region: BASE_ACCOUNT.region,
         orgSlug: ORG_ROW.slug,
         awsAccountId: BASE_ACCOUNT.id,
-        staleSince: TWO_HOURS_AGO,
+        lastEventAt: SEVEN_HOURS_AGO,
       })
     );
+
+    expect(mockNotifyOrg).toHaveBeenCalledTimes(1);
+    const notifyBody = mockNotifyOrg.mock.calls[0][0].body as string;
+    expect(notifyBody).toContain(SEVEN_HOURS_AGO.toISOString());
+    expect(notifyBody).not.toContain(TWO_HOURS_AGO.toISOString());
 
     const alertedUpdate = updateCalls.find((c) =>
       c.set.mock.calls.some(
@@ -326,7 +343,11 @@ describe("event-feed-staleness worker", () => {
     expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
   });
 
-  it("does not clear the flag for an account that never received any event", async () => {
+  it("clears a flag previously raised on an account that never received any event (plan 194)", async () => {
+    // Pre-plan-194 behavior could flag a never-connected account (see the
+    // gate at the top of the sweep loop). This proves the one-time
+    // correction: on the first sweep after the gate exists, both columns
+    // are cleared — not left alone, and not treated as a "recovery".
     setupSelects({
       connectedAccounts: [
         {
@@ -336,13 +357,35 @@ describe("event-feed-staleness worker", () => {
           eventFeedAlertedAt: THIRTY_MIN_AGO,
         },
       ],
-      unacknowledgedSend: false,
+    });
+    const updateCalls = setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(updateCalls).toHaveLength(1);
+    expect(updateCalls[0].table).toBe(awsAccount);
+    expect(updateCalls[0].set).toHaveBeenCalledWith({
+      eventFeedStaleSince: null,
+      eventFeedAlertedAt: null,
+    });
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+  });
+
+  it("never flags or alerts a never-connected account that has a recent send (plan 194)", async () => {
+    // lastEventReceivedAt === null short-circuits before hasUnacknowledgedSend
+    // ever runs — the messageSend probe's answer must not matter here. Leave
+    // unacknowledgedSend unset (defaults to "stale" in setupSelects) to prove
+    // the gate, not the predicate, is what keeps this account quiet.
+    setupSelects({
+      connectedAccounts: [{ ...BASE_ACCOUNT, lastEventReceivedAt: null }],
+      unacknowledgedSend: true,
     });
     const updateCalls = setupUpdateCapture();
 
     await handler({} as never, {} as never, {} as never);
 
     expect(updateCalls).toHaveLength(0);
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
   });
 
   it("continues the sweep when one org's email send throws, and does not set eventFeedAlertedAt for it", async () => {

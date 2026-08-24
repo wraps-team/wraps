@@ -54,6 +54,9 @@ export function EmailFeedBanners({ feed }: { feed: EmailListFeed | null }) {
               eventFeedStaleSince: account.eventFeedStaleSince
                 ? new Date(account.eventFeedStaleSince)
                 : null,
+              lastEventReceivedAt: account.lastEventReceivedAt
+                ? new Date(account.lastEventReceivedAt)
+                : null,
             }}
           />
         </div>

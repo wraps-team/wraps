@@ -54,6 +54,9 @@ export type EmailFeedAccount = {
   eventFeedStaleSince: string | null;
   /** False when `last_event_received_at IS NULL` - no event has ever arrived. */
   hasEverReceivedEvents: boolean;
+  /** ISO timestamp of the most recent event actually received, or null when
+   * `hasEverReceivedEvents` is false. */
+  lastEventReceivedAt: string | null;
 };
 
 export type EmailListFeed = {

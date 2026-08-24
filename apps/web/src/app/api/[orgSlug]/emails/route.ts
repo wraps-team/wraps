@@ -378,6 +378,8 @@ export async function GET(request: Request, context: RouteContext) {
           eventFeedStaleSince:
             account.eventFeedStaleSince?.toISOString() ?? null,
           hasEverReceivedEvents: account.lastEventReceivedAt !== null,
+          lastEventReceivedAt:
+            account.lastEventReceivedAt?.toISOString() ?? null,
         })),
       },
     };

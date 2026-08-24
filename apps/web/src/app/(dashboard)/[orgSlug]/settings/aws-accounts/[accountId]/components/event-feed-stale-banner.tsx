@@ -9,7 +9,10 @@ import { AlertTriangle } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 
 type EventFeedStaleBannerProps = {
-  account: Pick<InferSelectModel<typeof awsAccount>, "eventFeedStaleSince">;
+  account: Pick<
+    InferSelectModel<typeof awsAccount>,
+    "eventFeedStaleSince" | "lastEventReceivedAt"
+  >;
 };
 
 /**
@@ -22,6 +25,13 @@ export function EventFeedStaleBanner({ account }: EventFeedStaleBannerProps) {
   if (!account.eventFeedStaleSince) {
     return null;
   }
+  // After plan 194's sweep gate, the sweep never sets eventFeedStaleSince on
+  // an account whose lastEventReceivedAt is null — this combination should
+  // not exist. A banner is not the place to improvise a sentence about a
+  // state that shouldn't be reachable, so bail rather than render one.
+  if (!account.lastEventReceivedAt) {
+    return null;
+  }
 
   return (
     <Alert variant="destructive">
@@ -29,8 +39,8 @@ export function EventFeedStaleBanner({ account }: EventFeedStaleBannerProps) {
       <AlertTitle>Event streaming appears disconnected</AlertTitle>
       <AlertDescription>
         <p>
-          No delivery events received since{" "}
-          {formatRelativeTime(new Date(account.eventFeedStaleSince))}, though
+          The last delivery event we received was{" "}
+          {formatRelativeTime(new Date(account.lastEventReceivedAt))}, though
           emails are being sent. The email timeline and analytics for this
           account are frozen, and bounce/complaint handling is blind until the
           feed recovers. Run{" "}

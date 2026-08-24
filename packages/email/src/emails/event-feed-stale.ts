@@ -8,7 +8,8 @@ export type EventFeedStaleContent = {
   region: string;
   orgSlug: string;
   awsAccountId: string;
-  staleSince: Date;
+  /** The account's real last-received-event timestamp (aws_account.last_event_received_at). */
+  lastEventAt: Date;
 };
 
 export type SendEventFeedStaleEmailParams = EventFeedStaleContent & {
@@ -29,15 +30,15 @@ export function buildEventFeedStaleEmail({
   region,
   orgSlug,
   awsAccountId,
-  staleSince,
+  lastEventAt,
 }: EventFeedStaleContent): { subject: string; html: string; text: string } {
   const settingsUrl = `${resolveAppUrl()}/${orgSlug}/settings/aws-accounts/${awsAccountId}`;
-  const since = formatTimestamp(staleSince);
+  const since = formatTimestamp(lastEventAt);
 
   const subject = `SES event feed stalled for ${accountName} (${awsAccountNumber})`;
 
   const text = [
-    `Your AWS account "${accountName}" (${awsAccountNumber}, ${region}) is still sending email, but no delivery events have arrived since ${since}.`,
+    `Your AWS account "${accountName}" (${awsAccountNumber}, ${region}) is still sending email, but the last delivery event we received from it was ${since}.`,
     "",
     "Impact: the email timeline and analytics for this account are frozen, and bounce/complaint handling is blind until the feed recovers.",
     "",
@@ -46,7 +47,7 @@ export function buildEventFeedStaleEmail({
   ].join("\n");
 
   const html = [
-    `<p>Your AWS account <strong>${escapeHtml(accountName)}</strong> (${escapeHtml(awsAccountNumber)}, ${escapeHtml(region)}) is still sending email, but no delivery events have arrived since <strong>${escapeHtml(since)}</strong>.</p>`,
+    `<p>Your AWS account <strong>${escapeHtml(accountName)}</strong> (${escapeHtml(awsAccountNumber)}, ${escapeHtml(region)}) is still sending email, but the last delivery event we received from it was <strong>${escapeHtml(since)}</strong>.</p>`,
     "<p>Impact: the email timeline and analytics for this account are frozen, and bounce/complaint handling is blind until the feed recovers.</p>",
     `<p>To fix this, run <code>wraps email doctor</code> or visit your <a href="${escapeHtml(settingsUrl)}">account settings</a>.</p>`,
   ].join("\n");
