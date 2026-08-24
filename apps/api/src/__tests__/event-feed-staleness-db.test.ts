@@ -3,16 +3,28 @@
  *
  * The mocked sibling (event-feed-staleness.test.ts) stubs the send probe, so
  * it can only prove the worker reacts correctly to an answer it is handed —
- * not that the query asks the right question. The regression this file exists
- * for lived entirely in the predicate: pairing "sent in the last 24h" with
- * "no event in the last 6h" flagged healthy accounts that send in daily
- * batches, because those two windows disagree for any sender slower than one
- * message every 6 hours. Only real rows can catch that.
+ * not that the query asks the right question. This file exists because the
+ * predicate itself has now failed twice for that reason:
+ *
+ *   - Originally: pairing "sent in the last 24h" with "no event in the last
+ *     6h" flagged healthy accounts that send in daily batches, because those
+ *     two windows disagree for any sender slower than one message every 6
+ *     hours.
+ *   - Then (plan 196): comparing sentAt against lastEventReceivedAt flagged
+ *     healthy *bursty* senders, because the webhook throttles that cursor to
+ *     about one write per minute — it pins to the first event of a burst and
+ *     every later message in the same minute looks unacknowledged by a few
+ *     seconds, even though its own row already has an event on it.
+ *
+ * The fix removes the cursor from this comparison entirely: staleness is now
+ * read off each send row's own status. Only real rows, with real statuses
+ * and real timestamps, can prove the query asks the right question.
  *
  * File suffix `-db.test.ts` = real Neon test branch (no DB mocks). Email is
  * mocked at the @wraps/email boundary.
  */
 
+import type { MessageSendStatus } from "@wraps/db";
 import { awsAccount, db, messageSend, notification } from "@wraps/db";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -47,16 +59,47 @@ function ago(ms: number): Date {
   return new Date(Date.now() - ms);
 }
 
-/** Seed one send for the primary org's AWS account at the given time. */
-async function seedSend(sentAt: Date, label: string): Promise<void> {
+/** Seed one email send for the primary org's AWS account at the given time
+ * and status. Defaults to "sent" (accepted, never acknowledged) since that
+ * is the status every unacknowledged-send test case needs. */
+async function seedSend(
+  sentAt: Date,
+  label: string,
+  status: MessageSendStatus = "sent"
+): Promise<void> {
   await db.insert(messageSend).values(
     messageSendRow(ids, {
       id: `${PREFIX}-${label}`,
       messageId: `${PREFIX}-${label}-ses-id`,
       sentAt,
       createdAt: sentAt,
+      status,
     })
   );
+}
+
+/** Seed `count` email sends spread evenly across [start, start+span), all at
+ * the given status, for volume-shaped cases (FSI, TorBox). */
+async function seedSends(
+  count: number,
+  start: Date,
+  spanMs: number,
+  labelPrefix: string,
+  status: MessageSendStatus
+): Promise<void> {
+  const rows = Array.from({ length: count }, (_, i) => {
+    const sentAt = new Date(
+      start.getTime() + Math.floor((i * spanMs) / Math.max(count - 1, 1))
+    );
+    return messageSendRow(ids, {
+      id: `${PREFIX}-${labelPrefix}-${i}`,
+      messageId: `${PREFIX}-${labelPrefix}-${i}-ses-id`,
+      sentAt,
+      createdAt: sentAt,
+      status,
+    });
+  });
+  await db.insert(messageSend).values(rows);
 }
 
 /** Put the account's three feed columns into a known state. */
@@ -109,11 +152,132 @@ afterAll(async () => {
 });
 
 describe("event-feed-staleness detection (real DB)", () => {
+  // ─── Plan 196: the new per-message-status predicate ───────────────────
+
+  it("[Passel regression] does not flag a burst that lands inside one throttle window, even acknowledged seconds apart", async () => {
+    // Reproduces the production false positive exactly: four sends 30
+    // seconds apart, 90 minutes ago, every one of them acknowledged. The
+    // webhook throttles lastEventReceivedAt to ~1 write/min, so in
+    // production it pins to the FIRST send's arrival — set it here to match
+    // what the throttle actually produces, to prove the new predicate no
+    // longer reads that cursor at all.
+    const burstStart = ago(90 * MINUTE);
+    await seedSend(burstStart, "burst-0", "delivered");
+    await seedSend(
+      new Date(burstStart.getTime() + 10_000),
+      "burst-1",
+      "delivered"
+    );
+    await seedSend(
+      new Date(burstStart.getTime() + 20_000),
+      "burst-2",
+      "delivered"
+    );
+    await seedSend(
+      new Date(burstStart.getTime() + 30_000),
+      "burst-3",
+      "delivered"
+    );
+    await setFeedState({ lastEventReceivedAt: burstStart });
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+  });
+
+  it("[FSI case] flags an account whose sends have never once been acknowledged", async () => {
+    await seedSends(20, ago(6 * HOUR), 6 * HOUR - 20 * MINUTE, "fsi", "sent");
+    await setFeedState({ lastEventReceivedAt: null });
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeInstanceOf(Date);
+  });
+
+  it("[TorBox residue] does not flag a permanent trickle of lost-event rows on an otherwise healthy account", async () => {
+    await seedSends(
+      197,
+      ago(6 * HOUR),
+      6 * HOUR - 20 * MINUTE,
+      "acked",
+      "delivered"
+    );
+    await seedSends(3, ago(5 * HOUR), 4 * HOUR, "residue", "sent");
+    await setFeedState({ lastEventReceivedAt: null });
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+  });
+
+  it("pre-acceptance statuses are owed no event and never flag the feed", async () => {
+    await seedSend(ago(3 * HOUR), "never-accepted-queued", "queued");
+    await seedSend(ago(2 * HOUR), "never-accepted-failed", "failed");
+    await setFeedState({ lastEventReceivedAt: null });
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
+  });
+
+  it("flags an account when the only sends inside the lookback window are unacknowledged, even if an older acked send sits outside it", async () => {
+    // An acked send outside the 24h window must not give false comfort — the
+    // predicate only judges what's actually inside the window it checks.
+    await seedSend(ago(25 * HOUR), "acked-outside-window", "delivered");
+    await seedSend(ago(2 * HOUR), "unacked-inside-window", "sent");
+    await setFeedState({ lastEventReceivedAt: null });
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeInstanceOf(Date);
+  });
+
+  it("holds off on an all-'sent' send still inside the grace period", async () => {
+    await seedSend(ago(5 * MINUTE), "just-sent", "sent");
+    await setFeedState({ lastEventReceivedAt: null });
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
+  });
+
+  it("ignores all-'sent' sends older than the 24h lookback window", async () => {
+    await seedSend(ago(30 * HOUR), "ancient", "sent");
+    await setFeedState({ lastEventReceivedAt: null });
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
+  });
+
+  it("ignores SMS sends, which never carry an SES status", async () => {
+    // SMS delivery runs through End User Messaging, not SES, so an SMS row
+    // stuck at "sent" is not evidence of anything about the email feed.
+    await db.insert(messageSend).values(
+      messageSendRow(ids, {
+        id: `${PREFIX}-sms`,
+        messageId: `${PREFIX}-sms-ses-id`,
+        channel: "sms",
+        recipient: "+15555550123",
+        sentAt: ago(3 * HOUR),
+        createdAt: ago(3 * HOUR),
+        status: "sent",
+      })
+    );
+    await setFeedState({ lastEventReceivedAt: null });
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
+  });
+
   it("leaves an infrequent sender alone when every send was acknowledged", async () => {
-    // The regression case: one batch a day, each acknowledged seconds later.
-    // The last event is 20h old — well past the old 6h threshold — but no send
-    // is waiting on anything, so the feed is healthy.
-    await seedSend(ago(20 * HOUR), "daily-batch");
+    // One batch a day, acknowledged seconds later. The last event is 20h
+    // old — long past the grace period — but no accepted send in the window
+    // is still sitting at 'sent', so the feed is healthy.
+    await seedSend(ago(20 * HOUR), "daily-batch", "delivered");
     await setFeedState({
       lastEventReceivedAt: new Date(Date.now() - 20 * HOUR + 2000),
     });
@@ -124,64 +288,7 @@ describe("event-feed-staleness detection (real DB)", () => {
     expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
   });
 
-  it("flags an account whose sends have never been acknowledged", async () => {
-    await seedSend(ago(3 * HOUR), "unacked-old");
-    await seedSend(ago(45 * MINUTE), "unacked-recent");
-    await setFeedState({ lastEventReceivedAt: null });
-
-    await runSweep();
-
-    expect((await readFeedState())?.eventFeedStaleSince).toBeInstanceOf(Date);
-  });
-
-  it("flags a feed that stops mid-stream, with events trailing the sends", async () => {
-    // Events flowed until 4h ago; sends kept going after that.
-    await seedSend(ago(5 * HOUR), "acked");
-    await seedSend(ago(2 * HOUR), "orphaned");
-    await setFeedState({ lastEventReceivedAt: ago(4 * HOUR) });
-
-    await runSweep();
-
-    expect((await readFeedState())?.eventFeedStaleSince).toBeInstanceOf(Date);
-  });
-
-  it("holds off on a send still inside the grace period", async () => {
-    await seedSend(ago(5 * MINUTE), "just-sent");
-    await setFeedState({ lastEventReceivedAt: null });
-
-    await runSweep();
-
-    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
-  });
-
-  it("ignores sends older than the 24h lookback window", async () => {
-    await seedSend(ago(30 * HOUR), "ancient");
-    await setFeedState({ lastEventReceivedAt: null });
-
-    await runSweep();
-
-    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
-  });
-
-  it("ignores SMS sends, which the SES cursor never acknowledges", async () => {
-    // lastEventReceivedAt only moves for SES email events. An SMS send has no
-    // business making the email feed look broken.
-    await db.insert(messageSend).values(
-      messageSendRow(ids, {
-        id: `${PREFIX}-sms`,
-        messageId: `${PREFIX}-sms-ses-id`,
-        channel: "sms",
-        recipient: "+15555550123",
-        sentAt: ago(3 * HOUR),
-        createdAt: ago(3 * HOUR),
-      })
-    );
-    await setFeedState({ lastEventReceivedAt: null });
-
-    await runSweep();
-
-    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
-  });
+  // ─── Lifecycle coverage (unaffected by the predicate rewrite) ─────────
 
   it("never flags an idle account with no sends at all", async () => {
     await setFeedState({ lastEventReceivedAt: ago(20 * HOUR) });
@@ -192,7 +299,9 @@ describe("event-feed-staleness detection (real DB)", () => {
   });
 
   it("clears the flags once an event arrives after the episode began", async () => {
-    await seedSend(ago(3 * HOUR), "recovered-send");
+    // The recovered send must itself be acknowledged — that acknowledgment
+    // is the positive evidence the feed came back.
+    await seedSend(ago(3 * HOUR), "recovered-send", "delivered");
     await setFeedState({
       lastEventReceivedAt: ago(10 * MINUTE),
       eventFeedStaleSince: ago(2 * HOUR),
@@ -207,8 +316,9 @@ describe("event-feed-staleness detection (real DB)", () => {
   });
 
   it("keeps the flags when sends stop without the feed coming back", async () => {
-    // No sends in the window, so nothing is waiting on an event — but the last
-    // event still predates the flag, so the feed never proved it recovered.
+    // No sends in the window, so nothing is waiting on an event — but the
+    // last event still predates the flag, so the feed never proved it
+    // recovered.
     await setFeedState({
       lastEventReceivedAt: ago(6 * HOUR),
       eventFeedStaleSince: ago(2 * HOUR),
@@ -223,7 +333,7 @@ describe("event-feed-staleness detection (real DB)", () => {
   });
 
   it("alerts the org owner once the flag has aged past the debounce", async () => {
-    await seedSend(ago(3 * HOUR), "alerting-send");
+    await seedSend(ago(3 * HOUR), "alerting-send", "sent");
     await setFeedState({
       lastEventReceivedAt: null,
       eventFeedStaleSince: ago(2 * HOUR),
@@ -249,7 +359,7 @@ describe("event-feed-staleness detection (real DB)", () => {
   });
 
   it("does not re-alert an account already alerted in this episode", async () => {
-    await seedSend(ago(3 * HOUR), "already-alerted-send");
+    await seedSend(ago(3 * HOUR), "already-alerted-send", "sent");
     await setFeedState({
       lastEventReceivedAt: null,
       eventFeedStaleSince: ago(2 * HOUR),

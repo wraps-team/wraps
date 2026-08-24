@@ -111,11 +111,13 @@ function setupUpdateCapture(): UpdateCall[] {
 /**
  * Configure db.select to answer per-table with the given fixture rows.
  *
- * `unacknowledgedSend` is the messageSend probe: rows come back when the
- * account has a send that is newer than lastEventReceivedAt and older than
- * the grace period. Empty covers both "idle, nothing sent" and "sent, but
- * every send already has its event" — from the worker's side those are the
- * same answer, and neither is stale.
+ * `unacknowledgedSend` stands in for the messageSend probe's aggregate row:
+ * `{ total, unacknowledged }` counts of accepted sends in the grace-aged
+ * window. `true` answers as one accepted send that is still unacknowledged
+ * (total=1, unacknowledged=1 -> stale); `false` answers as no accepted sends
+ * in the window (total=0 -> not stale, whether that's an idle org or one
+ * whose every send already has its event — from the worker's side those are
+ * the same answer).
  */
 function setupSelects(opts: {
   connectedAccounts: (typeof BASE_ACCOUNT)[];
@@ -125,7 +127,12 @@ function setupSelects(opts: {
 }) {
   const resultsByTable = new Map<unknown, unknown[]>([
     [awsAccount, opts.connectedAccounts],
-    [messageSend, opts.unacknowledgedSend === false ? [] : [{ id: "send-1" }]],
+    [
+      messageSend,
+      opts.unacknowledgedSend === false
+        ? [{ total: 0, unacknowledged: 0 }]
+        : [{ total: 1, unacknowledged: 1 }],
+    ],
     // getOrgOwnerEmail selects .from(member).innerJoin(user, ...) — the
     // dispatch key is the `.from()` table, i.e. `member`, not `user`.
     [
@@ -245,9 +252,10 @@ describe("event-feed-staleness worker", () => {
           eventFeedAlertedAt: THIRTY_MIN_AGO,
         },
       ],
-      // Left true deliberately: an event inside the grace period short-circuits
-      // the probe, so even a waiting send can't hold the account stale.
-      unacknowledgedSend: true,
+      // The send probe no longer reads lastEventReceivedAt at all (plan 196),
+      // so recovery is driven purely by this cycle's probe coming back
+      // healthy plus the cursor being newer than the flag.
+      unacknowledgedSend: false,
     });
     const updateCalls = setupUpdateCapture();
 

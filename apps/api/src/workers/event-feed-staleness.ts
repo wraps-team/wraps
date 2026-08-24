@@ -11,16 +11,24 @@
  *
  * Detection (per connected account):
  *   1. Candidate: webhookSecret IS NOT NULL (account claims to be connected).
- *   2. feedStale: a send in the last 24h is newer than lastEventReceivedAt and
- *      older than the grace period — i.e. a send that should already have been
- *      acknowledged hasn't been. Measuring events against the send cursor
- *      rather than against a fixed age is what keeps a healthy-but-infrequent
- *      sender out of the alert: an account that sends twice a day and gets a
- *      delivery event for each one is never stale, however long the gaps are.
- *      SES emits SEND to the configuration set (see the CLI's ses.ts
- *      matchingEventTypes), so a working feed acknowledges every send within
- *      seconds and the grace period is generous. An idle org is never flagged
- *      — with no sends to acknowledge, silence proves nothing.
+ *   2. feedStale: every send in the grace-aged window (24h ago .. 15m ago)
+ *      that SES accepted is still sitting at status 'sent' — i.e. nothing has
+ *      come back about it. This is a per-message check against the row SES
+ *      itself wrote, not a comparison against lastEventReceivedAt. The cursor
+ *      can't serve that comparison: the webhook throttles it to about one
+ *      write per minute per account (apps/api/src/routes/webhooks.ts:239-253),
+ *      so it pins to the first event of a 60s burst and every later message in
+ *      the same burst looks "unacknowledged" by a few seconds even though its
+ *      event already landed on its own row. That pinning produced 13 of the 14
+ *      alerts this feature ever sent — all against accounts whose feeds had
+ *      never missed an event (plan 196). Requiring *every* accepted send in
+ *      the window to be unacknowledged (not just some) is what keeps a
+ *      high-volume account's permanent trickle of lost-event rows from
+ *      tripping the alert forever; see UNACKNOWLEDGED_RATIO_THRESHOLD below.
+ *      An idle org is never flagged — with no sends to judge, silence proves
+ *      nothing. An infrequent-but-acknowledged sender is never flagged either
+ *      — every one of its accepted sends already carries a post-'sent'
+ *      status, however long the gaps between sends are.
  *
  * Transitions:
  *   - stale && eventFeedStaleSince IS NULL -> set eventFeedStaleSince = now.
@@ -52,6 +60,7 @@ import {
 import {
   awsAccount,
   db,
+  MESSAGE_SEND_UNACCEPTED_STATUSES,
   member,
   messageSend,
   notifyOrg,
@@ -60,12 +69,20 @@ import {
 } from "@wraps/db";
 import { sendEventFeedStaleEmail } from "@wraps/email";
 import type { Handler } from "aws-lambda";
-import { and, eq, gt, isNotNull, lt } from "drizzle-orm";
+import { and, eq, gt, isNotNull, lt, sql } from "drizzle-orm";
 import { flushLogger, log } from "../lib/logger";
 
 const RECENT_SEND_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h
 const EVENT_GRACE_MS = 15 * 60 * 1000; // 15m
 const ALERT_DEBOUNCE_MS = 60 * 60 * 1000; // 1h
+// The bar for "stale" is total silence, not a percentage. Even TorBox and
+// JAST — the two busiest accounts, with feeds that have never actually
+// broken — carry a permanent trickle of rows stuck at 'sent' (lost events,
+// or messages SES is still retrying: ~17/day for TorBox). A partial residue
+// means *some* events are arriving, which is exactly the case this alert
+// must not fire for. Only when every accepted send in the window is
+// unacknowledged does it mean the feed itself has gone dark.
+const UNACKNOWLEDGED_RATIO_THRESHOLD = 1;
 
 /** Look up the org owner's email. Returns null if not found. */
 async function getOrgOwnerEmail(
@@ -82,54 +99,62 @@ async function getOrgOwnerEmail(
   return row?.email ?? null;
 }
 
+type StalenessCheck = {
+  stale: boolean;
+  /** Accepted sends (status not in MESSAGE_SEND_UNACCEPTED_STATUSES) in the window. */
+  total: number;
+  /** Of those, the ones still sitting at exactly 'sent' — nothing came back. */
+  unacknowledged: number;
+};
+
 /**
- * True when a send that should already have been acknowledged hasn't been:
- * newer than the last event we received, older than the grace period, and
- * inside the lookback window. This is the staleness signal — an account whose
- * every send has a matching event is healthy no matter how long it sits idle
- * between sends.
+ * True when every accepted send in the grace-aged window is still sitting at
+ * exactly 'sent' — nothing has ever come back about any of them. This reads
+ * the evidence already written on the row: every post-'sent' status
+ * ('delivered', 'opened', 'clicked', 'bounced', 'complained', 'suppressed')
+ * is written by the webhook and is therefore proof an event arrived for that
+ * specific message. Pre-acceptance statuses (MESSAGE_SEND_UNACCEPTED_STATUSES)
+ * are owed no event at all and are excluded from both counts.
  *
- * Scoped to channel="email" because lastEventReceivedAt is only ever bumped by
- * the SES webhook — SMS delivery runs through End User Messaging and never
- * touches the cursor, so judging an SMS send against it would report a feed
- * that was never supposed to acknowledge it. The channel predicate also lets
+ * Scoped to channel="email" because only SES produces the statuses this
+ * predicate reads — SMS delivery runs through End User Messaging and never
+ * writes them, so judging an SMS send here would report a feed that was
+ * never supposed to acknowledge it. The channel predicate also lets
  * message_send_org_channel_sent_at_idx serve this query on all three columns
  * instead of walking the org's whole index range.
  */
 async function hasUnacknowledgedSend(
   organizationId: string,
   awsAccountId: string,
-  lastEventReceivedAt: Date | null,
   now: Date
-): Promise<boolean> {
+): Promise<StalenessCheck> {
   const windowStart = new Date(now.getTime() - RECENT_SEND_WINDOW_MS);
   const graceCutoff = new Date(now.getTime() - EVENT_GRACE_MS);
-  // Sends before the last event are already accounted for; sends before the
-  // window opened are too old to judge the feed by.
-  const after =
-    lastEventReceivedAt && lastEventReceivedAt > windowStart
-      ? lastEventReceivedAt
-      : windowStart;
 
-  if (after >= graceCutoff) {
-    // An event arrived within the grace period — nothing can qualify.
-    return false;
-  }
-
+  const unaccepted = sql.raw(
+    MESSAGE_SEND_UNACCEPTED_STATUSES.map((s) => `'${s}'`).join(", ")
+  );
   const [row] = await db
-    .select({ id: messageSend.id })
+    .select({
+      total: sql<number>`count(*) filter (where ${messageSend.status} not in (${unaccepted}))::int`,
+      unacknowledged: sql<number>`count(*) filter (where ${messageSend.status} = 'sent')::int`,
+    })
     .from(messageSend)
     .where(
       and(
         eq(messageSend.organizationId, organizationId),
         eq(messageSend.awsAccountId, awsAccountId),
         eq(messageSend.channel, "email"),
-        gt(messageSend.sentAt, after),
+        gt(messageSend.sentAt, windowStart),
         lt(messageSend.sentAt, graceCutoff)
       )
-    )
-    .limit(1);
-  return row !== undefined;
+    );
+
+  const total = row?.total ?? 0;
+  const unacknowledged = row?.unacknowledged ?? 0;
+  const stale =
+    total > 0 && unacknowledged / total >= UNACKNOWLEDGED_RATIO_THRESHOLD;
+  return { stale, total, unacknowledged };
 }
 
 async function clearStaleFlags(accountId: string): Promise<void> {
@@ -292,14 +317,17 @@ export const handler: Handler = wrapHandler(async () => {
   let flaggedCount = 0;
   let alertedCount = 0;
   let recoveredCount = 0;
+  let totalAcceptedSends = 0;
+  let totalUnacknowledgedSends = 0;
 
   for (const account of connectedAccounts) {
-    const feedStale = await hasUnacknowledgedSend(
-      account.organizationId,
-      account.id,
-      account.lastEventReceivedAt,
-      now
-    );
+    const {
+      stale: feedStale,
+      total,
+      unacknowledged,
+    } = await hasUnacknowledgedSend(account.organizationId, account.id, now);
+    totalAcceptedSends += total;
+    totalUnacknowledgedSends += unacknowledged;
 
     if (feedStale) {
       if (account.eventFeedStaleSince === null) {
@@ -308,6 +336,8 @@ export const handler: Handler = wrapHandler(async () => {
         log.info("[event-feed-staleness] Flagged feed as stale", {
           accountId: account.id,
           organizationId: account.organizationId,
+          total,
+          unacknowledged,
         });
         continue;
       }
@@ -346,6 +376,8 @@ export const handler: Handler = wrapHandler(async () => {
     flaggedCount,
     alertedCount,
     recoveredCount,
+    totalAcceptedSends,
+    totalUnacknowledgedSends,
   });
   await flushLogger();
 });
