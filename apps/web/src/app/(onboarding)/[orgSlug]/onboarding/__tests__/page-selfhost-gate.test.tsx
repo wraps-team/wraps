@@ -133,3 +133,52 @@ describe("OnboardingPage — step 4 self-hosted gate", () => {
     expect(screen.queryByTestId("deploy-connect-step")).not.toBeInTheDocument();
   });
 });
+
+describe("OnboardingPage — step 4 gate after the step has mounted", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("keeps Deploy & Connect mounted when a later status refetch fails", async () => {
+    // First resolve: status is good, so the step renders and starts building
+    // its local state (webhook secret, selected method, typed ARN).
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ hasActiveSubscription: true, selfHosted: false }),
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OnboardingPage params={Promise.resolve({ orgSlug: "test-org" })} />
+      </QueryClientProvider>
+    );
+    await settle();
+
+    expect(screen.getByTestId("deploy-connect-step")).toBeInTheDocument();
+
+    // Mid-flow refetch fails (laptop sleep + reconnect, or a 500 from the
+    // status route). The step must not be torn down: unmounting it destroys
+    // the webhook secret already baked into the deployed CloudFormation stack.
+    mockFetch.mockResolvedValue({ ok: false });
+
+    await act(async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["onboarding-status", "test-org"],
+      });
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
+    expect(screen.getByTestId("deploy-connect-step")).toBeInTheDocument();
+  });
+});

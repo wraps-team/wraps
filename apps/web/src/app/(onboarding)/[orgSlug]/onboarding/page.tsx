@@ -178,7 +178,14 @@ export default function OnboardingPage({ params }: OnboardingPageProps) {
       }
       const res = await fetch(`/api/${orgSlug}/onboarding/status`);
       if (!res.ok) {
-        return null;
+        // Throw rather than return null: a returned null is a *successful*
+        // result to react-query, so it overwrites the last good status and
+        // flips the step-4 gate below back to the loader — unmounting an
+        // in-flight Deploy & Connect and destroying the webhook secret already
+        // baked into the user's CloudFormation stack. Throwing keeps the
+        // previous data through a failed refetch (and reaches the queryCache
+        // Sentry hook).
+        throw new Error(`Onboarding status request failed (${res.status})`);
       }
       return res.json();
     },
@@ -377,8 +384,9 @@ export default function OnboardingPage({ params }: OnboardingPageProps) {
   // Never render Deploy & Connect before we know whether this deployment is
   // self-hosted — `selfHosted={false}` renders the platform CloudFormation path,
   // which a self-hosted control plane can never read. `!onboardingStatus` also
-  // covers the queryFn returning null on a failed status fetch; without it the
-  // gate fails open permanently rather than for one render.
+  // covers a status fetch that has never succeeded; because the queryFn throws
+  // on a failed response, a later failed refetch keeps the last good status
+  // here rather than tearing an in-flight Deploy & Connect back down.
   if (currentStep === 4 && (isStatusLoading || !onboardingStatus)) {
     return <Loader fullScreen />;
   }
