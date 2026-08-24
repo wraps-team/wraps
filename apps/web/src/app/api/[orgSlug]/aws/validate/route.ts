@@ -48,7 +48,7 @@ export async function POST(request: Request, context: RouteContext) {
     const denied = requireRoutePermission(
       orgWithMembership.userRole,
       "awsAccounts",
-      ["read"]
+      ["write"]
     );
     if (denied) return denied;
 
