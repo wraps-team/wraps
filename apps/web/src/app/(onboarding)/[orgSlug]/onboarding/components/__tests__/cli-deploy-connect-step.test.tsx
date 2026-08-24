@@ -584,6 +584,40 @@ describe("CliDeployConnectStep — three-path layout", () => {
   });
 
   /**
+   * The CLI panel's opening line is the only guidance a user gets at the moment
+   * they discover they have no AWS credentials on this machine. Self-hosted
+   * renders no Browser card, so pointing there sends them looking for a card
+   * that does not exist and leaves Skip as the only move. The copy has to name
+   * a fallback the self-hosted page actually offers.
+   */
+  it("never sends a self-hosted user to a browser path the page does not render", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={true} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the cli/i }));
+
+    expect(
+      screen.queryByRole("button", { name: /use the browser/i })
+    ).not.toBeInTheDocument();
+    expect(renderedMarkup()).not.toContain("browser path");
+    expect(renderedMarkup()).toContain("wraps aws doctor");
+  });
+
+  it("keeps pointing a hosted user at the browser path it renders", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the cli/i }));
+
+    expect(
+      screen.getByRole("button", { name: /use the browser/i })
+    ).toBeInTheDocument();
+    expect(renderedMarkup()).toContain("browser path");
+  });
+
+  /**
    * The exact mirror of "never names the hosted connect command when
    * self-hosted". `wraps selfhost login` points at a control plane a hosted
    * org does not have, so a hosted user handed it can never authenticate and

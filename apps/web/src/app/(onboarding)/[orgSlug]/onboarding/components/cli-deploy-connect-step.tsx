@@ -547,7 +547,18 @@ export function CliDeployConnectStep({
           <div className="space-y-6">
             <p className="text-muted-foreground text-sm">
               Needs Node.js and AWS credentials on this machine. No local
-              credentials? Use the browser path instead.
+              credentials?{" "}
+              {selfHosted ? (
+                <>
+                  Configure them on the machine running the CLI, then{" "}
+                  <code className="rounded bg-muted px-1 py-0.5">
+                    wraps aws doctor
+                  </code>{" "}
+                  to verify.
+                </>
+              ) : (
+                "Use the browser path instead."
+              )}
             </p>
 
             {/* Prerequisites */}
