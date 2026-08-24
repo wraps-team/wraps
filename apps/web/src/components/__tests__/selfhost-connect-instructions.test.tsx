@@ -16,7 +16,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AwsConnectStep } from "@/app/(onboarding)/[orgSlug]/onboarding/components/aws-connect-step";
 import { AWSAccountList } from "../aws-account-list";
 import { ConnectAWSAccountForm } from "../forms/connect-aws-account-form";
 
@@ -149,38 +148,6 @@ describe("self-hosted AWS connect instructions", () => {
 
       expect(
         screen.queryByRole("link", { name: /update iam role/i })
-      ).not.toBeInTheDocument();
-      expect(renderedMarkup()).not.toContain(CFN_CONSOLE_HOST);
-      expect(renderedMarkup()).not.toContain(WRAPS_TEMPLATE_BUCKET);
-      expect(renderedMarkup()).not.toContain(PLATFORM_ACCOUNT_ID);
-      expect(screen.getByText(SELFHOST_CLI_COMMAND)).toBeInTheDocument();
-    });
-  });
-
-  describe("AwsConnectStep", () => {
-    const handlers = {
-      onNext: vi.fn(),
-      onBack: vi.fn(),
-      onSkip: vi.fn(),
-      organizationId: "org-1",
-    };
-
-    it("renders the CloudFormation quick-create link on the hosted platform", () => {
-      renderWithQueryClient(
-        <AwsConnectStep {...handlers} selfHosted={false} />
-      );
-
-      const link = screen.getByRole("link", { name: /deploy to aws console/i });
-      expect(link.getAttribute("href")).toContain(
-        `${CFN_CONSOLE_HOST}/cloudformation`
-      );
-    });
-
-    it("renders no CloudFormation link and shows the CLI command when self-hosted", () => {
-      renderWithQueryClient(<AwsConnectStep {...handlers} selfHosted={true} />);
-
-      expect(
-        screen.queryByRole("link", { name: /deploy to aws console/i })
       ).not.toBeInTheDocument();
       expect(renderedMarkup()).not.toContain(CFN_CONSOLE_HOST);
       expect(renderedMarkup()).not.toContain(WRAPS_TEMPLATE_BUCKET);
