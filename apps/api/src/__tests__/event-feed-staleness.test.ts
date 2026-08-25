@@ -173,24 +173,30 @@ function setupUpdateCapture(): UpdateCall[] {
  * `{ total, unacknowledged }` counts of accepted sends in the grace-aged
  * window. `true` answers as one accepted send that is still unacknowledged
  * (total=1, unacknowledged=1 -> stale); `false` answers as no accepted sends
- * in the window (total=0 -> not stale, whether that's an idle org or one
- * whose every send already has its event — from the worker's side those are
- * the same answer).
+ * at all (total=0 -> no evidence either way, an idle org or an SDK sender);
+ * `"acknowledged"` answers as one accepted send whose event already landed
+ * (total=1, unacknowledged=0 -> positive proof the feed works). The last two
+ * are emphatically not the same answer — plan 197's gate turns on which one
+ * it is, and conflating them is what let the CloudWatch fallback overturn a
+ * healthy account.
  */
 function setupSelects(opts: {
   connectedAccounts: (typeof BASE_ACCOUNT)[];
-  unacknowledgedSend?: boolean;
+  unacknowledgedSend?: boolean | "acknowledged";
   ownerEmail?: string | null;
   orgSlug?: string | null;
 }) {
+  const messageSendRow = () => {
+    if (opts.unacknowledgedSend === "acknowledged") {
+      return [{ total: 1, unacknowledged: 0 }];
+    }
+    return opts.unacknowledgedSend === false
+      ? [{ total: 0, unacknowledged: 0 }]
+      : [{ total: 1, unacknowledged: 1 }];
+  };
   const resultsByTable = new Map<unknown, unknown[]>([
     [awsAccount, opts.connectedAccounts],
-    [
-      messageSend,
-      opts.unacknowledgedSend === false
-        ? [{ total: 0, unacknowledged: 0 }]
-        : [{ total: 1, unacknowledged: 1 }],
-    ],
+    [messageSend, messageSendRow()],
     // getOrgOwnerEmail selects .from(member).innerJoin(user, ...) — the
     // dispatch key is the `.from()` table, i.e. `member`, not `user`.
     [
@@ -513,6 +519,72 @@ describe("event-feed-staleness worker", () => {
 
     expect(mockCloudWatchSend).not.toHaveBeenCalled();
     expect(updateCalls).toHaveLength(1);
+  });
+
+  // ─── Plan 197: the fallback must not overturn a healthy account ───────
+
+  it("[false-alert regression] never calls CloudWatch when every accepted send already carries its event (plan 197)", async () => {
+    // The 2026-08-25 false alerts. The DB signal is not merely "not stale"
+    // here — it is positive proof the feed delivered: one accepted send, zero
+    // unacknowledged. The old `!feedStale` gate consulted CloudWatch anyway
+    // and let an account-and-region-wide metric overturn it. CloudWatch is
+    // primed to report sends so this fails loudly if the probe is reached.
+    setupSelects({
+      connectedAccounts: [{ ...BASE_ACCOUNT }],
+      unacknowledgedSend: "acknowledged",
+    });
+    mockCloudWatchSend.mockResolvedValue(metricResult([1]));
+    const updateCalls = setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(mockCloudWatchSend).not.toHaveBeenCalled();
+    expect(updateCalls).toHaveLength(0);
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+  });
+
+  it("[false-alert regression] starts the SES metric window on a minute boundary after the last event (plan 197)", async () => {
+    // CloudWatch truncates StartTime to the minute and anchors its period
+    // buckets there, so an un-rounded 09:30:32 start opens a bucket at
+    // 09:30:00 and counts the send whose own event stamped 09:30:32.776 —
+    // reporting the proof of life as evidence of death. Asserting the
+    // command's StartTime is the only way to see this: the mocked client
+    // returns the same values whatever window it is handed.
+    const lastEventReceivedAt = new Date("2026-07-07T09:30:32.776Z");
+    setupSelects({
+      connectedAccounts: [{ ...BASE_ACCOUNT, lastEventReceivedAt }],
+      unacknowledgedSend: false,
+    });
+    setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(mockCloudWatchSend).toHaveBeenCalledTimes(1);
+    const { StartTime } = mockCloudWatchSend.mock.calls[0][0].input;
+    expect(StartTime).toEqual(new Date("2026-07-07T09:31:00.000Z"));
+    expect(StartTime.getTime()).toBeGreaterThan(lastEventReceivedAt.getTime());
+  });
+
+  it("skips the probe when rounding the window start pushes it past the grace cutoff (plan 197)", async () => {
+    // NOW is 12:00 and the grace cutoff 11:45, so an event at 11:44:10.5 is
+    // stale enough to reach the probe but its rounded-up start lands exactly
+    // on the cutoff. There is nothing left to observe, and CloudWatch rejects
+    // StartTime >= EndTime outright.
+    setupSelects({
+      connectedAccounts: [
+        {
+          ...BASE_ACCOUNT,
+          lastEventReceivedAt: new Date("2026-07-07T11:44:10.500Z"),
+        },
+      ],
+      unacknowledgedSend: false,
+    });
+    const updateCalls = setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(mockCloudWatchSend).not.toHaveBeenCalled();
+    expect(updateCalls).toHaveLength(0);
   });
 
   it("never calls CloudWatch for an account whose last event is still inside the grace period (plan 195)", async () => {

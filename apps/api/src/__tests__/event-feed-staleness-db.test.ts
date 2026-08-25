@@ -49,21 +49,43 @@ vi.mock("@wraps/email", () => ({
 // real, which is the whole point of this file. Defaults to a working role
 // reporting zero sends, so every pre-existing case whose account is old
 // enough to reach the fallback still resolves "not stale" without its own
-// setup; only the new SDK-sender case below overrides the metric.
-const mockGetCredentials = vi.fn().mockResolvedValue({
+// setup; cases that need sends call primeSesSends().
+const TEST_CREDENTIALS = {
   accessKeyId: "AKIA-test",
   secretAccessKey: "secret",
   sessionToken: "token",
   expiration: new Date("2099-01-01"),
   region: "us-east-1",
-});
+};
+const mockGetCredentials = vi.fn().mockResolvedValue(TEST_CREDENTIALS);
 vi.mock("../services/credentials", () => ({
   getCredentials: (...args: unknown[]) => mockGetCredentials(...args),
 }));
 
-const mockCloudWatchSend = vi
-  .fn()
-  .mockResolvedValue({ MetricDataResults: [{ Id: "sesSend", Values: [] }] });
+type SesMetricResponse = {
+  MetricDataResults: { Id: string; Values: number[] }[];
+};
+
+const NO_SENDS: SesMetricResponse = {
+  MetricDataResults: [{ Id: "sesSend", Values: [] }],
+};
+
+/**
+ * The account getCredentials was last asked about. The worker calls it
+ * immediately before each CloudWatch probe, inside one iteration of a
+ * sequential loop, so it names whose probe is in flight.
+ *
+ * This file needs that because the sweep is not scoped to its fixture: the
+ * shared test DB carries other orgs' connected accounts and the worker
+ * probes them too. A bare `mockResolvedValueOnce` therefore lands on
+ * whichever account the DB happened to return first — which is why the
+ * SDK-sender case below passed only in full-file order and failed on its
+ * own. Answering per-account makes every case here order-independent.
+ */
+let probingAccountId: string | null = null;
+let fixtureSesResponse: SesMetricResponse = NO_SENDS;
+
+const mockCloudWatchSend = vi.fn();
 vi.mock("@aws-sdk/client-cloudwatch", () => ({
   CloudWatchClient: class {
     send = mockCloudWatchSend;
@@ -162,20 +184,30 @@ async function runSweep(): Promise<void> {
   await handler({} as never, {} as never, {} as never);
 }
 
+/** Report the given hourly SES `Send` sums for this file's fixture account
+ * only. Every other account in the shared test DB keeps reporting zero, so a
+ * case's own metric can never be consumed by a stranger's probe. */
+function primeSesSends(values: number[]): void {
+  fixtureSesResponse = {
+    MetricDataResults: [{ Id: "sesSend", Values: values }],
+  };
+}
+
 beforeEach(async () => {
   vi.clearAllMocks();
   // clearAllMocks preserves implementations, but re-assert explicitly so this
   // file's default (working role, zero sends) can never drift silently.
-  mockGetCredentials.mockResolvedValue({
-    accessKeyId: "AKIA-test",
-    secretAccessKey: "secret",
-    sessionToken: "token",
-    expiration: new Date("2099-01-01"),
-    region: "us-east-1",
+  probingAccountId = null;
+  fixtureSesResponse = NO_SENDS;
+  mockGetCredentials.mockImplementation((accountId: string) => {
+    probingAccountId = accountId;
+    return Promise.resolve(TEST_CREDENTIALS);
   });
-  mockCloudWatchSend.mockResolvedValue({
-    MetricDataResults: [{ Id: "sesSend", Values: [] }],
-  });
+  mockCloudWatchSend.mockImplementation(() =>
+    Promise.resolve(
+      probingAccountId === ids.awsAccount ? fixtureSesResponse : NO_SENDS
+    )
+  );
   await db.delete(messageSend).where(eq(messageSend.organizationId, ids.org));
   await db.delete(notification).where(eq(notification.organizationId, ids.org));
   // The fixture's second account also carries a webhook secret, so the sweep
@@ -389,13 +421,67 @@ describe("event-feed-staleness detection (real DB)", () => {
     // found" branch). A broken feed for this population therefore produces
     // real absence of rows, not fabricated ones -- no seedSend call here.
     await setFeedState({ lastEventReceivedAt: ago(3 * HOUR) });
-    mockCloudWatchSend.mockResolvedValueOnce({
-      MetricDataResults: [{ Id: "sesSend", Values: [7, 5] }],
-    });
+    primeSesSends([7, 5]);
 
     await runSweep();
 
     expect((await readFeedState())?.eventFeedStaleSince).toBeInstanceOf(Date);
+  });
+
+  // ─── Plan 197: the fallback must not overturn a healthy account ───────
+
+  it("[2026-08-25 false alerts] never consults CloudWatch for an account whose one send is already acknowledged", async () => {
+    // The exact production shape of both false alerts: a low-volume account
+    // with a single send, acknowledged ~1.7s later (that acknowledgment is
+    // what stamped lastEventReceivedAt), and the last event now hours old
+    // because nothing has been sent since. The DB signal here is positive
+    // proof of delivery, not an absence of evidence -- the two are different
+    // answers and only the second may reach the account-wide metric. With
+    // CloudWatch primed to report a send, the old `!feedStale` gate flagged
+    // this account and emailed its owner.
+    const sentAt = ago(3 * HOUR);
+    await seedSend(sentAt, "acked-single", "opened");
+    await setFeedState({
+      lastEventReceivedAt: new Date(sentAt.getTime() + 1743),
+    });
+    primeSesSends([1]);
+
+    await runSweep();
+
+    expect(mockGetCredentials).not.toHaveBeenCalledWith(
+      ids.awsAccount,
+      ids.org
+    );
+    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+  });
+
+  it("asks CloudWatch only about time after the last event, never the minute containing it", async () => {
+    // Companion to the case above, for the population that legitimately
+    // reaches the probe (no rows at all). CloudWatch truncates StartTime to
+    // the minute and anchors its buckets there, so an un-rounded start would
+    // reopen the minute in which the last event landed -- and with it the
+    // send that event acknowledged.
+    // 2h back so the last event, not the 3h metric window, sets the start —
+    // and landing mid-minute is the whole point of the fixture.
+    const lastEventReceivedAt = ago(2 * HOUR);
+    lastEventReceivedAt.setSeconds(32, 776);
+    await setFeedState({ lastEventReceivedAt });
+
+    await runSweep();
+
+    // The shared test DB carries other orgs' connected accounts, so the
+    // sweep probes more than this fixture. getCredentials is called from
+    // nowhere but the probe, immediately before it, inside one sequential
+    // loop iteration — so its call index is the probe's call index.
+    const probeIndex = mockGetCredentials.mock.calls.findIndex(
+      ([accountId]) => accountId === ids.awsAccount
+    );
+    expect(probeIndex).toBeGreaterThanOrEqual(0);
+    const { StartTime } = mockCloudWatchSend.mock.calls[probeIndex][0].input;
+    expect(StartTime.getSeconds()).toBe(0);
+    expect(StartTime.getMilliseconds()).toBe(0);
+    expect(StartTime.getTime()).toBeGreaterThan(lastEventReceivedAt.getTime());
   });
 
   // ─── Lifecycle coverage (unaffected by the predicate rewrite) ─────────

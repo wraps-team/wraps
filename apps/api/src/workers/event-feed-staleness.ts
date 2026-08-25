@@ -37,7 +37,12 @@
  *      nothing. An infrequent-but-acknowledged sender is never flagged either
  *      — every one of its accepted sends already carries a post-'sent'
  *      status, however long the gaps between sends are.
- *   3. sesStale (fallback, plan 195): consulted only when #2 found nothing.
+ *   3. sesStale (fallback, plan 195): consulted only when #2 had *no
+ *      evidence at all* — zero accepted sends in the window. An account
+ *      whose sends all carry a post-'sent' status has positively proved its
+ *      feed works, and this account-and-region-wide metric is far too coarse
+ *      to overturn that; consulting it there is what sent two false alerts
+ *      on 2026-08-25 (plan 197).
  *      The SDK sends straight from the customer's own AWS account to their
  *      own SES — it never calls the Wraps API, so no message_send row exists
  *      until an event materializes one (apps/api/src/routes/webhooks.ts's
@@ -49,6 +54,8 @@
  *      configuration set too), so it only ever adds a stale verdict, never
  *      overrides a healthy one. `null` from the probe (no role, no
  *      permission) means no evidence and must never be read as zero sends.
+ *      Its window starts at ceilToMinute(...) — see that helper for why an
+ *      un-rounded start counts the very send that proves the feed alive.
  *
  * Transitions:
  *   - stale && eventFeedStaleSince IS NULL -> set eventFeedStaleSince = now.
@@ -217,6 +224,30 @@ async function hasUnacknowledgedSend(
   const stale =
     total > 0 && unacknowledged / total >= UNACKNOWLEDGED_RATIO_THRESHOLD;
   return { stale, total, unacknowledged };
+}
+
+/**
+ * Round a probe window's start up to the next whole minute.
+ *
+ * CloudWatch truncates GetMetricData's StartTime to the minute and anchors
+ * every period bucket to that truncated instant, so asking for 07:16:32
+ * opens a bucket at 07:16:00 and counts sends from up to 59 seconds *before*
+ * the window. That is not a rounding nuisance here: the window starts at
+ * lastEventReceivedAt, and the send whose event wrote that timestamp always
+ * precedes it by a second or two, so the un-rounded window counts exactly
+ * the message that proves the feed is working and reports it as unobserved.
+ * That is what fired both false alerts on 2026-08-25 — each said "SES
+ * reports 1 send" about a message already sitting at 'opened'.
+ *
+ * Rounding up rather than down: the window must never reach back before the
+ * last known event, and losing up to a minute of a 3-hour window costs
+ * nothing — a real stall still shows hours of sends.
+ */
+function ceilToMinute(date: Date): Date {
+  const remainder = date.getTime() % 60_000;
+  return remainder === 0
+    ? date
+    : new Date(date.getTime() + (60_000 - remainder));
 }
 
 /**
@@ -508,27 +539,45 @@ export const handler: Handler = wrapHandler(async () => {
     // Fallback for SDK/direct-SES senders (plan 195): message_send has no
     // evidence either way for them until an event materializes its row, so
     // an account whose feed just broke looks identical here to one with
-    // nothing to send. Ask SES itself, but only when the cheap DB signal
-    // already came back empty and the account isn't trivially alive — a
-    // recent event needs no further checking — so most accounts on most
-    // sweeps never make this call.
+    // nothing to send. The gate is `total === 0` — *no evidence* — not
+    // "not stale": an account with accepted sends that all carry a
+    // post-'sent' status has already proved its feed works, and the
+    // account-and-region-wide metric is far too coarse to overturn that. It
+    // used to read `!feedStale`, which let the fallback override a clean
+    // per-message verdict and produced two false alerts on 2026-08-25.
+    // Accounts whose last event is still inside the grace period are
+    // trivially alive and skipped too, so most accounts on most sweeps never
+    // make this call.
     let sesSendCount: number | null = null;
+    // Logged on the flag below. The 2026-08-25 false alerts were invisible
+    // for want of exactly this: a count with no window beside it cannot be
+    // checked against the send it claims to have missed.
+    let sesWindowStart: Date | null = null;
     let stale = feedStale;
-    if (!feedStale && lastEventAt < graceCutoff) {
-      const windowStart = new Date(
-        Math.max(lastEventAt.getTime(), now.getTime() - SES_METRIC_WINDOW_MS)
+    if (total === 0 && lastEventAt < graceCutoff) {
+      const windowStart = ceilToMinute(
+        new Date(
+          Math.max(lastEventAt.getTime(), now.getTime() - SES_METRIC_WINDOW_MS)
+        )
       );
-      sesProbeCount++;
-      sesSendCount = await getSesSendCountSince(
-        account,
-        windowStart,
-        graceCutoff
-      );
-      // null means "couldn't check" (no role, no permission) — never treat
-      // it as "sent nothing". Only a positive count is evidence of a stall.
-      if (sesSendCount !== null && sesSendCount > 0) {
-        stale = true;
-        sesFlaggedCount++;
+      // Rounding up can push the window start past its end when the last
+      // event landed within a minute of the grace cutoff. There is nothing
+      // to observe in a window that has closed, and CloudWatch rejects
+      // StartTime >= EndTime outright.
+      if (windowStart < graceCutoff) {
+        sesWindowStart = windowStart;
+        sesProbeCount++;
+        sesSendCount = await getSesSendCountSince(
+          account,
+          windowStart,
+          graceCutoff
+        );
+        // null means "couldn't check" (no role, no permission) — never treat
+        // it as "sent nothing". Only a positive count is evidence of a stall.
+        if (sesSendCount !== null && sesSendCount > 0) {
+          stale = true;
+          sesFlaggedCount++;
+        }
       }
     }
 
@@ -542,6 +591,9 @@ export const handler: Handler = wrapHandler(async () => {
           total,
           unacknowledged,
           sesSendCount,
+          sesWindowStart: sesWindowStart?.toISOString() ?? null,
+          sesWindowEnd: graceCutoff.toISOString(),
+          lastEventAt: lastEventAt.toISOString(),
         });
         continue;
       }
