@@ -706,43 +706,60 @@ describe("CliDeployConnectStep — three-path layout", () => {
     expect(renderedMarkup()).not.toContain("wraps selfhost");
   });
 
-  it("completes the step when the CLI path reports a live connection", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ connections: [{}] }),
-    });
-    const onConnected = vi.fn();
-    renderWithQueryClient(
-      <CliDeployConnectStep
-        {...defaultProps}
-        onConnected={onConnected}
-        selfHosted={false}
-      />
-    );
+  /**
+   * "I've finished — check connection" is the only control that completes this
+   * step, and it is rendered once per panel. The agent panel's copy even ends
+   * by telling the user to come back and click it. Driving both panels through
+   * one body keeps either render site from being deleted silently: without the
+   * agent case, removing that panel's button leaves an agent user with nothing
+   * to click and no error — the step never advances and the arm reads as total
+   * drop-off.
+   */
+  it.each([
+    ["CLI", /use the cli/i],
+    ["agent", /copy the agent prompt/i],
+  ])(
+    "completes the step when the %s path reports a live connection",
+    async (_label, pathButton) => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ connections: [{}] }),
+      });
+      const onConnected = vi.fn();
+      renderWithQueryClient(
+        <CliDeployConnectStep
+          {...defaultProps}
+          onConnected={onConnected}
+          selfHosted={false}
+        />
+      );
 
-    fireEvent.click(screen.getByRole("button", { name: /use the cli/i }));
-    fireEvent.click(
-      screen.getByRole("button", { name: /i've finished — check connection/i })
-    );
+      fireEvent.click(screen.getByRole("button", { name: pathButton }));
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /i've finished — check connection/i,
+        })
+      );
 
-    await waitFor(() => {
-      expect(onConnected).toHaveBeenCalled();
-    });
-    expect(mockCapture).toHaveBeenCalledWith(
-      "onboarding_cli_connection_detected",
-      {
+      await waitFor(() => {
+        expect(onConnected).toHaveBeenCalled();
+      });
+      expect(mockCapture).toHaveBeenCalledWith(
+        "onboarding_cli_connection_detected",
+        {
+          step: 4,
+          step_name: "Deploy & Connect",
+          organization_id: "org-123",
+        }
+      );
+      expect(mockCapture).toHaveBeenCalledWith("onboarding_step_completed", {
         step: 4,
         step_name: "Deploy & Connect",
         organization_id: "org-123",
-      }
-    );
-    expect(mockCapture).toHaveBeenCalledWith("onboarding_step_completed", {
-      step: 4,
-      step_name: "Deploy & Connect",
-      organization_id: "org-123",
-      method: "cli",
-    });
-  });
+        method: "cli",
+      });
+    }
+  );
 
   /**
    * The most common state on this screen: the user clicks check before the
