@@ -236,8 +236,32 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
       return { error: "Unauthorized" };
     }
 
+    // 3. Parse the EventBridge event
+    const event = body as EventBridgeEvent;
+    const { eventType, mail } = event.detail;
+
+    if (!mail?.messageId) {
+      log.warn("Webhook: event missing mail.messageId", {
+        eventType,
+        awsAccountNumber,
+      });
+      return { status: "ignored", reason: "missing mail.messageId" };
+    }
+
+    const messageId = mail.messageId;
+
     // Record feed liveness (throttled to ~1 write/min per account). Best-effort:
     // a failure here must never fail event processing.
+    //
+    // This sits BELOW the mail.messageId guard on purpose: every consumer of
+    // lastEventReceivedAt (the staleness worker, the dashboard banners) reads
+    // it as "a usable SES event arrived", so only a well-formed event may set
+    // it. Real SES events — including the SDK-sender ones this route otherwise
+    // ignores as "message not found" — always carry mail.messageId; a payload
+    // without one is EventBridge noise, not feed evidence. Stamping before the
+    // guard once let a single malformed POST promote a never-connected account
+    // past the staleness worker's never-connected gate, straight into a false
+    // "feed stalled" alert (SHC, 2026-08-25).
     try {
       await db
         .update(awsAccount)
@@ -256,20 +280,6 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
         awsAccountNumber,
       });
     }
-
-    // 3. Parse the EventBridge event
-    const event = body as EventBridgeEvent;
-    const { eventType, mail } = event.detail;
-
-    if (!mail?.messageId) {
-      log.warn("Webhook: event missing mail.messageId", {
-        eventType,
-        awsAccountNumber,
-      });
-      return { status: "ignored", reason: "missing mail.messageId" };
-    }
-
-    const messageId = mail.messageId;
 
     log.info("Webhook: processing event", { eventType, messageId });
 

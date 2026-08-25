@@ -6,8 +6,10 @@
  * the org owner once per staleness episode. Runs hourly in production.
  *
  * Ground truth: aws_account.last_event_received_at is bumped by the SES
- * webhook route every time an authenticated event arrives for an account.
- * See apps/api/src/routes/webhooks.ts.
+ * webhook route every time an authenticated, well-formed SES event (one
+ * carrying mail.messageId) arrives for an account. Malformed payloads never
+ * stamp it — one that did once dressed a never-connected account up as a
+ * stalled one (SHC, 2026-08-25). See apps/api/src/routes/webhooks.ts.
  *
  * Detection (per connected account):
  *   1. Candidate: webhookSecret IS NOT NULL (account claims to be connected)

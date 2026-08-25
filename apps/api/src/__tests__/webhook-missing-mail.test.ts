@@ -208,7 +208,7 @@ describe("Webhook SES — missing mail field", () => {
     expect(body.reason).toContain("missing");
   });
 
-  it("attempts no message-lookup DB work when mail is missing, only the liveness update", async () => {
+  it("attempts no DB writes at all when mail is missing — not even the liveness stamp", async () => {
     mockAccountLookup();
 
     const app = createApp();
@@ -225,8 +225,12 @@ describe("Webhook SES — missing mail field", () => {
 
     // Only one select call (account lookup), no message lookups.
     expect(mockSelectWhere).toHaveBeenCalledTimes(1);
-    // The route still records feed liveness (last_event_received_at) even for
-    // events it otherwise ignores — an SDK-only sender still has a live feed.
-    expect(mockUpdateSet).toHaveBeenCalledTimes(1);
+    // And no last_event_received_at stamp: every consumer reads that column
+    // as "a usable SES event arrived", and a payload without mail.messageId
+    // is not one — real SES events, SDK-sender ones included, always carry
+    // it. Stamping here once let a single malformed POST promote a
+    // never-connected account past the staleness worker's never-connected
+    // gate and into a false "feed stalled" alert (SHC, 2026-08-25).
+    expect(mockUpdateSet).not.toHaveBeenCalled();
   });
 });

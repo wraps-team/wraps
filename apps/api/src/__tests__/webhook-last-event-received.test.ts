@@ -2,12 +2,17 @@
  * Webhook — last_event_received_at Liveness Tracking
  *
  * The SES webhook route bumps aws_account.last_event_received_at for every
- * authenticated event (throttled to ~1 write/min). This is the ground-truth
- * signal that the SES event feed is alive — plan 113 builds staleness
- * alerting on top of it. These tests confirm:
- *   1. an authenticated event issues an update scoped to the resolved account
+ * authenticated, well-formed SES event (throttled to ~1 write/min). This is
+ * the ground-truth signal that the SES event feed is alive — plan 113 builds
+ * staleness alerting on top of it. These tests confirm:
+ *   1. an authenticated well-formed event issues an update scoped to the
+ *      resolved account
  *   2. the update failing is swallowed (best-effort) and never fails the webhook
  *   3. an unauthenticated (401) request never touches aws_account
+ *   4. an authenticated but malformed payload (no mail.messageId) never
+ *      stamps liveness — it is EventBridge noise, not feed evidence. One
+ *      such stamp promoted a never-connected account into a false "feed
+ *      stalled" alert (SHC, 2026-08-25).
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -57,17 +62,29 @@ function createTestApp() {
   return new Elysia().use(webhooksRoutes);
 }
 
-// Matches the account lookup: .from(awsAccount).where(eq(...)) — no .limit().
-function selectChainUnlimited(rows: unknown[]) {
-  return {
-    from: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(rows),
-    }),
-  };
-}
-
-function setupAccountLookup(rows: unknown[]) {
-  mockDbSelect.mockImplementation(() => selectChainUnlimited(rows));
+// Serves both select shapes in the route. The first select is the account
+// lookup, awaited directly off .where() (no .limit()); every later select is
+// the messageSend lookup, which chains .limit(1) and resolves empty here so a
+// well-formed event exits through the "message not found" branch without ever
+// reaching the insert path (its event carries no destination, so no row is
+// materialized either).
+function setupSelects(accountRows: unknown[]) {
+  let selectCall = 0;
+  mockDbSelect.mockImplementation(() => {
+    const rows = selectCall++ === 0 ? accountRows : [];
+    return {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue(rows),
+          // biome-ignore lint/suspicious/noThenProperty: intentional thenable mock
+          then: (
+            resolve: (v: unknown) => void,
+            reject?: (e: unknown) => void
+          ) => Promise.resolve(rows).then(resolve, reject),
+        }),
+      }),
+    };
+  });
 }
 
 // ─── Drizzle SQL token-tree flattening ─────────────────────────────────────
@@ -120,10 +137,11 @@ function setupUpdateCapture(shouldThrow = false) {
   return calls;
 }
 
-// Minimal EventBridge envelope with no `mail` field — the route returns
-// "ignored" (missing mail.messageId) immediately after the liveness update,
-// so these tests don't need to also mock the messageSend select/insert path.
-function buildMinimalEvent() {
+// Minimal *well-formed* SES event: mail.messageId present (the liveness
+// stamp sits below that guard), no destination (so the SDK-sender branch
+// never materializes a row), and no matching messageSend row mocked — the
+// route exits via "ignored" / "message not found" right after the stamp.
+function buildWellFormedEvent() {
   return {
     version: "0",
     id: "event-1",
@@ -132,13 +150,29 @@ function buildMinimalEvent() {
     account: AWS_ACCOUNT_NUMBER,
     time: new Date().toISOString(),
     region: "us-east-1",
-    detail: { eventType: "Delivery" },
+    detail: { eventType: "Delivery", mail: { messageId: "ses-message-1" } },
+  };
+}
+
+// The malformed shape from the 2026-08-25 incident: authenticated POST,
+// parseable JSON, but nothing SES about it — no eventType, no mail.
+function buildMalformedEvent() {
+  return {
+    version: "0",
+    id: "event-junk",
+    "detail-type": "Something Else Entirely",
+    source: "custom.app",
+    account: AWS_ACCOUNT_NUMBER,
+    time: new Date().toISOString(),
+    region: "us-east-1",
+    detail: {},
   };
 }
 
 async function sendWebhookEvent(
   app: ReturnType<typeof createTestApp>,
-  apiKey: string
+  apiKey: string,
+  event: Record<string, unknown> = buildWellFormedEvent()
 ) {
   return app.handle(
     new Request(`http://localhost/webhooks/ses/${AWS_ACCOUNT_NUMBER}`, {
@@ -147,7 +181,7 @@ async function sendWebhookEvent(
         "Content-Type": "application/json",
         "x-wraps-api-key": apiKey,
       },
-      body: JSON.stringify(buildMinimalEvent()),
+      body: JSON.stringify(event),
     })
   );
 }
@@ -157,8 +191,8 @@ describe("Webhook: last_event_received_at liveness tracking", () => {
     vi.clearAllMocks();
   });
 
-  it("authenticated event issues an update on aws_account scoped to the resolved account", async () => {
-    setupAccountLookup([ACCOUNT_ROW]);
+  it("authenticated well-formed event issues an update on aws_account scoped to the resolved account", async () => {
+    setupSelects([ACCOUNT_ROW]);
     const updateCalls = setupUpdateCapture();
 
     const app = createTestApp();
@@ -176,7 +210,7 @@ describe("Webhook: last_event_received_at liveness tracking", () => {
   });
 
   it("update failure is swallowed — the webhook still returns its normal response", async () => {
-    setupAccountLookup([ACCOUNT_ROW]);
+    setupSelects([ACCOUNT_ROW]);
     setupUpdateCapture(true);
 
     const app = createTestApp();
@@ -188,13 +222,36 @@ describe("Webhook: last_event_received_at liveness tracking", () => {
   });
 
   it("unauthenticated (401) request never issues an aws_account update", async () => {
-    setupAccountLookup([ACCOUNT_ROW]);
+    setupSelects([ACCOUNT_ROW]);
     setupUpdateCapture();
 
     const app = createTestApp();
     const response = await sendWebhookEvent(app, "wrong-secret");
 
     expect(response.status).toBe(401);
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+  });
+
+  it("[2026-08-25 SHC] authenticated but malformed payload never stamps liveness", async () => {
+    // Exactly what promoted SHC's never-connected account into a false
+    // "feed stalled" alert: one authenticated POST whose detail carried no
+    // eventType and no mail. Accepting it as feed evidence is what every
+    // consumer of lastEventReceivedAt gets wrong-footed by; the route must
+    // treat it as noise.
+    setupSelects([ACCOUNT_ROW]);
+    setupUpdateCapture();
+
+    const app = createTestApp();
+    const response = await sendWebhookEvent(
+      app,
+      WEBHOOK_SECRET,
+      buildMalformedEvent()
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.status).toBe("ignored");
+    expect(body.reason).toBe("missing mail.messageId");
     expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 });
