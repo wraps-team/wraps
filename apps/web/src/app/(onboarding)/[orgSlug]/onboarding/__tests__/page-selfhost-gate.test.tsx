@@ -11,7 +11,14 @@
 
 import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -129,7 +136,7 @@ describe("OnboardingPage — step 4 self-hosted gate", () => {
     expect(screen.queryByTestId("deploy-connect-step")).not.toBeInTheDocument();
   });
 
-  it("holds the loader when the onboarding status fetch fails", async () => {
+  it("shows a recoverable error instead of a forever-spinner when the onboarding status fetch fails", async () => {
     mockFetch.mockResolvedValue({ ok: false });
 
     renderWithQueryClient(
@@ -137,8 +144,49 @@ describe("OnboardingPage — step 4 self-hosted gate", () => {
     );
     await settle();
 
-    expect(screen.getByTestId("loader")).toBeInTheDocument();
+    // Fail CLOSED is still the requirement: the step must never render
+    // without a resolved status.
     expect(screen.queryByTestId("deploy-connect-step")).not.toBeInTheDocument();
+
+    // ...but the terminal state has to be visible and escapable. The query is
+    // settled (retry: false, refetchOnWindowFocus: false), so a bare spinner
+    // here spins forever, announces nothing, and offers no way out.
+    expect(screen.queryByTestId("loader")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /couldn't check your workspace settings/i
+    );
+    expect(
+      screen.getByRole("button", { name: /try again/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
+  });
+
+  it("recovers the step when the user retries and the status succeeds", async () => {
+    mockFetch.mockResolvedValue({ ok: false });
+
+    renderWithQueryClient(
+      <OnboardingPage params={Promise.resolve({ orgSlug: "test-org" })} />
+    );
+    await settle();
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ hasActiveSubscription: true, selfHosted: true }),
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("deploy-connect-step")).toHaveAttribute(
+        "data-self-hosted",
+        "true"
+      );
+    });
   });
 });
 

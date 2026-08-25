@@ -23,14 +23,19 @@ export default function Loader({
     : "flex h-full items-center justify-center pt-8";
 
   return (
-    <div className={containerClass}>
+    // A bare spinning icon is invisible to assistive tech: no role, no name.
+    // <output> is an implicit `status` live region; with the visually hidden
+    // label it announces the wait instead of nothing at all (WCAG 4.1.3).
+    <output className={containerClass}>
       <Loader2
+        aria-hidden="true"
         className={cn(
           "animate-spin text-primary",
           sizeClasses[size],
           className
         )}
       />
-    </div>
+      <span className="sr-only">Loading...</span>
+    </output>
   );
 }

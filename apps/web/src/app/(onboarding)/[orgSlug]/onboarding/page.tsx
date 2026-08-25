@@ -1,12 +1,19 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@wraps/ui/components/ui/alert";
+import { AlertCircleIcon } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import Loader from "@/components/loader";
+import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import { BillingStep } from "./components/billing-step";
 import { ChoosePathStep } from "./components/choose-path-step";
@@ -170,7 +177,12 @@ export default function OnboardingPage({ params }: OnboardingPageProps) {
   }, [isInitialized, orgSlug, currentStep, searchParams]);
 
   // Check if onboarding is already completed
-  const { data: onboardingStatus, isLoading: isStatusLoading } = useQuery({
+  const {
+    data: onboardingStatus,
+    isLoading: isStatusLoading,
+    isError: isStatusError,
+    refetch: refetchOnboardingStatus,
+  } = useQuery({
     queryKey: ["onboarding-status", orgSlug],
     queryFn: async () => {
       if (!orgSlug) {
@@ -381,16 +393,6 @@ export default function OnboardingPage({ params }: OnboardingPageProps) {
     return <Loader fullScreen />;
   }
 
-  // Never render Deploy & Connect before we know whether this deployment is
-  // self-hosted — `selfHosted={false}` renders the platform CloudFormation path,
-  // which a self-hosted control plane can never read. `!onboardingStatus` also
-  // covers a status fetch that has never succeeded; because the queryFn throws
-  // on a failed response, a later failed refetch keeps the last good status
-  // here rather than tearing an in-flight Deploy & Connect back down.
-  if (currentStep === 4 && (isStatusLoading || !onboardingStatus)) {
-    return <Loader fullScreen />;
-  }
-
   // Self-hosted orgs never see the "Choose Plan" step, so drop it from the
   // progress indicator and shift the displayed step number accordingly.
   const visibleSteps = isSelfHosted ? STEPS.slice(1) : STEPS;
@@ -440,6 +442,50 @@ export default function OnboardingPage({ params }: OnboardingPageProps) {
   };
 
   const handleComplete = completeOnboarding;
+
+  // Never render Deploy & Connect before we know whether this deployment is
+  // self-hosted — `selfHosted={false}` renders the platform CloudFormation path,
+  // which a self-hosted control plane can never read. `!onboardingStatus` also
+  // covers a status fetch that has never succeeded; because the queryFn throws
+  // on a failed response, a later failed refetch keeps the last good status
+  // here rather than tearing an in-flight Deploy & Connect back down.
+  if (currentStep === 4 && !onboardingStatus) {
+    // A settled failure is a terminal state, not a slow load: the query client
+    // retries once and never refetches on window focus, so a spinner here spins
+    // forever, announces nothing to a screen reader, and takes the progress
+    // indicator and the Back/Skip affordances down with it. Still fail closed —
+    // the step stays unrendered — but say so and offer a way out.
+    if (isStatusError) {
+      return (
+        <div className="space-y-8">
+          <StepProgress
+            currentStep={displayStep}
+            steps={visibleSteps.map((s) => s.title)}
+          />
+          <Alert variant="destructive">
+            <AlertCircleIcon />
+            <AlertTitle>
+              We couldn&apos;t check your workspace settings
+            </AlertTitle>
+            <AlertDescription>
+              Deploy &amp; Connect needs those settings before it can show you
+              the right instructions. Check your connection and try again.
+            </AlertDescription>
+          </Alert>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => refetchOnboardingStatus()}>Try again</Button>
+            <Button onClick={handleBack} variant="outline">
+              Back
+            </Button>
+            <Button onClick={handleSkip} variant="ghost">
+              Skip for now
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    return <Loader fullScreen />;
+  }
 
   return (
     <div className="space-y-8">
