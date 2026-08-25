@@ -420,6 +420,13 @@ export function CliDeployConnectStep({
     setCfnDeployed(true);
   };
 
+  const handleOpenAwsConsole = () => {
+    if (!quickCreateUrl) {
+      return;
+    }
+    window.open(quickCreateUrl, "_blank", "noopener,noreferrer");
+  };
+
   // Self-hosted deployments run a different CLI flow: `wraps selfhost login` and
   // `wraps selfhost connect` point at the user's own control plane, while the
   // hosted commands would connect their AWS account to the Wraps platform.
@@ -854,15 +861,21 @@ export function CliDeployConnectStep({
                 </form.Subscribe>
               </form>
 
-              <Button asChild className="w-full" variant="outline">
-                <a
-                  href={quickCreateUrl}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  <CloudIcon className="mr-2 h-4 w-4" />
-                  Open AWS Console
-                </a>
+              {/*
+                Opened from script rather than an href: `quickCreateUrl`
+                carries the webhook secret, and an href would put that bearer
+                credential into a DOM attribute for PostHog autocapture to
+                serialise as `attr__href` on every click. `ph-no-capture` is
+                belt-and-braces on top.
+              */}
+              <Button
+                className="ph-no-capture w-full"
+                onClick={handleOpenAwsConsole}
+                type="button"
+                variant="outline"
+              >
+                <CloudIcon className="mr-2 h-4 w-4" />
+                Open AWS Console
               </Button>
             </section>
           ) : (

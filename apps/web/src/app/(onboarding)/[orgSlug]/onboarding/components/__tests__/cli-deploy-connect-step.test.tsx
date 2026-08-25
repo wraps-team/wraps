@@ -83,6 +83,7 @@ function renderedMarkup() {
 const PLATFORM_ACCOUNT_ID = "905130073023";
 const CFN_CONSOLE_HOST = "console.aws.amazon.com";
 const WRAPS_TEMPLATE_BUCKET = "wraps-assets";
+const WEBHOOK_SECRET_PARAM = "param_WrapsWebhookSecret";
 const SELFHOST_CLI_COMMAND = "wraps selfhost connect";
 const HOSTED_CLI_COMMAND = "wraps platform connect";
 const SELFHOST_LOGIN_COMMAND = "wraps selfhost login";
@@ -438,6 +439,65 @@ describe("CliDeployConnectStep — three-path layout", () => {
     });
     const posted = JSON.parse(String(mockFetch.mock.calls.at(-1)?.[1]?.body));
     expect(posted.webhookSecret).toBe(openedSecret);
+  });
+
+  /**
+   * The webhook secret in `quickCreateUrl` is a bearer credential: the SES
+   * webhook route authenticates inbound events by timing-safe-comparing it
+   * against the stored secret for an AWS account number, and that account
+   * number is not secret. Rendering the URL as an `href` puts the credential
+   * in a live DOM attribute, which PostHog autocapture serialises as
+   * `attr__href` on every click and ships to the analytics project. The
+   * post-deploy "Open AWS Console" control has to open the URL from script,
+   * the way the primary deploy control already does, so the secret never
+   * becomes markup.
+   */
+  it("never renders the webhook secret as a DOM attribute", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the browser/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /deploy with cloudformation/i })
+    );
+
+    const openedSecret = new URL(
+      mockOpen.mock.calls[0][0].replace("#/", "")
+    ).searchParams.get("param_WrapsWebhookSecret");
+    expect(openedSecret).toBeTruthy();
+
+    // The post-deploy panel — the one carrying "Open AWS Console" — is what
+    // is on screen now.
+    expect(screen.getByText(/open aws console/i)).toBeInTheDocument();
+
+    for (const anchor of Array.from(document.querySelectorAll("a[href]"))) {
+      expect(anchor.getAttribute("href")).not.toContain(WEBHOOK_SECRET_PARAM);
+    }
+    expect(renderedMarkup()).not.toContain(WEBHOOK_SECRET_PARAM);
+    expect(renderedMarkup()).not.toContain(openedSecret);
+  });
+
+  it("opens the CloudFormation console from script, not from an href", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the browser/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /deploy with cloudformation/i })
+    );
+
+    const deployedUrl = mockOpen.mock.calls[0][0];
+    mockOpen.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: /open aws console/i }));
+
+    expect(mockOpen).toHaveBeenCalledWith(
+      deployedUrl,
+      "_blank",
+      "noopener,noreferrer"
+    );
   });
 
   /**
