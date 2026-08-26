@@ -298,16 +298,19 @@ export function handleApiError(
 }
 
 /**
- * Fill in `code` on an error body a route returned directly.
+ * The body to send for an error response, with `code` filled in.
  *
  * Routes that answer with their own `{ error }` object never reach
  * `handleApiError`, so without this the published contract — every failure
  * carries a machine-readable `code` — would hold for framework errors and
- * quietly not for the 40-odd hand-written ones. Normalizing on the way out
- * keeps one contract without threading a code through every route.
+ * quietly not for the 40-odd hand-written ones.
  *
- * Returns undefined when there is nothing to add, which the caller reads as
- * "leave the response alone".
+ * Returns the body to serialize, which may be the one passed in unchanged.
+ * `undefined` means "not ours" — a success status, or a value whose
+ * serialization we must not take over (a `Response`, a stream, a string). The
+ * caller must serialize whatever it gets back rather than falling through:
+ * Elysia's `mapResponse` drops the body entirely if it returns nothing on the
+ * error path, which is why this returns unchanged bodies instead of undefined.
  */
 export function normalizeErrorPayload(
   response: unknown,
@@ -321,14 +324,15 @@ export function normalizeErrorPayload(
   if (
     response === null ||
     typeof response !== "object" ||
-    Array.isArray(response)
+    Array.isArray(response) ||
+    response instanceof Response
   ) {
     return;
   }
 
   const body = response as Record<string, unknown>;
   if (typeof body.error !== "string" || typeof body.code === "string") {
-    return;
+    return body;
   }
 
   return { ...body, code: errorCodeFor(status, "") };

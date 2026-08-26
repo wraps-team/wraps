@@ -8,6 +8,11 @@
  *
  * It runs in `mapResponse`, after a route's own response schema has been
  * applied, so adding the field cannot trip validation.
+ *
+ * It serializes every error body it is handed, including the ones it did not
+ * change. Returning nothing from `mapResponse` falls through on the normal
+ * path but drops the body on the error path, which would empty out every 404
+ * and 401 the API sends.
  */
 
 import { Elysia } from "elysia";
@@ -17,12 +22,12 @@ import { normalizeErrorPayload, numericStatus } from "../lib/error-handler";
 export const errorContract = new Elysia({ name: "error-contract" }).mapResponse(
   { as: "global" },
   ({ response, set }) => {
-    const normalized = normalizeErrorPayload(response, set.status);
-    if (!normalized) {
+    const body = normalizeErrorPayload(response, set.status);
+    if (!body) {
       return;
     }
 
-    return new Response(JSON.stringify(normalized), {
+    return new Response(JSON.stringify(body), {
       status: numericStatus(set.status),
       headers: { "content-type": "application/json" },
     });

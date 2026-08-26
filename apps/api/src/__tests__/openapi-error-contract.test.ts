@@ -300,6 +300,46 @@ describe("a route's own error body gets the same contract", () => {
         }
       );
 
+  it("keeps a body on an error that goes through onError — the empty-404 regression", async () => {
+    // mapResponse falls through on the normal path when it returns nothing,
+    // but on the error path that empties the response. Shipped once; never
+    // again.
+    const app = new Elysia()
+      .use(errorContract)
+      .onError(() => ({ error: "Not found", code: "NOT_FOUND" }));
+
+    const response = await app.handle(new Request("http://localhost/missing"));
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(await response.json()).toEqual({
+      error: "Not found",
+      code: "NOT_FOUND",
+    });
+  });
+
+  it("keeps headers a thrown 429 set on its way out", async () => {
+    const app = new Elysia()
+      .use(errorContract)
+      .onError(({ error }) => ({ error: (error as Error).message }))
+      .get("/limited", ({ set }) => {
+        set.status = 429;
+        set.headers["Retry-After"] = "30";
+        set.headers["RateLimit-Limit"] = "10";
+        throw new Error("Rate limit exceeded");
+      });
+
+    const response = await app.handle(new Request("http://localhost/limited"));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("30");
+    expect(response.headers.get("ratelimit-limit")).toBe("10");
+    expect(await response.json()).toEqual({
+      error: "Rate limit exceeded",
+      code: "RATE_LIMITED",
+    });
+  });
+
   it("adds the code to a hand-written 401 that never reaches onError", async () => {
     const response = await routeApp().handle(
       new Request("http://localhost/denied")
@@ -332,12 +372,20 @@ describe("a route's own error body gets the same contract", () => {
     });
   });
 
-  it("ignores anything that is not an error-shaped object", () => {
-    expect(normalizeErrorPayload({ ok: true }, 400)).toBeUndefined();
+  it("hands back an object it did not change rather than nothing", () => {
+    // Returning undefined here would make mapResponse drop the body on the
+    // error path — every 404 and 401 would go out empty.
+    expect(normalizeErrorPayload({ ok: true }, 400)).toEqual({ ok: true });
+    expect(normalizeErrorPayload({ error: 42 }, 500)).toEqual({ error: 42 });
+  });
+
+  it("declines values whose serialization it must not take over", () => {
     expect(normalizeErrorPayload("plain string", 500)).toBeUndefined();
     expect(normalizeErrorPayload(["a"], 500)).toBeUndefined();
     expect(normalizeErrorPayload(null, 500)).toBeUndefined();
-    expect(normalizeErrorPayload({ error: 42 }, 500)).toBeUndefined();
+    expect(
+      normalizeErrorPayload(new Response("x", { status: 500 }), 500)
+    ).toBeUndefined();
   });
 
   it("ignores 2xx and 3xx, whatever the body looks like", () => {
