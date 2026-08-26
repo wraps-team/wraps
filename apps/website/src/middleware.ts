@@ -1,5 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { AGENT_CONTENT_PATHS } from "@/lib/agent-content-paths";
+import {
+  hasMarkdown,
+  markdownUrlFor,
+  pageForMarkdownUrl,
+  prefersMarkdown,
+} from "@/lib/agent-content-paths";
 import { setAttributionCookie } from "@/lib/attribution";
 
 export async function middleware(request: NextRequest) {
@@ -12,17 +17,35 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(new URL("/api/mcp", request.nextUrl.origin));
   }
 
-  const wantsMarkdown = accept.includes("text/markdown");
-  const isCovered = AGENT_CONTENT_PATHS.includes(request.nextUrl.pathname);
+  const { pathname } = request.nextUrl;
+
+  // A `.md` URL is a request for markdown however it was typed — no header
+  // needed. This is the form agents guess first, and the one the Link header
+  // below points at.
+  const markdownUrlTarget = pageForMarkdownUrl(pathname);
+  if (markdownUrlTarget !== undefined) {
+    return withAttribution(
+      request,
+      markdownRewrite(request, markdownUrlTarget)
+    );
+  }
+
+  // AI crawlers do not send Accept: text/markdown, and they are exactly who
+  // the markdown is for.
+  const wantsMarkdown =
+    accept.includes("text/markdown") ||
+    prefersMarkdown(request.headers.get("user-agent") ?? "");
+  const isCovered = hasMarkdown(pathname);
 
   const response = routeResponse(request, { wantsMarkdown, isCovered });
 
   if (!wantsMarkdown && isCovered) {
-    // Tell agents a markdown representation exists without them having to
-    // blind-guess the Accept header.
+    // Tell agents a markdown representation exists — pointing at the `.md`
+    // URL, which serves markdown to anyone. Advertising this path instead sent
+    // them back to the HTML they already had.
     response.headers.set(
       "Link",
-      `<${request.nextUrl.pathname}>; rel="alternate"; type="text/markdown"`
+      `<${markdownUrlFor(pathname)}>; rel="alternate"; type="text/markdown"`
     );
   }
 
@@ -48,7 +71,7 @@ function routeResponse(
     return NextResponse.redirect(new URL("/#pricing", request.nextUrl.origin));
   }
   if (wantsMarkdown && isCovered) {
-    return markdownRewrite(request);
+    return markdownRewrite(request, request.nextUrl.pathname);
   }
   return NextResponse.next();
 }
@@ -72,13 +95,26 @@ function isMcpTransportRequest(request: NextRequest, accept: string): boolean {
   );
 }
 
-function markdownRewrite(request: NextRequest): NextResponse {
-  const { pathname } = request.nextUrl;
-  // Route the request to /api/md/<path> so dynamic route params carry the page path
-  const mdPath = pathname === "/" ? "/api/md/root" : `/api/md${pathname}`;
-  const mdUrl = new URL(mdPath, request.nextUrl.origin);
+function markdownRewrite(request: NextRequest, page: string): NextResponse {
+  // Route the request to /api/md/<path> so dynamic route params carry the page
+  // path. An uncovered page still goes here on purpose: the route answers with
+  // a markdown 404 that names where to look instead.
+  const mdPath = page === "/" ? "/api/md/root" : `/api/md${page}`;
 
-  return NextResponse.rewrite(mdUrl);
+  return NextResponse.rewrite(new URL(mdPath, request.nextUrl.origin));
+}
+
+/**
+ * Attribution has to be recorded on whichever response is returned, including
+ * the early ones — campaign traffic lands on wraps.dev, not app.wraps.dev, so
+ * this is the only place first touch can be seen.
+ */
+function withAttribution(
+  request: NextRequest,
+  response: NextResponse
+): NextResponse {
+  setAttributionCookie(request, response);
+  return response;
 }
 
 export const config = {

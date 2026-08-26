@@ -150,8 +150,11 @@ describe("middleware only rewrites requests for paths AGENT_CONTENT actually ser
     const request = new NextRequest(`https://wraps.dev${COVERED_PATH}`);
     const response = await middleware(request);
 
+    // Points at the `.md` URL, not back at this path: this header used to name
+    // the page itself, which returns HTML to anyone who follows it without an
+    // Accept header — a dead end for the agents it exists to help.
     expect(response.headers.get("link")).toBe(
-      `<${COVERED_PATH}>; rel="alternate"; type="text/markdown"`
+      `<${COVERED_PATH}.md>; rel="alternate"; type="text/markdown"`
     );
   });
 

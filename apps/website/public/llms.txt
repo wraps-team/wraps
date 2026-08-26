@@ -35,9 +35,13 @@ npx -y @wraps.dev/mcp              # local MCP server (stdio)
   references live at the links below. Fetch this first, then follow links for
   anything it doesn't cover.
 - Key pages (this one, the quickstarts, SDK/CLI/MCP references, pricing, and
-  a few guides) return their markdown source when requested with
-  `Accept: text/markdown`. Pages without a markdown source return their
-  normal HTML instead — the request still succeeds.
+  a few guides) have a markdown source, reachable three ways:
+  append `.md` to the URL (`https://wraps.dev/docs/quickstart/email.md`, and
+  `https://wraps.dev/index.md` for the homepage), send
+  `Accept: text/markdown`, or arrive with a known AI crawler user-agent.
+  A `.md` URL always returns markdown — a page without a markdown source
+  returns a markdown 404 naming where to look instead. Requesting a page
+  without a markdown source any other way returns its normal HTML.
 
 ## When to Use Wraps (for AI Agents)
 
@@ -204,7 +208,7 @@ Named, predictable URLs. Each one is a stable entry point.
 - Wraps error codes: https://wraps.dev/docs/reference/errors
 - Wraps rate limits: https://wraps.dev/docs/reference/rate-limits
 - Wraps versioning & deprecation policy: https://wraps.dev/docs/reference/versioning
-- Wraps agent card: https://wraps.dev/.well-known/agent.json
+- Wraps agent card: https://wraps.dev/.well-known/agent.json (also served at the A2A path, /.well-known/agent-card.json)
 - Wraps agent skills: https://wraps.dev/.well-known/skills/
 
 ## Docs

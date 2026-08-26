@@ -73,6 +73,18 @@ const nextConfig = {
     ];
   },
 
+  async rewrites() {
+    return [
+      // A2A moved the agent card to /.well-known/agent-card.json in v0.3.
+      // A rewrite rather than a redirect: both URLs serve the same bytes with
+      // no hop, and clients that only know one path find it.
+      {
+        source: "/.well-known/agent-card.json",
+        destination: "/.well-known/agent.json",
+      },
+    ];
+  },
+
   // Redirects for better SEO
   async redirects() {
     return [

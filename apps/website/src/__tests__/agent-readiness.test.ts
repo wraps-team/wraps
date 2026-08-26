@@ -4,6 +4,12 @@ import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import { AGENT_CONTENT } from "@/lib/agent-content";
 import {
+  AGENT_CONTENT_PATHS,
+  markdownUrlFor,
+  pageForMarkdownUrl,
+  prefersMarkdown,
+} from "@/lib/agent-content-paths";
+import {
   callTool,
   FALLBACK_PROTOCOL_VERSION,
   handleMessage,
@@ -727,5 +733,176 @@ describe("onboarding signals are stated where an agent will find them", () => {
     expect(root).toContain("Start Without an Account");
     expect(root).toContain("https://wraps.dev/mcp");
     expect(root).toContain("Zero-Auth Endpoints");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reaching the markdown the way agents actually try
+// ---------------------------------------------------------------------------
+
+const rewriteOf = async (url: string, headers: Record<string, string> = {}) => {
+  const response = await middleware(new NextRequest(url, { headers }));
+  return response.headers.get("x-middleware-rewrite");
+};
+
+describe("a .md URL serves markdown with no header at all", () => {
+  it("maps /index.md to the homepage markdown", async () => {
+    expect(await rewriteOf("https://wraps.dev/index.md")).toBe(
+      "https://wraps.dev/api/md/root"
+    );
+  });
+
+  it("maps a docs page's .md URL to its markdown", async () => {
+    expect(await rewriteOf("https://wraps.dev/docs/sdk-reference.md")).toBe(
+      "https://wraps.dev/api/md/docs/sdk-reference"
+    );
+  });
+
+  it("leaves /pricing.md alone — it is a covered path in its own right", async () => {
+    expect(await rewriteOf("https://wraps.dev/pricing.md")).toBe(
+      "https://wraps.dev/api/md/pricing.md"
+    );
+  });
+
+  it("answers a .md URL with no markdown source in markdown, not HTML", async () => {
+    // A markdown 404 that names the sitemap beats an HTML page an agent then
+    // has to parse.
+    expect(await rewriteOf("https://wraps.dev/docs/guides/migration.md")).toBe(
+      "https://wraps.dev/api/md/docs/guides/migration"
+    );
+  });
+
+  it("still records attribution on that early return", async () => {
+    const response = await middleware(
+      new NextRequest("https://wraps.dev/index.md?utm_source=reddit")
+    );
+
+    expect(response.headers.get("set-cookie")).toContain("wraps_attribution");
+  });
+
+  it("does not touch a page URL that merely contains .md", async () => {
+    expect(await rewriteOf("https://wraps.dev/docs/sdk-reference")).toBeNull();
+  });
+});
+
+describe("the advertised markdown alternate is not a dead end", () => {
+  it("points at the .md URL, which serves markdown to anyone", async () => {
+    const response = await middleware(
+      new NextRequest("https://wraps.dev/docs/sdk-reference")
+    );
+
+    expect(response.headers.get("link")).toBe(
+      '</docs/sdk-reference.md>; rel="alternate"; type="text/markdown"'
+    );
+  });
+
+  it("advertises /index.md for the homepage, never /.md", async () => {
+    const response = await middleware(new NextRequest("https://wraps.dev/"));
+
+    expect(response.headers.get("link")).toBe(
+      '</index.md>; rel="alternate"; type="text/markdown"'
+    );
+  });
+
+  it("advertises a .md URL that serves the same markdown, for every covered page", () => {
+    // Not a path round-trip: /pricing and /pricing.md are both covered keys,
+    // so /pricing's alternate resolves to /pricing.md rather than back to
+    // /pricing. What has to hold is that an agent following the link gets the
+    // page's markdown.
+    for (const path of AGENT_CONTENT_PATHS) {
+      const mdUrl = markdownUrlFor(path);
+      expect(mdUrl, path).toBeDefined();
+
+      const resolved = pageForMarkdownUrl(mdUrl as string);
+      expect(resolved, path).toBeDefined();
+      expect(AGENT_CONTENT[resolved as string], path).toBe(AGENT_CONTENT[path]);
+    }
+  });
+});
+
+describe("AI crawlers get the markdown without asking for it", () => {
+  it.each([
+    "Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)",
+    "Mozilla/5.0 (compatible; ClaudeBot/1.0; +claudebot@anthropic.com)",
+    "Mozilla/5.0 (compatible; PerplexityBot/1.0)",
+    "ora-agent/1.0",
+  ])("serves markdown to %s", async (userAgent) => {
+    expect(
+      await rewriteOf("https://wraps.dev/docs/sdk-reference", {
+        "user-agent": userAgent,
+      })
+    ).toBe("https://wraps.dev/api/md/docs/sdk-reference");
+  });
+
+  it("leaves search crawlers on the HTML people see", async () => {
+    for (const userAgent of [
+      "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+      "Mozilla/5.0 (compatible; bingbot/2.0)",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    ]) {
+      expect(
+        await rewriteOf("https://wraps.dev/docs/sdk-reference", {
+          "user-agent": userAgent,
+        }),
+        userAgent
+      ).toBeNull();
+    }
+  });
+
+  it("does not redirect a crawler away from /pricing the way a browser is", async () => {
+    expect(
+      await rewriteOf("https://wraps.dev/pricing", {
+        "user-agent": "GPTBot/1.2",
+      })
+    ).toBe("https://wraps.dev/api/md/pricing");
+  });
+
+  it("matches the bot name case-insensitively, wherever it sits in the string", () => {
+    expect(prefersMarkdown("Mozilla/5.0 (compatible; gptbot/1.2)")).toBe(true);
+    expect(prefersMarkdown("CLAUDEBOT")).toBe(true);
+    expect(prefersMarkdown("")).toBe(false);
+    expect(prefersMarkdown("Mozilla/5.0 Chrome/120")).toBe(false);
+  });
+
+  it("varies the markdown response on User-Agent so a CDN cannot cross the wires", async () => {
+    const { GET } = await import("@/app/api/md/[...path]/route");
+    const response = await GET(
+      new NextRequest("https://wraps.dev/api/md/docs/sdk-reference"),
+      { params: Promise.resolve({ path: ["docs", "sdk-reference"] }) }
+    );
+
+    expect(response.headers.get("vary")).toBe("Accept, User-Agent");
+  });
+});
+
+describe("the A2A agent card is served at the path the spec names", () => {
+  it("rewrites /.well-known/agent-card.json onto the existing card", async () => {
+    const config = (await import("../../next.config")).default as {
+      rewrites: () => Promise<Array<{ source: string; destination: string }>>;
+    };
+    const rewrites = await config.rewrites();
+
+    expect(
+      rewrites.find((r) => r.source === "/.well-known/agent-card.json")
+        ?.destination
+    ).toBe("/.well-known/agent.json");
+  });
+
+  it("keeps that card parseable and carrying the A2A fields", () => {
+    const card = JSON.parse(read("public/.well-known/agent.json")) as {
+      name: string;
+      url: string;
+      capabilities: unknown;
+      skills: unknown[];
+      defaultInputModes: unknown;
+      securitySchemes: unknown;
+    };
+
+    expect(card.name).toBe("Wraps");
+    expect(card.url).toBe("https://wraps.dev");
+    expect(card.capabilities).toBeDefined();
+    expect(card.skills.length).toBeGreaterThan(0);
+    expect(card.defaultInputModes).toBeDefined();
+    expect(card.securitySchemes).toBeDefined();
   });
 });
