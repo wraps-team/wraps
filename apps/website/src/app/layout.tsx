@@ -68,24 +68,61 @@ const themeScript = `
 })();
 `;
 
-// Organization structured data for SEO
+// Organization structured data for SEO.
+// `address` is deliberately region-level: the registered jurisdiction is what
+// /terms and /privacy already state, and schema.org must not claim more than
+// the published record does.
 const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
+  "@id": "https://wraps.dev/#organization",
   name: "Wraps",
+  alternateName: ["Wraps.dev", "Wraps Email"],
   url: "https://wraps.dev",
   logo: "https://wraps.dev/logo.png",
+  email: "support@wraps.dev",
   description:
     "Email infrastructure platform that deploys to your AWS account. AWS pricing with modern developer experience.",
   sameAs: [
     "https://github.com/wraps-team/wraps",
     "https://twitter.com/useWraps",
   ],
-  contactPoint: {
-    "@type": "ContactPoint",
-    email: "support@wraps.dev",
-    contactType: "customer support",
+  address: {
+    "@type": "PostalAddress",
+    addressRegion: "CO",
+    addressCountry: "US",
   },
+  contactPoint: [
+    {
+      "@type": "ContactPoint",
+      email: "support@wraps.dev",
+      contactType: "customer support",
+      url: "https://wraps.dev/contact",
+      availableLanguage: ["English"],
+    },
+    {
+      "@type": "ContactPoint",
+      email: "support@wraps.dev",
+      contactType: "technical support",
+      url: "https://wraps.dev/docs",
+      availableLanguage: ["English"],
+    },
+  ],
+};
+
+// Names the site itself, so a brand-name query has something to match beyond
+// page titles.
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": "https://wraps.dev/#website",
+  name: "Wraps",
+  alternateName: ["Wraps.dev", "Wraps Email Infrastructure"],
+  url: "https://wraps.dev",
+  description:
+    "Wraps deploys email (AWS SES), SMS, and CDN infrastructure into your own AWS account with one command. CLI, TypeScript SDKs, MCP server, and a dashboard.",
+  inLanguage: "en-US",
+  publisher: { "@id": "https://wraps.dev/#organization" },
 };
 
 export default function RootLayout({
@@ -114,6 +151,7 @@ export default function RootLayout({
           type="text/plain"
         />
         <JsonLd data={organizationSchema} />
+        <JsonLd data={websiteSchema} />
       </head>
       <body className={inter.className}>
         <NuqsAdapter>

@@ -52,6 +52,31 @@ Wraps charges for the platform. You pay AWS directly for sending — $0.10/1,000
 
 Annual plans available (save ~16%). All paid plans: unlimited contacts, unlimited team members.
 
+## Start Without an Account
+
+- \`npx @wraps.dev/cli email init\` deploys into your own AWS account with your own AWS credentials. No Wraps account is involved.
+- Free tier: $0/month, 5,000 tracked events, 1 AWS account. Sign up at https://app.wraps.dev/sign-up.
+- API keys are self-serve in the dashboard under Settings → API Keys. Headless clients use the OAuth 2.0 Device Authorization Grant via \`wraps auth login\`.
+- Test environment: new AWS SES accounts start in the SES sandbox — sending is limited to verified addresses and the SES mailbox simulator (\`success@simulator.amazonses.com\`, \`bounce@simulator.amazonses.com\`, \`complaint@simulator.amazonses.com\`). \`wraps doctor\` reports sandbox state.
+- Nothing here requires talking to a salesperson.
+
+## MCP Servers
+
+- Hosted, no auth: \`https://wraps.dev/mcp\` (Streamable HTTP) — \`search_docs\`, \`get_doc\`, \`list_docs\`, \`estimate_cost\`.
+- Local, your AWS: \`npx -y @wraps.dev/mcp\` (stdio) — send history, delivery events, domain status, suppressions, guarded sending.
+- Manifest: https://wraps.dev/.well-known/mcp.json
+
+## Zero-Auth Endpoints
+
+| Endpoint | What it returns |
+|----------|-----------------|
+| \`https://wraps.dev/mcp\` | MCP over Streamable HTTP |
+| \`https://wraps.dev/api/pricing/estimate\` | Itemized Wraps + AWS cost estimate as JSON or markdown |
+| \`https://wraps.dev/llms.txt\` | Index of every page on the site |
+| \`https://wraps.dev/llms-full.txt\` | The whole documentation corpus |
+| \`https://wraps.dev/.well-known/agent.json\` | Agent card: capabilities, packages, onboarding |
+| \`https://api.wraps.dev/swagger/json\` | OpenAPI 3.0.3 specification |
+
 ## Key Pages
 
 - [Email Quickstart](https://wraps.dev/docs/quickstart/email)
@@ -252,7 +277,42 @@ Tools, configuration, and write-mode guardrails: [MCP Server Reference](https://
 
   "/docs/mcp-reference": `# MCP Server Reference (@wraps.dev/mcp)
 
-MCP server for Wraps email infrastructure. Gives AI agents access to your AWS SES sending history, delivery events, domain status, and suppression list — and, optionally, the ability to send email. Runs locally via stdio; your AWS credentials never leave your machine.
+Wraps runs two MCP servers: a hosted one for questions about Wraps, and a local one for your own email stack.
+
+## Hosted server: docs and pricing (no auth)
+
+\`https://wraps.dev/mcp\` speaks the Model Context Protocol over the Streamable HTTP transport. No API key, no account, no signup — it only reads public product data.
+
+| Tool | Description |
+|------|-------------|
+| \`search_docs\` | Search the full Wraps documentation and return matching sections as markdown |
+| \`get_doc\` | Read one Wraps page as markdown |
+| \`list_docs\` | The llms.txt index of every page |
+| \`estimate_cost\` | Monthly Wraps + AWS cost for a send volume, including the account's SES pricing plan |
+
+\`\`\`json
+{
+  "mcpServers": {
+    "wraps-docs": {
+      "type": "http",
+      "url": "https://wraps.dev/mcp"
+    }
+  }
+}
+\`\`\`
+
+\`\`\`bash
+curl -s https://wraps.dev/mcp \\
+  -H 'content-type: application/json' \\
+  -H 'accept: application/json' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+\`\`\`
+
+A manifest covering both servers: https://wraps.dev/.well-known/mcp.json
+
+## Local server: your own email stack
+
+\`@wraps.dev/mcp\` gives AI agents access to your AWS SES sending history, delivery events, domain status, and suppression list — and, optionally, the ability to send email. Runs locally via stdio; your AWS credentials never leave your machine.
 
 ## Prerequisites
 

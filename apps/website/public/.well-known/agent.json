@@ -82,7 +82,12 @@
       "tags": ["email", "content", "spam", "deliverability"]
     }
   ],
-  "protocols": ["llms.txt", "claude-code-skills"],
+  "protocols": [
+    "llms.txt",
+    "claude-code-skills",
+    "mcp/streamable-http",
+    "a2a/agent-card"
+  ],
   "defaultInputModes": ["application/json"],
   "defaultOutputModes": ["application/json"],
   "securitySchemes": {
@@ -103,13 +108,131 @@
     "oauth_discovery": "https://api.wraps.dev/.well-known/oauth-authorization-server",
     "cli_quickstart": "https://wraps.dev/docs/quickstart/email",
     "sdk_reference": "https://wraps.dev/docs/sdk-reference",
-    "cli_reference": "https://wraps.dev/docs/cli-reference"
+    "cli_reference": "https://wraps.dev/docs/cli-reference",
+    "mcp_remote": "https://wraps.dev/mcp",
+    "mcp_manifest": "https://wraps.dev/.well-known/mcp.json",
+    "sitemap": "https://wraps.dev/sitemap.xml",
+    "pricing_estimator": "https://wraps.dev/api/pricing/estimate"
   },
   "packages": {
-    "cli": "@wraps.dev/cli",
-    "email_sdk": "@wraps.dev/email",
-    "sms_sdk": "@wraps.dev/sms",
-    "platform_sdk": "@wraps.dev/client"
+    "cli": {
+      "name": "@wraps.dev/cli",
+      "registry": "npm",
+      "url": "https://www.npmjs.com/package/@wraps.dev/cli",
+      "install": "npm install -g @wraps.dev/cli",
+      "run": "npx @wraps.dev/cli email init"
+    },
+    "email_sdk": {
+      "name": "@wraps.dev/email",
+      "registry": "npm",
+      "url": "https://www.npmjs.com/package/@wraps.dev/email",
+      "install": "npm install @wraps.dev/email"
+    },
+    "email_sdk_python": {
+      "name": "wraps-email",
+      "registry": "pypi",
+      "url": "https://pypi.org/project/wraps-email/",
+      "install": "pip install wraps-email"
+    },
+    "sms_sdk": {
+      "name": "@wraps.dev/sms",
+      "registry": "npm",
+      "url": "https://www.npmjs.com/package/@wraps.dev/sms",
+      "install": "npm install @wraps.dev/sms"
+    },
+    "platform_sdk": {
+      "name": "@wraps.dev/client",
+      "registry": "npm",
+      "url": "https://www.npmjs.com/package/@wraps.dev/client",
+      "install": "npm install @wraps.dev/client"
+    },
+    "mcp_server": {
+      "name": "@wraps.dev/mcp",
+      "registry": "npm",
+      "url": "https://www.npmjs.com/package/@wraps.dev/mcp",
+      "run": "npx -y @wraps.dev/mcp"
+    }
   },
-  "contact": "support@wraps.dev"
+  "contact": "support@wraps.dev",
+  "mcp": {
+    "manifest": "https://wraps.dev/.well-known/mcp.json",
+    "remote": {
+      "url": "https://wraps.dev/mcp",
+      "transport": "streamable-http",
+      "authentication": "none",
+      "tools": ["search_docs", "get_doc", "list_docs", "estimate_cost"]
+    },
+    "local": {
+      "package": "@wraps.dev/mcp",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@wraps.dev/mcp"],
+      "authentication": "AWS credentials from the caller's own environment",
+      "tools": [
+        "list_recent_sends",
+        "get_email_event_log",
+        "verify_domain_status",
+        "list_suppressions",
+        "send_email"
+      ]
+    }
+  },
+  "onboarding": {
+    "free_tier": {
+      "available": true,
+      "price": "0",
+      "currency": "USD",
+      "includes": "5,000 tracked events per month, 1 AWS account",
+      "url": "https://wraps.dev/pricing.md"
+    },
+    "signup": {
+      "self_serve": true,
+      "url": "https://app.wraps.dev/sign-up",
+      "sales_contact_required": false
+    },
+    "api_keys": {
+      "self_serve": true,
+      "url": "https://app.wraps.dev",
+      "location": "Settings → API Keys",
+      "docs": "https://wraps.dev/docs/reference/api"
+    },
+    "headless_auth": {
+      "grant": "urn:ietf:params:oauth:grant-type:device_code",
+      "command": "wraps auth login",
+      "discovery": "https://api.wraps.dev/.well-known/oauth-authorization-server"
+    },
+    "sandbox": {
+      "available": true,
+      "description": "New AWS SES accounts start in the SES sandbox: sending is limited to verified addresses and the SES mailbox simulator. This is the test environment, and it costs nothing.",
+      "test_addresses": [
+        "success@simulator.amazonses.com",
+        "bounce@simulator.amazonses.com",
+        "complaint@simulator.amazonses.com"
+      ],
+      "status_command": "wraps doctor",
+      "exit_docs": "https://wraps.dev/docs/guides/production-access"
+    },
+    "zero_auth_endpoints": [
+      "https://wraps.dev/mcp",
+      "https://wraps.dev/api/pricing/estimate",
+      "https://wraps.dev/llms.txt",
+      "https://wraps.dev/llms-full.txt",
+      "https://wraps.dev/.well-known/mcp.json"
+    ],
+    "no_account_path": "npx @wraps.dev/cli email init deploys into the caller's own AWS account with no Wraps account at all."
+  },
+  "developer_resources": {
+    "api_reference": "https://wraps.dev/docs/reference/api",
+    "openapi": "https://wraps.dev/openapi.json",
+    "api_catalog": "https://wraps.dev/.well-known/api-catalog",
+    "authentication": "https://api.wraps.dev/.well-known/oauth-authorization-server",
+    "webhooks": "https://wraps.dev/docs/guides/webhooks",
+    "errors": "https://wraps.dev/docs/reference/errors",
+    "rate_limits": "https://wraps.dev/docs/reference/rate-limits",
+    "cli": "https://wraps.dev/docs/cli-reference",
+    "sdk": "https://wraps.dev/docs/sdk-reference",
+    "mcp": "https://wraps.dev/docs/mcp-reference",
+    "changelog": "https://wraps.dev/changelog",
+    "status": "https://api.wraps.dev/health"
+  }
 }

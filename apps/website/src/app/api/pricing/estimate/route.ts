@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import type { BillingInterval, TierId } from "@/config/pricing";
-import { renderEstimateMarkdown } from "@/lib/pricing-markdown";
+import { buildShareUrl, renderEstimateMarkdown } from "@/lib/pricing-markdown";
 import type { CostInput, RetentionPeriod, SesPlanId } from "@/lib/ses-cost";
 import {
   DEFAULT_COST_INPUT,
@@ -11,7 +11,6 @@ import {
 } from "@/lib/ses-cost";
 
 const SITE = "https://wraps.dev";
-const CALCULATOR_PATH = "/tools/ses-calculator";
 
 const TIER_IDS = ["free", "starter", "growth", "scale"] as const;
 const BILLING_INTERVALS = ["monthly", "annual"] as const;
@@ -158,26 +157,6 @@ function parseInput(params: URLSearchParams): CostInput {
     ),
     waf: parseBoolean(params.get("waf"), DEFAULT_COST_INPUT.waf, "waf"),
   };
-}
-
-/** Link back to the interactive calculator with the same inputs (nuqs params). */
-export function buildShareUrl(input: CostInput): string {
-  const params = new URLSearchParams({
-    emails: String(input.emailsPerMonth),
-    events: String(input.eventsPerMonth),
-    tier: input.tier,
-    billing: input.billing,
-    sesPlan: input.sesPlan,
-    tracking: String(input.eventTracking),
-    eventbridge: String(input.eventBridge),
-    dynamodb: String(input.dynamodb),
-    retention: input.retention,
-    eventTypes: String(input.eventTypes),
-    dedicatedIp: String(input.dedicatedIp),
-    https: String(input.httpsTracking),
-    waf: String(input.waf),
-  });
-  return `${SITE}${CALCULATOR_PATH}?${params.toString()}`;
 }
 
 export function GET(request: NextRequest) {

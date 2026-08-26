@@ -1,4 +1,5 @@
 import { FaqAccordion } from "./faq-accordion";
+import { faqItems } from "./faq-items";
 import { SectionKicker } from "./section-kicker";
 
 export function FaqSection() {
@@ -15,6 +16,25 @@ export function FaqSection() {
         <div className="max-w-3xl">
           <FaqAccordion />
         </div>
+
+        {/*
+          Radix renders every accordion panel with `hidden`, so with JavaScript
+          off the questions are readable and the answers are not — for people
+          and for the crawlers that extract visible text only. This fallback is
+          the same copy, flattened.
+        */}
+        <noscript>
+          <div className="max-w-3xl space-y-6">
+            {faqItems.map((item) => (
+              <div key={item.value}>
+                <h3 className="mb-1 font-medium text-foreground">
+                  {item.question}
+                </h3>
+                <p className="text-muted-foreground text-sm">{item.answer}</p>
+              </div>
+            ))}
+          </div>
+        </noscript>
 
         {/* Simple contact line - server rendered */}
         <p className="mt-8 text-muted-foreground text-sm">

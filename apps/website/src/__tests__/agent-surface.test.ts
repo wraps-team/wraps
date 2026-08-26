@@ -20,9 +20,9 @@ const read = (relativePath: string) =>
 // route. Both are deliberate, not drift:
 //  - /pricing.md is served from the generated public/pricing.md static file.
 //  - /pricing itself has no page route at all — it is the #pricing anchor
-//    section (PricingSection) rendered on the homepage ("/"). A direct GET
-//    to /pricing 404s today independent of markdown negotiation; that is a
-//    pre-existing condition, not something this plan's scope covers.
+//    section (PricingSection) rendered on the homepage ("/"). A direct HTML
+//    GET is redirected to /#pricing by next.config; markdown negotiation
+//    still resolves first, in middleware.
 const AGENT_CONTENT_PATHS_WITHOUT_PAGE_ROUTE = new Set([
   "/pricing.md",
   "/pricing",

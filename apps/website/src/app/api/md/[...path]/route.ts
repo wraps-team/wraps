@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { AGENT_CONTENT } from "@/lib/agent-content";
+import { renderNotFoundMarkdown } from "@/lib/not-found-content";
 
 const MD_HEADERS = {
   "Content-Type": "text/markdown; charset=utf-8",
@@ -27,10 +28,10 @@ export async function GET(
   const content = AGENT_CONTENT[pagePath];
 
   if (content === undefined) {
-    return new NextResponse(
-      "Not found. See https://wraps.dev/llms.txt for the documentation index.",
-      { status: 404, headers: NOT_FOUND_HEADERS }
-    );
+    return new NextResponse(renderNotFoundMarkdown(pagePath), {
+      status: 404,
+      headers: NOT_FOUND_HEADERS,
+    });
   }
 
   return new NextResponse(content, { headers: MD_HEADERS });

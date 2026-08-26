@@ -22,6 +22,20 @@ import {
   CodeBlockItem,
 } from "@/components/ui/shadcn-io/code-block";
 
+const hostedConfig = `{
+  "mcpServers": {
+    "wraps-docs": {
+      "type": "http",
+      "url": "https://wraps.dev/mcp"
+    }
+  }
+}`;
+
+const hostedCurl = `curl -s https://wraps.dev/mcp \\
+  -H 'content-type: application/json' \\
+  -H 'accept: application/json' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`;
+
 const claudeCodeConfig = `{
   "mcpServers": {
     "wraps": {
@@ -171,12 +185,20 @@ const guardrailVars = [
   },
 ];
 
-function ConfigBlock({ filename, code }: { filename: string; code: string }) {
+function ConfigBlock({
+  filename,
+  code,
+  language = "json",
+}: {
+  filename: string;
+  code: string;
+  language?: string;
+}) {
   return (
     <CodeBlock
       className="h-auto"
-      data={[{ language: "json", filename, code }]}
-      defaultValue="json"
+      data={[{ language, filename, code }]}
+      defaultValue={language}
     >
       <CodeBlockHeader>
         <CodeBlockFiles>
@@ -221,6 +243,45 @@ export default function McpReferencePageContent() {
           credentials never leave your machine.
         </p>
       </div>
+
+      {/* Hosted docs server */}
+      <section className="mb-12">
+        <h2 className="mb-4 font-bold text-2xl">
+          Hosted server: docs and pricing
+        </h2>
+        <p className="mb-4 text-muted-foreground">
+          There is a second, public server at{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            https://wraps.dev/mcp
+          </code>{" "}
+          over the Streamable HTTP transport. It answers questions{" "}
+          <em>about</em> Wraps — it never touches your AWS account, so it needs
+          no credentials, no API key, and no account. Four read-only tools:{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">search_docs</code>,{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">get_doc</code>,{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">list_docs</code>, and{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">estimate_cost</code>.
+        </p>
+        <div className="mb-4">
+          <ConfigBlock code={hostedConfig} filename=".mcp.json" />
+        </div>
+        <p className="mb-4 text-muted-foreground">
+          Or call it directly — it is plain JSON-RPC over HTTPS:
+        </p>
+        <div className="mb-4">
+          <ConfigBlock code={hostedCurl} filename="terminal" language="bash" />
+        </div>
+        <p className="text-muted-foreground">
+          A manifest covering both servers is published at{" "}
+          <a
+            className="text-orange-500 underline underline-offset-4"
+            href="/.well-known/mcp.json"
+          >
+            /.well-known/mcp.json
+          </a>
+          . Everything below this section is about the local server.
+        </p>
+      </section>
 
       <Card className="mb-12">
         <CardHeader>

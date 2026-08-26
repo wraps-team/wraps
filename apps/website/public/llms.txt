@@ -7,6 +7,26 @@ Wraps is a CLI and TypeScript SDK that deploys production-ready AWS
 infrastructure (SES, Lambda, DynamoDB, EventBridge, CloudFront) to your
 account. Zero credentials stored. OIDC authentication. You own everything.
 
+## Install
+
+The Wraps CLI and SDKs are published packages — no account, no API key, no
+waitlist. Every one of these is a real registry entry you can verify.
+
+```bash
+npx @wraps.dev/cli email init      # run the CLI without installing it
+npm install -g @wraps.dev/cli      # or install it globally
+curl -fsSL https://get.wraps.dev | sh   # or install the binary
+npm install @wraps.dev/email       # TypeScript email SDK
+npm install @wraps.dev/sms         # TypeScript SMS SDK
+npm install @wraps.dev/client      # Platform API client
+pip install wraps-email            # Python email SDK
+npx -y @wraps.dev/mcp              # local MCP server (stdio)
+```
+
+- CLI on npm: https://www.npmjs.com/package/@wraps.dev/cli
+- CLI docs: https://wraps.dev/cli and https://wraps.dev/docs/cli-reference
+- CLI source: https://github.com/wraps-team/wraps/tree/main/packages/cli
+
 ## Start Here
 
 - [llms-full.txt](https://wraps.dev/llms-full.txt): Extended reference in one
@@ -69,7 +89,31 @@ await email.send({
 });
 ```
 
-## MCP Server (for AI Agents)
+## MCP Servers (for AI Agents)
+
+Wraps runs two MCP servers.
+
+### Remote: docs and pricing (no auth)
+
+`https://wraps.dev/mcp` is a public Model Context Protocol server over the
+Streamable HTTP transport. No key, no account, no signup — POST JSON-RPC to it.
+Tools: `search_docs`, `get_doc`, `list_docs`, `estimate_cost`. Everything it
+returns is public product data; nothing it exposes can change anything.
+
+```json
+{
+  "mcpServers": {
+    "wraps-docs": {
+      "type": "http",
+      "url": "https://wraps.dev/mcp"
+    }
+  }
+}
+```
+
+Manifest for both servers: https://wraps.dev/.well-known/mcp.json
+
+### Local: your own email stack (AWS credentials)
 
 Wraps ships an MCP server, `@wraps.dev/mcp`, that exposes a deployed email
 stack as tools: `list_recent_sends`, `get_email_event_log`,
@@ -119,6 +163,48 @@ Important: AWS defaults every new SES account to the Essentials plan at
 $0.16 per 1,000 emails. À la carte is $0.10 per 1,000 and is still available —
 an account defaulted into Essentials can move back with immediate effect. SES
 plans are set per account and per Region. Pass `sesPlan` to model either.
+
+## Getting Started Without a Human
+
+Every step below is self-serve. There is no "contact sales" gate on any of it.
+
+- **No account needed at all**: `npx @wraps.dev/cli email init` deploys into
+  your own AWS account using your own AWS credentials. The CLI, the SDKs, and
+  the local console (`wraps console`) work with no Wraps account.
+- **Free tier**: $0/month, 5,000 tracked events, one AWS account. Sign up at
+  https://app.wraps.dev/sign-up. Pricing: https://wraps.dev/pricing.md
+- **Self-serve API keys**: create them yourself in the dashboard at
+  https://app.wraps.dev under Settings → API Keys. See
+  https://wraps.dev/docs/reference/api
+- **Device-code auth for headless clients**: `wraps auth login` uses the OAuth
+  2.0 Device Authorization Grant (RFC 8628). Discovery document:
+  https://api.wraps.dev/.well-known/oauth-authorization-server
+- **Test environment**: new AWS SES accounts start in the SES sandbox, which is
+  the test environment — sending is limited to verified addresses and the SES
+  mailbox simulator (`success@simulator.amazonses.com`,
+  `bounce@simulator.amazonses.com`, `complaint@simulator.amazonses.com`).
+  `wraps doctor` reports sandbox state; getting out of it is documented at
+  https://wraps.dev/docs/guides/production-access
+- **Zero-auth endpoints you can call right now**: `https://wraps.dev/mcp`
+  (MCP), `https://wraps.dev/api/pricing/estimate` (cost estimator),
+  `https://wraps.dev/llms.txt` and `https://wraps.dev/llms-full.txt` (docs).
+
+## Developer Resources
+
+Named, predictable URLs. Each one is a stable entry point.
+
+- Wraps API reference: https://wraps.dev/docs/reference/api (also /api-docs)
+- Wraps OpenAPI spec: https://wraps.dev/openapi.json → https://api.wraps.dev/swagger/json
+- Wraps API catalog (RFC 9727): https://wraps.dev/.well-known/api-catalog
+- Wraps authentication: https://api.wraps.dev/.well-known/oauth-authorization-server
+- Wraps webhooks: https://wraps.dev/docs/guides/webhooks
+- Wraps MCP servers: https://wraps.dev/mcp and https://wraps.dev/.well-known/mcp.json
+- Wraps CLI: https://wraps.dev/docs/cli-reference (npm `@wraps.dev/cli`)
+- Wraps SDKs: https://wraps.dev/docs/sdk-reference (npm `@wraps.dev/email`)
+- Wraps error codes: https://wraps.dev/docs/reference/errors
+- Wraps rate limits: https://wraps.dev/docs/reference/rate-limits
+- Wraps agent card: https://wraps.dev/.well-known/agent.json
+- Wraps agent skills: https://wraps.dev/.well-known/skills/
 
 ## Docs
 

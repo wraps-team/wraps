@@ -16,7 +16,7 @@ import {
   PRICING_TIERS,
   TIER_LIMITS,
 } from "../config/pricing";
-import type { CostEstimate, SesPlanId } from "./ses-cost";
+import type { CostEstimate, CostInput, SesPlanId } from "./ses-cost";
 import {
   AWS_INFRA_PRICING,
   estimateCost,
@@ -286,6 +286,32 @@ function whatYouOwnSection(): string {
 The infrastructure is deployed into your AWS account with Pulumi and namespaced \`wraps-email-*\`, \`wraps-sms-*\`, \`wraps-cdn-*\`. Nothing pre-existing is modified. Your sending identities, event history, and suppression lists live in your account. If you stop paying Wraps, the infrastructure keeps sending — you lose the dashboard, workflows, and platform tooling, not your ability to send email. \`wraps email destroy\` removes exactly what was deployed.
 
 Wraps is open source (AGPL-3.0). Self-hosting the control plane is available on Enterprise.`;
+}
+
+// =============================================================================
+// ESTIMATE SHARE LINKS
+// =============================================================================
+
+const CALCULATOR_PATH = "/tools/ses-calculator";
+
+/** Link back to the interactive calculator with the same inputs (nuqs params). */
+export function buildShareUrl(input: CostInput): string {
+  const params = new URLSearchParams({
+    emails: String(input.emailsPerMonth),
+    events: String(input.eventsPerMonth),
+    tier: input.tier,
+    billing: input.billing,
+    sesPlan: input.sesPlan,
+    tracking: String(input.eventTracking),
+    eventbridge: String(input.eventBridge),
+    dynamodb: String(input.dynamodb),
+    retention: String(input.retention),
+    eventTypes: String(input.eventTypes),
+    dedicatedIp: String(input.dedicatedIp),
+    https: String(input.httpsTracking),
+    waf: String(input.waf),
+  });
+  return `${SITE}${CALCULATOR_PATH}?${params.toString()}`;
 }
 
 // =============================================================================

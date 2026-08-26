@@ -19,6 +19,53 @@ export const metadata: Metadata = {
   },
 };
 
+// What an agent needs to answer "can I start with this on my own, today?" —
+// a free tier, a real package it can install, and no sales call in the path.
+const softwareSchema = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Wraps",
+  applicationCategory: "DeveloperApplication",
+  applicationSubCategory: "Email infrastructure",
+  operatingSystem: "macOS, Linux, Windows",
+  url: "https://wraps.dev",
+  downloadUrl: "https://www.npmjs.com/package/@wraps.dev/cli",
+  installUrl: "https://wraps.dev/docs/quickstart/email",
+  softwareHelp: "https://wraps.dev/docs",
+  license: "https://opensource.org/licenses/AGPL-3.0",
+  isAccessibleForFree: true,
+  provider: { "@id": "https://wraps.dev/#organization" },
+  description:
+    "Deploy email (AWS SES), SMS, and CDN infrastructure into your own AWS account with one command. CLI, TypeScript SDKs, MCP server, and a dashboard. You pay AWS directly.",
+  featureList: [
+    "One-command AWS SES deployment (npx @wraps.dev/cli email init)",
+    "TypeScript SDKs for email and SMS",
+    "MCP server for AI agents",
+    "Free tier with 5,000 tracked events per month",
+    "Self-serve API keys — no sales call",
+  ],
+  offers: [
+    {
+      "@type": "Offer",
+      name: "Free",
+      price: "0",
+      priceCurrency: "USD",
+      url: "https://wraps.dev/#pricing",
+      availability: "https://schema.org/InStock",
+      description:
+        "Free forever: 5,000 tracked events per month, one AWS account. The CLI and SDKs are free and open source with no account at all.",
+    },
+    {
+      "@type": "Offer",
+      name: "Starter",
+      price: "19",
+      priceCurrency: "USD",
+      url: "https://wraps.dev/#pricing",
+      availability: "https://schema.org/InStock",
+    },
+  ],
+};
+
 // FAQ structured data for rich results
 const faqSchema = {
   "@context": "https://schema.org",
@@ -87,6 +134,7 @@ export default function LandingPage() {
   return (
     <>
       <JsonLd data={faqSchema} />
+      <JsonLd data={softwareSchema} />
       <div className="min-h-screen bg-background">
         {/* Navigation */}
         <LandingNavbar />

@@ -4,10 +4,18 @@ import { setAttributionCookie } from "@/lib/attribution";
 
 export async function middleware(request: NextRequest) {
   const accept = request.headers.get("accept") ?? "";
+
+  // /mcp is two things at one URL: the product page for people, and the
+  // Streamable HTTP MCP endpoint for agents. Method and Accept separate them —
+  // anything that is not a document request goes to the JSON-RPC handler.
+  if (isMcpTransportRequest(request, accept)) {
+    return NextResponse.rewrite(new URL("/api/mcp", request.nextUrl.origin));
+  }
+
   const wantsMarkdown = accept.includes("text/markdown");
   const isCovered = AGENT_CONTENT_PATHS.includes(request.nextUrl.pathname);
-  const response =
-    wantsMarkdown && isCovered ? markdownRewrite(request) : NextResponse.next();
+
+  const response = routeResponse(request, { wantsMarkdown, isCovered });
 
   if (!wantsMarkdown && isCovered) {
     // Tell agents a markdown representation exists without them having to
@@ -24,6 +32,44 @@ export async function middleware(request: NextRequest) {
   setAttributionCookie(request, response);
 
   return response;
+}
+
+const PRICING_PATH = "/pricing";
+
+function routeResponse(
+  request: NextRequest,
+  { wantsMarkdown, isCovered }: { wantsMarkdown: boolean; isCovered: boolean }
+): NextResponse {
+  // /pricing is the #pricing section of the homepage, not a page of its own,
+  // so a plain GET used to 404 on the most-guessed URL on the site. The
+  // redirect lives here rather than in next.config because config redirects
+  // resolve before middleware, which would swallow markdown negotiation.
+  if (request.nextUrl.pathname === PRICING_PATH && !wantsMarkdown) {
+    return NextResponse.redirect(new URL("/#pricing", request.nextUrl.origin));
+  }
+  if (wantsMarkdown && isCovered) {
+    return markdownRewrite(request);
+  }
+  return NextResponse.next();
+}
+
+const MCP_PATHS = new Set(["/mcp", "/mcp/"]);
+
+function isMcpTransportRequest(request: NextRequest, accept: string): boolean {
+  if (!MCP_PATHS.has(request.nextUrl.pathname)) {
+    return false;
+  }
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return true;
+  }
+  // A browser always asks for text/html. An MCP client asking for a stream or
+  // for JSON is not after the marketing page.
+  if (accept.includes("text/html")) {
+    return false;
+  }
+  return (
+    accept.includes("text/event-stream") || accept.includes("application/json")
+  );
 }
 
 function markdownRewrite(request: NextRequest): NextResponse {

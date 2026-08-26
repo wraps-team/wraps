@@ -49,7 +49,7 @@ const nextConfig = {
           {
             key: "Link",
             value:
-              '</docs>; rel="service-doc", </.well-known/api-catalog>; rel="api-catalog"',
+              '</docs>; rel="service-doc", </.well-known/api-catalog>; rel="api-catalog", </llms.txt>; rel="alternate"; type="text/plain"; title="llms.txt", </.well-known/mcp.json>; rel="describedby"; type="application/json"; title="MCP server manifest"',
           },
         ],
       },
@@ -81,6 +81,39 @@ const nextConfig = {
         destination: "/tools/ses-calculator",
         permanent: true,
       },
+      // Predictable URLs for developer resources. Agents guess these names
+      // before they read llms.txt, and a guess that 404s reads as "no API".
+      {
+        source: "/openapi.json",
+        destination: "https://api.wraps.dev/swagger/json",
+        permanent: false,
+      },
+      {
+        source: "/api-docs",
+        destination: "/docs/reference/api",
+        permanent: true,
+      },
+      {
+        source: "/docs/api",
+        destination: "/docs/reference/api",
+        permanent: true,
+      },
+      {
+        source: "/api-reference",
+        destination: "/docs/reference/api",
+        permanent: true,
+      },
+      {
+        source: "/webhooks",
+        destination: "/docs/guides/webhooks",
+        permanent: true,
+      },
+      {
+        source: "/mcp.json",
+        destination: "/.well-known/mcp.json",
+        permanent: true,
+      },
+      { source: "/llms", destination: "/llms.txt", permanent: true },
     ];
   },
 } satisfies NextConfig;
