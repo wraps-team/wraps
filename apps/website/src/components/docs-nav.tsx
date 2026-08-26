@@ -241,6 +241,11 @@ export const navItems: NavSection[] = [
         icon: ShieldCheck,
       },
       {
+        title: "Versioning & Deprecation",
+        href: "/docs/reference/versioning",
+        icon: History,
+      },
+      {
         title: "Environment Variables",
         href: "/docs/reference/environment-variables",
         icon: Settings,

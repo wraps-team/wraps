@@ -46,6 +46,7 @@ vi.mock("@wraps/db", async () => {
 });
 
 const { webhooksRoutes } = await import("../routes/webhooks");
+const { errorContract } = await import("../middleware/error-contract");
 const { Elysia } = await import("elysia");
 
 const AWS_ACCOUNT_NUMBER = "123456789012";
@@ -65,7 +66,9 @@ const ATTACKER_ROW = {
 };
 
 function createTestApp() {
-  return new Elysia().use(webhooksRoutes);
+  // Mount the real error-contract plugin: these assertions are about the body
+  // a caller actually receives, and that plugin is what puts `code` in it.
+  return new Elysia().use(errorContract).use(webhooksRoutes);
 }
 
 // Matches the account lookup: .from(awsAccount).where(eq(...)) — no .limit().
@@ -206,7 +209,10 @@ describe("Webhook: account disambiguation by secret", () => {
     );
 
     expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: "Unauthorized" });
+    expect(await response.json()).toEqual({
+      error: "Unauthorized",
+      code: "UNAUTHORIZED",
+    });
   });
 
   it("returns 401 when the key doesn't match any registered secret", async () => {
@@ -217,7 +223,10 @@ describe("Webhook: account disambiguation by secret", () => {
     const response = await sendWebhookEvent(app, event, "wrong-secret-value");
 
     expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: "Unauthorized" });
+    expect(await response.json()).toEqual({
+      error: "Unauthorized",
+      code: "UNAUTHORIZED",
+    });
   });
 
   it("happy path: single registered row + correct secret processes the event", async () => {

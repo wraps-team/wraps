@@ -32,6 +32,11 @@ export function resolveErrorStatus(
     return 404;
   }
 
+  return numericStatus(setStatus) ?? 500;
+}
+
+/** `set.status` as a number, or undefined when it is absent or unrecognized. */
+export function numericStatus(setStatus: unknown): number | undefined {
   if (typeof setStatus === "number") {
     return setStatus;
   }
@@ -40,7 +45,7 @@ export function resolveErrorStatus(
     return StatusMap[setStatus as keyof typeof StatusMap];
   }
 
-  return 500;
+  return;
 }
 
 /**
@@ -107,6 +112,88 @@ function authMethodOf(
 }
 
 /**
+ * The response body every failure shares.
+ *
+ * `error` is for a person, `code` is for a program: stable across releases and
+ * safe to branch on, which a prose message is not. `requestId` is the same id
+ * the structured logs carry, so a caller reporting a failure hands support the
+ * one string that finds it.
+ */
+export type ApiErrorBody = {
+  error: string;
+  code: string;
+  requestId?: string;
+};
+
+/**
+ * Status → code. Exported so the OpenAPI error schema enumerates exactly what
+ * the handler can emit, instead of a hand-kept copy that drifts.
+ */
+export const STATUS_ERROR_CODES: Record<number, string> = {
+  400: "BAD_REQUEST",
+  401: "UNAUTHORIZED",
+  402: "PAYMENT_REQUIRED",
+  403: "FORBIDDEN",
+  404: "NOT_FOUND",
+  409: "CONFLICT",
+  413: "PAYLOAD_TOO_LARGE",
+  422: "VALIDATION_FAILED",
+  429: "RATE_LIMITED",
+};
+
+export const GENERIC_CLIENT_ERROR_CODE = "REQUEST_FAILED";
+export const INTERNAL_ERROR_CODE = "INTERNAL_ERROR";
+export const MALFORMED_REQUEST_CODE = "MALFORMED_REQUEST";
+
+/** Every value `handleApiError` can put in `code`, sorted and deduplicated. */
+export const API_ERROR_CODES: readonly string[] = [
+  ...new Set([
+    ...Object.values(STATUS_ERROR_CODES),
+    GENERIC_CLIENT_ERROR_CODE,
+    INTERNAL_ERROR_CODE,
+    MALFORMED_REQUEST_CODE,
+  ]),
+].sort();
+
+const CLIENT_ERROR_FLOOR = 400;
+const SERVER_ERROR_FLOOR = 500;
+
+/**
+ * Machine-readable code for a status. Elysia's own `code` wins when it names
+ * something more specific than the status does.
+ */
+export function errorCodeFor(
+  status: number,
+  elysiaCode: string | number
+): string {
+  if (elysiaCode === "PARSE") {
+    return MALFORMED_REQUEST_CODE;
+  }
+  if (elysiaCode === "VALIDATION") {
+    return STATUS_ERROR_CODES[422];
+  }
+
+  const mapped = STATUS_ERROR_CODES[status];
+  if (mapped) {
+    return mapped;
+  }
+
+  return status >= SERVER_ERROR_FLOOR
+    ? INTERNAL_ERROR_CODE
+    : GENERIC_CLIENT_ERROR_CODE;
+}
+
+function errorBody(
+  message: string,
+  code: string,
+  requestId: string | undefined
+): ApiErrorBody {
+  return requestId === undefined
+    ? { error: message, code }
+    : { error: message, code, requestId };
+}
+
+/**
  * The global onError handler, extracted so tests can mount the real thing.
  *
  * Three responsibilities, deliberately in one place because they share the
@@ -116,7 +203,7 @@ function authMethodOf(
 export function handleApiError(
   input: ApiErrorInput,
   sinks: ApiErrorSinks
-): { error: string } {
+): ApiErrorBody {
   const { error, request, code, setStatus, requestId, auth } = input;
   const url = new URL(request.url);
   const status = resolveErrorStatus(code, setStatus);
@@ -190,18 +277,59 @@ export function handleApiError(
   }
 
   if (code === "NOT_FOUND") {
-    return { error: "Not found" };
+    return errorBody("Not found", STATUS_ERROR_CODES[404], requestId);
   }
 
   if (code === "VALIDATION") {
-    return { error: "Validation failed" };
+    return errorBody("Validation failed", STATUS_ERROR_CODES[422], requestId);
   }
 
   // 4xx errors from routes are already sanitized — pass through
-  if (status >= 400 && status < 500) {
-    return { error: asError(error).message };
+  if (status >= CLIENT_ERROR_FLOOR && status < SERVER_ERROR_FLOOR) {
+    return errorBody(
+      asError(error).message,
+      errorCodeFor(status, code),
+      requestId
+    );
   }
 
   // 5xx: never leak internal details
-  return { error: "Internal server error" };
+  return errorBody("Internal server error", INTERNAL_ERROR_CODE, requestId);
+}
+
+/**
+ * Fill in `code` on an error body a route returned directly.
+ *
+ * Routes that answer with their own `{ error }` object never reach
+ * `handleApiError`, so without this the published contract — every failure
+ * carries a machine-readable `code` — would hold for framework errors and
+ * quietly not for the 40-odd hand-written ones. Normalizing on the way out
+ * keeps one contract without threading a code through every route.
+ *
+ * Returns undefined when there is nothing to add, which the caller reads as
+ * "leave the response alone".
+ */
+export function normalizeErrorPayload(
+  response: unknown,
+  setStatus: unknown
+): Record<string, unknown> | undefined {
+  const status = numericStatus(setStatus);
+  if (status === undefined || status < CLIENT_ERROR_FLOOR) {
+    return;
+  }
+
+  if (
+    response === null ||
+    typeof response !== "object" ||
+    Array.isArray(response)
+  ) {
+    return;
+  }
+
+  const body = response as Record<string, unknown>;
+  if (typeof body.error !== "string" || typeof body.code === "string") {
+    return;
+  }
+
+  return { ...body, code: errorCodeFor(status, "") };
 }

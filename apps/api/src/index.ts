@@ -14,9 +14,15 @@ import { workflowsRoutes } from "./(ee)/routes/workflows";
 import { workflowsSyncRoutes } from "./(ee)/routes/workflows-sync";
 import { type ApiErrorSinks, handleApiError } from "./lib/error-handler";
 import { log } from "./lib/logger";
+import {
+  ERROR_RESPONSES,
+  ERROR_SCHEMAS,
+  injectErrorResponses,
+} from "./lib/openapi-errors";
 import { getPostHogClient } from "./lib/posthog";
 import { resolveApiUrl } from "./lib/urls";
 import { getAuthOptional } from "./middleware/auth";
+import { errorContract } from "./middleware/error-contract";
 import { agentsRoutes } from "./routes/agents";
 import { agentsWebhookRoutes } from "./routes/agents-webhook";
 import { batchRoutes } from "./routes/batch";
@@ -42,8 +48,15 @@ const openApiDocumentation = {
   info: {
     title: "Wraps Platform API",
     version: "1.0.0",
-    description:
+    description: [
       "REST API for the Wraps email marketing platform. Send emails, manage contacts, trigger workflows, and process events.",
+      "",
+      "**Errors.** Every 4xx and 5xx response returns the `ApiError` object: branch on the stable `code`, show `error` to a person, quote `requestId` to support. The full list of codes is enumerated on the schema.",
+      "",
+      "**Rate limits.** Limited responses carry `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` (seconds, not a timestamp) and `RateLimit-Policy`, plus `Retry-After` on a 429. See https://wraps.dev/docs/reference/rate-limits",
+      "",
+      "**Versioning.** Breaking changes ship as a new version; deprecations are announced with `Deprecation` and `Sunset` headers and a 6-month minimum notice. Policy: https://wraps.dev/docs/reference/versioning",
+    ].join("\n"),
     contact: {
       name: "Wraps Support",
       url: "https://wraps.dev",
@@ -54,6 +67,10 @@ const openApiDocumentation = {
       url: "https://wraps.dev/terms",
     },
     termsOfService: "https://wraps.dev/terms",
+  },
+  externalDocs: {
+    description: "Wraps documentation",
+    url: "https://wraps.dev/docs",
   },
   servers: [
     {
@@ -114,9 +131,14 @@ const openApiDocumentation = {
           "API key (wraps_*) or session token. Use format: Bearer wraps_your_api_key",
       },
     },
+    schemas: ERROR_SCHEMAS,
+    responses: ERROR_RESPONSES,
   },
   security: [{ bearerAuth: [] }],
 };
+
+/** The spec route, so the injector can find it without guessing. */
+const OPENAPI_SPEC_PATH = "/swagger/json";
 
 /**
  * CORS is intentionally wildcard: this is a public API for customer apps,
@@ -170,6 +192,10 @@ export const app = new Elysia()
       authMethod: auth.apiKeyId ? "api_key" : "session",
     });
   })
+  // Routes that return their own `{ error }` object skip onError entirely, so
+  // the machine-readable `code` the OpenAPI contract promises is filled in
+  // there rather than in each of them.
+  .use(errorContract)
   .onError(({ error, request, code, set, requestId, ...ctx }) =>
     handleApiError(
       {
@@ -191,11 +217,23 @@ export const app = new Elysia()
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     })
   )
+  // Every operation shares one error contract. The plugin generates operations
+  // from the route definitions, so the responses are attached to the finished
+  // spec instead of being repeated in every route's `detail`.
+  .onAfterHandle({ as: "global" }, ({ path, response }) => {
+    if (
+      path === OPENAPI_SPEC_PATH &&
+      response &&
+      typeof response === "object"
+    ) {
+      injectErrorResponses(response as Record<string, never>);
+    }
+  })
   .use(
     swagger({
       path: "/swagger",
       documentation: openApiDocumentation,
-      exclude: ["/swagger", "/swagger/json"],
+      exclude: ["/swagger", OPENAPI_SPEC_PATH],
     })
   )
   .use(wellKnownRoutes)

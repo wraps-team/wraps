@@ -203,6 +203,7 @@ Named, predictable URLs. Each one is a stable entry point.
 - Wraps SDKs: https://wraps.dev/docs/sdk-reference (npm `@wraps.dev/email`)
 - Wraps error codes: https://wraps.dev/docs/reference/errors
 - Wraps rate limits: https://wraps.dev/docs/reference/rate-limits
+- Wraps versioning & deprecation policy: https://wraps.dev/docs/reference/versioning
 - Wraps agent card: https://wraps.dev/.well-known/agent.json
 - Wraps agent skills: https://wraps.dev/.well-known/skills/
 
@@ -243,7 +244,8 @@ Named, predictable URLs. Each one is a stable entry point.
 - [API Reference](https://wraps.dev/docs/reference/api): OpenAPI reference with interactive Swagger UI
 - [OpenAPI Spec (JSON)](https://api.wraps.dev/swagger/json): Machine-readable OpenAPI 3.0.3 specification
 - [Error Codes](https://wraps.dev/docs/reference/errors): All CLI and SDK error codes with solutions
-- [Rate Limits](https://wraps.dev/docs/reference/rate-limits): API rate limits by plan, response headers, and 429 handling
+- [Rate Limits](https://wraps.dev/docs/reference/rate-limits): API rate limits by plan, RateLimit-* response headers, and 429 handling
+- [Versioning & Deprecation](https://wraps.dev/docs/reference/versioning): How the API is versioned, what counts as a breaking change, and the Deprecation/Sunset headers that announce a removal
 - [Environment Variables](https://wraps.dev/docs/reference/environment-variables): All env vars for CLI, SDKs, and CI/CD
 - [JSON Output](https://wraps.dev/docs/reference/json-output): Machine-readable output format
 - [Telemetry](https://wraps.dev/docs/telemetry): What telemetry is collected and how to opt out

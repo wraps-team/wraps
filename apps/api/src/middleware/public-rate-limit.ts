@@ -10,6 +10,11 @@ import { Elysia } from "elysia";
 
 import { awsDefaults } from "../lib/aws-defaults";
 import { log } from "../lib/logger";
+import {
+  type RateLimitWindow,
+  setRateLimitExceededHeaders,
+  setRateLimitHeaders,
+} from "../lib/rate-limit-headers";
 
 // Rate limits for public endpoints
 const PUBLIC_LIMITS = {
@@ -110,6 +115,19 @@ function getHourKey(ip: string): string {
   return `${ip}:hour:${hour}`;
 }
 
+const MINUTE_SECONDS = 60;
+const HOUR_SECONDS = 3600;
+
+/** Seconds left in the current clock minute — the key rolls on that boundary. */
+function secondsUntilNextMinute(): number {
+  return MINUTE_SECONDS - Math.floor((Date.now() / 1000) % MINUTE_SECONDS);
+}
+
+/** Seconds left in the current clock hour, for the same reason. */
+function secondsUntilNextHour(): number {
+  return HOUR_SECONDS - Math.floor((Date.now() / 1000) % HOUR_SECONDS);
+}
+
 /**
  * Public rate limit middleware
  */
@@ -118,16 +136,29 @@ export const publicRateLimitMiddleware = new Elysia({
 }).derive({ as: "scoped" }, async ({ request, set }) => {
   const clientIp = getClientIp(request);
 
+  const minuteWindow = (remaining: number): RateLimitWindow => ({
+    name: "minute",
+    limit: PUBLIC_LIMITS.minute,
+    remaining,
+    windowSeconds: MINUTE_SECONDS,
+    resetSeconds: secondsUntilNextMinute(),
+  });
+  const hourWindow = (remaining: number): RateLimitWindow => ({
+    name: "hour",
+    limit: PUBLIC_LIMITS.hour,
+    remaining,
+    windowSeconds: HOUR_SECONDS,
+    resetSeconds: secondsUntilNextHour(),
+  });
+
   // Check minute limit
   const minuteCount = await incrementCounter(getMinuteKey(clientIp), 60);
   if (minuteCount > PUBLIC_LIMITS.minute) {
     set.status = 429;
-    set.headers["Retry-After"] = "60";
-    set.headers["X-RateLimit-Limit"] = String(PUBLIC_LIMITS.minute);
-    set.headers["X-RateLimit-Remaining"] = "0";
-    set.headers["X-RateLimit-Reset"] = String(
-      Math.floor(Date.now() / 1000) + 60
-    );
+    setRateLimitExceededHeaders(set, minuteWindow(0), [
+      minuteWindow(0),
+      hourWindow(0),
+    ]);
     throw new Error(
       "Rate limit exceeded. Please wait a minute before trying again."
     );
@@ -137,17 +168,17 @@ export const publicRateLimitMiddleware = new Elysia({
   const hourCount = await incrementCounter(getHourKey(clientIp), 3600);
   if (hourCount > PUBLIC_LIMITS.hour) {
     set.status = 429;
-    set.headers["Retry-After"] = "3600";
-    set.headers["X-RateLimit-Limit"] = String(PUBLIC_LIMITS.hour);
-    set.headers["X-RateLimit-Remaining"] = "0";
+    setRateLimitExceededHeaders(set, hourWindow(0), [
+      minuteWindow(0),
+      hourWindow(0),
+    ]);
     throw new Error("Hourly rate limit exceeded. Please try again later.");
   }
 
-  // Set rate limit headers
-  set.headers["X-RateLimit-Limit"] = String(PUBLIC_LIMITS.minute);
-  set.headers["X-RateLimit-Remaining"] = String(
-    Math.max(0, PUBLIC_LIMITS.minute - minuteCount)
-  );
+  setRateLimitHeaders(set, [
+    minuteWindow(PUBLIC_LIMITS.minute - minuteCount),
+    hourWindow(PUBLIC_LIMITS.hour - hourCount),
+  ]);
 
   return { clientIp };
 });

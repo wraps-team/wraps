@@ -90,6 +90,20 @@ export function CliHeroSection() {
                   </SnippetTabsContent>
                 ))}
               </Snippet>
+
+              {/*
+                The tab component renders only the active command; with
+                JavaScript off there is no way to reach the others, and a
+                crawler reading visible text sees one install path instead of
+                five. Same commands, flattened.
+              */}
+              <noscript>
+                <ul className="mt-3 space-y-1 text-left font-mono text-muted-foreground text-sm">
+                  {Object.entries(installCommands).map(([key, command]) => (
+                    <li key={key}>{command}</li>
+                  ))}
+                </ul>
+              </noscript>
             </div>
           </div>
 

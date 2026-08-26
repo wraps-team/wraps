@@ -75,6 +75,8 @@ describe("monitoring noise from route-level client errors", () => {
     expect(sinks.captureException).not.toHaveBeenCalled();
     expect(await res.json()).toEqual({
       error: "AWS account does not belong to this organization",
+      code: "FORBIDDEN",
+      requestId: "test-request-id",
     });
   });
 

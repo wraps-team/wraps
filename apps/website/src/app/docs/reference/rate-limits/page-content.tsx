@@ -65,17 +65,63 @@ const retryCode = `async function fetchWithRetry(url: string, options: RequestIn
 }`;
 
 const headersExample = `HTTP/1.1 200 OK
+RateLimit-Limit: 500
+RateLimit-Remaining: 487
+RateLimit-Reset: 34
+RateLimit-Policy: 500;w=60, 50000;w=86400
 X-RateLimit-Limit: 500
-X-RateLimit-Remaining: 487`;
+X-RateLimit-Remaining: 487
+X-RateLimit-Reset: 34`;
 
 const rateLimitedExample = `HTTP/1.1 429 Too Many Requests
-Retry-After: 60
+Retry-After: 34
+RateLimit-Limit: 500
+RateLimit-Remaining: 0
+RateLimit-Reset: 34
+RateLimit-Policy: 500;w=60, 50000;w=86400
 X-RateLimit-Limit: 500
 X-RateLimit-Remaining: 0
 
 {
-  "error": "Rate limit exceeded: 500 requests per minute"
+  "error": "Rate limit exceeded: 500 requests per minute",
+  "code": "RATE_LIMITED",
+  "requestId": "01JBZ9K3M4N5P6Q7R8S9T0"
 }`;
+
+const RESPONSE_HEADERS = [
+  {
+    name: "RateLimit-Limit",
+    description: "Requests permitted in the window closest to exhaustion",
+  },
+  {
+    name: "RateLimit-Remaining",
+    description: "Requests still available in that window",
+  },
+  {
+    name: "RateLimit-Reset",
+    description: "Seconds until that window resets — not a Unix timestamp",
+  },
+  {
+    name: "RateLimit-Policy",
+    description: "Every policy in force, as <limit>;w=<window seconds>",
+  },
+  {
+    name: "Retry-After",
+    description: "Seconds to wait before retrying (429 responses only)",
+  },
+  {
+    name: "X-RateLimit-Limit",
+    description: "Legacy alias for RateLimit-Limit",
+  },
+  {
+    name: "X-RateLimit-Remaining",
+    description: "Legacy alias for RateLimit-Remaining",
+  },
+  {
+    name: "X-RateLimit-Reset",
+    description: "Legacy alias for RateLimit-Reset",
+  },
+];
 
 // ============================================================================
 // MARKDOWN CONTENT FOR AI COPY
@@ -104,13 +150,20 @@ Unauthenticated endpoints (health check, public tools) use IP-based rate limitin
 
   responseHeaders: `## Response Headers
 
-Every API response includes rate limit headers:
+Every rate-limited response carries the limit headers. Read the unprefixed \`RateLimit-*\` names — the \`X-\` forms are the originals, kept so existing integrations keep working.
 
 | Header | Description |
 |--------|-------------|
-| \`X-RateLimit-Limit\` | Maximum requests allowed in the current window |
-| \`X-RateLimit-Remaining\` | Requests remaining in the current window |
-| \`Retry-After\` | Seconds to wait before retrying (only on 429 responses) |
+| \`RateLimit-Limit\` | Requests permitted in the window closest to exhaustion |
+| \`RateLimit-Remaining\` | Requests still available in that window |
+| \`RateLimit-Reset\` | **Seconds until** that window resets — not a Unix timestamp |
+| \`RateLimit-Policy\` | Every policy in force, as \`<limit>;w=<window seconds>\` |
+| \`Retry-After\` | Seconds to wait before retrying (429 responses only) |
+| \`X-RateLimit-Limit\` | Legacy alias for \`RateLimit-Limit\` |
+| \`X-RateLimit-Remaining\` | Legacy alias for \`RateLimit-Remaining\` |
+| \`X-RateLimit-Reset\` | Legacy alias for \`RateLimit-Reset\` |
+
+When two policies are in force (per-minute and per-day), the quota headers describe whichever is closest to running out — that is the one to pace against — while \`RateLimit-Policy\` lists both.
 
 ### Successful response
 \`\`\`
@@ -561,8 +614,13 @@ export default function PageContent() {
           title="Response Headers"
         />
         <p className="mb-4 text-muted-foreground">
-          Every API response includes rate limit headers so you can track your
-          usage:
+          Every rate-limited response carries these headers. Read the unprefixed{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            RateLimit-*
+          </code>{" "}
+          names — the{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">X-</code>{" "}
+          forms are the originals, kept so existing integrations keep working.
         </p>
 
         <Card className="mb-6">
@@ -578,36 +636,16 @@ export default function PageContent() {
                   </tr>
                 </thead>
                 <tbody className="text-muted-foreground">
-                  <tr className="border-b">
-                    <td className="px-4 py-2">
-                      <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                        X-RateLimit-Limit
-                      </code>
-                    </td>
-                    <td className="px-4 py-2">
-                      Maximum requests allowed in the current window
-                    </td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="px-4 py-2">
-                      <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                        X-RateLimit-Remaining
-                      </code>
-                    </td>
-                    <td className="px-4 py-2">
-                      Requests remaining in the current window
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-2">
-                      <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                        Retry-After
-                      </code>
-                    </td>
-                    <td className="px-4 py-2">
-                      Seconds to wait before retrying (only on 429 responses)
-                    </td>
-                  </tr>
+                  {RESPONSE_HEADERS.map((header) => (
+                    <tr className="border-b last:border-b-0" key={header.name}>
+                      <td className="px-4 py-2">
+                        <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                          {header.name}
+                        </code>
+                      </td>
+                      <td className="px-4 py-2">{header.description}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

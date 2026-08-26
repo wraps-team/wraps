@@ -11,6 +11,11 @@ import { Elysia } from "elysia";
 import { isSelfHosted } from "../(ee)/lib/license";
 import { awsDefaults } from "../lib/aws-defaults";
 import { log } from "../lib/logger";
+import {
+  type RateLimitWindow,
+  setRateLimitExceededHeaders,
+  setRateLimitHeaders,
+} from "../lib/rate-limit-headers";
 import { getAuthOptional } from "./auth";
 
 // Plan rate limits (requests)
@@ -25,6 +30,19 @@ const PLAN_LIMITS = {
 // DynamoDB client (reuse across invocations)
 const dynamoClient = new DynamoDBClient(awsDefaults);
 const TABLE_NAME = process.env.RATE_LIMIT_TABLE_NAME ?? "RateLimitTable";
+
+const MINUTE_SECONDS = 60;
+const DAY_SECONDS = 86_400;
+const HOURS_PER_DAY = 24;
+const MINUTES_PER_HOUR = 60;
+
+function secondsUntilUtcMidnight(now: Date): number {
+  const elapsed =
+    now.getUTCHours() * MINUTE_SECONDS * MINUTES_PER_HOUR +
+    now.getUTCMinutes() * MINUTE_SECONDS +
+    now.getUTCSeconds();
+  return HOURS_PER_DAY * MINUTES_PER_HOUR * MINUTE_SECONDS - elapsed;
+}
 
 export const rateLimitMiddleware = new Elysia({ name: "rate-limit" }).derive(
   { as: "scoped" },
@@ -51,6 +69,23 @@ export const rateLimitMiddleware = new Elysia({ name: "rate-limit" }).derive(
     const minuteKey = formatMinuteKey(now);
     const dailyKey = formatDailyKey(now);
 
+    // Both counters are keyed by clock window, so the reset is the time left in
+    // that window — not a full window from now.
+    const minuteWindow = (remaining: number): RateLimitWindow => ({
+      name: "minute",
+      limit: limits.minute,
+      remaining,
+      windowSeconds: MINUTE_SECONDS,
+      resetSeconds: MINUTE_SECONDS - now.getUTCSeconds(),
+    });
+    const dailyWindow = (remaining: number): RateLimitWindow => ({
+      name: "day",
+      limit: limits.daily,
+      remaining,
+      windowSeconds: DAY_SECONDS,
+      resetSeconds: secondsUntilUtcMidnight(now),
+    });
+
     try {
       // Check and increment minute counter
       const minuteResult = await incrementCounter(
@@ -61,9 +96,10 @@ export const rateLimitMiddleware = new Elysia({ name: "rate-limit" }).derive(
 
       if (minuteResult > limits.minute) {
         set.status = 429;
-        set.headers["Retry-After"] = "60";
-        set.headers["X-RateLimit-Limit"] = String(limits.minute);
-        set.headers["X-RateLimit-Remaining"] = "0";
+        setRateLimitExceededHeaders(set, minuteWindow(0), [
+          minuteWindow(0),
+          dailyWindow(0),
+        ]);
         throw new Error(
           `Rate limit exceeded: ${limits.minute} requests per minute`
         );
@@ -78,18 +114,19 @@ export const rateLimitMiddleware = new Elysia({ name: "rate-limit" }).derive(
 
       if (dailyResult > limits.daily) {
         set.status = 429;
-        set.headers["X-RateLimit-Limit"] = String(limits.daily);
-        set.headers["X-RateLimit-Remaining"] = "0";
+        setRateLimitExceededHeaders(set, dailyWindow(0), [
+          minuteWindow(0),
+          dailyWindow(0),
+        ]);
         throw new Error(
           `Daily limit exceeded: ${limits.daily} requests per day`
         );
       }
 
-      // Set rate limit headers
-      set.headers["X-RateLimit-Limit"] = String(limits.minute);
-      set.headers["X-RateLimit-Remaining"] = String(
-        Math.max(0, limits.minute - minuteResult)
-      );
+      setRateLimitHeaders(set, [
+        minuteWindow(limits.minute - minuteResult),
+        dailyWindow(limits.daily - dailyResult),
+      ]);
     } catch (error) {
       // Re-throw intentional 429 errors
       if (

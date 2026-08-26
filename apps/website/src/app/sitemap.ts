@@ -19,9 +19,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     .filter((route) => route !== "/sitemap")
     .sort();
 
+  // No lastModified: it was `new Date()`, which told crawlers every page on the
+  // site had changed on every fetch. An obviously-bogus lastmod is worse than
+  // none — search engines discount the whole file rather than the one field.
   return routes.map((route) => ({
     url: `${baseUrl}${route === "/" ? "" : route}`,
-    lastModified: new Date(),
     changeFrequency: route === "/" ? "daily" : "weekly",
     priority:
       route === "/"
