@@ -33,7 +33,7 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Wraps — Workflows as code. Delivered by your AWS.",
+        alt: "Wraps — Email infrastructure, deployed to your own AWS.",
       },
     ],
   },
