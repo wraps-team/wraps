@@ -26,6 +26,7 @@ import {
   SendHorizontal,
   Settings,
   Shield,
+  Sparkles,
   Tag,
   UserPlus,
   Users,
@@ -40,9 +41,11 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import { getContact } from "@/actions/contacts";
 import type { SearchEntityType, SearchResultItem } from "@/actions/search";
+import { AskPanel } from "@/components/assistant/ask-panel";
 import { useActiveOrganization } from "@/contexts/organization-context";
 import { useCommandSearch } from "@/hooks/use-command-search";
 import { useRecentItems } from "@/hooks/use-recent-items";
@@ -220,6 +223,7 @@ export function CommandSearch({ open, onOpenChange }: CommandSearchProps) {
   const commandRef = useRef<HTMLDivElement>(null);
   const { activeOrganization } = useActiveOrganization();
   const hasTrackedSearch = useRef(false);
+  const [askQuestion, setAskQuestion] = useState<string | null>(null);
 
   const orgSlug = activeOrganization?.slug;
   const orgId = activeOrganization?.id;
@@ -232,6 +236,7 @@ export function CommandSearch({ open, onOpenChange }: CommandSearchProps) {
   useEffect(() => {
     if (!open) {
       setInputValue("");
+      setAskQuestion(null);
       hasTrackedSearch.current = false;
     }
   }, [open, setInputValue]);
@@ -416,129 +421,160 @@ export function CommandSearch({ open, onOpenChange }: CommandSearchProps) {
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-w-[640px] overflow-hidden border border-border p-0 shadow-2xl">
+      <DialogContent
+        className="max-w-[640px] overflow-hidden border border-border p-0 shadow-2xl"
+        onEscapeKeyDown={(event) => {
+          if (askQuestion !== null) {
+            event.preventDefault();
+            setAskQuestion(null);
+          }
+        }}
+      >
         <DialogTitle className="sr-only">Command Search</DialogTitle>
-        <Command
-          className="transition-transform duration-100 ease-out"
-          ref={commandRef}
-          shouldFilter={!isServerMode}
-        >
-          <CommandInput
-            autoFocus
-            isLoading={isSearching}
-            onValueChange={setInputValue}
-            placeholder="Search everything..."
-            value={inputValue}
+        {askQuestion !== null && orgSlug ? (
+          <AskPanel
+            initialQuestion={askQuestion}
+            onExit={() => setAskQuestion(null)}
+            orgSlug={orgSlug}
           />
-          <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+        ) : (
+          <Command
+            className="transition-transform duration-100 ease-out"
+            ref={commandRef}
+            shouldFilter={!isServerMode}
+          >
+            <CommandInput
+              autoFocus
+              isLoading={isSearching}
+              onValueChange={setInputValue}
+              placeholder="Search everything..."
+              value={inputValue}
+            />
+            <CommandList>
+              <CommandEmpty>No results found.</CommandEmpty>
 
-            {isServerMode ? (
-              // ── Server results ──
-              (
-                Object.entries(results) as [
-                  SearchEntityType,
-                  SearchResultItem[],
-                ][]
-              ).map(([type, items]) => {
-                if (items.length === 0) {
-                  return null;
-                }
-                const config = ENTITY_CONFIG[type];
-                const GroupIcon = config.icon;
-                return (
-                  <CommandGroup heading={config.label} key={type}>
-                    {items.map((item) => (
-                      <CommandItem
-                        key={item.id}
-                        onSelect={() => handleSelect(item.url, item)}
-                        value={`${item.title} ${item.subtitle ?? ""}`}
-                      >
-                        <GroupIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate">{item.title}</span>
-                        {item.subtitle && (
-                          <span className="ml-1 truncate text-muted-foreground text-xs">
-                            {item.subtitle}
-                          </span>
-                        )}
-                        {item.status && <StatusBadge status={item.status} />}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                );
-              })
-            ) : (
-              // ── Client mode ──
-              <>
-                {/* Recent Items */}
-                {recentItems.length > 0 && (
-                  <CommandGroup heading="Recent">
-                    {recentItems.map((item) => {
-                      const config = ENTITY_CONFIG[item.type];
-                      const Icon = config.icon;
-                      return (
+              {inputValue.trim().length >= 2 && orgSlug && (
+                <CommandGroup heading="Ask">
+                  <CommandItem
+                    onSelect={() => {
+                      posthog.capture("cmd_k_asked");
+                      setAskQuestion(inputValue.trim());
+                    }}
+                    value={`ask ${inputValue}`}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <span className="truncate">{`Ask Wraps: "${inputValue.trim()}"`}</span>
+                  </CommandItem>
+                </CommandGroup>
+              )}
+
+              {isServerMode ? (
+                // ── Server results ──
+                (
+                  Object.entries(results) as [
+                    SearchEntityType,
+                    SearchResultItem[],
+                  ][]
+                ).map(([type, items]) => {
+                  if (items.length === 0) {
+                    return null;
+                  }
+                  const config = ENTITY_CONFIG[type];
+                  const GroupIcon = config.icon;
+                  return (
+                    <CommandGroup heading={config.label} key={type}>
+                      {items.map((item) => (
                         <CommandItem
-                          key={`recent-${item.id}`}
+                          key={item.id}
                           onSelect={() => handleSelect(item.url, item)}
-                          value={`recent ${item.title}`}
+                          value={`${item.title} ${item.subtitle ?? ""}`}
                         >
-                          <Icon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                          <GroupIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
                           <span className="truncate">{item.title}</span>
                           {item.subtitle && (
                             <span className="ml-1 truncate text-muted-foreground text-xs">
                               {item.subtitle}
                             </span>
                           )}
+                          {item.status && <StatusBadge status={item.status} />}
                         </CommandItem>
-                      );
-                    })}
-                  </CommandGroup>
-                )}
+                      ))}
+                    </CommandGroup>
+                  );
+                })
+              ) : (
+                // ── Client mode ──
+                <>
+                  {/* Recent Items */}
+                  {recentItems.length > 0 && (
+                    <CommandGroup heading="Recent">
+                      {recentItems.map((item) => {
+                        const config = ENTITY_CONFIG[item.type];
+                        const Icon = config.icon;
+                        return (
+                          <CommandItem
+                            key={`recent-${item.id}`}
+                            onSelect={() => handleSelect(item.url, item)}
+                            value={`recent ${item.title}`}
+                          >
+                            <Icon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <span className="truncate">{item.title}</span>
+                            {item.subtitle && (
+                              <span className="ml-1 truncate text-muted-foreground text-xs">
+                                {item.subtitle}
+                              </span>
+                            )}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  )}
 
-                {/* Quick Actions */}
-                {quickActions.length > 0 && (
-                  <CommandGroup heading="Quick Actions">
-                    {quickActions.map((action) => {
-                      const Icon = action.icon;
-                      return (
-                        <CommandItem
-                          key={action.url}
-                          keywords={[action.title.toLowerCase()]}
-                          onSelect={() => handleSelect(action.url)}
-                          value={action.title}
-                        >
-                          <Icon className="mr-2 h-4 w-4" />
-                          {action.title}
-                        </CommandItem>
-                      );
-                    })}
-                  </CommandGroup>
-                )}
+                  {/* Quick Actions */}
+                  {quickActions.length > 0 && (
+                    <CommandGroup heading="Quick Actions">
+                      {quickActions.map((action) => {
+                        const Icon = action.icon;
+                        return (
+                          <CommandItem
+                            key={action.url}
+                            keywords={[action.title.toLowerCase()]}
+                            onSelect={() => handleSelect(action.url)}
+                            value={action.title}
+                          >
+                            <Icon className="mr-2 h-4 w-4" />
+                            {action.title}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  )}
 
-                {/* Navigation / Settings / Account */}
-                {Object.entries(groupedStatic).map(([group, items]) => (
-                  <CommandGroup heading={group} key={group}>
-                    {items.map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <CommandItem
-                          key={item.url}
-                          keywords={item.keywords}
-                          onSelect={() => handleSelect(item.url)}
-                          shortcut={item.shortcut}
-                          value={item.title}
-                        >
-                          {Icon && <Icon className="mr-2 h-4 w-4" />}
-                          {item.title}
-                        </CommandItem>
-                      );
-                    })}
-                  </CommandGroup>
-                ))}
-              </>
-            )}
-          </CommandList>
-        </Command>
+                  {/* Navigation / Settings / Account */}
+                  {Object.entries(groupedStatic).map(([group, items]) => (
+                    <CommandGroup heading={group} key={group}>
+                      {items.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <CommandItem
+                            key={item.url}
+                            keywords={item.keywords}
+                            onSelect={() => handleSelect(item.url)}
+                            shortcut={item.shortcut}
+                            value={item.title}
+                          >
+                            {Icon && <Icon className="mr-2 h-4 w-4" />}
+                            {item.title}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  ))}
+                </>
+              )}
+            </CommandList>
+          </Command>
+        )}
       </DialogContent>
     </Dialog>
   );
