@@ -781,7 +781,10 @@ export default function MailgunVsWrapsPage() {
             </div>
           </section>
 
-          <AlsoCompare current="/compare/mailgun-vs-wraps" />
+          <AlsoCompare
+            alternativesSlug="mailgun"
+            current="/compare/mailgun-vs-wraps"
+          />
 
           {/* CTA */}
           <section className="rounded-lg border bg-muted/30 p-8 text-center">

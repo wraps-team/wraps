@@ -775,7 +775,10 @@ export default function ResendVsWrapsPage() {
             </div>
           </section>
 
-          <AlsoCompare current="/compare/resend-vs-wraps" />
+          <AlsoCompare
+            alternativesSlug="resend"
+            current="/compare/resend-vs-wraps"
+          />
 
           {/* CTA */}
           <section className="rounded-lg border bg-muted/30 p-8 text-center">

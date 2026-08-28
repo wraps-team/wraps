@@ -36,7 +36,7 @@ const footerLinks = {
     { name: "Changelog", href: "/changelog" },
   ],
   resources: [
-    { name: "Compare", href: "/compare" },
+    { name: "Alternatives", href: "/alternatives" },
     { name: "Email Tools", href: "/tools" },
     { name: "SES Cost Calculator", href: "/tools/ses-calculator" },
     {

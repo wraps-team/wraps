@@ -36,7 +36,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
         ? 1
         : path.startsWith("/tools")
           ? 0.9
-          : path.startsWith("/docs") || path.startsWith("/compare")
+          : path.startsWith("/docs") ||
+              path.startsWith("/compare") ||
+              path.startsWith("/alternatives")
             ? 0.8
             : 0.7,
   }));

@@ -51,7 +51,7 @@ export function WhyWrapsSection() {
               <p className="text-lg leading-relaxed text-muted-foreground md:text-xl">
                 <Link
                   className="text-foreground underline underline-offset-2 hover:text-orange-500 transition-colors"
-                  href="/compare"
+                  href="/alternatives"
                 >
                   Postmark charges per email. Resend charges per email.
                   Mailchimp charges per contact.

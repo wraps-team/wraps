@@ -1,9 +1,14 @@
+import { renderAllAlternativesMarkdown } from "./alternatives-markdown";
 import { renderPricingMarkdown } from "./pricing-markdown";
 
 /** Generated from config/pricing.ts + lib/ses-cost.ts — mirrors public/pricing.md */
 const PRICING_MARKDOWN = renderPricingMarkdown();
 
+/** Generated from config/alternatives.ts — the same source the HTML renders from. */
+const ALTERNATIVES_MARKDOWN = renderAllAlternativesMarkdown();
+
 export const AGENT_CONTENT: Record<string, string> = {
+  ...ALTERNATIVES_MARKDOWN,
   // Pricing is the single most-requested page for agents; serve it on both the
   // page path (via Accept: text/markdown) and the literal .md path.
   "/pricing": PRICING_MARKDOWN,

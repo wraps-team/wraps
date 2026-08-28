@@ -801,7 +801,10 @@ export default function PostmarkVsWrapsPage() {
             </p>
           </section>
 
-          <AlsoCompare current="/compare/postmark-vs-wraps" />
+          <AlsoCompare
+            alternativesSlug="postmark"
+            current="/compare/postmark-vs-wraps"
+          />
 
           {/* CTA */}
           <section className="rounded-lg border bg-muted/30 p-8 text-center">

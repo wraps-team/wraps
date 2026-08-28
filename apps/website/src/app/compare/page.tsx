@@ -147,10 +147,21 @@ export default function ComparePage() {
                 Compare Wraps
               </h1>
             </div>
-            <p className="max-w-2xl text-lg text-muted-foreground">
+            <p className="mb-4 max-w-2xl text-lg text-muted-foreground">
               Honest, data-backed comparisons with real pricing at real volumes.
               We show where competitors win too — because you deserve the full
               picture, not a sales pitch.
+            </p>
+            <p className="max-w-2xl text-muted-foreground">
+              These are head-to-heads: Wraps against one platform at a time. If
+              you are still surveying the field,{" "}
+              <Link
+                className="text-primary underline underline-offset-4"
+                href="/alternatives"
+              >
+                the ranked alternatives lists
+              </Link>{" "}
+              cover every real option, ours placed where it honestly belongs.
             </p>
           </div>
 

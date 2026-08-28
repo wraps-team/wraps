@@ -17,6 +17,15 @@ export const AGENT_CONTENT_PATHS: readonly string[] = [
   "/docs/cli-reference/email",
   "/docs/guides/domain-verification",
   "/docs/guides/webhooks",
+  // Ranked alternatives lists. Hardcoded rather than derived from
+  // config/alternatives.ts on purpose: that module is ~40KB of prose and this
+  // one is imported by middleware, which runs on the edge. A test in
+  // src/__tests__/alternatives.test.ts fails if the two lists diverge.
+  "/alternatives/resend",
+  "/alternatives/sendgrid",
+  "/alternatives/postmark",
+  "/alternatives/mailgun",
+  "/alternatives/customer-io",
 ];
 
 const AGENT_CONTENT_PATH_SET = new Set(AGENT_CONTENT_PATHS);

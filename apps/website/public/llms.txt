@@ -298,6 +298,18 @@ Named, predictable URLs. Each one is a stable entry point.
 - [MCP Server](https://wraps.dev/mcp): MCP server for AWS SES email — read tools plus guarded sending
 - [Why Wraps](https://wraps.dev/why-wraps): Value proposition and differentiators
 
+## Alternatives
+
+Ranked lists of the real options in each category, with published prices, a
+stated catch on every entry including ours, and the incumbent kept on the list.
+
+- [Alternatives Hub](https://wraps.dev/alternatives): Every ranked list
+- [Resend Alternatives](https://wraps.dev/alternatives/resend): 12 options ranked, with prices
+- [SendGrid Alternatives](https://wraps.dev/alternatives/sendgrid): 12 options ranked, with prices
+- [Postmark Alternatives](https://wraps.dev/alternatives/postmark): 11 options ranked, with prices
+- [Mailgun Alternatives](https://wraps.dev/alternatives/mailgun): 12 options ranked, with prices
+- [Customer.io Alternatives](https://wraps.dev/alternatives/customer-io): 11 options ranked, with prices
+
 ## Compare
 
 - [Comparison Hub](https://wraps.dev/compare): Compare Wraps to other providers

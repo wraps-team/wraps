@@ -74,20 +74,21 @@ describe("every AGENT_CONTENT_PATHS entry resolves to a real page (or a named ex
   });
 });
 
-describe("llms.txt lists every docs/compare page — no page an agent can't discover from the index", () => {
+describe("llms.txt lists every docs/compare/alternatives page — no page an agent can't discover from the index", () => {
   // Named, commented exclusions for pages intentionally not given their own
   // llms.txt bullet (e.g. index/hub pages whose children are all listed).
   // Start empty: everything else must be reachable from llms.txt.
   const INTENTIONALLY_UNLISTED: readonly string[] = [];
 
-  it("contains every /docs and /compare route from the page.tsx glob", () => {
+  it("contains every /docs, /compare and /alternatives route from the page.tsx glob", () => {
     const llms = read("public/llms.txt");
-    const docsAndCompareRoutes = [
+    const indexedRoutes = [
       ...pageRoutes("docs"),
       ...pageRoutes("compare"),
+      ...pageRoutes("alternatives"),
     ].filter((route) => !INTENTIONALLY_UNLISTED.includes(route));
 
-    const missing = docsAndCompareRoutes.filter(
+    const missing = indexedRoutes.filter(
       (route) => !llms.includes(`https://wraps.dev${route}`)
     );
     expect(missing).toEqual([]);

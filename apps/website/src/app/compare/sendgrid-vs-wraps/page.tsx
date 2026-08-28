@@ -859,7 +859,10 @@ export default function SendGridVsWrapsPage() {
             </div>
           </section>
 
-          <AlsoCompare current="/compare/sendgrid-vs-wraps" />
+          <AlsoCompare
+            alternativesSlug="sendgrid"
+            current="/compare/sendgrid-vs-wraps"
+          />
 
           {/* CTA */}
           <section className="rounded-lg border bg-muted/30 p-8 text-center">

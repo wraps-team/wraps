@@ -801,7 +801,10 @@ export default function CustomerIoVsWrapsPage() {
             </p>
           </section>
 
-          <AlsoCompare current="/compare/customer-io-vs-wraps" />
+          <AlsoCompare
+            alternativesSlug="customer-io"
+            current="/compare/customer-io-vs-wraps"
+          />
 
           {/* CTA */}
           <section className="rounded-lg border bg-muted/30 p-8 text-center">

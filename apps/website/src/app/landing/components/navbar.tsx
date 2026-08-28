@@ -100,9 +100,9 @@ const resourceItems = [
     description: "Tutorials, deep dives, and updates",
   },
   {
-    name: "Compare",
-    href: "/compare",
-    description: "Honest comparisons with Resend, SendGrid & more",
+    name: "Alternatives",
+    href: "/alternatives",
+    description: "Ranked lists of every real option, ours included",
   },
   {
     name: "Email Tools",
