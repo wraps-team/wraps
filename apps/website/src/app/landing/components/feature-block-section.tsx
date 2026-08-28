@@ -67,11 +67,14 @@ export function FeatureBlockSection() {
               loop
               muted
               playsInline
-              poster="/landing/posters/EventTimeline.jpg"
+              poster="/landing/posters/PlatformStack.jpg"
               preload="metadata"
-              src="/landing/EventTimeline.mp4"
+              src="/landing/PlatformStack.mp4"
             >
-              <track kind="descriptions" label="Live event timeline" />
+              <track
+                kind="descriptions"
+                label="wraps email init deploying the IAM role, SES config set, EventBridge rule, Lambda processor, and DynamoDB table, then delivery events streaming into that table"
+              />
             </video>
           </div>
 
