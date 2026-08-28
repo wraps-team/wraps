@@ -192,6 +192,39 @@ async function createOrg(
   return { orgId, awsAccountId: accountId, ownerUserId };
 }
 
+/**
+ * Insert an additional subscription row for an org that already has one
+ * (via createOrg or a prior call). `subscription` has no unique constraint
+ * on referenceId, so an org can legitimately have more than one row — this
+ * is how the "canceled then resubscribed" fixture (test 16) is built.
+ */
+async function insertSubscription(
+  orgId: string,
+  key: string,
+  spec: { plan: string; status: string; periodEnd: Date | null }
+): Promise<string> {
+  const subId = `${TEST_PREFIX}-sub-${key}`;
+  await db.insert(subscription).values({
+    id: subId,
+    plan: spec.plan,
+    referenceId: orgId,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    status: spec.status,
+    periodStart: null,
+    periodEnd: spec.periodEnd,
+    cancelAtPeriodEnd: null,
+    seats: null,
+    trialStart: null,
+    trialEnd: null,
+    annual: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as typeof subscription.$inferInsert);
+  subscriptionIds.push(subId);
+  return subId;
+}
+
 let sendCounter = 0;
 
 async function insertSend(
@@ -641,6 +674,84 @@ describe("message-send-cleanup handler — deletion (RETENTION_DRY_RUN=false)", 
     expect(warnings).toHaveLength(1);
     expect(warnings[0].body).toBe("pre-existing warning");
   });
+
+  it("grace-window notification states the true count when it exceeds BATCH_SIZE (FIX 2 guard)", async () => {
+    const { orgId, awsAccountId, ownerUserId } = await createOrg({
+      key: "grace-overflow",
+      plan: "free",
+      status: "active",
+    });
+
+    // Bulk-insert in one round trip — see the batching test above for why.
+    const rows: (typeof messageSend.$inferInsert)[] = [];
+    const ids: string[] = [];
+    for (let i = 0; i < 1200; i++) {
+      sendCounter += 1;
+      const id = `${TEST_PREFIX}-send-${sendCounter}`;
+      ids.push(id);
+      rows.push({
+        id,
+        organizationId: orgId,
+        awsAccountId,
+        contactId: null,
+        channel: "email",
+        sourceType: "workflow",
+        recipient: "test@example.com",
+        messageId: `${id}-msg`,
+        status: "sent",
+        // All inside the grace window: older than free's 30-day visible
+        // window, younger than its 60-day delete cutoff.
+        sentAt: daysAgo(45),
+        createdAt: daysAgo(45),
+      } as typeof messageSend.$inferInsert);
+    }
+    await db.insert(messageSend).values(rows);
+    messageSendIds.push(...ids);
+
+    await handler({} as never, {} as never, () => {});
+
+    const warnings = await notificationsForOrg(orgId, "retention.warning");
+    const ownerWarning = warnings.find((w) => w.userId === ownerUserId);
+    // Before FIX 2, countGraceWindowRows capped at BATCH_SIZE (1000) via a
+    // `.limit(BATCH_SIZE)` select — this asserts the true, uncapped count.
+    expect(ownerWarning?.body).toContain("1200 messages");
+
+    // None of these rows crossed the delete cutoff, so all should survive.
+    const remaining = await db
+      .select({ id: messageSend.id })
+      .from(messageSend)
+      .where(inArray(messageSend.id, ids));
+    expect(remaining).toHaveLength(1200);
+  }, 60_000);
+
+  it("resolves the active subscription row, not a stale canceled one, when both exist (FIX 3 guard)", async () => {
+    const { orgId, awsAccountId } = await createOrg({
+      key: "dual-sub",
+      skipSubscription: true,
+    });
+
+    // Insert the canceled row first so a naive `.limit(1)` with no ORDER BY
+    // is likely to pick it over the active row inserted after.
+    await insertSubscription(orgId, "dual-sub-canceled", {
+      plan: "growth",
+      status: "canceled",
+      periodEnd: daysAgo(200),
+    });
+    await insertSubscription(orgId, "dual-sub-active", {
+      plan: "starter",
+      status: "active",
+      periodEnd: null,
+    });
+
+    // starter's window is 120 days; growth's (stale) is 395. A row 200 days
+    // old is past starter's cutoff but well inside growth's — only
+    // correctly resolving to the active starter row deletes it.
+    const rowId = await insertSend(orgId, awsAccountId, daysAgo(200));
+
+    await handler({} as never, {} as never, () => {});
+
+    expect(await messageSendExists(rowId)).toBe(false);
+  });
 });
 
 describe("message-send-cleanup handler — DRY_RUN safety guard", () => {
@@ -662,4 +773,74 @@ describe("message-send-cleanup handler — DRY_RUN safety guard", () => {
 
     expect(await messageSendExists(wouldDeleteId)).toBe(true);
   });
+
+  it("with more than BATCH_SIZE eligible rows, reports the true would-delete count, not 1,000 (FIX 1 guard)", async () => {
+    const { orgId, awsAccountId } = await createOrg({
+      key: "dry-run-overflow",
+      plan: "free",
+      status: "active",
+    });
+
+    // Bulk-insert in one round trip — see the batching test above for why.
+    const rows: (typeof messageSend.$inferInsert)[] = [];
+    const ids: string[] = [];
+    for (let i = 0; i < 1200; i++) {
+      sendCounter += 1;
+      const id = `${TEST_PREFIX}-send-${sendCounter}`;
+      ids.push(id);
+      rows.push({
+        id,
+        organizationId: orgId,
+        awsAccountId,
+        contactId: null,
+        channel: "email",
+        sourceType: "workflow",
+        recipient: "test@example.com",
+        messageId: `${id}-msg`,
+        status: "sent",
+        sentAt: daysAgo(200 + i),
+        createdAt: daysAgo(200 + i),
+      } as typeof messageSend.$inferInsert);
+    }
+    await db.insert(messageSend).values(rows);
+    messageSendIds.push(...ids);
+
+    // Own reset+import (rather than the shared describe-level `handler`) so
+    // we can spy on the logger the freshly-imported worker module resolves
+    // to, and read back the exact rowsWouldDelete value it logs.
+    vi.resetModules();
+    process.env.RETENTION_DRY_RUN = "true";
+    const loggerMod = await import("../../lib/logger");
+    const infoSpy = vi.spyOn(loggerMod.log, "info");
+    const { handler: overflowHandler } = await import(
+      "../message-send-cleanup"
+    );
+
+    await overflowHandler({} as never, {} as never, () => {});
+
+    // Match on organizationId, not just the message — the handler processes
+    // every org with eligible rows in the shared test DB (including "dry-run"
+    // from the previous test, whose row DRY_RUN never deletes), so more than
+    // one "Processed org" line can appear.
+    const processedCall = infoSpy.mock.calls.find(
+      ([msg, data]) =>
+        msg === "[message-send-cleanup] Processed org" &&
+        (data as { organizationId?: string } | undefined)?.organizationId ===
+          orgId
+    );
+    // Before FIX 1, dry-run counted only the first BATCH_SIZE (1000) rows
+    // and broke out of the loop — this asserts the true, uncapped count.
+    expect(processedCall?.[1]).toMatchObject({
+      organizationId: orgId,
+      rowsWouldDelete: 1200,
+    });
+
+    infoSpy.mockRestore();
+
+    const remaining = await db
+      .select({ id: messageSend.id })
+      .from(messageSend)
+      .where(inArray(messageSend.id, ids));
+    expect(remaining).toHaveLength(1200);
+  }, 60_000);
 });

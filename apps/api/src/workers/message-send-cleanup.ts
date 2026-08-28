@@ -27,7 +27,7 @@ import {
   subscription,
 } from "@wraps/db";
 import type { Handler } from "aws-lambda";
-import { and, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { flushLogger, log } from "../lib/logger";
 
 // When true, the worker logs exactly what it would delete and deletes nothing.
@@ -85,6 +85,14 @@ type OrgRetention = {
  * subscriptions keep their old plan's window for CANCELLATION_GRACE_DAYS
  * after their period ends, then drop to free. No subscription row at all is
  * treated as free.
+ *
+ * `subscription` has no unique constraint on referenceId, so an org that
+ * canceled and later resubscribed can have more than one row for it. A bare
+ * `.limit(1)` with no ordering could hand back either — including a stale
+ * canceled row for an org that is currently paying, silently shrinking its
+ * retention window. So: fetch every row, prefer any that's active/trialing,
+ * and only fall back to the most recent terminal row (by periodEnd) if none
+ * is active.
  */
 export async function getOrgRetention(
   organizationId: string
@@ -96,10 +104,15 @@ export async function getOrgRetention(
       periodEnd: subscription.periodEnd,
     })
     .from(subscription)
-    .where(eq(subscription.referenceId, organizationId))
-    .limit(1);
+    .where(eq(subscription.referenceId, organizationId));
 
-  const row = rows[0];
+  const row =
+    rows.find((r) => r.status === "active" || r.status === "trialing") ??
+    rows
+      .filter((r) => r.periodEnd)
+      .sort(
+        (a, b) => (b.periodEnd?.getTime() ?? 0) - (a.periodEnd?.getTime() ?? 0)
+      )[0];
 
   let plan = DEFAULT_PLAN;
   let canceledAt: Date | null = null;
@@ -132,15 +145,53 @@ type MessageSendCleanupResult = {
   oldestRemaining: Date | null;
 };
 
+async function oldestRemainingMessageSend(
+  organizationId: string
+): Promise<Date | null> {
+  const [oldest] = await db
+    .select({ createdAt: messageSend.createdAt })
+    .from(messageSend)
+    .where(eq(messageSend.organizationId, organizationId))
+    .orderBy(messageSend.createdAt)
+    .limit(1);
+
+  return oldest?.createdAt ?? null;
+}
+
 /**
  * Delete (or, in dry-run, count) message_send rows older than the org's
  * deleteAfterDays cutoff, batched by id — never a single unbatched DELETE.
+ *
+ * In dry-run this never enters the batch loop at all: a `LIMIT BATCH_SIZE`
+ * select would return the same rows forever (nothing is ever deleted to move
+ * the window), so a single COUNT over the same predicate is both the correct
+ * total and the only way to terminate. Reporting just the first batch would
+ * cap every org's would-delete count at BATCH_SIZE, which defeats the whole
+ * point of the step-8 human sign-off — see plans/210.
  */
 async function cleanupMessageSendForOrg(
   organizationId: string,
   deleteAfterDays: number
 ): Promise<MessageSendCleanupResult> {
   const cutoff = daysAgo(deleteAfterDays);
+
+  if (DRY_RUN) {
+    const [row] = await db
+      .select({ n: count() })
+      .from(messageSend)
+      .where(
+        and(
+          eq(messageSend.organizationId, organizationId),
+          lt(messageSend.createdAt, cutoff)
+        )
+      );
+
+    return {
+      rowsDeleted: row?.n ?? 0,
+      oldestRemaining: await oldestRemainingMessageSend(organizationId),
+    };
+  }
+
   let rowsDeleted = 0;
 
   while (true) {
@@ -159,14 +210,8 @@ async function cleanupMessageSendForOrg(
       break;
     }
 
-    if (DRY_RUN) {
-      rowsDeleted += batch.length;
-      break;
-    }
-
     const ids = batch.map((r) => r.id);
-    // biome-ignore lint/plugin: ids came from the org-scoped select above —
-    // deleting by that id set is already scoped to organizationId.
+    // biome-ignore lint/plugin: ids came from the org-scoped select above — deleting by that id set is already scoped to organizationId.
     await db.delete(messageSend).where(inArray(messageSend.id, ids));
     rowsDeleted += ids.length;
 
@@ -177,20 +222,18 @@ async function cleanupMessageSendForOrg(
     await sleep(BATCH_PAUSE_MS);
   }
 
-  const [oldest] = await db
-    .select({ createdAt: messageSend.createdAt })
-    .from(messageSend)
-    .where(eq(messageSend.organizationId, organizationId))
-    .orderBy(messageSend.createdAt)
-    .limit(1);
-
-  return { rowsDeleted, oldestRemaining: oldest?.createdAt ?? null };
+  return {
+    rowsDeleted,
+    oldestRemaining: await oldestRemainingMessageSend(organizationId),
+  };
 }
 
 /**
  * Count message_send rows for an org that are older than the visible window
  * but not yet past the delete cutoff — the grace-month population that gets
- * the warning notification.
+ * the warning notification. A true COUNT, not a capped select: the warning
+ * body quotes this number to the customer, so it must not understate a
+ * grace-window population larger than BATCH_SIZE.
  */
 async function countGraceWindowRows(
   organizationId: string,
@@ -200,8 +243,8 @@ async function countGraceWindowRows(
   const visibleCutoff = daysAgo(visibleDays);
   const deleteCutoff = daysAgo(deleteAfterDays);
 
-  const rows = await db
-    .select({ id: messageSend.id })
+  const [row] = await db
+    .select({ n: count() })
     .from(messageSend)
     .where(
       and(
@@ -209,10 +252,9 @@ async function countGraceWindowRows(
         lt(messageSend.createdAt, visibleCutoff),
         gte(messageSend.createdAt, deleteCutoff)
       )
-    )
-    .limit(BATCH_SIZE);
+    );
 
-  return rows.length;
+  return row?.n ?? 0;
 }
 
 async function wasRecentlyWarned(organizationId: string): Promise<boolean> {
@@ -247,13 +289,13 @@ async function warnOrgIfNeeded(
   visibleDays: number,
   deleteAfterDays: number
 ): Promise<void> {
-  const count = await countGraceWindowRows(
+  const graceRowCount = await countGraceWindowRows(
     organizationId,
     visibleDays,
     deleteAfterDays
   );
 
-  if (count === 0) {
+  if (graceRowCount === 0) {
     return;
   }
 
@@ -268,9 +310,9 @@ async function warnOrgIfNeeded(
     roles: ["owner", "admin"],
     type: WARNING_TYPE,
     title: "Some of your email history will be removed soon",
-    body: `${count} messages older than ${visibleDays} days will be deleted from your Wraps dashboard on ${deletionDate}. Upgrade to keep a longer history — your raw delivery events remain in your own AWS account either way.`,
+    body: `${graceRowCount} messages older than ${visibleDays} days will be deleted from your Wraps dashboard on ${deletionDate}. Upgrade to keep a longer history — your raw delivery events remain in your own AWS account either way.`,
     href: "/settings/billing",
-    data: { rowsAffected: count, deletionDate, plan, visibleDays },
+    data: { rowsAffected: graceRowCount, deletionDate, plan, visibleDays },
   });
 }
 
@@ -278,37 +320,43 @@ async function warnOrgIfNeeded(
  * Delete (or, in dry-run, count) contact_event rows past their expires_at.
  * Global pass, not per-org — expires_at is already the contract on these
  * rows. Rows with a NULL expires_at predate the TTL and are left alone.
+ *
+ * In dry-run this never enters the batch loop: see the comment on
+ * cleanupMessageSendForOrg for why a capped batch count would understate the
+ * true total and defeat the step-8 sign-off gate.
  */
 async function cleanupExpiredContactEvents(): Promise<number> {
+  const predicate = and(
+    isNotNull(contactEvent.expiresAt),
+    lt(contactEvent.expiresAt, new Date())
+  );
+
+  if (DRY_RUN) {
+    // biome-ignore lint/plugin: deliberately global, not org-scoped — expires_at is already the contract on these rows (see plans/210 step 4).
+    const [row] = await db
+      .select({ n: count() })
+      .from(contactEvent)
+      .where(predicate);
+
+    return row?.n ?? 0;
+  }
+
   let rowsDeleted = 0;
 
   while (true) {
+    // biome-ignore lint/plugin: deliberately global, not org-scoped — expires_at is already the contract on these rows (see plans/210 step 4).
     const batch = await db
       .select({ id: contactEvent.id })
       .from(contactEvent)
-      // biome-ignore lint/plugin: deliberately global, not org-scoped —
-      // expires_at is already the contract on these rows (see plans/210 step
-      // 4), so plan windows and per-org scoping don't apply to this pass.
-      .where(
-        and(
-          isNotNull(contactEvent.expiresAt),
-          lt(contactEvent.expiresAt, new Date())
-        )
-      )
+      .where(predicate)
       .limit(BATCH_SIZE);
 
     if (batch.length === 0) {
       break;
     }
 
-    if (DRY_RUN) {
-      rowsDeleted += batch.length;
-      break;
-    }
-
     const ids = batch.map((r) => r.id);
-    // biome-ignore lint/plugin: ids came from the global expires_at select
-    // above, which is intentionally not org-scoped (see comment above).
+    // biome-ignore lint/plugin: ids came from the global expires_at select above, which is intentionally not org-scoped.
     await db.delete(contactEvent).where(inArray(contactEvent.id, ids));
     rowsDeleted += ids.length;
 
