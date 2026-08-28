@@ -10,8 +10,9 @@
  * 1. Run `pnpm sst:dev` in another terminal
  * 2. Run `pnpm --filter @wraps/api test:integration`
  *
- * Validates that enforceEventLimit actually blocks requests over the grace
- * limit and sets the correct response headers.
+ * Validates that a free-plan organization is gated out of event ingestion by
+ * planGateMiddleware. Volume no longer blocks anything on any plan — see
+ * event-limit.test.ts for that coverage, which has an injectable auth context.
  */
 
 import { createHash } from "node:crypto";
@@ -142,7 +143,7 @@ async function seedUsage(count: number) {
 // -----------------------------------------------------------------------------
 
 describe.skipIf(!existsSync(resolve(process.cwd(), "../../.sst/outputs.json")))(
-  "Event Limit Enforcement (real Lambda, real DB)",
+  "free plan is gated out of event ingestion (real Lambda, real DB)",
   () => {
     let apiUrl: string;
 
@@ -212,51 +213,47 @@ describe.skipIf(!existsSync(resolve(process.cwd(), "../../.sst/outputs.json")))(
         .where(eq(eventUsageMonthly.organizationId, testOrg.id));
     });
 
-    it("returns 200 with usage headers when under limit", async () => {
+    // Volume behaviour (no cap on paid plans) is covered in event-limit.test.ts,
+    // where the auth context is injectable. This file's fixture org has no
+    // subscription row, so it can only ever exercise the free-plan gate.
+
+    it("returns 403 with zero prior usage", async () => {
+      const res = await postEvent();
+      expect(res.status).toBe(403);
+      expect(res.headers.get("X-Event-Exceeded")).toBeNull();
+      const body = await res.json();
+      expect(body.error).toMatch(/requires starter plan/i);
+    });
+
+    it("returns 403 with usage under the former free limit (2500)", async () => {
       await seedUsage(2500);
       const res = await postEvent();
-      expect(res.status).toBe(200);
-      expect(res.headers.get("X-Event-Limit")).toBe(String(FREE_LIMIT));
-      expect(res.headers.get("X-Event-Current")).toBe("2500");
-      expect(res.headers.get("X-Event-Remaining")).toBe("2500");
-      expect(res.headers.get("X-Event-Percent")).toBe("50");
+      expect(res.status).toBe(403);
+      expect(res.headers.get("X-Event-Exceeded")).toBeNull();
     });
 
-    it("returns 200 with zero prior usage", async () => {
-      const res = await postEvent();
-      expect(res.status).toBe(200);
-      expect(res.headers.get("X-Event-Limit")).toBe(String(FREE_LIMIT));
-      expect(res.headers.get("X-Event-Current")).toBe("0");
-    });
-
-    it("returns 200 one below the grace limit (6249)", async () => {
+    it("returns 403 one below the former grace limit (6249)", async () => {
       await seedUsage(FREE_GRACE - 1);
       const res = await postEvent();
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(403);
     });
 
-    it("returns 429 at the grace limit (6250)", async () => {
+    it("returns 403 at the former grace limit (6250)", async () => {
       await seedUsage(FREE_GRACE);
       const res = await postEvent();
-      expect(res.status).toBe(429);
-      expect(res.headers.get("X-Event-Exceeded")).toBe("true");
-      expect(Number(res.headers.get("Retry-After"))).toBeGreaterThan(0);
+      expect(res.status).toBe(403);
+      expect(res.headers.get("X-Event-Exceeded")).toBeNull();
+      expect(res.headers.get("Retry-After")).toBeNull();
       const body = await res.json();
-      expect(body.error).toBe("event_limit_exceeded");
-      expect(body.current).toBe(FREE_GRACE);
-      expect(body.limit).toBe(FREE_LIMIT);
-      expect(body.upgradeUrl).toBe("https://app.wraps.dev/settings/billing");
-      expect(body.resetsAt).toMatch(/^\d{4}-\d{2}-01T/);
+      expect(body.error).toMatch(/requires starter plan/i);
     });
 
-    it("returns 429 well over the limit (Darren's 8259 scenario)", async () => {
+    it("returns 403 well over the former limit (Darren's 8259 scenario)", async () => {
       await seedUsage(8259);
       const res = await postEvent();
-      expect(res.status).toBe(429);
+      expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body.current).toBe(8259);
-      expect(body.limit).toBe(FREE_LIMIT);
-      expect(body.percentUsed).toBe(165);
+      expect(body.error).toMatch(/requires starter plan/i);
     });
   }
 );

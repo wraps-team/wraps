@@ -88,6 +88,8 @@ const freeAuth: AuthContext = {
   planId: null,
 };
 
+const starterAuth: AuthContext = { ...freeAuth, planId: "starter" };
+
 const PERIOD_KEY = `${new Date().getUTCFullYear()}-${String(new Date().getUTCMonth() + 1).padStart(2, "0")}`;
 const FREE_LIMIT = 5000;
 const FREE_GRACE = Math.floor(FREE_LIMIT * 1.25); // 6250
@@ -123,7 +125,7 @@ function postEvent(app: ReturnType<typeof createTestApp>) {
 
 describe("event limit enforcement (real middleware, real DB)", () => {
   // WRAPS_LICENSE_KEY in the shell env makes isSelfHosted() return true, bypassing limit checks.
-  // Stub it to empty so enforceEventLimit actually runs during these tests.
+  // Stub it to empty so enforceEventLimit and planGateMiddleware actually run during these tests.
   beforeEach(() => vi.stubEnv("WRAPS_LICENSE_KEY", ""));
   afterEach(() => vi.unstubAllEnvs());
 
@@ -167,59 +169,74 @@ describe("event limit enforcement (real middleware, real DB)", () => {
       .where(eq(eventUsageMonthly.organizationId, testOrg.id));
   });
 
-  it("allows the event and sets usage headers when under limit", async () => {
-    await seedUsage(2500);
-    const res = await postEvent(createTestApp());
-    expect(res.status).toBe(200);
-    expect(res.headers.get("X-Event-Limit")).toBe(String(FREE_LIMIT));
-    expect(res.headers.get("X-Event-Current")).toBe("2500");
-    expect(res.headers.get("X-Event-Remaining")).toBe("2500");
-    expect(res.headers.get("X-Event-Percent")).toBe("50");
+  // Volume is no longer capped on a paid plan — these cases were written to
+  // guard the (now-removed) 429 block, so they run on a paid auth context to
+  // keep exercising that behavior. A free-plan org never reaches the volume
+  // logic at all — see "the free plan is gated" below.
+  describe("volume is not capped on a paid plan", () => {
+    it("allows the event and sets usage headers when under limit", async () => {
+      await seedUsage(2500);
+      const res = await postEvent(createTestApp(starterAuth));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Event-Limit")).toBe("50000");
+      expect(res.headers.get("X-Event-Current")).toBe("2500");
+      expect(res.headers.get("X-Event-Remaining")).toBe("47500");
+      expect(res.headers.get("X-Event-Percent")).toBe("5");
+    });
+
+    it("allows the event with no prior usage (zero usage row)", async () => {
+      const res = await postEvent(createTestApp(starterAuth));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Event-Limit")).toBe("50000");
+      expect(res.headers.get("X-Event-Current")).toBe("0");
+    });
+
+    it("does not block a paid plan at the former grace limit", async () => {
+      await seedUsage(FREE_GRACE); // 6250 — used to be the free-plan 429 threshold
+      const res = await postEvent(createTestApp(starterAuth));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Event-Exceeded")).toBeNull();
+      expect(res.headers.get("Retry-After")).toBeNull();
+    });
+
+    it("does not block a paid plan well over the former limit (8259 scenario)", async () => {
+      await seedUsage(8259);
+      const res = await postEvent(createTestApp(starterAuth));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Event-Limit")).toBe("50000");
+      expect(res.headers.get("X-Event-Current")).toBe("8259");
+      expect(res.headers.get("X-Event-Percent")).toBe("17");
+      expect(res.headers.get("X-Event-Exceeded")).toBeNull();
+      expect(res.headers.get("Retry-After")).toBeNull();
+    });
+
+    it("does not block starter plan at free-tier counts", async () => {
+      await seedUsage(FREE_GRACE); // 6250 — would have blocked free but not starter
+      const res = await postEvent(createTestApp(starterAuth));
+      // 6250 is only 12.5% of starter's 50k limit — well under the former grace threshold
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Event-Limit")).toBe("50000");
+    });
   });
 
-  it("allows the event with no prior usage (zero usage row)", async () => {
-    const res = await postEvent(createTestApp());
-    expect(res.status).toBe(200);
-    expect(res.headers.get("X-Event-Limit")).toBe(String(FREE_LIMIT));
-    expect(res.headers.get("X-Event-Current")).toBe("0");
-  });
+  // The numeric limit no longer blocks anything, but the events feature itself
+  // is starter+ (FEATURE_PLANS.events in plan-gate.ts). A free org is gated out
+  // regardless of usage — this is what FSI's $19/mo actually pays for.
+  describe("the free plan is gated", () => {
+    it("returns 403 with zero seeded usage", async () => {
+      const res = await postEvent(createTestApp(freeAuth));
+      expect(res.status).toBe(403);
+      const text = await res.text();
+      expect(text).toMatch(/requires starter plan/i);
+    });
 
-  it("allows the event one below the grace limit", async () => {
-    await seedUsage(FREE_GRACE - 1); // 6249
-    const res = await postEvent(createTestApp());
-    expect(res.status).toBe(200);
-  });
-
-  it("blocks with 429 at the grace limit", async () => {
-    await seedUsage(FREE_GRACE); // 6250
-    const res = await postEvent(createTestApp());
-    expect(res.status).toBe(429);
-    expect(res.headers.get("X-Event-Exceeded")).toBe("true");
-    expect(Number(res.headers.get("Retry-After"))).toBeGreaterThan(0);
-    const body = await res.json();
-    expect(body.error).toBe("event_limit_exceeded");
-    expect(body.current).toBe(FREE_GRACE);
-    expect(body.limit).toBe(FREE_LIMIT);
-    expect(body.upgradeUrl).toBe("https://app.wraps.dev/settings/billing");
-    expect(body.resetsAt).toMatch(/^\d{4}-\d{2}-01T/);
-  });
-
-  it("blocks when well over the limit (Darren's 8259 scenario)", async () => {
-    await seedUsage(8259);
-    const res = await postEvent(createTestApp());
-    expect(res.status).toBe(429);
-    const body = await res.json();
-    expect(body.current).toBe(8259);
-    expect(body.limit).toBe(FREE_LIMIT);
-    expect(body.percentUsed).toBe(165);
-  });
-
-  it("does not block starter plan at free-tier counts", async () => {
-    await seedUsage(FREE_GRACE); // 6250 — would block free but not starter
-    const starterAuth: AuthContext = { ...freeAuth, planId: "starter" };
-    const res = await postEvent(createTestApp(starterAuth));
-    // 6250 is only 12.5% of starter's 50k limit — well under grace
-    expect(res.status).toBe(200);
-    expect(res.headers.get("X-Event-Limit")).toBe("50000");
+    it("returns 403 with usage well over the former limit (8259 scenario)", async () => {
+      await seedUsage(8259);
+      const res = await postEvent(createTestApp(freeAuth));
+      // Gated on plan, not volume — same 403 whether usage is 0 or 8259.
+      expect(res.status).toBe(403);
+      const text = await res.text();
+      expect(text).toMatch(/requires starter plan/i);
+    });
   });
 });
