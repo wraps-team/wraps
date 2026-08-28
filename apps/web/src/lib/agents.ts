@@ -31,6 +31,9 @@ export type AgentSendPayload = {
   subject: string;
   html?: string;
   text?: string;
+  replyTo?: string;
+  inReplyTo?: string;
+  references?: string;
 };
 
 // Serialized approval-queue row as returned to the dashboard

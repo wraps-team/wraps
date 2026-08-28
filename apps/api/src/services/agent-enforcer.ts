@@ -195,6 +195,13 @@ export async function executeApprovedSend(
     subject: approval.payload.subject,
     html: approval.payload.html ?? "",
     text: approval.payload.text ?? "",
+    ...(approval.payload.replyTo ? { replyTo: approval.payload.replyTo } : {}),
+    ...(approval.payload.inReplyTo
+      ? { inReplyTo: approval.payload.inReplyTo }
+      : {}),
+    ...(approval.payload.references
+      ? { references: approval.payload.references }
+      : {}),
   };
 
   const request: EnforcerRequest = {

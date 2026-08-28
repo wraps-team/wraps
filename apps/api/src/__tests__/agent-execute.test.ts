@@ -130,7 +130,7 @@ function appAsMemberApiKey() {
     .use(agentsRoutes);
 }
 
-async function seedPendingApproval() {
+async function seedPendingApproval(payloadOverrides?: Record<string, unknown>) {
   const [row] = await db
     .insert(agentApprovalQueue)
     .values({
@@ -142,6 +142,7 @@ async function seedPendingApproval() {
         subject: "Hi",
         html: "<p>hi</p>",
         text: "hi",
+        ...payloadOverrides,
       },
       reason: "recipient not on allowlist",
       status: "PENDING",
@@ -228,7 +229,11 @@ describe("POST /v1/agents/approvals/:id/approve", () => {
         JSON.stringify({ status: "sent", messageId: "ses-msg-abc" })
       ),
     };
-    const approval = await seedPendingApproval();
+    const approval = await seedPendingApproval({
+      replyTo: "human@example.com",
+      inReplyTo: "<abc@mail.example.com>",
+      references: "<abc@mail.example.com> <def@mail.example.com>",
+    });
 
     const res = await app().handle(
       new Request(
@@ -251,6 +256,12 @@ describe("POST /v1/agents/approvals/:id/approve", () => {
     expect(sent.action).toBe("execute");
     expect(sent.approvalId).toBe(approval.id);
     expect(sent.agentId).toBe(agentRowId);
+    // The reply-to and threading fields round-trip through Neon → approve → Lambda invoke.
+    expect(sent.payload.replyTo).toBe("human@example.com");
+    expect(sent.payload.inReplyTo).toBe("<abc@mail.example.com>");
+    expect(sent.payload.references).toBe(
+      "<abc@mail.example.com> <def@mail.example.com>"
+    );
 
     // Row is durably SENT with the messageId.
     const [rowAfter] = await db

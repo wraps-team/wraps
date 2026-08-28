@@ -535,3 +535,102 @@ describe("agent-enforcer — status poll", () => {
     expect(res).toEqual({ status: "unknown" });
   });
 });
+
+describe("agent-enforcer — reply-to and threading headers", () => {
+  it("sends with replyTo and sets ReplyToAddresses", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: configItem() });
+    ddbMock.on(UpdateCommand).resolves({});
+    sesMock.on(SendEmailCommand).resolves({ MessageId: "msg-1" });
+
+    const event = sendEvent();
+    event.payload!.replyTo = "human@example.com";
+    const handler = makeHandler();
+    const res = await handler(event, agentContext("a1"));
+
+    expect(res.status).toBe("sent");
+    const sent = sesMock.commandCalls(SendEmailCommand)[0].args[0].input;
+    expect(sent.ReplyToAddresses).toEqual(["human@example.com"]);
+  });
+
+  it("sends with inReplyTo + references and sets Content.Simple.Headers", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: configItem() });
+    ddbMock.on(UpdateCommand).resolves({});
+    sesMock.on(SendEmailCommand).resolves({ MessageId: "msg-1" });
+
+    const event = sendEvent();
+    event.payload!.inReplyTo = "<abc@mail.example.com>";
+    event.payload!.references = "<abc@mail.example.com> <def@mail.example.com>";
+    const handler = makeHandler();
+    const res = await handler(event, agentContext("a1"));
+
+    expect(res.status).toBe("sent");
+    const sent = sesMock.commandCalls(SendEmailCommand)[0].args[0].input;
+    expect(sent.Content?.Simple?.Headers).toEqual([
+      { Name: "In-Reply-To", Value: "<abc@mail.example.com>" },
+      {
+        Name: "References",
+        Value: "<abc@mail.example.com> <def@mail.example.com>",
+      },
+    ]);
+  });
+
+  it("omits ReplyToAddresses and Headers keys entirely when none of the three fields are set", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: configItem() });
+    ddbMock.on(UpdateCommand).resolves({});
+    sesMock.on(SendEmailCommand).resolves({ MessageId: "msg-1" });
+
+    const handler = makeHandler();
+    const res = await handler(sendEvent(), agentContext("a1"));
+
+    expect(res.status).toBe("sent");
+    const sent = sesMock.commandCalls(SendEmailCommand)[0].args[0].input;
+    expect(sent).not.toHaveProperty("ReplyToAddresses");
+    expect(sent.Content?.Simple).not.toHaveProperty("Headers");
+  });
+
+  it("blocks a multi-address replyTo before consuming any cap", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: configItem() });
+    ddbMock.on(UpdateCommand).resolves({});
+    sesMock.on(SendEmailCommand).resolves({ MessageId: "nope" });
+
+    const event = sendEvent();
+    event.payload!.replyTo = "a@b.com, c@d.com";
+    const handler = makeHandler();
+    const res = await handler(event, agentContext("a1"));
+
+    expect(res).toEqual({ status: "blocked", reason: "invalid reply-to" });
+    expect(sesMock.commandCalls(SendEmailCommand)).toHaveLength(0);
+    expect(ddbMock.commandCalls(UpdateCommand)).toHaveLength(0);
+  });
+
+  it("blocks a CRLF header-injection attempt in inReplyTo, no SES, no counter write", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: configItem() });
+    ddbMock.on(UpdateCommand).resolves({});
+    sesMock.on(SendEmailCommand).resolves({ MessageId: "nope" });
+
+    const event = sendEvent();
+    event.payload!.inReplyTo =
+      "<abc@mail.example.com>\r\nBcc: attacker@evil.com";
+    const handler = makeHandler();
+    const res = await handler(event, agentContext("a1"));
+
+    expect(res).toEqual({ status: "blocked", reason: "invalid in-reply-to" });
+    expect(sesMock.commandCalls(SendEmailCommand)).toHaveLength(0);
+    expect(ddbMock.commandCalls(UpdateCommand)).toHaveLength(0);
+  });
+
+  it("blocks the same malformed replyTo on an execute event too", async () => {
+    routeExecuteReads({ outcome: null });
+    ddbMock.on(PutCommand).resolves({});
+    sesMock.on(SendEmailCommand).resolves({ MessageId: "should-not-send" });
+
+    const event = executeEvent();
+    event.payload!.replyTo = "a@b.com, c@d.com";
+    const handler = makeHandler();
+    const res = await handler(event, platformContext());
+
+    expect(res).toEqual({ status: "blocked", reason: "invalid reply-to" });
+    expect(sesMock.commandCalls(SendEmailCommand)).toHaveLength(0);
+    expect(ddbMock.commandCalls(PutCommand)).toHaveLength(0);
+  });
+});

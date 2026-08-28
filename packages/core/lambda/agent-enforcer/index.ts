@@ -82,6 +82,21 @@ function isSingleEmail(to: unknown): to is string {
   return /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(to);
 }
 
+/**
+ * A value safe to place on a MIME header line. CR/LF is the header-injection
+ * vector; SES additionally requires printable ASCII. Mirrors
+ * assertNoHeaderInjection() in wraps-js packages/email/src/utils/headers.ts,
+ * reimplemented as a predicate because the enforcer returns verdicts, never throws.
+ */
+function isSafeHeaderValue(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 998 &&
+    /^[\x20-\x7e]+$/.test(value)
+  );
+}
+
 /** Sender pinning (SEC-3): `payload.from` must be the agent's own address. */
 function isOwnSender(from: unknown, emailAddress: string): boolean {
   return (
@@ -167,6 +182,26 @@ async function tryDecrement(
   }
 }
 
+/** Verdict reason if the optional header fields are malformed, else null. */
+function headerFieldProblem(payload: AgentEmailPayload): string | null {
+  if (payload.replyTo !== undefined && !isSingleEmail(payload.replyTo)) {
+    return "invalid reply-to";
+  }
+  if (
+    payload.inReplyTo !== undefined &&
+    !isSafeHeaderValue(payload.inReplyTo)
+  ) {
+    return "invalid in-reply-to";
+  }
+  if (
+    payload.references !== undefined &&
+    !isSafeHeaderValue(payload.references)
+  ) {
+    return "invalid references";
+  }
+  return null;
+}
+
 /** Caller identity bound to the invoke principal, never the payload (SEC-2). */
 type Caller = { kind: "agent"; agentId: string } | { kind: "platform" };
 
@@ -211,10 +246,20 @@ async function sendViaSes(
   agentId: string,
   configSet: string
 ): Promise<string> {
+  const headers = [
+    ...(payload.inReplyTo
+      ? [{ Name: "In-Reply-To", Value: payload.inReplyTo }]
+      : []),
+    ...(payload.references
+      ? [{ Name: "References", Value: payload.references }]
+      : []),
+  ];
+
   const response = await sesClient.send(
     new SendEmailCommand({
       FromEmailAddress: payload.from,
       Destination: { ToAddresses: [payload.to] },
+      ...(payload.replyTo ? { ReplyToAddresses: [payload.replyTo] } : {}),
       Content: {
         Simple: {
           Subject: { Data: payload.subject },
@@ -222,6 +267,7 @@ async function sendViaSes(
             Html: { Data: payload.html },
             Text: { Data: payload.text },
           },
+          ...(headers.length > 0 ? { Headers: headers } : {}),
         },
       },
       ConfigurationSetName: configSet,
@@ -286,6 +332,10 @@ export function createHandler(deps: EnforcerDeps) {
     // Enforced mode is single-recipient; reject anything not a lone address (COR-6).
     if (!isSingleEmail(payload.to)) {
       return { status: "blocked", reason: "invalid recipient" };
+    }
+    const headerProblem = headerFieldProblem(payload);
+    if (headerProblem) {
+      return { status: "blocked", reason: headerProblem };
     }
 
     const config = await loadConfig(dynamo, table, agentId);
@@ -419,6 +469,10 @@ export function createHandler(deps: EnforcerDeps) {
     }
     if (!isSingleEmail(payload.to)) {
       return { status: "blocked", reason: "invalid recipient" };
+    }
+    const headerProblem = headerFieldProblem(payload);
+    if (headerProblem) {
+      return { status: "blocked", reason: headerProblem };
     }
 
     const configSet = process.env.CONFIG_SET || DEFAULT_CONFIG_SET;

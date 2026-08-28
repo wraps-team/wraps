@@ -35,6 +35,9 @@ const webhookBodySchema = t.Object({
     subject: t.String(),
     html: t.Optional(t.String()),
     text: t.Optional(t.String()),
+    replyTo: t.Optional(t.String()),
+    inReplyTo: t.Optional(t.String()),
+    references: t.Optional(t.String()),
   }),
   reason: t.Optional(t.String()),
 });

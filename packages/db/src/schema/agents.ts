@@ -37,6 +37,9 @@ export type AgentSendPayload = {
   subject: string;
   html?: string;
   text?: string;
+  replyTo?: string;
+  inReplyTo?: string;
+  references?: string;
 };
 
 // Agents — an addressable, leashed sender scoped to an organization

@@ -19,6 +19,12 @@ export type AgentEmailPayload = {
   subject: string;
   html: string;
   text: string;
+  /** Where a human's reply should land. Single address; not the agent's identity. */
+  replyTo?: string;
+  /** RFC 5322 Message-ID of the message being replied to. */
+  inReplyTo?: string;
+  /** RFC 5322 References chain. */
+  references?: string;
 };
 
 /**

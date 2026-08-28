@@ -195,6 +195,11 @@ export function AgentApprovalQueue({
                           <p className="truncate text-muted-foreground text-sm">
                             {approval.payload.from} → {approval.payload.to}
                           </p>
+                          {approval.payload.replyTo && (
+                            <p className="truncate text-muted-foreground text-sm">
+                              Reply-To: {approval.payload.replyTo}
+                            </p>
+                          )}
                           {approval.status === "FAILED" &&
                             approval.errorMessage && (
                               <p className="truncate text-destructive text-sm">
