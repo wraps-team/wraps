@@ -1,12 +1,10 @@
 /**
  * Event Usage Limit Middleware
  *
- * Enforces monthly event limits based on plan tier.
- * Uses soft caps with 25% grace period before hard blocking.
- *
- * Thresholds:
- * - 100%: Warning logged
- * - 125%: Hard block with 429 response
+ * Observability only. Reports monthly custom-event usage per plan tier via
+ * response headers and logs a warning at 100% of the plan's included volume.
+ * It does not block ingestion — event volume is unmetered on every plan; see
+ * the comment on enforceEventLimit for why.
  *
  * Usage: call applyEventLimit(app) on the Elysia instance that owns your
  * routes. Do NOT wrap in a plugin — Elysia 1.4 does not propagate plugin
@@ -103,6 +101,10 @@ export function getEventTTLExpiration(): Date {
  * Elysia 1.4 does not propagate plugin hooks to parent route instances, so
  * this must be added inline — not wrapped in a plugin and .use()-d.
  */
+// Observability only — this no longer blocks. Event volume is unmetered on
+// every plan; the abuse backstop is the per-org rate limit (see rateLimits in
+// apps/web/src/lib/plans.ts), not this counter. Headers are retained because
+// the dashboard's event-usage card reads them.
 // biome-ignore lint/suspicious/noExplicitAny: ctx shape varies across Elysia route instances
 export async function enforceEventLimit(ctx: any) {
   const auth = getAuthOptional(ctx);
@@ -120,27 +122,11 @@ export async function enforceEventLimit(ctx: any) {
     const currentUsage = await getEventUsageCount(organizationId);
     const percentUsed = Math.round((currentUsage / limit) * 100);
     const remaining = Math.max(0, limit - currentUsage);
-    const graceLimit = Math.floor(limit * 1.25);
 
     set.headers["X-Event-Limit"] = String(limit);
     set.headers["X-Event-Current"] = String(currentUsage);
     set.headers["X-Event-Remaining"] = String(remaining);
     set.headers["X-Event-Percent"] = String(percentUsed);
-
-    if (currentUsage >= graceLimit) {
-      set.status = 429;
-      set.headers["X-Event-Exceeded"] = "true";
-      set.headers["Retry-After"] = String(getSecondsUntilNextMonth());
-      return {
-        error: "event_limit_exceeded",
-        message: `Monthly event limit exceeded (${percentUsed}% used). Upgrade your plan to continue ingesting events.`,
-        upgradeUrl: "https://app.wraps.dev/settings/billing",
-        current: currentUsage,
-        limit,
-        percentUsed,
-        resetsAt: getNextMonthResetDate().toISOString(),
-      };
-    }
 
     if (currentUsage >= limit) {
       log.warn("Event limit reached", {
@@ -154,25 +140,4 @@ export async function enforceEventLimit(ctx: any) {
     log.error("Event limit check failed", error, { organizationId });
     // fail open — a DB error here should not block event ingestion
   }
-}
-
-/**
- * Get seconds until the 1st of next month (for Retry-After header)
- */
-function getSecondsUntilNextMonth(): number {
-  const now = new Date();
-  const nextMonth = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0)
-  );
-  return Math.ceil((nextMonth.getTime() - now.getTime()) / 1000);
-}
-
-/**
- * Get the Date object for the 1st of next month
- */
-function getNextMonthResetDate(): Date {
-  const now = new Date();
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0)
-  );
 }
