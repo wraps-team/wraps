@@ -46,6 +46,30 @@ describe("public/pricing.md", () => {
   });
 });
 
+describe("tracked-event definition (agent surfaces must state what actually meters)", () => {
+  it("pricing.md does not claim SES delivery events are billable", () => {
+    const md = read("public/pricing.md");
+    expect(md).not.toMatch(/a send, delivery, open, click/);
+  });
+
+  it("pricing.md states sending is unmetered", () => {
+    const md = read("public/pricing.md");
+    expect(md).toContain("sending volume does not change the Wraps column");
+  });
+
+  it("the MCP estimate_cost schema does not describe events as including sends or opens", () => {
+    const source = read("src/lib/mcp-server.ts");
+    expect(source).not.toContain(
+      "sends, opens, clicks, bounces, custom events"
+    );
+  });
+
+  it("agent-content.ts states email sending is unmetered", () => {
+    const source = read("src/lib/agent-content.ts");
+    expect(source).toContain("Email sending is unmetered on every plan");
+  });
+});
+
 describe("markdown content negotiation", () => {
   it("serves pricing on /pricing instead of falling back to llms.txt", () => {
     expect(AGENT_CONTENT["/pricing"]).toBe(renderPricingMarkdown());
