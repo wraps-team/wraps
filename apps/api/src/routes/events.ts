@@ -45,6 +45,7 @@ import {
   getEventTTLExpiration,
   incrementEventUsage,
 } from "../middleware/event-limit";
+import { planGateMiddleware } from "../middleware/plan-gate";
 import {
   deleteScheduledStep,
   enqueueWorkflowStep,
@@ -63,6 +64,7 @@ const propertiesSchema = t.Optional(
 );
 
 export const eventsRoutes = createAuthenticatedRoutes("/v1/events")
+  .use(planGateMiddleware("events"))
   .onBeforeHandle(enforceEventLimit)
 
   /**
