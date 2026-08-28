@@ -36,7 +36,7 @@ export function WebMCP() {
         {
           name: "get_pricing",
           description:
-            "Get Wraps pricing: plans, tracked-event limits and overage rates, AWS SES pricing plans, worked cost examples, and the feature comparison (markdown)",
+            "Get Wraps pricing: plans, custom-event limits and overage rates, AWS SES pricing plans, worked cost examples, and the feature comparison (markdown)",
           inputSchema: { type: "object", properties: {} },
           execute: async () => {
             const res = await fetch("/pricing.md");
@@ -46,7 +46,7 @@ export function WebMCP() {
         {
           name: "estimate_cost",
           description:
-            "Estimate the real monthly cost of running email on Wraps + AWS: Wraps platform fee, tracked-event overage, and the itemized AWS bill (SES, EventBridge, SQS, Lambda, DynamoDB, dedicated IP, WAF). Use this instead of doing the arithmetic — the model has six interacting variables, including which SES pricing plan the AWS account is on.",
+            "Estimate the real monthly cost of running email on Wraps + AWS: Wraps platform fee, custom-event overage, and the itemized AWS bill (SES, EventBridge, SQS, Lambda, DynamoDB, dedicated IP, WAF). Use this instead of doing the arithmetic — the model has six interacting variables, including which SES pricing plan the AWS account is on.",
           inputSchema: {
             type: "object",
             properties: {
@@ -57,7 +57,7 @@ export function WebMCP() {
               events: {
                 type: "integer",
                 description:
-                  "Wraps tracked events per month (sends, opens, clicks, bounces, custom events)",
+                  "Custom events you emit via POST /v1/events per month. Emails sent and SES delivery events (deliveries, opens, clicks, bounces) are not counted and do not affect price.",
               },
               tier: {
                 type: "string",

@@ -177,7 +177,7 @@ export const TOOLS = [
           minimum: 0,
           maximum: MAX_VOLUME,
           description:
-            "Wraps tracked events per month (sends, opens, clicks, bounces, custom events).",
+            "Custom events you emit via POST /v1/events per month. Emails sent and SES delivery events (deliveries, opens, clicks, bounces) are not counted and do not affect price.",
         },
         tier: {
           type: "string",

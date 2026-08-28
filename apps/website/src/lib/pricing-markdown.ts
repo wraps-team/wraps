@@ -20,7 +20,6 @@ import type { CostEstimate, CostInput, SesPlanId } from "./ses-cost";
 import {
   AWS_INFRA_PRICING,
   estimateCost,
-  recommendTier,
   SES_PLAN_IDS,
   SES_PLANS,
 } from "./ses-cost";
@@ -93,7 +92,7 @@ ${table(
   rows
 )}
 
-Wraps bills on **tracked events**, not emails sent. A tracked event is anything Wraps records or acts on: a send, delivery, open, click, bounce, complaint, or an event you emit yourself to trigger a workflow. Sending 100,000 emails with tracking disabled costs $0 in Wraps events.
+Wraps bills on **custom events** — events you emit yourself via \`POST /v1/events\` to trigger workflows and build segments. Emails sent, broadcasts, contacts stored, and the delivery events SES reports back (deliveries, opens, clicks, bounces, complaints) are recorded and displayed at no charge and count toward nothing. Sending 100,000 emails costs $0 in Wraps events.
 
 The overage rate applies only to events beyond the included volume. Free and Starter have no overage rate — they stop at the included volume and require an upgrade. Annual billing is billed once per year and saves roughly two months.`;
 }
@@ -135,11 +134,11 @@ The SES-specific free tier (3,000 emails/month for 12 months) no longer exists f
 const EXAMPLE_VOLUMES = [10_000, 100_000, 500_000, 1_000_000];
 
 function exampleEstimate(emails: number, sesPlan: SesPlanId): CostEstimate {
-  const events = emails / 2;
+  const events = 0;
   return estimateCost({
     emailsPerMonth: emails,
     eventsPerMonth: events,
-    tier: recommendTier(events),
+    tier: "free",
     sesPlan,
   });
 }
@@ -162,12 +161,12 @@ function examplesSection(): string {
 
   return `## Worked examples (all-in monthly cost)
 
-Precomputed so you do not have to do the arithmetic. Assumes event tracking on, 8 event types per email, DynamoDB history with 90-day retention, no dedicated IP, monthly billing, and tracked events at half of email volume. The AWS column is what AWS bills you; the Wraps column is what Wraps bills you.
+Precomputed so you do not have to do the arithmetic. Assumes no custom events emitted, DynamoDB history with 90-day retention, no dedicated IP, and monthly billing. The AWS column is what AWS bills you; the Wraps column is what Wraps bills you — note that sending volume does not change the Wraps column.
 
 ${table(
   [
     "Volume",
-    "Tracked events",
+    "Custom events",
     "Wraps plan",
     "Wraps cost",
     "AWS (à la carte)",
@@ -184,7 +183,12 @@ Change any assumption and the numbers move. Call the estimator below instead of 
 function estimatorSection(): string {
   const params = [
     ["emails", "integer", "Emails sent per month", "25000"],
-    ["events", "integer", "Wraps tracked events per month", "5000"],
+    [
+      "events",
+      "integer",
+      "Custom events you emit via POST /v1/events per month (not emails, not SES delivery events)",
+      "0",
+    ],
     ["tier", "free \\| starter \\| growth \\| scale", "Wraps plan", "free"],
     ["billing", "monthly \\| annual", "Wraps billing interval", "monthly"],
     [
