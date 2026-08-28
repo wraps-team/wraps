@@ -91,6 +91,16 @@ const productItems = [
     href: "/sms",
     description: "Send texts via AWS End User Messaging",
   },
+  {
+    name: "For Marketing",
+    href: "/for/marketing",
+    description: "Broadcasts and segments, unlimited contacts",
+  },
+  {
+    name: "For Email Ops",
+    href: "/for/operators",
+    description: "Consent, deliverability, and a paper trail",
+  },
 ];
 
 const resourceItems = [

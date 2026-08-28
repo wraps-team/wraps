@@ -16,6 +16,8 @@ const footerLinks = {
     { name: "Agents", href: "/agents" },
     { name: "MCP Server", href: "/mcp" },
     { name: "Platform", href: "/platform" },
+    { name: "For Marketing", href: "/for/marketing" },
+    { name: "For Email Ops", href: "/for/operators" },
     { name: "Pricing", href: "/#pricing" },
   ],
   developers: [
