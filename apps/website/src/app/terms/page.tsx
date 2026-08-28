@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
+import { LegalArticle } from "@/components/legal-article";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -27,8 +28,8 @@ export default function TermsOfService() {
   return (
     <div className="min-h-screen bg-background">
       <LandingNavbar />
-      <div className="container mx-auto max-w-4xl px-4 py-16">
-        <article className="prose prose-gray dark:prose-invert max-w-none">
+      <div className="container mx-auto max-w-4xl px-4 pt-24 pb-16">
+        <LegalArticle>
           <h1>Terms of Service</h1>
           <p className="text-muted-foreground">
             <strong>Last Updated:</strong> December 22, 2025
@@ -522,7 +523,7 @@ export default function TermsOfService() {
             </Link>
             .
           </p>
-        </article>
+        </LegalArticle>
       </div>
       <LandingFooter />
     </div>
