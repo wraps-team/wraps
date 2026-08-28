@@ -1,8 +1,8 @@
 "use client";
 
 import { Avatar, AvatarFallback } from "@wraps/ui/components/ui/avatar";
-import type { UIMessage } from "ai";
-import { Bot, Loader2, User } from "lucide-react";
+import { getToolName, isToolUIPart, type ToolUIPart, type UIMessage } from "ai";
+import { AlertCircle, Bot, Check, Loader2, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/reasoning";
 import { cn } from "@/lib/utils";
 
+export type ToolPartRenderer = (part: ToolUIPart) => ReactNode;
+
 type AssistantConversationProps = {
   messages: UIMessage[];
   isLoading: boolean;
@@ -38,6 +40,11 @@ type AssistantConversationProps = {
   // Rendered inside the scroller when there are no messages yet. Each panel
   // owns its own empty state (limit reached, welcome, quick prompts, etc.).
   emptyState?: ReactNode;
+  // Maps a tool name (no `tool-` prefix) to the component that renders that
+  // tool's invocation. A tool with no entry falls back to a compact status
+  // line — never a raw dump of the tool output, which is frequently large and
+  // sometimes contains data the surrounding page is not meant to show.
+  toolRenderers?: Record<string, ToolPartRenderer>;
 };
 
 // Helper to get concatenated text content from a message
@@ -50,6 +57,41 @@ function getMessageText(message: UIMessage) {
     .join("");
 }
 
+// Shown for a tool the caller registered no renderer for. Deliberately shows
+// the tool's name and lifecycle only: tool outputs are unbounded in size and
+// not guaranteed to be safe to paint into the page, so an unregistered tool
+// degrades to a status line rather than a JSON dump.
+function ToolPartFallback({ part }: { part: ToolUIPart }) {
+  const name = getToolName(part);
+
+  if (part.state === "output-error") {
+    return (
+      <Marker role="status">
+        <MarkerIcon>
+          <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+        </MarkerIcon>
+        <MarkerContent>{`${name} failed`}</MarkerContent>
+      </Marker>
+    );
+  }
+
+  const done = part.state === "output-available";
+  return (
+    <Marker role="status">
+      <MarkerIcon>
+        {done ? (
+          <Check className="h-3.5 w-3.5 text-muted-foreground" />
+        ) : (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        )}
+      </MarkerIcon>
+      <MarkerContent>
+        {done ? `Ran ${name}` : `Running ${name}...`}
+      </MarkerContent>
+    </Marker>
+  );
+}
+
 export function AssistantConversation({
   messages,
   isLoading,
@@ -57,6 +99,7 @@ export function AssistantConversation({
   className,
   renderAssistantText,
   emptyState,
+  toolRenderers,
 }: AssistantConversationProps) {
   // A part is still streaming if it's the last part of the last message and
   // generation is in progress.
@@ -141,6 +184,23 @@ export function AssistantConversation({
                                       : part.text}
                                   </BubbleContent>
                                 </Bubble>
+                              );
+                            }
+
+                            if (isToolUIPart(part)) {
+                              const renderer =
+                                toolRenderers?.[getToolName(part)];
+                              return (
+                                <div
+                                  className="w-full"
+                                  key={`${message.id}-${partIndex}`}
+                                >
+                                  {renderer ? (
+                                    renderer(part)
+                                  ) : (
+                                    <ToolPartFallback part={part} />
+                                  )}
+                                </div>
                               );
                             }
 

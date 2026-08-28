@@ -26,6 +26,26 @@ const assistantMessage: UIMessage = {
   parts: [{ type: "text", text: "Hi, how can I help?" }],
 };
 
+const toolMessage = (
+  state: "input-streaming" | "output-available" | "output-error"
+): UIMessage =>
+  ({
+    id: `msg-tool-${state}`,
+    role: "assistant",
+    parts: [
+      {
+        type: "tool-get_setup_status",
+        toolCallId: "call-1",
+        state,
+        ...(state === "output-available"
+          ? { input: {}, output: { sandbox: true, secretish: "DO-NOT-PAINT" } }
+          : {}),
+        ...(state === "output-error" ? { input: {}, errorText: "boom" } : {}),
+        ...(state === "input-streaming" ? { input: undefined } : {}),
+      },
+    ],
+  }) as UIMessage;
+
 describe("AssistantConversation", () => {
   it("renders both user and assistant message text inside a log region", () => {
     render(
@@ -63,5 +83,54 @@ describe("AssistantConversation", () => {
 
     expect(screen.getByRole("status")).toBeInTheDocument();
     expect(screen.getByText("Generating...")).toBeInTheDocument();
+  });
+
+  it("renders a registered tool renderer instead of the fallback", () => {
+    render(
+      <AssistantConversation
+        isLoading={false}
+        messages={[toolMessage("output-available")]}
+        toolRenderers={{
+          get_setup_status: () => <p>Sandbox card</p>,
+        }}
+      />
+    );
+
+    expect(screen.getByText("Sandbox card")).toBeInTheDocument();
+    expect(screen.queryByText(/Ran get_setup_status/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to a running status line for an unregistered tool", () => {
+    render(
+      <AssistantConversation
+        isLoading={false}
+        messages={[toolMessage("input-streaming")]}
+      />
+    );
+
+    expect(screen.getByText("Running get_setup_status...")).toBeInTheDocument();
+  });
+
+  it("never paints raw tool output when no renderer is registered", () => {
+    render(
+      <AssistantConversation
+        isLoading={false}
+        messages={[toolMessage("output-available")]}
+      />
+    );
+
+    expect(screen.queryByText(/DO-NOT-PAINT/)).not.toBeInTheDocument();
+    expect(screen.getByText("Ran get_setup_status")).toBeInTheDocument();
+  });
+
+  it("renders a failure status line for output-error", () => {
+    render(
+      <AssistantConversation
+        isLoading={false}
+        messages={[toolMessage("output-error")]}
+      />
+    );
+
+    expect(screen.getByText("get_setup_status failed")).toBeInTheDocument();
   });
 });
