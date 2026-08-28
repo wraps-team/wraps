@@ -37,6 +37,7 @@ const footerLinks = {
   ],
   resources: [
     { name: "Alternatives", href: "/alternatives" },
+    { name: "Migrate from Pinpoint", href: "/migrate/amazon-pinpoint" },
     { name: "Email Tools", href: "/tools" },
     { name: "SES Cost Calculator", href: "/tools/ses-calculator" },
     {
@@ -51,6 +52,9 @@ const footerLinks = {
     },
   ],
   legal: [
+    { name: "Security", href: "/security" },
+    { name: "Subprocessors", href: "/subprocessors" },
+    { name: "DPA", href: "/dpa" },
     { name: "Privacy Policy", href: "/privacy" },
     { name: "Terms of Service", href: "/terms" },
     {
