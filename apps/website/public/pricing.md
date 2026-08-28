@@ -18,7 +18,7 @@ You get two bills:
 | **Growth** | $79/mo | $799/yr | 250,000/mo | $0.50 | 3 | Priority (24hr) |
 | **Scale** | $199/mo | $1,999/yr | 1,000,000/mo | $0.15 | Unlimited | Priority + SLA |
 
-Wraps bills on **tracked events**, not emails sent. A tracked event is anything Wraps records or acts on: a send, delivery, open, click, bounce, complaint, or an event you emit yourself to trigger a workflow. Sending 100,000 emails with tracking disabled costs $0 in Wraps events.
+Wraps bills on **custom events** — events you emit yourself via `POST /v1/events` to trigger workflows and build segments. Emails sent, broadcasts, contacts stored, and the delivery events SES reports back (deliveries, opens, clicks, bounces, complaints) are recorded and displayed at no charge and count toward nothing. Sending 100,000 emails costs $0 in Wraps events.
 
 The overage rate applies only to events beyond the included volume. Free and Starter have no overage rate — they stop at the included volume and require an upgrade. Annual billing is billed once per year and saves roughly two months.
 
@@ -41,14 +41,14 @@ The SES-specific free tier (3,000 emails/month for 12 months) no longer exists f
 
 ## Worked examples (all-in monthly cost)
 
-Precomputed so you do not have to do the arithmetic. Assumes event tracking on, 8 event types per email, DynamoDB history with 90-day retention, no dedicated IP, monthly billing, and tracked events at half of email volume. The AWS column is what AWS bills you; the Wraps column is what Wraps bills you.
+Precomputed so you do not have to do the arithmetic. Assumes no custom events emitted, DynamoDB history with 90-day retention, no dedicated IP, and monthly billing. The AWS column is what AWS bills you; the Wraps column is what Wraps bills you — note that sending volume does not change the Wraps column.
 
-| Volume | Tracked events | Wraps plan | Wraps cost | AWS (à la carte) | Total (à la carte) | Total (Essentials) | Effective per 1,000 emails |
+| Volume | Custom events | Wraps plan | Wraps cost | AWS (à la carte) | Total (à la carte) | Total (Essentials) | Effective per 1,000 emails |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 10,000 emails | 5,000 | Free | $0 | $1.18 | **$1.18** | $1.78 | $0.12 |
-| 100,000 emails | 50,000 | Starter | $19.00 | $12.50 | **$31.50** | $37.50 | $0.32 |
-| 500,000 emails | 250,000 | Growth | $79.00 | $65.10 | **$144.10** | $174.10 | $0.29 |
-| 1,000,000 emails | 500,000 | Scale | $199.00 | $136.09 | **$335.09** | $395.09 | $0.34 |
+| 10,000 emails | 0 | Free | $0 | $1.18 | **$1.18** | $1.78 | $0.12 |
+| 100,000 emails | 0 | Free | $0 | $12.50 | **$12.50** | $18.50 | $0.13 |
+| 500,000 emails | 0 | Free | $0 | $65.10 | **$65.10** | $95.10 | $0.13 |
+| 1,000,000 emails | 0 | Free | $0 | $136.09 | **$136.09** | $196.09 | $0.14 |
 
 Change any assumption and the numbers move. Call the estimator below instead of interpolating between these rows.
 
@@ -65,7 +65,7 @@ Returns JSON by default. Send `Accept: text/markdown` for a rendered cost table.
 | Parameter | Values | Meaning | Default |
 | --- | --- | --- | --- |
 | `emails` | integer | Emails sent per month | `25000` |
-| `events` | integer | Wraps tracked events per month | `5000` |
+| `events` | integer | Custom events you emit via POST /v1/events per month (not emails, not SES delivery events) | `0` |
 | `tier` | free \| starter \| growth \| scale | Wraps plan | `free` |
 | `billing` | monthly \| annual | Wraps billing interval | `monthly` |
 | `sesPlan` | alacarte \| essentials \| pro \| enterprise | AWS SES pricing plan for the account and Region | `alacarte` |
