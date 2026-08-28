@@ -731,11 +731,7 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
                           />
                         }
                       />
-                      {/* type="linear": these are counted events, and monotone
-                          splines invented peaks and fractional values between
-                          days that never existed.
-
-                          isAnimationActive is JS-driven, so the reduced-motion
+                      {/* isAnimationActive is JS-driven, so the reduced-motion
                           rules in globals.css cannot reach it. */}
                       <Area
                         dataKey="sent"
@@ -743,7 +739,7 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
                         isAnimationActive={!reducedMotion}
                         stroke="var(--color-sent)"
                         strokeWidth={SERIES.sent.width}
-                        type="linear"
+                        type="monotone"
                       />
                       <Area
                         dataKey="delivered"
@@ -752,7 +748,7 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
                         stroke="var(--color-delivered)"
                         strokeDasharray={SERIES.delivered.dash}
                         strokeWidth={SERIES.delivered.width}
-                        type="linear"
+                        type="monotone"
                       />
                       <Area
                         dataKey="opened"
@@ -761,7 +757,7 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
                         stroke="var(--color-opened)"
                         strokeDasharray={SERIES.opened.dash}
                         strokeWidth={SERIES.opened.width}
-                        type="linear"
+                        type="monotone"
                       />
                       <Area
                         dataKey="clicked"
@@ -770,7 +766,7 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
                         stroke="var(--color-clicked)"
                         strokeDasharray={SERIES.clicked.dash}
                         strokeWidth={SERIES.clicked.width}
-                        type="linear"
+                        type="monotone"
                       />
                     </AreaChart>
                   </ChartContainer>
