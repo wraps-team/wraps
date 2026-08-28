@@ -13,9 +13,7 @@ export function FaqSection() {
         </h2>
 
         {/* Interactive accordion - client component */}
-        <div className="max-w-3xl">
-          <FaqAccordion />
-        </div>
+        <FaqAccordion />
 
         {/*
           Radix renders every accordion panel with `hidden`, so with JavaScript
@@ -24,7 +22,7 @@ export function FaqSection() {
           the same copy, flattened.
         */}
         <noscript>
-          <div className="max-w-3xl space-y-6">
+          <div className="space-y-6">
             {faqItems.map((item) => (
               <div key={item.value}>
                 <h3 className="mb-1 font-medium text-foreground">
