@@ -18,16 +18,19 @@ export function LiveRefreshToggle({ params }: LiveRefreshToggleProps) {
   const [, startTransition] = useTransition();
   const eligible = canAutoRefresh(params);
   const [enabled, setEnabled] = useState(true);
-  // Initialised from the current tab state rather than defaulting to visible
-  // — a background tab should never start polling just because it mounted.
-  const [visible, setVisible] = useState(
-    () => document.visibilityState === "visible"
-  );
+  // Assumed visible for the server render and for hydration — the effect
+  // below corrects it on mount. Reading `document` here would crash the
+  // server render, and computing a different value on the client would be a
+  // hydration mismatch.
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
     const onVisibilityChange = () => {
       setVisible(document.visibilityState === "visible");
     };
+    // Run once on mount too — a tab that is already hidden when this mounts
+    // must not wait for the next visibilitychange event to stop polling.
+    onVisibilityChange();
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () =>
       document.removeEventListener("visibilitychange", onVisibilityChange);

@@ -5,7 +5,13 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LiveRefreshToggle } from "../live-refresh-toggle";
 
@@ -63,5 +69,25 @@ describe("LiveRefreshToggle", () => {
     vi.advanceTimersByTime(60_000);
 
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("stops polling when the tab is hidden", () => {
+    vi.useFakeTimers();
+    render(<LiveRefreshToggle params={{}} />);
+
+    const visibilitySpy = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockReturnValue("hidden");
+    try {
+      act(() => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      refresh.mockClear();
+      vi.advanceTimersByTime(60_000);
+
+      expect(refresh).not.toHaveBeenCalled();
+    } finally {
+      visibilitySpy.mockRestore();
+    }
   });
 });
