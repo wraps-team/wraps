@@ -15,7 +15,7 @@ import { JsonLd } from "@/components/json-ld";
 import ToolsPageContent from "./page-content";
 
 export const metadata: Metadata = {
-  title: "Email Tools",
+  title: "Free Email Tools - SPF, DMARC, and Amazon SES Checks",
   description:
     "Free tools to check your email deliverability setup. DMARC analyzer, SPF validator, and more.",
   openGraph: {

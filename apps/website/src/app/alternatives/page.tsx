@@ -13,7 +13,7 @@ const description =
   "Ranked, honestly-written lists of the real alternatives to Resend, SendGrid, Postmark, Mailgun, and Customer.io. Published prices, a catch on every option, and the incumbent kept on the list.";
 
 export const metadata: Metadata = {
-  title: "Email Platform Alternatives, Ranked",
+  title: "Amazon SES and Email Platform Alternatives, Ranked",
   description,
   openGraph: {
     title: "Email Platform Alternatives, Ranked | Wraps",

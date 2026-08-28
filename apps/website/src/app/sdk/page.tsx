@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import SdkPageContent from "./page-content";
 
 export const metadata: Metadata = {
-  title: "SDK",
+  title: "TypeScript SDK for Amazon SES",
   description:
     "TypeScript SDKs for email, SMS, and workflow automation. Templates as code, automations as code, custom events that trigger workflows.",
   openGraph: {

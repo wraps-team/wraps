@@ -97,7 +97,7 @@ const softwareSchema = {
 };
 
 export const metadata: Metadata = {
-  title: "Inbound Email - Receive Emails in Your AWS | Wraps",
+  title: "Inbound Email for Amazon SES - Receive Emails in Your AWS | Wraps",
   description:
     "Receive and process emails in your AWS account. Parse headers, extract attachments, detect spam, and trigger webhooks with EventBridge.",
   openGraph: {

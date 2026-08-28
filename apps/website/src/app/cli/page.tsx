@@ -38,7 +38,7 @@ const softwareSchema = {
 };
 
 export const metadata: Metadata = {
-  title: "Wraps CLI - Deploy AWS SES Infrastructure in 2 Minutes",
+  title: "Wraps CLI - Deploy Amazon SES Infrastructure in 2 Minutes",
   description:
     "Free, open-source CLI and SDK to deploy email infrastructure to your AWS account. One command deploys everything.",
   openGraph: {

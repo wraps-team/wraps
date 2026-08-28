@@ -25,10 +25,12 @@ export function HeroSection() {
         <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
           {/* Left column: copy */}
           <div className="flex flex-col items-start">
-            <SectionKicker>Open-source email infrastructure</SectionKicker>
+            <SectionKicker>
+              Open-source email infrastructure for Amazon SES
+            </SectionKicker>
 
-            <h1 className="max-w-[15ch] text-left font-heading font-semibold text-[40px] text-foreground leading-[1.04] tracking-[-0.03em] md:text-[52px] lg:text-[62px]">
-              Email sending infrastructure, deployed to your own AWS.
+            <h1 className="max-w-[19ch] text-left font-heading font-semibold text-[40px] text-foreground leading-[1.04] tracking-[-0.03em] md:text-[52px] lg:text-[62px]">
+              Everything Amazon SES needs, in one command.
             </h1>
 
             <p className="mt-5 max-w-[46ch] text-left text-[17px] text-muted-foreground leading-[1.55] md:text-[19px]">

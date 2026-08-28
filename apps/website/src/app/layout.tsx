@@ -16,17 +16,17 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://wraps.dev"),
   title: {
-    default: "Wraps - The Email Platform That Sends Through Your AWS",
+    default: "Wraps - The Email Platform for Amazon SES",
     template: "%s | Wraps",
   },
   description:
-    "Write email templates as React components. Define automations as TypeScript. Review in PRs, deploy with your app. Your marketing team edits and sends without code.",
+    "Deploy everything Amazon SES needs into your own AWS account with one command: event tracking, bounce handling, templates, workflows, and a dashboard. You pay AWS directly.",
   openGraph: {
     type: "website",
     siteName: "Wraps",
-    title: "Wraps - The Email Platform That Sends Through Your AWS",
+    title: "Wraps - The Email Platform for Amazon SES",
     description:
-      "Write email templates as React components. Define automations as TypeScript. Review in PRs, deploy with your app. Your marketing team edits and sends without code.",
+      "Deploy everything Amazon SES needs into your own AWS account with one command: event tracking, bounce handling, templates, workflows, and a dashboard. You pay AWS directly.",
     url: "https://wraps.dev/",
     images: [
       {
@@ -40,9 +40,9 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     site: "@useWraps",
-    title: "Wraps - The Email Platform That Sends Through Your AWS",
+    title: "Wraps - The Email Platform for Amazon SES",
     description:
-      "Write email templates as React components. Define automations as TypeScript. Review in PRs, deploy with your app. Your marketing team edits and sends without code.",
+      "Deploy everything Amazon SES needs into your own AWS account with one command: event tracking, bounce handling, templates, workflows, and a dashboard. You pay AWS directly.",
     images: ["/og-image.png"],
   },
   icons: {

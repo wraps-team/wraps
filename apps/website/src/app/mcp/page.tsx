@@ -32,18 +32,18 @@ const softwareSchema = {
 };
 
 export const metadata: Metadata = {
-  title: "MCP server for AWS SES email | Wraps",
+  title: "MCP server for Amazon SES email | Wraps",
   description:
     "Give your AI agent read access to your email infrastructure — send history, delivery events, domain status, suppressions — and guarded sending. npx -y @wraps.dev/mcp.",
   openGraph: {
-    title: "MCP server for AWS SES email | Wraps",
+    title: "MCP server for Amazon SES email | Wraps",
     description:
       "Give your AI agent read access to your email infrastructure — send history, delivery events, domain status, suppressions — and guarded sending. Runs locally against your AWS account.",
     type: "website",
     url: "https://wraps.dev/mcp",
   },
   twitter: {
-    title: "MCP server for AWS SES email | Wraps",
+    title: "MCP server for Amazon SES email | Wraps",
     description:
       "Six MCP tools over the AWS SES stack in your account — seven in enforced mode. Read by default, sending behind explicit guardrails.",
   },

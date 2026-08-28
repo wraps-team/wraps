@@ -16,16 +16,16 @@ import { JsonLd } from "@/components/json-ld";
 import SESCalculatorPageContent from "./page-content";
 
 export const metadata: Metadata = {
-  title: "AWS SES Cost Calculator",
+  title: "Amazon SES Pricing Calculator",
   description:
     "Calculate your true AWS SES email costs including infrastructure (Lambda, DynamoDB, SQS, EventBridge). The only SES pricing calculator that shows full production costs, not just the $0.10/1K à la carte sending fee — or the $0.16/1K AWS defaults new accounts to.",
   openGraph: {
-    title: "AWS SES Cost Calculator | Wraps",
+    title: "Amazon SES Pricing Calculator | Wraps",
     description:
       "Calculate your true AWS SES costs including infrastructure. See full production email costs beyond the $0.10/1K à la carte headline — AWS now defaults new accounts to $0.16/1K instead.",
   },
   twitter: {
-    title: "AWS SES Cost Calculator | Wraps",
+    title: "Amazon SES Pricing Calculator | Wraps",
     description:
       "Calculate your true AWS SES costs including infrastructure. See full production email costs beyond the $0.10/1K à la carte headline — AWS now defaults new accounts to $0.16/1K instead.",
   },
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
 const webAppSchema = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "AWS SES Cost Calculator",
+  name: "Amazon SES Pricing Calculator",
   description:
     "Interactive calculator for estimating AWS SES email costs including full infrastructure pricing for Lambda, DynamoDB, SQS, EventBridge, dedicated IPs, and more.",
   url: "https://wraps.dev/tools/ses-calculator",
@@ -127,7 +127,7 @@ export default function SESCalculatorPage() {
                 Cost Estimator
               </Badge>
               <h1 className="mb-4 text-balance font-bold text-4xl tracking-tight">
-                AWS SES Cost Calculator
+                Amazon SES Pricing Calculator
               </h1>
               <p className="mx-auto max-w-2xl text-pretty text-lg text-muted-foreground">
                 Calculate your true AWS SES costs — not just the $0.10/1K à la

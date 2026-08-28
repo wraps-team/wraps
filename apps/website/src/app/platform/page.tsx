@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import DashboardPageContent from "./page-content";
 
 export const metadata: Metadata = {
-  title: "Wraps Platform",
+  title: "Email Platform for Amazon SES - Templates, Broadcasts, Workflows",
   description:
     "Templates, broadcasts, contacts, and analytics. The premium layer on top of your AWS infrastructure.",
   openGraph: {

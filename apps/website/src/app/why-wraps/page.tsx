@@ -22,7 +22,7 @@ import { CopyLinkButton } from "./components/copy-link-button";
 import { FaqSection } from "./components/faq-section";
 
 export const metadata: Metadata = {
-  title: "Why Wraps - AWS SES Pricing with Modern Developer Experience",
+  title: "Why Wraps - Amazon SES Pricing with Modern Developer Experience",
   description:
     "Own your infrastructure, pay AWS prices, keep the great DX. No vendor lock-in, full data control.",
   openGraph: {
