@@ -6,6 +6,17 @@
  * - Deletes audit_log rows older than the org's plan retention window
  * - free=7d, starter=30d, growth=90d, scale=365d
  *
+ * MessageSendCleanup:
+ * - Runs nightly at 03:00 UTC in production (offset from AuditLogCleanup so
+ *   the two don't contend)
+ * - Deletes message_send rows older than the org's plan-based window plus a
+ *   30-day grace month, and contact_event rows past their expires_at. Warns
+ *   org owners/admins once when rows enter the grace window, before they are
+ *   actually deleted. See apps/api/src/workers/message-send-cleanup.ts.
+ * - Ships with RETENTION_DRY_RUN=true — logs what it would delete and
+ *   deletes nothing. Flip to "false" only after a human reviews a real
+ *   dry-run report. See plans/210.
+ *
  * WorkflowReaper:
  * - Runs hourly in production
  * - Detects and fails stuck workflow executions:
@@ -101,6 +112,31 @@ export const auditLogCleanupCron = new sst.aws.CronV2("AuditLogCleanup", {
       AXIOM_TOKEN: axiomToken.value,
       AXIOM_DATASET: "wraps",
       SENTRY_DSN: sentryDsn.value,
+    },
+    nodejs: { install: ["pg", "@sentry/profiling-node"] },
+  },
+});
+
+export const messageSendCleanupCron = new sst.aws.CronV2("MessageSendCleanup", {
+  schedule: "cron(0 3 * * ? *)",
+  enabled: $app.stage === "production",
+  job: {
+    handler: "apps/api/src/workers/message-send-cleanup.handler",
+    runtime: "nodejs24.x",
+    timeout: "15 minutes",
+    memory: "512 MB",
+    environment: {
+      DATABASE_URL:
+        process.env.DATABASE_URL ||
+        (() => {
+          throw new Error("DATABASE_URL is required");
+        })(),
+      AXIOM_TOKEN: axiomToken.value,
+      AXIOM_DATASET: "wraps",
+      SENTRY_DSN: sentryDsn.value,
+      // Ships in dry-run. Flip to "false" only after a human has reviewed a
+      // dry-run report — see plans/210 step 8.
+      RETENTION_DRY_RUN: "true",
     },
     nodejs: { install: ["pg", "@sentry/profiling-node"] },
   },

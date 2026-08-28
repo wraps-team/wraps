@@ -39,8 +39,12 @@ export default $config({
     const { schedulerGroup, schedulerRole } = await import("./infra/scheduler");
     const { api } = await import("./infra/api");
     const { alertsTopic } = await import("./infra/alarms");
-    const { auditLogCleanupCron, eventFeedStalenessCron, accountHealthCron } =
-      await import("./infra/cron");
+    const {
+      auditLogCleanupCron,
+      messageSendCleanupCron,
+      eventFeedStalenessCron,
+      accountHealthCron,
+    } = await import("./infra/cron");
 
     return {
       apiUrl: api.url,
