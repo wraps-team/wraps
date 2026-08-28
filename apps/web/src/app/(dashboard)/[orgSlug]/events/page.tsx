@@ -4,6 +4,7 @@ import { getEventNames, listEvents } from "@/actions/events";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { EventAnalytics } from "./components/event-analytics";
 import { EventsTable } from "./components/events-table";
+import { LiveRefreshToggle } from "./components/live-refresh-toggle";
 
 type EventsPageProps = {
   params: Promise<{
@@ -87,6 +88,19 @@ export default async function EventsPage({
 
       {/* Events Table */}
       <div className="@container/main px-4 lg:px-6">
+        <div className="mb-3 flex justify-end">
+          <LiveRefreshToggle
+            params={{
+              page,
+              search,
+              eventName,
+              contactEmail,
+              dateFrom,
+              dateTo,
+              datePreset,
+            }}
+          />
+        </div>
         <EventsTable
           datePreset={datePreset}
           eventNames={eventNames}
