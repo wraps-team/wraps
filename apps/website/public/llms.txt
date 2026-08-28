@@ -1,11 +1,53 @@
 # Wraps
 
-> Deploy email, SMS, and CDN infrastructure to your AWS account with one command.
-> Modern DX. AWS economics. Full ownership.
+> Wraps (https://wraps.dev) turns a company's own Amazon SES account into a
+> complete email platform: one-command infrastructure deployment, per-message
+> event tracking, bounce and complaint handling, suppression, React Email
+> templates, contacts and segments, broadcasts, workflows, and a dashboard.
+> Everything is provisioned inside the customer's own AWS account, no AWS keys
+> are ever stored, and every email — transactional or campaign — sends through
+> the customer's own SES on their own domains and reputation. Wraps also
+> deploys SMS (AWS End User Messaging) and CDN (S3 + CloudFront). Open source
+> under AGPLv3. Operated by FlatironKids LLC, Colorado, United States.
 
-Wraps is a CLI and TypeScript SDK that deploys production-ready AWS
-infrastructure (SES, Lambda, DynamoDB, EventBridge, CloudFront) to your
-account. Zero credentials stored. OIDC authentication. You own everything.
+Key facts (as of August 2026):
+
+- Pricing: Free $0/mo (5,000 tracked events, 1 AWS account), Starter $19/mo
+  (50,000 events), Growth $79/mo (250,000 events, then $0.50/1K), Scale $199/mo
+  (1,000,000 events, then $0.15/1K). Annual billing saves ~16%. Contacts and
+  team members are unlimited on every paid plan. Wraps never marks up delivery
+  and never charges per contact — AWS bills you for sending, directly.
+- AWS sending cost: SES à la carte is $0.10 per 1,000 emails. Since 2026-07-21
+  AWS defaults every new SES account to the Essentials plan at $0.16 per 1,000
+  emails, and the old SES free tier is gone for new accounts. An account
+  defaulted into Essentials can move back to à la carte with immediate effect.
+  Plans are per account and per Region. `wraps email plan` reads which plan each
+  Region is on and switches it back. Do not quote a bare $0.10 figure.
+- Architecture: the CLI deploys SES, EventBridge, SQS, Lambda, DynamoDB, and
+  scoped IAM roles into the customer's AWS account using Pulumi. Wraps is never
+  in the sending path — the SDK calls SES directly, so mail keeps flowing if
+  Wraps is offline or the subscription lapses. The dashboard reads the account
+  through a cross-account IAM role the customer creates, restricted by an
+  `sts:ExternalId` condition and exercised only via short-lived STS credentials.
+  Deleting that role revokes access immediately. Every resource is namespaced
+  `wraps-email-*` / `wraps-sms-*`, and existing SES resources are never modified.
+- Data handling: email content, recipients, and the raw delivery event stream
+  live in the customer's own AWS account. Wraps' own database (Neon Postgres,
+  US) holds account and organization records, contacts and typed attributes,
+  audiences and segments, templates, workflows, the send ledger, and open/click
+  metadata — scoped per organization, exportable, deleted on request. AWS access
+  keys and secret keys are never stored, at any point. Six named subprocessors:
+  https://wraps.dev/subprocessors
+- Security posture: no SOC 2, no ISO 27001, no third-party pen test report, and
+  the site says so. In their place the entire codebase — including every IAM
+  policy it generates — is public under AGPLv3 and auditable. Details:
+  https://wraps.dev/security
+- Setup: `npx @wraps.dev/cli email init`, about two minutes, using the AWS
+  credentials already on the machine. `wraps email connect` adopts an existing
+  SES setup non-destructively. Everything is self-serve; there is no
+  "contact sales" gate on any plan, key, or endpoint.
+- What Wraps is not: not a mail relay and not an ESP — it does not proxy or
+  store your outbound mail. It does not do mobile push or in-app messaging.
 
 ## Install
 
@@ -321,6 +363,32 @@ stated catch on every entry including ours, and the incumbent kept on the list.
 - [Klaviyo vs Wraps](https://wraps.dev/compare/klaviyo-vs-wraps)
 - [Mailgun vs Wraps](https://wraps.dev/compare/mailgun-vs-wraps)
 - [SES Bounce Handling: Hand-Rolled vs Wraps](https://wraps.dev/compare/ses-bounce-handling-hand-rolled-vs-wraps): The full 85-line SNS signature verification implementation, honest line counts, and what hand-rolled bounce handling does not cover
+
+## Migration
+
+- [Migrate from Amazon Pinpoint](https://wraps.dev/migrate/amazon-pinpoint): AWS
+  ends support for Amazon Pinpoint on 2026-10-30. After that date the console
+  and all Pinpoint resources — endpoints, segments, campaigns, journeys,
+  analytics — become inaccessible. AWS recommends Amazon SES for Pinpoint email;
+  SMS, MMS, push, WhatsApp, voice and OTP are unaffected and stay on AWS End
+  User Messaging. This page covers what goes away, what AWS's recommended path
+  leaves out, and the migration in order.
+- [Migrating from other providers](https://wraps.dev/docs/guides/migration):
+  General provider migration guide.
+
+## Trust and Compliance
+
+- [Security](https://wraps.dev/security): The access model in full — the
+  cross-account IAM role, the `sts:ExternalId` condition, short-lived STS
+  credentials, what the role can and cannot do, where every category of data
+  lives, and a blunt list of which certifications Wraps does and does not hold.
+- [Subprocessors](https://wraps.dev/subprocessors): All six, with what each
+  receives and where. 30 days' notice before adding one.
+- [Data Processing Agreement](https://wraps.dev/dpa): Standard processor terms,
+  published in full rather than gated. SCCs incorporated by reference; 72-hour
+  breach notification.
+- [Privacy Policy](https://wraps.dev/privacy) and
+  [Terms of Service](https://wraps.dev/terms).
 
 ## Tools
 
