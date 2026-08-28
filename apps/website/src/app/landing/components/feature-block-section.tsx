@@ -42,6 +42,43 @@ const checks: Check[] = [
   },
 ];
 
+/*
+ * Light and dark renders of the same clip, swapped on the site's `.dark` class
+ * — the tile sits on the page background, so a single dark clip read as a hole
+ * punched in the light theme. The still is a CSS background rather than the
+ * `poster` attribute: a poster downloads even when the video is display:none,
+ * a background-image does not.
+ */
+function StackVideo({ theme }: { theme: "light" | "dark" }) {
+  const suffix = theme === "light" ? "-light" : "";
+
+  return (
+    <video
+      autoPlay
+      className={
+        theme === "light"
+          ? "size-full object-cover dark:hidden"
+          : "hidden size-full object-cover dark:block"
+      }
+      loop
+      muted
+      playsInline
+      preload="metadata"
+      src={`/landing/PlatformStack${suffix}.mp4`}
+      style={{
+        backgroundImage: `url(/landing/posters/PlatformStack${suffix}.jpg)`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
+      <track
+        kind="descriptions"
+        label="wraps email init deploying the IAM role, SES config set, EventBridge rule, Lambda processor, and DynamoDB table, then delivery events streaming into that table"
+      />
+    </video>
+  );
+}
+
 export function FeatureBlockSection() {
   return (
     <section className="border-border border-b py-20 md:py-24" id="features">
@@ -60,22 +97,9 @@ export function FeatureBlockSection() {
 
         <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
           {/* Visual */}
-          <div className="aspect-[4/3] overflow-hidden rounded-xl border border-border bg-zinc-950">
-            <video
-              autoPlay
-              className="size-full object-cover"
-              loop
-              muted
-              playsInline
-              poster="/landing/posters/PlatformStack.jpg"
-              preload="metadata"
-              src="/landing/PlatformStack.mp4"
-            >
-              <track
-                kind="descriptions"
-                label="wraps email init deploying the IAM role, SES config set, EventBridge rule, Lambda processor, and DynamoDB table, then delivery events streaming into that table"
-              />
-            </video>
+          <div className="aspect-[4/3] overflow-hidden rounded-xl border border-border bg-background">
+            <StackVideo theme="light" />
+            <StackVideo theme="dark" />
           </div>
 
           {/* Checks */}
