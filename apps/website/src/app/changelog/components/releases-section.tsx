@@ -48,10 +48,284 @@ const Code = ({ children }: { children: ReactNode }) => (
 
 const releases: Release[] = [
   {
+    version: "Platform v0.25.0",
+    date: "August 2026",
+    icon: Bot,
+    title: "Ask Mode & Guided Setup",
+    items: [
+      <>
+        <Code>&#8984;K</Code> now answers questions. Type two or more characters
+        and pick &ldquo;Ask Wraps&rdquo; to get a setup-status card, an
+        email-metrics card, or a recent-sends list &mdash; streamed, and
+        validated against the tool&rsquo;s output schema before anything renders
+      </>,
+      <>
+        The assistant reads through a read-only tool layer. Every tool closes
+        over the <Code>organizationId</Code> of the authenticated request (never
+        a model input), projects an explicit field allowlist &mdash; no secrets,
+        no PII, no raw metadata &mdash; and is filtered by the caller&rsquo;s
+        role before the model is offered it
+      </>,
+      <>
+        Setup gained a next-best-action card that names the single blocking
+        step. The choice is deterministic, not generated: a first send comes
+        before requesting SES production access, because a sandboxed account can
+        already send to verified recipients and the mailbox simulator
+      </>,
+      <>
+        Copy on the top insight and the next step is now phrased from facts the
+        dashboard already established. Detection thresholds are unchanged and a
+        model decides nothing; only numbers and closed enums cross into the
+        prompt, the result is schema-validated, and static copy stands in on any
+        failure
+      </>,
+      <>
+        The events feed refreshes itself on the unfiltered first page, and
+        pauses when the tab is hidden or you switch it off. Waiting on an event
+        you just fired no longer looks the same as a broken integration
+      </>,
+      "Fix: navigating between dashboard routes keeps the shell mounted instead of tearing it down and rebuilding it",
+      "Fix: the events live-refresh toggle no longer crashes during server render",
+    ],
+  },
+  {
+    version: "API v1.1",
+    date: "August 2026",
+    icon: Blocks,
+    title: "Machine-Readable Errors & Data Retention",
+    items: [
+      <>
+        Every 4xx and 5xx body now carries a stable, enumerated{" "}
+        <Code>code</Code> and a <Code>requestId</Code> alongside{" "}
+        <Code>error</Code>. It comes from one response plugin, so all ~40 routes
+        that return their own error object are covered rather than nearly all of
+        them
+      </>,
+      <>
+        The OpenAPI spec declares that shape as <Code>ApiError</Code> and
+        attaches it to every operation. The <Code>code</Code> enum is derived
+        from the handler&rsquo;s own table, so the spec cannot drift from what
+        the API emits
+      </>,
+      <>
+        Rate-limited responses gain <Code>RateLimit-Limit</Code>,{" "}
+        <Code>RateLimit-Remaining</Code>, <Code>RateLimit-Reset</Code> and{" "}
+        <Code>RateLimit-Policy</Code> next to the <Code>X-</Code> originals,
+        which are kept. <Code>Reset</Code> is seconds remaining, and the quota
+        headers describe whichever window is closest to exhaustion &mdash; the
+        one actually pacing you
+      </>,
+      <>
+        New <Code>/docs/reference/versioning</Code> states what counts as a
+        breaking change and how a deprecation is announced
+      </>,
+      <>
+        A nightly retention worker ages out <Code>message_send</Code> and{" "}
+        <Code>contact_event</Code> rows against your plan&rsquo;s visible
+        window, with a 30-day grace period and a one-time owner and admin
+        notification before anything is removed. It ships in dry-run: it reports
+        what it would delete and deletes nothing
+      </>,
+      <>
+        Custom event ingestion is gated on the Starter plan, matching what the
+        pricing page has always said. The unreachable per-org volume block it
+        replaced is gone, and the tracked-events definition is corrected
+        everywhere agents read it
+      </>,
+      <>
+        wraps.dev serves a markdown representation of every page the three ways
+        an agent actually asks for one, and sitemap entries carry a real{" "}
+        <Code>lastmod</Code> instead of the current timestamp on every request
+      </>,
+    ],
+  },
+  {
+    version: "Platform v0.24.0",
+    date: "August 2026",
+    icon: Compass,
+    title: "Three Deploy Paths & Feed Health",
+    items: [
+      <>
+        Onboarding offers the CLI, a coding agent, and the AWS console as peer
+        cards. The step used to lead with CloudFormation and bury the other two
+        in collapsibles, so a shift toward the CLI would have read as a funnel
+        drop rather than a preference
+      </>,
+      <>
+        Self-hosted orgs no longer see the platform CloudFormation path at all:
+        the quick-create URL is not built, the card is not rendered, and the CLI
+        steps and agent prompt name <Code>wraps selfhost login</Code> and{" "}
+        <Code>wraps selfhost connect</Code>
+      </>,
+      <>
+        Launching a stack closes the other two paths, so nobody runs{" "}
+        <Code>wraps email init</Code> over resources CloudFormation is still
+        creating. The connection gate has a visible terminal state and no longer
+        unmounts an in-flight Deploy &amp; Connect
+      </>,
+      "Retired four onboarding steps that nothing could reach: deploy-infrastructure, deploy, cli-install, and the orphaned AWS connect path",
+      <>
+        Event-feed stall alerts judge staleness per message rather than against
+        a cursor the webhook throttles to one write a minute. That cursor
+        flagged every later message in a burst as unacknowledged: 13 of the 14
+        alerts this feature had ever sent were false, all against feeds that
+        never missed an event
+      </>,
+      <>
+        SDK senders get a stall alert at all. Sends through{" "}
+        <Code>@wraps.dev/email</Code> go straight from your infrastructure to
+        your SES and never touch the Wraps API, so a broken feed produced no
+        rows and looked healthy. The hourly console-access role now reads the{" "}
+        <Code>AWS/SES</Code> Send metric as an independent fallback, and a null
+        probe means no evidence &mdash; never zero sends
+      </>,
+      "Fix: the org webhook secret is no longer exposed through the Open AWS Console link",
+      <>
+        Fix: AWS connection routes require <Code>awsAccounts:write</Code>, not{" "}
+        <Code>awsAccounts:read</Code>
+      </>,
+    ],
+  },
+  {
+    version: "CLI v3.4.0",
+    date: "August 2026",
+    icon: Wrench,
+    title: "One Doctor Command & Structured Remediations",
+    items: [
+      <>
+        New <Code>wraps doctor</Code> merges the AWS and email doctors into one
+        report and one exit code, with <Code>--json</Code> carrying remediations
+        for MCP and agent callers. <Code>wraps email doctor</Code> is unchanged
+      </>,
+      <>
+        Every finding now carries a structured remediation from one registry
+        &mdash; the command that repairs it, rather than a hand-written sentence
+        beside it. A single missing SES configuration set previously took a user
+        five commands and a CLI reinstall, three of them because the CLI
+        misdirected them. Checks with no automatic repair say so instead of
+        guessing
+      </>,
+      <>
+        Remediation commands carry the region the doctor actually scanned, so a
+        pasted fix cannot fall back to <Code>us-east-1</Code> and report that
+        the connection does not exist. <Code>wraps aws doctor -r/--region</Code>{" "}
+        answers for a named region on both the human and <Code>--json</Code>{" "}
+        paths
+      </>,
+      <>
+        An unrecognized command is reported as bad input with the nearest routed
+        command suggested, not as a crash
+      </>,
+      <>
+        Fix: error telemetry is flushed before the process exits &mdash; it was
+        being dropped. Event names no longer carry whatever you typed, error
+        telemetry no longer ships raw error messages, and{" "}
+        <Code>wraps push</Code> no longer puts the template slug in the payload
+      </>,
+      <>
+        Fix: <Code>wraps platform connect</Code> and{" "}
+        <Code>wraps email upgrade</Code> no longer print raw API error text
+      </>,
+      "Fix: a failed Pulumi deploy exits non-zero instead of reporting success",
+      "Fix: the standalone binary ships on the Node version it claims to require",
+    ],
+  },
+  {
+    version: "Platform v0.23.0",
+    date: "August 2026",
+    icon: Tags,
+    title: "Audience Counts That Match What Sends",
+    items: [
+      <>
+        Segment and topic counts are computed by the send path&rsquo;s own
+        counting instead of a <Code>memberCount</Code> column written at create
+        and never recomputed. The only segment in production was rendering a
+        six-month-old number, and the details sheet showed a different figure
+        for that same segment on the same page
+      </>,
+      <>
+        Those counts respect channel eligibility and join contact, so bounced,
+        complained, and globally unsubscribed people stop counting as
+        subscribers &mdash; one topic read 5 subscribers and would have sent to
+        2. Double opt-in pending subscribers get their own count, so turning on
+        a compliance feature no longer shrinks your audience with no number
+        explaining where the people went
+      </>,
+      <>
+        The segment Status filter resolves to <Code>email_status</Code>, the
+        column every send path already reads, instead of the deprecated{" "}
+        <Code>contact.status</Code> that defaults to active. Status equals
+        Active matched every contact in the org, and Unsubscribed, Bounced, and
+        Complained could never match at all
+      </>,
+      <>
+        The list operators on that field emit arrays. Two of the four failed
+        every time behind a generic &ldquo;Failed to preview segment&rdquo; with
+        the previous count left on screen; a failed preview now says why. Event
+        filters were fully implemented and unreachable from any UI
+      </>,
+      <>
+        Fix: CSV import merges custom properties instead of overwriting them.
+        Every update-strategy import silently deleted whatever properties the
+        file did not mention, including the ones segments filter on, with no
+        undo
+      </>,
+      <>
+        Fix: the contact timeline distinguishes events aged out past retention
+        from nothing ever having happened, stops swallowing load-more failures,
+        and no longer caps out around 120 events regardless of real volume
+      </>,
+      "Fix: a failed audience fetch renders an error with a retry instead of an empty list that reads as an empty org",
+      "Fix: contacts health buckets are a filter you can see and undo, and CSV export ships the search the list actually applied",
+    ],
+  },
+  {
+    version: "Platform v0.22.0",
+    date: "August 2026",
+    icon: Send,
+    title: "Test Sends, Recipient Results & Resume",
+    items: [
+      <>
+        Send a test before committing to the whole list: one rendered copy to
+        one address, using a real contact from the selected audience and the
+        same variable mappings the batch sender resolves, so what arrives is
+        what the broadcast would send. It records nothing &mdash; no batch row,
+        no message row, no counters
+      </>,
+      <>
+        A broadcast that reports 50 failed now shows which 50 and why. Address,
+        status, error, and SES bounce type per recipient, defaulting to the
+        failures, paginated, and exportable to CSV with an explicit notice when
+        the export is capped
+      </>,
+      <>
+        Broadcast history paginates against the real total. Rows 21 and beyond
+        were unreachable, the footer showed the loaded-row count instead of your
+        broadcast count, and CSV export serialised whatever happened to be
+        loaded and reported it as the total. Server-side search over name and
+        subject, plus a status filter, both live in the URL
+      </>,
+      <>
+        A stuck or failed send can be resumed from the detail page, gated the
+        same way the API gates itself. The resume endpoint existed and nothing
+        in the dashboard called it, so recovery meant curl and a runbook
+      </>,
+      <>
+        Rates name their denominator and use a consistent one &mdash;
+        unsubscribes were rated against sent while opens and clicks used
+        delivered. 0% opened now distinguishes nobody opening from no SES event
+        ever arriving
+      </>,
+      "Fix: any fetch failure on the detail page rendered a 404, telling an operator watching a live send that their broadcast did not exist",
+      "Fix: auto-refresh latched at mount, so a scheduled broadcast that began sending never started polling",
+      "Fix: the clicked-URL breakdown had no limit, so per-recipient unsubscribe links returned one row per recipient",
+    ],
+  },
+  {
     version: "Platform v0.21.0",
     date: "August 2026",
     icon: Inbox,
-    title: "Message-Level Search & Honest Email History",
+    title: "Message-Level Search & Full Send History",
     items: [
       <>
         The emails page now pages through your entire send history with cursor
@@ -72,7 +346,7 @@ const releases: Release[] = [
         account-wide
       </>,
       <>
-        Every state tells the truth: a failed load says so and offers retry
+        Every state says what it is: a failed load says so and offers retry
         instead of rendering "No emails found", sandboxed AWS accounts are told
         they are in the SES sandbox instead of being asked to send their first
         email, and orgs whose event pipeline has never delivered an event see a
@@ -102,10 +376,37 @@ const releases: Release[] = [
     ],
   },
   {
+    version: "CLI v3.2",
+    date: "August 2026",
+    icon: Terminal,
+    title: "Non-Interactive SMS Setup & Corrected Error Codes",
+    items: [
+      <>
+        <Code>wraps sms init --countries</Code> makes SMS setup fully
+        automatable without a TTY
+      </>,
+      <>
+        Non-interactive and <Code>--json</Code> runs fail fast naming the flag
+        they need instead of hanging on a prompt, and an already-deployed{" "}
+        <Code>init</Code> exits with a proper JSON envelope
+      </>,
+      <>
+        Fix: the documented CLI error codes were rewritten from CLI source
+        &mdash; all 22 of them were fictional &mdash; and the reference&rsquo;s
+        camelCase flags, which the CLI silently ignored, are corrected
+      </>,
+      <>
+        Fix: SSO login links to unverified local users, and callback errors are
+        mapped instead of surfacing raw
+      </>,
+      "Fix: 52 dependency advisories cleared by raising stale CVE-floor overrides that were holding packages below their patched versions",
+    ],
+  },
+  {
     version: "CLI v3.1.0",
     date: "August 2026",
     icon: ShieldCheck,
-    title: "BIMI Checks & Honest Event Tracking",
+    title: "BIMI Checks & Configurable Event Types",
     items: [
       <>
         <Code>wraps email check</Code> now reports BIMI: record status, logo and
