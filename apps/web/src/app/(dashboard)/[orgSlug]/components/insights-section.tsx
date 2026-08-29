@@ -12,7 +12,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useActiveOrganization } from "@/contexts/organization-context";
 import { useEventUsage } from "@/hooks/use-event-usage";
+import { useInsightExplanation } from "@/hooks/use-insight-explanation";
 import { cn } from "@/lib/utils";
 import { useProductsStore } from "@/stores/products-store";
 import {
@@ -22,6 +24,17 @@ import {
 import type { SetupStatus } from "../page";
 import { useSMSVolumeData } from "../sms/analytics/hooks/use-sms-analytics";
 
+type InsightFacts = {
+  kind:
+    | "bounce_rate"
+    | "complaint_rate"
+    | "delivery_rate_drop"
+    | "volume_drop"
+    | "event_limit";
+  current: number;
+  previous: number | null;
+};
+
 type Insight = {
   id: string;
   icon: React.ReactNode;
@@ -30,7 +43,29 @@ type Insight = {
   href: string;
   label: string;
   severity: "warning" | "critical" | "info";
+  facts?: InsightFacts;
 };
+
+/**
+ * Maps an anomaly's detected metric name to the closed-enum kind the AI
+ * explanation action accepts. Metrics this cannot classify (every `SMS `
+ * metric today) get no `facts` and are therefore never explained.
+ */
+function deriveAnomalyKind(metric: string): InsightFacts["kind"] | undefined {
+  if (metric === "Email delivery rate") {
+    return "delivery_rate_drop";
+  }
+  if (metric.includes("volume")) {
+    return "volume_drop";
+  }
+  if (metric.includes("bounce")) {
+    return "bounce_rate";
+  }
+  if (metric.includes("complaint")) {
+    return "complaint_rate";
+  }
+  return;
+}
 
 // Minimum sends in a period to trigger anomaly detection
 const MIN_VOLUME_FOR_ANOMALY = 50;
@@ -231,6 +266,9 @@ export function InsightsSection({
   setupStatus: SetupStatus;
   days?: number;
 }) {
+  const { activeOrganization } = useActiveOrganization();
+  const orgId = activeOrganization?.id;
+
   const productsStatus = useProductsStore((s) => s.status);
   const isEmailEnabled = productsStatus?.emailEnabled ?? false;
   const isSMSEnabled = productsStatus?.smsEnabled ?? false;
@@ -309,6 +347,7 @@ export function InsightsSection({
     }
 
     const isSMS = anomaly.metric.startsWith("SMS");
+    const anomalyKind = deriveAnomalyKind(anomaly.metric);
     insights.push({
       id: `anomaly-${anomaly.metric}`,
       icon,
@@ -319,6 +358,13 @@ export function InsightsSection({
         : `/${orgSlug}/emails/analytics`,
       label: "Investigate",
       severity: anomaly.severity,
+      facts: anomalyKind
+        ? {
+            kind: anomalyKind,
+            current: anomaly.current,
+            previous: anomaly.previous,
+          }
+        : undefined,
     });
   }
 
@@ -346,6 +392,11 @@ export function InsightsSection({
       href: `/${orgSlug}/settings/billing`,
       label: "Upgrade Plan",
       severity,
+      facts: {
+        kind: "event_limit",
+        current: eventUsage.percentUsed,
+        previous: null,
+      },
     });
   }
 
@@ -375,6 +426,11 @@ export function InsightsSection({
         href: `/${orgSlug}/emails/analytics`,
         label: "View Bounces",
         severity,
+        facts: {
+          kind: "bounce_rate",
+          current: emailAnalytics.bounceRate,
+          previous: null,
+        },
       });
     }
   }
@@ -392,6 +448,11 @@ export function InsightsSection({
       href: `/${orgSlug}/emails/analytics`,
       label: "View Details",
       severity,
+      facts: {
+        kind: "complaint_rate",
+        current: emailAnalytics.complaintRate,
+        previous: null,
+      },
     });
   }
 
@@ -422,38 +483,76 @@ export function InsightsSection({
     });
   }
 
+  // Exactly one insight per render may be explained — the first critical
+  // insight that carries facts, else the first warning one. "info" insights
+  // are never explained. This bounds the cost to one generation per render.
+  const explanationTarget =
+    insights.find((i) => i.facts && i.severity === "critical") ??
+    insights.find((i) => i.facts && i.severity === "warning") ??
+    null;
+
+  // Called unconditionally (hooks rules) even when there is nothing to
+  // explain yet — `target: null` short-circuits the query via `enabled`.
+  const { data: explanation } = useInsightExplanation({
+    orgId,
+    target: explanationTarget?.facts
+      ? {
+          facts: {
+            ...explanationTarget.facts,
+            severity: explanationTarget.severity as "warning" | "critical",
+          },
+        }
+      : null,
+    windowDays: days,
+    sandbox: setupStatus.sandboxStatus === true,
+    verifiedDomainCount: setupStatus.verifiedDomains.length,
+  });
+
   if (insights.length === 0) {
     return null;
   }
 
   return (
     <div className="space-y-2">
-      {insights.map((insight) => (
-        <div
-          className={cn(
-            "flex items-start gap-3 rounded-lg border p-3",
-            insight.severity === "critical" && "border-red-500/20 bg-red-500/5",
-            insight.severity === "warning" &&
-              "border-amber-500/20 bg-amber-500/5",
-            insight.severity === "info" && "border-border"
-          )}
-          key={insight.id}
-        >
-          <div className="mt-0.5 shrink-0">{insight.icon}</div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">{insight.title}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {insight.description}
-            </p>
+      {insights.map((insight) => {
+        // While the explanation is loading (or absent), render the static
+        // copy verbatim — never a skeleton. The generated text is an upgrade
+        // that arrives, not a placeholder the card waits on.
+        const isExplained =
+          explanation != null && explanationTarget?.id === insight.id;
+        const title = isExplained ? explanation.title : insight.title;
+        const description = isExplained
+          ? explanation.description
+          : insight.description;
+
+        return (
+          <div
+            className={cn(
+              "flex items-start gap-3 rounded-lg border p-3",
+              insight.severity === "critical" &&
+                "border-red-500/20 bg-red-500/5",
+              insight.severity === "warning" &&
+                "border-amber-500/20 bg-amber-500/5",
+              insight.severity === "info" && "border-border"
+            )}
+            key={insight.id}
+          >
+            <div className="mt-0.5 shrink-0">{insight.icon}</div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">{title}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {description}
+              </p>
+            </div>
+            <Button asChild className="shrink-0" size="sm" variant="ghost">
+              <Link href={insight.href}>
+                {insight.label}
+                <ArrowRightIcon className="ml-1 h-3 w-3" />
+              </Link>
+            </Button>
           </div>
-          <Button asChild className="shrink-0" size="sm" variant="ghost">
-            <Link href={insight.href}>
-              {insight.label}
-              <ArrowRightIcon className="ml-1 h-3 w-3" />
-            </Link>
-          </Button>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
