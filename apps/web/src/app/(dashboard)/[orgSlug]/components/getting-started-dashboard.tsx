@@ -62,6 +62,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { AccountFeatures, AwsAccountData, SetupStatus } from "../page";
 import { CAL_BOOKING_URL, HelpCard } from "./help-card";
+import { NextStepCard } from "./next-step-card";
 
 type GettingStartedDashboardProps = {
   orgSlug: string;
@@ -1297,6 +1298,15 @@ export function GettingStartedDashboard({
             Connect your AWS account and verify your domain to start sending.
           </p>
         </div>
+      </div>
+
+      {/* Next Step */}
+      <div className="px-4 lg:px-6">
+        <NextStepCard
+          organizationId={organizationId}
+          orgSlug={orgSlug}
+          setupStatus={setupStatus}
+        />
       </div>
 
       {/* Main Content */}
