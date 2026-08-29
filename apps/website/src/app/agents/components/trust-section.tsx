@@ -24,6 +24,11 @@ const differentiators = [
     tradeoff:
       "Agent-specific, third-party sender — still their infra, still their reputation.",
   },
+  {
+    name: "Bavimail",
+    tradeoff:
+      "Per-agent inboxes on your domain, but the sending account and its reputation stay theirs.",
+  },
 ];
 
 export function AgentsTrustSection() {

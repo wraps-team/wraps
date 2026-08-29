@@ -137,24 +137,26 @@ export function AlternativesPageLayout({ page }: { page: AlternativesPage }) {
             </Card>
           </section>
 
-          <section className="mb-16">
-            <Link className="block" href={page.compareHref}>
-              <Card className="transition-colors hover:border-orange-500/50">
-                <CardContent className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-medium">
-                      Already down to Wraps and {page.incumbent}?
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                      The head-to-head goes deeper: full feature tables, cost at
-                      four volumes, and the code diff for switching.
-                    </p>
-                  </div>
-                  <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            </Link>
-          </section>
+          {page.compareHref && (
+            <section className="mb-16">
+              <Link className="block" href={page.compareHref}>
+                <Card className="transition-colors hover:border-orange-500/50">
+                  <CardContent className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium">
+                        Already down to Wraps and {page.incumbent}?
+                      </p>
+                      <p className="text-muted-foreground text-sm">
+                        The head-to-head goes deeper: full feature tables, cost
+                        at four volumes, and the code diff for switching.
+                      </p>
+                    </div>
+                    <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+                  </CardContent>
+                </Card>
+              </Link>
+            </section>
+          )}
 
           <AlsoAlternatives currentSlug={page.slug} />
 

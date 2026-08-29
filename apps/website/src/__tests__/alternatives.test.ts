@@ -200,14 +200,20 @@ describe("the link back to /compare stays intact", () => {
   );
 
   it.each(ALTERNATIVES_PAGES.map((page) => [page.slug, page] as const))(
-    "%s: compareHref points at a page that exists",
+    "%s: compareHref, when set, points at a page that exists",
     (_slug, page) => {
-      expect(routes.has(page.compareHref)).toBe(true);
+      if (page.compareHref) {
+        expect(routes.has(page.compareHref)).toBe(true);
+      }
     }
   );
 
   it("gives every compare target a distinct page", () => {
-    const hrefs = ALTERNATIVES_PAGES.map((page) => page.compareHref);
+    // An incumbent with no head-to-head page omits the field rather than
+    // pointing at someone else's — /alternatives/agentmail is the first.
+    const hrefs = ALTERNATIVES_PAGES.map((page) => page.compareHref).filter(
+      Boolean
+    );
     expect(new Set(hrefs).size).toBe(hrefs.length);
   });
 });

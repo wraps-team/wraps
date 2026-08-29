@@ -26,6 +26,7 @@ export const AGENT_CONTENT_PATHS: readonly string[] = [
   "/alternatives/postmark",
   "/alternatives/mailgun",
   "/alternatives/customer-io",
+  "/alternatives/agentmail",
 ];
 
 const AGENT_CONTENT_PATH_SET = new Set(AGENT_CONTENT_PATHS);

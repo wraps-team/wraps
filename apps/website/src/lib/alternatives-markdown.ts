@@ -75,7 +75,11 @@ export function renderAlternativesMarkdown(page: AlternativesPage): string {
       (other) =>
         `- [${other.incumbent} alternatives](${SITE}/alternatives/${other.slug})`
     ),
-    `- [${page.incumbent} vs Wraps, head to head](${SITE}${page.compareHref})`,
+    ...(page.compareHref
+      ? [
+          `- [${page.incumbent} vs Wraps, head to head](${SITE}${page.compareHref})`,
+        ]
+      : []),
     `- [All head-to-head comparisons](${SITE}/compare)`,
     `- [Pricing](${SITE}/pricing.md)`,
     "",

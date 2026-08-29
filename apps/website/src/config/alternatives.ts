@@ -31,9 +31,12 @@
 // =============================================================================
 
 export type VendorId =
+  | "agentmail"
   | "ahasend"
   | "amazon-ses"
+  | "bavimail"
   | "brevo"
+  | "cloudflare-email"
   | "courier"
   | "customer-io"
   | "klaviyo"
@@ -41,8 +44,10 @@ export type VendorId =
   | "loops"
   | "mailersend"
   | "mailgun"
+  | "mailslurp"
   | "mailtrap"
   | "mandrill"
+  | "nylas"
   | "postmark"
   | "resend"
   | "scaleway-tem"
@@ -100,9 +105,10 @@ export type AlternativesPage = {
    * The head-to-head page for the same incumbent. Stated explicitly rather
    * than derived from the slug: /compare/* is no longer in the nav, so these
    * links are most of what keeps those pages reachable, and a silent break
-   * would strand them.
+   * would strand them. Omitted when no head-to-head exists for this incumbent
+   * — the test still enforces that any href set here points at a real page.
    */
-  compareHref: string;
+  compareHref?: string;
   /** Tailored to this incumbent. Cut weak answers rather than padding. */
   ranked: readonly RankedEntry[];
   /** The honest case for not moving at all. */
@@ -209,6 +215,18 @@ export const VENDORS: Record<VendorId, Vendor> = {
     watchOut:
       "Small and young: fewer integrations, a short deliverability record, and thinner support than any incumbent on this list.",
     url: "https://ahasend.com/pricing",
+  },
+  bavimail: {
+    id: "bavimail",
+    name: "Bavimail",
+    category: "Low-cost transactional API with inbound and per-agent inboxes",
+    pricing:
+      "Free 6,000/mo (200/day) with 3 inboxes. Pro $5/mo for 50K emails, 10 domains, 10 inboxes per domain. Startup $50/mo for 300K plus overage. Annual billing takes those to $48 and $492 a year.",
+    bestFor:
+      "Cost-sensitive teams wanting a Resend-shaped API with inbound and per-agent inboxes included.",
+    watchOut:
+      "New and small, with no published deliverability record, no dedicated-IP or warm-up option, SDKs in TypeScript and Python only, and no overage rate on the pricing page.",
+    url: "https://bavimail.com/pricing",
   },
   smtp2go: {
     id: "smtp2go",
@@ -339,6 +357,54 @@ export const VENDORS: Record<VendorId, Vendor> = {
       "IP warming, blocklist remediation, feedback loops, and DMARC alignment become an on-call rotation rather than a one-time setup task.",
     url: "https://docs.postalserver.io/",
   },
+  agentmail: {
+    id: "agentmail",
+    name: "AgentMail",
+    category: "Hosted inbox API built specifically for AI agents",
+    pricing:
+      "Free at 3 inboxes, 3,000 emails/mo and 100/day. Developer $20/mo for 10 inboxes and 10,000 emails/mo. Startup $200/mo for 150 inboxes and 15,000 emails/day, with monthly volume quoted. Enterprise is custom. Overage rates are not published.",
+    bestFor:
+      "Agent builders who want an inbox from a single API call and no email infrastructure to run.",
+    watchOut:
+      "Plans meter inboxes before volume — Developer caps at 10 — so a fleet outgrows the tier long before the send limit. Mail sits in their storage, and no compliance certification is published.",
+    url: "https://agentmail.to/pricing",
+  },
+  mailslurp: {
+    id: "mailslurp",
+    name: "MailSlurp",
+    category: "Programmatic inboxes over an API, with SMTP and IMAP",
+    pricing:
+      "Free sandbox: 1 permanent inbox, 500 inbound and 25 outbound emails. Pro $49.99/mo for unlimited permanent inboxes, 5,000 inbound and 500 outbound. Team $129.99/mo. Overage $0.99 per 1,000 emails.",
+    bestFor:
+      "Agents needing many inboxes on demand, reachable over REST, SMTP, and IMAP alike.",
+    watchOut:
+      "Built for test automation first, so outbound allowances are small — 500 a month on Pro — and being a production sender of record is not what the product optimises for.",
+    url: "https://app.mailslurp.com/pricing/",
+  },
+  nylas: {
+    id: "nylas",
+    name: "Nylas",
+    category: "Unified API for real Gmail and Outlook mailboxes",
+    pricing:
+      "Free sandbox with 5 connected accounts. Full Platform $15/mo base including 5 connected accounts and 20 agent accounts, then $2.00 per extra account and $0.20 per extra agent account. Calendar-only $10/mo. Enterprise custom.",
+    bestFor:
+      "Agents that must work inside a person's existing mailbox rather than from an address of their own.",
+    watchOut:
+      "Billing follows connected accounts, and you inherit Google and Microsoft OAuth review — a security assessment on their schedule, not yours, and a common cause of slipped launch dates.",
+    url: "https://www.nylas.com/pricing/",
+  },
+  "cloudflare-email": {
+    id: "cloudflare-email",
+    name: "Cloudflare Email Routing",
+    category: "Free inbound email routing into a Worker you write",
+    pricing:
+      "Email Routing is free: 200 routing rules per domain, 200 destination addresses per account, 25 MiB per message. Outbound is a separate Cloudflare Email Service with its own quota, and Workers CPU limits apply on the free plan.",
+    bestFor:
+      "Receiving agent mail straight into code you already run on Workers, at no cost.",
+    watchOut:
+      "Routing is inbound only, so most setups still need a sending provider alongside it. There is no mailbox and no threading — only the handler you write and whatever you decide to store.",
+    url: "https://developers.cloudflare.com/email-routing/limits/",
+  },
   wraps: {
     id: "wraps",
     name: "Wraps",
@@ -427,6 +493,11 @@ const RESEND_PAGE: AlternativesPage = {
       vendor: "ahasend",
       verdict:
         "The nearest thing to SES pricing without opening an AWS account: $0.50 per 1,000, no brackets, no recipient limits. That is about $50 at 100K against Resend's $35, but about $250 at 500K against Resend's $350, so the crossover sits somewhere near 150K. The honest caveat is size. Weigh a young vendor with a short deliverability record against whatever you are about to move onto it, and probably do not start with your payment receipts.",
+    },
+    {
+      vendor: "bavimail",
+      verdict:
+        "The nearest thing on this list to Resend's shape at a fraction of the price, and it adds the half Resend does not have: inbound MX, parsing, and webhook routing are in the base product. Pro is $5 at 50K against Resend Pro's $20, and Startup covers 300K for $50 where Resend Scale is $350 at 500K. Read that gap as the risk it is. No published deliverability record, no dedicated IP to move to if a shared pool goes bad, and no overage rate on the pricing page, so model your worst month before you put payment receipts on it.",
     },
     {
       vendor: "mailersend",
@@ -559,6 +630,11 @@ const SENDGRID_PAGE: AlternativesPage = {
       vendor: "ahasend",
       verdict:
         "$0.50 per 1,000 with no brackets works out around $50 at 100K, roughly half SendGrid Pro, and about $250 at 500K against $499. The counterweight is that you would be moving from one of the largest senders in the world to one of the smallest, with a correspondingly short deliverability record. Read the watch-out and decide with your eyes open.",
+    },
+    {
+      vendor: "bavimail",
+      verdict:
+        "The far end of the market from Twilio: no procurement, no seat model, no separate marketing SKU, and a bill of $5 at 50K against Essentials' $19.95, or $50 at 300K against Pro's $249. What you give up is most of what the enterprise plan was for — dedicated IPs, a compliance package, a support contract, and a vendor with a decade of sending behind it. Sensible for a small product that got a SendGrid invoice it did not expect. Not the move if you chose SendGrid because legal asked who the sub-processor was.",
     },
     {
       vendor: "zeptomail",
@@ -770,6 +846,11 @@ const MAILGUN_PAGE: AlternativesPage = {
         "$0.50 per 1,000 with no brackets is the closest thing on this list to Flex's original spirit, and a quarter of the doubled legacy rate. About $50 at 100K against Mailgun's $75 to $90, and about $250 at 500K against $400. Small vendor, short track record, priced accordingly, and no inbound routing to speak of.",
     },
     {
+      vendor: "bavimail",
+      verdict:
+        "Here because inbound is the reason most people stay on Mailgun, and it is one of the few options on this page that does inbound at all: MX, parsing, attachment capture, and webhook routing, at $5 a month for 50K sends against Foundation's $35. It does not replace the rest of the bill — no email validation, no deep log search, and no dedicated IP where Mailgun includes one from the $75 plans. The cheap inbound-plus-outbound option for a small app, not a like-for-like swap for a high-volume account.",
+    },
+    {
       vendor: "sendgrid",
       verdict:
         "Similar scale, similar feature surface, similar suspension complaints, and a free tier that died in May 2025. It is on this list because procurement sometimes picks it and because it genuinely does handle enormous volume. It is worth being blunt that it does not solve the problem most people are leaving Mailgun over.",
@@ -912,12 +993,121 @@ const CUSTOMER_IO_PAGE: AlternativesPage = {
   ],
 };
 
+const AGENTMAIL_PAGE: AlternativesPage = {
+  slug: "agentmail",
+  incumbent: "AgentMail",
+  title: "AgentMail Alternatives",
+  description:
+    "Eleven real alternatives to AgentMail, ranked, with published prices and the catch on each. MailSlurp, Nylas, Cloudflare Email Routing, Amazon SES, and where Wraps actually fits.",
+  intro:
+    "AgentMail gives an agent its own inbox in one API call, and for a lot of projects that is the whole job. People start shopping when the bill meters inboxes rather than emails, when the mail — which is the agent's memory — needs to sit inside their own compliance boundary, or when they notice that the only thing between the agent and a stranger's address is a sentence in a prompt. Which of those applies decides where you go, because this list splits into inbox providers, mailbox APIs, and sending infrastructure, and those three are not substitutes for each other.",
+  whyPeopleLeave: [
+    "Pricing meters inboxes before volume: Developer is $20 for 10 inboxes and 10,000 emails a month, so a fleet of agents hits the inbox cap long before the sending cap.",
+    "The mail is the agent's memory and it lives in AgentMail's storage, allocated by plan at 3 GB free and 10 GB on Developer. Retention becomes a vendor question rather than a schema you control.",
+    "An API key is the whole authorization model. Which addresses an agent may write to, and how often, ends up in the prompt rather than in the infrastructure.",
+    "Custom domains are supported, but the sending account and the IPs behind it are theirs, so a deliverability problem is something you escalate rather than something you fix.",
+  ],
+  router: [
+    {
+      condition: "You need inboxes on demand and mostly receive",
+      pick: "MailSlurp. Inbox creation is the product, and the API predates the agent framing by years.",
+    },
+    {
+      condition:
+        "The agent should work out of a real person's Gmail or Outlook",
+      pick: "Nylas. Connect the mailbox that already exists instead of minting a new identity.",
+    },
+    {
+      condition:
+        "You want the agent's sending limited by infrastructure, not by a prompt",
+      pick: "Wraps. Allowlist, rate caps, kill switch, and an approval queue, enforced in your own AWS account.",
+    },
+    {
+      condition: "You want AgentMail's shape for less money",
+      pick: "Bavimail. Per-agent inboxes on your domain at $5 a month for 50K emails.",
+    },
+    {
+      condition: "You already have a sending provider and only need to receive",
+      pick: "Cloudflare Email Routing into a Worker. Free, and it lands where your code already runs.",
+    },
+    {
+      condition: "Volume is the point and a per-agent identity is not",
+      pick: "Resend, Postmark, or SES directly. Stop paying per inbox for something you use as a sender.",
+    },
+  ],
+  ranked: [
+    {
+      vendor: "mailslurp",
+      verdict:
+        "The closest thing to AgentMail's core trick — an inbox from an API call — from a vendor that was doing it long before agents were the reason. Pro is $49.99 a month for unlimited permanent inboxes against AgentMail Developer's 10 at $20, which is the right trade the moment your agent count matters more than your send volume. The catch is direction. It was built for test automation, so outbound is 500 emails a month on Pro with overage at $0.99 per 1,000. Strong at receiving, thin as a sender of record.",
+    },
+    {
+      vendor: "bavimail",
+      verdict:
+        "The same shape as AgentMail — per-agent inboxes on your own domain, inbound parsing, webhook routing — at $5 a month for 50K emails against Developer's $20 for 10,000, and 10 inboxes per domain rather than 10 in total. It is also the youngest option here, with no published deliverability record and no dedicated-IP path, so this is a choice between two young vendors rather than an upgrade to a settled one. Cheaper is not the same as more likely to be here in two years.",
+    },
+    {
+      vendor: "nylas",
+      verdict:
+        "On this list because a good share of people shopping for an agent inbox do not actually want a new address: they want the agent working out of the mailbox a human already uses. Full Platform is $15 a month base with 5 connected accounts and 20 agent accounts, then $2.00 per extra account, which is a different billing unit than inbox count and usually a larger one. Budget for Google and Microsoft OAuth review, a security assessment that runs on their timeline and has moved more than one launch date.",
+    },
+    {
+      vendor: "wraps",
+      verdict:
+        "The answer when the reason you are shopping is that an API key is the entire authorization model. Each agent gets an address plus an IAM credential whose only permission is invoking one policy Lambda in your own AWS account, so it cannot reach SES directly: kill switch, sender pin, recipient allowlist, hourly and daily caps, and an approval queue for anything that trips them. Defaults are 20 sends an hour, 100 a day, and an empty allowlist, so it starts locked down rather than open. Sending is $0.10 to $0.16 per 1,000 billed by AWS, plus a platform fee of $19 to $79. It needs an AWS account and SES production access, which is real setup cost AgentMail does not charge you.",
+    },
+    {
+      vendor: "resend",
+      verdict:
+        "The pragmatic answer when the agent sends far more than it receives and does not need an identity of its own. The free tier matches AgentMail's 3,000 a month, and Pro is $20 at 50K against Developer's $20 at 10,000, so on sending alone the arithmetic is not close. What you give up is the inbox: no inbox per agent, no threading model, no mail as memory, and an API key that can reach any address. Logs purge at 30 days too, which is a poor fit when the mail is meant to be the history.",
+    },
+    {
+      vendor: "postmark",
+      verdict:
+        "Pick this when the agent's mail is transactional in everything but name — confirmations, receipts, replies a customer is waiting on — and inbox placement matters more than inbox creation. Inbound streams parse to a webhook, and the deliverability reputation is the strongest on this page. You are buying a sending product rather than an agent product: no inbox per agent and no threading, at about $133 a month for 100K, where AgentMail's published tiers stop at 10,000 a month before you are talking to sales.",
+    },
+    {
+      vendor: "mailgun",
+      verdict:
+        "The old answer to this problem, and it still works: inbound routes match on the recipient address and POST the parsed message to your app, with log search and storage attached. Foundation is $35 at 50K against Developer's $20 at 10,000, so it is cheaper per email and more expensive per agent, because routes are not inboxes and the mailbox abstraction is yours to write. Flex closed to new signups in December 2025, and the suspension complaints in its reviews are not folklore.",
+    },
+    {
+      vendor: "amazon-ses",
+      verdict:
+        "The build-it-yourself option, and the one worth pricing before you accept anyone's per-inbox bill. SES receiving writes to S3 and triggers a Lambda, sending runs $0.10 to $0.16 per 1,000, and there is no cap on how many addresses you route. Budget an engineer-week for parsing, threading, and storage, plus a production-access application AWS can refuse. Cheapest at any real volume, and the only row here where the mail never leaves your own account.",
+    },
+    {
+      vendor: "cloudflare-email",
+      verdict:
+        "Free, and the right answer if you already run Workers and only need to receive. A routing rule hands the inbound message to a handler you write, which is most of what an agent inbox is when the agent does its own parsing. It does not send: outbound is a separate Cloudflare service with its own quota, so pair it with something else on this page. No mailbox, no threading, no history beyond what you choose to store.",
+    },
+    {
+      vendor: "self-hosted",
+      verdict:
+        "Here for the reader whose actual constraint is that agent mail cannot touch a third party at all. Stalwart or Postal on a box you own gives you unlimited inboxes and nobody's per-agent pricing. It also gives you IP warming, blocklist remediation, and DMARC alignment as an on-call rotation. At the volumes most agent projects run, the arithmetic favours this far less than it looks, because the cost is attention rather than money.",
+    },
+    {
+      vendor: "agentmail",
+      isIncumbent: true,
+      verdict:
+        "Staying is often right, and this page would be dishonest not to say so. It is the only vendor here whose product is specifically an inbox for an agent — threading, attachments, WebSocket events, an MCP server, IMAP and SMTP alongside REST — where everything above gives you either inboxes without the agent framing or sending without the inboxes. The free tier is three inboxes and 3,000 emails, Developer is $20, and rebuilding that on a sending API is a week of work plus the parsing bugs that come after. Leave when the inbox cap starts pricing your fleet, when the mail has to live inside your own compliance boundary, or when the agent's sending needs a stronger limit than a prompt. Do not leave over $20.",
+    },
+  ],
+  stayIf: [
+    "Three inboxes and 3,000 emails a month covers you. The free tier is genuinely usable, not a trial.",
+    "The value to you is that inbox creation is one API call and threading arrives already parsed. That is a real week of work to rebuild on a sending API.",
+    "You need IMAP and SMTP alongside REST. Most of this list gives you one or the other, not all three.",
+    "Nothing in the reasons above describes a problem you actually have. A young vendor is a risk; so is a migration you did not need.",
+  ],
+};
+
 export const ALTERNATIVES_PAGES: readonly AlternativesPage[] = [
   RESEND_PAGE,
   SENDGRID_PAGE,
   POSTMARK_PAGE,
   MAILGUN_PAGE,
   CUSTOMER_IO_PAGE,
+  AGENTMAIL_PAGE,
 ];
 
 /** Throws rather than returning undefined: a missing slug is a build-time bug. */

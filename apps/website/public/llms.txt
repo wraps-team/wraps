@@ -346,11 +346,12 @@ Ranked lists of the real options in each category, with published prices, a
 stated catch on every entry including ours, and the incumbent kept on the list.
 
 - [Alternatives Hub](https://wraps.dev/alternatives): Every ranked list
-- [Resend Alternatives](https://wraps.dev/alternatives/resend): 12 options ranked, with prices
-- [SendGrid Alternatives](https://wraps.dev/alternatives/sendgrid): 12 options ranked, with prices
+- [Resend Alternatives](https://wraps.dev/alternatives/resend): 13 options ranked, with prices
+- [SendGrid Alternatives](https://wraps.dev/alternatives/sendgrid): 13 options ranked, with prices
 - [Postmark Alternatives](https://wraps.dev/alternatives/postmark): 11 options ranked, with prices
-- [Mailgun Alternatives](https://wraps.dev/alternatives/mailgun): 12 options ranked, with prices
+- [Mailgun Alternatives](https://wraps.dev/alternatives/mailgun): 13 options ranked, with prices
 - [Customer.io Alternatives](https://wraps.dev/alternatives/customer-io): 11 options ranked, with prices
+- [AgentMail Alternatives](https://wraps.dev/alternatives/agentmail): 11 options ranked, with prices
 
 ## Compare
 
