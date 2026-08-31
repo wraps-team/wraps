@@ -121,13 +121,24 @@ export function OrganizationProvider({
     : null;
   const activeOrg = liveActiveOrg ?? initialActiveOrganization;
 
+  // better-auth's getFullOrganization payload has no top-level `role` — the
+  // role lives on the member row. Derive it here rather than seeding it from
+  // the server, so the dashboard layout does not have to run an organizations
+  // query above the shell.
+  const { data: sessionData } = authClient.useSession();
+  const currentUserId = sessionData?.user?.id;
+  const derivedRole =
+    (activeOrgData as any)?.members?.find(
+      (m: { userId?: string }) => m.userId === currentUserId
+    )?.role ?? null;
+
   const value: OrganizationContextValue = {
     activeOrganization: activeOrg,
     // Only "loading" when we have neither client nor server data yet.
     isLoading: !activeOrg && isPending,
     setActiveOrganization,
     organizations,
-    userRole: ((activeOrgData as any)?.role ?? initialUserRole ?? null) as
+    userRole: (derivedRole ?? initialUserRole ?? null) as
       | "owner"
       | "admin"
       | "member"

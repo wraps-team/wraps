@@ -1,8 +1,8 @@
 import { auth } from "@wraps/auth";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import type React from "react";
 import { OrganizationProvider } from "@/contexts/organization-context";
-import { getUserOrganizations } from "@/lib/organization";
 import { DashboardShell } from "./dashboard-shell";
 
 export default async function DashboardLayout({
@@ -10,30 +10,24 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // The only await above the shell. better-auth's cookie cache
+  // (packages/auth/src/index.ts:534-539, maxAge 5min) answers this from a
+  // signed cookie on the hot path, so the shell is not held behind a query.
+  //
+  // The organizations query that used to live here has moved to the client:
+  // OrganizationProvider already calls authClient.organization.list() on
+  // mount and OrganizationSwitcher already renders a skeleton until the
+  // active org is known. Seeding those props server-side cost a database
+  // round-trip *above* the shell, which meant the whole application sat
+  // behind the root full-screen loader while it ran.
   const session = await auth.api.getSession({ headers: await headers() });
 
-  // Seed the org switcher with server-rendered data so it renders instantly
-  // instead of waiting on two client-side /api/auth round-trips.
-  const memberships = session?.user
-    ? await getUserOrganizations(session.user.id)
-    : [];
-  const initialOrganizations = memberships.map((m) => m.organization);
-
-  const activeId = (
-    session?.session as { activeOrganizationId?: string | null } | undefined
-  )?.activeOrganizationId;
-  const active = activeId
-    ? memberships.find((m) => m.organization.id === activeId)
-    : null;
-  const initialActiveOrganization = active?.organization ?? null;
-  const initialUserRole = active?.role ?? null;
+  if (!session?.user) {
+    redirect("/auth");
+  }
 
   return (
-    <OrganizationProvider
-      initialActiveOrganization={initialActiveOrganization}
-      initialOrganizations={initialOrganizations}
-      initialUserRole={initialUserRole}
-    >
+    <OrganizationProvider>
       <DashboardShell>{children}</DashboardShell>
     </OrganizationProvider>
   );
