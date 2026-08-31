@@ -1,7 +1,3 @@
-import { auth } from "@wraps/auth";
-import { db } from "@wraps/db";
-import { member, organization } from "@wraps/db/schema/auth";
-import { eq } from "drizzle-orm";
 import { type NextRequest, NextResponse, userAgent } from "next/server";
 
 // --- Marketing attribution cookie ---
@@ -115,19 +111,6 @@ function setDeviceTypeCookie(
   });
 }
 
-// Define public routes that don't require authentication
-// All other routes are protected by default
-const publicRoutes = [
-  "/", // Landing page / org selector
-  "/auth", // Authentication pages
-  "/docs", // Documentation (if public)
-  "/pricing", // Pricing page (if exists)
-  "/about", // About page (if exists)
-];
-
-// Auth routes that should redirect authenticated users to dashboard
-const authRoutes = ["/auth"];
-
 /**
  * Add request ID header for log correlation
  */
@@ -137,7 +120,7 @@ function addRequestId(request: NextRequest, response: NextResponse): void {
   response.headers.set("x-request-id", requestId);
 }
 
-export async function proxy(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Attach attribution cookie + request ID to every response
@@ -148,94 +131,33 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // API routes: only add request ID, skip auth checks
-  if (pathname.startsWith("/api")) {
-    return finalize(NextResponse.next());
-  }
-
-  // Check if the current path is public (unprotected)
-  const isPublicRoute = publicRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
-
-  // Check if the current path is an auth page
-  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
-
-  // Get session using better-auth's recommended API
-  const session = await auth.api.getSession({
-    headers: request.headers,
-  });
-
-  const isAuthenticated = !!session;
-
-  // Redirect authenticated users away from auth pages to their organization
-  if (isAuthenticated && isAuthRoute && session?.user) {
-    // 1. Check if user has an active organization
-    const activeOrgId = (session.session as { activeOrganizationId?: string })
-      ?.activeOrganizationId;
-
-    if (activeOrgId) {
-      const activeOrg = await db.query.organization.findFirst({
-        where: eq(organization.id, activeOrgId),
-      });
-
-      if (activeOrg?.slug) {
-        return finalize(
-          NextResponse.redirect(
-            new URL(`/${activeOrg.slug}/emails`, request.url)
-          )
-        );
-      }
-    }
-
-    // 2. If no active org, check how many orgs the user is a member of
-    const userMemberships = await db.query.member.findMany({
-      where: eq(member.userId, session.user.id),
-    });
-
-    if (userMemberships.length === 0) {
-      // No orgs → redirect to onboarding
-      return finalize(
-        NextResponse.redirect(new URL("/onboarding", request.url))
-      );
-    }
-
-    if (userMemberships.length === 1) {
-      // Exactly 1 org → redirect to that org
-      const userOrg = await db.query.organization.findFirst({
-        where: eq(organization.id, userMemberships[0].organizationId),
-      });
-
-      if (userOrg?.slug) {
-        return finalize(
-          NextResponse.redirect(new URL(`/${userOrg.slug}/emails`, request.url))
-        );
-      }
-    }
-
-    // Multiple orgs or couldn't find org → redirect to dashboard (org selector)
-    return finalize(NextResponse.redirect(new URL("/", request.url)));
-  }
-
-  // Redirect unauthenticated users trying to access protected routes to auth
-  // (All routes are protected unless explicitly listed as public)
-  if (!(isAuthenticated || isPublicRoute)) {
-    const redirectUrl = new URL("/auth", request.url);
-    // Add the original URL as a redirect parameter for post-login redirect
-    redirectUrl.searchParams.set("redirect", pathname);
-    return finalize(NextResponse.redirect(redirectUrl));
-  }
-
   // Allow the request to continue
   return finalize(NextResponse.next());
 }
 
 export const config = {
   matcher: [
-    // Match all request paths except for the ones starting with:
-    // - _next/static (static files)
-    // - _next/image (image optimization files)
-    // - favicon.ico, sitemap.xml, robots.txt (meta files)
-    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+    /*
+     * Run only on document routes. Next runs the proxy *before* filesystem
+     * routes (see proxy.mdx §Execution order), so without these exclusions it
+     * runs on every file in `public/`, every API call and every optimized
+     * image — none of which needs an attribution cookie.
+     *
+     * - api            — route handlers; nothing reads these cookies off them
+     * - _next          — all Next internals, static chunks and image optimizer
+     * - monitoring     — Sentry tunnelRoute (next.config.ts:90 `tunnelRoute`)
+     * - __nextjs       — dev-only asset routes (e.g. /__nextjs_font/*)
+     * - *.<ext>        — everything served straight out of `public/`
+     *
+     * The `(?:/|$)` after each name anchors the exclusion to a whole path
+     * segment. Without it the lookahead matches on a bare prefix, so an
+     * organization slugged `apidocs` or `monitoring-tools` would silently stop
+     * getting the proxy — slugs are user-chosen and `generateSlug`
+     * (src/lib/utils/slug.ts) does not reserve these words. Same reason the
+     * extension group ends in `$`.
+     *
+     * Mirrors apps/website/src/middleware.ts, which already excludes this set.
+     */
+    "/((?!api(?:/|$)|_next(?:/|$)|monitoring(?:/|$)|__nextjs|.*\\.(?:png|jpe?g|gif|webp|avif|svg|ico|txt|xml|json|map|woff2?|ttf|otf|pdf|mp4|zip)$).*)",
   ],
 };

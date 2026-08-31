@@ -141,6 +141,22 @@ export default async function HomePage() {
     } => item.organization !== null && item.organization !== undefined
   );
 
+  // A signed-in user with an active organization goes straight there, rather
+  // than to the selector. This used to live in the proxy, which resolved the
+  // same thing with two extra database queries on the way to /auth.
+  const activeOrgId = (
+    session.session as { activeOrganizationId?: string | null } | undefined
+  )?.activeOrganizationId;
+
+  if (activeOrgId) {
+    const activeOrg = validOrgs.find(
+      (item) => item.organization.id === activeOrgId
+    );
+    if (activeOrg?.organization.slug) {
+      redirect(`/${activeOrg.organization.slug}/emails`);
+    }
+  }
+
   // If user has no orgs, redirect to onboarding
   if (validOrgs.length === 0) {
     redirect("/onboarding");
