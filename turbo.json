@@ -4,6 +4,11 @@
   "globalEnv": [
     "DATABASE_URL",
     "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GITHUB_CLIENT_ID",
+    "GITHUB_CLIENT_SECRET",
     "PASSKEY_RP_ID",
     "PASSKEY_RP_NAME",
     "NEXT_PUBLIC_APP_URL",
@@ -34,6 +39,11 @@
       "env": [
         "DATABASE_URL",
         "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GITHUB_CLIENT_ID",
+        "GITHUB_CLIENT_SECRET",
         "PASSKEY_RP_ID",
         "PASSKEY_RP_NAME",
         "NEXT_PUBLIC_APP_URL",
