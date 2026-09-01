@@ -150,7 +150,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 
     // Rate Limits
     rateLimits: {
-      dailyRequests: 1000,
+      dailyRequests: -1,
       minuteRequests: 50,
     },
 
@@ -206,7 +206,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 
     // Rate Limits
     rateLimits: {
-      dailyRequests: 200_000,
+      dailyRequests: -1,
       minuteRequests: 2000,
     },
 
@@ -263,7 +263,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 
     // Rate Limits
     rateLimits: {
-      dailyRequests: 500_000,
+      dailyRequests: -1,
       minuteRequests: 5000,
     },
 
@@ -330,7 +330,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 
     // Rate Limits
     rateLimits: {
-      dailyRequests: 200_000,
+      dailyRequests: -1,
       minuteRequests: 2000,
     },
 
@@ -390,7 +390,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 
     // Rate Limits
     rateLimits: {
-      dailyRequests: 500_000,
+      dailyRequests: -1,
       minuteRequests: 5000,
     },
 
@@ -450,7 +450,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 
     // Rate Limits
     rateLimits: {
-      dailyRequests: 500_000,
+      dailyRequests: -1,
       minuteRequests: 5000,
     },
 
@@ -765,7 +765,7 @@ export function getRateLimits(planId: PlanId | string): RateLimits {
   const plan = PLANS[planId as PlanId];
   return (
     plan?.rateLimits ?? {
-      dailyRequests: 50_000,
+      dailyRequests: -1,
       minuteRequests: 500,
     }
   );

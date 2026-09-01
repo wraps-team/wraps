@@ -44,7 +44,7 @@ const headersExample = `HTTP/1.1 200 OK
 RateLimit-Limit: 500
 RateLimit-Remaining: 487
 RateLimit-Reset: 34
-RateLimit-Policy: 500;w=60, 50000;w=86400
+RateLimit-Policy: 500;w=60
 X-RateLimit-Limit: 500
 X-RateLimit-Remaining: 487
 X-RateLimit-Reset: 34`;
@@ -54,7 +54,7 @@ Retry-After: 34
 RateLimit-Limit: 500
 RateLimit-Remaining: 0
 RateLimit-Reset: 34
-RateLimit-Policy: 500;w=60, 50000;w=86400
+RateLimit-Policy: 500;w=60
 X-RateLimit-Limit: 500
 X-RateLimit-Remaining: 0
 
@@ -106,13 +106,13 @@ const RESPONSE_HEADERS = [
 const SECTION_MD = {
   limitsByPlan: `## Limits by Plan
 
-The Wraps Platform API enforces per-minute and daily rate limits based on your plan. Limits are applied per organization using DynamoDB-backed sliding windows.
+The Wraps Platform API enforces a per-minute rate limit based on your plan. Limits are applied per organization using DynamoDB-backed sliding windows. There is no daily request cap and no monthly send quota on any plan — sends are unlimited and billed by AWS directly. The per-minute limit exists to protect the API from bursts.
 
-| Plan | Per Minute | Per Day |
-|------|-----------|---------|
-| Free | 50 | 1,000 |
-| Pro | 2,000 | 200,000 |
-| Business | 5,000 | 500,000 |`,
+| Plan | Per Minute |
+|------|-----------|
+| Free | 50 |
+| Pro | 2,000 |
+| Business | 5,000 |`,
 
   publicEndpoints: `## Public Endpoints
 
@@ -138,7 +138,7 @@ Every rate-limited response carries the limit headers. Read the unprefixed \`Rat
 | \`X-RateLimit-Remaining\` | Legacy alias for \`RateLimit-Remaining\` |
 | \`X-RateLimit-Reset\` | Legacy alias for \`RateLimit-Reset\` |
 
-When two policies are in force (per-minute and per-day), the quota headers describe whichever is closest to running out — that is the one to pace against — while \`RateLimit-Policy\` lists both.
+The quota headers describe the policy closest to running out — that is the one to pace against — while \`RateLimit-Policy\` lists every policy in force. On every current plan that is a single per-minute entry; there is no daily policy.
 
 ### Successful response
 \`\`\`
@@ -225,9 +225,11 @@ export default function PageContent() {
           title="Limits by Plan"
         />
         <p className="mb-4 text-muted-foreground">
-          The Wraps Platform API enforces per-minute and daily rate limits based
-          on your plan. Limits are applied per organization using
-          DynamoDB-backed sliding windows.
+          The Wraps Platform API enforces a per-minute rate limit based on your
+          plan. Limits are applied per organization using DynamoDB-backed
+          sliding windows. There is no daily request cap and no monthly send
+          quota on any plan &mdash; sends are unlimited and billed by AWS
+          directly. The per-minute limit exists to protect the API from bursts.
         </p>
         <Card>
           <CardContent className="p-0">
@@ -239,14 +241,13 @@ export default function PageContent() {
                     <th className="px-4 py-2 text-left font-medium">
                       Per Minute
                     </th>
-                    <th className="px-4 py-2 text-left font-medium">Per Day</th>
                   </tr>
                 </thead>
                 <tbody className="text-muted-foreground">
                   {[
-                    { plan: "Free", minute: "50", daily: "1,000" },
-                    { plan: "Pro", minute: "2,000", daily: "200,000" },
-                    { plan: "Business", minute: "5,000", daily: "500,000" },
+                    { plan: "Free", minute: "50" },
+                    { plan: "Pro", minute: "2,000" },
+                    { plan: "Business", minute: "5,000" },
                   ].map((row, i) => (
                     <tr className={i < 2 ? "border-b" : ""} key={row.plan}>
                       <td className="px-4 py-2 font-medium text-foreground">
@@ -255,12 +256,6 @@ export default function PageContent() {
                       <td className="px-4 py-2">
                         <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
                           {row.minute}
-                        </code>{" "}
-                        requests
-                      </td>
-                      <td className="px-4 py-2">
-                        <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                          {row.daily}
                         </code>{" "}
                         requests
                       </td>

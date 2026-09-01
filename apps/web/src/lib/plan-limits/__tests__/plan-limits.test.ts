@@ -536,6 +536,22 @@ describe("Plan configuration", () => {
     expect(PLANS.pro.features.events).toBe(true);
   });
 
+  // plans/227: dailyRequests was a send-volume meter in disguise. Wraps does
+  // not pay for sends, so every plan's daily cap is retired to unlimited.
+  it("no plan has a finite daily request cap", () => {
+    for (const plan of Object.values(PLANS)) {
+      expect(plan.rateLimits.dailyRequests).toBe(-1);
+    }
+  });
+
+  // minuteRequests is the real burst backstop and must stay tiered — this
+  // guards against a future cleanup "unlimiting" it alongside dailyRequests.
+  it("every plan still has a positive per-minute request limit", () => {
+    for (const plan of Object.values(PLANS)) {
+      expect(plan.rateLimits.minuteRequests).toBeGreaterThan(0);
+    }
+  });
+
   it("getRequiredPlan never returns a legacy plan ID", () => {
     const features = Object.keys(
       PLANS.business.features

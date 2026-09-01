@@ -20,14 +20,17 @@ import { getAuthOptional } from "./auth";
 
 // Plan rate limits (requests)
 // Aligned with apps/web/src/lib/plans.ts
+// Per-minute limits protect this API from bursts and are real.
+// Daily limits were a send-volume meter — retired in plans/227. Sends are
+// unlimited on every plan; customers pay AWS directly for them.
 const PLAN_LIMITS = {
-  free: { daily: 1000, minute: 50 },
-  pro: { daily: 200_000, minute: 2000 },
-  business: { daily: 500_000, minute: 5000 },
-  // Legacy plans — see plans/208. Mapped to their new-tier equivalent.
-  starter: { daily: 50_000, minute: 500 },
-  growth: { daily: 200_000, minute: 2000 },
-  scale: { daily: 500_000, minute: 5000 },
+  free: { daily: -1, minute: 50 },
+  pro: { daily: -1, minute: 2000 },
+  business: { daily: -1, minute: 5000 },
+  // Legacy plans — see plans/208.
+  starter: { daily: -1, minute: 500 },
+  growth: { daily: -1, minute: 2000 },
+  scale: { daily: -1, minute: 5000 },
 } as const;
 
 // DynamoDB client (reuse across invocations)
@@ -89,6 +92,8 @@ export const rateLimitMiddleware = new Elysia({ name: "rate-limit" }).derive(
       resetSeconds: secondsUntilUtcMidnight(now),
     });
 
+    const dailyUnlimited = limits.daily === -1;
+
     try {
       // Check and increment minute counter
       const minuteResult = await incrementCounter(
@@ -101,34 +106,40 @@ export const rateLimitMiddleware = new Elysia({ name: "rate-limit" }).derive(
         set.status = 429;
         setRateLimitExceededHeaders(set, minuteWindow(0), [
           minuteWindow(0),
-          dailyWindow(0),
+          ...(dailyUnlimited ? [] : [dailyWindow(0)]),
         ]);
         throw new Error(
           `Rate limit exceeded: ${limits.minute} requests per minute`
         );
       }
 
-      // Check and increment daily counter
-      const dailyResult = await incrementCounter(
-        organizationId,
-        `daily:${dailyKey}`,
-        86_400 // 24 hour TTL
-      );
-
-      if (dailyResult > limits.daily) {
-        set.status = 429;
-        setRateLimitExceededHeaders(set, dailyWindow(0), [
-          minuteWindow(0),
-          dailyWindow(0),
-        ]);
-        throw new Error(
-          `Daily limit exceeded: ${limits.daily} requests per day`
+      // Check and increment daily counter — skipped entirely when the plan's
+      // daily limit is unlimited (-1). Sends are not metered by request count;
+      // see plans/227.
+      let dailyRemaining: number | null = null;
+      if (!dailyUnlimited) {
+        const dailyResult = await incrementCounter(
+          organizationId,
+          `daily:${dailyKey}`,
+          86_400 // 24 hour TTL
         );
+
+        if (dailyResult > limits.daily) {
+          set.status = 429;
+          setRateLimitExceededHeaders(set, dailyWindow(0), [
+            minuteWindow(0),
+            dailyWindow(0),
+          ]);
+          throw new Error(
+            `Daily limit exceeded: ${limits.daily} requests per day`
+          );
+        }
+        dailyRemaining = limits.daily - dailyResult;
       }
 
       setRateLimitHeaders(set, [
         minuteWindow(limits.minute - minuteResult),
-        dailyWindow(limits.daily - dailyResult),
+        ...(dailyRemaining === null ? [] : [dailyWindow(dailyRemaining)]),
       ]);
     } catch (error) {
       // Re-throw intentional 429 errors
