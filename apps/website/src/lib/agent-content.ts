@@ -48,20 +48,20 @@ await email.send({
 
 Wraps charges for the platform. You pay AWS directly for sending — $0.10/1,000 emails on SES à la carte, $0.16/1,000 on the Essentials plan AWS assigns to new accounts by default. Full pricing, SES plan detail, and a cost estimator API: https://wraps.dev/pricing.md
 
-| Plan | Price | AWS Accounts | History |
-|------|-------|--------------|---------|
-| Free | $0 | 1 | 30 days |
-| Pro | $29/mo | 3 | 90 days |
-| Business | $199/mo | Unlimited | 1 year |
+| Plan | Price | Custom events | AWS Accounts | History |
+|------|-------|---------------|--------------|---------|
+| Free | $0 | 5,000/mo | 1 | 30 days |
+| Pro | $29/mo | Unlimited | 1 | 90 days |
+| Business | $199/mo | Unlimited | Unlimited | 1 year |
 
-Email sending is unmetered on every plan — you pay AWS directly and Wraps adds no per-email fee. Every plan also includes unlimited domains, contacts, templates, and team members.
+Email sending is unmetered on every plan — you pay AWS directly and Wraps adds no per-email fee. Every plan also includes unlimited domains, contacts, templates, and team members. The only metered resource is custom events emitted via \`POST /v1/events\`, which are Wraps' own storage: 5,000/month on Free, unlimited on every paid plan. More than one AWS account requires Business.
 
 Annual plans save 14–16%.
 
 ## Start Without an Account
 
 - \`npx @wraps.dev/cli email init\` deploys into your own AWS account with your own AWS credentials. No Wraps account is involved.
-- Free tier: $0/month, unmetered email sending, 1 AWS account, 30-day history. Sign up at https://app.wraps.dev/sign-up.
+- Free tier: $0/month, unmetered email sending, 5,000 custom events/month, 1 AWS account, 30-day history. Sign up at https://app.wraps.dev/sign-up.
 - API keys are self-serve in the dashboard under Settings → API Keys. Headless clients use the OAuth 2.0 Device Authorization Grant via \`wraps auth login\`.
 - Test environment: new AWS SES accounts start in the SES sandbox — sending is limited to verified addresses and the SES mailbox simulator (\`success@simulator.amazonses.com\`, \`bounce@simulator.amazonses.com\`, \`complaint@simulator.amazonses.com\`). \`wraps doctor\` reports sandbox state.
 - Nothing here requires talking to a salesperson.

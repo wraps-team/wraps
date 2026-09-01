@@ -7,6 +7,7 @@
  */
 
 import {
+  and,
   contact,
   db,
   eq,
@@ -34,6 +35,7 @@ vi.mock("../services/workflow-queue", () => ({
 
 import { Elysia } from "elysia";
 import type { AuthContext } from "../middleware/auth";
+import { EVENT_GRACE_MULTIPLIER } from "../middleware/event-limit";
 import { eventsRoutes } from "../routes/events";
 
 const TEST_PREFIX = "event-limit-test";
@@ -92,7 +94,11 @@ const starterAuth: AuthContext = { ...freeAuth, planId: "starter" };
 
 const PERIOD_KEY = `${new Date().getUTCFullYear()}-${String(new Date().getUTCMonth() + 1).padStart(2, "0")}`;
 const FREE_LIMIT = 5000;
-const FREE_GRACE = Math.floor(FREE_LIMIT * 1.25); // 6250
+// Derived from the middleware's own multiplier, not a copy of it. These were
+// hardcoded at 1.25 and silently kept asserting the old ceiling when the
+// constant moved to 1.1 — the boundary cases still passed against the wrong
+// number until the block/allow boundary itself shifted.
+const FREE_GRACE = Math.floor(FREE_LIMIT * EVENT_GRACE_MULTIPLIER);
 
 async function seedUsage(count: number) {
   await db
@@ -109,6 +115,20 @@ async function seedUsage(count: number) {
     });
 }
 
+async function readUsage(): Promise<number> {
+  const [row] = await db
+    .select({ eventCount: eventUsageMonthly.eventCount })
+    .from(eventUsageMonthly)
+    .where(
+      and(
+        eq(eventUsageMonthly.organizationId, testOrg.id),
+        eq(eventUsageMonthly.periodKey, PERIOD_KEY)
+      )
+    )
+    .limit(1);
+  return row?.eventCount ?? 0;
+}
+
 function createTestApp(auth = freeAuth) {
   return new Elysia().derive(() => ({ auth })).use(eventsRoutes);
 }
@@ -119,6 +139,21 @@ function postEvent(app: ReturnType<typeof createTestApp>) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "test.event", contactId: testContact.id }),
+    })
+  );
+}
+
+function postBatch(app: ReturnType<typeof createTestApp>, count: number) {
+  return app.handle(
+    new Request("http://localhost/v1/events/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        events: Array.from({ length: count }, (_, i) => ({
+          name: `bulk.event.${i}`,
+          contactId: testContact.id,
+        })),
+      }),
     })
   );
 }
@@ -169,12 +204,11 @@ describe("event limit enforcement (real middleware, real DB)", () => {
       .where(eq(eventUsageMonthly.organizationId, testOrg.id));
   });
 
-  // Volume is no longer capped on a paid plan — these cases were written to
-  // guard the (now-removed) 429 block, so they run on a paid auth context to
-  // keep exercising that behavior. A free-plan org never reaches the volume
-  // logic at all — see "the free plan is gated" below.
+  // Paid plans are unlimited. The Wraps fee is flat, so a paid org that emits
+  // ten million events pays the same $29 — metering it would be a billing
+  // meter with nothing to bill.
   describe("volume is not capped on a paid plan", () => {
-    it("allows the event and sets usage headers to unlimited (plans/208)", async () => {
+    it("allows the event and sets usage headers to unlimited", async () => {
       await seedUsage(2500);
       const res = await postEvent(createTestApp(starterAuth));
       expect(res.status).toBe(200);
@@ -191,15 +225,15 @@ describe("event limit enforcement (real middleware, real DB)", () => {
       expect(res.headers.get("X-Event-Current")).toBe("0");
     });
 
-    it("does not block a paid plan at the former grace limit", async () => {
-      await seedUsage(FREE_GRACE); // 6250 — used to be the free-plan 429 threshold
+    it("does not block a paid plan at the free grace limit", async () => {
+      await seedUsage(FREE_GRACE);
       const res = await postEvent(createTestApp(starterAuth));
       expect(res.status).toBe(200);
       expect(res.headers.get("X-Event-Exceeded")).toBeNull();
       expect(res.headers.get("Retry-After")).toBeNull();
     });
 
-    it("does not block a paid plan well over the former limit (8259 scenario)", async () => {
+    it("does not block a paid plan well over the free limit (8259 scenario)", async () => {
       await seedUsage(8259);
       const res = await postEvent(createTestApp(starterAuth));
       expect(res.status).toBe(200);
@@ -209,35 +243,151 @@ describe("event limit enforcement (real middleware, real DB)", () => {
       expect(res.headers.get("X-Event-Exceeded")).toBeNull();
       expect(res.headers.get("Retry-After")).toBeNull();
     });
+  });
 
-    it("does not block starter plan at free-tier counts", async () => {
-      await seedUsage(FREE_GRACE); // 6250 — would have blocked free but not starter
-      const res = await postEvent(createTestApp(starterAuth));
-      // 6250 is only 12.5% of starter's 50k limit — well under the former grace threshold
-      expect(res.status).toBe(200);
-      expect(res.headers.get("X-Event-Limit")).toBe("-1");
+  // Free is metered, not gated. planGateMiddleware lets every plan through
+  // (FEATURE_PLANS.events is "free"); the 5,000/month allowance is what
+  // prompts the upgrade, and it is the only trigger with an observed organic
+  // conversion behind it.
+  describe("a batch cannot vault over the grace ceiling", () => {
+    // These cases seed high usage and the third one actually ingests, so reset
+    // the counter afterwards. Later cases in this file ("ingests with no prior
+    // usage") assume a clean counter rather than seeding one themselves.
+    afterEach(async () => {
+      await seedUsage(0);
+    });
+
+    // The gate runs before the handler and the counter increments after it, so
+    // checking currentUsage alone let one batch land entirely on top of the
+    // ceiling. At a 5,000 allowance and 1.1 grace the wall is 5,500; a
+    // 1,000-event batch posted at 5,499 used to settle at 6,499. The gate now
+    // charges the request its real cost up front.
+    it("refuses a batch that would cross the ceiling, even from under it", async () => {
+      await seedUsage(5499);
+
+      const res = await postBatch(createTestApp(), 1000);
+      const body = (await res.json()) as {
+        error?: string;
+        requested?: number;
+      };
+
+      expect(res.status).toBe(429);
+      expect(body.error).toBe("event_limit_exceeded");
+      expect(body.requested).toBe(1000);
+    });
+
+    it("leaves the counter untouched when it refuses the batch", async () => {
+      // The real damage in the old behaviour was the stored rows, not the
+      // status code — assert the overshoot never lands.
+      await seedUsage(5499);
+
+      await postBatch(createTestApp(), 1000);
+
+      expect(await readUsage()).toBe(5499);
+    });
+
+    it("still accepts a batch that fits inside the remaining headroom", async () => {
+      // Guards against over-correcting into "block every batch near the cap".
+      await seedUsage(5000);
+
+      const res = await postBatch(createTestApp(), 100);
+
+      expect(res.status).not.toBe(429);
     });
   });
 
-  // The numeric limit no longer blocks anything, but the events feature itself
-  // is pro+ (FEATURE_PLANS.events in plan-gate.ts — plans/208 renamed the
-  // required plan from "starter" to "pro"). A free org is gated out
-  // regardless of usage — this is what FSI's $19/mo actually pays for.
-  describe("the free plan is gated", () => {
-    it("returns 403 with zero seeded usage", async () => {
+  describe("the meter fails open when its own lookup breaks", () => {
+    it("ingests the event when the usage query throws", async () => {
+      // Matches the posture of the rate limiter and the subscription gate: a
+      // DB blip must not become an outage of event ingestion. The counter
+      // lives in Postgres, so an error here says nothing about whether the
+      // org is actually over its allowance — refusing on no evidence would
+      // drop a paying customer's events. This catch (event-limit.ts:181) was
+      // the last uncovered line in the newly-live enforcement path.
+      const spy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+        throw new Error("connection terminated unexpectedly");
+      });
+
+      try {
+        const res = await postEvent(createTestApp());
+        expect(res.status).not.toBe(429);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
+  describe("the free plan is metered, not gated", () => {
+    it("ingests below the allowance and reports the real headers", async () => {
+      await seedUsage(2500);
       const res = await postEvent(createTestApp(freeAuth));
-      expect(res.status).toBe(403);
-      const text = await res.text();
-      expect(text).toMatch(/requires pro plan/i);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Event-Limit")).toBe(String(FREE_LIMIT));
+      expect(res.headers.get("X-Event-Current")).toBe("2500");
+      expect(res.headers.get("X-Event-Remaining")).toBe("2500");
+      expect(res.headers.get("X-Event-Percent")).toBe("50");
     });
 
-    it("returns 403 with usage well over the former limit (8259 scenario)", async () => {
+    it("ingests with no prior usage", async () => {
+      const res = await postEvent(createTestApp(freeAuth));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Event-Limit")).toBe(String(FREE_LIMIT));
+      expect(res.headers.get("X-Event-Remaining")).toBe(String(FREE_LIMIT));
+    });
+
+    // The whole point of the grace margin: hitting 100% warns, it does not
+    // cut the org off mid-month.
+    it("keeps ingesting at 100% of the allowance, inside the grace margin", async () => {
+      await seedUsage(FREE_LIMIT);
+      const res = await postEvent(createTestApp(freeAuth));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Event-Remaining")).toBe("0");
+      expect(res.headers.get("X-Event-Percent")).toBe("100");
+      expect(res.headers.get("X-Event-Exceeded")).toBeNull();
+    });
+
+    it("keeps ingesting one event below the grace limit", async () => {
+      await seedUsage(FREE_GRACE - 1);
+      const res = await postEvent(createTestApp(freeAuth));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Event-Exceeded")).toBeNull();
+    });
+
+    it("blocks with 429 at the grace limit", async () => {
+      await seedUsage(FREE_GRACE);
+      const res = await postEvent(createTestApp(freeAuth));
+      expect(res.status).toBe(429);
+      expect(res.headers.get("X-Event-Exceeded")).toBe("true");
+      expect(Number(res.headers.get("Retry-After"))).toBeGreaterThan(0);
+
+      const body = await res.json();
+      expect(body.error).toBe("event_limit_exceeded");
+      expect(body.limit).toBe(FREE_LIMIT);
+      expect(body.current).toBe(FREE_GRACE);
+      expect(body.upgradeUrl).toContain("billing");
+      expect(Date.parse(body.resetsAt)).toBeGreaterThan(Date.now());
+    });
+
+    // Darren's real number: he hit the cap and upgraded a few days later.
+    it("blocks well over the allowance (8259 scenario)", async () => {
       await seedUsage(8259);
       const res = await postEvent(createTestApp(freeAuth));
-      // Gated on plan, not volume — same 403 whether usage is 0 or 8259.
-      expect(res.status).toBe(403);
-      const text = await res.text();
-      expect(text).toMatch(/requires pro plan/i);
+      expect(res.status).toBe(429);
+      const body = await res.json();
+      expect(body.percentUsed).toBe(165);
+    });
+
+    // A 429 must be the meter talking, never the plan gate: events are a
+    // feature every tier has.
+    it("never returns 403 — events are not gated off Free", async () => {
+      for (const usage of [0, FREE_LIMIT, FREE_GRACE, 8259]) {
+        await db
+          .delete(eventUsageMonthly)
+          .where(eq(eventUsageMonthly.organizationId, testOrg.id));
+        await seedUsage(usage);
+        const res = await postEvent(createTestApp(freeAuth));
+        expect(res.status).not.toBe(403);
+      }
     });
   });
 });

@@ -15,20 +15,16 @@ type RouteContext = {
 };
 
 /**
- * GET /api/[orgSlug]/events/usage - Get current tracked event usage status
+ * GET /api/[orgSlug]/events/usage - Get current custom-event usage status
  *
- * Tracked event usage is tracked per calendar month and resets on the 1st.
- *
- * Tracked event limits (2026 pricing model):
- * - Starter: 50,000 tracked events/month
- * - Growth: 250,000 tracked events/month
- * - Scale: 1,000,000 tracked events/month
- * - Enterprise: Unlimited
+ * Counted per calendar month and reset on the 1st. Free includes 5,000 custom
+ * events/month; every paid plan is unlimited and reports `limit: -1`. Email
+ * sends are never counted here — see /api/[orgSlug]/messages/usage.
  *
  * Thresholds:
  * - 80%: warning
  * - 100%: critical (banner + email)
- * - 125%: exceeded (hard block)
+ * - 110%: exceeded (hard block)
  */
 export async function GET(_request: Request, context: RouteContext) {
   try {

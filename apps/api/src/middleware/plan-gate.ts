@@ -6,6 +6,7 @@
 
 import { Elysia } from "elysia";
 import { isSelfHosted } from "../(ee)/lib/license";
+import { isPlanId, type PlanId } from "../lib/plan-ids";
 import { getAuthOptional } from "./auth";
 
 // Feature to minimum plan mapping (aligned with apps/web/src/lib/plans.ts)
@@ -15,7 +16,7 @@ export const FEATURE_PLANS = {
   segments: "pro",
   campaigns: "pro",
   workflows: "free", // All tiers (quantity limited by tier)
-  events: "pro",
+  events: "free", // All tiers — Free is metered at 5K/mo, not gated
   advancedSegments: "business",
   customRetention: "business",
   prioritySLA: "business",
@@ -33,9 +34,7 @@ const PLAN_HIERARCHY = {
   starter: 1, // legacy → pro
   growth: 2, // legacy → business
   scale: 2, // legacy → business
-} as const;
-
-type PlanId = keyof typeof PLAN_HIERARCHY;
+} as const satisfies Record<PlanId, number>;
 
 export function planGateMiddleware(feature: Feature) {
   return new Elysia({ name: `plan-gate:${feature}` }).derive(
@@ -57,8 +56,14 @@ export function planGateMiddleware(feature: Feature) {
       const { planId } = authContext;
       const requiredPlan = FEATURE_PLANS[feature];
 
-      const currentLevel = PLAN_HIERARCHY[planId as PlanId] ?? 0;
-      const requiredLevel = PLAN_HIERARCHY[requiredPlan as PlanId] ?? 0;
+      // Explicit narrow, not `PLAN_HIERARCHY[planId as PlanId] ?? 0`. That
+      // form walks the prototype chain: PLAN_HIERARCHY["constructor"] returns
+      // a Function rather than undefined, so `?? 0` never fires and
+      // `Function < requiredLevel` evaluates false — the gate grants access
+      // instead of denying it. Same class of bug as 317855ad, which fixed the
+      // apps/web side; this is the enforcement side.
+      const currentLevel = isPlanId(planId) ? PLAN_HIERARCHY[planId] : 0;
+      const requiredLevel = PLAN_HIERARCHY[requiredPlan];
 
       if (currentLevel < requiredLevel) {
         set.status = 403;

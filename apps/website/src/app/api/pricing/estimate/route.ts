@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import type { BillingInterval, TierId } from "@/config/pricing";
-import { resolveTierId } from "@/config/pricing";
+import { PUBLIC_TIER_IDS, resolveTierId } from "@/config/pricing";
 import { buildShareUrl, renderEstimateMarkdown } from "@/lib/pricing-markdown";
 import type { CostInput, RetentionPeriod, SesPlanId } from "@/lib/ses-cost";
 import {
@@ -19,7 +19,6 @@ const SITE = "https://wraps.dev";
  * agent that learned "starter"/"growth"/"scale" from the pricing.md that
  * shipped before this change keeps getting a 200, not a 400.
  */
-const PUBLIC_TIER_IDS = ["free", "pro", "business"] as const;
 const BILLING_INTERVALS = ["monthly", "annual"] as const;
 
 const MAX_VOLUME = 1_000_000_000;

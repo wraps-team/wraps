@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
+import { PRICING_TIERS } from "@/config/pricing";
+
+// Derived, not hardcoded: this enum advertised the pre-restructure ladder
+// ("starter"/"growth"/"scale") to every agent that read the tool schema long
+// after those tiers stopped being purchasable.
+const TIER_IDS = PRICING_TIERS.map((t) => t.id);
 
 type WebMCPTool = {
   name: string;
@@ -61,7 +67,7 @@ export function WebMCP() {
               },
               tier: {
                 type: "string",
-                enum: ["free", "starter", "growth", "scale"],
+                enum: TIER_IDS,
                 description: "Wraps plan",
               },
               billing: {

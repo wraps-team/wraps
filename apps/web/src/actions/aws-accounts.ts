@@ -21,8 +21,7 @@ import {
 import { createServerValidate } from "@tanstack/react-form-nextjs";
 import { auth } from "@wraps/auth";
 import { auditLog, awsAccount, db, notifyOrg } from "@wraps/db";
-import { subscription } from "@wraps/db/schema/auth";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { after } from "next/server";
@@ -40,7 +39,7 @@ import {
 } from "@/lib/forms/connect-aws-account";
 import { createActionLogger, serializeError } from "@/lib/logger";
 import { grantAWSAccountAccess } from "@/lib/permissions/grant-access";
-import { isSelfHosted } from "@/lib/plan-limits";
+import { getOrganizationPlan, isSelfHosted } from "@/lib/plan-limits";
 import { canAddAwsAccount, getAwsAccountLimitMessage } from "@/lib/plans";
 import { checkPermission } from "./shared/permissions";
 import { verifyOrgAccess } from "./shared/verify-org-access";
@@ -219,23 +218,19 @@ export async function connectAWSAccountAction(
     ]);
     if (awsConnectError) return { error: awsConnectError.error };
 
-    // 4. Check AWS account limit based on subscription plan
-    const activeSubscription = await db.query.subscription.findFirst({
-      where: and(
-        eq(subscription.referenceId, validatedData.organizationId),
-        or(
-          eq(subscription.status, "active"),
-          eq(subscription.status, "trialing")
-        )
-      ),
-    });
-
+    // 4. Check AWS account limit based on subscription plan.
+    // `getOrganizationPlan` is the single source of truth: it honours a
+    // self-host licence, requires an active/trialing subscription on a real
+    // paid plan, and defaults to "free". The hand-rolled query this replaced
+    // defaulted to legacy "starter", which post-restructure carries
+    // maxAwsAccounts: 3 — so an org with no subscription was handed a paid
+    // tier's limit.
     const existingAccounts = await db.query.awsAccount.findMany({
       where: (table, { eq }) =>
         eq(table.organizationId, validatedData.organizationId),
     });
 
-    const planId = activeSubscription?.plan || "starter";
+    const planId = await getOrganizationPlan(validatedData.organizationId);
     if (
       !(isSelfHosted() || canAddAwsAccount(planId, existingAccounts.length))
     ) {

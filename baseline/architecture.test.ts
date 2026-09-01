@@ -1912,3 +1912,362 @@ describe("agent briefing files stay true", () => {
     ).toEqual([]);
   });
 });
+
+// ─────────────────────────────────────────────────────────
+// Plan resolution must go through getOrganizationPlan
+// ─────────────────────────────────────────────────────────
+
+describe("no hand-rolled subscription plan resolution", () => {
+  // Three call sites each ran their own subscription query and defaulted the
+  // result to the literal "starter". After the three-tier restructure, legacy
+  // Starter carries maxAwsAccounts: 3, so an org with no subscription was
+  // handed a paid tier's AWS account limit. `getOrganizationPlan` is the one
+  // helper that honours a self-host licence, requires an active/trialing
+  // subscription on a real paid plan, and defaults to "free".
+  // Only *paid* fallbacks are flagged. `?.plan || "free"` is fail-closed and
+  // appears legitimately in the billing UI and in getOrganizationPlanId.
+  test("plan must not be defaulted to a paid plan name", () => {
+    const files = findFiles("apps/web/src/**/*.ts")
+      .concat(findFiles("apps/web/src/**/*.tsx"))
+      .filter((f) => !(f.includes("__tests__") || f.includes(".test.")))
+      // The plan config and the resolver itself legitimately name plans.
+      .filter(
+        (f) =>
+          !(
+            f.endsWith("src/lib/plans.ts") || f.includes("src/lib/plan-limits/")
+          )
+      );
+
+    // e.g. `subscription?.plan || "starter"` / `sub?.plan ?? "growth"`
+    const defaultRegex =
+      /\?\.plan\s*(?:\|\||\?\?)\s*["'](pro|business|starter|growth|scale)["']/g;
+
+    const violations: string[] = [];
+    for (const file of files) {
+      const content = readFile(file);
+      defaultRegex.lastIndex = 0;
+      for (const match of content.matchAll(defaultRegex)) {
+        violations.push(
+          `${file} defaults a subscription plan to "${match[1]}" (use getOrganizationPlan from @/lib/plan-limits instead)`
+        );
+      }
+    }
+
+    expect(violations, violations.join("\n")).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// Plan id and licence tier parity across packages
+// ─────────────────────────────────────────────────────────
+
+/** Pull the string literals out of a `const X = [...] as const` declaration. */
+function readLiteralList(file: string, declaration: string): string[] {
+  const content = readFile(file);
+  const start = content.indexOf(declaration);
+  if (start === -1) {
+    throw new Error(`${file} no longer declares ${declaration}`);
+  }
+  const end = content.indexOf("]", start);
+  const body = content.slice(start, end);
+  return [...body.matchAll(/"([a-z]+)"/g)].map((m) => m[1]).sort();
+}
+
+describe("plan ladder parity across packages", () => {
+  // The three-tier restructure renamed the ladder and left four independent
+  // hardcoded copies of it behind. Each one failed *silently* — an unknown
+  // plan name falls through to the Free entry rather than throwing — so a
+  // paying customer was served Free limits and nothing failed to typecheck.
+  // These are the guards that make the next rename loud.
+
+  test("apps/api PLAN_IDS matches the PLANS keys in apps/web", () => {
+    const apiPlans = readLiteralList(
+      "apps/api/src/lib/plan-ids.ts",
+      "export const PLAN_IDS = ["
+    );
+
+    // apps/web's PLANS is an object literal, so read its top-level keys.
+    const webSource = readFile("apps/web/src/lib/plans.ts");
+    const plansStart = webSource.indexOf("export const PLANS");
+    const webPlans = [
+      ...webSource
+        .slice(plansStart)
+        .matchAll(/^ {2}(free|pro|business|starter|growth|scale): \{/gm),
+    ]
+      .map((m) => m[1])
+      .sort();
+
+    expect(webPlans.length).toBeGreaterThan(0);
+    expect(apiPlans).toEqual(webPlans);
+  });
+
+  test("every licence tier whitelist lists the same tiers", () => {
+    const sources: [string, string][] = [
+      ["apps/api/src/(ee)/lib/license.ts", "const VALID_TIERS = ["],
+      [
+        "apps/web/src/lib/plan-limits/index.ts",
+        "const LICENSE_VALID_TIERS = [",
+      ],
+      ["packages/cli/src/utils/license.ts", "const VALID_TIERS = ["],
+      [
+        "packages/cli/src/commands/license/generate.ts",
+        "const VALID_TIERS = [",
+      ],
+    ];
+
+    const [firstFile, firstDecl] = sources[0];
+    const expected = readLiteralList(firstFile, firstDecl);
+    expect(expected.length).toBeGreaterThan(0);
+
+    const violations: string[] = [];
+    for (const [file, declaration] of sources.slice(1)) {
+      const actual = readLiteralList(file, declaration);
+      if (actual.join(",") !== expected.join(",")) {
+        violations.push(
+          `${file} lists [${actual.join(", ")}] but ${firstFile} lists [${expected.join(", ")}]`
+        );
+      }
+    }
+
+    expect(violations, violations.join("\n")).toEqual([]);
+  });
+
+  test("licence tiers are exactly the paid plans", () => {
+    const tiers = readLiteralList(
+      "apps/api/src/(ee)/lib/license.ts",
+      "const VALID_TIERS = ["
+    );
+    const plans = readLiteralList(
+      "apps/api/src/lib/plan-ids.ts",
+      "export const PLAN_IDS = ["
+    );
+
+    // A licence never grants "free" — every other plan must be licensable.
+    expect(tiers).toEqual(plans.filter((p) => p !== "free"));
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// apps/api plan allowances match apps/web's PLANS
+// ─────────────────────────────────────────────────────────
+
+/** Numeric field per plan, read out of apps/web's PLANS object literal. */
+function readWebPlanField(field: string): Record<string, number> {
+  const src = readFile("apps/web/src/lib/plans.ts");
+  const start = src.indexOf("export const PLANS");
+  const body = src.slice(start, src.indexOf("\n} as const;", start));
+  const blocks = body.split(
+    /\n {2}(free|pro|business|starter|growth|scale): \{/
+  );
+
+  const out: Record<string, number> = {};
+  for (let i = 1; i < blocks.length; i += 2) {
+    const match = new RegExp(`${field}:\\s*(-?\\d+)`).exec(blocks[i + 1]);
+    if (match) {
+      out[blocks[i]] = Number(match[1]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Read a field per public tier out of apps/website's TIER_LIMITS literal.
+ *
+ * Values come back as strings because this table mixes numbers with the
+ * sentinel "unlimited" — the caller decides what each means.
+ */
+function readWebsiteTierField(field: string): Record<string, string> {
+  const src = readFile("apps/website/src/config/pricing.ts");
+  const start = src.indexOf("export const TIER_LIMITS");
+  const body = src.slice(start, src.indexOf("\n};", start));
+  const blocks = body.split(/\n {2}(free|pro|business): \{/);
+
+  const out: Record<string, string> = {};
+  for (let i = 1; i < blocks.length; i += 2) {
+    const match = new RegExp(`${field}:\\s*(-?\\d+|"[^"]*")`).exec(
+      blocks[i + 1]
+    );
+    if (match) {
+      out[blocks[i]] = match[1].replace(/"/g, "");
+    }
+  }
+  return out;
+}
+
+/** Numeric value per plan, read out of an apps/api lookup table. */
+function readApiTable(
+  file: string,
+  declaration: string,
+  valuePattern: string
+): Record<string, number> {
+  const src = readFile(file);
+  const start = src.indexOf(declaration);
+  if (start === -1) {
+    throw new Error(`${file} no longer declares ${declaration}`);
+  }
+  // Tables close either `\n};` or `\n} as const satisfies …`, so stop at the
+  // first line that begins with a closing brace rather than assuming one form.
+  const closing = src.slice(start).search(/\n\}/);
+  const body = src.slice(start, start + closing);
+  const out: Record<string, number> = {};
+  const re = new RegExp(
+    `^ {2}(free|pro|business|starter|growth|scale): ${valuePattern}`,
+    "gm"
+  );
+  for (const m of body.matchAll(re)) {
+    out[m[1]] = Number(m[2]);
+  }
+  return out;
+}
+
+describe("apps/api plan allowances match apps/web", () => {
+  // The dashboard and the API each keep their own copy of what a plan grants.
+  // They drifted: the API still had legacy Starter at 2 AWS accounts and 500
+  // req/min after the restructure raised them to 3 and 2000, so a
+  // grandfathered org saw one allowance in the dashboard and hit a lower one
+  // through the API. Grandfathering fixes which plan an org keeps — it must
+  // not mean two services disagree about that plan.
+
+  test("AWS account limits match maxAwsAccounts", () => {
+    expect(
+      readApiTable(
+        "apps/api/src/routes/connections.ts",
+        "const PLAN_AWS_ACCOUNT_LIMITS",
+        "(-?\\d+)"
+      )
+    ).toEqual(readWebPlanField("maxAwsAccounts"));
+  });
+
+  test("per-minute rate limits match rateLimits.minuteRequests", () => {
+    expect(
+      readApiTable(
+        "apps/api/src/middleware/rate-limit.ts",
+        "const PLAN_LIMITS",
+        "\\{ daily: -?\\d+, minute: (-?\\d+) \\}"
+      )
+    ).toEqual(readWebPlanField("minuteRequests"));
+  });
+
+  // EVENT_LIMITS is the meter that decides whether a Free org's custom events
+  // are accepted at all. A drift here either meters nobody or 429s a paying
+  // customer, and neither shows up as a type error.
+  test("custom event allowances match maxCustomEvents", () => {
+    expect(
+      readApiTable(
+        "apps/api/src/middleware/event-limit.ts",
+        "const EVENT_LIMITS",
+        "(-?\\d+)"
+      )
+    ).toEqual(readWebPlanField("maxCustomEvents"));
+  });
+
+  // The grace margin is duplicated the same way. A mismatch means the
+  // dashboard's "exceeded" banner and the API's 429 disagree about when an org
+  // is actually cut off.
+  test("the event grace multiplier matches across apps/api and apps/web", () => {
+    const read = (path: string) =>
+      readFile(path).match(/EVENT_GRACE_MULTIPLIER = ([\d.]+);/)?.[1];
+
+    const api = read("apps/api/src/middleware/event-limit.ts");
+    expect(api).toBeDefined();
+    expect(read("apps/web/src/lib/plans.ts")).toBe(api);
+  });
+
+  // ── Advertised (apps/website) vs enforced (apps/web) ──────────────────
+  //
+  // Every other parity test in this file binds apps/api to apps/web —
+  // enforcement to enforcement. These bind the PRICING PAGE to enforcement,
+  // which is the more damaging direction: an api/web mismatch produces a
+  // support ticket, while a website/web mismatch means the site sells
+  // something the product refuses to deliver.
+  //
+  // Nothing bound these before. Free moved from 2 workflows to 1 during the
+  // repricing; had only one side been edited, neither the compiler nor any
+  // test would have noticed.
+  const ADVERTISED_LIMITS: ReadonlyArray<{
+    site: string;
+    enforced: string;
+  }> = [
+    { site: "workflows", enforced: "maxWorkflows" },
+    { site: "customEvents", enforced: "maxCustomEvents" },
+    { site: "awsAccounts", enforced: "maxAwsAccounts" },
+    { site: "historyDays", enforced: "historyRetentionDays" },
+    { site: "aiGenerations", enforced: "aiMessages" },
+    { site: "teamMembers", enforced: "maxTeamMembers" },
+  ];
+
+  const PUBLIC_TIERS = ["free", "pro", "business"] as const;
+
+  test.each(ADVERTISED_LIMITS)(
+    "advertised $site matches enforced $enforced",
+    ({ site, enforced }) => {
+      const enforcedValues = readWebPlanField(enforced);
+      const advertised = readWebsiteTierField(site);
+
+      for (const tier of PUBLIC_TIERS) {
+        expect(
+          enforcedValues[tier],
+          `${tier}.${enforced} missing from PLANS`
+        ).toBeDefined();
+        expect(
+          advertised[tier],
+          `${tier}.${site} missing from TIER_LIMITS`
+        ).toBeDefined();
+
+        // -1 is the enforced sentinel for unlimited; the site spells it out.
+        const expected =
+          enforcedValues[tier] === -1
+            ? "unlimited"
+            : String(enforcedValues[tier]);
+
+        expect(
+          advertised[tier],
+          `${tier}: site advertises ${site}=${advertised[tier]}, dashboard enforces ${enforced}=${enforcedValues[tier]}`
+        ).toBe(expected);
+      }
+    }
+  );
+
+  // The *Display strings are what actually render on the card, so they can
+  // drift from the number sitting directly above them in the same object.
+  //
+  // historyDisplay is deliberately absent: it is prose ("1 year" for 365), so
+  // there is no mechanical relationship to assert. The rest are either a bare
+  // number or a formatted one that still contains its digits.
+  const DISPLAY_PAIRS: ReadonlyArray<{ numeric: string; display: string }> = [
+    { numeric: "workflows", display: "workflowsDisplay" },
+    { numeric: "customEvents", display: "customEventsDisplay" },
+    { numeric: "awsAccounts", display: "awsAccountsDisplay" },
+    { numeric: "teamMembers", display: "teamMembersDisplay" },
+  ];
+
+  test.each(DISPLAY_PAIRS)(
+    "$display agrees with the $numeric it describes",
+    ({ numeric, display }) => {
+      const values = readWebsiteTierField(numeric);
+      const shown = readWebsiteTierField(display);
+
+      for (const tier of PUBLIC_TIERS) {
+        if (values[tier] === "unlimited") {
+          expect(shown[tier], `${tier}.${display}`).toBe("Unlimited");
+          continue;
+        }
+        // Finite: formatting varies ("1", "5,000/mo"), but the digits survive.
+        expect(
+          shown[tier].replace(/,/g, ""),
+          `${tier}: ${display}="${shown[tier]}" does not contain ${numeric}=${values[tier]}`
+        ).toContain(values[tier]);
+      }
+    }
+  );
+
+  test("audit log retention matches historyRetentionDays", () => {
+    expect(
+      readApiTable(
+        "apps/api/src/workers/audit-log-cleanup.ts",
+        "const RETENTION_DAYS",
+        "(-?\\d+)"
+      )
+    ).toEqual(readWebPlanField("historyRetentionDays"));
+  });
+});

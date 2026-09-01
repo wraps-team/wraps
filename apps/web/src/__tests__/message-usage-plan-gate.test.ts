@@ -6,9 +6,14 @@
  * Email sends should NEVER be plan-gated — users pay AWS directly.
  * Only behavioral events (event_usage_monthly) count against plan limits.
  *
- * See: apps/web/src/lib/usage/message-usage.ts — checkMessageUsageLimit()
- * calls getMessageLimit() against message_usage_monthly counts, but
- * plans.ts states maxMessages is the "tracked events" limit.
+ * Fixed: checkMessageUsageLimit() now returns an unconditional unlimited
+ * result and reads no plan allowance at all. The plan field it used to read is
+ * named maxCustomEvents and is reachable only through getEventLimit(), so
+ * there is no longer a helper on this path that a future change could
+ * accidentally point back at send counts.
+ *
+ * These cases stay as regression guards: every one of them must report
+ * allowed=true and limit=-1 no matter how many emails the org has sent.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -45,7 +50,7 @@ const mockFindFirst = db.query.messageUsageMonthly.findFirst as ReturnType<
 
 describe("checkMessageUsageLimit — email sends must not trigger plan gate", () => {
   it("50K email sends on a free plan should NOT set allowed=false", async () => {
-    // A free plan has maxMessages=5000 (tracked events limit).
+    // A free plan has a 5,000/month custom-event allowance.
     // A customer sending 50K emails via the SDK populates message_usage_monthly
     // with messageCount=50000. The bug: this makes allowed=false because
     // 50000 >= 5000 * 1.25 (6250), so the org looks like it hit its limit.
@@ -56,12 +61,12 @@ describe("checkMessageUsageLimit — email sends must not trigger plan gate", ()
 
     // Email sends are unlimited — the customer pays AWS directly.
     // This assertion FAILS with current code because checkMessageUsageLimit
-    // uses message_usage_monthly counts against the plan's maxMessages cap.
+    // used message_usage_monthly counts against the plan's event allowance.
     expect(result.allowed).toBe(true);
   });
 
   it("50K email sends on a starter plan should NOT set allowed=false", async () => {
-    // Starter plan maxMessages=50000. Customer who has sent exactly 50K emails
+    // Legacy Starter once capped at 50K. A customer who has sent exactly 50K
     // is at 100% of the limit, which puts threshold at "critical" and would
     // approach the 125% hard-block. Sending one more email would hit the block.
     mockGetOrganizationPlanId.mockResolvedValue("starter");
@@ -70,14 +75,14 @@ describe("checkMessageUsageLimit — email sends must not trigger plan gate", ()
     const result = await checkMessageUsageLimit("org-starter-sender");
 
     // Email sends don't count against plan limits — should always be allowed.
-    // Fails today: at 100% of maxMessages (50K/50K), threshold is "critical"
+    // Used to fail: at 100% of the old cap (50K/50K), threshold was "critical"
     // and allowed=true only because it hasn't crossed 125% yet — but this is
     // the wrong check entirely. The "allowed" flag should not exist for email sends.
     expect(result.threshold).toBe("normal");
   });
 
   it("high email send count should not affect the plan-gate allowed flag", async () => {
-    // 70K sends on starter (maxMessages=50000): 140% — currently triggers hard block.
+    // 70K sends on starter (old cap 50000): 140% — used to trigger a hard block.
     mockGetOrganizationPlanId.mockResolvedValue("starter");
     mockFindFirst.mockResolvedValue({ messageCount: 70_000 });
 

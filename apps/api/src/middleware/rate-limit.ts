@@ -11,6 +11,7 @@ import { Elysia } from "elysia";
 import { isSelfHosted } from "../(ee)/lib/license";
 import { awsDefaults } from "../lib/aws-defaults";
 import { log } from "../lib/logger";
+import { isPlanId, type PlanId } from "../lib/plan-ids";
 import {
   type RateLimitWindow,
   setRateLimitExceededHeaders,
@@ -27,11 +28,13 @@ const PLAN_LIMITS = {
   free: { daily: -1, minute: 50 },
   pro: { daily: -1, minute: 2000 },
   business: { daily: -1, minute: 5000 },
-  // Legacy plans — see plans/208.
-  starter: { daily: -1, minute: 500 },
-  growth: { daily: -1, minute: 2000 },
+  // Legacy plans — see plans/208. Kept identical to plans.ts's rateLimits by
+  // a parity test: these lagged at 500 and 2000 after the restructure raised
+  // them, so a grandfathered org was throttled below its published allowance.
+  starter: { daily: -1, minute: 2000 },
+  growth: { daily: -1, minute: 5000 },
   scale: { daily: -1, minute: 5000 },
-} as const;
+} as const satisfies Record<PlanId, { daily: number; minute: number }>;
 
 // DynamoDB client (reuse across invocations)
 const dynamoClient = new DynamoDBClient(awsDefaults);
@@ -68,8 +71,11 @@ export const rateLimitMiddleware = new Elysia({ name: "rate-limit" }).derive(
     const { set } = ctx;
 
     const { organizationId, planId } = authContext;
-    const limits =
-      PLAN_LIMITS[planId as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.free;
+    // Explicit narrow: a raw index lets a prototype key (e.g. "constructor")
+    // return a Function, so `?? PLAN_LIMITS.free` never fires and
+    // `limits.minute` is undefined — every comparison against it is false and
+    // the org is never rate limited at all.
+    const limits = isPlanId(planId) ? PLAN_LIMITS[planId] : PLAN_LIMITS.free;
 
     const now = new Date();
     const minuteKey = formatMinuteKey(now);

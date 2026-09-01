@@ -217,7 +217,8 @@ export default function CLIReferencePlatformPageContent() {
                 <li>AI template editor</li>
                 <li>Topics, segments & broadcasts</li>
                 <li>Unlimited workflows</li>
-                <li>3 AWS accounts</li>
+                <li>Unlimited custom events</li>
+                <li>1 AWS account</li>
                 <li>90-day dashboard history</li>
               </ul>
             </CardContent>

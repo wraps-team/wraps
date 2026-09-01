@@ -8,11 +8,14 @@ const COMMANDS_DIR = join(import.meta.dirname, "..");
  * Commands that may legitimately name the hosted platform.
  *
  * `wraps platform connect` exists to connect an account TO app.wraps.dev, so
- * printing that URL is the whole point. Everywhere else, the dashboard a
- * customer should be sent to is whatever their account actually reports to —
- * see resolveDashboardUrl.
+ * printing that URL is the whole point. `platform disconnect` is the same
+ * case inverted: it names the plane being switched off, and resolving that
+ * through resolveDashboardUrl would tell a self-hosted customer their events
+ * stop reaching their OWN dashboard — the one this command deliberately keeps
+ * connected. Everywhere else, the dashboard a customer should be sent to is
+ * whatever their account actually reports to — see resolveDashboardUrl.
  */
-const ALLOWED = ["platform/connect.ts"];
+const ALLOWED = ["platform/connect.ts", "platform/disconnect.ts"];
 
 function sourceFiles(dir: string, prefix = ""): string[] {
   return readdirSync(dir).flatMap((entry) => {

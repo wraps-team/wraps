@@ -22,6 +22,7 @@ import {
 } from "@wraps/db";
 import { count } from "drizzle-orm";
 import {
+  getNextPlan,
   getRequiredPlan,
   hasFeature,
   PLANS,
@@ -29,8 +30,15 @@ import {
   type PlanId,
 } from "../plans";
 
-// Duplicate of apps/api/src/lib/license.ts — intentional to avoid cross-package coupling.
-// Keep in sync manually; consolidate when divergence causes an actual bug.
+// Duplicate of apps/api/src/(ee)/lib/license.ts — intentional to avoid
+// cross-package coupling. Keep in sync manually.
+//
+// This note used to point at apps/api/src/lib/license.ts, a path that no longer
+// exists, and the two copies duly diverged: the API's tier list was never
+// updated for the three-tier restructure, so a valid pro/business licence was
+// rejected there while being accepted here. `packages/cli/src/utils/license.ts`
+// and `packages/cli/src/commands/license/generate.ts` are two further copies.
+// Four in total — consolidate them.
 const PROD_PUBLIC_KEY_PEM =
   "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEATgLTGM1FH6spW9Ayl9Srb1dDHk7KlVX9NBTQQw+4vjQ=\n-----END PUBLIC KEY-----\n";
 // "starter" | "growth" | "scale" are legacy names that appear in licences
@@ -150,8 +158,23 @@ export async function getOrganizationPlan(
   return "free";
 }
 
+/**
+ * True for any plan id in `PLANS` that costs money — the three publicly
+ * purchasable paid tiers and the legacy ids still attached to grandfathered
+ * subscriptions.
+ *
+ * Derived from `PLANS` rather than hardcoded. A hardcoded list is what broke
+ * this: it still read `["starter", "growth", "scale"]` after the three-tier
+ * restructure renamed the ladder, so `getOrganizationPlan` rejected every
+ * `pro` and `business` subscription and fell through to "free" — silently
+ * serving Free limits to paying customers. Adding a tier to `PLANS` must never
+ * again require remembering to edit a second list here.
+ *
+ * `Object.hasOwn` rather than `in`: `in` walks the prototype chain, so
+ * "constructor" and "__proto__" would resolve to `Object.prototype` and pass.
+ */
 function isValidPaidPlan(plan: string): boolean {
-  return ["starter", "growth", "scale"].includes(plan);
+  return Object.hasOwn(PLANS, plan) && PLANS[plan as PlanId].price > 0;
 }
 
 /**
@@ -179,7 +202,7 @@ export async function checkContactLimit(
     message: allowed
       ? undefined
       : `You've reached your ${plan.name} plan limit of ${limit.toLocaleString()} contacts. Upgrade to add more.`,
-    requiredPlan: allowed ? undefined : getNextPlan(planId),
+    requiredPlan: allowed ? undefined : (getNextPlan(planId) ?? undefined),
   };
 }
 
@@ -208,7 +231,7 @@ export async function checkAwsAccountLimit(
     message: allowed
       ? undefined
       : `Your ${plan.name} plan includes ${limit} AWS account${limit !== 1 ? "s" : ""}. Upgrade for more.`,
-    requiredPlan: allowed ? undefined : getNextPlan(planId),
+    requiredPlan: allowed ? undefined : (getNextPlan(planId) ?? undefined),
   };
 }
 
@@ -237,7 +260,7 @@ export async function checkWorkflowLimit(
     message: allowed
       ? undefined
       : `Your ${plan.name} plan includes ${limit} workflow${limit !== 1 ? "s" : ""}. Upgrade for more.`,
-    requiredPlan: allowed ? undefined : getNextPlan(planId),
+    requiredPlan: allowed ? undefined : (getNextPlan(planId) ?? undefined),
   };
 }
 
@@ -301,22 +324,8 @@ export async function checkTeamMemberLimit(
     message: allowed
       ? undefined
       : `Your ${plan.name} plan includes ${limit} team member${limit !== 1 ? "s" : ""}. Upgrade to Starter for unlimited team members.`,
-    requiredPlan: allowed ? undefined : getNextPlan(planId),
+    requiredPlan: allowed ? undefined : (getNextPlan(planId) ?? undefined),
   };
-}
-
-/**
- * Get the next plan tier for upgrade suggestions
- */
-function getNextPlan(currentPlan: PlanId): PlanId | undefined {
-  const planOrder: PlanId[] = ["free", "starter", "growth", "scale"];
-  const currentIndex = planOrder.indexOf(currentPlan);
-
-  if (currentIndex === -1 || currentIndex >= planOrder.length - 1) {
-    return;
-  }
-
-  return planOrder[currentIndex + 1];
 }
 
 /**

@@ -46,6 +46,7 @@ import {
   getCtaLink,
   getDisplayPrice,
   PRICING_TIERS,
+  PUBLIC_TIER_IDS,
   TIER_LIMITS,
 } from "@/config/pricing";
 import type { RetentionPeriod } from "@/lib/ses-cost";
@@ -61,7 +62,6 @@ import {
 } from "@/lib/ses-cost";
 import { cn } from "@/lib/utils";
 
-const TIER_IDS = ["free", "pro", "business"] as const;
 const BILLING_INTERVALS = ["monthly", "annual"] as const;
 
 const VOLUME_PRESETS = [
@@ -100,7 +100,7 @@ function getStepSize(value: number): number {
 const calculatorParsers = {
   emails: parseAsInteger.withDefault(25_000),
   events: parseAsInteger.withDefault(5000),
-  tier: parseAsStringLiteral(TIER_IDS).withDefault("free"),
+  tier: parseAsStringLiteral(PUBLIC_TIER_IDS).withDefault("free"),
   billing: parseAsStringLiteral(BILLING_INTERVALS).withDefault("monthly"),
   sesPlan: parseAsStringLiteral(SES_PLAN_IDS).withDefault("alacarte"),
   tracking: parseAsBoolean.withDefault(true),

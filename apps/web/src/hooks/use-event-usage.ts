@@ -12,13 +12,10 @@ type EventUsageResponse = {
 };
 
 /**
- * Hook to fetch and track event usage for an organization
+ * Hook to fetch and track custom-event usage for an organization.
  *
- * Tracked event limits (2026 pricing model):
- * - Starter: 50,000 tracked events/month
- * - Growth: 250,000 tracked events/month
- * - Scale: 1,000,000 tracked events/month
- * - Enterprise: Unlimited
+ * Free includes 5,000 custom events/month; every paid plan is unlimited and
+ * reports `limit: -1`. This never reflects email sends, which are unmetered.
  */
 export function useEventUsage(orgSlug: string) {
   return useQuery<EventUsageResponse>({

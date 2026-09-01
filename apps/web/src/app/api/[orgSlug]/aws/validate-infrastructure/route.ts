@@ -2,8 +2,7 @@ import { randomBytes } from "node:crypto";
 import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
 import { awsAccount } from "@wraps/db/schema/app";
-import { subscription } from "@wraps/db/schema/auth";
-import { and, eq, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireRoutePermission } from "@/app/api/shared/route-permission";
 import {
@@ -17,7 +16,7 @@ import {
 } from "@/lib/aws/detect-features";
 import { createRequestLogger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
-import { isSelfHosted } from "@/lib/plan-limits";
+import { getOrganizationPlan, isSelfHosted } from "@/lib/plan-limits";
 import { canAddAwsAccount, getAwsAccountLimitMessage } from "@/lib/plans";
 
 type RouteContext = {
@@ -196,23 +195,18 @@ export async function POST(request: Request, context: RouteContext) {
           })
           .where(eq(awsAccount.id, existingAccount.id));
       } else {
-        // Check account limit for new accounts
-        const activeSubscription = await db.query.subscription.findFirst({
-          where: and(
-            eq(subscription.referenceId, orgWithMembership.id),
-            or(
-              eq(subscription.status, "active"),
-              eq(subscription.status, "trialing")
-            )
-          ),
-        });
-
+        // Check account limit for new accounts.
+        // `getOrganizationPlan` honours a self-host licence, requires an
+        // active/trialing subscription on a real paid plan, and defaults to
+        // "free". The hand-rolled query this replaced defaulted to legacy
+        // "starter" (maxAwsAccounts: 3), handing unsubscribed orgs a paid
+        // tier's limit.
         const existingAccountCount = await db.query.awsAccount.findMany({
           where: (table, { eq }) =>
             eq(table.organizationId, orgWithMembership.id),
         });
 
-        const planId = activeSubscription?.plan || "starter";
+        const planId = await getOrganizationPlan(orgWithMembership.id);
         if (
           !(
             isSelfHosted() ||

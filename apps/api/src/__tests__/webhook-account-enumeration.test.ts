@@ -12,6 +12,10 @@ const { mockSelectWhere } = vi.hoisted(() => ({
   mockSelectWhere: vi.fn(),
 }));
 
+vi.mock("../lib/subscription-gate", () => ({
+  hasActiveSubscription: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock("@wraps/db", () => ({
   db: {
     select: vi.fn(() => ({

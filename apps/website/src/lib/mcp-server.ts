@@ -9,6 +9,7 @@
  * what the stdio server `@wraps.dev/mcp` is for.
  */
 
+import { PUBLIC_TIER_IDS } from "@/config/pricing";
 import { AGENT_CONTENT } from "@/lib/agent-content";
 import { AGENT_CONTENT_PATHS } from "@/lib/agent-content-paths";
 import { buildShareUrl, renderEstimateMarkdown } from "@/lib/pricing-markdown";
@@ -94,7 +95,6 @@ const SITE = "https://wraps.dev";
 // Tools
 // ---------------------------------------------------------------------------
 
-const TIER_IDS = ["free", "pro", "business"] as const;
 const BILLING_INTERVALS = ["monthly", "annual"] as const;
 const MAX_VOLUME = 1_000_000_000;
 const DEFAULT_SEARCH_LIMIT = 5;
@@ -181,7 +181,7 @@ export const TOOLS = [
         },
         tier: {
           type: "string",
-          enum: [...TIER_IDS],
+          enum: [...PUBLIC_TIER_IDS],
           description: "Wraps plan.",
         },
         billing: {
@@ -452,7 +452,8 @@ function runEstimateCost(args: Record<string, unknown>): ToolResult {
     eventsPerMonth:
       optionalInteger(args, "events", { min: 0, max: MAX_VOLUME }) ??
       DEFAULT_COST_INPUT.eventsPerMonth,
-    tier: optionalEnum(args, "tier", TIER_IDS) ?? DEFAULT_COST_INPUT.tier,
+    tier:
+      optionalEnum(args, "tier", PUBLIC_TIER_IDS) ?? DEFAULT_COST_INPUT.tier,
     billing:
       optionalEnum(args, "billing", BILLING_INTERVALS) ??
       DEFAULT_COST_INPUT.billing,

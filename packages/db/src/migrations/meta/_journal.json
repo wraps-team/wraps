@@ -547,6 +547,13 @@
       "when": 1786719234033,
       "tag": "0077_colossal_squirrel_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1788275165138,
+      "tag": "0078_wise_red_ghost",
+      "breakpoints": true
     }
   ]
 }

@@ -14,27 +14,37 @@ import { and, awsAccount, db, eq, sqlExpr } from "@wraps/db";
 import { count } from "drizzle-orm";
 import { t } from "elysia";
 import { log } from "../lib/logger";
+import { isPlanId, type PlanId } from "../lib/plan-ids";
 import { resolveApiUrl } from "../lib/urls";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 
 // Plan limits for AWS accounts (matches apps/web/src/lib/plans.ts)
-const PLAN_AWS_ACCOUNT_LIMITS: Record<string, number> = {
+const PLAN_AWS_ACCOUNT_LIMITS: Record<PlanId, number> = {
   free: 1,
-  pro: 3,
+  pro: 1, // A second AWS account means Business
   business: -1, // unlimited
-  // Legacy plans — see plans/208. Mapped to their new-tier equivalent.
-  // starter's 2 disagrees with plans.ts's maxAwsAccounts: 1 — pre-existing,
-  // a live customer may be relying on it. Do not "fix".
-  starter: 2,
-  growth: 5,
+  // Legacy plans — see plans/208. Mapped to their new-tier equivalent, and
+  // kept identical to plans.ts's maxAwsAccounts by a parity test.
+  //
+  // These were 2 and 5, set when plans.ts gave starter 1 account — the API was
+  // then the *more generous* side and the mismatch was left alone on purpose.
+  // The restructure raised starter to 3 and growth to unlimited, which flipped
+  // it: the dashboard offered a grandfathered org more accounts than the API
+  // would let it connect. Grandfathering decides which plan an org keeps, not
+  // whether two services agree on what that plan grants.
+  starter: 3,
+  growth: -1, // unlimited
   scale: -1, // unlimited
 };
 
 function getMaxAwsAccounts(planId: string | null): number {
-  if (!planId) {
+  // Explicit narrow, not an index-and-hope: an unrecognised plan name falling
+  // through to the Free entry is how the restructure served paid customers
+  // Free limits. `isPlanId` makes that fallback a decision the reader can see.
+  if (!isPlanId(planId)) {
     return PLAN_AWS_ACCOUNT_LIMITS.free;
   }
-  return PLAN_AWS_ACCOUNT_LIMITS[planId] ?? PLAN_AWS_ACCOUNT_LIMITS.free;
+  return PLAN_AWS_ACCOUNT_LIMITS[planId];
 }
 
 function generateExternalId(): string {

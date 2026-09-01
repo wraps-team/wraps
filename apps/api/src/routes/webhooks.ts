@@ -21,8 +21,10 @@ import {
 } from "@wraps/db";
 import { and, inArray, isNull, lt, ne, notInArray, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
+import { isSelfHosted } from "../(ee)/lib/license";
 import { trackFirstEmailDelivered } from "../lib/activation-tracking";
 import { log } from "../lib/logger";
+import { hasActiveSubscription } from "../lib/subscription-gate";
 import {
   deleteScheduledStep,
   enqueueWorkflowStep,
@@ -236,7 +238,29 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
       return { error: "Unauthorized" };
     }
 
-    // 3. Parse the EventBridge event
+    // 3. Gate ingestion on a live subscription.
+    //
+    // We are not in the customer's send path — they send through their own SES
+    // with their own credentials, and these events only arrive because their
+    // EventBridge rule forwards them here. So this cannot and does not stop
+    // anyone's mail. What it stops is a lapsed org continuing to consume
+    // platform storage and analytics: every ingested event materializes or
+    // updates a message_send row.
+    //
+    // Deliberately a 200. EventBridge API Destinations retry 4xx/5xx with
+    // backoff and then DLQ, and a canceled subscription is a permanent
+    // condition — retrying it forever would just manufacture noise.
+    if (
+      !(isSelfHosted() || (await hasActiveSubscription(account.organizationId)))
+    ) {
+      log.warn("Webhook: dropped event, no active subscription", {
+        organizationId: account.organizationId,
+        awsAccountNumber,
+      });
+      return { status: "ignored", reason: "no active subscription" };
+    }
+
+    // 4. Parse the EventBridge event
     const event = body as EventBridgeEvent;
     const { eventType, mail } = event.detail;
 
@@ -283,7 +307,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
 
     log.info("Webhook: processing event", { eventType, messageId });
 
-    // 4. Find the messageSend record, scoped to the authenticated AWS account's org
+    // 5. Find the messageSend record, scoped to the authenticated AWS account's org
     const [message] = await db
       .select({
         id: messageSend.id,
@@ -358,7 +382,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
       return { status: "ignored", reason: "message not found" };
     }
 
-    // 5. Process based on event type
+    // 6. Process based on event type
     try {
       switch (eventType) {
         case "Delivery": {

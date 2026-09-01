@@ -11,7 +11,16 @@
 // TYPES
 // =============================================================================
 
-export type TierId = "free" | "pro" | "business";
+/**
+ * The purchasable tiers, in ladder order. The single runtime source — the
+ * calculator, the public estimate endpoint, the MCP server and the WebMCP tool
+ * schema each used to keep their own copy, and the WebMCP one was still
+ * advertising the pre-2026-08 ladder to agents long after those tiers stopped
+ * being sold.
+ */
+export const PUBLIC_TIER_IDS = ["free", "pro", "business"] as const;
+
+export type TierId = (typeof PUBLIC_TIER_IDS)[number];
 
 /**
  * Tier names from the pre-2026-08 ladder. They are never displayed and never
@@ -31,7 +40,7 @@ export function resolveTierId(id: string): TierId | null {
   if (Object.hasOwn(LEGACY_TIER_ALIASES, id)) {
     return LEGACY_TIER_ALIASES[id as LegacyTierId];
   }
-  return (["free", "pro", "business"] as const).find((t) => t === id) ?? null;
+  return PUBLIC_TIER_IDS.find((t) => t === id) ?? null;
 }
 
 export type BillingInterval = "monthly" | "annual";
@@ -57,6 +66,8 @@ export type TierLimits = {
   workflows: number | "unlimited";
   workflowsDisplay: string;
   aiGenerations: number;
+  customEvents: number | "unlimited";
+  customEventsDisplay: string;
   awsAccounts: number | "unlimited";
   awsAccountsDisplay: string;
   historyDays: number;
@@ -101,6 +112,8 @@ export const TIER_LIMITS: Record<TierId, TierLimits> = {
     workflows: 2,
     workflowsDisplay: "2",
     aiGenerations: 10,
+    customEvents: 5000,
+    customEventsDisplay: "5,000/mo",
     awsAccounts: 1,
     awsAccountsDisplay: "1",
     historyDays: 30,
@@ -116,8 +129,10 @@ export const TIER_LIMITS: Record<TierId, TierLimits> = {
     workflows: "unlimited",
     workflowsDisplay: "Unlimited",
     aiGenerations: 250,
-    awsAccounts: 3,
-    awsAccountsDisplay: "3",
+    customEvents: "unlimited",
+    customEventsDisplay: "Unlimited",
+    awsAccounts: 1,
+    awsAccountsDisplay: "1",
     historyDays: 90,
     historyDisplay: "90 days",
     teamMembers: "unlimited",
@@ -131,6 +146,8 @@ export const TIER_LIMITS: Record<TierId, TierLimits> = {
     workflows: "unlimited",
     workflowsDisplay: "Unlimited",
     aiGenerations: 1000,
+    customEvents: "unlimited",
+    customEventsDisplay: "Unlimited",
     awsAccounts: "unlimited",
     awsAccountsDisplay: "Unlimited",
     historyDays: 365,
@@ -160,6 +177,7 @@ export const PRICING_TIERS: PricingTier[] = [
     features: [
       "Unlimited sends, domains & contacts",
       "Unlimited team members",
+      "5,000 custom events/mo",
       "1 AWS account",
       "2 workflows",
       "30-day history",
@@ -177,10 +195,13 @@ export const PRICING_TIERS: PricingTier[] = [
     ctaLink: "https://app.wraps.dev/auth?mode=signup&plan=pro",
     limits: TIER_LIMITS.pro,
     features: [
-      "Unlimited sends, domains & contacts",
+      // "1 AWS account" is deliberately absent: Pro gets the same single
+      // account Free does, so listing it read as a Pro benefit when it is not
+      // one. A second account is what Business sells.
+      "Everything in Free",
       "Unlimited workflows",
+      "Unlimited custom events",
       "Topics, segments, batch & campaigns",
-      "3 AWS accounts",
       "250 AI generations/mo",
       "90-day history",
     ],
@@ -459,7 +480,7 @@ export const FEATURE_COMPARISON: FeatureComparison[] = [
   },
   {
     name: "Workflows",
-    free: "2",
+    free: "1",
     pro: "Unlimited",
     business: "Unlimited",
   },
@@ -472,7 +493,7 @@ export const FEATURE_COMPARISON: FeatureComparison[] = [
   {
     name: "AWS accounts",
     free: "1",
-    pro: "3",
+    pro: "1",
     business: "Unlimited",
   },
   {
@@ -512,10 +533,10 @@ export const FEATURE_COMPARISON: FeatureComparison[] = [
     business: true,
   },
   {
-    name: "Event tracking",
-    free: false,
-    pro: true,
-    business: true,
+    name: "Custom events",
+    free: "5,000/mo",
+    pro: "Unlimited",
+    business: "Unlimited",
   },
   {
     name: "Behavioral segments",

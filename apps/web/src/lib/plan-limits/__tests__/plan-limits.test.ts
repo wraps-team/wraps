@@ -134,6 +134,43 @@ describe("Plan Limits", () => {
       expect(plan).toBe("growth");
     });
 
+    // Regression: `isValidPaidPlan` hardcoded ["starter","growth","scale"] and
+    // was not updated when the ladder was renamed, so every `pro` and
+    // `business` subscription failed the check and fell through to "free" —
+    // serving Free limits to paying customers across all 33 call sites of
+    // getOrganizationPlan. Every test above used a legacy plan name, which is
+    // why nothing caught it. These pin the *current* purchasable plans.
+    it.each(PUBLIC_PLAN_IDS.filter((id) => PLANS[id].price > 0))(
+      "should return %s for an active subscription on that plan",
+      async (planId) => {
+        await db.insert(subscription).values({
+          id: `sub_test_${planId}_${Date.now()}`,
+          plan: planId,
+          referenceId: testOrgId,
+          status: "active",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        const plan = await getOrganizationPlan(testOrgId);
+        expect(plan).toBe(planId);
+      }
+    );
+
+    it("should not resolve a prototype-chain key as a paid plan", async () => {
+      await db.insert(subscription).values({
+        id: `sub_test_proto_${Date.now()}`,
+        plan: "constructor",
+        referenceId: testOrgId,
+        status: "active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const plan = await getOrganizationPlan(testOrgId);
+      expect(plan).toBe("free");
+    });
+
     it("should return plan from trialing subscription", async () => {
       await db.insert(subscription).values({
         id: `sub_test_${Date.now()}`,
@@ -320,7 +357,8 @@ describe("Plan Limits", () => {
 
       expect(result.allowed).toBe(true);
       expect(result.current).toBe(0);
-      // Legacy Starter now carries Pro's limits (plans/208) — 3 AWS accounts
+      // Legacy Starter keeps the 3 AWS accounts it was sold, even though Pro
+      // has since dropped to 1 — grandfathered entitlements do not shrink.
       expect(result.limit).toBe(3);
     });
 
@@ -337,6 +375,70 @@ describe("Plan Limits", () => {
       try {
         const result = await checkAwsAccountLimit(testOrgId);
         expect(result.current).toBe(1);
+      } finally {
+        await db
+          .delete(awsAccount)
+          .where(eq(awsAccount.organizationId, testOrgId));
+      }
+    });
+
+    // Regression: the limit checks used a local getNextPlan whose plan order
+    // was still ["free","starter","growth","scale"], so a Free org at its
+    // limit was told to upgrade to "starter" — a plan that is no longer
+    // purchasable — and a Pro org got `undefined` (indexOf → -1), so no
+    // Business upsell ever rendered. The feature checks were fine because they
+    // use getRequiredPlan; only the *limit* checks were wrong, and nothing
+    // asserted their requiredPlan.
+    it("should point a Free org at its limit to the next purchasable plan", async () => {
+      await db.insert(awsAccount).values({
+        organizationId: testOrgId,
+        name: "limit-test-account",
+        accountId: "123456789013",
+        region: "us-east-1",
+        roleArn: "arn:aws:iam::123456789013:role/test",
+        externalId: `limit-test-ext-${Date.now()}`,
+      });
+
+      try {
+        const result = await checkAwsAccountLimit(testOrgId);
+
+        expect(result.allowed).toBe(false);
+        expect(result.limit).toBe(1);
+        expect(result.requiredPlan).toBe("pro");
+      } finally {
+        await db
+          .delete(awsAccount)
+          .where(eq(awsAccount.organizationId, testOrgId));
+      }
+    });
+
+    it("should offer Business as the upgrade from a Pro org at its limit", async () => {
+      await db.insert(subscription).values({
+        id: `sub_test_awslimit_${Date.now()}`,
+        plan: "pro",
+        referenceId: testOrgId,
+        status: "active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      // Pro allows 1 AWS account — a second one means Business.
+      await db.insert(awsAccount).values(
+        [0].map((i) => ({
+          organizationId: testOrgId,
+          name: `pro-limit-account-${i}`,
+          accountId: `12345678900${i}`,
+          region: "us-east-1",
+          roleArn: `arn:aws:iam::12345678900${i}:role/test`,
+          externalId: `pro-limit-ext-${i}-${Date.now()}`,
+        }))
+      );
+
+      try {
+        const result = await checkAwsAccountLimit(testOrgId);
+
+        expect(result.allowed).toBe(false);
+        expect(result.limit).toBe(1);
+        expect(result.requiredPlan).toBe("business");
       } finally {
         await db
           .delete(awsAccount)
@@ -524,16 +626,52 @@ describe("Plan configuration", () => {
     expect(PLANS.scale.features).toEqual(PLANS.business.features);
   });
 
-  it("no plan has a finite tracked-event allowance or overage pricing", () => {
-    for (const plan of Object.values(PLANS)) {
-      expect(plan.maxMessages).toBe(-1);
+  // Free is the only metered tier, and the meter is custom events — Wraps'
+  // own storage. Nothing here may ever meter sends: those run through the
+  // customer's SES account and Wraps takes no cut, so a finite allowance on a
+  // paid plan would contradict the pass-through promise.
+  it("only Free has a finite custom-event allowance, and no plan has overage", () => {
+    expect(PLANS.free.maxCustomEvents).toBe(5000);
+    for (const [id, plan] of Object.entries(PLANS)) {
+      if (id !== "free") {
+        expect(plan.maxCustomEvents).toBe(-1);
+      }
       expect(plan.overagePriceCentsPerK).toBeNull();
     }
   });
 
-  it("events are gated off Free and on for Pro", () => {
-    expect(PLANS.free.features.events).toBe(false);
-    expect(PLANS.pro.features.events).toBe(true);
+  // Events are metered on Free, not gated off it: a hard feature gate makes the
+  // upgrade decision binary on day one, while an allowance lets an org grow into
+  // the bill. The one observed organic Free→paid conversion came from hitting
+  // this cap.
+  it("every plan can emit custom events", () => {
+    for (const plan of Object.values(PLANS)) {
+      expect(plan.features.events).toBe(true);
+    }
+    expect(getRequiredPlan("events")).toBe("free");
+  });
+
+  // Free gets two workflows on purpose. One is not enough to feel what the
+  // builder does — a welcome sequence OR a re-engagement flow, never both — and
+  // the allowance sits beside a 5,000-event month generous enough to feed
+  // workflows a one-workflow plan could not create.
+  it("Free includes two workflows and every paid plan is unlimited", () => {
+    expect(PLANS.free.maxWorkflows).toBe(2);
+    for (const [id, plan] of Object.entries(PLANS)) {
+      if (id !== "free") {
+        expect(plan.maxWorkflows).toBe(-1);
+      }
+    }
+  });
+
+  // A second AWS account means Business. Pro dropped from 3 to 1 — but the
+  // grandfathered Starter subscribers who bought 3 keep them, because
+  // PRICING_COPY.foundingMemberPerks promises locked-in pricing for life.
+  it("more than one AWS account requires Business, except on grandfathered Starter", () => {
+    expect(PLANS.free.maxAwsAccounts).toBe(1);
+    expect(PLANS.pro.maxAwsAccounts).toBe(1);
+    expect(PLANS.business.maxAwsAccounts).toBe(-1);
+    expect(PLANS.starter.maxAwsAccounts).toBe(3);
   });
 
   // plans/227: dailyRequests was a send-volume meter in disguise. Wraps does

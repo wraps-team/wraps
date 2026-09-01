@@ -420,7 +420,7 @@ const EXPECTED_REJECTIONS = [
   'unknownCommand("sms command", subCommand, "Run wraps --help for available commands.")',
   'unknownCommand("cdn command", subCommand, "Run wraps --help for available commands.")',
   'unknownCommand("workflow command", subCommand, "Available commands: init\\n\\nRun wraps --help for more information.")',
-  'unknownCommand("platform command", subCommand, "Available commands: connect, update-role\\n\\nRun wraps platform for more information.")',
+  'unknownCommand("platform command", subCommand, "Available commands: connect, disconnect, update-role\\n\\nRun wraps platform for more information.")',
   'unknownCommand("auth command", subCommand, "Available commands: login, status, logout")',
   'unknownCommand("aws command", subCommand, "Available commands: setup, doctor\\n\\nRun wraps --help for more information.")',
   'unknownCommand("telemetry command", subCommand, "Available commands: enable, disable, status")',

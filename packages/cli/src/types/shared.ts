@@ -105,3 +105,13 @@ export type PlatformConnectOptions = {
   json?: boolean; // Output as JSON (suppress interactive output)
   selfhosted?: boolean; // Target the self-hosted instance instead of the Wraps Platform
 };
+
+/**
+ * Command options for platform disconnect
+ */
+export type PlatformDisconnectOptions = {
+  region?: string;
+  force?: boolean; // Skip the confirmation prompt
+  yes?: boolean; // Auto-confirm (same effect as force here; parity with connect)
+  json?: boolean; // Output as JSON (suppress interactive output)
+};

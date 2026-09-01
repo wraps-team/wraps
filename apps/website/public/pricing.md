@@ -11,13 +11,13 @@ You get two bills:
 
 ## Wraps plans
 
-| Plan | Monthly | Annual | AWS accounts | History | Support |
-| --- | --- | --- | --- | --- | --- |
-| **Free** | $0/mo | — | 1 | 30 days | Community |
-| **Pro** | $29/mo | $299/yr | 3 | 90 days | Email |
-| **Business** | $199/mo | $1,999/yr | Unlimited | 1 year | Priority |
+| Plan | Monthly | Annual | Custom events | AWS accounts | History | Support |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Free** | $0/mo | — | 5,000/mo | 1 | 30 days | Community |
+| **Pro** | $29/mo | $299/yr | Unlimited | 1 | 90 days | Email |
+| **Business** | $199/mo | $1,999/yr | Unlimited | Unlimited | 1 year | Priority |
 
-The Wraps fee is a flat monthly charge per plan — it never varies with volume. Sends, domains, contacts, and templates are unlimited on every plan. The AWS-side event-pipeline line items (EventBridge, SQS, Lambda, DynamoDB) in the estimator below are derived from emails sent and event types per email. The `events` parameter is accepted for backward compatibility and does not currently affect the estimate. Emails sent, broadcasts, and the delivery events SES reports back (deliveries, opens, clicks, bounces, complaints) are recorded and displayed at no charge. Annual billing is billed once per year and saves 14–16%.
+The Wraps fee is a flat monthly charge per plan — it never varies with sending volume. Sends, domains, contacts, and templates are unlimited on every plan. The one metered resource is custom events (`POST /v1/events`), which are Wraps' own storage rather than AWS's: Free includes 5,000 per month and every paid plan is unlimited. Exceeding the Free allowance returns 429 after a 25% grace margin; it never affects sending. The AWS-side event-pipeline line items (EventBridge, SQS, Lambda, DynamoDB) in the estimator below are derived from emails sent and event types per email. The `events` parameter is accepted for backward compatibility and does not currently affect the estimate. Emails sent, broadcasts, and the delivery events SES reports back (deliveries, opens, clicks, bounces, complaints) are recorded and displayed at no charge. Annual billing is billed once per year and saves 14–16%.
 
 ## AWS SES pricing plans (paid to AWS, not to Wraps)
 
@@ -100,16 +100,16 @@ These appear on your AWS bill, not your Wraps bill. You keep AWS volume discount
 | Contacts | Unlimited | Unlimited | Unlimited |
 | Domains | Unlimited | Unlimited | Unlimited |
 | Templates | Unlimited | Unlimited | Unlimited |
-| Workflows | 2 | Unlimited | Unlimited |
+| Workflows | 1 | Unlimited | Unlimited |
 | AI generations | 10/mo | 250/mo | 1,000/mo |
-| AWS accounts | 1 | 3 | Unlimited |
+| AWS accounts | 1 | 1 | Unlimited |
 | Team members | Unlimited | Unlimited | Unlimited |
 | Batch sending | — | Yes | Yes |
 | Topics & preferences | — | Yes | Yes |
 | Segments & targeting | — | Yes | Yes |
 | Campaigns | — | Yes | Yes |
 | Cross-channel cascades | — | Yes | Yes |
-| Event tracking | — | Yes | Yes |
+| Custom events | 5,000/mo | Unlimited | Unlimited |
 | Behavioral segments | — | — | Yes |
 | SSO + SCIM | — | — | Yes |
 | Support | Community | Email | Priority |

@@ -3,7 +3,11 @@ import { eventUsageMonthly } from "@wraps/db/schema/usage";
 import { and, eq, sql } from "drizzle-orm";
 import { getOrganizationPlanId } from "@/lib/organization";
 import { isSelfHosted } from "@/lib/plan-limits";
-import { getEventLimit, getEventUsageThreshold } from "@/lib/plans";
+import {
+  EVENT_GRACE_MULTIPLIER,
+  getEventLimit,
+  getEventUsageThreshold,
+} from "@/lib/plans";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PERIOD KEY HELPERS
@@ -67,8 +71,12 @@ export async function checkEventUsageLimit(organizationId: string): Promise<{
   const threshold =
     limit === -1 ? "normal" : getEventUsageThreshold(planId, currentUsage);
 
-  // Allow if unlimited (-1) or below 125% (25% grace period)
-  const allowed = limit === -1 || currentUsage < limit * 1.25;
+  // Allow if unlimited (-1) or below the grace ceiling. Reads the shared
+  // constant rather than repeating the number: the parity test in
+  // baseline/architecture.test.ts compares the two EVENT_GRACE_MULTIPLIER
+  // declarations, so a literal here would silently keep enforcing the old
+  // ceiling after the constant moved.
+  const allowed = limit === -1 || currentUsage < limit * EVENT_GRACE_MULTIPLIER;
 
   // Calculate percent used (0 if unlimited)
   const percentUsed =

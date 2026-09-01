@@ -82,6 +82,7 @@ export type {
   DestroyOptions,
   FeatureCost,
   PlatformConnectOptions,
+  PlatformDisconnectOptions,
   Provider,
   ServiceType,
   StatusOptions,

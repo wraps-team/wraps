@@ -20,6 +20,10 @@ const mockDbSelect = vi.fn();
 const mockDbUpdate = vi.fn();
 const mockDbInsert = vi.fn();
 
+vi.mock("../lib/subscription-gate", () => ({
+  hasActiveSubscription: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock("../services/workflow-queue", () => ({
   enqueueWorkflowStep: vi.fn(),
   deleteScheduledStep: vi.fn(),

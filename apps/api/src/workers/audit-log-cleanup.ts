@@ -23,8 +23,9 @@ import { auditLog, db, subscription } from "@wraps/db";
 import type { Handler } from "aws-lambda";
 import { and, eq, inArray, lt } from "drizzle-orm";
 import { flushLogger, log } from "../lib/logger";
+import { isPlanId, type PlanId } from "../lib/plan-ids";
 
-const RETENTION_DAYS: Record<string, number> = {
+const RETENTION_DAYS: Record<PlanId, number> = {
   free: 30,
   pro: 90,
   business: 365,
@@ -61,7 +62,12 @@ async function deleteOldLogsForOrg(
   organizationId: string,
   plan: string
 ): Promise<number> {
-  const retentionDays = RETENTION_DAYS[plan] ?? RETENTION_DAYS[DEFAULT_PLAN];
+  // Explicit narrow — see the note on RETENTION_DAYS. An unknown plan name
+  // deletes on the Free window, which for a paying customer would destroy
+  // audit history early, so the fallback must be deliberate and visible.
+  const retentionDays = isPlanId(plan)
+    ? RETENTION_DAYS[plan]
+    : RETENTION_DAYS[DEFAULT_PLAN];
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - retentionDays);
 

@@ -4,13 +4,10 @@
  * Receives tracked events from customer's API, triggers matching workflows,
  * and resumes waiting executions.
  *
- * Tracked event limits (2026 pricing model):
- * - Starter: 50,000 tracked events/month
- * - Growth: 250,000 tracked events/month
- * - Scale: 1,000,000 tracked events/month
- * - Enterprise: Unlimited
- *
- * Soft cap with 25% grace period (blocks at 125% of limit).
+ * Custom-event allowance: 5,000/month on Free, unlimited on every paid plan.
+ * Soft cap with a 10% grace period (blocks at 110% of the allowance).
+ * See middleware/event-limit.ts — these are Wraps' own storage and compute,
+ * not email sends, which are never metered.
  */
 
 import { createHash } from "node:crypto";

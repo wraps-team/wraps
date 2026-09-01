@@ -60,16 +60,27 @@ describe("AI Usage Functions", () => {
   });
 
   describe("getAiMessageLimit", () => {
-    it("should return 50 for starter plan", () => {
-      expect(getAiMessageLimit("starter")).toBe(50);
+    it("should return the published limit for each purchasable plan", () => {
+      // Hardcoded on purpose. getAiMessageLimit just reads PLANS, so
+      // comparing against PLANS would assert nothing — this is a tripwire that
+      // makes changing a published allowance require restating it here.
+      expect(getAiMessageLimit("free")).toBe(10);
+      expect(getAiMessageLimit("pro")).toBe(250);
+      expect(getAiMessageLimit("business")).toBe(1000);
     });
 
-    it("should return 250 for growth plan", () => {
-      expect(getAiMessageLimit("growth")).toBe(250);
-    });
-
-    it("should return 1000 for scale plan", () => {
-      expect(getAiMessageLimit("scale")).toBe(1000);
+    // The three-tier restructure gave each legacy plan its successor's
+    // allowances (starter→pro, growth→business, scale→business), the same
+    // parity rule used for maxAwsAccounts and sso. These assertions state that
+    // rule rather than repeating the numbers, so a future change to Pro's or
+    // Business's allowance cannot silently strand a grandfathered customer.
+    //
+    // This test previously asserted the pre-restructure numbers (starter 50,
+    // growth 250) and was the failing suite in `pnpm check:all`.
+    it("should give legacy plans their successor's allowance", () => {
+      expect(getAiMessageLimit("starter")).toBe(getAiMessageLimit("pro"));
+      expect(getAiMessageLimit("growth")).toBe(getAiMessageLimit("business"));
+      expect(getAiMessageLimit("scale")).toBe(getAiMessageLimit("business"));
     });
 
     it("should return default (50) for unknown plan", () => {
@@ -222,78 +233,89 @@ describe("AI Usage Functions", () => {
   });
 
   describe("checkAiUsageLimit", () => {
+    // Derived, not hardcoded: these cases exercise the allow/deny boundary,
+    // not one tier's specific allowance. Spelling the numbers out is what left
+    // this suite asserting the pre-restructure limits.
+    const PRO_LIMIT = getAiMessageLimit("pro");
+    const BUSINESS_LIMIT = getAiMessageLimit("business");
+
     it("should allow usage when under limit", async () => {
-      mockGetOrganizationPlanId.mockResolvedValueOnce("starter");
+      mockGetOrganizationPlanId.mockResolvedValueOnce("pro");
 
       const result = await checkAiUsageLimit(testOrganization.id);
       expect(result.allowed).toBe(true);
       expect(result.current).toBe(0);
-      expect(result.limit).toBe(50);
-      expect(result.planId).toBe("starter");
+      expect(result.limit).toBe(PRO_LIMIT);
+      expect(result.planId).toBe("pro");
     });
 
     it("should deny usage when at limit", async () => {
       const periodKey = getCurrentPeriodKey();
-      mockGetOrganizationPlanId.mockResolvedValueOnce("starter");
+      mockGetOrganizationPlanId.mockResolvedValueOnce("pro");
 
-      // Set usage at limit (starter = 50)
       await db.insert(aiUsageMonthly).values({
         organizationId: testOrganization.id,
         periodKey,
-        messageCount: 50,
+        messageCount: PRO_LIMIT,
       });
 
       const result = await checkAiUsageLimit(testOrganization.id);
       expect(result.allowed).toBe(false);
-      expect(result.current).toBe(50);
-      expect(result.limit).toBe(50);
+      expect(result.current).toBe(PRO_LIMIT);
+      expect(result.limit).toBe(PRO_LIMIT);
     });
 
     it("should deny usage when over limit", async () => {
       const periodKey = getCurrentPeriodKey();
-      mockGetOrganizationPlanId.mockResolvedValueOnce("starter");
+      mockGetOrganizationPlanId.mockResolvedValueOnce("pro");
 
       await db.insert(aiUsageMonthly).values({
         organizationId: testOrganization.id,
         periodKey,
-        messageCount: 55,
+        messageCount: PRO_LIMIT + 5,
       });
 
       const result = await checkAiUsageLimit(testOrganization.id);
       expect(result.allowed).toBe(false);
-      expect(result.current).toBe(55);
+      expect(result.current).toBe(PRO_LIMIT + 5);
     });
 
     it("should respect different plan limits", async () => {
       const periodKey = getCurrentPeriodKey();
-      mockGetOrganizationPlanId.mockResolvedValueOnce("growth");
+      mockGetOrganizationPlanId.mockResolvedValueOnce("business");
 
-      // 150 messages - under growth limit (250) but over starter (50)
+      // Over Pro's allowance, still inside Business's.
       await db.insert(aiUsageMonthly).values({
         organizationId: testOrganization.id,
         periodKey,
-        messageCount: 150,
+        messageCount: PRO_LIMIT + 1,
       });
 
-      const growthResult = await checkAiUsageLimit(testOrganization.id);
-      expect(growthResult.allowed).toBe(true);
-      expect(growthResult.limit).toBe(250);
+      const businessResult = await checkAiUsageLimit(testOrganization.id);
+      expect(businessResult.allowed).toBe(true);
+      expect(businessResult.limit).toBe(BUSINESS_LIMIT);
     });
 
     it("should allow high usage for scale plan", async () => {
       const periodKey = getCurrentPeriodKey();
       mockGetOrganizationPlanId.mockResolvedValueOnce("scale");
 
-      // 800 messages - under scale limit (1000)
+      // Comfortably under scale's allowance, derived rather than hardcoded:
+      // this was a literal 800 against a then-1000 limit, and silently became
+      // an over-limit value when Business (and so scale) dropped to 500.
+      const underScaleLimit = Math.floor(getAiMessageLimit("scale") * 0.8);
       await db.insert(aiUsageMonthly).values({
         organizationId: testOrganization.id,
         periodKey,
-        messageCount: 800,
+        messageCount: underScaleLimit,
       });
 
       const result = await checkAiUsageLimit(testOrganization.id);
       expect(result.allowed).toBe(true);
-      expect(result.limit).toBe(1000);
+      // scale is a legacy id mapped to Business, so it must report Business's
+      // allowance — that mapping is what this case exists to prove, not the
+      // literal number, which BUSINESS_LIMIT already pins above.
+      expect(result.limit).toBe(BUSINESS_LIMIT);
     });
   });
 
@@ -393,7 +415,7 @@ describe("AI Usage Functions", () => {
   describe("getUsageSummary", () => {
     it("should return usage summary for current period", async () => {
       const periodKey = getCurrentPeriodKey();
-      mockGetOrganizationPlanId.mockResolvedValueOnce("growth");
+      mockGetOrganizationPlanId.mockResolvedValueOnce("business");
 
       await db.insert(aiUsageMonthly).values({
         organizationId: testOrganization.id,
@@ -405,17 +427,17 @@ describe("AI Usage Functions", () => {
       expect(summary).toEqual({
         periodKey,
         messageCount: 75,
-        limit: 250,
-        planId: "growth",
+        limit: getAiMessageLimit("business"),
+        planId: "business",
       });
     });
 
     it("should return zero count when no usage", async () => {
-      mockGetOrganizationPlanId.mockResolvedValueOnce("starter");
+      mockGetOrganizationPlanId.mockResolvedValueOnce("pro");
 
       const summary = await getUsageSummary(testOrganization.id);
       expect(summary.messageCount).toBe(0);
-      expect(summary.limit).toBe(50);
+      expect(summary.limit).toBe(getAiMessageLimit("pro"));
     });
 
     it("should allow querying specific period", async () => {

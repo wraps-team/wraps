@@ -13,6 +13,7 @@ import {
   FEATURE_COMPARISON,
   PRICING_LAST_UPDATED,
   PRICING_TIERS,
+  PUBLIC_TIER_IDS,
   TIER_LIMITS,
 } from "../config/pricing";
 import type { CostEstimate, CostInput, SesPlanId } from "./ses-cost";
@@ -68,6 +69,7 @@ function plansSection(): string {
     `**${tier.name}**`,
     tier.price === 0 ? "$0/mo" : `$${tier.price}/mo`,
     tier.annualPrice ? `$${count(tier.annualPrice)}/yr` : "—",
+    TIER_LIMITS[tier.id].customEventsDisplay,
     TIER_LIMITS[tier.id].awsAccountsDisplay,
     TIER_LIMITS[tier.id].historyDisplay,
     TIER_LIMITS[tier.id].support,
@@ -75,9 +77,9 @@ function plansSection(): string {
 
   return `## Wraps plans
 
-${table(["Plan", "Monthly", "Annual", "AWS accounts", "History", "Support"], rows)}
+${table(["Plan", "Monthly", "Annual", "Custom events", "AWS accounts", "History", "Support"], rows)}
 
-The Wraps fee is a flat monthly charge per plan — it never varies with volume. Sends, domains, contacts, and templates are unlimited on every plan. The AWS-side event-pipeline line items (EventBridge, SQS, Lambda, DynamoDB) in the estimator below are derived from emails sent and event types per email. The \`events\` parameter is accepted for backward compatibility and does not currently affect the estimate. Emails sent, broadcasts, and the delivery events SES reports back (deliveries, opens, clicks, bounces, complaints) are recorded and displayed at no charge. Annual billing is billed once per year and saves 14–16%.`;
+The Wraps fee is a flat monthly charge per plan — it never varies with sending volume. Sends, domains, contacts, and templates are unlimited on every plan. The one metered resource is custom events (\`POST /v1/events\`), which are Wraps' own storage rather than AWS's: Free includes ${count(5000)} per month and every paid plan is unlimited. Exceeding the Free allowance returns 429 after a 25% grace margin; it never affects sending. The AWS-side event-pipeline line items (EventBridge, SQS, Lambda, DynamoDB) in the estimator below are derived from emails sent and event types per email. The \`events\` parameter is accepted for backward compatibility and does not currently affect the estimate. Emails sent, broadcasts, and the delivery events SES reports back (deliveries, opens, clicks, bounces, complaints) are recorded and displayed at no charge. Annual billing is billed once per year and saves 14–16%.`;
 }
 
 function sesPlansSection(): string {
@@ -254,7 +256,7 @@ These appear on your AWS bill, not your Wraps bill. You keep AWS volume discount
 }
 
 function featuresSection(): string {
-  const tierIds: TierId[] = ["free", "pro", "business"];
+  const tierIds: readonly TierId[] = PUBLIC_TIER_IDS;
   const rows = FEATURE_COMPARISON.map((feature) => [
     feature.name,
     ...tierIds.map((id) => cell(feature[id])),

@@ -71,6 +71,7 @@ import { news } from "./commands/news.js";
 import { permissions } from "./commands/permissions.js";
 // Platform commands
 import { connect as platformConnect } from "./commands/platform/connect.js";
+import { disconnect as platformDisconnect } from "./commands/platform/disconnect.js";
 import { platform as platformInfo } from "./commands/platform/index.js";
 import { updateRole } from "./commands/platform/update-role.js";
 // Self-hosted commands
@@ -311,6 +312,9 @@ function showHelp() {
   );
   console.log(
     `  ${pc.cyan("platform connect")}      Connect to Wraps Platform (events + IAM)`
+  );
+  console.log(
+    `  ${pc.cyan("platform disconnect")}   Stop streaming events to Wraps Platform`
   );
   console.log(
     `  ${pc.cyan("platform update-role")} Update platform IAM permissions\n`
@@ -1474,6 +1478,15 @@ async function run() {
           });
           break;
 
+        case "disconnect":
+          await platformDisconnect({
+            region: flags.region,
+            force: flags.force,
+            yes: flags.yes,
+            json: flags.json,
+          });
+          break;
+
         case "update-role":
           await updateRole({
             region: flags.region,
@@ -1486,7 +1499,7 @@ async function run() {
           throw errors.unknownCommand(
             "platform command",
             subCommand,
-            "Available commands: connect, update-role\n\nRun wraps platform for more information."
+            "Available commands: connect, disconnect, update-role\n\nRun wraps platform for more information."
           );
       }
       // Track platform commands (they return early, so track here)

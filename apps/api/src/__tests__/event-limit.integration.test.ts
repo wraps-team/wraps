@@ -10,9 +10,9 @@
  * 1. Run `pnpm sst:dev` in another terminal
  * 2. Run `pnpm --filter @wraps/api test:integration`
  *
- * Validates that a free-plan organization is gated out of event ingestion by
- * planGateMiddleware. Volume no longer blocks anything on any plan — see
- * event-limit.test.ts for that coverage, which has an injectable auth context.
+ * Validates the free plan's 5,000/month custom-event allowance end to end
+ * through the real Lambda. Paid-plan behaviour needs an injectable auth
+ * context, so it lives in event-limit.test.ts.
  */
 
 import { createHash } from "node:crypto";
@@ -29,6 +29,7 @@ import {
   user,
 } from "@wraps/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { EVENT_GRACE_MULTIPLIER } from "../middleware/event-limit";
 
 // -----------------------------------------------------------------------------
 // SST output loading
@@ -117,7 +118,11 @@ const testContact = {
 
 const PERIOD_KEY = `${new Date().getUTCFullYear()}-${String(new Date().getUTCMonth() + 1).padStart(2, "0")}`;
 const FREE_LIMIT = 5000;
-const FREE_GRACE = Math.floor(FREE_LIMIT * 1.25); // 6250
+// Derived from the middleware's own multiplier, not a copy of it. These were
+// hardcoded at 1.25 and silently kept asserting the old ceiling when the
+// constant moved to 1.1 — the boundary cases still passed against the wrong
+// number until the block/allow boundary itself shifted.
+const FREE_GRACE = Math.floor(FREE_LIMIT * EVENT_GRACE_MULTIPLIER);
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -143,7 +148,7 @@ async function seedUsage(count: number) {
 // -----------------------------------------------------------------------------
 
 describe.skipIf(!existsSync(resolve(process.cwd(), "../../.sst/outputs.json")))(
-  "free plan is gated out of event ingestion (real Lambda, real DB)",
+  "free plan custom-event allowance (real Lambda, real DB)",
   () => {
     let apiUrl: string;
 
@@ -213,47 +218,47 @@ describe.skipIf(!existsSync(resolve(process.cwd(), "../../.sst/outputs.json")))(
         .where(eq(eventUsageMonthly.organizationId, testOrg.id));
     });
 
-    // Volume behaviour (no cap on paid plans) is covered in event-limit.test.ts,
-    // where the auth context is injectable. This file's fixture org has no
-    // subscription row, so it can only ever exercise the free-plan gate.
+    // Paid-plan behaviour (unlimited) is covered in event-limit.test.ts, where
+    // the auth context is injectable. This file's fixture org has no
+    // subscription row, so it can only ever exercise the free allowance.
 
-    it("returns 403 with zero prior usage", async () => {
+    it("ingests with zero prior usage and reports the allowance", async () => {
       const res = await postEvent();
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Event-Limit")).toBe(String(FREE_LIMIT));
       expect(res.headers.get("X-Event-Exceeded")).toBeNull();
-      const body = await res.json();
-      expect(body.error).toMatch(/requires starter plan/i);
     });
 
-    it("returns 403 with usage under the former free limit (2500)", async () => {
+    it("ingests under the allowance (2500)", async () => {
       await seedUsage(2500);
       const res = await postEvent();
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Event-Remaining")).toBe("2500");
       expect(res.headers.get("X-Event-Exceeded")).toBeNull();
     });
 
-    it("returns 403 one below the former grace limit (6249)", async () => {
+    it("ingests one below the grace limit (6249)", async () => {
       await seedUsage(FREE_GRACE - 1);
       const res = await postEvent();
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
     });
 
-    it("returns 403 at the former grace limit (6250)", async () => {
+    it("returns 429 at the grace limit (6250)", async () => {
       await seedUsage(FREE_GRACE);
       const res = await postEvent();
-      expect(res.status).toBe(403);
-      expect(res.headers.get("X-Event-Exceeded")).toBeNull();
-      expect(res.headers.get("Retry-After")).toBeNull();
+      expect(res.status).toBe(429);
+      expect(res.headers.get("X-Event-Exceeded")).toBe("true");
+      expect(Number(res.headers.get("Retry-After"))).toBeGreaterThan(0);
       const body = await res.json();
-      expect(body.error).toMatch(/requires starter plan/i);
+      expect(body.error).toBe("event_limit_exceeded");
     });
 
-    it("returns 403 well over the former limit (Darren's 8259 scenario)", async () => {
+    it("returns 429, not 403, well over the allowance (Darren's 8259 scenario)", async () => {
       await seedUsage(8259);
       const res = await postEvent();
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(429);
       const body = await res.json();
-      expect(body.error).toMatch(/requires starter plan/i);
+      expect(body.limit).toBe(FREE_LIMIT);
     });
   }
 );

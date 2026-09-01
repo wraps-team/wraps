@@ -180,25 +180,35 @@ export const statement = pgTable("statement", {
 });
 
 // Stripe plugin subscription table
-export const subscription = pgTable("subscription", {
-  id: text("id").primaryKey(),
-  plan: text("plan").notNull(),
-  referenceId: text("reference_id")
-    .notNull()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  stripeCustomerId: text("stripe_customer_id"),
-  stripeSubscriptionId: text("stripe_subscription_id"),
-  status: text("status").notNull(), // 'active' | 'trialing' | 'canceled' | 'past_due' etc.
-  periodStart: timestamp("period_start"),
-  periodEnd: timestamp("period_end"),
-  cancelAtPeriodEnd: boolean("cancel_at_period_end"),
-  seats: integer("seats"),
-  trialStart: timestamp("trial_start"),
-  trialEnd: timestamp("trial_end"),
-  annual: boolean("annual").default(false), // true for annual billing, false for monthly
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const subscription = pgTable(
+  "subscription",
+  {
+    id: text("id").primaryKey(),
+    plan: text("plan").notNull(),
+    referenceId: text("reference_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+    status: text("status").notNull(), // 'active' | 'trialing' | 'canceled' | 'past_due' etc.
+    periodStart: timestamp("period_start"),
+    periodEnd: timestamp("period_end"),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end"),
+    seats: integer("seats"),
+    trialStart: timestamp("trial_start"),
+    trialEnd: timestamp("trial_end"),
+    annual: boolean("annual").default(false), // true for annual billing, false for monthly
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    // Postgres does not index a foreign key automatically, and this table had
+    // only its primary key. The SES webhook looks a subscription up by
+    // referenceId on every inbound event (lib/subscription-gate.ts), which
+    // made that an unindexed scan on the API's highest-volume path.
+    index("subscription_reference_id_idx").on(table.referenceId),
+  ]
+);
 
 // better-inbox plugin table (in-app notifications)
 export const notification = pgTable(

@@ -18,6 +18,10 @@ const { mockSelectWhere, mockUpdateSet } = vi.hoisted(() => ({
   mockUpdateSet: vi.fn(),
 }));
 
+vi.mock("../lib/subscription-gate", () => ({
+  hasActiveSubscription: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock("@wraps/db", () => {
   const makeWhereResult = (impl: () => unknown) => ({
     limit: vi.fn(() => impl()),

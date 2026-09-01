@@ -24,6 +24,7 @@ import {
   member,
   messageSend,
   organization,
+  subscription,
   user,
   workflow,
   workflowExecution,
@@ -39,6 +40,8 @@ export type BaseOrgIds = {
   otherAwsAccount: string;
   contact: string;
   otherContact: string;
+  subscription: string;
+  otherSubscription: string;
 };
 
 export type BaseOrgFixture = {
@@ -81,13 +84,15 @@ export function baseOrgIds(prefix: string): BaseOrgIds {
     otherAwsAccount: `${prefix}-aws-2`,
     contact: `${prefix}-contact`,
     otherContact: `${prefix}-contact-2`,
+    subscription: `${prefix}-sub`,
+    otherSubscription: `${prefix}-sub-2`,
   };
 }
 
 /**
  * Seed a complete org graph: user, two organizations (primary + other), a
  * membership in the primary org, an AWS account per org (with webhook secret),
- * and one contact per org. Idempotent — safe to call in beforeAll across reruns.
+ * an active `free` subscription per org, and one contact per org. Idempotent — safe to call in beforeAll across reruns.
  */
 export async function seedBaseOrg(prefix: string): Promise<BaseOrgFixture> {
   const ids = baseOrgIds(prefix);
@@ -145,6 +150,29 @@ export async function seedBaseOrg(prefix: string): Promise<BaseOrgFixture> {
       createdAt: now,
     } as typeof member.$inferInsert)
     .onConflictDoUpdate({ target: member.id, set: { role: "owner" } });
+
+  // Both orgs get a live `free` subscription. The SES webhook drops events for
+  // orgs with no active subscription (routes/webhooks.ts step 3), so a fixture
+  // without one would make every webhook test assert on a dropped event.
+  for (const [id, orgId] of [
+    [ids.subscription, ids.org],
+    [ids.otherSubscription, ids.otherOrg],
+  ] as const) {
+    await db
+      .insert(subscription)
+      .values({
+        id,
+        plan: "free",
+        referenceId: orgId,
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      } as typeof subscription.$inferInsert)
+      .onConflictDoUpdate({
+        target: subscription.id,
+        set: { status: "active" },
+      });
+  }
 
   await db
     .insert(awsAccount)
@@ -245,6 +273,9 @@ export async function cleanupBaseOrg(prefix: string): Promise<void> {
   await clearWorkflowState(...orgIds);
   await db.delete(contact).where(inArray(contact.organizationId, orgIds));
   await db.delete(awsAccount).where(inArray(awsAccount.organizationId, orgIds));
+  await db
+    .delete(subscription)
+    .where(inArray(subscription.referenceId, orgIds));
   await db.delete(member).where(eq(member.id, ids.member));
   await db.delete(organization).where(inArray(organization.id, orgIds));
   await db.delete(user).where(eq(user.id, ids.user));

@@ -152,7 +152,17 @@ ${rateLimitedExample}
 
   eventLimits: `## Event Ingestion
 
-Custom events (sent via \`POST /v1/events\` and \`POST /v1/events/batch\`) are unmetered on every plan — there is no monthly quota and no 429 for volume. The response still carries \`X-Event-*\` headers for backward compatibility; they always report an unlimited state (\`X-Event-Limit: -1\`, \`X-Event-Remaining: -1\`, \`X-Event-Percent: 0\`).`,
+Custom events (sent via \`POST /v1/events\` and \`POST /v1/events/batch\`) are the one metered resource — they are Wraps' own storage, not AWS sending, which is never metered.
+
+| Plan | Custom events / month |
+| --- | --- |
+| Free | 5,000 |
+| Pro | Unlimited |
+| Business | Unlimited |
+
+Every response carries \`X-Event-Limit\`, \`X-Event-Current\`, \`X-Event-Remaining\` and \`X-Event-Percent\`. On an unlimited plan the limit and remaining values are \`-1\` and the percentage is \`0\`.
+
+Free ingestion continues through a 25% grace margin (6,250 events) before returning \`429\` with \`X-Event-Exceeded: true\` and a \`Retry-After\` pointing at the 1st of the next month, when the counter resets. Sending is never affected.`,
 
   handling429: `## Handling 429 Errors
 
@@ -333,14 +343,45 @@ export default function PageContent() {
           <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
             POST /v1/events/batch
           </code>
-          ) are unmetered on every plan &mdash; there is no monthly quota and no
-          429 for volume. The response still carries{" "}
+          ) are the one metered resource &mdash; they are Wraps&apos; own
+          storage, not AWS sending, which is never metered. Free ingestion
+          continues through a 25% grace margin (6,250 events) before returning{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">429</code>{" "}
+          with a{" "}
           <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
-            X-Event-*
+            Retry-After
           </code>{" "}
-          headers for backward compatibility; they always report an unlimited
-          state.
+          pointing at the 1st of the next month, when the counter resets.
+          Sending is never affected.
         </p>
+        <Card className="mb-6">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="px-4 py-2 text-left font-medium">Plan</th>
+                    <th className="px-4 py-2 text-left font-medium">
+                      Custom events / month
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="text-muted-foreground">
+                  {[
+                    { plan: "Free", events: "5,000" },
+                    { plan: "Pro", events: "Unlimited" },
+                    { plan: "Business", events: "Unlimited" },
+                  ].map((row, i) => (
+                    <tr className={i < 2 ? "border-b" : ""} key={row.plan}>
+                      <td className="px-4 py-2">{row.plan}</td>
+                      <td className="px-4 py-2">{row.events}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -348,28 +389,36 @@ export default function PageContent() {
                 <thead>
                   <tr className="border-b">
                     <th className="px-4 py-2 text-left font-medium">Header</th>
-                    <th className="px-4 py-2 text-left font-medium">
-                      Always reports
-                    </th>
+                    <th className="px-4 py-2 text-left font-medium">Reports</th>
                   </tr>
                 </thead>
                 <tbody className="text-muted-foreground">
                   {[
-                    { header: "X-Event-Limit", value: "-1" },
-                    { header: "X-Event-Remaining", value: "-1" },
-                    { header: "X-Event-Percent", value: "0" },
+                    {
+                      header: "X-Event-Limit",
+                      value: "Monthly allowance, or -1 when unlimited",
+                    },
+                    {
+                      header: "X-Event-Current",
+                      value: "Events ingested this month",
+                    },
+                    {
+                      header: "X-Event-Remaining",
+                      value: "Events left, or -1 when unlimited",
+                    },
+                    {
+                      header: "X-Event-Percent",
+                      value:
+                        "Percent of the allowance used, or 0 when unlimited",
+                    },
                   ].map((row, i) => (
-                    <tr className={i < 2 ? "border-b" : ""} key={row.header}>
+                    <tr className={i < 3 ? "border-b" : ""} key={row.header}>
                       <td className="px-4 py-2">
                         <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
                           {row.header}
                         </code>
                       </td>
-                      <td className="px-4 py-2">
-                        <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                          {row.value}
-                        </code>
-                      </td>
+                      <td className="px-4 py-2">{row.value}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -3,7 +3,18 @@ import { createPublicKey, verify } from "node:crypto";
 const PROD_PUBLIC_KEY_PEM =
   "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEATgLTGM1FH6spW9Ayl9Srb1dDHk7KlVX9NBTQQw+4vjQ=\n-----END PUBLIC KEY-----\n";
 
-const VALID_TIERS = ["starter", "growth", "scale"] as const;
+// Mirror of LICENSE_VALID_TIERS in apps/web/src/lib/plan-limits/index.ts, and
+// of VALID_TIERS in packages/cli/src/utils/license.ts + commands/license/generate.ts.
+// Four copies exist to avoid cross-package coupling; they must be kept in sync.
+//
+// "starter" | "growth" | "scale" are legacy names that appear in licences
+// already issued to self-hosted customers. They must remain valid forever.
+//
+// This list going stale is not hypothetical: it kept "pro" and "business" out
+// after the three-tier restructure, so `isSelfHosted()` returned false for a
+// valid Business licence and the plan-gate, rate-limit and event-limit
+// middlewares all treated a self-hosted customer as an unlicensed cloud org.
+const VALID_TIERS = ["pro", "business", "starter", "growth", "scale"] as const;
 type ValidTier = (typeof VALID_TIERS)[number];
 
 export type LicenseResult = {

@@ -98,11 +98,12 @@ import {
   messageSend,
   notifyOrg,
   organization,
+  subscription,
   user,
 } from "@wraps/db";
 import { sendEventFeedStaleEmail } from "@wraps/email";
 import type { Handler } from "aws-lambda";
-import { and, eq, gt, isNotNull, lt, sql } from "drizzle-orm";
+import { and, eq, exists, gt, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { flushLogger, log } from "../lib/logger";
 import { getCredentials } from "../services/credentials";
 
@@ -492,7 +493,28 @@ export const handler: Handler = wrapHandler(async () => {
       eventFeedAlertedAt: awsAccount.eventFeedAlertedAt,
     })
     .from(awsAccount)
-    .where(isNotNull(awsAccount.webhookSecret));
+    .where(
+      and(
+        isNotNull(awsAccount.webhookSecret),
+        // Skip orgs whose events the SES webhook is deliberately dropping
+        // (routes/webhooks.ts step 3 — no active subscription). Their
+        // lastEventReceivedAt freezes by design while SES keeps reporting
+        // sends, which is exactly the shape this worker treats as a stalled
+        // feed. Without this, disconnecting an org is immediately followed by
+        // telling them their integration is broken.
+        exists(
+          db
+            .select({ live: sql`1` })
+            .from(subscription)
+            .where(
+              and(
+                eq(subscription.referenceId, awsAccount.organizationId),
+                inArray(subscription.status, ["active", "trialing"])
+              )
+            )
+        )
+      )
+    );
 
   let flaggedCount = 0;
   let alertedCount = 0;

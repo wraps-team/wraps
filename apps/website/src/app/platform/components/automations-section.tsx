@@ -92,7 +92,7 @@ export function DashboardAutomationsSection() {
               <p className="text-sm">
                 <span className="font-medium text-foreground">Free:</span>{" "}
                 <span className="text-muted-foreground">
-                  2 workflows included
+                  1 workflow included
                 </span>
               </p>
               <p className="text-sm">

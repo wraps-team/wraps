@@ -50,6 +50,9 @@ export async function platform(): Promise<void> {
     `    ${pc.cyan("wraps platform connect")}      Connect infrastructure to Wraps Platform`
   );
   console.log(
+    `    ${pc.cyan("wraps platform disconnect")}   Stop streaming events to Wraps Platform`
+  );
+  console.log(
     `    ${pc.cyan("wraps platform update-role")}  Update IAM permissions for dashboard`
   );
   console.log();

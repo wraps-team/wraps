@@ -25,7 +25,13 @@
  */
 
 import type { MessageSendStatus } from "@wraps/db";
-import { awsAccount, db, messageSend, notification } from "@wraps/db";
+import {
+  awsAccount,
+  db,
+  messageSend,
+  notification,
+  subscription,
+} from "@wraps/db";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -350,6 +356,33 @@ describe("event-feed-staleness detection (real DB)", () => {
     await runSweep();
 
     expect((await readFeedState())?.eventFeedStaleSince).toBeInstanceOf(Date);
+  });
+
+  it("never flags an org whose events the webhook is deliberately dropping", async () => {
+    // Once a subscription lapses the SES webhook drops the org's events
+    // (routes/webhooks.ts step 3), so lastEventReceivedAt freezes while SES
+    // keeps reporting sends — exactly the shape this worker reads as a stalled
+    // feed. Without the subscription filter on the sweep query, disconnecting
+    // an org is immediately followed by telling them their integration broke.
+    // This is the same setup as the flagging case above, minus a live plan.
+    await db
+      .update(subscription)
+      .set({ status: "canceled" })
+      .where(eq(subscription.id, ids.subscription));
+
+    await seedSend(ago(2 * HOUR), "gated-unacked", "sent");
+    await setFeedState({ lastEventReceivedAt: ago(3 * HOUR) });
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+
+    // Restore so ordering between cases in this file can never matter.
+    await db
+      .update(subscription)
+      .set({ status: "active" })
+      .where(eq(subscription.id, ids.subscription));
   });
 
   it("holds off on an all-'sent' send still inside the grace period", async () => {

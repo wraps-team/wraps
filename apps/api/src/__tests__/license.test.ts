@@ -24,6 +24,38 @@ describe("validateLicenseKey", () => {
     expect(result).toEqual({ valid: true, tier: "scale" });
   });
 
+  // Regression: VALID_TIERS here listed only the pre-restructure legacy names,
+  // so a valid "pro"/"business" licence was rejected — which made
+  // isSelfHosted() false and left plan-gate, rate-limit and event-limit
+  // treating a self-hosted customer as an unlicensed cloud org. Every existing
+  // test above signs a legacy tier, which is why nothing caught it.
+  it.each(["pro", "business"])(
+    "accepts a correctly signed %s licence",
+    (tier) => {
+      expect(validateLicenseKey(makeKey(tier, "2099-12-31"))).toEqual({
+        valid: true,
+        tier,
+      });
+    }
+  );
+
+  it.each(["starter", "growth", "scale"])(
+    "still accepts the legacy %s licence issued before the restructure",
+    (tier) => {
+      expect(validateLicenseKey(makeKey(tier, "2099-12-31"))).toEqual({
+        valid: true,
+        tier,
+      });
+    }
+  );
+
+  it("rejects a tier that is not a real plan", () => {
+    expect(validateLicenseKey(makeKey("enterprise", "2099-12-31"))).toEqual({
+      valid: false,
+      tier: null,
+    });
+  });
+
   it("returns valid:false and tier:null for a tampered signature", () => {
     const key = makeKey("scale", "2099-12-31");
     const tampered = `${key.slice(0, -4)}dead`;
