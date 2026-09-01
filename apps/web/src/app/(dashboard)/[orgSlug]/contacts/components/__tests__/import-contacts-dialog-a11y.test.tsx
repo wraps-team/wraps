@@ -298,17 +298,23 @@ describe("import outcome (M8)", () => {
 // for.
 
 describe("repeated rows in the source file", () => {
-  it("names the repeated row and the row it repeats", async () => {
-    await reachResults({
-      success: true,
-      created: 1,
+  /** A server result for a run where the client already removed the repeats. */
+  function imported(created: number) {
+    return {
+      success: true as const,
+      created,
       updated: 0,
-      skipped: 1,
+      skipped: 0,
       errors: [],
-      duplicates: [
-        { row: 2, firstRow: 1, field: "email", value: "ada@example.com" },
-      ],
-    });
+      duplicates: [],
+    };
+  }
+
+  it("names the repeated row and the row it repeats", async () => {
+    await reachResults(
+      imported(1),
+      "email\nada@example.com\nada@example.com\n"
+    );
 
     expect(
       await screen.findByText(/Row 2: same email as row 1/)
@@ -317,38 +323,25 @@ describe("repeated rows in the source file", () => {
   });
 
   it("says the first of each repeat was kept, not that rows failed", async () => {
-    await reachResults({
-      success: true,
-      created: 1,
-      updated: 0,
-      skipped: 1,
-      errors: [],
-      duplicates: [
-        { row: 2, firstRow: 1, field: "phone", value: "+15550000101" },
-      ],
-    });
+    await reachResults(imported(1), "phone\n+15550000101\n+15550000101\n");
 
     expect(
       await screen.findByText(/The first of each was imported/)
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Row 2: same phone as row 1/)
     ).toBeInTheDocument();
     // A repeat is not a failed row, so it must not wear the error treatment.
     expect(screen.queryByText(/couldn't be imported/i)).not.toBeInTheDocument();
   });
 
   it("offers the full list as a file rather than an unreadable scroll", async () => {
-    await reachResults({
-      success: true,
-      created: 1,
-      updated: 0,
-      skipped: 30,
-      errors: [],
-      duplicates: Array.from({ length: 30 }, (_, i) => ({
-        row: i + 2,
-        firstRow: 1,
-        field: "email" as const,
-        value: "ada@example.com",
-      })),
-    });
+    const rows = ["email", "ada@example.com"];
+    for (let i = 0; i < 30; i++) {
+      rows.push("ada@example.com");
+    }
+
+    await reachResults(imported(1), `${rows.join("\n")}\n`);
 
     expect(
       await screen.findByText(/30 repeated rows in your file/)
@@ -360,16 +353,93 @@ describe("repeated rows in the source file", () => {
   });
 
   it("says nothing about repeats when the file had none", async () => {
-    await reachResults({
-      success: true,
-      created: 2,
-      updated: 0,
-      skipped: 0,
-      errors: [],
-      duplicates: [],
-    });
+    await reachResults(
+      imported(2),
+      "email\nada@example.com\nbea@example.com\n"
+    );
 
     expect(await screen.findByText(/^Imported /)).toBeInTheDocument();
     expect(screen.queryByText(/repeated row/i)).not.toBeInTheDocument();
+  });
+});
+
+// ─── Repeats are resolved before the send, not per chunk ───────────────────
+// The server sees one chunk per call, so it can only relate rows that land in
+// the same chunk. These pin the behaviour that made chunking safe: the file is
+// deduplicated whole, in the browser, and the server never receives a repeat.
+
+describe("repeats found across the whole file", () => {
+  /** Rows 1 and N share an email, far enough apart to span chunks. */
+  function csvWithDistantRepeat(rows: number) {
+    const lines = ["email"];
+    lines.push("straddle@example.com");
+    for (let i = 0; i < rows - 2; i++) {
+      lines.push(`filler-${i}@example.com`);
+    }
+    lines.push("straddle@example.com");
+    return `${lines.join("\n")}\n`;
+  }
+
+  it("reports a repeat whose copies fall in different chunks", async () => {
+    await reachResults(
+      {
+        success: true,
+        created: 2100,
+        updated: 0,
+        skipped: 0,
+        errors: [],
+        duplicates: [],
+      },
+      csvWithDistantRepeat(2101)
+    );
+
+    // Row 2101 repeats row 1 — more than one 2,000-row chunk apart, so no
+    // single call to the action could have seen both.
+    expect(
+      await screen.findByText(/Row 2101: same email as row 1/)
+    ).toBeInTheDocument();
+  });
+
+  it("never sends the repeated row to the server", async () => {
+    await reachResults(
+      {
+        success: true,
+        created: 2,
+        updated: 0,
+        skipped: 0,
+        errors: [],
+        duplicates: [],
+      },
+      "email\nada@example.com\nbea@example.com\nada@example.com\n"
+    );
+
+    await waitFor(() => expect(importContacts).toHaveBeenCalled());
+    const sent = importContacts.mock.calls.flatMap(
+      (call) => (call[1] as { contacts: { email?: string }[] }).contacts
+    );
+    expect(sent).toHaveLength(2);
+    expect(sent.map((c) => c.email)).toEqual([
+      "ada@example.com",
+      "bea@example.com",
+    ]);
+  });
+
+  it("counts a repeat as skipped without the server reporting it", async () => {
+    await reachResults(
+      {
+        success: true,
+        created: 2,
+        updated: 0,
+        skipped: 0,
+        errors: [],
+        duplicates: [],
+      },
+      "email\nada@example.com\nbea@example.com\nada@example.com\n"
+    );
+
+    expect(
+      await screen.findByText("Imported 2 of 3 contacts")
+    ).toBeInTheDocument();
+    expect(screen.getByText("1 skipped")).toBeInTheDocument();
   });
 });

@@ -63,6 +63,7 @@ import {
   validateCSVFile,
 } from "@/lib/csv-parse";
 import { chunkForImport, serializedBytes } from "@/lib/import-chunks";
+import { splitRepeats } from "@/lib/import-dedupe";
 import type { TopicWithMeta } from "@/lib/topics";
 import {
   captureContactsImportColumnsMapped,
@@ -552,20 +553,29 @@ export function ImportContactsDialog({
       was_truncated: csvData?.truncated ?? false,
     });
 
+    // Repeats are found here, over the whole file, before anything is sent.
+    // The server sees only one chunk per call, so a repeat straddling a chunk
+    // boundary would reach it as an ordinary existing contact and be counted
+    // as skipped without ever being reported.
+    const { kept, duplicates: repeatedRows } = splitRepeats(mappedContacts);
+
     // Split the send so no single request approaches the Server Action body
     // limit. A chunk that still exceeds it — one row carrying megabytes of
     // custom properties — is caught here, because Next rejects an oversized
     // body before the action runs and nothing downstream could explain it.
-    const chunks = chunkForImport(mappedContacts);
-    const oversized = chunks.find(
-      (chunk) =>
-        describePayloadTooLarge(serializedBytes(chunk), chunk.length) !== null
-    );
+    const chunks = chunkForImport(kept);
+    const oversized = chunks.find((chunk) => {
+      const contacts = chunk.map((k) => k.contact);
+      return (
+        describePayloadTooLarge(serializedBytes(contacts), chunk.length) !==
+        null
+      );
+    });
     if (oversized) {
       setResult({
         success: false,
         error: describePayloadTooLarge(
-          serializedBytes(oversized),
+          serializedBytes(oversized.map((k) => k.contact)),
           oversized.length
         ) as string,
       });
@@ -575,19 +585,21 @@ export function ImportContactsDialog({
     }
 
     startTransition(async () => {
-      const totals = { created: 0, updated: 0, skipped: 0, errorCount: 0 };
+      const totals = {
+        created: 0,
+        updated: 0,
+        skipped: repeatedRows.length,
+        errorCount: 0,
+      };
       const errors: Array<{ row: number; error: string }> = [];
-      const duplicates: ImportDuplicateRow[] = [];
-      // Each call numbers its rows from 1 within the chunk it was given, so
-      // rows have to be shifted back onto the file the operator is looking at.
-      let rowOffset = 0;
 
       for (let i = 0; i < chunks.length; i++) {
         const isLast = i === chunks.length - 1;
+        const chunk = chunks[i];
         setProgress({ done: i, total: chunks.length });
 
         const res = await importContacts(organizationId, {
-          contacts: chunks[i],
+          contacts: chunk.map((k) => k.contact),
           topicIds: selectedTopicIds.length > 0 ? selectedTopicIds : undefined,
           duplicateStrategy,
           deferSummary: !isLast,
@@ -616,17 +628,15 @@ export function ImportContactsDialog({
         totals.updated += res.updated;
         totals.skipped += res.skipped;
         totals.errorCount += res.errors.length;
+        // Each call numbers rows from 1 within the list it was handed, and
+        // that list has had repeats removed — so a row number only means
+        // something once it is mapped back through the chunk it came from.
         errors.push(
-          ...res.errors.map((err) => ({ ...err, row: err.row + rowOffset }))
-        );
-        duplicates.push(
-          ...(res.duplicates ?? []).map((dup) => ({
-            ...dup,
-            row: dup.row + rowOffset,
-            firstRow: dup.firstRow + rowOffset,
+          ...res.errors.map((err) => ({
+            ...err,
+            row: chunk[err.row - 1]?.row ?? err.row,
           }))
         );
-        rowOffset += chunks[i].length;
       }
 
       setProgress(null);
@@ -636,7 +646,7 @@ export function ImportContactsDialog({
         updated: totals.updated,
         skipped: totals.skipped,
         errors,
-        duplicates,
+        duplicates: repeatedRows,
       });
       setStep("results");
       captureContactsImportCompleted({
