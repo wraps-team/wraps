@@ -37,6 +37,8 @@ import type {
 } from "@/app/(dashboard)/[orgSlug]/emails/types";
 import { createRequestLogger, serializeError } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
+import { getOrganizationPlan } from "@/lib/plan-limits";
+import { getHistoryRetentionDays, isTopPlan } from "@/lib/plans";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -197,11 +199,24 @@ export async function GET(request: Request, context: RouteContext) {
     // from the membership check above and never from the request.
     const organizationId = orgWithMembership.id;
 
+    // The plan's history window is the real ceiling on this list, not
+    // EMAIL_LIST_MAX_DAYS. Until now only the audit log applied it, so the
+    // 30/90/365-day retention every tier is sold on was unenforced on the
+    // surface customers actually browse: a Free org could ask for days=365
+    // and get a year back.
+    const planId = await getOrganizationPlan(organizationId);
+    const retentionDays = getHistoryRetentionDays(planId);
+    const maxDays = Math.min(EMAIL_LIST_MAX_DAYS, retentionDays);
+
     const { searchParams } = new URL(request.url);
-    const days = Math.min(
-      EMAIL_LIST_MAX_DAYS,
-      Math.max(1, Number.parseInt(searchParams.get("days") || "7", 10) || 7)
+    const requestedDays = Math.max(
+      1,
+      Number.parseInt(searchParams.get("days") || "7", 10) || 7
     );
+    const days = Math.min(maxDays, requestedDays);
+    // Only true when the plan is what shortened the window — asking for 7 days
+    // on a 30-day plan is not a clamp, and must not raise an upgrade prompt.
+    const clampedByPlan = requestedDays > maxDays;
     const limit = Math.min(
       EMAIL_LIST_MAX_PAGE_SIZE,
       Math.max(
@@ -265,7 +280,7 @@ export async function GET(request: Request, context: RouteContext) {
     const to = pinned
       ? new Date(Math.min(pinned.to.getTime(), now.getTime()))
       : now;
-    const earliest = to.getTime() - EMAIL_LIST_MAX_DAYS * DAY_MS;
+    const earliest = to.getTime() - maxDays * DAY_MS;
     const from = pinned
       ? new Date(Math.max(pinned.from.getTime(), earliest))
       : new Date(to.getTime() - days * DAY_MS);
@@ -370,7 +385,14 @@ export async function GET(request: Request, context: RouteContext) {
         row.sentAt ? [toListItem({ ...row, sentAt: row.sentAt })] : []
       ),
       nextCursor,
-      window: { days, from: from.toISOString(), to: to.toISOString() },
+      window: {
+        days,
+        from: from.toISOString(),
+        to: to.toISOString(),
+        retentionDays,
+        clampedByPlan,
+        canExtend: !isTopPlan(planId),
+      },
       feed: {
         hasEverSent: everSent.length > 0,
         accounts: accounts.map((account) => ({

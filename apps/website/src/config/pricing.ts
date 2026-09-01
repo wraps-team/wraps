@@ -222,7 +222,7 @@ export const PRICING_TIERS: PricingTier[] = [
       "Unlimited AWS accounts",
       "1,000 AI generations/mo",
       "1-year history",
-      "SSO + SCIM, audit export",
+      "SSO + SCIM, audit log & export",
       "Priority support",
     ],
   },
@@ -480,7 +480,7 @@ export const FEATURE_COMPARISON: FeatureComparison[] = [
   },
   {
     name: "Workflows",
-    free: "1",
+    free: "2",
     pro: "Unlimited",
     business: "Unlimited",
   },
@@ -546,6 +546,16 @@ export const FEATURE_COMPARISON: FeatureComparison[] = [
   },
   {
     name: "SSO + SCIM",
+    free: false,
+    pro: false,
+    business: true,
+  },
+  {
+    // Absent from this table entirely while the feature was Pro+, which is how
+    // it stayed unadvertised on the tier that had it. Now that it is a Business
+    // differentiator it needs a row, or the pricing page still never mentions
+    // the audit log outside one bullet on the Business card.
+    name: "Audit log",
     free: false,
     pro: false,
     business: true,

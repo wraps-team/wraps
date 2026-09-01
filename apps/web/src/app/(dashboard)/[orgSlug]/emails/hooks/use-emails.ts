@@ -3,7 +3,12 @@
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { EMAIL_LIST_PAGE_SIZE, type EmailListSort } from "../lib/list-query";
-import type { EmailListFeed, EmailListItem, EmailListResponse } from "../types";
+import type {
+  EmailListFeed,
+  EmailListItem,
+  EmailListResponse,
+  EmailListWindow,
+} from "../types";
 
 /** Carries the HTTP status so a 4xx is not retried three times. */
 export class EmailsRequestError extends Error {
@@ -104,11 +109,14 @@ export function useEmailsData(input: EmailsQueryInput) {
   );
 
   const feed: EmailListFeed | null = pages?.[0]?.feed ?? null;
+  // Page 1 pins the window for the whole keyset, so later pages restate it.
+  const window: EmailListWindow | null = pages?.[0]?.window ?? null;
 
   return {
     ...query,
     emails,
     feed,
+    window,
     /**
      * The total is only known once the server has said there is no next page.
      * Anything else would be a bounded number formatted as a total, which is

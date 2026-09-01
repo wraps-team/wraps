@@ -52,7 +52,11 @@ export default async function AuditLogsPage({ params }: AuditLogsPageProps) {
     getOrganizationPlan(orgWithMembership.id),
   ]);
 
-  const requiredPlan = getRequiredPlan("auditLog") || "pro";
+  // Fallback matches the tier that actually grants the feature. It read "pro"
+  // while the log was Pro+; leaving it there after the move to Business would
+  // have told a Free org to buy the wrong plan on the one screen whose whole
+  // job is telling them which plan they need.
+  const requiredPlan = getRequiredPlan("auditLog") || "business";
 
   if (!featureCheck.allowed) {
     return (
@@ -96,6 +100,7 @@ export default async function AuditLogsPage({ params }: AuditLogsPageProps) {
       <AuditLogViewer
         initialData={initialData}
         organizationId={orgWithMembership.id}
+        orgSlug={orgSlug}
       />
     </div>
   );

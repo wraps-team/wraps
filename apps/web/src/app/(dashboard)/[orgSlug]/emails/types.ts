@@ -74,6 +74,23 @@ export type EmailListWindow = {
   /** ISO. The window the server actually applied, not the one requested. */
   from: string;
   to: string;
+  /**
+   * The plan's history window in days, and whether it is what limited this
+   * request. `retentionDays` is always the plan's allowance; `clampedByPlan`
+   * is true only when the caller asked for more than that and was cut back.
+   *
+   * Carried so the list can say why a window is short. Without it a Free org
+   * asking for 90 days silently receives 30 and reads the result as missing
+   * data rather than a plan boundary.
+   */
+  retentionDays: number;
+  clampedByPlan: boolean;
+  /**
+   * False on the top tier. A clamp there is still real — Business caps at 365
+   * days — but there is no higher plan, and a CTA pointing at one the customer
+   * already has is worse than saying nothing.
+   */
+  canExtend: boolean;
 };
 
 export type EmailListResponse = {

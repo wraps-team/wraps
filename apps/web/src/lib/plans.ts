@@ -56,7 +56,7 @@ export type PlanFeature =
   | "customRetention" // Enterprise+: Custom data retention
   | "prioritySLA" // Business+: Priority support SLA
   | "sso" // Business+: SSO + SCIM provisioning
-  | "auditLog"; // Pro+: Audit log viewer
+  | "auditLog"; // Business+: Audit log viewer
 
 export type RateLimits = {
   dailyRequests: number; // -1 = unlimited
@@ -202,7 +202,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       customRetention: false,
       prioritySLA: false,
       sso: false,
-      auditLog: true,
+      auditLog: false,
     },
 
     // Rate Limits
@@ -276,7 +276,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       "Unlimited AWS accounts",
       "1,000 AI generations",
       "1-year history",
-      "SSO + SCIM, audit export",
+      "SSO + SCIM, audit log & export",
       "Priority support SLA",
     ],
     cta: "Subscribe",
@@ -330,7 +330,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       customRetention: false,
       prioritySLA: false,
       sso: false,
-      auditLog: true,
+      auditLog: false,
     },
 
     // Rate Limits
@@ -405,7 +405,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       "Unlimited AWS accounts",
       "1,000 AI generations",
       "1-year history",
-      "SSO + SCIM, audit export",
+      "SSO + SCIM, audit log & export",
       "Priority support SLA",
     ],
     cta: "Subscribe",
@@ -465,7 +465,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       "Unlimited AWS accounts",
       "1,000 AI generations",
       "1-year history",
-      "SSO + SCIM, audit export",
+      "SSO + SCIM, audit log & export",
       "Priority support SLA",
     ],
     cta: "Subscribe",

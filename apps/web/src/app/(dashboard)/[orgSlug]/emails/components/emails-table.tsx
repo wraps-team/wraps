@@ -76,6 +76,7 @@ import { createColumns } from "./columns";
 import { EmailsListState } from "./emails-list-state";
 import { EmailsTableSkeletonRows } from "./emails-table-skeleton";
 import { EmailFeedBanners } from "./event-feed-banners";
+import { HistoryWindowNotice } from "./history-window-notice";
 
 /** How long after the last keystroke the search term is committed to the URL. */
 const SEARCH_COMMIT_DELAY_MS = 400;
@@ -155,6 +156,7 @@ export function EmailsTable({
     isLoading,
     refetch,
     totalKnown,
+    window,
   } = useEmailsData({ orgSlug, days, search, sort, status });
 
   const router = useRouter();
@@ -559,6 +561,7 @@ export function EmailsTable({
       </div>
 
       <EmailFeedBanners feed={feed} />
+      <HistoryWindowNotice orgSlug={orgSlug} window={window} />
 
       {/* Filters Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

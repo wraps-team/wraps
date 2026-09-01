@@ -2094,6 +2094,49 @@ function readWebsiteTierField(field: string): Record<string, string> {
   return out;
 }
 
+/**
+ * Rows of apps/website's FEATURE_COMPARISON, as `name -> {free, pro, business}`
+ * with each cell kept as written ("true", "false", "Unlimited", "30 days").
+ */
+function readFeatureComparison(): Record<string, Record<string, string>> {
+  const src = readFile("apps/website/src/config/pricing.ts");
+  const start = src.indexOf("export const FEATURE_COMPARISON");
+  const body = src.slice(start, src.indexOf("\n];", start));
+
+  const out: Record<string, Record<string, string>> = {};
+  const row =
+    /name: "([^"]+)",\s*\n\s*free: ("[^"]*"|true|false),\s*\n\s*pro: ("[^"]*"|true|false),\s*\n\s*business: ("[^"]*"|true|false),/g;
+  let match = row.exec(body);
+  while (match !== null) {
+    out[match[1]] = {
+      free: match[2].replace(/"/g, ""),
+      pro: match[3].replace(/"/g, ""),
+      business: match[4].replace(/"/g, ""),
+    };
+    match = row.exec(body);
+  }
+  return out;
+}
+
+/** `features` booleans per plan, read out of apps/web's PLANS literal. */
+function readWebPlanFeature(flag: string): Record<string, boolean> {
+  const src = readFile("apps/web/src/lib/plans.ts");
+  const start = src.indexOf("export const PLANS");
+  const body = src.slice(start, src.indexOf("\n} as const;", start));
+  const blocks = body.split(
+    /\n {2}(free|pro|business|starter|growth|scale): \{/
+  );
+
+  const out: Record<string, boolean> = {};
+  for (let i = 1; i < blocks.length; i += 2) {
+    const match = new RegExp(`${flag}:\\s*(true|false)`).exec(blocks[i + 1]);
+    if (match) {
+      out[blocks[i]] = match[1] === "true";
+    }
+  }
+  return out;
+}
+
 /** Numeric value per plan, read out of an apps/api lookup table. */
 function readApiTable(
   file: string,
@@ -2260,6 +2303,83 @@ describe("apps/api plan allowances match apps/web", () => {
       }
     }
   );
+
+  // The pricing page's feature table is what a prospect reads before buying.
+  // Nothing bound it to the flags that actually gate the features, so "Audit
+  // log" could say Business while `auditLog: true` sat on Pro — or, as
+  // happened, the feature could be gated on a tier the table never mentioned
+  // at all.
+  const COMPARISON_FEATURE_ROWS: Readonly<Record<string, string>> = {
+    "Batch sending": "batch",
+    "Topics & preferences": "topics",
+    "Segments & targeting": "segments",
+    Campaigns: "campaigns",
+    "Behavioral segments": "advancedSegments",
+    "SSO + SCIM": "sso",
+    "Audit log": "auditLog",
+  };
+
+  test.each(Object.entries(COMPARISON_FEATURE_ROWS))(
+    'comparison row "%s" matches the %s flag',
+    (rowName, flag) => {
+      const row = readFeatureComparison()[rowName];
+      const flags = readWebPlanFeature(flag);
+      expect(
+        row,
+        `row "${rowName}" missing from FEATURE_COMPARISON`
+      ).toBeDefined();
+
+      for (const tier of PUBLIC_TIERS) {
+        expect(
+          row[tier],
+          `${tier}: table says ${rowName}=${row[tier]}, PLANS says ${flag}=${flags[tier]}`
+        ).toBe(String(flags[tier]));
+      }
+    }
+  );
+
+  // The map above is only airtight if it is exhaustive. Without this, adding a
+  // gated feature to the table wires it to nothing and the drift it exists to
+  // catch walks straight past.
+  /**
+   * Rows advertised as gated that no PlanFeature actually enforces.
+   *
+   * "Cross-channel cascades" is sold as Pro+ but the cascade node sits in the
+   * workflow palette ungated (components/(ee)/workflow-builder/node-palette.ts),
+   * so a Free org can build one today. Listed here rather than quietly skipped:
+   * the entry is the record that the table promises something the product does
+   * not withhold. Resolve it by adding a flag and gating the node, or by
+   * dropping the row — not by extending this list.
+   */
+  const KNOWN_UNENFORCED_ROWS: readonly string[] = ["Cross-channel cascades"];
+
+  test("every yes/no row in the comparison table is bound to a plan flag", () => {
+    const boolRows = Object.entries(readFeatureComparison())
+      .filter(([, cells]) =>
+        Object.values(cells).every((v) => v === "true" || v === "false")
+      )
+      .map(([name]) => name);
+
+    const unbound = boolRows.filter(
+      (name) =>
+        !(
+          name in COMPARISON_FEATURE_ROWS ||
+          KNOWN_UNENFORCED_ROWS.includes(name)
+        )
+    );
+
+    expect(
+      unbound,
+      `these rows advertise a gate with nothing enforcing it: ${unbound.join(", ")}`
+    ).toEqual([]);
+  });
+
+  // Pins the exception list. Without this, "add it to KNOWN_UNENFORCED_ROWS"
+  // becomes the path of least resistance and the guard above rots into a
+  // rubber stamp.
+  test("the unenforced-row exception list has not grown", () => {
+    expect(KNOWN_UNENFORCED_ROWS).toEqual(["Cross-channel cascades"]);
+  });
 
   test("audit log retention matches historyRetentionDays", () => {
     expect(

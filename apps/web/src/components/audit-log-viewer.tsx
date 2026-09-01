@@ -26,6 +26,7 @@ import {
 } from "@wraps/ui/components/ui/tooltip";
 import { format, formatDistanceToNow } from "date-fns";
 import { ChevronRight, ShieldAlert } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { type AuditLogAction, listAuditLogs } from "@/actions/audit-log";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ type AuditLogRow = AuditLogSuccess["data"][number];
 
 type Props = {
   organizationId: string;
+  orgSlug: string;
   initialData: Awaited<ReturnType<typeof listAuditLogs>>;
 };
 
@@ -224,7 +226,11 @@ function EmptyState() {
   );
 }
 
-export function AuditLogViewer({ organizationId, initialData }: Props) {
+export function AuditLogViewer({
+  organizationId,
+  orgSlug,
+  initialData,
+}: Props) {
   const [actionFilter, setActionFilter] = useState<AuditLogAction | "all">(
     "all"
   );
@@ -262,6 +268,8 @@ export function AuditLogViewer({ organizationId, initialData }: Props) {
 
   const rows: AuditLogRow[] = data?.success ? (data.data as AuditLogRow[]) : [];
   const nextCursor = data?.success ? data.nextCursor : null;
+  const retentionDays = data?.success ? data.retentionDays : null;
+  const canExtend = data?.success ? data.canExtend : false;
 
   function handleFilterChange() {
     setCursor(null);
@@ -406,6 +414,45 @@ export function AuditLogViewer({ organizationId, initialData }: Props) {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {/* Why the log stops where it does. The query already applied this
+          cutoff; before it was carried here the entries simply ended, which
+          reads as "nothing happened" rather than "your plan does not keep
+          this". Shown whenever a finite window applies — unlike the emails
+          list there is no user-chosen range to compare against, so the only
+          honest thing to state is the window itself. */}
+      {retentionDays !== null && retentionDays > 0 && (
+        <p className="text-muted-foreground text-sm">
+          Showing the last{" "}
+          {retentionDays >= 365
+            ? "year"
+            : `${retentionDays} day${retentionDays === 1 ? "" : "s"}`}{" "}
+          of activity, the history your plan keeps.
+          {canExtend ? (
+            <>
+              {" "}
+              <Link
+                className="font-medium underline underline-offset-4"
+                href={`/${orgSlug}/settings/billing`}
+              >
+                Upgrade to extend it
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              {" "}
+              <a
+                className="font-medium underline underline-offset-4"
+                href="mailto:support@wraps.dev?subject=Extended%20audit%20log%20history"
+              >
+                Contact us for Enterprise
+              </a>{" "}
+              to extend it.
+            </>
+          )}
+        </p>
       )}
 
       {/* Pagination */}

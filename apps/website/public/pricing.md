@@ -100,7 +100,7 @@ These appear on your AWS bill, not your Wraps bill. You keep AWS volume discount
 | Contacts | Unlimited | Unlimited | Unlimited |
 | Domains | Unlimited | Unlimited | Unlimited |
 | Templates | Unlimited | Unlimited | Unlimited |
-| Workflows | 1 | Unlimited | Unlimited |
+| Workflows | 2 | Unlimited | Unlimited |
 | AI generations | 10/mo | 250/mo | 1,000/mo |
 | AWS accounts | 1 | 1 | Unlimited |
 | Team members | Unlimited | Unlimited | Unlimited |
@@ -112,6 +112,7 @@ These appear on your AWS bill, not your Wraps bill. You keep AWS volume discount
 | Custom events | 5,000/mo | Unlimited | Unlimited |
 | Behavioral segments | — | — | Yes |
 | SSO + SCIM | — | — | Yes |
+| Audit log | — | — | Yes |
 | Support | Community | Email | Priority |
 
 Every plan includes: the CLI, the TypeScript SDKs (`@wraps.dev/email`, `@wraps.dev/sms`, `@wraps.dev/client`), the MCP server (`@wraps.dev/mcp`), React Email templates, the dashboard, DKIM/SPF/DMARC setup, bounce and complaint handling, suppression lists, webhooks, and infrastructure deployed into your own AWS account under `wraps-*` namespaced resources.

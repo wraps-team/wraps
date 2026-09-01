@@ -4,7 +4,7 @@ import { auditLog, db } from "@wraps/db";
 import { and, desc, eq, gte, lt, or } from "drizzle-orm";
 import type { AuditLogAction } from "@/lib/audit";
 import { getOrganizationPlan } from "@/lib/plan-limits";
-import { getHistoryRetentionDays } from "@/lib/plans";
+import { getHistoryRetentionDays, isTopPlan, type PlanId } from "@/lib/plans";
 import { orgAction } from "./shared/org-action";
 
 export type { AuditLogAction } from "@/lib/audit";
@@ -14,6 +14,22 @@ export type ListAuditLogsResult =
       success: true;
       data: (typeof auditLog.$inferSelect)[];
       nextCursor: string | null;
+      /**
+       * The plan's history window in days. The query already cut the result
+       * to it; carrying the number is what lets the viewer say so.
+       *
+       * Without this the cutoff was computed, applied, and discarded — an
+       * owner on Free saw entries simply stop with nothing to distinguish
+       * "nothing happened" from "your plan does not keep this".
+       */
+      retentionDays: number;
+      /**
+       * False on the top tier. The window is still worth stating there — it
+       * explains where the log stops — but there is nothing to upgrade to,
+       * and a CTA pointing at a plan the customer already has is worse than
+       * the silent cutoff this replaced.
+       */
+      canExtend: boolean;
     }
   | { success: false; error: string };
 
@@ -114,6 +130,12 @@ export const listAuditLogs = orgAction(
           })
         : null;
 
-    return { success: true, data, nextCursor };
+    return {
+      success: true,
+      data,
+      nextCursor,
+      retentionDays,
+      canExtend: !isTopPlan(planId as PlanId),
+    };
   }
 );

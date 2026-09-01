@@ -252,6 +252,58 @@ describe("Emails API - the cursor pins its window", () => {
     expect(page2.body.window.to).toBe(page1.body.window.to);
   });
 
+  // The plan's retention window is the real ceiling on this list. It was
+  // applied to the audit log and nowhere else, so the 30/90/365 days each tier
+  // is sold on went unenforced on the surface customers actually browse — a
+  // Free org could ask for days=365 and receive a year.
+  it("clamps a request past the plan's window and says so", async () => {
+    const { body } = await callList("days=365&limit=2");
+
+    // The seeded org has no paid subscription, so it resolves to free (30d).
+    expect(body.window.retentionDays).toBe(30);
+    expect(body.window.days).toBe(30);
+    expect(body.window.clampedByPlan).toBe(true);
+  });
+
+  it("does not report a clamp when the caller asked for less than the plan", async () => {
+    // Guards the notice against firing when nothing is withheld. Asking for 7
+    // days on a 30-day plan is a choice, not a limit; a prompt here would be
+    // noise and would teach people to ignore the one that matters.
+    const { body } = await callList("days=7&limit=2");
+
+    expect(body.window.days).toBe(7);
+    expect(body.window.clampedByPlan).toBe(false);
+    expect(body.window.retentionDays).toBe(30);
+  });
+
+  it("offers an upgrade path only where one exists", async () => {
+    // The seeded org is on free, so a self-serve upgrade is available. The
+    // inverse — Business clamped at 365 with canExtend false — routes to an
+    // Enterprise conversation instead; a CTA pointing at a plan the customer
+    // already holds would be worse than the silent cutoff this replaced.
+    const { body } = await callList("days=365&limit=2");
+
+    expect(body.window.canExtend).toBe(true);
+  });
+
+  it("holds the plan ceiling across pagination, not just page 1", async () => {
+    // The cursor carries its own window and used to be clamped to
+    // EMAIL_LIST_MAX_DAYS, so a hand-edited token could widen page 2 past the
+    // plan even after page 1 was cut back.
+    const first = await callList("days=365&limit=2");
+    const cursor = first.body.nextCursor;
+    if (!cursor) {
+      return;
+    }
+    const second = await callList(
+      `days=365&limit=2&cursor=${encodeURIComponent(cursor)}`
+    );
+
+    const from = new Date(second.body.window.from).getTime();
+    const to = new Date(second.body.window.to).getTime();
+    expect(Math.round((to - from) / DAY_MS)).toBeLessThanOrEqual(30);
+  });
+
   it("picks a fresh window when there is no cursor", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(T0));
