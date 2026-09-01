@@ -21,8 +21,10 @@ import { authClient } from "@/lib/auth-client";
 import {
   type BillingInterval,
   getPriceByInterval,
+  isPlanId,
   PLANS,
   type PlanId,
+  toPublicPlanId,
 } from "@/lib/plans";
 
 type BillingStepProps = {
@@ -41,18 +43,18 @@ export function BillingStep({
   const orgSlug = params.orgSlug as string;
 
   // Get plan from URL param or localStorage, default to free
-  const planParam = searchParams.get("plan") as PlanId | null;
+  const planParam = searchParams.get("plan");
   const storedPlan =
     typeof window !== "undefined"
-      ? (localStorage.getItem(`onboarding_plan_${orgSlug}`) as PlanId | null)
+      ? localStorage.getItem(`onboarding_plan_${orgSlug}`)
       : null;
-  const initialPlan: PlanId =
-    (planParam && ["free", "starter", "growth", "scale"].includes(planParam)
+  const initialPlan: PlanId = toPublicPlanId(
+    (planParam && isPlanId(planParam)
       ? planParam
-      : storedPlan &&
-          ["free", "starter", "growth", "scale"].includes(storedPlan)
+      : storedPlan && isPlanId(storedPlan)
         ? storedPlan
-        : null) ?? "free";
+        : null) ?? "free"
+  );
 
   // Get billing interval from URL param or localStorage, default to monthly
   const intervalParam = searchParams.get("interval") as BillingInterval | null;

@@ -22,6 +22,7 @@ import { authClient } from "@/lib/auth-client";
 import {
   getDisplayPrice,
   hasEarlyAdopterPricing,
+  isPublicPlanId,
   PLANS,
   type PlanId,
 } from "@/lib/plans";
@@ -31,12 +32,12 @@ export default function UpgradePage() {
   const searchParams = useSearchParams();
   const { orgSlug } = useParams<{ orgSlug: string }>();
 
-  // Get plan from URL param, default to starter
-  const planParam = searchParams.get("plan") as PlanId | null;
+  // Get plan from URL param, default to pro
+  const planParam = searchParams.get("plan");
   const initialPlan: PlanId =
-    planParam && ["starter", "growth", "scale"].includes(planParam)
+    planParam && isPublicPlanId(planParam) && planParam !== "free"
       ? planParam
-      : "starter";
+      : "pro";
 
   const [selectedPlan, setSelectedPlan] = useState<PlanId>(initialPlan);
   const [isLoading, setIsLoading] = useState(false);

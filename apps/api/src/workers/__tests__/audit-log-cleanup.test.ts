@@ -86,6 +86,57 @@ const testMemberFreeB = {
   createdAt: new Date(),
 };
 
+const testOrgPro = {
+  id: `${TEST_PREFIX}-org-pro`,
+  name: "Audit Cleanup Pro Org",
+  slug: `${TEST_PREFIX}-org-pro`,
+  createdAt: new Date(),
+  logo: null,
+  metadata: null,
+};
+
+const testOrgBusiness = {
+  id: `${TEST_PREFIX}-org-business`,
+  name: "Audit Cleanup Business Org",
+  slug: `${TEST_PREFIX}-org-business`,
+  createdAt: new Date(),
+  logo: null,
+  metadata: null,
+};
+
+const testOrgStarter = {
+  id: `${TEST_PREFIX}-org-starter`,
+  name: "Audit Cleanup Legacy Starter Org",
+  slug: `${TEST_PREFIX}-org-starter`,
+  createdAt: new Date(),
+  logo: null,
+  metadata: null,
+};
+
+const testMemberPro = {
+  id: `${TEST_PREFIX}-member-pro`,
+  organizationId: testOrgPro.id,
+  userId: testUser.id,
+  role: "owner" as const,
+  createdAt: new Date(),
+};
+
+const testMemberBusiness = {
+  id: `${TEST_PREFIX}-member-business`,
+  organizationId: testOrgBusiness.id,
+  userId: testUser.id,
+  role: "owner" as const,
+  createdAt: new Date(),
+};
+
+const testMemberStarter = {
+  id: `${TEST_PREFIX}-member-starter`,
+  organizationId: testOrgStarter.id,
+  userId: testUser.id,
+  role: "owner" as const,
+  createdAt: new Date(),
+};
+
 // Subscription for scale org
 const testSubscriptionScale = {
   id: `${TEST_PREFIX}-sub-scale`,
@@ -103,6 +154,27 @@ const testSubscriptionScale = {
   annual: false,
   createdAt: new Date(),
   updatedAt: new Date(),
+};
+
+const testSubscriptionPro = {
+  ...testSubscriptionScale,
+  id: `${TEST_PREFIX}-sub-pro`,
+  plan: "pro",
+  referenceId: testOrgPro.id,
+};
+
+const testSubscriptionBusiness = {
+  ...testSubscriptionScale,
+  id: `${TEST_PREFIX}-sub-business`,
+  plan: "business",
+  referenceId: testOrgBusiness.id,
+};
+
+const testSubscriptionStarter = {
+  ...testSubscriptionScale,
+  id: `${TEST_PREFIX}-sub-starter`,
+  plan: "starter",
+  referenceId: testOrgStarter.id,
 };
 
 // Helper: build a date N days ago
@@ -123,7 +195,14 @@ beforeAll(async () => {
     .onConflictDoUpdate({ target: user.id, set: { updatedAt: new Date() } });
 
   // Insert orgs
-  for (const org of [testOrgFree, testOrgScale, testOrgFreeB]) {
+  for (const org of [
+    testOrgFree,
+    testOrgScale,
+    testOrgFreeB,
+    testOrgPro,
+    testOrgBusiness,
+    testOrgStarter,
+  ]) {
     await db
       .insert(organization)
       .values(org)
@@ -131,21 +210,35 @@ beforeAll(async () => {
   }
 
   // Insert members
-  for (const m of [testMemberFree, testMemberScale, testMemberFreeB]) {
+  for (const m of [
+    testMemberFree,
+    testMemberScale,
+    testMemberFreeB,
+    testMemberPro,
+    testMemberBusiness,
+    testMemberStarter,
+  ]) {
     await db
       .insert(member)
       .values(m)
       .onConflictDoUpdate({ target: member.id, set: { role: m.role } });
   }
 
-  // Insert scale subscription
-  await db
-    .insert(subscription)
-    .values(testSubscriptionScale)
-    .onConflictDoUpdate({
-      target: subscription.id,
-      set: { status: testSubscriptionScale.status },
-    });
+  // Insert subscriptions
+  for (const sub of [
+    testSubscriptionScale,
+    testSubscriptionPro,
+    testSubscriptionBusiness,
+    testSubscriptionStarter,
+  ]) {
+    await db
+      .insert(subscription)
+      .values(sub)
+      .onConflictDoUpdate({
+        target: subscription.id,
+        set: { status: sub.status },
+      });
+  }
 });
 
 afterAll(async () => {
@@ -157,7 +250,14 @@ afterAll(async () => {
   // Clean up test data in reverse dependency order
   await db
     .delete(subscription)
-    .where(eq(subscription.id, testSubscriptionScale.id));
+    .where(
+      inArray(subscription.id, [
+        testSubscriptionScale.id,
+        testSubscriptionPro.id,
+        testSubscriptionBusiness.id,
+        testSubscriptionStarter.id,
+      ])
+    );
   await db
     .delete(member)
     .where(
@@ -165,9 +265,19 @@ afterAll(async () => {
         testMemberFree.id,
         testMemberScale.id,
         testMemberFreeB.id,
+        testMemberPro.id,
+        testMemberBusiness.id,
+        testMemberStarter.id,
       ])
     );
-  for (const org of [testOrgFree, testOrgScale, testOrgFreeB]) {
+  for (const org of [
+    testOrgFree,
+    testOrgScale,
+    testOrgFreeB,
+    testOrgPro,
+    testOrgBusiness,
+    testOrgStarter,
+  ]) {
     await db.delete(organization).where(eq(organization.id, org.id));
   }
   await db.delete(user).where(eq(user.id, testUser.id));
@@ -200,8 +310,8 @@ async function rowExists(id: string): Promise<boolean> {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("audit-log-cleanup handler", () => {
-  it("deletes events older than retention window (free = 7 days)", async () => {
-    const oldId = await insertAuditLog(testOrgFree.id, daysAgo(10));
+  it("deletes events older than retention window (free = 30 days)", async () => {
+    const oldId = await insertAuditLog(testOrgFree.id, daysAgo(40));
     const recentId = await insertAuditLog(testOrgFree.id, daysAgo(1));
 
     await handler({} as never, {} as never, () => {});
@@ -218,15 +328,45 @@ describe("audit-log-cleanup handler", () => {
     expect(await rowExists(recentId)).toBe(true);
   });
 
-  it("applies correct retention per org plan (scale=365, free=7)", async () => {
+  it("applies correct retention per org plan (scale=365, free=30)", async () => {
     // 100-day-old row for scale org — within 365-day window, should survive
     const scaleId = await insertAuditLog(testOrgScale.id, daysAgo(100));
-    // 100-day-old row for free org — outside 7-day window, should be deleted
+    // 100-day-old row for free org — outside 30-day window, should be deleted
     const freeId = await insertAuditLog(testOrgFree.id, daysAgo(100));
 
     await handler({} as never, {} as never, () => {});
 
     expect(await rowExists(scaleId)).toBe(true);
     expect(await rowExists(freeId)).toBe(false);
+  });
+
+  it("pro org keeps a 60-day-old row and loses a 100-day-old one (90-day window)", async () => {
+    const keptId = await insertAuditLog(testOrgPro.id, daysAgo(60));
+    const deletedId = await insertAuditLog(testOrgPro.id, daysAgo(100));
+
+    await handler({} as never, {} as never, () => {});
+
+    expect(await rowExists(keptId)).toBe(true);
+    expect(await rowExists(deletedId)).toBe(false);
+  });
+
+  it("business org keeps a 300-day-old row (365-day window)", async () => {
+    const keptId = await insertAuditLog(testOrgBusiness.id, daysAgo(300));
+
+    await handler({} as never, {} as never, () => {});
+
+    expect(await rowExists(keptId)).toBe(true);
+  });
+
+  it("legacy starter org gets the Pro window (90 days), not the old 30-day window", async () => {
+    // 60 days old: outside the old 30-day Free window, inside the 90-day Pro
+    // window Starter is grandfathered into (plans/208).
+    const keptId = await insertAuditLog(testOrgStarter.id, daysAgo(60));
+    const deletedId = await insertAuditLog(testOrgStarter.id, daysAgo(100));
+
+    await handler({} as never, {} as never, () => {});
+
+    expect(await rowExists(keptId)).toBe(true);
+    expect(await rowExists(deletedId)).toBe(false);
   });
 });

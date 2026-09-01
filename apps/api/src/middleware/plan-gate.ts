@@ -10,26 +10,29 @@ import { getAuthOptional } from "./auth";
 
 // Feature to minimum plan mapping (aligned with apps/web/src/lib/plans.ts)
 export const FEATURE_PLANS = {
-  batch: "starter", // Starter+
-  topics: "starter", // Starter+
-  segments: "starter", // Starter+
-  campaigns: "starter", // Starter+
-  workflows: "free", // All tiers (quantity limited: 1/unlimited by tier)
-  events: "starter", // Starter+
-  advancedSegments: "scale", // Scale+
-  customRetention: "scale", // Scale+
-  prioritySLA: "scale", // Scale+
-  sso: "scale", // Scale+
+  batch: "pro",
+  topics: "pro",
+  segments: "pro",
+  campaigns: "pro",
+  workflows: "free", // All tiers (quantity limited by tier)
+  events: "pro",
+  advancedSegments: "business",
+  customRetention: "business",
+  prioritySLA: "business",
+  sso: "business",
 } as const;
 
 type Feature = keyof typeof FEATURE_PLANS;
 
-// Plan hierarchy for comparison
+// Legacy names keep their old rank so a grandfathered subscription clears the
+// same gates it always did — see plans/208.
 const PLAN_HIERARCHY = {
   free: 0,
-  starter: 1,
-  growth: 2,
-  scale: 3,
+  pro: 1,
+  business: 2,
+  starter: 1, // legacy → pro
+  growth: 2, // legacy → business
+  scale: 2, // legacy → business
 } as const;
 
 type PlanId = keyof typeof PLAN_HIERARCHY;

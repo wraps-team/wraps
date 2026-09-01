@@ -32,20 +32,31 @@
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type PlanId = "free" | "starter" | "growth" | "scale";
+/** Publicly purchasable plans. */
+export type PublicPlanId = "free" | "pro" | "business";
+
+/**
+ * Plans that exist only for grandfathered subscriptions and already-issued
+ * self-hosted licences. Never shown on the pricing page, never purchasable.
+ * These names appear in live Stripe subscriptions and in signed licence
+ * payloads — they can never be removed.
+ */
+export type LegacyPlanId = "starter" | "growth" | "scale";
+
+export type PlanId = PublicPlanId | LegacyPlanId;
 
 export type PlanFeature =
-  | "batch" // Starter+: Send to all contacts
-  | "topics" // Growth+: Subscription management
-  | "segments" // Growth+: Property-based targeting
-  | "campaigns" // Growth+: Scheduled, targeted sends
-  | "workflows" // All tiers: Visual automation builder (1/unlimited by tier)
-  | "events" // Scale+: Behavioral tracking
-  | "advancedSegments" // Scale+: Behavioral segments
+  | "batch" // Pro+: Send to all contacts
+  | "topics" // Pro+: Subscription management
+  | "segments" // Pro+: Property-based targeting
+  | "campaigns" // Pro+: Scheduled, targeted sends
+  | "workflows" // All tiers: Visual automation builder (2/unlimited by tier)
+  | "events" // Pro+: Behavioral tracking
+  | "advancedSegments" // Business+: Behavioral segments
   | "customRetention" // Enterprise+: Custom data retention
-  | "prioritySLA" // Enterprise+: Priority support SLA
-  | "sso" // Scale+: SSO + SCIM provisioning
-  | "auditLog"; // Starter+: Audit log viewer
+  | "prioritySLA" // Business+: Priority support SLA
+  | "sso" // Business+: SSO + SCIM provisioning
+  | "auditLog"; // Pro+: Audit log viewer
 
 export type RateLimits = {
   dailyRequests: number; // -1 = unlimited
@@ -64,10 +75,11 @@ export type PlanConfig = {
   period: string;
   description: string;
   dashboardAccess: boolean;
+  legacy?: boolean;
 
   // Resource Limits
   maxContacts: number; // -1 = unlimited
-  maxTeamMembers: number; // -1 = unlimited (free tier = 1)
+  maxTeamMembers: number; // -1 = unlimited (unlimited on every tier — plans/208)
   maxAwsAccounts: number; // -1 = unlimited
   aiMessages: number;
   bulkBatchSize: number;
@@ -108,27 +120,27 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 
     // Resource Limits
     maxContacts: -1, // Unlimited contacts
-    maxTeamMembers: 1, // Solo only
+    maxTeamMembers: -1, // Unlimited seats on every tier
     maxAwsAccounts: 1,
     aiMessages: 10,
     bulkBatchSize: 50,
 
     // Event-Based Pricing Limits
-    maxMessages: 5000, // 5K tracked events/month
-    maxWorkflows: 1, // 1 workflow
-    historyRetentionDays: 7, // 7-day retention
+    maxMessages: -1, // No tracked-event allowance
+    maxWorkflows: 2, // 2 workflows
+    historyRetentionDays: 30, // 30-day retention
 
     // Overage: must upgrade (no overage on Free)
     overagePriceCentsPerK: null,
 
     // Feature Access
     features: {
-      batch: false, // Batch sending requires Starter+
+      batch: false, // Batch sending requires Pro+
       topics: false,
       segments: false,
       campaigns: false,
-      workflows: true, // 1 workflow limit
-      events: false,
+      workflows: true, // 2 workflow limit
+      events: false, // Pro+ — plan 207 enforces this at the API
       advancedSegments: false,
       customRetention: false,
       prioritySLA: false,
@@ -144,83 +156,22 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 
     // Display
     featureList: [
-      "5,000 tracked events/month",
-      "1 workflow",
-      "10 AI generations",
+      "Unlimited sends, domains & contacts",
+      "Unlimited team members",
       "1 AWS account",
-      "7-day history",
+      "2 workflows",
+      "30-day history",
     ],
     cta: "Start Free",
   },
 
-  starter: {
-    name: "Starter",
-    price: 19,
-    earlyAdopterPrice: 19,
-    annualPrice: 17, // ~$199/yr
-    annualEarlyAdopterPrice: 17,
-    annualTotal: 199, // Total billed annually
+  pro: {
+    name: "Pro",
+    price: 29,
+    annualPrice: 25, // ~$299/yr
+    annualTotal: 299, // Total billed annually
     period: "/month",
     description: "For indie hackers and side projects",
-    dashboardAccess: true,
-
-    // Resource Limits
-    maxContacts: -1, // Unlimited contacts
-    maxTeamMembers: -1, // Unlimited
-    maxAwsAccounts: 1,
-    aiMessages: 50,
-    bulkBatchSize: 500,
-
-    // Event-Based Pricing Limits
-    maxMessages: 50_000, // 50K tracked events/month
-    maxWorkflows: -1, // Unlimited workflows
-    historyRetentionDays: 30, // 30-day retention
-
-    // Overage: must upgrade (no overage on Starter)
-    overagePriceCentsPerK: null,
-
-    // Feature Access
-    features: {
-      batch: true, // Send to all contacts
-      topics: true, // Subscription management
-      segments: true, // Property-based targeting
-      campaigns: true, // Scheduled broadcasts
-      workflows: true, // Unlimited workflows
-      events: true, // Custom event tracking
-      advancedSegments: false, // Behavioral segments (Scale+)
-      customRetention: false,
-      prioritySLA: false,
-      sso: false,
-      auditLog: true,
-    },
-
-    // Rate Limits
-    rateLimits: {
-      dailyRequests: 50_000,
-      minuteRequests: 500,
-    },
-
-    // Display
-    featureList: [
-      "50,000 tracked events/month",
-      "Unlimited workflows",
-      "Topics & segments",
-      "Broadcasts & campaigns",
-      "50 AI generations",
-      "30-day history",
-    ],
-    cta: "Subscribe",
-  },
-
-  growth: {
-    name: "Growth",
-    price: 79,
-    earlyAdopterPrice: 79,
-    annualPrice: 67, // ~$799/yr
-    annualEarlyAdopterPrice: 67,
-    annualTotal: 799, // Total billed annually
-    period: "/month",
-    description: "For growing startups",
     dashboardAccess: true,
 
     // Resource Limits
@@ -231,22 +182,22 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     bulkBatchSize: 2000,
 
     // Event-Based Pricing Limits
-    maxMessages: 250_000, // 250K tracked events/month
+    maxMessages: -1, // No tracked-event allowance
     maxWorkflows: -1, // Unlimited workflows
     historyRetentionDays: 90, // 90-day retention
 
-    // Overage: $0.50/1K tracked events
-    overagePriceCentsPerK: 50,
+    // Overage: must upgrade (no overage on Pro)
+    overagePriceCentsPerK: null,
 
     // Feature Access
     features: {
-      batch: true,
+      batch: true, // Send to all contacts
       topics: true, // Subscription management
       segments: true, // Property-based targeting
-      campaigns: true, // Scheduled, targeted sends
+      campaigns: true, // Scheduled broadcasts
       workflows: true, // Unlimited workflows
       events: true, // Custom event tracking
-      advancedSegments: false, // Behavioral segments (Scale+)
+      advancedSegments: false, // Business only
       customRetention: false,
       prioritySLA: false,
       sso: false,
@@ -261,12 +212,196 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 
     // Display
     featureList: [
-      "250,000 tracked events/month",
-      "Everything in Starter",
-      "250 AI generations",
+      "Unlimited sends, domains & contacts",
+      "Unlimited workflows",
+      "Topics, segments, batch & campaigns",
       "3 AWS accounts",
+      "250 AI generations",
       "90-day history",
-      "$0.50/1K tracked events overage",
+    ],
+    cta: "Subscribe",
+  },
+
+  business: {
+    name: "Business",
+    price: 199,
+    annualPrice: 167, // ~$1,999/yr
+    annualTotal: 1999, // Total billed annually
+    period: "/month",
+    description: "For scaling companies",
+    dashboardAccess: true,
+
+    // Resource Limits
+    maxContacts: -1, // Unlimited contacts
+    maxTeamMembers: -1, // Unlimited
+    maxAwsAccounts: -1, // Unlimited
+    aiMessages: 1000,
+    bulkBatchSize: 10_000,
+
+    // Event-Based Pricing Limits
+    maxMessages: -1, // No tracked-event allowance
+    maxWorkflows: -1, // Unlimited workflows
+    historyRetentionDays: 365, // 1-year retention
+
+    // Overage: must upgrade (no overage on Business)
+    overagePriceCentsPerK: null,
+
+    // Feature Access
+    features: {
+      batch: true,
+      topics: true,
+      segments: true,
+      campaigns: true,
+      workflows: true,
+      events: true, // Behavioral tracking
+      advancedSegments: true, // Behavioral segments
+      customRetention: false, // Enterprise only
+      prioritySLA: true, // Priority support SLA
+      sso: true, // SSO + SCIM provisioning
+      auditLog: true,
+    },
+
+    // Rate Limits
+    rateLimits: {
+      dailyRequests: 500_000,
+      minuteRequests: 5000,
+    },
+
+    // Display
+    featureList: [
+      "Everything in Pro",
+      "Unlimited AWS accounts",
+      "1,000 AI generations",
+      "1-year history",
+      "SSO + SCIM, audit export",
+      "Priority support SLA",
+    ],
+    cta: "Subscribe",
+  },
+
+  // ─────────────────────────────────────────────────────────────────────
+  // LEGACY PLANS — grandfathered, never purchasable. See plans/208.
+  // Prices are frozen forever (PRICING_COPY.foundingMemberPerks promises
+  // "Locked-in pricing for life"); limits and features match the new-tier
+  // equivalent named in LEGACY_PLAN_SUCCESSOR.
+  // ─────────────────────────────────────────────────────────────────────
+
+  starter: {
+    name: "Starter",
+    price: 19,
+    earlyAdopterPrice: 19,
+    annualPrice: 17, // ~$199/yr
+    annualEarlyAdopterPrice: 17,
+    annualTotal: 199, // Total billed annually
+    period: "/month",
+    description: "For indie hackers and side projects",
+    dashboardAccess: true,
+    legacy: true,
+
+    // Resource Limits — same as Pro
+    maxContacts: -1, // Unlimited contacts
+    maxTeamMembers: -1, // Unlimited
+    maxAwsAccounts: 3,
+    aiMessages: 250,
+    bulkBatchSize: 2000,
+
+    // Event-Based Pricing Limits
+    maxMessages: -1, // No tracked-event allowance
+    maxWorkflows: -1, // Unlimited workflows
+    historyRetentionDays: 90, // 90-day retention
+
+    // Overage: must upgrade (no overage on Starter)
+    overagePriceCentsPerK: null,
+
+    // Feature Access — same as Pro
+    features: {
+      batch: true, // Send to all contacts
+      topics: true, // Subscription management
+      segments: true, // Property-based targeting
+      campaigns: true, // Scheduled broadcasts
+      workflows: true, // Unlimited workflows
+      events: true, // Custom event tracking
+      advancedSegments: false, // Business only
+      customRetention: false,
+      prioritySLA: false,
+      sso: false,
+      auditLog: true,
+    },
+
+    // Rate Limits
+    rateLimits: {
+      dailyRequests: 200_000,
+      minuteRequests: 2000,
+    },
+
+    // Display
+    featureList: [
+      "Unlimited sends, domains & contacts",
+      "Unlimited workflows",
+      "Topics, segments, batch & campaigns",
+      "3 AWS accounts",
+      "250 AI generations",
+      "90-day history",
+    ],
+    cta: "Subscribe",
+  },
+
+  growth: {
+    name: "Growth",
+    price: 79,
+    earlyAdopterPrice: 79,
+    annualPrice: 67, // ~$799/yr
+    annualEarlyAdopterPrice: 67,
+    annualTotal: 799, // Total billed annually
+    period: "/month",
+    description: "For growing startups",
+    dashboardAccess: true,
+    legacy: true,
+
+    // Resource Limits — same as Business
+    maxContacts: -1, // Unlimited contacts
+    maxTeamMembers: -1, // Unlimited
+    maxAwsAccounts: -1, // Unlimited
+    aiMessages: 1000,
+    bulkBatchSize: 10_000,
+
+    // Event-Based Pricing Limits
+    maxMessages: -1, // No tracked-event allowance
+    maxWorkflows: -1, // Unlimited workflows
+    historyRetentionDays: 365, // 1-year retention
+
+    // Overage: must upgrade (no overage on Growth)
+    overagePriceCentsPerK: null,
+
+    // Feature Access — same as Business
+    features: {
+      batch: true,
+      topics: true, // Subscription management
+      segments: true, // Property-based targeting
+      campaigns: true, // Scheduled, targeted sends
+      workflows: true, // Unlimited workflows
+      events: true, // Custom event tracking
+      advancedSegments: true, // Behavioral segments
+      customRetention: false, // Enterprise only
+      prioritySLA: true, // Priority support SLA
+      sso: true, // SSO + SCIM provisioning
+      auditLog: true,
+    },
+
+    // Rate Limits
+    rateLimits: {
+      dailyRequests: 500_000,
+      minuteRequests: 5000,
+    },
+
+    // Display
+    featureList: [
+      "Everything in Pro",
+      "Unlimited AWS accounts",
+      "1,000 AI generations",
+      "1-year history",
+      "SSO + SCIM, audit export",
+      "Priority support SLA",
     ],
     cta: "Subscribe",
   },
@@ -281,8 +416,9 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     period: "/month",
     description: "For scaling companies",
     dashboardAccess: true,
+    legacy: true,
 
-    // Resource Limits
+    // Resource Limits — same as Business
     maxContacts: -1, // Unlimited contacts
     maxTeamMembers: -1, // Unlimited
     maxAwsAccounts: -1, // Unlimited
@@ -290,14 +426,14 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     bulkBatchSize: 10_000,
 
     // Event-Based Pricing Limits
-    maxMessages: 1_000_000, // 1M tracked events/month
+    maxMessages: -1, // No tracked-event allowance
     maxWorkflows: -1, // Unlimited workflows
     historyRetentionDays: 365, // 1-year retention
 
-    // Overage: $0.15/1K tracked events
-    overagePriceCentsPerK: 15,
+    // Overage: must upgrade (no overage on Scale)
+    overagePriceCentsPerK: null,
 
-    // Feature Access
+    // Feature Access — same as Business
     features: {
       batch: true,
       topics: true,
@@ -306,7 +442,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       workflows: true,
       events: true, // Behavioral tracking
       advancedSegments: true, // Behavioral segments
-      customRetention: false,
+      customRetention: false, // Enterprise only
       prioritySLA: true, // Priority support SLA
       sso: true, // SSO + SCIM provisioning
       auditLog: true,
@@ -320,13 +456,12 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 
     // Display
     featureList: [
-      "1,000,000 tracked events/month",
-      "Everything in Growth",
-      "Behavioral segments",
-      "1,000 AI generations",
+      "Everything in Pro",
       "Unlimited AWS accounts",
+      "1,000 AI generations",
       "1-year history",
-      "$0.15/1K tracked events overage",
+      "SSO + SCIM, audit export",
+      "Priority support SLA",
     ],
     cta: "Subscribe",
   },
@@ -353,27 +488,59 @@ export function getPlan(planId: PlanId | string): PlanConfig | undefined {
   return PLANS[planId as PlanId];
 }
 
+/** Purchasable plans, in ladder order. Legacy IDs are deliberately absent. */
+export const PUBLIC_PLAN_IDS = ["free", "pro", "business"] as const;
+
+/**
+ * Which current plan each legacy plan is the equivalent of. Used to point a
+ * grandfathered customer's UI at the right upgrade target without changing
+ * what they are billed.
+ */
+export const LEGACY_PLAN_SUCCESSOR: Record<LegacyPlanId, PublicPlanId> = {
+  starter: "pro",
+  growth: "business",
+  scale: "business",
+};
+
+export function isPlanId(id: string): id is PlanId {
+  return Object.hasOwn(PLANS, id);
+}
+
+export function isPublicPlanId(id: string): id is PublicPlanId {
+  return (PUBLIC_PLAN_IDS as readonly string[]).includes(id);
+}
+
+/** The purchasable plan a given plan maps to (identity for public plans). */
+export function toPublicPlanId(id: PlanId): PublicPlanId {
+  return isPublicPlanId(id) ? id : LEGACY_PLAN_SUCCESSOR[id];
+}
+
+/** Next plan up the purchasable ladder, or null if already at the top. */
+export function getNextPlan(id: PlanId): PublicPlanId | null {
+  const current = toPublicPlanId(id);
+  const idx = PUBLIC_PLAN_IDS.indexOf(current);
+  return PUBLIC_PLAN_IDS[idx + 1] ?? null;
+}
+
+export function isTopPlan(id: PlanId): boolean {
+  return getNextPlan(id) === null;
+}
+
 /**
  * Get available plans for self-serve display
  */
-export function getDisplayPlans(): { id: PlanId; plan: PlanConfig }[] {
-  return [
-    { id: "free", plan: PLANS.free },
-    { id: "starter", plan: PLANS.starter },
-    { id: "growth", plan: PLANS.growth },
-    { id: "scale", plan: PLANS.scale },
-  ];
+export function getDisplayPlans(): { id: PublicPlanId; plan: PlanConfig }[] {
+  return PUBLIC_PLAN_IDS.map((id) => ({ id, plan: PLANS[id] }));
 }
 
 /**
  * Get paid plans only (excludes free tier)
  */
-export function getPaidPlans(): { id: PlanId; plan: PlanConfig }[] {
-  return [
-    { id: "starter", plan: PLANS.starter },
-    { id: "growth", plan: PLANS.growth },
-    { id: "scale", plan: PLANS.scale },
-  ];
+export function getPaidPlans(): { id: PublicPlanId; plan: PlanConfig }[] {
+  return PUBLIC_PLAN_IDS.filter((id) => PLANS[id].price > 0).map((id) => ({
+    id,
+    plan: PLANS[id],
+  }));
 }
 
 /**
@@ -557,7 +724,7 @@ export function hasFeature(
  * Get the minimum plan required for a feature
  */
 export function getRequiredPlan(feature: PlanFeature): PlanId | null {
-  const planOrder: PlanId[] = ["free", "starter", "growth", "scale"];
+  const planOrder: readonly PlanId[] = PUBLIC_PLAN_IDS;
 
   for (const planId of planOrder) {
     if (PLANS[planId].features[feature]) {

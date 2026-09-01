@@ -33,7 +33,15 @@ import {
 // Keep in sync manually; consolidate when divergence causes an actual bug.
 const PROD_PUBLIC_KEY_PEM =
   "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEATgLTGM1FH6spW9Ayl9Srb1dDHk7KlVX9NBTQQw+4vjQ=\n-----END PUBLIC KEY-----\n";
-const LICENSE_VALID_TIERS = ["starter", "growth", "scale"] as const;
+// "starter" | "growth" | "scale" are legacy names that appear in licences
+// already issued to self-hosted customers. They must remain valid forever.
+const LICENSE_VALID_TIERS = [
+  "pro",
+  "business",
+  "starter",
+  "growth",
+  "scale",
+] as const;
 type LicenseTier = (typeof LICENSE_VALID_TIERS)[number];
 
 function getPublicKey() {

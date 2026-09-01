@@ -1,6 +1,6 @@
 import { sign } from "node:crypto";
 
-const VALID_TIERS = ["starter", "growth", "scale"] as const;
+const VALID_TIERS = ["pro", "business", "starter", "growth", "scale"] as const;
 
 export function generateLicenseKey(tier: string, expires: string): string {
   if (!(VALID_TIERS as readonly string[]).includes(tier)) {

@@ -52,7 +52,7 @@ export default async function AuditLogsPage({ params }: AuditLogsPageProps) {
     getOrganizationPlan(orgWithMembership.id),
   ]);
 
-  const requiredPlan = getRequiredPlan("auditLog") || "starter";
+  const requiredPlan = getRequiredPlan("auditLog") || "pro";
 
   if (!featureCheck.allowed) {
     return (

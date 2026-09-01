@@ -22,6 +22,9 @@ import { getAuthOptional } from "./auth";
 // Aligned with apps/web/src/lib/plans.ts
 const PLAN_LIMITS = {
   free: { daily: 1000, minute: 50 },
+  pro: { daily: 200_000, minute: 2000 },
+  business: { daily: 500_000, minute: 5000 },
+  // Legacy plans — see plans/208. Mapped to their new-tier equivalent.
   starter: { daily: 50_000, minute: 500 },
   growth: { daily: 200_000, minute: 2000 },
   scale: { daily: 500_000, minute: 5000 },

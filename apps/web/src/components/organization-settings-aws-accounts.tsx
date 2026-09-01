@@ -69,7 +69,7 @@ type OrganizationSettingsAwsAccountsProps = {
 export function OrganizationSettingsAwsAccounts({
   organization,
   userRole,
-  planId = "starter",
+  planId = "free",
   unlimited = false,
   selfHosted,
 }: OrganizationSettingsAwsAccountsProps) {

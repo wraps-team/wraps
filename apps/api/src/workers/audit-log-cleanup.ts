@@ -5,10 +5,14 @@
  * plan-based retention window. Runs nightly at 02:00 UTC in production.
  *
  * Retention windows:
- *   free    →  7 days
- *   starter → 30 days
- *   growth  → 90 days
- *   scale   → 365 days
+ *   free     →  30 days
+ *   pro      →  90 days
+ *   business → 365 days
+ *
+ *   Legacy plans — see plans/208. Mapped to their new-tier equivalent.
+ *   starter →  90 days (pro)
+ *   growth  → 365 days (business)
+ *   scale   → 365 days (business)
  */
 
 // Initialize Sentry before all other imports
@@ -21,9 +25,12 @@ import { and, eq, inArray, lt } from "drizzle-orm";
 import { flushLogger, log } from "../lib/logger";
 
 const RETENTION_DAYS: Record<string, number> = {
-  free: 7,
-  starter: 30,
-  growth: 90,
+  free: 30,
+  pro: 90,
+  business: 365,
+  // Legacy plans — see plans/208. Mapped to their new-tier equivalent.
+  starter: 90,
+  growth: 365,
   scale: 365,
 };
 

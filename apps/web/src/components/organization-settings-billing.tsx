@@ -37,10 +37,14 @@ import { authClient } from "@/lib/auth-client";
 import {
   type BillingInterval,
   getAnnualTotal,
+  getPaidPlans,
   getPriceByInterval,
   hasEarlyAdopterPricing,
+  isTopPlan,
   PLANS,
   type PlanId,
+  PUBLIC_PLAN_IDS,
+  toPublicPlanId,
 } from "@/lib/plans";
 
 type OrganizationSettingsBillingProps = {
@@ -263,7 +267,7 @@ export function OrganizationSettingsBilling({
       {organization.slug && <EventUsageCard orgSlug={organization.slug} />}
 
       {/* Upgrade Options */}
-      {!isCancelled && currentPlan !== "scale" && (
+      {!(isCancelled || isTopPlan(currentPlan)) && (
         <Card>
           <CardHeader>
             <CardTitle>Upgrade Your Plan</CardTitle>
@@ -279,263 +283,72 @@ export function OrganizationSettingsBilling({
             />
 
             <div className="grid gap-4 md:grid-cols-2">
-              {/* Starter Plan - show for Free tier */}
-              {currentPlan === "free" && (
-                <div className="space-y-4 rounded-lg border p-6">
-                  <div>
-                    <h3 className="font-semibold text-lg">
-                      {PLANS.starter.name}
-                    </h3>
-                    <div className="mt-2 flex items-baseline gap-1">
-                      <span className="font-bold text-3xl">
-                        $
-                        {getPriceByInterval(
-                          PLANS.starter,
-                          upgradeBillingInterval
-                        )}
-                      </span>
-                      {hasEarlyAdopterPricing(PLANS.starter) && (
-                        <span className="text-muted-foreground text-sm line-through">
-                          $
-                          {upgradeBillingInterval === "annual"
-                            ? PLANS.starter.annualPrice
-                            : PLANS.starter.price}
+              {/* One card per purchasable plan above the org's current one */}
+              {getPaidPlans()
+                .filter(
+                  ({ id }) =>
+                    PUBLIC_PLAN_IDS.indexOf(id) >
+                    PUBLIC_PLAN_IDS.indexOf(toPublicPlanId(currentPlan))
+                )
+                .map(({ id, plan }, index) => (
+                  <div className="space-y-4 rounded-lg border p-6" key={id}>
+                    <div>
+                      <h3 className="font-semibold text-lg">{plan.name}</h3>
+                      <div className="mt-2 flex items-baseline gap-1">
+                        <span className="font-bold text-3xl">
+                          ${getPriceByInterval(plan, upgradeBillingInterval)}
                         </span>
-                      )}
-                      <span className="text-muted-foreground text-sm">/mo</span>
-                    </div>
-                    {upgradeBillingInterval === "annual" &&
-                      getAnnualTotal(PLANS.starter) && (
-                        <p className="mt-1 text-green-600 text-sm">
-                          ${getAnnualTotal(PLANS.starter)} billed annually
-                        </p>
-                      )}
-                    <p className="mt-1 text-muted-foreground text-sm">
-                      {PLANS.starter.description}
-                    </p>
-                  </div>
-
-                  <ul className="space-y-2">
-                    {PLANS.starter.featureList.slice(0, 4).map((feature) => (
-                      <li
-                        className="flex items-start gap-2 text-sm"
-                        key={feature}
-                      >
-                        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-primary" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Button
-                    className="w-full"
-                    disabled={!canManageBilling}
-                    loading={upgradeMutation.isPending}
-                    onClick={() =>
-                      upgradeMutation.mutate({
-                        plan: "starter",
-                        annual: upgradeBillingInterval === "annual",
-                      })
-                    }
-                  >
-                    Upgrade to Starter
-                  </Button>
-                </div>
-              )}
-
-              {/* Growth Plan - show for Free and Starter */}
-              {(currentPlan === "free" || currentPlan === "starter") && (
-                <div className="space-y-4 rounded-lg border p-6">
-                  <div>
-                    <h3 className="font-semibold text-lg">
-                      {PLANS.growth.name}
-                    </h3>
-                    <div className="mt-2 flex items-baseline gap-1">
-                      <span className="font-bold text-3xl">
-                        $
-                        {getPriceByInterval(
-                          PLANS.growth,
-                          upgradeBillingInterval
+                        {hasEarlyAdopterPricing(plan) && (
+                          <span className="text-muted-foreground text-sm line-through">
+                            $
+                            {upgradeBillingInterval === "annual"
+                              ? plan.annualPrice
+                              : plan.price}
+                          </span>
                         )}
-                      </span>
-                      {hasEarlyAdopterPricing(PLANS.growth) && (
-                        <span className="text-muted-foreground text-sm line-through">
-                          $
-                          {upgradeBillingInterval === "annual"
-                            ? PLANS.growth.annualPrice
-                            : PLANS.growth.price}
+                        <span className="text-muted-foreground text-sm">
+                          /mo
                         </span>
-                      )}
-                      <span className="text-muted-foreground text-sm">/mo</span>
-                    </div>
-                    {upgradeBillingInterval === "annual" &&
-                      getAnnualTotal(PLANS.growth) && (
-                        <p className="mt-1 text-green-600 text-sm">
-                          ${getAnnualTotal(PLANS.growth)} billed annually
-                        </p>
-                      )}
-                    <p className="mt-1 text-muted-foreground text-sm">
-                      {PLANS.growth.description}
-                    </p>
-                  </div>
-
-                  <ul className="space-y-2">
-                    {PLANS.growth.featureList.slice(0, 4).map((feature) => (
-                      <li
-                        className="flex items-start gap-2 text-sm"
-                        key={feature}
-                      >
-                        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-primary" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Button
-                    className="w-full"
-                    disabled={!canManageBilling}
-                    loading={upgradeMutation.isPending}
-                    onClick={() =>
-                      upgradeMutation.mutate({
-                        plan: "growth",
-                        annual: upgradeBillingInterval === "annual",
-                      })
-                    }
-                    variant={currentPlan === "free" ? "outline" : "default"}
-                  >
-                    Upgrade to Growth
-                  </Button>
-                </div>
-              )}
-
-              {/* Scale Plan - show for Free and Starter (as third option) */}
-              {(currentPlan === "free" || currentPlan === "starter") && (
-                <div className="space-y-4 rounded-lg border p-6">
-                  <div>
-                    <h3 className="font-semibold text-lg">
-                      {PLANS.scale.name}
-                    </h3>
-                    <div className="mt-2 flex items-baseline gap-1">
-                      <span className="font-bold text-3xl">
-                        $
-                        {getPriceByInterval(
-                          PLANS.scale,
-                          upgradeBillingInterval
+                      </div>
+                      {upgradeBillingInterval === "annual" &&
+                        getAnnualTotal(plan) && (
+                          <p className="mt-1 text-green-600 text-sm">
+                            ${getAnnualTotal(plan)} billed annually
+                          </p>
                         )}
-                      </span>
-                      {hasEarlyAdopterPricing(PLANS.scale) && (
-                        <span className="text-muted-foreground text-sm line-through">
-                          $
-                          {upgradeBillingInterval === "annual"
-                            ? PLANS.scale.annualPrice
-                            : PLANS.scale.price}
-                        </span>
-                      )}
-                      <span className="text-muted-foreground text-sm">/mo</span>
+                      <p className="mt-1 text-muted-foreground text-sm">
+                        {plan.description}
+                      </p>
                     </div>
-                    {upgradeBillingInterval === "annual" &&
-                      getAnnualTotal(PLANS.scale) && (
-                        <p className="mt-1 text-green-600 text-sm">
-                          ${getAnnualTotal(PLANS.scale)} billed annually
-                        </p>
-                      )}
-                    <p className="mt-1 text-muted-foreground text-sm">
-                      {PLANS.scale.description}
-                    </p>
+
+                    <ul className="space-y-2">
+                      {plan.featureList.slice(0, 4).map((feature) => (
+                        <li
+                          className="flex items-start gap-2 text-sm"
+                          key={feature}
+                        >
+                          <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-primary" />
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Button
+                      className="w-full"
+                      disabled={!canManageBilling}
+                      loading={upgradeMutation.isPending}
+                      onClick={() =>
+                        upgradeMutation.mutate({
+                          plan: id,
+                          annual: upgradeBillingInterval === "annual",
+                        })
+                      }
+                      variant={index === 0 ? "default" : "outline"}
+                    >
+                      Upgrade to {plan.name}
+                    </Button>
                   </div>
-
-                  <ul className="space-y-2">
-                    {PLANS.scale.featureList.slice(0, 4).map((feature) => (
-                      <li
-                        className="flex items-start gap-2 text-sm"
-                        key={feature}
-                      >
-                        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-primary" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Button
-                    className="w-full"
-                    disabled={!canManageBilling}
-                    loading={upgradeMutation.isPending}
-                    onClick={() =>
-                      upgradeMutation.mutate({
-                        plan: "scale",
-                        annual: upgradeBillingInterval === "annual",
-                      })
-                    }
-                    variant="outline"
-                  >
-                    Upgrade to Scale
-                  </Button>
-                </div>
-              )}
-
-              {/* Scale Plan - show for Growth tier as the only upgrade option */}
-              {currentPlan === "growth" && (
-                <div className="space-y-4 rounded-lg border p-6">
-                  <div>
-                    <h3 className="font-semibold text-lg">
-                      {PLANS.scale.name}
-                    </h3>
-                    <div className="mt-2 flex items-baseline gap-1">
-                      <span className="font-bold text-3xl">
-                        $
-                        {getPriceByInterval(
-                          PLANS.scale,
-                          upgradeBillingInterval
-                        )}
-                      </span>
-                      {hasEarlyAdopterPricing(PLANS.scale) && (
-                        <span className="text-muted-foreground text-sm line-through">
-                          $
-                          {upgradeBillingInterval === "annual"
-                            ? PLANS.scale.annualPrice
-                            : PLANS.scale.price}
-                        </span>
-                      )}
-                      <span className="text-muted-foreground text-sm">/mo</span>
-                    </div>
-                    {upgradeBillingInterval === "annual" &&
-                      getAnnualTotal(PLANS.scale) && (
-                        <p className="mt-1 text-green-600 text-sm">
-                          ${getAnnualTotal(PLANS.scale)} billed annually
-                        </p>
-                      )}
-                    <p className="mt-1 text-muted-foreground text-sm">
-                      {PLANS.scale.description}
-                    </p>
-                  </div>
-
-                  <ul className="space-y-2">
-                    {PLANS.scale.featureList.slice(0, 4).map((feature) => (
-                      <li
-                        className="flex items-start gap-2 text-sm"
-                        key={feature}
-                      >
-                        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-primary" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Button
-                    className="w-full"
-                    disabled={!canManageBilling}
-                    loading={upgradeMutation.isPending}
-                    onClick={() =>
-                      upgradeMutation.mutate({
-                        plan: "scale",
-                        annual: upgradeBillingInterval === "annual",
-                      })
-                    }
-                  >
-                    Upgrade to Scale
-                  </Button>
-                </div>
-              )}
+                ))}
             </div>
 
             {!canManageBilling && (

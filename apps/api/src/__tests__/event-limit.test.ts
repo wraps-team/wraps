@@ -174,20 +174,20 @@ describe("event limit enforcement (real middleware, real DB)", () => {
   // keep exercising that behavior. A free-plan org never reaches the volume
   // logic at all — see "the free plan is gated" below.
   describe("volume is not capped on a paid plan", () => {
-    it("allows the event and sets usage headers when under limit", async () => {
+    it("allows the event and sets usage headers to unlimited (plans/208)", async () => {
       await seedUsage(2500);
       const res = await postEvent(createTestApp(starterAuth));
       expect(res.status).toBe(200);
-      expect(res.headers.get("X-Event-Limit")).toBe("50000");
+      expect(res.headers.get("X-Event-Limit")).toBe("-1");
       expect(res.headers.get("X-Event-Current")).toBe("2500");
-      expect(res.headers.get("X-Event-Remaining")).toBe("47500");
-      expect(res.headers.get("X-Event-Percent")).toBe("5");
+      expect(res.headers.get("X-Event-Remaining")).toBe("-1");
+      expect(res.headers.get("X-Event-Percent")).toBe("0");
     });
 
     it("allows the event with no prior usage (zero usage row)", async () => {
       const res = await postEvent(createTestApp(starterAuth));
       expect(res.status).toBe(200);
-      expect(res.headers.get("X-Event-Limit")).toBe("50000");
+      expect(res.headers.get("X-Event-Limit")).toBe("-1");
       expect(res.headers.get("X-Event-Current")).toBe("0");
     });
 
@@ -203,9 +203,9 @@ describe("event limit enforcement (real middleware, real DB)", () => {
       await seedUsage(8259);
       const res = await postEvent(createTestApp(starterAuth));
       expect(res.status).toBe(200);
-      expect(res.headers.get("X-Event-Limit")).toBe("50000");
+      expect(res.headers.get("X-Event-Limit")).toBe("-1");
       expect(res.headers.get("X-Event-Current")).toBe("8259");
-      expect(res.headers.get("X-Event-Percent")).toBe("17");
+      expect(res.headers.get("X-Event-Percent")).toBe("0");
       expect(res.headers.get("X-Event-Exceeded")).toBeNull();
       expect(res.headers.get("Retry-After")).toBeNull();
     });
@@ -215,19 +215,20 @@ describe("event limit enforcement (real middleware, real DB)", () => {
       const res = await postEvent(createTestApp(starterAuth));
       // 6250 is only 12.5% of starter's 50k limit — well under the former grace threshold
       expect(res.status).toBe(200);
-      expect(res.headers.get("X-Event-Limit")).toBe("50000");
+      expect(res.headers.get("X-Event-Limit")).toBe("-1");
     });
   });
 
   // The numeric limit no longer blocks anything, but the events feature itself
-  // is starter+ (FEATURE_PLANS.events in plan-gate.ts). A free org is gated out
+  // is pro+ (FEATURE_PLANS.events in plan-gate.ts — plans/208 renamed the
+  // required plan from "starter" to "pro"). A free org is gated out
   // regardless of usage — this is what FSI's $19/mo actually pays for.
   describe("the free plan is gated", () => {
     it("returns 403 with zero seeded usage", async () => {
       const res = await postEvent(createTestApp(freeAuth));
       expect(res.status).toBe(403);
       const text = await res.text();
-      expect(text).toMatch(/requires starter plan/i);
+      expect(text).toMatch(/requires pro plan/i);
     });
 
     it("returns 403 with usage well over the former limit (8259 scenario)", async () => {
@@ -236,7 +237,7 @@ describe("event limit enforcement (real middleware, real DB)", () => {
       // Gated on plan, not volume — same 403 whether usage is 0 or 8259.
       expect(res.status).toBe(403);
       const text = await res.text();
-      expect(text).toMatch(/requires starter plan/i);
+      expect(text).toMatch(/requires pro plan/i);
     });
   });
 });

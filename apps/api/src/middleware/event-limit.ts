@@ -17,13 +17,16 @@ import { isSelfHosted } from "../(ee)/lib/license";
 import { log } from "../lib/logger";
 import { getAuthOptional } from "./auth";
 
-// Tracked event limits per plan (tracked events per month)
+// Tracked event limits per plan (tracked events per month, -1 = unlimited)
 // Aligned with apps/web/src/lib/plans.ts
 const EVENT_LIMITS = {
-  free: 5000,
-  starter: 50_000,
-  growth: 250_000,
-  scale: 1_000_000,
+  free: -1,
+  pro: -1,
+  business: -1,
+  // Legacy plans — see plans/208. Events are unmetered on every plan.
+  starter: -1,
+  growth: -1,
+  scale: -1,
 } as const;
 
 /**
@@ -120,6 +123,15 @@ export async function enforceEventLimit(ctx: any) {
 
   try {
     const currentUsage = await getEventUsageCount(organizationId);
+
+    if (limit === -1) {
+      set.headers["X-Event-Limit"] = "-1";
+      set.headers["X-Event-Current"] = String(currentUsage);
+      set.headers["X-Event-Remaining"] = "-1";
+      set.headers["X-Event-Percent"] = "0";
+      return;
+    }
+
     const percentUsed = Math.round((currentUsage / limit) * 100);
     const remaining = Math.max(0, limit - currentUsage);
 

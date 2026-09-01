@@ -8,7 +8,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useActiveOrganization } from "@/contexts/organization-context";
-import { PLANS } from "@/lib/plans";
+import { getNextPlan, PLANS } from "@/lib/plans";
 import { useProductsStore } from "@/stores/products-store";
 
 /**
@@ -46,14 +46,7 @@ export function SidebarUpgrade() {
 
   // Get next plan info
   const _currentPlan = PLANS[planId];
-  const nextPlanId =
-    planId === "free"
-      ? "starter"
-      : planId === "starter"
-        ? "growth"
-        : planId === "growth"
-          ? "scale"
-          : null;
+  const nextPlanId = getNextPlan(planId);
   const nextPlan = nextPlanId ? PLANS[nextPlanId] : null;
 
   if (!nextPlan) {

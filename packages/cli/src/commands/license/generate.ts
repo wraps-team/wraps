@@ -4,7 +4,7 @@ import type { LicenseGenerateOptions } from "../../types/index.js";
 import { generateLicenseKey } from "../../utils/license.js";
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 
-const VALID_TIERS = ["starter", "growth", "scale"];
+const VALID_TIERS = ["pro", "business", "starter", "growth", "scale"];
 
 export async function licenseGenerate(
   options: LicenseGenerateOptions

@@ -20,6 +20,11 @@ import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 // Plan limits for AWS accounts (matches apps/web/src/lib/plans.ts)
 const PLAN_AWS_ACCOUNT_LIMITS: Record<string, number> = {
   free: 1,
+  pro: 3,
+  business: -1, // unlimited
+  // Legacy plans — see plans/208. Mapped to their new-tier equivalent.
+  // starter's 2 disagrees with plans.ts's maxAwsAccounts: 1 — pre-existing,
+  // a live customer may be relying on it. Do not "fix".
   starter: 2,
   growth: 5,
   scale: -1, // unlimited

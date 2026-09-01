@@ -30,12 +30,7 @@ export function PlanSelector({
   showFreeTier = false,
 }: PlanSelectorProps) {
   // Get paid plans only (exclude free tier unless explicitly requested)
-  const displayPlans = getPaidPlans();
-
-  // Show Starter and Growth for most cases, Scale on upgrade page
-  const paidPlans = displayPlans.filter(({ id }) =>
-    ["starter", "growth"].includes(id)
-  );
+  const paidPlans = getPaidPlans();
 
   // Include free tier as a proper card when requested
   const visiblePlans = showFreeTier

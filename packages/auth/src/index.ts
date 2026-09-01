@@ -412,6 +412,30 @@ export const subscriptionPlans = [
       members: -1, // Unlimited
     },
   },
+  {
+    name: "pro",
+    priceId: process.env.STRIPE_PRO_PRICE_ID,
+    annualDiscountPriceId: process.env.STRIPE_PRO_ANNUAL_PRICE_ID,
+    limits: {
+      emails: -1,
+      awsAccounts: 3,
+      aiMessages: 250,
+      bulkBatchSize: 2000,
+      members: -1,
+    },
+  },
+  {
+    name: "business",
+    priceId: process.env.STRIPE_BUSINESS_PRICE_ID,
+    annualDiscountPriceId: process.env.STRIPE_BUSINESS_ANNUAL_PRICE_ID,
+    limits: {
+      emails: -1,
+      awsAccounts: -1,
+      aiMessages: 1000,
+      bulkBatchSize: 10_000,
+      members: -1,
+    },
+  },
 ] as const;
 
 /**

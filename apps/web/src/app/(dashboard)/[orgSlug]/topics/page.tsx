@@ -58,7 +58,7 @@ export default async function TopicsPage({ params }: TopicsPageProps) {
   }
 
   const currentPlanId = planId;
-  const requiredPlan = getRequiredPlan("topics") || "starter";
+  const requiredPlan = getRequiredPlan("topics") || "pro";
 
   // If feature not allowed, show upgrade prompt
   if (!featureCheck.allowed) {

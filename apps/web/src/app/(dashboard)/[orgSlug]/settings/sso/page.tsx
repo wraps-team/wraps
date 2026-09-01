@@ -53,7 +53,7 @@ export default async function SsoPage({ params }: SsoPageProps) {
     getOrganizationPlan(orgWithMembership.id),
   ]);
 
-  const requiredPlan = getRequiredPlan("sso") || "scale";
+  const requiredPlan = getRequiredPlan("sso") || "business";
 
   if (!featureCheck.allowed) {
     return (
