@@ -268,6 +268,22 @@ export type DeleteContactResult =
   | { success: true }
   | { success: false; error: string };
 
+/**
+ * A row the file itself repeated, kept out of the import because an earlier
+ * row already claimed the same email or phone.
+ *
+ * Reported per row rather than folded into `skipped` alone: a repeat inside
+ * the source file is something the operator will want to fix at the source,
+ * and a bare count gives them nothing to search for.
+ */
+export type ImportDuplicateRow = {
+  row: number;
+  /** The row that claimed this identity first. */
+  firstRow: number;
+  field: "email" | "phone";
+  value: string;
+};
+
 export type ImportContactsResult =
   | {
       success: true;
@@ -275,5 +291,10 @@ export type ImportContactsResult =
       updated: number;
       skipped: number;
       errors: Array<{ row: number; error: string }>;
+      /**
+       * Optional because a rolling deploy can answer a new client from an
+       * older server that doesn't send it — not because an import may omit it.
+       */
+      duplicates?: ImportDuplicateRow[];
     }
   | { success: false; error: string };

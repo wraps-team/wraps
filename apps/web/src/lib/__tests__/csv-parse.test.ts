@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   describeParseFailure,
+  describePayloadTooLarge,
   MAX_CSV_BYTES,
+  MAX_IMPORT_PAYLOAD_BYTES,
   parseCSV,
   validateCSVFile,
 } from "../csv-parse";
@@ -171,12 +173,21 @@ describe("validateCSVFile", () => {
   });
 
   it("rejects a file over the byte ceiling and names both sizes", () => {
+    // Twice the ceiling, so the file's size and the ceiling render as two
+    // different numbers and the message is checked for carrying both.
     const message = validateCSVFile({
       name: "contacts.csv",
-      size: MAX_CSV_BYTES + 1,
+      size: MAX_CSV_BYTES * 2,
     });
-    expect(message).toContain("10 MB");
+    expect(message).toContain(`${(MAX_CSV_BYTES * 2) / (1024 * 1024)} MB`);
+    expect(message).toContain(`${MAX_CSV_BYTES / (1024 * 1024)} MB`);
     expect(message).toMatch(/split/i);
+  });
+
+  it("rejects a file one byte over the ceiling", () => {
+    expect(
+      validateCSVFile({ name: "contacts.csv", size: MAX_CSV_BYTES + 1 })
+    ).toMatch(/split/i);
   });
 
   it("accepts a file exactly at the ceiling", () => {
@@ -219,5 +230,43 @@ describe("truncation reporting", () => {
     expect(result.totalRows).toBe(12);
     expect(result.rows).toHaveLength(10);
     expect(result.totalRows - result.rows.length).toBe(2);
+  });
+});
+
+// ─── Payload ceiling (WEB-V) ───────────────────────────────────────────────
+// validateCSVFile guards the file on disk; nothing guarded the JSON the mapped
+// rows are actually posted as. A file well under MAX_CSV_BYTES serialized past
+// the Server Action body cap and was rejected by the framework before the
+// action ran, so the dialog had nothing to show.
+
+describe("describePayloadTooLarge", () => {
+  it("says nothing about a payload under the ceiling", () => {
+    expect(describePayloadTooLarge(1024, 10)).toBeNull();
+  });
+
+  it("says nothing about a payload exactly at the ceiling", () => {
+    expect(describePayloadTooLarge(MAX_IMPORT_PAYLOAD_BYTES, 10)).toBeNull();
+  });
+
+  it("explains a payload over the ceiling and names both sizes", () => {
+    const message = describePayloadTooLarge(MAX_IMPORT_PAYLOAD_BYTES * 2, 1000);
+
+    expect(message).toContain("1,000 rows");
+    expect(message).toContain("16 MB");
+    expect(message).toContain("8 MB");
+  });
+
+  it("suggests a batch size that would actually fit", () => {
+    const message = describePayloadTooLarge(MAX_IMPORT_PAYLOAD_BYTES * 4, 1000);
+
+    // A quarter of the rows is a quarter of the bytes.
+    expect(message).toContain("250");
+  });
+
+  it("never suggests a batch of zero rows", () => {
+    const message = describePayloadTooLarge(MAX_IMPORT_PAYLOAD_BYTES * 100, 1);
+
+    expect(message).toContain("1 rows");
+    expect(message).not.toContain("about 0 rows");
   });
 });

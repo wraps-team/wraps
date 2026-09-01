@@ -1,6 +1,7 @@
 import { withPostHogConfig } from "@posthog/nextjs-config";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
+import { MAX_IMPORT_PAYLOAD_BYTES } from "./src/lib/csv-parse";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["web.wraps.localhost", "*.wraps.localhost"],
@@ -10,6 +11,14 @@ const nextConfig: NextConfig = {
 
   experimental: {
     optimizePackageImports: ["lucide-react", "@radix-ui/react-icons"],
+
+    // The contact importer posts every mapped row to a Server Action in one
+    // body. The 1 MB default rejected real customer files at the framework
+    // boundary, before the action could say anything useful — so this tracks
+    // the same constant the importer checks in the browser.
+    serverActions: {
+      bodySizeLimit: MAX_IMPORT_PAYLOAD_BYTES,
+    },
   },
 
   // Mark server-only packages to prevent bundling in edge/client

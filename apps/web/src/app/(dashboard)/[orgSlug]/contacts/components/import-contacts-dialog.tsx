@@ -46,7 +46,7 @@ import {
   importContacts,
 } from "@/actions/import-contacts";
 import { Button } from "@/components/ui/button";
-import type { ImportContactsResult } from "@/lib/contacts";
+import type { ImportContactsResult, ImportDuplicateRow } from "@/lib/contacts";
 import {
   autoMapColumns,
   type ColumnMapping,
@@ -56,11 +56,13 @@ import {
 import { downloadCSV, toCSV } from "@/lib/csv-export";
 import {
   describeParseFailure,
+  describePayloadTooLarge,
   MAX_CSV_ROWS,
   type ParseCSVResult,
   parseCSV,
   validateCSVFile,
 } from "@/lib/csv-parse";
+import { chunkForImport, serializedBytes } from "@/lib/import-chunks";
 import type { TopicWithMeta } from "@/lib/topics";
 import {
   captureContactsImportColumnsMapped,
@@ -233,7 +235,73 @@ function ImportOutcome({
           ))}
         </div>
       )}
+
+      {result.duplicates && result.duplicates.length > 0 && (
+        <DuplicateRows duplicates={result.duplicates} />
+      )}
     </>
+  );
+}
+
+/** How many repeated rows to list before offering the file instead. */
+const DUPLICATES_SHOWN = 20;
+
+/**
+ * Names the rows the file repeated, rather than burying them in a count.
+ *
+ * A repeat is why an import used to fail outright, so the operator has every
+ * reason to want to fix it at the source — and "N skipped" tells them nothing
+ * about where to look. Past a screenful the list stops being readable, so the
+ * rest go out as a CSV they can open next to the original.
+ */
+function DuplicateRows({ duplicates }: { duplicates: ImportDuplicateRow[] }) {
+  const shown = duplicates.slice(0, DUPLICATES_SHOWN);
+  const remaining = duplicates.length - shown.length;
+
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-medium text-sm">
+          {duplicates.length.toLocaleString()} repeated row
+          {duplicates.length === 1 ? "" : "s"} in your file
+        </p>
+        <Button
+          onClick={() =>
+            downloadCSV(
+              toCSV(duplicates, [
+                { header: "Row", accessor: (d) => d.row },
+                { header: "Duplicate of row", accessor: (d) => d.firstRow },
+                { header: "Field", accessor: (d) => d.field },
+                { header: "Value", accessor: (d) => d.value },
+              ]),
+              "repeated-rows.csv"
+            )
+          }
+          size="sm"
+          variant="outline"
+        >
+          <Download className="mr-2 h-4 w-4" />
+          Download
+        </Button>
+      </div>
+      <p className="text-muted-foreground text-xs">
+        Each was left out because an earlier row already had the same address or
+        number. The first of each was imported.
+      </p>
+      <div className="max-h-[150px] space-y-1 overflow-y-auto">
+        {shown.map((dup) => (
+          <p className="text-muted-foreground text-xs" key={dup.row}>
+            Row {dup.row}: same {dup.field} as row {dup.firstRow} ({dup.value})
+          </p>
+        ))}
+        {remaining > 0 && (
+          <p className="text-muted-foreground text-xs italic">
+            and {remaining.toLocaleString()} more — download the list to see
+            them all.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -256,6 +324,12 @@ export function ImportContactsDialog({
   const [result, setResult] = useState<ImportContactsResult | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  // How many of the chunked calls have finished, for files large enough to
+  // take more than one. Null when an import isn't running or needs only one.
+  const [progress, setProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const announcedStepRef = useRef<Step | null>(null);
@@ -284,6 +358,7 @@ export function ImportContactsDialog({
     setResult(null);
     setUploadError(null);
     setIsDraggingFile(false);
+    setProgress(null);
   }, []);
 
   const handleOpenChange = useCallback(
@@ -476,26 +551,102 @@ export function ImportContactsDialog({
       topic_count: selectedTopicIds.length,
       was_truncated: csvData?.truncated ?? false,
     });
-    startTransition(async () => {
-      const res = await importContacts(organizationId, {
-        contacts: mappedContacts,
-        topicIds: selectedTopicIds.length > 0 ? selectedTopicIds : undefined,
-        duplicateStrategy,
+
+    // Split the send so no single request approaches the Server Action body
+    // limit. A chunk that still exceeds it — one row carrying megabytes of
+    // custom properties — is caught here, because Next rejects an oversized
+    // body before the action runs and nothing downstream could explain it.
+    const chunks = chunkForImport(mappedContacts);
+    const oversized = chunks.find(
+      (chunk) =>
+        describePayloadTooLarge(serializedBytes(chunk), chunk.length) !== null
+    );
+    if (oversized) {
+      setResult({
+        success: false,
+        error: describePayloadTooLarge(
+          serializedBytes(oversized),
+          oversized.length
+        ) as string,
       });
-      setResult(res);
       setStep("results");
-      if (res.success) {
-        captureContactsImportCompleted({
-          contact_count: mappedContacts.length,
-          created: res.created,
-          failed: res.errors.length,
-          skipped: res.skipped,
-          updated: res.updated,
+      captureContactsImportFailed({ contact_count: mappedContacts.length });
+      return;
+    }
+
+    startTransition(async () => {
+      const totals = { created: 0, updated: 0, skipped: 0, errorCount: 0 };
+      const errors: Array<{ row: number; error: string }> = [];
+      const duplicates: ImportDuplicateRow[] = [];
+      // Each call numbers its rows from 1 within the chunk it was given, so
+      // rows have to be shifted back onto the file the operator is looking at.
+      let rowOffset = 0;
+
+      for (let i = 0; i < chunks.length; i++) {
+        const isLast = i === chunks.length - 1;
+        setProgress({ done: i, total: chunks.length });
+
+        const res = await importContacts(organizationId, {
+          contacts: chunks[i],
+          topicIds: selectedTopicIds.length > 0 ? selectedTopicIds : undefined,
+          duplicateStrategy,
+          deferSummary: !isLast,
+          priorTotals: i === 0 ? undefined : { ...totals },
         });
-        onImportComplete();
-      } else {
-        captureContactsImportFailed({ contact_count: mappedContacts.length });
+
+        // A failed chunk stops the run. Earlier chunks are already committed,
+        // so report what did land rather than implying nothing was imported.
+        if (!res.success) {
+          setResult({
+            success: false,
+            error:
+              chunks.length > 1
+                ? `${res.error} ${totals.created.toLocaleString()} contacts from earlier in the file were imported before this happened.`
+                : res.error,
+          });
+          setStep("results");
+          setProgress(null);
+          captureContactsImportFailed({
+            contact_count: mappedContacts.length,
+          });
+          return;
+        }
+
+        totals.created += res.created;
+        totals.updated += res.updated;
+        totals.skipped += res.skipped;
+        totals.errorCount += res.errors.length;
+        errors.push(
+          ...res.errors.map((err) => ({ ...err, row: err.row + rowOffset }))
+        );
+        duplicates.push(
+          ...(res.duplicates ?? []).map((dup) => ({
+            ...dup,
+            row: dup.row + rowOffset,
+            firstRow: dup.firstRow + rowOffset,
+          }))
+        );
+        rowOffset += chunks[i].length;
       }
+
+      setProgress(null);
+      setResult({
+        success: true,
+        created: totals.created,
+        updated: totals.updated,
+        skipped: totals.skipped,
+        errors,
+        duplicates,
+      });
+      setStep("results");
+      captureContactsImportCompleted({
+        contact_count: mappedContacts.length,
+        created: totals.created,
+        failed: totals.errorCount,
+        skipped: totals.skipped,
+        updated: totals.updated,
+      });
+      onImportComplete();
     });
   }, [
     organizationId,
@@ -827,7 +978,11 @@ export function ImportContactsDialog({
                 {isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Importing...
+                    {/* A file large enough to be split takes long enough that
+                        a bare spinner reads as a hang. */}
+                    {progress && progress.total > 1
+                      ? `Importing batch ${progress.done + 1} of ${progress.total}...`
+                      : "Importing..."}
                   </>
                 ) : (
                   "Import"

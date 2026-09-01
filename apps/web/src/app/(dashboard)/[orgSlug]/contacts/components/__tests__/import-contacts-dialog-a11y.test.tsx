@@ -290,3 +290,86 @@ describe("import outcome (M8)", () => {
     expect(screen.queryByText(/^Imported /)).not.toBeInTheDocument();
   });
 });
+
+// ─── Repeated rows (WEB-W follow-up) ───────────────────────────────────────
+// A repeat inside the file used to abort the whole import. It is now skipped
+// rather than fatal, which makes it easy to lose: without naming the rows, the
+// operator sees only a "skipped" count and has nothing to search their file
+// for.
+
+describe("repeated rows in the source file", () => {
+  it("names the repeated row and the row it repeats", async () => {
+    await reachResults({
+      success: true,
+      created: 1,
+      updated: 0,
+      skipped: 1,
+      errors: [],
+      duplicates: [
+        { row: 2, firstRow: 1, field: "email", value: "ada@example.com" },
+      ],
+    });
+
+    expect(
+      await screen.findByText(/Row 2: same email as row 1/)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/1 repeated row in your file/)).toBeInTheDocument();
+  });
+
+  it("says the first of each repeat was kept, not that rows failed", async () => {
+    await reachResults({
+      success: true,
+      created: 1,
+      updated: 0,
+      skipped: 1,
+      errors: [],
+      duplicates: [
+        { row: 2, firstRow: 1, field: "phone", value: "+15550000101" },
+      ],
+    });
+
+    expect(
+      await screen.findByText(/The first of each was imported/)
+    ).toBeInTheDocument();
+    // A repeat is not a failed row, so it must not wear the error treatment.
+    expect(screen.queryByText(/couldn't be imported/i)).not.toBeInTheDocument();
+  });
+
+  it("offers the full list as a file rather than an unreadable scroll", async () => {
+    await reachResults({
+      success: true,
+      created: 1,
+      updated: 0,
+      skipped: 30,
+      errors: [],
+      duplicates: Array.from({ length: 30 }, (_, i) => ({
+        row: i + 2,
+        firstRow: 1,
+        field: "email" as const,
+        value: "ada@example.com",
+      })),
+    });
+
+    expect(
+      await screen.findByText(/30 repeated rows in your file/)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/and 10 more/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /download/i })
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing about repeats when the file had none", async () => {
+    await reachResults({
+      success: true,
+      created: 2,
+      updated: 0,
+      skipped: 0,
+      errors: [],
+      duplicates: [],
+    });
+
+    expect(await screen.findByText(/^Imported /)).toBeInTheDocument();
+    expect(screen.queryByText(/repeated row/i)).not.toBeInTheDocument();
+  });
+});

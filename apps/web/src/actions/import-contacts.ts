@@ -11,7 +11,7 @@ import {
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { trackContactsImported } from "@/lib/activation-tracking";
 import { auditLogEntry, getAuditContext } from "@/lib/audit";
-import type { ImportContactsResult } from "@/lib/contacts";
+import type { ImportContactsResult, ImportDuplicateRow } from "@/lib/contacts";
 import { createActionLogger } from "@/lib/logger";
 import { checkContactLimit } from "@/lib/plan-limits";
 import { revalidateContacts } from "./contacts";
@@ -27,6 +27,64 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isValidEmail(email: string): boolean {
   return EMAIL_REGEX.test(email);
+}
+
+/**
+ * Pull the Postgres error out of whatever Drizzle wrapped it in.
+ *
+ * A failed query arrives as a DrizzleQueryError whose `cause` chain ends at
+ * the pg error carrying `code` and `constraint`. Reading the top-level error
+ * alone gets you the whole parameterized INSERT as a message and none of the
+ * detail that says what went wrong.
+ */
+function findPostgresError(
+  error: unknown
+): { code: string; constraint?: string } | null {
+  let current = error;
+  for (let depth = 0; depth < 5 && current; depth++) {
+    if (typeof current === "object" && "code" in current) {
+      const { code, constraint } = current as {
+        code?: unknown;
+        constraint?: unknown;
+      };
+      if (typeof code === "string") {
+        return {
+          code,
+          constraint: typeof constraint === "string" ? constraint : undefined,
+        };
+      }
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+  return null;
+}
+
+/**
+ * Turn a thrown import failure into a sentence the operator can act on.
+ *
+ * Returns null when we genuinely don't recognise it, so the caller keeps a
+ * generic message rather than inventing a confident wrong one.
+ */
+function describeImportFailure(error: unknown): string | null {
+  const pgError = findPostgresError(error);
+  if (!pgError) {
+    return null;
+  }
+
+  // Unique violation — the class that actually reached a customer (WEB-W),
+  // and the only one the import path is known to produce. Anything else keeps
+  // the generic message rather than a guess dressed up as a diagnosis.
+  if (pgError.code === "23505") {
+    if (pgError.constraint === "contact_unique_org_phone_idx") {
+      return "Two rows in this file share a phone number. Remove the repeat and import again.";
+    }
+    if (pgError.constraint === "contact_unique_org_email_idx") {
+      return "Two rows in this file share an email address. Remove the repeat and import again.";
+    }
+    return "This file repeats a contact that has to be unique. Remove the repeat and import again.";
+  }
+
+  return null;
 }
 
 function parseDate(value: string): Date | null {
@@ -60,6 +118,27 @@ export type ImportContactsData = {
   contacts: ImportContactInput[];
   topicIds?: string[];
   duplicateStrategy: "skip" | "update";
+  /**
+   * Set on every chunk of a client-side chunked import except the last.
+   *
+   * The importer splits a large file across several calls so no single request
+   * body hits the Server Action limit. Each call still writes its own contacts,
+   * but the audit entry, notification, activation event and cache revalidation
+   * are the *import's* side effects, not the chunk's — a 40,000-row file should
+   * read as one import in the audit log, not twenty. Deferring them here lets
+   * the final chunk emit them once, for the whole run.
+   */
+  deferSummary?: boolean;
+  /**
+   * Totals from the chunks already committed, folded into this call's summary
+   * so the single audit entry and notification describe the whole import.
+   */
+  priorTotals?: {
+    created: number;
+    updated: number;
+    skipped: number;
+    errorCount: number;
+  };
 };
 
 const BATCH_SIZE = 100;
@@ -133,6 +212,17 @@ export async function importContacts(
     const allCreatedContactIds: string[] = [];
     const allUpdatedContactIds: string[] = [];
 
+    // Identities already claimed by an earlier row of this same file, mapped to
+    // the row that claimed them. The duplicate lookups below only compare a row
+    // against contacts already in the database, so two rows sharing an email or
+    // phone both landed in the INSERT and tripped
+    // contact_unique_org_{email,phone}_idx — aborting the whole batch
+    // transaction and importing nothing. Held across batches, not per batch, so
+    // the guard holds no matter how the rows are chunked.
+    const seenEmailHashes = new Map<string, number>();
+    const seenPhoneHashes = new Map<string, number>();
+    const duplicates: ImportDuplicateRow[] = [];
+
     // Process in batches
     for (let i = 0; i < data.contacts.length; i += BATCH_SIZE) {
       const batch = data.contacts.slice(i, i + BATCH_SIZE);
@@ -173,12 +263,51 @@ export async function importContacts(
           continue;
         }
 
+        const emailHash = email ? hashEmail(email) : null;
+        const phoneHash = phone ? hashPhone(phone) : null;
+
+        // A repeat of a row this file already carried. Not a validation error
+        // — the file just lists someone twice — so it counts as skipped the
+        // way a duplicate of an existing contact does, but it is reported by
+        // row so the operator can fix the source file.
+        const firstEmailRow = emailHash
+          ? seenEmailHashes.get(emailHash)
+          : undefined;
+        const firstPhoneRow = phoneHash
+          ? seenPhoneHashes.get(phoneHash)
+          : undefined;
+        if (firstEmailRow !== undefined || firstPhoneRow !== undefined) {
+          skipped++;
+          duplicates.push(
+            firstEmailRow !== undefined
+              ? {
+                  row: rowIndex,
+                  firstRow: firstEmailRow,
+                  field: "email",
+                  value: email as string,
+                }
+              : {
+                  row: rowIndex,
+                  firstRow: firstPhoneRow as number,
+                  field: "phone",
+                  value: phone as string,
+                }
+          );
+          continue;
+        }
+        if (emailHash) {
+          seenEmailHashes.set(emailHash, rowIndex);
+        }
+        if (phoneHash) {
+          seenPhoneHashes.set(phoneHash, rowIndex);
+        }
+
         validRows.push({
           index: rowIndex,
           email,
           phone,
-          emailHash: email ? hashEmail(email) : null,
-          phoneHash: phone ? hashPhone(phone) : null,
+          emailHash,
+          phoneHash,
           firstName: row.firstName?.trim() || null,
           lastName: row.lastName?.trim() || null,
           company: row.company?.trim() || null,
@@ -354,6 +483,16 @@ export async function importContacts(
       });
     }
 
+    // What this run has done, counting the chunks that came before it. `created`
+    // and friends stay per-call — they are this call's return value — while the
+    // audit entry, notification and activation event describe the whole import.
+    const runTotals = {
+      created: created + (data.priorTotals?.created ?? 0),
+      updated: updated + (data.priorTotals?.updated ?? 0),
+      skipped: skipped + (data.priorTotals?.skipped ?? 0),
+      errorCount: errors.length + (data.priorTotals?.errorCount ?? 0),
+    };
+
     // Topic subscriptions + audit log in one final transaction
     await db.transaction(async (tx) => {
       // Topic subscriptions for all created + updated contacts
@@ -389,24 +528,33 @@ export async function importContacts(
         }
       }
 
-      await tx.insert(auditLog).values(
-        auditLogEntry(auditCtx, {
-          organizationId,
-          actorId: access.userId,
-          actorEmail: access.userEmail,
-          action: "contact.imported",
-          resource: "contact",
-          metadata: { count: created, updated },
-        })
-      );
+      // Whole-import side effects. A deferred chunk writes its contacts and
+      // their topic subscriptions above, then leaves the summary to the chunk
+      // that finishes the run.
+      if (!data.deferSummary) {
+        await tx.insert(auditLog).values(
+          auditLogEntry(auditCtx, {
+            organizationId,
+            actorId: access.userId,
+            actorEmail: access.userEmail,
+            action: "contact.imported",
+            resource: "contact",
+            metadata: { count: runTotals.created, updated: runTotals.updated },
+          })
+        );
+      }
     });
+
+    if (data.deferSummary) {
+      return { success: true, created, updated, skipped, errors, duplicates };
+    }
 
     // Post-processing
     revalidateContacts(orgSlug);
 
-    if (created > 0) {
+    if (runTotals.created > 0) {
       trackContactsImported(access.userEmail, organizationId, {
-        count: created,
+        count: runTotals.created,
         firstContact: data.contacts[0],
       });
     }
@@ -416,13 +564,18 @@ export async function importContacts(
         userId: access.userId,
         organizationId,
         type: "contact.imported",
-        title: `Contact import finished: ${created} created, ${updated} updated`,
+        title: `Contact import finished: ${runTotals.created} created, ${runTotals.updated} updated`,
         body:
-          skipped > 0 || errors.length > 0
-            ? `${skipped} skipped, ${errors.length} rows had errors.`
+          runTotals.skipped > 0 || runTotals.errorCount > 0
+            ? `${runTotals.skipped} skipped, ${runTotals.errorCount} rows had errors.`
             : undefined,
         href: `/${orgSlug}/contacts`,
-        data: { created, updated, skipped, errorCount: errors.length },
+        data: {
+          created: runTotals.created,
+          updated: runTotals.updated,
+          skipped: runTotals.skipped,
+          errorCount: runTotals.errorCount,
+        },
       });
     } catch (notifyError) {
       const log = createActionLogger("importContacts", { orgSlug });
@@ -432,13 +585,24 @@ export async function importContacts(
       );
     }
 
-    return { success: true, created, updated, skipped, errors };
+    return { success: true, created, updated, skipped, errors, duplicates };
   } catch (error) {
     const log = createActionLogger("importContacts", { orgSlug });
+    const pgError = findPostgresError(error);
     log.error(
-      { err: error, contactCount: data.contacts.length },
+      {
+        err: error,
+        contactCount: data.contacts.length,
+        pgCode: pgError?.code,
+        pgConstraint: pgError?.constraint,
+      },
       "Failed to import contacts"
     );
-    return { success: false, error: "Failed to import contacts" };
+    return {
+      success: false,
+      error:
+        describeImportFailure(error) ??
+        "Failed to import contacts. The error has been logged and we're looking at it.",
+    };
   }
 }

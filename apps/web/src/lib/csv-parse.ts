@@ -21,19 +21,56 @@ export type ParseCSVResult = {
 
 /**
  * The importer reads the whole file into browser memory before parsing, so it
- * needs a ceiling. 10 MB is roughly 100k contact rows — well past the 10,000-row
- * import cap, so a file this large is already going to be truncated.
+ * needs a ceiling. This is the only limit on how large a file may be: the send
+ * is chunked (see lib/import-chunks.ts), so request size no longer caps it.
  */
-export const MAX_CSV_BYTES = 10 * 1024 * 1024;
+export const MAX_CSV_BYTES = 25 * 1024 * 1024;
 
-/** Rows kept per import. Mirrors MAX_IMPORT_SIZE in actions/import-contacts.ts. */
-export const MAX_CSV_ROWS = 10_000;
+/**
+ * Rows kept per import. Not a request limit — the importer splits the send
+ * into several calls — but a bound on how much the browser parses and holds
+ * at once. 25 MB of contact rows lands near this.
+ */
+export const MAX_CSV_ROWS = 250_000;
+
+/**
+ * Ceiling on a single call's JSON payload, matching `serverActions.bodySizeLimit`
+ * in next.config.ts.
+ *
+ * The importer chunks its send well under this (IMPORT_CHUNK_BYTES), so a
+ * normal import never approaches it. It stays as the floor under the chunker:
+ * one pathological row — a contact carrying megabytes of custom properties —
+ * is a chunk of its own and could still exceed the cap, and Next enforces that
+ * cap before our code runs. `describePayloadTooLarge` catches it in the browser
+ * so the operator gets a sentence rather than a framework error.
+ */
+export const MAX_IMPORT_PAYLOAD_BYTES = 8 * 1024 * 1024;
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024) {
     return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
   }
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/**
+ * Explain an import too large to send, or null when it fits.
+ *
+ * Takes the serialized byte length so the caller measures the payload it is
+ * actually about to send, not an estimate of it.
+ */
+export function describePayloadTooLarge(
+  payloadBytes: number,
+  rowCount: number
+): string | null {
+  if (payloadBytes <= MAX_IMPORT_PAYLOAD_BYTES) {
+    return null;
+  }
+  const rowsThatFit = Math.max(
+    1,
+    Math.floor(rowCount * (MAX_IMPORT_PAYLOAD_BYTES / payloadBytes))
+  );
+  return `These ${rowCount.toLocaleString()} rows come to ${formatBytes(payloadBytes)}, over the ${formatBytes(MAX_IMPORT_PAYLOAD_BYTES)} an import can send at once. Split the file into batches of about ${rowsThatFit.toLocaleString()} rows and import them one at a time.`;
 }
 
 /**
