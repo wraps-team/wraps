@@ -410,7 +410,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
     name: "Wraps",
     category: "Email platform that sends through your own AWS account",
     pricing:
-      "Platform fee only: Free at 5,000 tracked events/mo, Starter $19, Growth $79, Scale $199. Sending is billed by AWS directly — $0.10 per 1,000 on SES à la carte, or $0.16 on the Essentials plan new AWS accounts are defaulted to. Contacts are unlimited on every tier.",
+      "Platform fee only: Free ($0/mo), Pro ($29/mo), Business ($199/mo) — priced on AWS accounts, dashboard history, and governance features, not send volume. Sending is billed by AWS directly — $0.10 per 1,000 on SES à la carte, or $0.16 on the Essentials plan new AWS accounts are defaulted to. Contacts are unlimited on every tier.",
     bestFor:
       "Teams already on AWS who want the platform layer without sending or logs leaving their account.",
     // Deliberately the longest watch-out on the page. Shortening ours while
@@ -487,7 +487,7 @@ const RESEND_PAGE: AlternativesPage = {
     {
       vendor: "wraps",
       verdict:
-        "The answer specifically to the retention and suspension complaints rather than to price. Sending runs through SES in your own AWS account and delivery events land in your own DynamoDB, so the 30-day purge stops applying and the only party who can freeze your sending is AWS. Workflows are defined in TypeScript and pushed from the CLI, so a lifecycle change is reviewed in a pull request instead of clicked into a canvas. At 100K a month sending is about $10 of SES plus a platform fee of $19 to $79 depending on how many events you track. It needs an AWS account, which is simultaneously the entire point and the entire cost.",
+        "The answer specifically to the retention and suspension complaints rather than to price. Sending runs through SES in your own AWS account and delivery events land in your own DynamoDB, so the 30-day purge stops applying and the only party who can freeze your sending is AWS. Workflows are defined in TypeScript and pushed from the CLI, so a lifecycle change is reviewed in a pull request instead of clicked into a canvas. At 100K a month sending is about $10 of SES plus a flat platform fee of $0 to $199 depending on the plan, not on how much you send. It needs an AWS account, which is simultaneously the entire point and the entire cost.",
     },
     {
       vendor: "ahasend",

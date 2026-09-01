@@ -450,9 +450,10 @@ export default function SESCalculatorPage() {
                     You pay us for tooling (dashboard, workflows, AI, analytics)
                     and AWS directly for sending ($0.10/1K emails at the à la
                     carte rate, or $0.16/1K if your account defaults to
-                    Essentials). Free tier includes 5K tracked events/month.
-                    Paid plans unlock more volume, longer history retention, and
-                    features like topics, segments, and campaigns.
+                    Essentials). Sends, domains, contacts, and templates are
+                    unlimited on every plan. Paid plans unlock longer dashboard
+                    history, more AWS accounts, and features like topics,
+                    segments, and campaigns.
                   </p>
                 </div>
                 <div>

@@ -12,13 +12,13 @@ const faqItems = [
     id: "cost",
     question: "What's the total cost of ownership?",
     answer:
-      "Two costs: a Wraps Platform fee (Free, $19, $79, or $199/mo depending on features) and AWS sending paid directly to AWS — $0.10/1K emails à la carte, or $0.16/1K on AWS's default Essentials plan (Wraps tells you which one you're on). No per-seat pricing, no per-contact pricing. The Free tier includes 5K tracked events/mo and a hosted dashboard.",
+      "Two costs: a Wraps Platform fee (Free, $29, or $199/mo) and AWS sending paid directly to AWS — $0.10/1K emails à la carte, or $0.16/1K on AWS's default Essentials plan (Wraps tells you which one you're on). No per-seat pricing, no per-contact pricing, no per-domain or per-template pricing — every plan includes unlimited sends, domains, contacts, and templates. The Free tier includes a hosted dashboard.",
   },
   {
     id: "support",
     question: "What support is available?",
     answer:
-      "Free: community support via GitHub and Discord. Starter ($19/mo): email support. Growth ($79/mo): priority support with 24-hour response. Scale ($199/mo): priority support with SLA.",
+      "Free: community support via GitHub and Discord. Pro ($29/mo): email support. Business ($199/mo): priority support.",
   },
   {
     id: "compare",

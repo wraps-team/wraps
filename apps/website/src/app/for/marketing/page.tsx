@@ -10,7 +10,7 @@ import { MarketingHonestSection } from "./components/honest-section";
 import { MarketingMeasurementSection } from "./components/measurement-section";
 
 const description =
-  "Broadcasts, segments, topics, and a hosted preference center — the lifecycle toolkit, priced on tracked events instead of contacts stored. Unlimited contacts on every plan, starting at $19 a month.";
+  "Broadcasts, segments, topics, and a hosted preference center — the lifecycle toolkit, priced flat by plan, not by contacts stored. Unlimited contacts on every plan, starting at $29 a month.";
 
 const softwareSchema = {
   "@context": "https://schema.org",

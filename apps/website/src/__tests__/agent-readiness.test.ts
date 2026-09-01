@@ -440,7 +440,12 @@ describe("MCP: tools", () => {
   it("estimate_cost returns both a readable table and structured totals", async () => {
     const result = await callTool(
       "estimate_cost",
-      { emails: 500_000, events: 250_000, tier: "growth", sesPlan: "alacarte" },
+      {
+        emails: 500_000,
+        events: 250_000,
+        tier: "business",
+        sesPlan: "alacarte",
+      },
       fixtureFetcher
     );
 

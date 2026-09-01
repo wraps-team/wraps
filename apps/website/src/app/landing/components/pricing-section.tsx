@@ -7,7 +7,6 @@ import {
   type PricingTier,
 } from "@/config/pricing";
 import { SectionKicker } from "./section-kicker";
-import { TrackedEventsExplainer } from "./tracked-events-explainer";
 
 function tierLabel(tier: PricingTier): string {
   if (tier.id === "free") {
@@ -32,7 +31,7 @@ export function PricingSection() {
         </p>
 
         {/* Tier grid — hairline rules, no boxed border (echoes the compare table) */}
-        <div className="grid grid-cols-1 border-border border-y sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 border-border border-y sm:grid-cols-2 lg:grid-cols-3">
           {PRICING_TIERS.map((tier) => {
             const label = tierLabel(tier);
             return (
@@ -89,6 +88,12 @@ export function PricingSection() {
           })}
         </div>
 
+        {/* Unlimited-set note */}
+        <p className="mt-6 text-center text-muted-foreground text-sm">
+          Every plan includes unlimited sends, domains, contacts, templates, and
+          team members.
+        </p>
+
         {/* Enterprise note */}
         <p className="mt-6 text-center text-muted-foreground text-sm">
           {PRICING_COPY.enterpriseNote.split("Contact us")[0]}
@@ -99,11 +104,6 @@ export function PricingSection() {
             Contact us for Enterprise
           </a>
         </p>
-
-        {/* Tracked events explainer */}
-        <div className="mt-10">
-          <TrackedEventsExplainer />
-        </div>
 
         {/* AWS Cost Note */}
         <div className="relative mt-8 rounded-xl border border-border bg-muted/30 p-6">

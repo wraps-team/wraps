@@ -10,12 +10,7 @@
  */
 
 import type { BillingInterval, TierId } from "../config/pricing";
-import {
-  getDisplayPrice,
-  getTier,
-  OVERAGE_RATES,
-  TIER_LIMITS,
-} from "../config/pricing";
+import { getDisplayPrice, getTier } from "../config/pricing";
 
 // =============================================================================
 // SES PRICING PLANS (announced 2026-07-21, per-account and per-Region)
@@ -258,7 +253,10 @@ export function calculateStorageGrowth(
 
 export type CostInput = {
   emailsPerMonth: number;
-  /** Wraps tracked events — billed separately from raw email volume. */
+  /**
+   * Custom events (POST /v1/events). Accepted for backward compatibility;
+   * does not currently affect the estimate — see estimateWrapsCost below.
+   */
   eventsPerMonth: number;
   tier: TierId;
   billing: BillingInterval;
@@ -285,11 +283,6 @@ export type CostEstimate = {
     tier: TierId;
     tierName: string;
     platformCost: number;
-    overageCost: number;
-    includedEvents: number;
-    overageEvents: number;
-    /** True when the tier has no overage rate and the volume exceeds it. */
-    requiresUpgrade: boolean;
     annualSavings: number;
     total: number;
   };
@@ -324,33 +317,18 @@ function roundCents(value: number): number {
 
 function estimateWrapsCost(input: CostInput): CostEstimate["wraps"] {
   const tier = getTier(input.tier);
-  const limits = TIER_LIMITS[input.tier];
-  const overage = OVERAGE_RATES[input.tier];
-
   const platformCost = getDisplayPrice(tier, input.billing);
   const annualSavings =
     input.billing === "annual" && tier.annualPrice
       ? tier.price * 12 - tier.annualPrice
       : 0;
 
-  const includedEvents =
-    typeof limits.messages === "number"
-      ? limits.messages
-      : Number.POSITIVE_INFINITY;
-  const overageEvents = Math.max(0, input.eventsPerMonth - includedEvents);
-  const overageCost =
-    overage.perThousand > 0 ? (overageEvents / 1000) * overage.perThousand : 0;
-
   return {
     tier: input.tier,
     tierName: tier.name,
     platformCost,
-    overageCost: roundCents(overageCost),
-    includedEvents,
-    overageEvents,
-    requiresUpgrade: overageEvents > 0 && overage.perThousand === 0,
     annualSavings,
-    total: roundCents(platformCost + overageCost),
+    total: roundCents(platformCost),
   };
 }
 
@@ -499,19 +477,6 @@ export function estimateCost(partial: Partial<CostInput> = {}): CostEstimate {
         ? Math.round((total / input.emailsPerMonth) * 1000 * 10_000) / 10_000
         : 0,
   };
-}
-
-/**
- * Cheapest Wraps tier that covers a given tracked-event volume without
- * requiring an upgrade. Falls back to the top tier for volumes beyond it.
- */
-export function recommendTier(eventsPerMonth: number): TierId {
-  const order: TierId[] = ["free", "starter", "growth", "scale"];
-  const fit = order.find((id) => {
-    const included = TIER_LIMITS[id].messages;
-    return typeof included === "number" ? eventsPerMonth <= included : true;
-  });
-  return fit ?? "scale";
 }
 
 export type SesPlanRecommendation = {

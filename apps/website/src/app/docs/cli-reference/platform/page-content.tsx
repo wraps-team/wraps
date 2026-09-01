@@ -206,46 +206,35 @@ export default function CLIReferencePlatformPageContent() {
           your AWS infrastructure.
         </p>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Starter</CardTitle>
-              <p className="text-muted-foreground text-sm">$19/mo</p>
+              <CardTitle className="text-lg">Pro</CardTitle>
+              <p className="text-muted-foreground text-sm">$29/mo</p>
             </CardHeader>
             <CardContent>
               <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
                 <li>AI template editor</li>
                 <li>Topics, segments & broadcasts</li>
                 <li>Unlimited workflows</li>
-                <li>50K tracked events/mo</li>
-              </ul>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Growth</CardTitle>
-              <p className="text-muted-foreground text-sm">$79/mo</p>
-            </CardHeader>
-            <CardContent>
-              <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
-                <li>Everything in Starter</li>
-                <li>AI workflow generation</li>
                 <li>3 AWS accounts</li>
-                <li>250K tracked events/mo</li>
+                <li>90-day dashboard history</li>
               </ul>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Scale</CardTitle>
+              <CardTitle className="text-lg">Business</CardTitle>
               <p className="text-muted-foreground text-sm">$199/mo</p>
             </CardHeader>
             <CardContent>
               <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
-                <li>Everything in Growth</li>
+                <li>Everything in Pro</li>
+                <li>AI workflow generation</li>
                 <li>Behavioral segments</li>
-                <li>1K AI generations/mo</li>
+                <li>1,000 AI generations/mo</li>
                 <li>Unlimited AWS accounts</li>
+                <li>SSO + SCIM, 1-year history</li>
               </ul>
             </CardContent>
           </Card>

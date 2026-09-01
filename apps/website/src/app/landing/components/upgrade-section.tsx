@@ -10,122 +10,99 @@ import { FadeIn } from "./animations";
 
 // Get prices from config
 const freeTier = PRICING_TIERS.find((t) => t.id === "free")!;
-const starterTier = PRICING_TIERS.find((t) => t.id === "starter")!;
-const growthTier = PRICING_TIERS.find((t) => t.id === "growth")!;
-const scaleTier = PRICING_TIERS.find((t) => t.id === "scale")!;
+const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
+const businessTier = PRICING_TIERS.find((t) => t.id === "business")!;
 
 const comparisonFeatures = [
   {
     feature: "Hosted dashboard",
     free: true,
-    starter: true,
-    growth: true,
-    scale: true,
+    pro: true,
+    business: true,
   },
   {
     feature: "CLI + SDK",
     free: true,
-    starter: true,
-    growth: true,
-    scale: true,
-  },
-  {
-    feature: "Tracked events/month",
-    free: "5K",
-    starter: "50K",
-    growth: "250K",
-    scale: "1M",
-  },
-  {
-    feature: "Overage rate",
-    free: "—",
-    starter: "Upgrade",
-    growth: "$0.50/1K",
-    scale: "$0.15/1K",
+    pro: true,
+    business: true,
   },
   {
     feature: "Workflows",
-    free: "1",
-    starter: "Unlimited",
-    growth: "Unlimited",
-    scale: "Unlimited",
+    free: "2",
+    pro: "Unlimited",
+    business: "Unlimited",
   },
   {
     feature: "AI generations",
     free: "10/mo",
-    starter: "50/mo",
-    growth: "250/mo",
-    scale: "1,000/mo",
+    pro: "250/mo",
+    business: "1,000/mo",
   },
   {
     feature: "Contacts",
     free: "Unlimited",
-    starter: "Unlimited",
-    growth: "Unlimited",
-    scale: "Unlimited",
+    pro: "Unlimited",
+    business: "Unlimited",
   },
   {
     feature: "Templates",
     free: true,
-    starter: true,
-    growth: true,
-    scale: true,
+    pro: true,
+    business: true,
   },
   {
     feature: "Team members",
-    free: "1",
-    starter: "Unlimited",
-    growth: "Unlimited",
-    scale: "Unlimited",
+    free: "Unlimited",
+    pro: "Unlimited",
+    business: "Unlimited",
   },
   {
     feature: "Topics, segments & broadcasts",
     free: false,
-    starter: true,
-    growth: true,
-    scale: true,
+    pro: true,
+    business: true,
   },
   {
     feature: "Cross-channel cascades",
     free: false,
-    starter: true,
-    growth: true,
-    scale: true,
+    pro: true,
+    business: true,
   },
   {
     feature: "Event tracking",
     free: false,
-    starter: true,
-    growth: true,
-    scale: true,
+    pro: true,
+    business: true,
   },
   {
     feature: "AI workflow generation",
     free: false,
-    starter: false,
-    growth: true,
-    scale: true,
+    pro: false,
+    business: true,
   },
   {
     feature: "Behavioral segments",
     free: false,
-    starter: false,
-    growth: false,
-    scale: true,
+    pro: false,
+    business: true,
   },
   {
     feature: "AWS accounts",
     free: "1",
-    starter: "1",
-    growth: "3",
-    scale: "Unlimited",
+    pro: "3",
+    business: "Unlimited",
+  },
+  {
+    feature: "Dashboard history",
+    free: "30 days",
+    pro: "90 days",
+    business: "1 year",
   },
   {
     feature: "Support",
     free: "Community",
-    starter: "Email",
-    growth: "Priority (24hr)",
-    scale: "Priority + SLA",
+    pro: "Email",
+    business: "Priority",
   },
 ];
 
@@ -228,7 +205,7 @@ function TableRow({
   return (
     <motion.div
       animate={{ opacity: 1, x: 0 }}
-      className={`grid grid-cols-5 px-4 py-3 transition-colors hover:bg-muted/30 sm:px-6 ${
+      className={`grid grid-cols-4 px-4 py-3 transition-colors hover:bg-muted/30 sm:px-6 ${
         isLast ? "" : "border-b"
       }`}
       initial={{ opacity: 0, x: -20 }}
@@ -253,11 +230,9 @@ function TableRow({
         )}
       </div>
       <div className="flex justify-center">
-        {typeof row.starter === "string" ? (
-          <span className="text-foreground text-xs sm:text-sm">
-            {row.starter}
-          </span>
-        ) : row.starter ? (
+        {typeof row.pro === "string" ? (
+          <span className="text-foreground text-xs sm:text-sm">{row.pro}</span>
+        ) : row.pro ? (
           <>
             <Check aria-hidden="true" className="size-5 text-green-500" />
             <span className="sr-only">Included</span>
@@ -270,28 +245,11 @@ function TableRow({
         )}
       </div>
       <div className="flex justify-center">
-        {typeof row.growth === "string" ? (
-          <span className="text-foreground text-xs sm:text-sm">
-            {row.growth}
-          </span>
-        ) : row.growth ? (
-          <>
-            <Check aria-hidden="true" className="size-5 text-green-500" />
-            <span className="sr-only">Included</span>
-          </>
-        ) : (
-          <>
-            <X aria-hidden="true" className="size-5 text-muted-foreground/30" />
-            <span className="sr-only">Not included</span>
-          </>
-        )}
-      </div>
-      <div className="flex justify-center">
-        {typeof row.scale === "string" ? (
+        {typeof row.business === "string" ? (
           <span className="font-medium text-orange-500 text-xs sm:text-sm">
-            {row.scale}
+            {row.business}
           </span>
-        ) : row.scale ? (
+        ) : row.business ? (
           <>
             <Check aria-hidden="true" className="size-5 text-green-500" />
             <span className="sr-only">Included</span>
@@ -348,7 +306,7 @@ export function UpgradeSection() {
                 transition={{ duration: 0.6, ease: "easeOut" }}
               >
                 {/* Table Header */}
-                <div className="grid grid-cols-5 border-b bg-muted/50 px-4 py-4 sm:px-6">
+                <div className="grid grid-cols-4 border-b bg-muted/50 px-4 py-4 sm:px-6">
                   <div className="font-medium text-muted-foreground text-sm">
                     Feature
                   </div>
@@ -361,23 +319,17 @@ export function UpgradeSection() {
                     </p>
                   </div>
                   <div className="text-center">
-                    <span className="font-semibold text-sm">Starter</span>
+                    <span className="font-semibold text-sm">Pro</span>
                     <p className="text-muted-foreground text-xs">
-                      ${starterTier.price}/mo
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <span className="font-semibold text-sm">Growth</span>
-                    <p className="text-muted-foreground text-xs">
-                      ${growthTier.price}/mo
+                      ${proTier.price}/mo
                     </p>
                   </div>
                   <div className="text-center">
                     <span className="font-semibold text-orange-500 text-sm">
-                      Scale
+                      Business
                     </span>
                     <p className="text-muted-foreground text-xs">
-                      ${scaleTier.price}/mo
+                      ${businessTier.price}/mo
                     </p>
                   </div>
                 </div>

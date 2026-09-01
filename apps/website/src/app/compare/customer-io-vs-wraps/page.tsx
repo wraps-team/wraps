@@ -74,12 +74,12 @@ const tldrRows = [
   {
     dimension: "Pricing model",
     customerio: "Per contact (profile). High-watermark billing.",
-    wraps: "Per tracked event. Unlimited contacts on every tier.",
+    wraps: "Flat monthly fee by tier. Unlimited contacts on every tier.",
   },
   {
     dimension: "Starting price",
     customerio: "$100/mo for 5,000 profiles",
-    wraps: "Free (5K events/mo) + AWS SES at $0.10/1K à la carte",
+    wraps: "Free ($0/mo) + AWS SES at $0.10/1K à la carte",
   },
   {
     dimension: "Infrastructure",
@@ -117,24 +117,24 @@ const pricingRows = [
     emails: "50,000",
     customerio: "$100",
     customerioNote: "Essentials (at profile limit)",
-    wraps: "$24",
-    wrapsNote: "$19 Starter + $5 SES",
+    wraps: "$34",
+    wrapsNote: "$29 Pro + $5 SES",
   },
   {
     contacts: "10,000",
     emails: "100,000",
     customerio: "$145",
     customerioNote: "$100 + 5K overage at $0.009/profile",
-    wraps: "$29",
-    wrapsNote: "$19 Starter + $10 SES",
+    wraps: "$39",
+    wrapsNote: "$29 Pro + $10 SES",
   },
   {
     contacts: "50,000",
     emails: "500,000",
     customerio: "$505",
     customerioNote: "$100 + 45K overage at $0.009/profile",
-    wraps: "$129",
-    wrapsNote: "$79 Growth + $50 SES",
+    wraps: "$249",
+    wrapsNote: "$199 Business + $50 SES",
   },
   {
     contacts: "100,000",
@@ -142,7 +142,7 @@ const pricingRows = [
     customerio: "$1,000+",
     customerioNote: "Premium tier minimum (annual contract)",
     wraps: "$299",
-    wrapsNote: "$199 Scale + $100 SES",
+    wrapsNote: "$199 Business + $100 SES",
   },
   {
     contacts: "500,000",
@@ -150,7 +150,7 @@ const pricingRows = [
     customerio: "$4,000-5,000+",
     customerioNote: "Enterprise (custom, estimated)",
     wraps: "$699",
-    wrapsNote: "$199 Scale + $500 SES",
+    wrapsNote: "$199 Business + $500 SES",
   },
 ];
 
@@ -616,10 +616,10 @@ export default function CustomerIoVsWrapsPage() {
               </div>
             </Card>
             <p className="mt-4 text-muted-foreground text-sm">
-              Wraps pricing: Free (5K events/mo), $19/mo (50K events), $79/mo
-              (250K events), $199/mo (1M events). AWS SES costs $0.10 per 1,000
-              emails on à la carte (AWS defaults new accounts to $0.16), paid
-              directly to AWS.{" "}
+              Wraps pricing: Free ($0/mo), Pro ($29/mo), Business ($199/mo) — a
+              flat monthly fee by tier, not by contact or event volume. AWS SES
+              costs $0.10 per 1,000 emails on à la carte (AWS defaults new
+              accounts to $0.16), paid directly to AWS.{" "}
               <a
                 className="text-primary underline"
                 href="/tools/ses-calculator"

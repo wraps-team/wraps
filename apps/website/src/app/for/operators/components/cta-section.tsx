@@ -50,7 +50,7 @@ export function OperatorsCtaSection() {
         </div>
 
         <p className="mt-6 text-muted-foreground text-sm">
-          Topics, segments, and scheduled campaigns are on Starter, $19 a month,
+          Topics, segments, and scheduled campaigns are on Pro, $29 a month,
           with unlimited contacts.
         </p>
       </div>

@@ -20,6 +20,20 @@ import Link from "next/link";
 export function ScalePlanContent() {
   return (
     <main className="mx-auto max-w-4xl space-y-20 px-6 py-16">
+      {/* Update note — this post describes the pre-2026-08 ladder. Do not
+          rewrite the body; the plan names and prices below are historical. */}
+      <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 text-sm">
+        <p className="text-foreground/90">
+          <strong>Updated 2026-08:</strong> the Scale plan described in this
+          post is now called Business. Existing Scale subscriptions keep their
+          $199/mo pricing for life. See{" "}
+          <Link className="underline" href="/platform#pricing">
+            current plans
+          </Link>
+          .
+        </p>
+      </div>
+
       {/* Intro */}
       <section>
         <p className="text-foreground/80 text-lg leading-relaxed">

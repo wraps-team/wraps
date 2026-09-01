@@ -1,10 +1,10 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import { AGENT_CONTENT } from "@/lib/agent-content";
 import { renderPricingMarkdown } from "@/lib/pricing-markdown";
-import { estimateCost, recommendTier, SES_PLANS } from "@/lib/ses-cost";
+import { estimateCost, SES_PLANS } from "@/lib/ses-cost";
 
 const webRoot = resolve(__dirname, "..", "..");
 const read = (relativePath: string) =>
@@ -89,6 +89,15 @@ describe("markdown content negotiation", () => {
     expect(source).toContain("/api/pricing/estimate");
     expect(source).toContain("essentials");
   });
+
+  it("advertises only the three purchasable tiers in the MCP estimate_cost enum", async () => {
+    const { TOOLS } = await import("@/lib/mcp-server");
+    const estimateCostTool = TOOLS.find((t) => t.name === "estimate_cost");
+    const tierSchema = estimateCostTool?.inputSchema.properties.tier as {
+      enum: readonly string[];
+    };
+    expect(tierSchema.enum).toEqual(["free", "pro", "business"]);
+  });
 });
 
 describe("cost engine", () => {
@@ -139,7 +148,7 @@ describe("cost engine", () => {
     const estimate = estimateCost({
       emailsPerMonth: 1_000_000,
       eventsPerMonth: 500_000,
-      tier: "scale",
+      tier: "business",
       sesPlan: "alacarte",
     });
     const names = estimate.aws.lines.map((line) => line.name);
@@ -156,25 +165,24 @@ describe("cost engine", () => {
     expect(estimate.total).toBeCloseTo(335.09, 2);
   });
 
-  it("flags volumes that a no-overage tier cannot absorb", () => {
-    const estimate = estimateCost({ tier: "starter", eventsPerMonth: 80_000 });
-    expect(estimate.wraps.requiresUpgrade).toBe(true);
-    expect(estimate.wraps.overageEvents).toBe(30_000);
-    expect(estimate.wraps.overageCost).toBe(0);
+  it("charges the flat Wraps fee regardless of event volume", () => {
+    const low = estimateCost({ tier: "pro", eventsPerMonth: 0 });
+    const high = estimateCost({ tier: "pro", eventsPerMonth: 5_000_000 });
+    expect(low.wraps.total).toBe(29);
+    expect(high.wraps.total).toBe(29);
   });
 
-  it("bills overage per 1,000 events on tiers that have a rate", () => {
-    const estimate = estimateCost({ tier: "growth", eventsPerMonth: 300_000 });
-    expect(estimate.wraps.requiresUpgrade).toBe(false);
-    expect(estimate.wraps.overageCost).toBe(25); // 50,000 over × $0.50/1K
-    expect(estimate.wraps.total).toBe(104);
-  });
-
-  it("recommends the cheapest tier that covers the volume", () => {
-    expect(recommendTier(5000)).toBe("free");
-    expect(recommendTier(5001)).toBe("starter");
-    expect(recommendTier(250_000)).toBe("growth");
-    expect(recommendTier(9_000_000)).toBe("scale");
+  // Pins the truth behind the doc claim: the events parameter is accepted
+  // for backward compatibility but does not currently drive any part of the
+  // estimate — not the Wraps fee, and not the AWS-side event-pipeline lines
+  // either (those come from emailsPerMonth × eventTypes). If this ever
+  // fails, the parameter has become load-bearing and every "does not
+  // currently affect the estimate" claim in mcp-server.ts and
+  // pricing-markdown.ts needs to be rewritten, not this test.
+  it("does not currently let the events parameter affect the AWS-side estimate either", () => {
+    const low = estimateCost({ tier: "pro", eventsPerMonth: 0 });
+    const high = estimateCost({ tier: "pro", eventsPerMonth: 5_000_000 });
+    expect(high.aws.total).toBe(low.aws.total);
   });
 });
 
@@ -183,7 +191,7 @@ describe("GET /api/pricing/estimate", () => {
     const { GET } = await import("@/app/api/pricing/estimate/route");
     const response = GET(
       new NextRequest(
-        estimateUrl("?emails=500000&events=250000&tier=growth&sesPlan=alacarte")
+        estimateUrl("?emails=500000&events=250000&tier=pro&sesPlan=alacarte")
       )
     );
 
@@ -192,12 +200,12 @@ describe("GET /api/pricing/estimate", () => {
 
     expect(body.currency).toBe("USD");
     expect(body.aws.sesPlan.id).toBe("alacarte");
-    expect(body.wraps.tierName).toBe("Growth");
+    expect(body.wraps.tierName).toBe("Pro");
     expect(body.total).toBeCloseTo(
       estimateCost({
         emailsPerMonth: 500_000,
         eventsPerMonth: 250_000,
-        tier: "growth",
+        tier: "pro",
         sesPlan: "alacarte",
       }).total,
       2
@@ -205,6 +213,15 @@ describe("GET /api/pricing/estimate", () => {
     expect(body.shareUrl).toContain("/tools/ses-calculator?");
     expect(body.shareUrl).toContain("emails=500000");
     expect(body.shareUrl).toContain("sesPlan=alacarte");
+  });
+
+  it("resolves a legacy tier alias to its purchasable successor instead of 400ing", async () => {
+    const { GET } = await import("@/app/api/pricing/estimate/route");
+    const response = GET(new NextRequest(estimateUrl("?tier=starter")));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.wraps.tierName).toBe("Pro");
   });
 
   it("defaults to the a-la-carte SES rate rather than assuming a plan", async () => {
@@ -229,16 +246,6 @@ describe("GET /api/pricing/estimate", () => {
     expect(text).toContain("/tools/ses-calculator?");
   });
 
-  it("warns in markdown when the chosen tier cannot absorb the volume", async () => {
-    const { GET } = await import("@/app/api/pricing/estimate/route");
-    const text = await GET(
-      new NextRequest(estimateUrl("?events=80000&tier=starter"), {
-        headers: { accept: "text/markdown" },
-      })
-    ).text();
-    expect(text).toMatch(/cannot absorb this volume/i);
-  });
-
   it("quotes the a-la-carte alternative when the account is on Essentials", async () => {
     const { GET } = await import("@/app/api/pricing/estimate/route");
     const text = await GET(
@@ -255,7 +262,24 @@ describe("GET /api/pricing/estimate", () => {
     const response = GET(new NextRequest(estimateUrl("?tier=enterprise")));
     expect(response.status).toBe(400);
     const body = await response.json();
-    expect(body.error).toContain("free, starter, growth, scale");
+    expect(body.error).toContain("free, pro, business");
+  });
+
+  // Regression guard: resolveTierId used `id in LEGACY_TIER_ALIASES`, which
+  // walks the prototype chain. `?tier=__proto__` resolved to Object.prototype
+  // itself — truthy, so it passed the `!resolved` guard as a "valid" tier and
+  // flowed into estimateCost, which is not an InvalidParamError and so
+  // re-throws as an unhandled 500 on this public, agent-facing endpoint.
+  it("rejects prototype-chain tier values instead of 500ing", async () => {
+    const { GET } = await import("@/app/api/pricing/estimate/route");
+
+    const proto = GET(new NextRequest(estimateUrl("?tier=__proto__")));
+    expect(proto.status).toBe(400);
+    expect(proto.status).not.toBe(200);
+
+    const ctor = GET(new NextRequest(estimateUrl("?tier=constructor")));
+    expect(ctor.status).toBe(400);
+    expect(ctor.status).not.toBe(200);
   });
 
   it("rejects non-integer and out-of-range volumes", async () => {
@@ -272,5 +296,54 @@ describe("GET /api/pricing/estimate", () => {
     const response = GET(new NextRequest(estimateUrl("")));
     expect(response.headers.get("access-control-allow-origin")).toBe("*");
     expect(response.headers.get("cache-control")).toContain("max-age=3600");
+  });
+});
+
+describe("tracked-events sweep guard", () => {
+  const srcRoot = resolve(__dirname, "..");
+
+  // Excluded — each for a stated reason, not because the guard is wrong.
+  const excludedDirs = [
+    resolve(srcRoot, "__tests__"), // the guard itself names the phrase
+    resolve(srcRoot, "app/blog"), // dated posts, deliberately not rewritten
+    resolve(srcRoot, "app/changelog"), // dated release notes, same
+  ];
+
+  // Hyphen included on purpose: mcp-server.ts and ses-cost.ts carried the
+  // phrase as "tracked-event", and a narrower /tracked event/i guard would
+  // have passed clean over both. See plans/209. \s+ (not a literal space)
+  // because JSX text wraps across source lines -- two compare-page CTAs
+  // read "5K tracked\n  events/month" in source and would have slipped
+  // past a single-space-only pattern even though React renders them
+  // adjacent on the page.
+  const TRACKED_EVENTS_PATTERN = /tracked[-\s]+events?/i;
+
+  function isExcluded(absPath: string): boolean {
+    return excludedDirs.some(
+      (dir) => absPath === dir || absPath.startsWith(`${dir}/`)
+    );
+  }
+
+  function collectSourceFiles(dir: string, files: string[] = []): string[] {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (isExcluded(full)) {
+        continue;
+      }
+      const stat = statSync(full);
+      if (stat.isDirectory()) {
+        collectSourceFiles(full, files);
+      } else if (/\.(tsx|ts)$/.test(full)) {
+        files.push(full);
+      }
+    }
+    return files;
+  }
+
+  it("apps/website/src has no surviving 'tracked event(s)' / 'tracked-event(s)' mentions outside dated posts", () => {
+    const offenders = collectSourceFiles(srcRoot).filter((file) =>
+      TRACKED_EVENTS_PATTERN.test(readFileSync(file, "utf8"))
+    );
+    expect(offenders).toEqual([]);
   });
 });

@@ -196,7 +196,7 @@ export function TemplateEditorSection() {
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                10 AI generations on Free, 50 on Starter
+                10 AI generations on Free, 250 on Pro
               </li>
             </ul>
           </div>

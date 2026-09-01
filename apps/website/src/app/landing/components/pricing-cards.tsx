@@ -3,7 +3,6 @@
 import { Button } from "@wraps/ui/components/ui/button";
 import { Check } from "lucide-react";
 import { memo, useState } from "react";
-import { TrackedEventTooltip } from "@/components/tracked-event-tooltip";
 import {
   type BillingInterval,
   getCtaLink,
@@ -12,28 +11,6 @@ import {
   type PricingTier,
 } from "@/config/pricing";
 import { BillingToggle } from "./billing-toggle";
-
-const TRACKED_EVENTS_RE = /(tracked events)/i;
-
-function FeatureText({ text }: { text: string }) {
-  if (!text.toLowerCase().includes("tracked events")) {
-    return <>{text}</>;
-  }
-
-  const parts = text.split(TRACKED_EVENTS_RE);
-
-  return (
-    <>
-      {parts.map((part) =>
-        part.toLowerCase() === "tracked events" ? (
-          <TrackedEventTooltip key={part}>{part}</TrackedEventTooltip>
-        ) : (
-          part
-        )
-      )}
-    </>
-  );
-}
 
 function PricingCard({
   plan,
@@ -73,9 +50,7 @@ function PricingCard({
           {plan.features.map((feature) => (
             <li className="flex items-start gap-2" key={feature}>
               <Check className="mt-0.5 size-3 shrink-0 text-orange-500/70" />
-              <span className="text-sm">
-                <FeatureText text={feature} />
-              </span>
+              <span className="text-sm">{feature}</span>
             </li>
           ))}
         </ul>

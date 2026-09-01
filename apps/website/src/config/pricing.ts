@@ -3,14 +3,37 @@
  * Single source of truth for all pricing data across the website.
  *
  * Last updated: January 2026
- * Pricing model: Event-based Platform Fee — we charge for tooling, users pay AWS for sending
+ * Pricing model: flat monthly platform fee per tier (governance, history,
+ * AWS accounts) — we charge for tooling, users pay AWS for sending
  */
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
-export type TierId = "free" | "starter" | "growth" | "scale";
+export type TierId = "free" | "pro" | "business";
+
+/**
+ * Tier names from the pre-2026-08 ladder. They are never displayed and never
+ * purchasable — they exist so that agents holding a cached copy of
+ * `pricing.md` (which advertised them until this change) keep getting a
+ * 200 from /api/pricing/estimate instead of a 400.
+ */
+export const LEGACY_TIER_ALIASES = {
+  starter: "pro",
+  growth: "business",
+  scale: "business",
+} as const satisfies Record<string, TierId>;
+
+export type LegacyTierId = keyof typeof LEGACY_TIER_ALIASES;
+
+export function resolveTierId(id: string): TierId | null {
+  if (Object.hasOwn(LEGACY_TIER_ALIASES, id)) {
+    return LEGACY_TIER_ALIASES[id as LegacyTierId];
+  }
+  return (["free", "pro", "business"] as const).find((t) => t === id) ?? null;
+}
+
 export type BillingInterval = "monthly" | "annual";
 
 export type PricingTier = {
@@ -28,23 +51,19 @@ export type PricingTier = {
 };
 
 export type TierLimits = {
-  messages: number | "unlimited";
-  messagesDisplay: string;
   contacts: "unlimited";
+  domains: "unlimited";
+  templates: "unlimited";
   workflows: number | "unlimited";
   workflowsDisplay: string;
   aiGenerations: number;
   awsAccounts: number | "unlimited";
   awsAccountsDisplay: string;
+  historyDays: number;
+  historyDisplay: string;
   teamMembers: number | "unlimited";
   teamMembersDisplay: string;
   support: string;
-};
-
-export type OverageRate = {
-  tierId: TierId;
-  perThousand: number;
-  display: string;
 };
 
 export type Competitor = {
@@ -71,88 +90,54 @@ export const AWS_PRICING = {
 } as const;
 
 // =============================================================================
-// OVERAGE RATES
-// =============================================================================
-
-export const OVERAGE_RATES: Record<TierId, OverageRate> = {
-  free: {
-    tierId: "free",
-    perThousand: 0,
-    display: "Upgrade required",
-  },
-  starter: {
-    tierId: "starter",
-    perThousand: 0,
-    display: "Upgrade required",
-  },
-  growth: {
-    tierId: "growth",
-    perThousand: 0.5,
-    display: "$0.50/1K tracked events",
-  },
-  scale: {
-    tierId: "scale",
-    perThousand: 0.15,
-    display: "$0.15/1K tracked events",
-  },
-};
-
-// =============================================================================
 // TIER LIMITS
 // =============================================================================
 
 export const TIER_LIMITS: Record<TierId, TierLimits> = {
   free: {
-    messages: 5000,
-    messagesDisplay: "5,000/mo",
     contacts: "unlimited",
-    workflows: 1,
-    workflowsDisplay: "1",
+    domains: "unlimited",
+    templates: "unlimited",
+    workflows: 2,
+    workflowsDisplay: "2",
     aiGenerations: 10,
     awsAccounts: 1,
     awsAccountsDisplay: "1",
-    teamMembers: 1,
-    teamMembersDisplay: "1",
-    support: "Community",
-  },
-  starter: {
-    messages: 50_000,
-    messagesDisplay: "50,000/mo",
-    contacts: "unlimited",
-    workflows: "unlimited",
-    workflowsDisplay: "Unlimited",
-    aiGenerations: 50,
-    awsAccounts: 1,
-    awsAccountsDisplay: "1",
+    historyDays: 30,
+    historyDisplay: "30 days",
     teamMembers: "unlimited",
     teamMembersDisplay: "Unlimited",
-    support: "Email",
+    support: "Community",
   },
-  growth: {
-    messages: 250_000,
-    messagesDisplay: "250,000/mo",
+  pro: {
     contacts: "unlimited",
+    domains: "unlimited",
+    templates: "unlimited",
     workflows: "unlimited",
     workflowsDisplay: "Unlimited",
     aiGenerations: 250,
     awsAccounts: 3,
     awsAccountsDisplay: "3",
+    historyDays: 90,
+    historyDisplay: "90 days",
     teamMembers: "unlimited",
     teamMembersDisplay: "Unlimited",
-    support: "Priority (24hr)",
+    support: "Email",
   },
-  scale: {
-    messages: 1_000_000,
-    messagesDisplay: "1,000,000/mo",
+  business: {
     contacts: "unlimited",
+    domains: "unlimited",
+    templates: "unlimited",
     workflows: "unlimited",
     workflowsDisplay: "Unlimited",
     aiGenerations: 1000,
     awsAccounts: "unlimited",
     awsAccountsDisplay: "Unlimited",
+    historyDays: 365,
+    historyDisplay: "1 year",
     teamMembers: "unlimited",
     teamMembersDisplay: "Unlimited",
-    support: "Priority + SLA",
+    support: "Priority",
   },
 };
 
@@ -167,80 +152,57 @@ export const PRICING_TIERS: PricingTier[] = [
     price: 0,
     annualPrice: null,
     period: "/mo",
-    description: "Get started — no credit card required",
+    description: "Try the platform with your AWS account",
     highlight: false,
     cta: "Get Started",
     ctaLink: "https://app.wraps.dev/auth?mode=signup&plan=free",
     limits: TIER_LIMITS.free,
     features: [
-      "Dashboard + AI template editor",
-      "5K tracked events/mo",
-      "1 workflow",
-      "Unlimited contacts",
-      "CLI + TypeScript SDK",
-      "10 AI template generations/mo",
-    ],
-  },
-  {
-    id: "starter",
-    name: "Starter",
-    price: 19,
-    annualPrice: 199,
-    period: "/mo",
-    description: "For developers shipping their first integration",
-    highlight: false,
-    cta: "Subscribe",
-    ctaLink: "https://app.wraps.dev/auth?mode=signup&plan=starter",
-    limits: TIER_LIMITS.starter,
-    features: [
-      "50K tracked events/mo",
-      "Unlimited workflows",
-      "React templates + AI editor",
-      "Topics, segments & broadcasts",
+      "Unlimited sends, domains & contacts",
       "Unlimited team members",
-      "Email support",
+      "1 AWS account",
+      "2 workflows",
+      "30-day history",
     ],
   },
   {
-    id: "growth",
-    name: "Growth",
-    price: 79,
-    annualPrice: 799,
+    id: "pro",
+    name: "Pro",
+    price: 29,
+    annualPrice: 299,
     period: "/mo",
-    description: "For teams where developers and marketers ship together",
+    description: "For indie hackers and side projects",
     highlight: true,
     cta: "Subscribe",
-    ctaLink: "https://app.wraps.dev/auth?mode=signup&plan=growth",
-    limits: TIER_LIMITS.growth,
+    ctaLink: "https://app.wraps.dev/auth?mode=signup&plan=pro",
+    limits: TIER_LIMITS.pro,
     features: [
-      "250K tracked events/mo",
-      "Then $0.50/1K tracked events",
-      "Everything in Starter, plus:",
-      "AI workflow generation",
+      "Unlimited sends, domains & contacts",
+      "Unlimited workflows",
+      "Topics, segments, batch & campaigns",
       "3 AWS accounts",
-      "Priority support (24hr)",
+      "250 AI generations/mo",
+      "90-day history",
     ],
   },
   {
-    id: "scale",
-    name: "Scale",
+    id: "business",
+    name: "Business",
     price: 199,
     annualPrice: 1999,
     period: "/mo",
-    description: "For high-volume teams with multiple AWS accounts",
+    description: "For scaling companies",
     highlight: false,
     cta: "Subscribe",
-    ctaLink: "https://app.wraps.dev/auth?mode=signup&plan=scale",
-    limits: TIER_LIMITS.scale,
+    ctaLink: "https://app.wraps.dev/auth?mode=signup&plan=business",
+    limits: TIER_LIMITS.business,
     features: [
-      "1M tracked events/mo",
-      "Then $0.15/1K tracked events",
-      "Everything in Growth, plus:",
-      "Behavioral segments",
-      "1K AI generations/mo",
+      "Everything in Pro",
       "Unlimited AWS accounts",
-      "SSO + SCIM provisioning",
-      "Priority support + SLA",
+      "1,000 AI generations/mo",
+      "1-year history",
+      "SSO + SCIM, audit export",
+      "Priority support",
     ],
   },
 ];
@@ -419,8 +381,6 @@ export function calculateTotalCost(
   totalCost: number;
 } {
   const tier = getTier(tierId);
-  const limits = tier.limits;
-  const overage = OVERAGE_RATES[tierId];
 
   // Platform cost
   let platformCost = tier.price;
@@ -428,13 +388,8 @@ export function calculateTotalCost(
     platformCost = tier.annualPrice / 12;
   }
 
-  // Overage cost
-  const includedMessages =
-    typeof limits.messages === "number"
-      ? limits.messages
-      : Number.POSITIVE_INFINITY;
-  const overageMessages = Math.max(0, messagesPerMonth - includedMessages);
-  const overageCost = (overageMessages / 1000) * overage.perThousand;
+  // Overage: gone — the Wraps fee is flat per tier.
+  const overageCost = 0;
 
   // AWS cost (SES only)
   const awsCost = messagesPerMonth * AWS_PRICING.sesPerEmail;
@@ -473,130 +428,112 @@ export function formatNumber(num: number): string {
 export type FeatureComparison = {
   name: string;
   free: string | boolean;
-  starter: string | boolean;
-  growth: string | boolean;
-  scale: string | boolean;
+  pro: string | boolean;
+  business: string | boolean;
 };
 
 export const FEATURE_COMPARISON: FeatureComparison[] = [
   {
-    name: "Tracked events/month",
-    free: "5K",
-    starter: "50K",
-    growth: "250K",
-    scale: "1M",
-  },
-  {
     name: "Dashboard history",
-    free: "7 days",
-    starter: "30 days",
-    growth: "90 days",
-    scale: "1 year",
-  },
-  {
-    name: "Overage rate",
-    free: "Upgrade",
-    starter: "Upgrade",
-    growth: "$0.50/1K",
-    scale: "$0.15/1K",
+    free: "30 days",
+    pro: "90 days",
+    business: "1 year",
   },
   {
     name: "Contacts",
     free: "Unlimited",
-    starter: "Unlimited",
-    growth: "Unlimited",
-    scale: "Unlimited",
+    pro: "Unlimited",
+    business: "Unlimited",
+  },
+  {
+    name: "Domains",
+    free: "Unlimited",
+    pro: "Unlimited",
+    business: "Unlimited",
+  },
+  {
+    name: "Templates",
+    free: "Unlimited",
+    pro: "Unlimited",
+    business: "Unlimited",
   },
   {
     name: "Workflows",
-    free: "1",
-    starter: "Unlimited",
-    growth: "Unlimited",
-    scale: "Unlimited",
+    free: "2",
+    pro: "Unlimited",
+    business: "Unlimited",
   },
   {
     name: "AI generations",
     free: "10/mo",
-    starter: "50/mo",
-    growth: "250/mo",
-    scale: "1,000/mo",
+    pro: "250/mo",
+    business: "1,000/mo",
   },
   {
     name: "AWS accounts",
     free: "1",
-    starter: "1",
-    growth: "3",
-    scale: "Unlimited",
+    pro: "3",
+    business: "Unlimited",
   },
   {
     name: "Team members",
-    free: "1",
-    starter: "Unlimited",
-    growth: "Unlimited",
-    scale: "Unlimited",
+    free: "Unlimited",
+    pro: "Unlimited",
+    business: "Unlimited",
   },
   {
     name: "Batch sending",
     free: false,
-    starter: true,
-    growth: true,
-    scale: true,
+    pro: true,
+    business: true,
   },
   {
     name: "Topics & preferences",
     free: false,
-    starter: true,
-    growth: true,
-    scale: true,
+    pro: true,
+    business: true,
   },
   {
     name: "Segments & targeting",
     free: false,
-    starter: true,
-    growth: true,
-    scale: true,
+    pro: true,
+    business: true,
   },
   {
     name: "Campaigns",
     free: false,
-    starter: true,
-    growth: true,
-    scale: true,
+    pro: true,
+    business: true,
   },
   {
     name: "Cross-channel cascades",
     free: false,
-    starter: true,
-    growth: true,
-    scale: true,
+    pro: true,
+    business: true,
   },
   {
     name: "Event tracking",
     free: false,
-    starter: true,
-    growth: true,
-    scale: true,
+    pro: true,
+    business: true,
   },
   {
     name: "Behavioral segments",
     free: false,
-    starter: false,
-    growth: false,
-    scale: true,
+    pro: false,
+    business: true,
   },
   {
     name: "SSO + SCIM",
     free: false,
-    starter: false,
-    growth: false,
-    scale: true,
+    pro: false,
+    business: true,
   },
   {
     name: "Support",
     free: "Community",
-    starter: "Email",
-    growth: "Priority (24hr)",
-    scale: "Priority + SLA",
+    pro: "Email",
+    business: "Priority",
   },
 ];
 
@@ -622,10 +559,7 @@ export const PRICING_COPY = {
   freeHeroHeadline: "Start Free. Deploy in 2 Minutes.",
   freeHeroSubline:
     "No credit card. No time limit. Your AWS account, your data.",
-  trackedEventsHeadline: "What are tracked events?",
-  trackedEventsSubline:
-    "You emit an event, and Wraps does the rest: triggers workflows, builds segments, runs automations on your AWS.",
   paidTiersHeadline: "Outgrowing the free tier?",
   paidTiersSubline:
-    "Event tracking, segments, broadcasts, unlimited workflows, and team access — starting at $19/mo.",
+    "Event tracking, segments, broadcasts, unlimited workflows, and team access — starting at $29/mo.",
 } as const;

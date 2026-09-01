@@ -41,12 +41,10 @@ import {
 } from "nuqs";
 import { Suspense } from "react";
 import { BillingToggle } from "@/app/landing/components/billing-toggle";
-import { TrackedEventTooltip } from "@/components/tracked-event-tooltip";
 import type { BillingInterval } from "@/config/pricing";
 import {
   getCtaLink,
   getDisplayPrice,
-  OVERAGE_RATES,
   PRICING_TIERS,
   TIER_LIMITS,
 } from "@/config/pricing";
@@ -63,7 +61,7 @@ import {
 } from "@/lib/ses-cost";
 import { cn } from "@/lib/utils";
 
-const TIER_IDS = ["free", "starter", "growth", "scale"] as const;
+const TIER_IDS = ["free", "pro", "business"] as const;
 const BILLING_INTERVALS = ["monthly", "annual"] as const;
 
 const VOLUME_PRESETS = [
@@ -72,19 +70,13 @@ const VOLUME_PRESETS = [
     label: "Startup",
     emails: 50_000,
     events: 25_000,
-    tier: "starter" as const,
-  },
-  {
-    label: "Growth",
-    emails: 250_000,
-    events: 125_000,
-    tier: "growth" as const,
+    tier: "pro" as const,
   },
   {
     label: "Scale",
     emails: 1_000_000,
     events: 500_000,
-    tier: "scale" as const,
+    tier: "business" as const,
   },
 ];
 
@@ -252,12 +244,11 @@ function SESCalculatorInner() {
                 value={billingInterval}
               />
             </div>
-            <fieldset className="grid grid-cols-2 gap-2 border-none p-0 m-0">
+            <fieldset className="grid grid-cols-3 gap-2 border-none p-0 m-0">
               <legend className="sr-only">Wraps plan selection</legend>
               {PRICING_TIERS.map((tier) => {
                 const isSelected = selectedTier === tier.id;
                 const limits = TIER_LIMITS[tier.id];
-                const overage = OVERAGE_RATES[tier.id];
                 const displayPrice = getDisplayPrice(tier, billingInterval);
                 return (
                   <button
@@ -270,13 +261,7 @@ function SESCalculatorInner() {
                     )}
                     key={tier.id}
                     onClick={() => {
-                      const maxEvents = limits.messages;
-                      setState({
-                        tier: tier.id,
-                        ...(typeof maxEvents === "number"
-                          ? { events: maxEvents }
-                          : {}),
-                      });
+                      setState({ tier: tier.id });
                     }}
                     type="button"
                   >
@@ -288,12 +273,10 @@ function SESCalculatorInner() {
                       </span>
                     </div>
                     <div className="mt-1 text-muted-foreground text-xs">
-                      {limits.messagesDisplay} tracked events
+                      {limits.awsAccountsDisplay} AWS accounts
                     </div>
                     <div className="text-muted-foreground text-xs">
-                      {overage.perThousand > 0
-                        ? overage.display.replace("events", "tracked events")
-                        : "Upgrade if over"}
+                      {limits.historyDisplay} history
                     </div>
                   </button>
                 );
@@ -301,14 +284,15 @@ function SESCalculatorInner() {
             </fieldset>
           </div>
 
-          {/* Monthly Tracked Events (Wraps billing) */}
+          {/* Monthly Custom Events — accepted for backward compatibility,
+              does not currently affect the estimate (see lib/ses-cost.ts) */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1" htmlFor="events">
-              Monthly <TrackedEventTooltip>Tracked Events</TrackedEventTooltip>
+              Monthly Custom Events
             </Label>
             <div className="flex items-center gap-1.5">
               <button
-                aria-label="Decrease tracked events"
+                aria-label="Decrease custom events"
                 className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                 disabled={eventsPerMonth <= 0}
                 onClick={() =>
@@ -347,7 +331,7 @@ function SESCalculatorInner() {
                 />
               </div>
               <button
-                aria-label="Increase tracked events"
+                aria-label="Increase custom events"
                 className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                 disabled={eventsPerMonth >= 10_000_000}
                 onClick={() =>
@@ -675,42 +659,12 @@ function SESCalculatorInner() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {wrapsCosts.requiresUpgrade ? (
-              <div className="mb-6">
-                <div className="mb-2 rounded-lg border border-amber-500/50 bg-amber-500/10 p-4">
-                  <p className="font-semibold text-amber-700 dark:text-amber-400">
-                    Upgrade Required
-                  </p>
-                  <p className="mt-1 text-amber-600 text-sm dark:text-amber-300">
-                    Your tracked events ({eventsPerMonth.toLocaleString()})
-                    exceed the{" "}
-                    {PRICING_TIERS.find((t) => t.id === selectedTier)?.name}{" "}
-                    plan limit of {wrapsCosts.includedEvents?.toLocaleString()}{" "}
-                    tracked events/month.
-                  </p>
-                  <p className="mt-2 text-sm">
-                    Consider upgrading to{" "}
-                    <strong>
-                      {selectedTier === "free"
-                        ? "Starter"
-                        : selectedTier === "starter"
-                          ? "Growth"
-                          : "Scale"}
-                    </strong>{" "}
-                    for more tracked events or overage billing.
-                  </p>
-                </div>
+            <div className="mb-6">
+              <div className="mb-2 tabular-nums font-bold text-4xl sm:text-5xl">
+                {formatCost(wrapsCosts.totalWrapsCost + total)}
               </div>
-            ) : (
-              <div className="mb-6">
-                <div className="mb-2 tabular-nums font-bold text-4xl sm:text-5xl">
-                  {formatCost(wrapsCosts.totalWrapsCost + total)}
-                </div>
-                <div className="text-muted-foreground">
-                  Wraps + AWS combined
-                </div>
-              </div>
-            )}
+              <div className="text-muted-foreground">Wraps + AWS combined</div>
+            </div>
 
             <div className="space-y-2 border-t pt-4 text-sm">
               <div className="flex justify-between font-medium">
@@ -727,17 +681,6 @@ function SESCalculatorInner() {
                   </span>
                 </div>
               )}
-              {wrapsCosts.overageCost > 0 && (
-                <div className="flex justify-between gap-2 text-muted-foreground">
-                  <span className="ml-4 min-w-0 truncate">
-                    + Overage ({wrapsCosts.overageEvents?.toLocaleString()}{" "}
-                    events)
-                  </span>
-                  <span className="tabular-nums">
-                    {formatCost(wrapsCosts.overageCost)}
-                  </span>
-                </div>
-              )}
               <div className="flex justify-between font-medium">
                 <span>AWS Infrastructure</span>
                 <span className="tabular-nums">{formatCost(total)}/mo</span>
@@ -745,24 +688,16 @@ function SESCalculatorInner() {
               <div className="flex justify-between border-t pt-2 font-bold">
                 <span>Total Monthly Cost</span>
                 <span className="tabular-nums">
-                  {wrapsCosts.requiresUpgrade
-                    ? "—"
-                    : formatCost(wrapsCosts.totalWrapsCost + total)}
+                  {formatCost(wrapsCosts.totalWrapsCost + total)}
                 </span>
               </div>
             </div>
 
             <div className="mt-4 space-y-1 border-t pt-4 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Tracked Events:</span>
+                <span className="text-muted-foreground">Custom Events:</span>
                 <span className="tabular-nums font-medium">
                   {eventsPerMonth.toLocaleString()}/mo
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Included in Plan:</span>
-                <span className="tabular-nums font-medium">
-                  {wrapsCosts.includedEvents?.toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between text-lg">
@@ -788,17 +723,6 @@ function SESCalculatorInner() {
                   {formatCost(wrapsCosts.platformCost)}/mo
                 </span>
               </div>
-              {wrapsCosts.overageCost > 0 && (
-                <div className="flex justify-between gap-2 text-muted-foreground">
-                  <span className="ml-4 min-w-0 truncate">
-                    + Overage ({wrapsCosts.overageEvents?.toLocaleString()}{" "}
-                    events)
-                  </span>
-                  <span className="tabular-nums">
-                    {formatCost(wrapsCosts.overageCost)}
-                  </span>
-                </div>
-              )}
               <div className="flex justify-between font-medium">
                 <span>AWS Infrastructure</span>
                 <span className="tabular-nums">{formatCost(total)}/mo</span>
@@ -806,9 +730,7 @@ function SESCalculatorInner() {
               <div className="flex justify-between border-t pt-2 font-bold">
                 <span>Total</span>
                 <span className="tabular-nums">
-                  {wrapsCosts.requiresUpgrade
-                    ? "—"
-                    : formatCost(wrapsCosts.totalWrapsCost + total)}
+                  {formatCost(wrapsCosts.totalWrapsCost + total)}
                   /mo
                 </span>
               </div>

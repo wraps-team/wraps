@@ -110,31 +110,31 @@ const pricingComparison = [
     volume: "50K/mo",
     mailgunTier: "Foundation",
     mailgunCost: "$35",
-    wrapsTier: "Starter",
-    wrapsPlatform: "$19",
+    wrapsTier: "Pro",
+    wrapsPlatform: "$29",
     awsSes: "$5",
-    wrapsTotal: "$24",
-    savings: "31%",
+    wrapsTotal: "$34",
+    savings: "3%",
   },
   {
     volume: "100K/mo",
     mailgunTier: "Foundation 100K / Scale",
     mailgunCost: "$75-90",
-    wrapsTier: "Starter",
-    wrapsPlatform: "$19",
+    wrapsTier: "Pro",
+    wrapsPlatform: "$29",
     awsSes: "$10",
-    wrapsTotal: "$29",
-    savings: "61-68%",
+    wrapsTotal: "$39",
+    savings: "48-57%",
   },
   {
     volume: "500K/mo",
     mailgunTier: "Scale 500K",
     mailgunCost: "$400",
-    wrapsTier: "Growth",
-    wrapsPlatform: "$79",
+    wrapsTier: "Pro",
+    wrapsPlatform: "$29",
     awsSes: "$50",
-    wrapsTotal: "$129",
-    savings: "68%",
+    wrapsTotal: "$79",
+    savings: "80%",
   },
 ];
 
@@ -287,7 +287,7 @@ const chooseMailgunReasons = [
 const chooseWrapsReasons = [
   "You already have an AWS account (or your company does)",
   "You need HIPAA compliance without paying for an Enterprise contract",
-  "You're sending 100K+ emails/month and want 61%+ cost savings",
+  "You're sending 100K+ emails/month and want 48%+ cost savings",
   "You need data residency beyond US/EU -- any AWS SES region",
   "You don't want a third party able to suspend your account at the worst possible moment",
   "You want a modern template editor and workflow builder, not just a raw API",
@@ -599,9 +599,10 @@ export default function MailgunVsWrapsPage() {
             </Card>
             <div className="mt-4 space-y-2 text-muted-foreground text-sm">
               <p>
-                Wraps platform tiers: Free (5K tracked events/mo), Starter
-                $19/mo (50K events), Growth $79/mo (250K events), Scale $199/mo
-                (1M events). All tiers include unlimited contacts.
+                Wraps platform tiers: Free ($0/mo), Pro ($29/mo), Business
+                ($199/mo) — priced on AWS accounts, dashboard history, and
+                governance features, not send volume. All tiers include
+                unlimited sends, contacts, domains, and templates.
               </p>
               <p>
                 Mailgun gotchas: legacy Flex users saw their rate double to

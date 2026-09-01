@@ -13,25 +13,25 @@ const features = [
     icon: Filter,
     title: "Segments",
     description: "Target by properties like plan or location",
-    badge: "Starter",
+    badge: "Pro",
   },
   {
     icon: Calendar,
     title: "Schedule",
     description: "Pick a date and time for automatic sending",
-    badge: "Starter",
+    badge: "Pro",
   },
   {
     icon: Tag,
     title: "Topics",
     description: "Let contacts subscribe to what they care about",
-    badge: "Starter",
+    badge: "Pro",
   },
   {
     icon: Users,
     title: "Preference Center",
     description: "Hosted page for managing subscriptions",
-    badge: "Starter",
+    badge: "Pro",
   },
 ];
 
@@ -86,7 +86,7 @@ export function DashboardBroadcastsSection() {
           <div className="space-y-8">
             <p className="text-lg text-muted-foreground">
               Send newsletters, announcements, and marketing campaigns.
-              Segments, topics, and scheduling included in Starter.
+              Segments, topics, and scheduling included in Pro.
             </p>
 
             {/* Features as list */}
@@ -121,7 +121,7 @@ export function DashboardBroadcastsSection() {
             <div className="rounded-lg border border-border bg-background/60 p-4">
               <p className="text-sm">
                 <span className="font-medium text-foreground">
-                  Starter ($19/mo):
+                  Pro ($29/mo):
                 </span>{" "}
                 <span className="text-muted-foreground">
                   Broadcasts, segments, scheduling, and topics
@@ -129,10 +129,10 @@ export function DashboardBroadcastsSection() {
               </p>
               <p className="mt-1 text-sm">
                 <span className="font-medium text-foreground">
-                  Growth ($79/mo):
+                  Business ($199/mo):
                 </span>{" "}
                 <span className="text-muted-foreground">
-                  Everything in Starter plus AI workflows and 3 AWS accounts
+                  Everything in Pro plus unlimited AWS accounts and SSO + SCIM
                 </span>
               </p>
             </div>

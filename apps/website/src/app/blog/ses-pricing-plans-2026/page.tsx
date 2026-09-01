@@ -9,6 +9,7 @@ import {
   Terminal,
 } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
@@ -230,6 +231,21 @@ export default function Page() {
         </header>
 
         <main className="mx-auto max-w-4xl space-y-16 px-6 py-16">
+          {/* Update note — this post's Wraps tier mentions describe the
+              pre-2026-08 ladder. Do not rewrite the body; historical. */}
+          <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 text-sm">
+            <p className="text-foreground/90">
+              <strong>Updated 2026-08:</strong> the Wraps "Growth" tier
+              mentioned below is now called Business. Existing Growth
+              subscriptions keep their $79/mo pricing for life. The AWS SES
+              pricing details in this post are unaffected. See{" "}
+              <Link className="underline" href="/platform#pricing">
+                current Wraps plans
+              </Link>
+              .
+            </p>
+          </div>
+
           {/* What happened */}
           <section>
             <h2 className="mb-6 font-bold text-3xl">What AWS announced</h2>

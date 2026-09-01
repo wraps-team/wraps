@@ -40,7 +40,7 @@ export function MarketingAudienceSection() {
             <p className="mt-4 border-border/60 border-t pt-4 text-muted-foreground text-xs leading-relaxed">
               Preview any segment for a count and sample addresses before you
               commit. Behavioral filters — triggered or didn&rsquo;t trigger a
-              given event, within a window — are on the Scale plan.
+              given event, within a window — are on the Business plan.
             </p>
           </div>
 

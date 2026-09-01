@@ -58,7 +58,7 @@ export function OperatorsExclusionSection() {
             </ul>
             <p className="mt-5 border-border/60 border-t pt-4 text-muted-foreground text-xs leading-relaxed">
               Behavioral filters — has or has not triggered a given event, and
-              within what window — are on the Scale plan.
+              within what window — are on the Business plan.
             </p>
           </div>
         </div>

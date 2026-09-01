@@ -569,47 +569,10 @@ export default function CustomEventsPageContent() {
             Event Limits
           </h2>
           <p className="mb-4 text-muted-foreground">
-            Tracked events are metered per organization per month with a 25%
-            grace period.
+            Custom events are unmetered on every plan that has the feature —
+            there is no monthly quota, grace period, or hard cap. Free
+            doesn&apos;t include event tracking; Pro and Business do.
           </p>
-
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Plan</th>
-                  <th className="px-4 py-3 text-left font-medium">
-                    Monthly limit
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium">
-                    Hard cap (125%)
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="px-4 py-3 font-medium">Starter</td>
-                  <td className="px-4 py-3 text-muted-foreground">50,000</td>
-                  <td className="px-4 py-3 text-muted-foreground">62,500</td>
-                </tr>
-                <tr className="border-b">
-                  <td className="px-4 py-3 font-medium">Growth</td>
-                  <td className="px-4 py-3 text-muted-foreground">250,000</td>
-                  <td className="px-4 py-3 text-muted-foreground">312,500</td>
-                </tr>
-                <tr className="border-b">
-                  <td className="px-4 py-3 font-medium">Scale</td>
-                  <td className="px-4 py-3 text-muted-foreground">1,000,000</td>
-                  <td className="px-4 py-3 text-muted-foreground">1,250,000</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-3 font-medium">Enterprise</td>
-                  <td className="px-4 py-3 text-muted-foreground">Unlimited</td>
-                  <td className="px-4 py-3 text-muted-foreground">&mdash;</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
         </section>
 
         {/* ── Examples ────────────────────────────────────────────── */}

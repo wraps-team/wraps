@@ -11,7 +11,6 @@
 import type { TierId } from "../config/pricing";
 import {
   FEATURE_COMPARISON,
-  OVERAGE_RATES,
   PRICING_LAST_UPDATED,
   PRICING_TIERS,
   TIER_LIMITS,
@@ -69,32 +68,16 @@ function plansSection(): string {
     `**${tier.name}**`,
     tier.price === 0 ? "$0/mo" : `$${tier.price}/mo`,
     tier.annualPrice ? `$${count(tier.annualPrice)}/yr` : "—",
-    TIER_LIMITS[tier.id].messagesDisplay,
-    OVERAGE_RATES[tier.id].perThousand > 0
-      ? `$${OVERAGE_RATES[tier.id].perThousand.toFixed(2)}`
-      : "Upgrade required",
     TIER_LIMITS[tier.id].awsAccountsDisplay,
+    TIER_LIMITS[tier.id].historyDisplay,
     TIER_LIMITS[tier.id].support,
   ]);
 
   return `## Wraps plans
 
-${table(
-  [
-    "Plan",
-    "Monthly",
-    "Annual",
-    "Tracked events/mo",
-    "Overage (per 1,000 events)",
-    "AWS accounts",
-    "Support",
-  ],
-  rows
-)}
+${table(["Plan", "Monthly", "Annual", "AWS accounts", "History", "Support"], rows)}
 
-Wraps bills on **custom events** — events you emit yourself via \`POST /v1/events\` to trigger workflows and build segments. Emails sent, broadcasts, contacts stored, and the delivery events SES reports back (deliveries, opens, clicks, bounces, complaints) are recorded and displayed at no charge and count toward nothing. Sending 100,000 emails costs $0 in Wraps events.
-
-The overage rate applies only to events beyond the included volume. Free and Starter have no overage rate — they stop at the included volume and require an upgrade. Annual billing is billed once per year and saves roughly two months.`;
+The Wraps fee is a flat monthly charge per plan — it never varies with volume. Sends, domains, contacts, and templates are unlimited on every plan. The AWS-side event-pipeline line items (EventBridge, SQS, Lambda, DynamoDB) in the estimator below are derived from emails sent and event types per email. The \`events\` parameter is accepted for backward compatibility and does not currently affect the estimate. Emails sent, broadcasts, and the delivery events SES reports back (deliveries, opens, clicks, bounces, complaints) are recorded and displayed at no charge. Annual billing is billed once per year and saves 14–16%.`;
 }
 
 function sesPlansSection(): string {
@@ -189,7 +172,7 @@ function estimatorSection(): string {
       "Custom events you emit via POST /v1/events per month (not emails, not SES delivery events)",
       "0",
     ],
-    ["tier", "free \\| starter \\| growth \\| scale", "Wraps plan", "free"],
+    ["tier", "free \\| pro \\| business", "Wraps plan", "free"],
     ["billing", "monthly \\| annual", "Wraps billing interval", "monthly"],
     [
       "sesPlan",
@@ -217,14 +200,14 @@ function estimatorSection(): string {
 Do not estimate Wraps + AWS costs by hand — the model has six interacting variables. Call this endpoint instead. It is public, unauthenticated, needs no account, and returns the same numbers the website calculator shows.
 
 \`\`\`
-GET ${SITE}/api/pricing/estimate?emails=500000&events=250000&tier=growth&sesPlan=alacarte
+GET ${SITE}/api/pricing/estimate?emails=500000&events=250000&tier=pro&sesPlan=alacarte
 \`\`\`
 
 Returns JSON by default. Send \`Accept: text/markdown\` for a rendered cost table. Every response includes a \`shareUrl\` pointing at the interactive calculator with the same inputs — hand that to a human rather than re-describing the breakdown.
 
 ${table(["Parameter", "Values", "Meaning", "Default"], params)}
 
-The response contains a per-line AWS breakdown (SES, EventBridge, SQS, Lambda, DynamoDB, dedicated IP, WAF), the Wraps platform and overage split, the combined total, and the effective cost per 1,000 emails.`;
+The response contains a per-line AWS breakdown (SES, EventBridge, SQS, Lambda, DynamoDB, dedicated IP, WAF), the flat Wraps platform fee, the combined total, and the effective cost per 1,000 emails.`;
 }
 
 function awsExtrasSection(): string {
@@ -271,7 +254,7 @@ These appear on your AWS bill, not your Wraps bill. You keep AWS volume discount
 }
 
 function featuresSection(): string {
-  const tierIds: TierId[] = ["free", "starter", "growth", "scale"];
+  const tierIds: TierId[] = ["free", "pro", "business"];
   const rows = FEATURE_COMPARISON.map((feature) => [
     feature.name,
     ...tierIds.map((id) => cell(feature[id])),
@@ -279,7 +262,7 @@ function featuresSection(): string {
 
   return `## Feature comparison
 
-${table(["Feature", "Free", "Starter", "Growth", "Scale"], rows)}
+${table(["Feature", "Free", "Pro", "Business"], rows)}
 
 Every plan includes: the CLI, the TypeScript SDKs (\`@wraps.dev/email\`, \`@wraps.dev/sms\`, \`@wraps.dev/client\`), the MCP server (\`@wraps.dev/mcp\`), React Email templates, the dashboard, DKIM/SPF/DMARC setup, bounce and complaint handling, suppression lists, webhooks, and infrastructure deployed into your own AWS account under \`wraps-*\` namespaced resources.`;
 }
@@ -336,18 +319,7 @@ export function renderEstimateMarkdown(
 
   const wrapsRows = [
     [`Wraps ${wraps.tierName} plan`, money(wraps.platformCost), input.billing],
-    [
-      "Tracked event overage",
-      money(wraps.overageCost),
-      wraps.overageEvents > 0
-        ? `${count(wraps.overageEvents)} events over the ${count(wraps.includedEvents)} included`
-        : `Within the ${count(wraps.includedEvents)} included`,
-    ],
   ];
-
-  const upgradeWarning = wraps.requiresUpgrade
-    ? `\n> **This plan cannot absorb this volume.** The ${wraps.tierName} plan has no overage rate — ${count(wraps.overageEvents)} tracked events would exceed it. Move to Growth or Scale.\n`
-    : "";
 
   const annualNote =
     wraps.annualSavings > 0
@@ -356,8 +328,8 @@ export function renderEstimateMarkdown(
 
   return `# Cost estimate
 
-${count(input.emailsPerMonth)} emails/month, ${count(input.eventsPerMonth)} tracked events/month, Wraps ${wraps.tierName}, SES ${aws.plan.name}.
-${upgradeWarning}
+${count(input.emailsPerMonth)} emails/month, Wraps ${wraps.tierName}, SES ${aws.plan.name}. The Wraps fee is flat and does not change with volume; the AWS-side pipeline cost below is derived from emails sent and event types per email, not from the events parameter.
+
 ## Wraps (billed by Wraps)
 
 ${table(["Line", "Monthly", "Notes"], wrapsRows)}
@@ -398,8 +370,8 @@ Wraps is a CLI, SDK, MCP server, and dashboard that deploys email (AWS SES), SMS
 
 You get two bills:
 
-1. **Wraps** — a flat monthly platform fee based on tracked events. That is the table below.
-2. **AWS** — sending and infrastructure costs, billed directly to you by AWS at AWS rates. Wraps adds no markup and takes no cut.
+1. **Wraps** — a flat monthly fee per plan. That is the table below.
+2. **AWS** — sending and infrastructure costs, billed directly to you by AWS at AWS rates. Wraps adds no markup and takes no cut. The AWS-side event-pipeline cost (EventBridge, SQS, Lambda, DynamoDB) is derived from emails sent and event types per email. The \`events\` parameter is accepted for backward compatibility and does not currently affect the estimate.
 
 ${plansSection()}
 
@@ -417,7 +389,7 @@ ${whatYouOwnSection()}
 
 ## Enterprise
 
-Custom event limits, self-hosted control plane, SSO/SCIM, dedicated support, and SLAs. Contact ${SITE}/contact.
+Custom data retention, self-hosted control plane, SSO/SCIM, dedicated support, and SLAs. Contact ${SITE}/contact.
 
 ## Links
 

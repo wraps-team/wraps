@@ -264,7 +264,7 @@ export function AutomationsCodePanel() {
           </a>
         </Button>
         <p className="mt-3 text-muted-foreground text-sm">
-          1 workflow included free. Unlimited workflows on Starter ($19/mo).
+          2 workflows included free. Unlimited workflows on Pro ($29/mo).
         </p>
       </FadeIn>
     </div>

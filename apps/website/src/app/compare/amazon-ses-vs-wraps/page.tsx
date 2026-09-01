@@ -144,27 +144,27 @@ const pricingComparison = [
     sesRaw: "$5.00",
     diyTotal: "~$770/mo (yr 1)",
     diyYear2: "~$270/mo",
-    wrapsTier: "Starter ($19)",
-    wrapsCost: "$24.00",
-    wrapsBreakdown: "$19 + $5 SES",
+    wrapsTier: "Pro ($29)",
+    wrapsCost: "$34.00",
+    wrapsBreakdown: "$29 + $5 SES",
   },
   {
     volume: "100K/mo",
     sesRaw: "$10.00",
     diyTotal: "~$785/mo (yr 1)",
     diyYear2: "~$285/mo",
-    wrapsTier: "Starter ($19)",
-    wrapsCost: "$29.00",
-    wrapsBreakdown: "$19 + $10 SES",
+    wrapsTier: "Pro ($29)",
+    wrapsCost: "$39.00",
+    wrapsBreakdown: "$29 + $10 SES",
   },
   {
     volume: "500K/mo",
     sesRaw: "$50.00",
     diyTotal: "~$830/mo (yr 1)",
     diyYear2: "~$330/mo",
-    wrapsTier: "Growth ($79)",
-    wrapsCost: "$129.00",
-    wrapsBreakdown: "$79 + $50 SES",
+    wrapsTier: "Pro ($29)",
+    wrapsCost: "$79.00",
+    wrapsBreakdown: "$29 + $50 SES",
   },
 ];
 
@@ -652,10 +652,10 @@ export default function AmazonSesVsWrapsPage() {
               </p>
               <p>
                 <strong className="text-foreground">Wraps tiers</strong>: Free
-                (5K tracked events/mo), Starter $19/mo (50K events), Growth
-                $79/mo (250K events), Scale $199/mo (1M events). SES charges are
-                billed by AWS directly at $0.10/1K emails à la carte (AWS
-                defaults new accounts to $0.16/1K).{" "}
+                ($0/mo), Pro ($29/mo), Business ($199/mo) — priced on AWS
+                accounts, dashboard history, and governance features, not send
+                volume. SES charges are billed by AWS directly at $0.10/1K
+                emails à la carte (AWS defaults new accounts to $0.16/1K).{" "}
                 <a className="text-primary underline" href="/platform#pricing">
                   See what each tier includes
                 </a>

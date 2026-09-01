@@ -116,32 +116,32 @@ const pricingRows = [
     volume: "50K/mo",
     postmark: "$68.50",
     postmarkDetail: "Pro + 40K overage @ $1.30/1K",
-    wraps: "$24",
-    wrapsDetail: "$19 Starter + $5 SES",
-    savings: "65%",
+    wraps: "$34",
+    wrapsDetail: "$29 Pro + $5 SES",
+    savings: "50%",
   },
   {
     volume: "100K/mo",
     postmark: "$126-$134",
     postmarkDetail: "Pro/Platform + overage",
-    wraps: "$29",
-    wrapsDetail: "$19 Starter + $10 SES",
-    savings: "77-78%",
+    wraps: "$39",
+    wrapsDetail: "$29 Pro + $10 SES",
+    savings: "69-71%",
   },
   {
     volume: "500K/mo",
     postmark: "$606-$654",
     postmarkDetail: "Pro/Platform + overage",
-    wraps: "$129",
-    wrapsDetail: "$79 Growth + $50 SES",
-    savings: "79-80%",
+    wraps: "$249",
+    wrapsDetail: "$199 Business + $50 SES",
+    savings: "59-62%",
   },
   {
     volume: "1M/mo",
     postmark: "~$1,200-$1,300",
     postmarkDetail: "Pro/Platform + overage (custom deals at 1.5M+)",
     wraps: "$299",
-    wrapsDetail: "$199 Scale + $100 SES",
+    wrapsDetail: "$199 Business + $100 SES",
     savings: "75%+",
   },
 ];
@@ -812,8 +812,8 @@ export default function PostmarkVsWrapsPage() {
               Own your email infrastructure
             </h2>
             <p className="mb-6 text-muted-foreground">
-              Deploy to your AWS in 2 minutes. Free tier includes 5,000 tracked
-              events per month.
+              Deploy to your AWS in 2 minutes. Free tier includes unlimited
+              sends and a 30-day dashboard history.
             </p>
             <div className="flex flex-col justify-center gap-4 sm:flex-row">
               <Button asChild size="lg">

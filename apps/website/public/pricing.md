@@ -6,21 +6,18 @@ Wraps is a CLI, SDK, MCP server, and dashboard that deploys email (AWS SES), SMS
 
 You get two bills:
 
-1. **Wraps** — a flat monthly platform fee based on tracked events. That is the table below.
-2. **AWS** — sending and infrastructure costs, billed directly to you by AWS at AWS rates. Wraps adds no markup and takes no cut.
+1. **Wraps** — a flat monthly fee per plan. That is the table below.
+2. **AWS** — sending and infrastructure costs, billed directly to you by AWS at AWS rates. Wraps adds no markup and takes no cut. The AWS-side event-pipeline cost (EventBridge, SQS, Lambda, DynamoDB) is derived from emails sent and event types per email. The `events` parameter is accepted for backward compatibility and does not currently affect the estimate.
 
 ## Wraps plans
 
-| Plan | Monthly | Annual | Tracked events/mo | Overage (per 1,000 events) | AWS accounts | Support |
-| --- | --- | --- | --- | --- | --- | --- |
-| **Free** | $0/mo | — | 5,000/mo | Upgrade required | 1 | Community |
-| **Starter** | $19/mo | $199/yr | 50,000/mo | Upgrade required | 1 | Email |
-| **Growth** | $79/mo | $799/yr | 250,000/mo | $0.50 | 3 | Priority (24hr) |
-| **Scale** | $199/mo | $1,999/yr | 1,000,000/mo | $0.15 | Unlimited | Priority + SLA |
+| Plan | Monthly | Annual | AWS accounts | History | Support |
+| --- | --- | --- | --- | --- | --- |
+| **Free** | $0/mo | — | 1 | 30 days | Community |
+| **Pro** | $29/mo | $299/yr | 3 | 90 days | Email |
+| **Business** | $199/mo | $1,999/yr | Unlimited | 1 year | Priority |
 
-Wraps bills on **custom events** — events you emit yourself via `POST /v1/events` to trigger workflows and build segments. Emails sent, broadcasts, contacts stored, and the delivery events SES reports back (deliveries, opens, clicks, bounces, complaints) are recorded and displayed at no charge and count toward nothing. Sending 100,000 emails costs $0 in Wraps events.
-
-The overage rate applies only to events beyond the included volume. Free and Starter have no overage rate — they stop at the included volume and require an upgrade. Annual billing is billed once per year and saves roughly two months.
+The Wraps fee is a flat monthly charge per plan — it never varies with volume. Sends, domains, contacts, and templates are unlimited on every plan. The AWS-side event-pipeline line items (EventBridge, SQS, Lambda, DynamoDB) in the estimator below are derived from emails sent and event types per email. The `events` parameter is accepted for backward compatibility and does not currently affect the estimate. Emails sent, broadcasts, and the delivery events SES reports back (deliveries, opens, clicks, bounces, complaints) are recorded and displayed at no charge. Annual billing is billed once per year and saves 14–16%.
 
 ## AWS SES pricing plans (paid to AWS, not to Wraps)
 
@@ -57,7 +54,7 @@ Change any assumption and the numbers move. Call the estimator below instead of 
 Do not estimate Wraps + AWS costs by hand — the model has six interacting variables. Call this endpoint instead. It is public, unauthenticated, needs no account, and returns the same numbers the website calculator shows.
 
 ```
-GET https://wraps.dev/api/pricing/estimate?emails=500000&events=250000&tier=growth&sesPlan=alacarte
+GET https://wraps.dev/api/pricing/estimate?emails=500000&events=250000&tier=pro&sesPlan=alacarte
 ```
 
 Returns JSON by default. Send `Accept: text/markdown` for a rendered cost table. Every response includes a `shareUrl` pointing at the interactive calculator with the same inputs — hand that to a human rather than re-describing the breakdown.
@@ -66,7 +63,7 @@ Returns JSON by default. Send `Accept: text/markdown` for a rendered cost table.
 | --- | --- | --- | --- |
 | `emails` | integer | Emails sent per month | `25000` |
 | `events` | integer | Custom events you emit via POST /v1/events per month (not emails, not SES delivery events) | `0` |
-| `tier` | free \| starter \| growth \| scale | Wraps plan | `free` |
+| `tier` | free \| pro \| business | Wraps plan | `free` |
 | `billing` | monthly \| annual | Wraps billing interval | `monthly` |
 | `sesPlan` | alacarte \| essentials \| pro \| enterprise | AWS SES pricing plan for the account and Region | `alacarte` |
 | `tracking` | boolean | Event tracking pipeline deployed | `true` |
@@ -78,7 +75,7 @@ Returns JSON by default. Send `Accept: text/markdown` for a rendered cost table.
 | `https` | boolean | HTTPS tracking domain (CloudFront) | `false` |
 | `waf` | boolean | WAF protection on the tracking domain | `false` |
 
-The response contains a per-line AWS breakdown (SES, EventBridge, SQS, Lambda, DynamoDB, dedicated IP, WAF), the Wraps platform and overage split, the combined total, and the effective cost per 1,000 emails.
+The response contains a per-line AWS breakdown (SES, EventBridge, SQS, Lambda, DynamoDB, dedicated IP, WAF), the flat Wraps platform fee, the combined total, and the effective cost per 1,000 emails.
 
 ## Other AWS costs (paid to AWS)
 
@@ -97,25 +94,25 @@ These appear on your AWS bill, not your Wraps bill. You keep AWS volume discount
 
 ## Feature comparison
 
-| Feature | Free | Starter | Growth | Scale |
-| --- | --- | --- | --- | --- |
-| Tracked events/month | 5K | 50K | 250K | 1M |
-| Dashboard history | 7 days | 30 days | 90 days | 1 year |
-| Overage rate | Upgrade | Upgrade | $0.50/1K | $0.15/1K |
-| Contacts | Unlimited | Unlimited | Unlimited | Unlimited |
-| Workflows | 1 | Unlimited | Unlimited | Unlimited |
-| AI generations | 10/mo | 50/mo | 250/mo | 1,000/mo |
-| AWS accounts | 1 | 1 | 3 | Unlimited |
-| Team members | 1 | Unlimited | Unlimited | Unlimited |
-| Batch sending | — | Yes | Yes | Yes |
-| Topics & preferences | — | Yes | Yes | Yes |
-| Segments & targeting | — | Yes | Yes | Yes |
-| Campaigns | — | Yes | Yes | Yes |
-| Cross-channel cascades | — | Yes | Yes | Yes |
-| Event tracking | — | Yes | Yes | Yes |
-| Behavioral segments | — | — | — | Yes |
-| SSO + SCIM | — | — | — | Yes |
-| Support | Community | Email | Priority (24hr) | Priority + SLA |
+| Feature | Free | Pro | Business |
+| --- | --- | --- | --- |
+| Dashboard history | 30 days | 90 days | 1 year |
+| Contacts | Unlimited | Unlimited | Unlimited |
+| Domains | Unlimited | Unlimited | Unlimited |
+| Templates | Unlimited | Unlimited | Unlimited |
+| Workflows | 2 | Unlimited | Unlimited |
+| AI generations | 10/mo | 250/mo | 1,000/mo |
+| AWS accounts | 1 | 3 | Unlimited |
+| Team members | Unlimited | Unlimited | Unlimited |
+| Batch sending | — | Yes | Yes |
+| Topics & preferences | — | Yes | Yes |
+| Segments & targeting | — | Yes | Yes |
+| Campaigns | — | Yes | Yes |
+| Cross-channel cascades | — | Yes | Yes |
+| Event tracking | — | Yes | Yes |
+| Behavioral segments | — | — | Yes |
+| SSO + SCIM | — | — | Yes |
+| Support | Community | Email | Priority |
 
 Every plan includes: the CLI, the TypeScript SDKs (`@wraps.dev/email`, `@wraps.dev/sms`, `@wraps.dev/client`), the MCP server (`@wraps.dev/mcp`), React Email templates, the dashboard, DKIM/SPF/DMARC setup, bounce and complaint handling, suppression lists, webhooks, and infrastructure deployed into your own AWS account under `wraps-*` namespaced resources.
 
@@ -127,7 +124,7 @@ Wraps is open source (AGPL-3.0). Self-hosting the control plane is available on 
 
 ## Enterprise
 
-Custom event limits, self-hosted control plane, SSO/SCIM, dedicated support, and SLAs. Contact https://wraps.dev/contact.
+Custom data retention, self-hosted control plane, SSO/SCIM, dedicated support, and SLAs. Contact https://wraps.dev/contact.
 
 ## Links
 

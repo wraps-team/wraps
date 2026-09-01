@@ -92,12 +92,12 @@ export function DashboardAutomationsSection() {
               <p className="text-sm">
                 <span className="font-medium text-foreground">Free:</span>{" "}
                 <span className="text-muted-foreground">
-                  1 workflow included
+                  2 workflows included
                 </span>
               </p>
               <p className="text-sm">
                 <span className="font-medium text-foreground">
-                  Starter ($19/mo):
+                  Pro ($29/mo):
                 </span>{" "}
                 <span className="text-muted-foreground">
                   Unlimited workflows

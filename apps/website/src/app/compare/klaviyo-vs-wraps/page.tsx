@@ -123,37 +123,37 @@ const pricingComparison = [
     volume: "50K",
     klaviyoProfiles: "~5,000",
     klaviyoCost: "$100",
-    wrapsPlatform: "$19",
+    wrapsPlatform: "$29",
     awsSes: "$5",
-    wrapsTotal: "$24",
-    savings: "4.2x",
+    wrapsTotal: "$34",
+    savings: "2.9x",
   },
   {
     volume: "100K",
     klaviyoProfiles: "~10,000",
     klaviyoCost: "$150",
-    wrapsPlatform: "$19",
+    wrapsPlatform: "$29",
     awsSes: "$10",
-    wrapsTotal: "$29",
-    savings: "5.2x",
+    wrapsTotal: "$39",
+    savings: "3.8x",
   },
   {
     volume: "500K",
     klaviyoProfiles: "~50,000",
     klaviyoCost: "$720",
-    wrapsPlatform: "$79",
+    wrapsPlatform: "$29",
     awsSes: "$50",
-    wrapsTotal: "$129",
-    savings: "5.6x",
+    wrapsTotal: "$79",
+    savings: "9.1x",
   },
   {
     volume: "1M",
     klaviyoProfiles: "~100,000",
     klaviyoCost: "$1,380",
-    wrapsPlatform: "$199",
+    wrapsPlatform: "$29",
     awsSes: "$100",
-    wrapsTotal: "$299",
-    savings: "4.6x",
+    wrapsTotal: "$129",
+    savings: "10.7x",
   },
 ];
 
@@ -885,7 +885,7 @@ export default function KlaviyoVsWrapsPage() {
                         You&rsquo;re paying $700+/month at Klaviyo
                       </strong>{" "}
                       and your engineering team wants AWS-level economics. The
-                      same 500K emails/month costs $129/mo with Wraps (5.6x
+                      same 500K emails/month costs $79/mo with Wraps (9.1x
                       cheaper).
                     </span>
                   </li>

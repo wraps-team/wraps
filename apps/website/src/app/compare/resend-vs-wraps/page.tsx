@@ -111,31 +111,31 @@ const pricingComparison = [
     volume: "50K/mo",
     resendTier: "Pro (at limit)",
     resendCost: "$20",
-    wrapsTier: "Starter",
-    wrapsPlatform: "$19",
+    wrapsTier: "Pro",
+    wrapsPlatform: "$29",
     awsSes: "$5",
-    wrapsTotal: "$24",
+    wrapsTotal: "$34",
     savings: null,
   },
   {
     volume: "100K/mo",
     resendTier: "Pro 100K / Scale",
     resendCost: "$35-90",
-    wrapsTier: "Starter",
-    wrapsPlatform: "$19",
+    wrapsTier: "Pro",
+    wrapsPlatform: "$29",
     awsSes: "$10",
-    wrapsTotal: "$29",
-    savings: "17-68%",
+    wrapsTotal: "$39",
+    savings: null,
   },
   {
     volume: "500K/mo",
     resendTier: "Scale 500K tier",
     resendCost: "$350",
-    wrapsTier: "Growth",
-    wrapsPlatform: "$79",
+    wrapsTier: "Pro",
+    wrapsPlatform: "$29",
     awsSes: "$50",
-    wrapsTotal: "$129",
-    savings: "63%",
+    wrapsTotal: "$79",
+    savings: "77%",
   },
 ];
 
@@ -302,7 +302,7 @@ const articleSchema = {
 const chooseWrapsReasons = [
   "You already have an AWS account (or your company does)",
   "You want to own your raw event history -- it lands in your DynamoDB and stays there, instead of being purged after 30 days",
-  "You're sending 500K+ emails/month and want 60%+ cost savings",
+  "You're sending 500K+ emails/month and want 77%+ cost savings",
   "You need data residency in a specific region for compliance (GDPR, HIPAA)",
   "You don't want a third party able to suspend your transactional email at the worst possible moment",
   "You want infrastructure that keeps running even if the vendor disappears",
@@ -600,9 +600,10 @@ export default function ResendVsWrapsPage() {
             </Card>
             <div className="mt-4 space-y-2 text-muted-foreground text-sm">
               <p>
-                Wraps platform tiers: Free (5K tracked events/mo), Starter
-                $19/mo (50K events), Growth $79/mo (250K events), Scale $199/mo
-                (1M events). All tiers include unlimited contacts.
+                Wraps platform tiers: Free ($0/mo), Pro ($29/mo), Business
+                ($199/mo) — priced on AWS accounts, dashboard history, and
+                governance features, not send volume. All tiers include
+                unlimited sends, contacts, domains, and templates.
               </p>
               <p>
                 Resend gotchas: exceeding your tier auto-bills overage at

@@ -3,7 +3,6 @@
 import { Button } from "@wraps/ui/components/ui/button";
 import { ArrowRight, Mail, Send, Workflow } from "lucide-react";
 import { useState } from "react";
-import { TrackedEventTooltip } from "@/components/tracked-event-tooltip";
 import { cn } from "@/lib/utils";
 
 type UseCase = {
@@ -37,11 +36,11 @@ const useCases: UseCase[] = [
       price: 100,
     },
     wraps: {
-      plan: "Starter",
-      price: 24,
-      breakdown: "$19 platform + ~$5 AWS",
+      plan: "Pro",
+      price: 34,
+      breakdown: "$29 platform + ~$5 AWS",
     },
-    savings: 76,
+    savings: 66,
   },
   {
     id: "transactional",
@@ -71,11 +70,11 @@ const useCases: UseCase[] = [
       price: 250,
     },
     wraps: {
-      plan: "Growth",
-      price: 84,
-      breakdown: "$79 platform + ~$5 AWS",
+      plan: "Business",
+      price: 204,
+      breakdown: "$199 platform + ~$5 AWS",
     },
-    savings: 66,
+    savings: 18,
   },
 ];
 
@@ -205,8 +204,7 @@ export function PricingComparisonSection() {
                     {activeCase.tagline}
                   </span>
                   {" · "}
-                  SDK sends don't consume{" "}
-                  <TrackedEventTooltip>tracked events</TrackedEventTooltip>
+                  Sends, contacts, and templates are always free
                 </p>
                 <Button
                   asChild

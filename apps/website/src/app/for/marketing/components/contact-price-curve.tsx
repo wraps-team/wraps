@@ -4,10 +4,10 @@
 // Klaviyo $150 @10K, $720 @50K, $1,380 @100K profiles.
 
 const rows = [
-  { contacts: "5,000", customerIo: "$100", klaviyo: "$100", wraps: "$19" },
-  { contacts: "10,000", customerIo: "$145", klaviyo: "$150", wraps: "$19" },
-  { contacts: "50,000", customerIo: "$505", klaviyo: "$720", wraps: "$19" },
-  { contacts: "100,000", customerIo: "$955", klaviyo: "$1,380", wraps: "$19" },
+  { contacts: "5,000", customerIo: "$100", klaviyo: "$100", wraps: "$29" },
+  { contacts: "10,000", customerIo: "$145", klaviyo: "$150", wraps: "$29" },
+  { contacts: "50,000", customerIo: "$505", klaviyo: "$720", wraps: "$29" },
+  { contacts: "100,000", customerIo: "$955", klaviyo: "$1,380", wraps: "$29" },
 ];
 
 export function ContactPriceCurve() {
@@ -52,9 +52,8 @@ export function ContactPriceCurve() {
 
       <div className="border-border border-t bg-muted/40 px-4 py-3">
         <p className="text-[12px] text-muted-foreground leading-relaxed">
-          Wraps tiers move on tracked events, not list size, and sending is
-          billed by AWS directly at SES rates. Competitor figures verified July
-          2026.
+          Wraps' fee is flat by plan, not by list size, and sending is billed by
+          AWS directly at SES rates. Competitor figures verified July 2026.
         </p>
       </div>
     </div>

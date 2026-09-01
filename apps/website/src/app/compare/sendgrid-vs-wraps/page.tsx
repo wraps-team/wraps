@@ -82,12 +82,12 @@ const tldrComparison = [
   {
     dimension: "Pricing (100K emails/mo)",
     sendgrid: "$89.95/mo",
-    wraps: "$19 + $10 AWS = $29/mo",
+    wraps: "$29 + $10 AWS = $39/mo",
   },
   {
     dimension: "Pricing (500K emails/mo)",
     sendgrid: "~$499/mo",
-    wraps: "$79 + $50 AWS = $129/mo",
+    wraps: "$29 + $50 AWS = $79/mo",
   },
   {
     dimension: "Account suspension risk",
@@ -121,31 +121,31 @@ const pricingComparison = [
     volume: "50K/mo",
     sendgridTier: "Essentials 50K",
     sendgridCost: "$19.95/mo",
-    wrapsTier: "Starter",
-    wrapsPlatform: "$19",
+    wrapsTier: "Pro",
+    wrapsPlatform: "$29",
     wrapsAws: "$5.00",
-    wrapsTotal: "$24.00/mo",
+    wrapsTotal: "$34.00/mo",
     savings: null,
   },
   {
     volume: "100K/mo",
     sendgridTier: "Pro 100K",
     sendgridCost: "$89.95/mo",
-    wrapsTier: "Starter",
-    wrapsPlatform: "$19",
+    wrapsTier: "Pro",
+    wrapsPlatform: "$29",
     wrapsAws: "$10.00",
-    wrapsTotal: "$29.00/mo",
-    savings: "68%",
+    wrapsTotal: "$39.00/mo",
+    savings: "57%",
   },
   {
     volume: "500K/mo",
     sendgridTier: "Pro 700K",
     sendgridCost: "~$499/mo",
-    wrapsTier: "Growth",
-    wrapsPlatform: "$79",
+    wrapsTier: "Pro",
+    wrapsPlatform: "$29",
     wrapsAws: "$50.00",
-    wrapsTotal: "$129.00/mo",
-    savings: "74%",
+    wrapsTotal: "$79.00/mo",
+    savings: "84%",
   },
 ];
 
@@ -771,7 +771,7 @@ export default function SendGridVsWrapsPage() {
               <CardContent>
                 <ul className="space-y-3">
                   {[
-                    "You care about cost at scale. At 500K emails/month, Wraps runs $129/mo against SendGrid's ~$499 -- $370/mo, or $4,440/year.",
+                    "You care about cost at scale. At 500K emails/month, Wraps runs $79/mo against SendGrid's ~$499 -- $420/mo, or $5,040/year.",
                     "You want to own your email infrastructure and data. If you leave Wraps, your SES, DynamoDB, and Lambda stay in your account.",
                     "You need reliability you control. SES reputation is domain-based, and dedicated IPs are available when you need them.",
                     "You're already on AWS and don't want to add another vendor dependency.",
@@ -870,8 +870,8 @@ export default function SendGridVsWrapsPage() {
               Ready to own your email infrastructure?
             </h2>
             <p className="mb-6 text-muted-foreground">
-              Deploy to your AWS in 2 minutes. Free tier includes 5K tracked
-              events/month.
+              Deploy to your AWS in 2 minutes. Free tier includes unlimited
+              sends and a 30-day dashboard history.
             </p>
             <div className="flex flex-col justify-center gap-4 sm:flex-row">
               <Button asChild size="lg">

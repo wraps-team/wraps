@@ -388,7 +388,7 @@ function EventsContent() {
 
 const tabs: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: "automations", label: "Automations", icon: Workflow },
-  { key: "events", label: "Tracked Events", icon: Activity },
+  { key: "events", label: "Events", icon: Activity },
   { key: "broadcasts", label: "Broadcasts", icon: Send },
   { key: "templates", label: "Templates", icon: LayoutGrid },
 ];

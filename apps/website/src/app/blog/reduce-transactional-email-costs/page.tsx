@@ -956,17 +956,18 @@ wraps email plan --region us-east-1 --set alacarte`}
             </p>
 
             <p className="mb-4 text-foreground/80 text-lg leading-relaxed">
-              The Free tier includes the CLI and the TypeScript SDK with 5,000
-              tracked events a month, so a 100K-a-month sender who wants
-              infrastructure and nothing else pays us nothing. If you want the
-              full send history in the dashboard, 100,000 emails generates
-              enough tracked events to need Starter at $19 or Growth at $79,
-              depending on how many event types you record.
+              The Free tier includes the CLI and the TypeScript SDK with
+              unlimited sends, so a 100K-a-month sender who wants infrastructure
+              and nothing else pays us nothing &mdash; sending volume
+              doesn&apos;t push you onto a paid tier. If you want the full
+              dashboard (broadcasts, segments, campaigns, more than 30&ndash;90
+              days of history), that&apos;s Pro at $29 or Business at $199,
+              regardless of how many emails you send.
             </p>
 
             <p className="text-foreground/80 text-lg leading-relaxed">
               Which means the honest full-stack number at 100K a month is $12.50
-              to AWS plus $0&ndash;79 to us &mdash; and worth comparing against
+              to AWS plus $0&ndash;29 to us &mdash; and worth comparing against
               the $35&ndash;177 in the provider table, with the difference that
               the AWS half of it keeps costing $0.10 per 1,000 at 10M.
             </p>

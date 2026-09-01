@@ -11,7 +11,7 @@ import { SectionKicker } from "@/app/landing/components/section-kicker";
 const eventTypes = [
   {
     icon: Zap,
-    title: "Tracked Events",
+    title: "Custom Events",
     description:
       "Track any action: signups, purchases, page views, button clicks",
     counted: true,
@@ -39,15 +39,15 @@ const benefits = [
   },
   {
     icon: CircleDollarSign,
-    title: "Pay for Actions",
+    title: "Unlimited Events",
     description:
-      "Only tracked events count. Email engagement tracking is always free.",
+      "Send as many custom events as you want on Pro and Business. Nothing is metered.",
   },
   {
     icon: Clock,
     title: "Flexible Retention",
     description:
-      "7 days to 1 year history. Tracked events power segments and automations.",
+      "30 days to 1 year of dashboard history, by plan. Events power segments and automations.",
   },
 ];
 
@@ -57,13 +57,14 @@ export function DashboardEventsSection() {
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-12">
-          <SectionKicker>Event-Based Pricing</SectionKicker>
+          <SectionKicker>Events & Automation</SectionKicker>
           <h2 className="mb-4 font-heading font-semibold text-3xl tracking-tight md:text-4xl">
-            What counts as an event?
+            Trigger workflows from any event
           </h2>
           <p className="max-w-2xl text-muted-foreground">
-            We only charge for tracked events you explicitly send. Email opens,
-            clicks, and delivery events are always free.
+            Send a custom event to trigger a workflow or build a segment. Email
+            opens, clicks, and delivery events are tracked automatically at no
+            charge, on every plan.
           </p>
         </div>
 
@@ -83,7 +84,7 @@ export function DashboardEventsSection() {
                 {/* Badge */}
                 <div className="absolute top-4 right-4">
                   <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.08em]">
-                    {type.counted ? "Counts toward limit" : "Always free"}
+                    {type.counted ? "Sent via API" : "Automatic"}
                   </span>
                 </div>
 
@@ -125,7 +126,7 @@ export function DashboardEventsSection() {
         {/* Benefits Grid */}
         <div className="rounded-2xl border border-border bg-muted/30 p-8">
           <h3 className="mb-6 font-heading font-semibold text-lg tracking-tight">
-            Why event-based pricing?
+            Built for automation, not billing
           </h3>
           <div className="grid gap-6 md:grid-cols-3">
             {benefits.map((benefit) => {

@@ -450,7 +450,7 @@ export default function SecurityPage() {
               {[
                 {
                   title: "Access control",
-                  body: "Production access is limited to the engineers who need it. Authentication to the dashboard supports SSO and SCIM provisioning on the Scale plan.",
+                  body: "Production access is limited to the engineers who need it. Authentication to the dashboard supports SSO and SCIM provisioning on the Business plan.",
                 },
                 {
                   title: "Tenant isolation",

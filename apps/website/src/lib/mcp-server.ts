@@ -94,7 +94,7 @@ const SITE = "https://wraps.dev";
 // Tools
 // ---------------------------------------------------------------------------
 
-const TIER_IDS = ["free", "starter", "growth", "scale"] as const;
+const TIER_IDS = ["free", "pro", "business"] as const;
 const BILLING_INTERVALS = ["monthly", "annual"] as const;
 const MAX_VOLUME = 1_000_000_000;
 const DEFAULT_SEARCH_LIMIT = 5;
@@ -162,7 +162,7 @@ export const TOOLS = [
     name: "estimate_cost",
     title: "Estimate Wraps + AWS cost",
     description:
-      "Estimate the real monthly cost of running email on Wraps + AWS: the Wraps platform fee, tracked-event overage, and the itemized AWS bill (SES, EventBridge, SQS, Lambda, DynamoDB, dedicated IP, WAF). Use this instead of doing the arithmetic — six variables interact, including which SES pricing plan the AWS account is on.",
+      "Estimate the real monthly cost of running email on Wraps + AWS: the flat Wraps platform fee for the plan, and the itemized AWS bill (SES, EventBridge, SQS, Lambda, DynamoDB, dedicated IP, WAF). The Wraps fee never varies with volume; the AWS-side event-pipeline line items (EventBridge, SQS, Lambda, DynamoDB) are derived from emails sent and event types per email. The events parameter is accepted for backward compatibility and does not currently affect the estimate. Use this instead of doing the arithmetic — six variables interact, including which SES pricing plan the AWS account is on.",
     inputSchema: {
       type: "object",
       properties: {

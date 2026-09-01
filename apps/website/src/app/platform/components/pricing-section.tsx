@@ -6,7 +6,6 @@ import { useState } from "react";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import {
   type BillingInterval,
-  OVERAGE_RATES,
   PRICING_COPY,
   PRICING_TIERS,
   type PricingTier,
@@ -49,7 +48,7 @@ export function DashboardPricingSection() {
             Simple, predictable pricing
           </h2>
           <p className="mb-6 max-w-2xl text-muted-foreground">
-            Unlimited contacts. Pay per message. No per-seat fees.
+            Unlimited sends, domains, contacts & templates. No per-seat fees.
           </p>
           <BillingToggle
             className="items-start"
@@ -59,9 +58,8 @@ export function DashboardPricingSection() {
         </div>
 
         {/* Pricing cards */}
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {allTiers.map((tier) => {
-            const overage = OVERAGE_RATES[tier.id];
             return (
               <div
                 className={`relative flex flex-col overflow-hidden rounded-2xl border bg-background ${
@@ -101,9 +99,9 @@ export function DashboardPricingSection() {
                   <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
                     <div>
                       <span className="block font-medium text-foreground">
-                        {tier.limits.messagesDisplay}
+                        {tier.limits.historyDisplay}
                       </span>
-                      messages
+                      history
                     </div>
                     <div>
                       <span className="block font-medium text-foreground">
@@ -128,17 +126,9 @@ export function DashboardPricingSection() {
                             : "text-muted-foreground"
                         }`}
                       />
-                      <span>Unlimited contacts</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <Check
-                        className={`mt-0.5 size-4 shrink-0 ${
-                          tier.highlight
-                            ? "text-orange-500"
-                            : "text-muted-foreground"
-                        }`}
-                      />
-                      <span>Then {overage.display}</span>
+                      <span>
+                        Unlimited sends, domains, contacts & templates
+                      </span>
                     </li>
                     {tier.features.slice(2).map((feature) => (
                       <li
@@ -193,7 +183,7 @@ export function DashboardPricingSection() {
         <p className="mt-6 text-muted-foreground text-sm">
           AWS costs billed separately by AWS (~$0.10 per 1,000 emails à la
           carte, or ~$0.16 on AWS&apos;s new default Essentials plan). Free tier
-          available with 5,000 tracked events/month.
+          available, no credit card required.
         </p>
       </div>
     </section>

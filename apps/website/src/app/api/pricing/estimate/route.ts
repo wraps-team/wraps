@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import type { BillingInterval, TierId } from "@/config/pricing";
+import { resolveTierId } from "@/config/pricing";
 import { buildShareUrl, renderEstimateMarkdown } from "@/lib/pricing-markdown";
 import type { CostInput, RetentionPeriod, SesPlanId } from "@/lib/ses-cost";
 import {
@@ -12,7 +13,13 @@ import {
 
 const SITE = "https://wraps.dev";
 
-const TIER_IDS = ["free", "starter", "growth", "scale"] as const;
+/**
+ * Publicly advertised tiers, for the 400 error message only. The parser
+ * itself accepts these plus the legacy aliases (see resolveTierId) — an
+ * agent that learned "starter"/"growth"/"scale" from the pricing.md that
+ * shipped before this change keeps getting a 200, not a 400.
+ */
+const PUBLIC_TIER_IDS = ["free", "pro", "business"] as const;
 const BILLING_INTERVALS = ["monthly", "annual"] as const;
 
 const MAX_VOLUME = 1_000_000_000;
@@ -42,6 +49,19 @@ function parseEnum<const T extends readonly string[]>(
     );
   }
   return match;
+}
+
+function parseTier(raw: string | null): TierId {
+  if (raw === null) {
+    return DEFAULT_COST_INPUT.tier;
+  }
+  const resolved = resolveTierId(raw);
+  if (!resolved) {
+    throw new InvalidParamError(
+      `Invalid "tier": "${raw}". Allowed values: ${PUBLIC_TIER_IDS.join(", ")}.`
+    );
+  }
+  return resolved;
 }
 
 function parseInteger(
@@ -100,12 +120,7 @@ function parseInput(params: URLSearchParams): CostInput {
       "events",
       { min: 0, max: MAX_VOLUME }
     ),
-    tier: parseEnum(
-      params.get("tier"),
-      TIER_IDS,
-      DEFAULT_COST_INPUT.tier,
-      "tier"
-    ) as TierId,
+    tier: parseTier(params.get("tier")),
     billing: parseEnum(
       params.get("billing"),
       BILLING_INTERVALS,

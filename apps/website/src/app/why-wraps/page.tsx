@@ -44,36 +44,31 @@ const costComparison = [
   {
     volume: "1K/mo",
     saas: "$0-30",
-    wrapsPlatform: "Free",
-    trackedEvents: "5K/mo",
+    wrapsPlatform: "$0",
     awsCost: "~$0.10 (à la carte)",
   },
   {
     volume: "10K/mo",
     saas: "$15-100",
-    wrapsPlatform: "Free",
-    trackedEvents: "5K/mo",
+    wrapsPlatform: "$0",
     awsCost: "~$1",
   },
   {
     volume: "50K/mo",
     saas: "$20-150",
-    wrapsPlatform: "$19",
-    trackedEvents: "50K/mo",
+    wrapsPlatform: "$0",
     awsCost: "~$5",
   },
   {
     volume: "100K/mo",
     saas: "$35-200",
-    wrapsPlatform: "$19",
-    trackedEvents: "50K/mo",
+    wrapsPlatform: "$0",
     awsCost: "~$10",
   },
   {
     volume: "500K/mo",
     saas: "$350-720",
-    wrapsPlatform: "$79",
-    trackedEvents: "250K/mo",
+    wrapsPlatform: "$0",
     awsCost: "~$50",
   },
 ];
@@ -131,9 +126,6 @@ export default function WhyWrapsPage() {
                         <th className="p-4 text-left font-medium">
                           Send Volume
                         </th>
-                        <th className="p-4 text-left font-medium text-primary">
-                          Tracked Events
-                        </th>
                         <th className="p-4 text-left font-medium">
                           Email SaaS
                         </th>
@@ -150,9 +142,6 @@ export default function WhyWrapsPage() {
                         <tr key={row.volume}>
                           <td className="p-4 text-muted-foreground">
                             {row.volume}
-                          </td>
-                          <td className="p-4 text-primary">
-                            {row.trackedEvents}
                           </td>
                           <td className="p-4">{row.saas}</td>
                           <td className="p-4 font-medium text-primary">
@@ -171,12 +160,12 @@ export default function WhyWrapsPage() {
             <p className="mt-4 text-muted-foreground text-sm">
               Email SaaS examples: Mailchimp, Resend, SendGrid, Postmark,
               Customer.io. Wraps Platform is a flat fee for tooling (dashboard,
-              workflows, templates, analytics) — not based on email volume. You
-              pay AWS directly for sending at $0.10/1K emails on à la carte (AWS
-              defaults new accounts to $0.16/1K). Email engagement events
-              (delivered, opened, clicked, bounced) don&apos;t count against
-              your tier &mdash; only custom events you track do, so the tier
-              rows above assume modest custom-event usage.{" "}
+              workflows, templates, analytics) and does not scale with send
+              volume — Free covers any volume. You pay AWS directly for sending
+              at $0.10/1K emails on à la carte (AWS defaults new accounts to
+              $0.16/1K). Paid tiers (Pro $29, Business $199) buy more AWS
+              accounts, longer dashboard history, and governance features, not
+              more volume.{" "}
               <a className="text-primary underline" href="/platform#pricing">
                 See what each tier includes
               </a>
