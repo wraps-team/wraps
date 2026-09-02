@@ -288,6 +288,7 @@ export async function checkFeatureAccess(
     prioritySLA: "Priority SLA",
     sso: "SSO & SCIM provisioning",
     auditLog: "Audit logs",
+    auditLogExport: "Audit log export",
   };
 
   return {

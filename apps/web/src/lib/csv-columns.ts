@@ -1,4 +1,4 @@
-import type { BroadcastRecipientRow } from "@wraps/db";
+import type { auditLog, BroadcastRecipientRow } from "@wraps/db";
 import type { EmailListItem } from "@/app/(dashboard)/[orgSlug]/emails/types";
 import type { SMSListItem } from "@/app/(dashboard)/[orgSlug]/sms/types";
 import type { BatchSendWithMeta } from "@/lib/batch";
@@ -77,6 +77,25 @@ export const broadcastRecipientCSVColumns: CSVColumnDef<BroadcastRecipientRow>[]
     {
       header: "Sent At",
       accessor: (r) => (r.sentAt ? new Date(r.sentAt).toISOString() : ""),
+    },
+  ];
+
+export const auditLogCSVColumns: CSVColumnDef<typeof auditLog.$inferSelect>[] =
+  [
+    {
+      header: "Timestamp",
+      accessor: (r) => new Date(r.createdAt).toISOString(),
+    },
+    { header: "Action", accessor: (r) => r.action },
+    { header: "Resource", accessor: (r) => r.resource },
+    { header: "Resource ID", accessor: (r) => r.resourceId },
+    { header: "Actor Email", accessor: (r) => r.actorEmail },
+    { header: "Actor ID", accessor: (r) => r.userId },
+    { header: "IP Address", accessor: (r) => r.ipAddress },
+    { header: "User Agent", accessor: (r) => r.userAgent },
+    {
+      header: "Metadata",
+      accessor: (r) => (r.metadata ? JSON.stringify(r.metadata) : ""),
     },
   ];
 

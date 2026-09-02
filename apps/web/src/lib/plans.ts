@@ -56,7 +56,8 @@ export type PlanFeature =
   | "customRetention" // Enterprise+: Custom data retention
   | "prioritySLA" // Business+: Priority support SLA
   | "sso" // Business+: SSO + SCIM provisioning
-  | "auditLog"; // Business+: Audit log viewer
+  | "auditLog" // Business+: Audit log viewer
+  | "auditLogExport"; // Business+: Export the audit log to CSV
 
 export type RateLimits = {
   dailyRequests: number; // -1 = unlimited
@@ -146,6 +147,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       prioritySLA: false,
       sso: false,
       auditLog: false,
+      auditLogExport: false,
     },
 
     // Rate Limits
@@ -203,6 +205,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       prioritySLA: false,
       sso: false,
       auditLog: false,
+      auditLogExport: false,
     },
 
     // Rate Limits
@@ -262,6 +265,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       prioritySLA: true, // Priority support SLA
       sso: true, // SSO + SCIM provisioning
       auditLog: true,
+      auditLogExport: true,
     },
 
     // Rate Limits
@@ -331,6 +335,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       prioritySLA: false,
       sso: false,
       auditLog: false,
+      auditLogExport: false,
     },
 
     // Rate Limits
@@ -391,6 +396,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       prioritySLA: true, // Priority support SLA
       sso: true, // SSO + SCIM provisioning
       auditLog: true,
+      auditLogExport: true,
     },
 
     // Rate Limits
@@ -451,6 +457,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       prioritySLA: true, // Priority support SLA
       sso: true, // SSO + SCIM provisioning
       auditLog: true,
+      auditLogExport: true,
     },
 
     // Rate Limits

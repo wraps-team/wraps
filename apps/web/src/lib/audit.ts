@@ -11,6 +11,7 @@ export type AuditLogAction =
   | "api_key.created"
   | "api_key.revoked"
   | "settings.updated"
+  | "audit_log.exported"
   | "plan.changed"
   | "domain.verified"
   | "auth.login"

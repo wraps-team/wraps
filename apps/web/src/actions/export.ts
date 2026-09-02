@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  auditLog,
   contact,
   contactTopic,
   db,
@@ -9,7 +10,8 @@ import {
   exportContactEvents,
   listBroadcasts,
 } from "@wraps/db";
-import { and, desc, eq, ilike, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, lt, sql } from "drizzle-orm";
+import type { AuditLogAction } from "@/lib/audit";
 import type { BatchSendWithMeta, BatchStatus } from "@/lib/batch";
 import type {
   ContactStatus,
@@ -19,6 +21,8 @@ import type {
   SmsStatus,
 } from "@/lib/contacts";
 import type { EventWithContact, ListEventsOptions } from "@/lib/events";
+import { getOrganizationPlan } from "@/lib/plan-limits";
+import { getHistoryRetentionDays } from "@/lib/plans";
 import { orgAction } from "./shared/org-action";
 
 const MAX_EXPORT_ROWS = 50_000;
@@ -275,6 +279,118 @@ export const exportAllEvents = orgAction(
       success: true,
       events: events as EventWithContact[],
       total: events.length,
+    };
+  }
+);
+
+export type AuditLogExportFilter = {
+  action?: AuditLogAction;
+  actorId?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+};
+
+export const exportAuditLogs = orgAction(
+  {
+    name: "exportAuditLogs",
+    resource: "orgSettings",
+    permission: ["read"],
+    orgId: (
+      organizationId: string,
+      _options?: { filter?: AuditLogExportFilter }
+    ) => organizationId,
+    onError: "Failed to export audit logs",
+    feature: "auditLogExport",
+  },
+  async (
+    ctx,
+    organizationId: string,
+    options: { filter?: AuditLogExportFilter } = {}
+  ): Promise<
+    | {
+        success: true;
+        logs: (typeof auditLog.$inferSelect)[];
+        total: number;
+        truncated: boolean;
+      }
+    | { success: false; error: string }
+  > => {
+    if (ctx.access.role !== "owner" && ctx.access.role !== "admin") {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const planId = await getOrganizationPlan(organizationId);
+    const retentionDays = getHistoryRetentionDays(planId);
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+
+    const filter = options.filter;
+
+    const conditions = [
+      eq(auditLog.organizationId, organizationId),
+      gte(auditLog.createdAt, cutoff),
+    ];
+
+    if (filter?.action) {
+      conditions.push(eq(auditLog.action, filter.action));
+    }
+
+    if (filter?.actorId) {
+      conditions.push(eq(auditLog.userId, filter.actorId));
+    }
+
+    if (filter?.dateFrom) {
+      conditions.push(gte(auditLog.createdAt, filter.dateFrom));
+    }
+
+    if (filter?.dateTo) {
+      conditions.push(lt(auditLog.createdAt, filter.dateTo));
+    }
+
+    const whereClause = and(...conditions);
+
+    const { rows, matchingCount } = await ctx.audited(
+      async (tx) => {
+        // The real count of everything matching, independent of
+        // MAX_EXPORT_ROWS, so `total` below can be honest instead of
+        // reporting the truncated fetch's own length as if it were the whole
+        // match (audit F23 — see exportAllContacts above for the original
+        // finding).
+        const [{ value: matchingCount }] = await tx
+          .select({ value: sql<number>`count(*)::int` })
+          .from(auditLog)
+          .where(whereClause);
+
+        const rows = await tx
+          .select()
+          .from(auditLog)
+          .where(whereClause)
+          .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
+          .limit(MAX_EXPORT_ROWS);
+
+        return { rows, matchingCount };
+      },
+      (result) => ({
+        action: "audit_log.exported" as const,
+        resource: "auditLog",
+        metadata: {
+          rowCount: result.rows.length,
+          total: result.matchingCount,
+          truncated: result.matchingCount > result.rows.length,
+          filter: {
+            action: filter?.action ?? null,
+            actorId: filter?.actorId ?? null,
+            dateFrom: filter?.dateFrom ? filter.dateFrom.toISOString() : null,
+            dateTo: filter?.dateTo ? filter.dateTo.toISOString() : null,
+          },
+        },
+      })
+    );
+
+    return {
+      success: true,
+      logs: rows,
+      total: matchingCount,
+      truncated: matchingCount > rows.length,
     };
   }
 );

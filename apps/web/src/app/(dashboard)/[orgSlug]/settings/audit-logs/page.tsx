@@ -47,9 +47,10 @@ export default async function AuditLogsPage({ params }: AuditLogsPageProps) {
   );
   if (!orgWithMembership) redirect("/");
 
-  const [featureCheck, planId] = await Promise.all([
+  const [featureCheck, planId, exportCheck] = await Promise.all([
     checkFeatureAccess(orgWithMembership.id, "auditLog"),
     getOrganizationPlan(orgWithMembership.id),
+    checkFeatureAccess(orgWithMembership.id, "auditLogExport"),
   ]);
 
   // Fallback matches the tier that actually grants the feature. It read "pro"
@@ -98,6 +99,7 @@ export default async function AuditLogsPage({ params }: AuditLogsPageProps) {
       </div>
 
       <AuditLogViewer
+        canExport={exportCheck.allowed}
         initialData={initialData}
         organizationId={orgWithMembership.id}
         orgSlug={orgSlug}

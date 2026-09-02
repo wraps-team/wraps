@@ -25,11 +25,15 @@ import {
   TooltipTrigger,
 } from "@wraps/ui/components/ui/tooltip";
 import { format, formatDistanceToNow } from "date-fns";
-import { ChevronRight, ShieldAlert } from "lucide-react";
+import { ChevronRight, Download, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { toast } from "sonner";
 import { type AuditLogAction, listAuditLogs } from "@/actions/audit-log";
+import { exportAuditLogs } from "@/actions/export";
 import { Button } from "@/components/ui/button";
+import { auditLogCSVColumns } from "@/lib/csv-columns";
+import { exportTableToCSV } from "@/lib/csv-export";
 
 type AuditLogSuccess = Extract<
   Awaited<ReturnType<typeof listAuditLogs>>,
@@ -41,6 +45,7 @@ type Props = {
   organizationId: string;
   orgSlug: string;
   initialData: Awaited<ReturnType<typeof listAuditLogs>>;
+  canExport: boolean;
 };
 
 const ACTION_LABELS: Record<AuditLogAction, string> = {
@@ -54,6 +59,7 @@ const ACTION_LABELS: Record<AuditLogAction, string> = {
   "api_key.created": "API Key Created",
   "api_key.revoked": "API Key Revoked",
   "settings.updated": "Settings Updated",
+  "audit_log.exported": "Audit Log Exported",
   "plan.changed": "Plan Changed",
   "domain.verified": "Domain Verified",
   "auth.login": "Login",
@@ -230,6 +236,7 @@ export function AuditLogViewer({
   organizationId,
   orgSlug,
   initialData,
+  canExport,
 }: Props) {
   const [actionFilter, setActionFilter] = useState<AuditLogAction | "all">(
     "all"
@@ -238,6 +245,7 @@ export function AuditLogViewer({
   const [dateTo, setDateTo] = useState("");
   const [cursor, setCursor] = useState<string | null>(null);
   const [cursorStack, setCursorStack] = useState<string[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
 
   const queryKey = [
     "audit-logs",
@@ -351,6 +359,53 @@ export function AuditLogViewer({
             variant="ghost"
           >
             Clear filters
+          </Button>
+        )}
+
+        {canExport && (
+          <Button
+            disabled={isExporting}
+            onClick={async () => {
+              setIsExporting(true);
+              try {
+                const result = await exportAuditLogs(organizationId, {
+                  filter: {
+                    action: actionFilter !== "all" ? actionFilter : undefined,
+                    dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+                    dateTo: dateTo ? new Date(dateTo) : undefined,
+                  },
+                });
+                if (result.success) {
+                  exportTableToCSV(
+                    result.logs,
+                    auditLogCSVColumns,
+                    `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
+                  );
+                  if (result.truncated) {
+                    toast.warning(
+                      `Exported ${result.logs.length} of ${result.total.toLocaleString()} matching audit log entries`,
+                      {
+                        description:
+                          "This export is capped and left some entries out. Narrow your filters to export the rest.",
+                      }
+                    );
+                  } else {
+                    toast.success(
+                      `Exported ${result.logs.length} audit log entries to CSV`
+                    );
+                  }
+                } else {
+                  toast.error(result.error);
+                }
+              } finally {
+                setIsExporting(false);
+              }
+            }}
+            size="sm"
+            variant="outline"
+          >
+            <Download className="mr-1 h-4 w-4" />
+            Export CSV
           </Button>
         )}
       </div>
