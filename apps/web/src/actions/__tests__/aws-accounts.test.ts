@@ -10,8 +10,10 @@ import {
   it,
   vi,
 } from "vitest";
+import { AssumeRoleError } from "@/lib/aws/assume-role";
 import {
   deleteAWSAccount,
+  getSMSPhoneNumbers,
   getVerifiedDomains,
   listAWSAccounts,
   removeWebhookSecretAction,
@@ -271,6 +273,9 @@ vi.mock("@/lib/activation-tracking", () => ({
 // Capture warnings so tests can assert on them. `serializeError` stays real —
 // the actions module uses it to shape what gets logged.
 const mockLogWarn = vi.fn();
+// `error` is what forwards to Sentry, so tests assert on it to prove that an
+// expected customer misconfiguration does not page us.
+const mockLogError = vi.fn();
 
 vi.mock("@/lib/logger", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/logger")>();
@@ -279,7 +284,7 @@ vi.mock("@/lib/logger", async (importOriginal) => {
     createActionLogger: () => ({
       info: vi.fn(),
       warn: (...args: unknown[]) => mockLogWarn(...args),
-      error: vi.fn(),
+      error: (...args: unknown[]) => mockLogError(...args),
       debug: vi.fn(),
     }),
   };
@@ -726,6 +731,55 @@ describe("getVerifiedDomains", () => {
       }
     });
 
+    // assumeRole() replaces the underlying AWS message with its own copy, so
+    // the only surviving signal that the customer's role is unusable is the
+    // AssumeRoleError `code`.
+    it.each(["ACCESS_DENIED", "INVALID_TRUST_POLICY"] as const)(
+      "reports a %s assume-role failure as PERMISSION_DENIED",
+      async (code) => {
+        mockLogError.mockClear();
+        mockGetOrAssumeRole.mockRejectedValueOnce(
+          new AssumeRoleError(
+            code,
+            "Wraps could not assume the IAM role. Check that the CloudFormation stack deployed successfully and that the External ID matches the stack output."
+          )
+        );
+
+        const result = await getVerifiedDomains(
+          testAwsAccount.id,
+          testOrganization.id
+        );
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.errorCode).toBe("PERMISSION_DENIED");
+        }
+        // log.error is the Sentry hook — a customer misconfiguration must not page us.
+        expect(mockLogError).not.toHaveBeenCalled();
+      }
+    );
+
+    it("still reports a Wraps-side credential failure as UNKNOWN so it reaches Sentry", async () => {
+      mockLogError.mockClear();
+      mockGetOrAssumeRole.mockRejectedValueOnce(
+        new AssumeRoleError(
+          "INVALID_BACKEND_CREDENTIALS",
+          "Wraps could not authenticate to AWS to validate your connection. This is a Wraps-side issue — please try again shortly."
+        )
+      );
+
+      const result = await getVerifiedDomains(
+        testAwsAccount.id,
+        testOrganization.id
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.errorCode).toBe("UNKNOWN");
+      }
+      expect(mockLogError).toHaveBeenCalled();
+    });
+
     it("should skip identities that fail to fetch details", async () => {
       mockSend.mockImplementation((command) => {
         if (command._type === "ListEmailIdentitiesCommand") {
@@ -771,6 +825,43 @@ describe("getVerifiedDomains", () => {
         expect(result.identities[0].identity).toBe("good.com");
       }
     });
+  });
+});
+
+describe("getSMSPhoneNumbers", () => {
+  beforeAll(async () => {
+    await db
+      .update(awsAccount)
+      .set({ smsEnabled: true })
+      .where(eq(awsAccount.id, testAwsAccount.id));
+  });
+
+  afterAll(async () => {
+    await db
+      .update(awsAccount)
+      .set({ smsEnabled: false })
+      .where(eq(awsAccount.id, testAwsAccount.id));
+  });
+
+  it("does not page us when the customer's role cannot be assumed", async () => {
+    currentMockUserId = testUser.id;
+    mockLogError.mockClear();
+    mockLogWarn.mockClear();
+    mockGetOrAssumeRole.mockRejectedValueOnce(
+      new AssumeRoleError(
+        "ACCESS_DENIED",
+        "Wraps could not assume the IAM role. Check that the CloudFormation stack deployed successfully and that the External ID matches the stack output."
+      )
+    );
+
+    const result = await getSMSPhoneNumbers(
+      testAwsAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(false);
+    expect(mockLogError).not.toHaveBeenCalled();
+    expect(mockLogWarn).toHaveBeenCalled();
   });
 });
 

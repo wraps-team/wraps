@@ -45,6 +45,33 @@ export function classifyAssumeRoleError(error: unknown): AssumeRoleErrorCode {
   return "UNKNOWN";
 }
 
+/**
+ * True when a failure means the customer's IAM role is unusable — a broken
+ * trust policy, a mismatched External ID, or a role missing the permission.
+ * These are customer-side misconfigurations: surface a remediation in the UI
+ * rather than reporting them to Sentry as Wraps defects.
+ *
+ * `assumeRole` replaces the underlying AWS message with its own copy, so the
+ * structured `code` is the only reliable signal for an assume-role failure —
+ * matching on `.message` silently misses every one of them.
+ */
+export function isCustomerRoleAccessError(error: unknown): boolean {
+  if (error instanceof AssumeRoleError) {
+    return (
+      error.code === "ACCESS_DENIED" || error.code === "INVALID_TRUST_POLICY"
+    );
+  }
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  // A call made with successfully assumed credentials still carries the raw
+  // AWS SDK error, where `name` is unreliable and `message` holds the signal.
+  return (
+    error.name === "AccessDeniedException" ||
+    error.message.includes("is not authorized to perform")
+  );
+}
+
 // Types for AWS credentials - compatible with AWS SDK v3
 type AwsCredentialIdentity = {
   accessKeyId: string;

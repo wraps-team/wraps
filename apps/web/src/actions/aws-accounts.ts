@@ -30,7 +30,10 @@ import {
   trackDomainVerified,
 } from "@/lib/activation-tracking";
 import { auditLogEntry, getAuditContext } from "@/lib/audit";
-import { getCredentials } from "@/lib/aws/assume-role";
+import {
+  getCredentials,
+  isCustomerRoleAccessError,
+} from "@/lib/aws/assume-role";
 import { getOrAssumeRole } from "@/lib/aws/credential-cache";
 import { findWrapsArchive } from "@/lib/aws/mailmanager";
 import {
@@ -1551,11 +1554,7 @@ export async function getVerifiedDomains(
       identities: verifiedIdentities,
     };
   } catch (error) {
-    const isAccessDenied =
-      error instanceof Error &&
-      ((error as { name?: string }).name === "AccessDeniedException" ||
-        error.message.includes("is not authorized to perform") ||
-        error.message.includes("Access denied when assuming role"));
+    const isAccessDenied = isCustomerRoleAccessError(error);
 
     if (isAccessDenied) {
       log.warn(
@@ -1689,11 +1688,7 @@ export async function getSMSPhoneNumbers(
       phoneNumbers,
     };
   } catch (error) {
-    const isAccessDenied =
-      error instanceof Error &&
-      ((error as { name?: string }).name === "AccessDeniedException" ||
-        error.message.includes("is not authorized to perform") ||
-        error.message.includes("Access denied when assuming role"));
+    const isAccessDenied = isCustomerRoleAccessError(error);
 
     if (isAccessDenied) {
       log.warn(
