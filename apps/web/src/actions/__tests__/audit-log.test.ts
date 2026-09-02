@@ -361,12 +361,21 @@ describe("exportAuditLogs", () => {
     expect(orgBRow).toBeUndefined();
   });
 
+  // These two tests are a matched pair: together they prove the orgAction
+  // `feature: "auditLogExport"` gate actually flips with the plan, not just
+  // that *something* about the call succeeds or fails.
   it("denies the export when the org's plan lacks auditLogExport", async () => {
     await setOrgAPlan("free");
 
     const result = await exportAuditLogs(orgA.id, {});
 
     expect(result.success).toBe(false);
+    if (result.success) return;
+    // Asserts the wrapper's actual plan-gate message (checkFeatureAccess +
+    // PLANS.business.name), not just success === false — a bad fixture, a
+    // thrown error, or an accidental auditLogExport: true on free would all
+    // still satisfy a bare success === false check.
+    expect(result.error).toBe("Audit log export requires a Business plan.");
   });
 
   it("allows the export when the org's plan has auditLogExport (business)", async () => {
