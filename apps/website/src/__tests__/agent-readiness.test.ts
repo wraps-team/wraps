@@ -13,12 +13,15 @@ import {
   callTool,
   FALLBACK_PROTOCOL_VERSION,
   handleMessage,
+  SERVER_CAPABILITIES,
+  SERVER_INFO,
   SUPPORTED_PROTOCOL_VERSIONS,
   searchSections,
   splitMarkdownSections,
   type TextFetcher,
   TOOLS,
 } from "@/lib/mcp-server";
+import { SERVER_CARD_NAME, SERVER_CARD_URL } from "@/lib/mcp-server-card";
 import {
   NOT_FOUND_LINKS,
   renderNotFoundMarkdown,
@@ -679,6 +682,114 @@ describe("the MCP manifest describes both servers", () => {
     expect(remote?.tools.map((tool) => tool.name).sort()).toEqual(
       TOOLS.map((tool) => tool.name).sort()
     );
+  });
+});
+
+describe("the MCP server card is discoverable and matches the live server", () => {
+  it("serves the card at the location the spec reserves", async () => {
+    const { GET } = await import("@/app/mcp/server-card/route");
+    const response = GET();
+    const card = (await response.json()) as {
+      $schema: string;
+      name: string;
+      version: string;
+      description: string;
+      remotes: Array<{ type: string; url: string }>;
+    };
+
+    expect(response.headers.get("Content-Type")).toBe(
+      "application/mcp-server-card+json"
+    );
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(card.$schema).toBe(
+      "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json"
+    );
+    expect(card.remotes[0]).toMatchObject({
+      type: "streamable-http",
+      url: "https://wraps.dev/mcp",
+    });
+  });
+
+  it("keeps the card inside the schema's constraints", async () => {
+    const { GET } = await import("@/app/mcp/server-card/route");
+    const card = (await GET().json()) as {
+      name: string;
+      version: string;
+      description: string;
+      remotes: Array<{ supportedProtocolVersions: string[] }>;
+    };
+
+    // Reverse-DNS with exactly one slash, a semantic version, and a
+    // description the 100-character cap accepts.
+    expect(card.name).toMatch(/^[a-zA-Z0-9.-]+\/[a-zA-Z0-9._-]+$/);
+    expect(card.version).toMatch(/^\d+\.\d+\.\d+/);
+    expect(card.description.length).toBeLessThanOrEqual(100);
+    expect(card.remotes[0].supportedProtocolVersions).toEqual([
+      ...SUPPORTED_PROTOCOL_VERSIONS,
+    ]);
+  });
+
+  it("omits the primitives the spec keeps at runtime", async () => {
+    const { GET } = await import("@/app/mcp/server-card/route");
+    const card = (await GET().json()) as Record<string, unknown>;
+
+    // A static card must not claim a tool list; clients read it from
+    // tools/list against the live connection.
+    expect(card.tools).toBeUndefined();
+    expect(card.capabilities).toBeUndefined();
+    expect(card.serverInfo).toBeUndefined();
+  });
+
+  it("answers the .well-known path scanners probe, with their field names", async () => {
+    const { GET } = await import(
+      "@/app/.well-known/mcp/server-card.json/route"
+    );
+    const card = (await GET().json()) as {
+      name: string;
+      serverInfo: { name: string; version: string };
+      endpoint: string;
+      capabilities: unknown;
+    };
+
+    expect(card.serverInfo.name).toBe(SERVER_INFO.name);
+    expect(card.serverInfo.version).toBe(SERVER_INFO.version);
+    expect(card.endpoint).toBe("https://wraps.dev/mcp");
+    expect(card.capabilities).toEqual(SERVER_CAPABILITIES);
+    // Still a card, not a separate document that can drift.
+    expect(card.name).toBe(SERVER_CARD_NAME);
+  });
+
+  it("points the AI catalog at the card it actually serves", async () => {
+    const { GET } = await import("@/app/.well-known/ai-catalog.json/route");
+    const catalog = (await GET().json()) as {
+      specVersion: string;
+      entries: Array<{ identifier: string; type: string; url: string }>;
+    };
+
+    const entry = catalog.entries.find(
+      (candidate) => candidate.type === "application/mcp-server-card+json"
+    );
+
+    expect(catalog.specVersion).toBe("1.0");
+    expect(entry?.url).toBe(SERVER_CARD_URL);
+    expect(entry?.identifier).toMatch(/^urn:air:wraps\.dev:/);
+  });
+
+  it("advertises both discovery documents from the home page", async () => {
+    const config = (await import("../../next.config")).default as {
+      headers: () => Promise<
+        Array<{
+          source: string;
+          headers: Array<{ key: string; value: string }>;
+        }>
+      >;
+    };
+    const link = (await config.headers())
+      .find((rule) => rule.source === "/")
+      ?.headers.find((header) => header.key === "Link")?.value;
+
+    expect(link).toContain("/.well-known/ai-catalog.json");
+    expect(link).toContain("/mcp/server-card");
   });
 });
 

@@ -49,7 +49,7 @@ const nextConfig = {
           {
             key: "Link",
             value:
-              '</docs>; rel="service-doc", </.well-known/api-catalog>; rel="api-catalog", </llms.txt>; rel="alternate"; type="text/plain"; title="llms.txt", </.well-known/mcp.json>; rel="describedby"; type="application/json"; title="MCP server manifest"',
+              '</docs>; rel="service-doc", </.well-known/api-catalog>; rel="api-catalog", </llms.txt>; rel="alternate"; type="text/plain"; title="llms.txt", </.well-known/mcp.json>; rel="describedby"; type="application/json"; title="MCP server manifest", </.well-known/ai-catalog.json>; rel="describedby"; type="application/ai-catalog+json"; title="AI catalog", </mcp/server-card>; rel="describedby"; type="application/mcp-server-card+json"; title="MCP server card"',
           },
         ],
       },
