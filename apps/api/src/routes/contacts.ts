@@ -496,6 +496,12 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
         );
         topicIds = [...topicIds, ...resolvedIds];
       }
+      // contact_topic is keyed by (contactId, topicId), and every narrowing
+      // below is a filter rather than a set — so a topic named twice would
+      // reach the INSERT as two identical rows and fail the whole write on the
+      // primary key. A caller does not have to repeat itself to get here:
+      // naming one topic by id and by slug in the same request is enough.
+      topicIds = [...new Set(topicIds)];
 
       // Add to topics if specified
       const pendingTopics: string[] = [];
@@ -747,6 +753,11 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
           );
           topicIds = [...topicIds, ...resolvedIds];
         }
+        // contact_topic is keyed by (contactId, topicId): a repeat reaching the
+        // INSERT below fails the write on the primary key. It also double-fires
+        // the resubscribe path, which UPDATEs and so would not fail at all —
+        // just emit the event and send the confirmation email twice.
+        topicIds = [...new Set(topicIds)];
 
         const existingSubscriptions =
           await fetchContactSubscriptions(contactId);

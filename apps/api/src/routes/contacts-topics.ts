@@ -65,6 +65,14 @@ export const contactsTopicsRoutes = createAuthenticatedRoutes("/v1/contacts")
         );
         topicIds = [...topicIds, ...resolvedIds];
       }
+      // contact_topic is keyed by (contactId, topicId), and the narrowing below
+      // is a filter rather than a set — so a topic named twice (repeated in
+      // topicIds, or given once by id and once by slug) would reach the INSERT
+      // as two identical rows and fail on the primary key. That matters more
+      // here than anywhere else: this handler deletes every existing
+      // subscription before inserting, so a failed insert left the contact
+      // with none at all.
+      topicIds = [...new Set(topicIds)];
 
       // Get existing subscriptions to preserve confirmation dates and for event emission
       const existingSubscriptions = await db
