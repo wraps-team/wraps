@@ -12,7 +12,9 @@ export type ContactField =
   | "lastName"
   | "company"
   | "jobTitle"
-  | "createdAt";
+  | "createdAt"
+  | "smsStatus"
+  | "smsConsentedAt";
 
 export type ColumnMapping = ContactField | "property" | "skip";
 
@@ -58,6 +60,30 @@ export const KNOWN_COLUMNS: Record<ContactField, string[]> = {
     "joined",
     "joined_at",
   ],
+  smsStatus: [
+    "sms_status",
+    "smsstatus",
+    "sms status",
+    "sms_consent",
+    "sms consent",
+    "sms_opt_in",
+    "sms opt in",
+    "sms_optin",
+    "smsoptin",
+  ],
+  smsConsentedAt: [
+    "sms_consented_at",
+    "smsconsentedat",
+    "sms consented at",
+    "sms_consent_date",
+    "sms consent date",
+    "consent_date",
+    "consent date",
+    "opt_in_date",
+    "opt in date",
+    "opted_in_at",
+    "sms_opt_in_date",
+  ],
 };
 
 /** Human-readable labels for display in the mapping UI */
@@ -69,6 +95,8 @@ export const FIELD_LABELS: Record<ContactField, string> = {
   company: "Company",
   jobTitle: "Job Title",
   createdAt: "Created At",
+  smsStatus: "SMS Status",
+  smsConsentedAt: "SMS Consent Date",
 };
 
 /**

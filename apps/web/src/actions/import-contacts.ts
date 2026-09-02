@@ -12,6 +12,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { trackContactsImported } from "@/lib/activation-tracking";
 import { auditLogEntry, getAuditContext } from "@/lib/audit";
 import type { ImportContactsResult, ImportDuplicateRow } from "@/lib/contacts";
+import { SMS_STATUSES } from "@/lib/contacts";
 import { createActionLogger } from "@/lib/logger";
 import { checkContactLimit } from "@/lib/plan-limits";
 import { revalidateContacts } from "./contacts";
@@ -111,6 +112,10 @@ export type ImportContactInput = {
   company?: string;
   jobTitle?: string;
   createdAt?: string;
+  /** Raw CSV value; validated against SMS_STATUSES in the row loop. */
+  smsStatus?: string;
+  /** Raw CSV value; the date consent was given, not the date of the import. */
+  smsConsentedAt?: string;
   properties?: Record<string, string>;
 };
 
@@ -239,6 +244,8 @@ export async function importContacts(
         company: string | null;
         jobTitle: string | null;
         createdAt: Date | null;
+        smsStatus: (typeof SMS_STATUSES)[number] | null;
+        smsConsentedAt: Date | null;
         properties: Record<string, string>;
       };
 
@@ -261,6 +268,49 @@ export async function importContacts(
         if (email && !isValidEmail(email)) {
           errors.push({ row: rowIndex, error: `Invalid email: ${email}` });
           continue;
+        }
+
+        // Consent the file already carries. A status is only meaningful
+        // alongside a phone number, and a bad value is one bad row — never a
+        // silent downgrade, because quietly turning a claimed opt-in into
+        // pending_consent hides a migration problem, and quietly accepting
+        // garbage would fabricate one.
+        let smsStatus: (typeof SMS_STATUSES)[number] | null = null;
+        const rawSmsStatus = row.smsStatus?.trim().toLowerCase();
+        if (rawSmsStatus) {
+          const match = SMS_STATUSES.find((s) => s === rawSmsStatus);
+          if (!match) {
+            errors.push({
+              row: rowIndex,
+              error: `Invalid SMS status: ${row.smsStatus}. Use one of ${SMS_STATUSES.join(", ")}.`,
+            });
+            continue;
+          }
+          if (phone) {
+            smsStatus = match;
+          }
+        }
+
+        // The consent date is the record that proves consent, so an
+        // unparseable one is an error rather than a silent fallback to import
+        // time — unlike `createdAt`, where a wrong guess costs nothing.
+        let smsConsentedAt: Date | null = null;
+        const rawConsentDate = row.smsConsentedAt?.trim();
+        if (rawConsentDate) {
+          const parsedConsent = parseDate(rawConsentDate);
+          if (!parsedConsent) {
+            errors.push({
+              row: rowIndex,
+              error: `Invalid SMS consent date: ${row.smsConsentedAt}`,
+            });
+            continue;
+          }
+          if (smsStatus === "opted_in") {
+            smsConsentedAt = parsedConsent;
+          }
+        }
+        if (smsStatus === "opted_in" && !smsConsentedAt) {
+          smsConsentedAt = new Date();
         }
 
         const emailHash = email ? hashEmail(email) : null;
@@ -313,6 +363,8 @@ export async function importContacts(
           company: row.company?.trim() || null,
           jobTitle: row.jobTitle?.trim() || null,
           createdAt: row.createdAt ? parseDate(row.createdAt) : null,
+          smsStatus,
+          smsConsentedAt,
           properties: row.properties ?? {},
         });
       }
@@ -414,7 +466,13 @@ export async function importContacts(
                 emailVerifiedAt: row.email ? new Date() : null,
                 phone: row.phone,
                 phoneHash: row.phoneHash,
-                smsStatus: row.phone ? ("pending_consent" as const) : null,
+                smsStatus: row.phone
+                  ? (row.smsStatus ?? ("pending_consent" as const))
+                  : null,
+                smsConsentedAt: row.smsConsentedAt,
+                smsOptedOutAt:
+                  row.smsStatus === "opted_out" ? new Date() : null,
+                smsInvalidAt: row.smsStatus === "invalid" ? new Date() : null,
                 firstName: row.firstName,
                 lastName: row.lastName,
                 company: row.company,
@@ -458,6 +516,19 @@ export async function importContacts(
               // `properties` is a `json` column and `||` is jsonb-only, so the
               // merge round-trips through jsonb.
               updateData.properties = sql`(COALESCE(${contact.properties}, '{}'::json)::jsonb || ${JSON.stringify(row.properties)}::jsonb)::json`;
+            }
+
+            // Consent a re-import carries is only ever *filled in*, never
+            // overwritten. A stale export must not flip an opt-out back to
+            // opted-in, and must not restart the clock on an existing consent
+            // record. The guard is in SQL so it is evaluated against the row
+            // as it stands at write time, not against a value read earlier.
+            if (row.smsStatus) {
+              const undecided = sql`(${contact.smsStatus} IS NULL OR ${contact.smsStatus} = 'pending_consent')`;
+              updateData.smsStatus = sql`CASE WHEN ${undecided} THEN ${row.smsStatus} ELSE ${contact.smsStatus} END`;
+              if (row.smsConsentedAt) {
+                updateData.smsConsentedAt = sql`CASE WHEN ${undecided} THEN ${row.smsConsentedAt.toISOString()}::timestamp ELSE ${contact.smsConsentedAt} END`;
+              }
             }
 
             if (Object.keys(updateData).length > 0) {

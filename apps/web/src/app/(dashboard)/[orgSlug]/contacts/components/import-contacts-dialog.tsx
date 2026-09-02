@@ -463,6 +463,8 @@ export function ImportContactsDialog({
       "Company",
       "Job Title",
       "Created At",
+      "SMS Status",
+      "SMS Consent Date",
     ];
     const csv = toCSV(
       [
@@ -474,6 +476,8 @@ export function ImportContactsDialog({
           company: "Acme Inc",
           jobTitle: "Engineer",
           createdAt: "2024-01-15T00:00:00.000Z",
+          smsStatus: "opted_in",
+          smsConsentedAt: "2024-01-15T00:00:00.000Z",
         },
       ],
       headers.map((h, i) => ({

@@ -103,4 +103,28 @@ describe("autoMapColumns", () => {
       "  phone  ": "phone",
     });
   });
+
+  it("maps SMS consent headers", () => {
+    const result = autoMapColumns([
+      "Email",
+      "Phone",
+      "SMS Status",
+      "Consent Date",
+    ]);
+    expect(result).toEqual({
+      Email: "email",
+      Phone: "phone",
+      "SMS Status": "smsStatus",
+      "Consent Date": "smsConsentedAt",
+    });
+  });
+
+  it("maps SMS consent aliases", () => {
+    const result = autoMapColumns(["email", "sms_opt_in", "opted_in_at"]);
+    expect(result).toEqual({
+      email: "email",
+      sms_opt_in: "smsStatus",
+      opted_in_at: "smsConsentedAt",
+    });
+  });
 });
