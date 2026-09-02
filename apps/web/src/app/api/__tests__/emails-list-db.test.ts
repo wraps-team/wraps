@@ -16,6 +16,7 @@
 import { awsAccount, db, messageSend, organization } from "@wraps/db";
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { PlanId } from "@/lib/plans";
 
 vi.mock("next/headers", () => ({
   headers: () => new Headers(),
@@ -50,11 +51,13 @@ vi.mock("@/lib/organization", () => ({
  * org's plan, so the plan lookup is stubbed rather than seeded, and defaults to
  * the Free tier every other test in this file already ran under.
  */
-const mockPlanId = vi.fn(async () => "free");
+const mockPlanId = vi.fn(
+  async (_organizationId: string): Promise<PlanId> => "free"
+);
 
 vi.mock("@/lib/plan-limits", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/plan-limits")>()),
-  getOrganizationPlan: (...args: unknown[]) => mockPlanId(...args),
+  getOrganizationPlan: (organizationId: string) => mockPlanId(organizationId),
 }));
 
 vi.mock("@/lib/logger", () => ({
