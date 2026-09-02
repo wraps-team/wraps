@@ -23,26 +23,48 @@ const contacts = await db.query.contact.findMany({
 });
 ```
 
-### 2. Always Call verifyOrgAccess First
+### 2. Wrap Every Org-Scoped Server Action in `orgAction`
 
-Every server action must verify the user has access to the organization before doing anything.
+`orgAction` (`src/actions/shared/org-action.ts`) is the canonical wrapper. It
+runs, in order: `verifyOrgAccess` (session + membership) → `checkPermission`
+(RBAC) → optional `checkFeatureAccess` (plan gate) → your handler, with error
+handling + Pino logging built in. Writing an action without it silently skips
+the permission check and the in-transaction audit-log write.
 
 ```typescript
 "use server";
+import { orgAction } from "@/actions/shared/org-action";
 
-export async function myAction(organizationId: string, data: Input) {
-  const access = await verifyOrgAccess(organizationId);
-  if (!access) return { success: false, error: "No access" };
-
-  // access.userId, access.orgSlug, access.role are now available
-  // ... do work ...
-
-  revalidatePath(`/${access.orgSlug}/contacts`, "page");
-  return { success: true };
-}
+export const createContact = orgAction(
+  {
+    name: "createContact",
+    resource: "contacts",          // a ResourceName from @wraps/auth/access
+    permission: ["write"],
+    orgId: (organizationId: string) => organizationId,
+    onError: "Failed to create contact",
+    // feature: "someFeature",     // optional plan-gate
+  },
+  async (ctx, organizationId: string, data: Input) => {
+    // ctx.access.{orgSlug,userId,userEmail,role}; ctx.log; ctx.audited
+    const inserted = await ctx.audited(
+      async (tx) => { /* ...insert within tx... */ return row; },
+      (row) => ({ action: "contact.created", resource: "contacts", resourceId: row.id })
+    );
+    revalidatePath(`/${ctx.access.orgSlug}/contacts`, "page");
+    return { success: true };
+  }
+);
 ```
 
-`verifyOrgAccess` is in `src/actions/shared/verify-org-access.ts`. It checks session + org membership. Returns `null` if unauthorized.
+`ctx.audited(fn, fields)` runs `fn(tx)` and writes the audit-log row in the
+same transaction — see the `audit-coverage` skill. The wrapper returns
+`TResult | { success: false; error: string }`; the exact string returned for
+an unauthorized org is exported as `UNAUTHORIZED` from `org-action.ts` — compare
+against it instead of duplicating the literal.
+
+Use raw `verifyOrgAccess` (`src/actions/shared/verify-org-access.ts`, checks
+session + org membership, returns `null` if unauthorized) ONLY for reads
+inside a `page.tsx` server component, not for mutations.
 
 ### 3. Revalidate with orgSlug, Not organizationId
 
@@ -68,21 +90,11 @@ await trackEvent(data);
 
 ### 5. Log with Context Using Pino
 
-```typescript
-import { createActionLogger, serializeError } from "@/lib/logger";
-
-export async function myAction(organizationId: string) {
-  const log = createActionLogger("myAction", { organizationId });
-  try {
-    // ...
-    log.info({ contactId }, "Contact created");
-    return { success: true };
-  } catch (error) {
-    log.error({ err: serializeError(error) }, "Failed to create contact");
-    return { success: false, error: "Internal error" };
-  }
-}
-```
+`orgAction` already gives your handler `ctx.log` (a `createActionLogger`
+instance scoped to the action name + `organizationId`) and logs unexpected
+errors itself — manual try/catch + `createActionLogger`/`serializeError` is
+only needed for code that runs outside the wrapper (e.g. route handlers,
+`page.tsx` server components).
 
 ## Server Action Pattern
 
@@ -106,11 +118,20 @@ export const createContactFormOpts = formOptions({
 **2. Server action** (`actions/contacts.ts`):
 ```typescript
 "use server";
-export async function createContact(organizationId: string, data: Input) {
-  const access = await verifyOrgAccess(organizationId);
-  if (!access) return { success: false, error: "No access" };
-  // validate → check limits → insert → revalidate → return
-}
+import { orgAction } from "@/actions/shared/org-action";
+
+export const createContact = orgAction(
+  {
+    name: "createContact",
+    resource: "contacts",
+    permission: ["write"],
+    orgId: (organizationId: string) => organizationId,
+    onError: "Failed to create contact",
+  },
+  async (ctx, organizationId: string, data: Input) => {
+    // validate → check limits → insert (ctx.audited for the write) → revalidate → return
+  }
+);
 ```
 
 **3. Client form** — uses `useActionState` + `useForm` from TanStack Form + `mergeForm`/`useTransform` for server state sync.
@@ -173,3 +194,24 @@ pnpm --filter @wraps/web test        # Run tests
 pnpm --filter @wraps/web test:ee     # Enterprise tests only
 pnpm --filter @wraps/web typecheck   # Type check
 ```
+
+## Testing
+
+`pnpm --filter @wraps/web test` runs against a **real Postgres (Neon) database**,
+not a mock. `vitest.config.ts` loads `apps/web/.env.test` (gitignored — you must
+create it) and needs a working `DATABASE_URL`. Without it, tests fail with
+opaque connection/query errors, not a helpful message.
+
+- The suite runs **serially** (`fileParallelism: false`) because tests share one
+  database and clean up in `afterEach`. Never run two vitest processes against
+  the same database — check `ps aux | grep vitest` before blaming a flake.
+- In a **linked git worktree**, `scripts/test-db/resolve-branch.mjs` gives the
+  worktree its own Neon branch (`wt-<name>`) automatically, but only if
+  `NEON_API_KEY` and `NEON_PROJECT_ID` are in the env that loads `.env.test`.
+  The main checkout and CI always use `.env.test`'s `DATABASE_URL` as-is. Any
+  resolver failure falls back to that base URL rather than erroring, so a
+  worktree silently sharing the main branch is a real possibility.
+- After deleting a worktree, reclaim its branch:
+  `node scripts/test-db/reap-branches.mjs`.
+- Default test environment is `node`; `src/components/**/*.test.{ts,tsx}` run in
+  jsdom via `environmentMatchGlobs`.
