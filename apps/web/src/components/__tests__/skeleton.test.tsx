@@ -40,7 +40,7 @@ describe("Skeleton", () => {
   });
 
   it("keeps the guard when a caller passes its own classes", () => {
-    // `cn` merges through tailwind-merge, so a caller adding sizing must not
+    // `cn` merges Tailwind conflicts, so a caller adding sizing must not
     // knock the guard out.
     const { container } = render(<Skeleton className="h-4 w-32" />);
 

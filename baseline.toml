@@ -78,6 +78,15 @@ glob = "**/*.{ts,tsx}"
 message = "Use next/navigation instead of next/router. See Next.js App Router migration guide."
 suggest = "Import from 'next/navigation' instead"
 
+[[rule]]
+id = "no-clsx-tailwind-merge"
+type = "banned-import"
+severity = "error"
+packages = ["clsx", "tailwind-merge"]
+glob = "**/*.{ts,tsx}"
+message = "Use `cn` from the local lib/utils (backed by the `cn` package) instead of clsx or tailwind-merge."
+suggest = "Import { cn } from '@/lib/utils' (or '@wraps/ui/lib/utils')"
+
 
 # ══════════════════════════════════════════════
 # ARCHITECTURE RULES (replaces select tests)

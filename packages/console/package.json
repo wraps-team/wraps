@@ -16,14 +16,13 @@
     "@jsquash/resize": "2.1.1",
     "@jsquash/webp": "1.5.0",
     "@wraps/ui": "workspace:*",
-    "clsx": "^2.1.1",
+    "cn": "0.2.4",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.27.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "recharts": "2.15.4",
-    "sonner": "2.0.7",
-    "tailwind-merge": "^3.6.0"
+    "sonner": "2.0.7"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
