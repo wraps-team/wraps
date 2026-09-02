@@ -2118,4 +2118,414 @@ describe("Contacts API Integration", () => {
       expect(response.status).toBe(400);
     });
   });
+
+  describe("status transition timestamps", () => {
+    describe("POST /v1/contacts", () => {
+      it("stamps smsConsentedAt when creating with smsStatus opted_in", async () => {
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request("http://localhost/v1/contacts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phone: "+15550000101",
+              smsStatus: "opted_in",
+            }),
+          })
+        );
+
+        expect(response.status).toBe(201);
+        const body = await response.json();
+
+        const [row] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, body.id));
+        expect(row.smsStatus).toBe("opted_in");
+        expect(row.smsConsentedAt).not.toBeNull();
+      });
+
+      it("defaults to pending_consent with no smsConsentedAt when no status is given", async () => {
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request("http://localhost/v1/contacts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone: "+15550000102" }),
+          })
+        );
+
+        expect(response.status).toBe(201);
+        const body = await response.json();
+
+        const [row] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, body.id));
+        expect(row.smsStatus).toBe("pending_consent");
+        expect(row.smsConsentedAt).toBeNull();
+      });
+
+      it("stamps emailVerifiedAt when creating with an email and no explicit status", async () => {
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request("http://localhost/v1/contacts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: "timestamp-create@example.com" }),
+          })
+        );
+
+        expect(response.status).toBe(201);
+        const body = await response.json();
+
+        const [row] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, body.id));
+        expect(row.emailStatus).toBe("active");
+        expect(row.emailVerifiedAt).not.toBeNull();
+      });
+
+      it("stamps smsOptedOutAt and leaves smsConsentedAt null for an opted_out create", async () => {
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request("http://localhost/v1/contacts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phone: "+15550000104",
+              smsStatus: "opted_out",
+            }),
+          })
+        );
+
+        expect(response.status).toBe(201);
+        const body = await response.json();
+
+        const [row] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, body.id));
+        expect(row.smsOptedOutAt).not.toBeNull();
+        expect(row.smsConsentedAt).toBeNull();
+      });
+    });
+
+    describe("PATCH /v1/contacts/:id", () => {
+      it("stamps smsConsentedAt when a pending_consent contact opts in", async () => {
+        const [existing] = await db
+          .insert(contact)
+          .values({
+            organizationId: testOrg.id,
+            phone: "+15550000105",
+            phoneHash: "hash-timestamp-105",
+            smsStatus: "pending_consent",
+            properties: {},
+          })
+          .returning();
+
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request(`http://localhost/v1/contacts/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ smsStatus: "opted_in" }),
+          })
+        );
+
+        expect(response.status).toBe(200);
+
+        const [updated] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, existing.id));
+        expect(updated.smsConsentedAt).not.toBeNull();
+      });
+
+      it("preserves the earliest smsConsentedAt on a repeated opt-in", async () => {
+        const originalConsent = new Date("2020-06-01T00:00:00.000Z");
+        const [existing] = await db
+          .insert(contact)
+          .values({
+            organizationId: testOrg.id,
+            phone: "+15550000106",
+            phoneHash: "hash-timestamp-106",
+            smsStatus: "opted_in",
+            smsConsentedAt: originalConsent,
+            properties: {},
+          })
+          .returning();
+
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request(`http://localhost/v1/contacts/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ smsStatus: "opted_in" }),
+          })
+        );
+
+        expect(response.status).toBe(200);
+
+        const [updated] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, existing.id));
+        expect(updated.smsConsentedAt?.toISOString()).toBe(
+          originalConsent.toISOString()
+        );
+      });
+
+      it("stamps smsOptedOutAt on an opt-out PATCH", async () => {
+        const [existing] = await db
+          .insert(contact)
+          .values({
+            organizationId: testOrg.id,
+            phone: "+15550000107",
+            phoneHash: "hash-timestamp-107",
+            smsStatus: "opted_in",
+            properties: {},
+          })
+          .returning();
+
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request(`http://localhost/v1/contacts/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ smsStatus: "opted_out" }),
+          })
+        );
+
+        expect(response.status).toBe(200);
+
+        const [updated] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, existing.id));
+        expect(updated.smsOptedOutAt).not.toBeNull();
+      });
+
+      it("stamps smsInvalidAt on an invalid PATCH", async () => {
+        const [existing] = await db
+          .insert(contact)
+          .values({
+            organizationId: testOrg.id,
+            phone: "+15550000108",
+            phoneHash: "hash-timestamp-108",
+            smsStatus: "opted_in",
+            properties: {},
+          })
+          .returning();
+
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request(`http://localhost/v1/contacts/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ smsStatus: "invalid" }),
+          })
+        );
+
+        expect(response.status).toBe(200);
+
+        const [updated] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, existing.id));
+        expect(updated.smsInvalidAt).not.toBeNull();
+      });
+
+      it("stamps emailUnsubscribedAt on an unsubscribed PATCH", async () => {
+        const [existing] = await db
+          .insert(contact)
+          .values({
+            organizationId: testOrg.id,
+            email: "timestamp-unsub@example.com",
+            emailHash: "hash-timestamp-unsub",
+            emailStatus: "active",
+            properties: {},
+          })
+          .returning();
+
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request(`http://localhost/v1/contacts/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emailStatus: "unsubscribed" }),
+          })
+        );
+
+        expect(response.status).toBe(200);
+
+        const [updated] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, existing.id));
+        expect(updated.emailUnsubscribedAt).not.toBeNull();
+      });
+
+      it("stamps emailBouncedAt on a bounced PATCH", async () => {
+        const [existing] = await db
+          .insert(contact)
+          .values({
+            organizationId: testOrg.id,
+            email: "timestamp-bounced@example.com",
+            emailHash: "hash-timestamp-bounced",
+            emailStatus: "active",
+            properties: {},
+          })
+          .returning();
+
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request(`http://localhost/v1/contacts/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emailStatus: "bounced" }),
+          })
+        );
+
+        expect(response.status).toBe(200);
+
+        const [updated] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, existing.id));
+        expect(updated.emailBouncedAt).not.toBeNull();
+      });
+
+      it("stamps emailComplainedAt on a complained PATCH", async () => {
+        const [existing] = await db
+          .insert(contact)
+          .values({
+            organizationId: testOrg.id,
+            email: "timestamp-complained@example.com",
+            emailHash: "hash-timestamp-complained",
+            emailStatus: "active",
+            properties: {},
+          })
+          .returning();
+
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request(`http://localhost/v1/contacts/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emailStatus: "complained" }),
+          })
+        );
+
+        expect(response.status).toBe(200);
+
+        const [updated] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, existing.id));
+        expect(updated.emailComplainedAt).not.toBeNull();
+      });
+
+      it("preserves the earliest emailVerifiedAt across a bounce-and-recover", async () => {
+        const originalVerified = new Date("2021-02-03T00:00:00.000Z");
+        const [existing] = await db
+          .insert(contact)
+          .values({
+            organizationId: testOrg.id,
+            email: "timestamp-recover@example.com",
+            emailHash: "hash-timestamp-recover",
+            emailStatus: "bounced",
+            emailVerifiedAt: originalVerified,
+            properties: {},
+          })
+          .returning();
+
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request(`http://localhost/v1/contacts/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emailStatus: "active" }),
+          })
+        );
+
+        expect(response.status).toBe(200);
+
+        const [updated] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, existing.id));
+        expect(updated.emailVerifiedAt?.toISOString()).toBe(
+          originalVerified.toISOString()
+        );
+      });
+
+      it("defaults a newly-added phone to pending_consent", async () => {
+        const [existing] = await db
+          .insert(contact)
+          .values({
+            organizationId: testOrg.id,
+            email: "timestamp-addphone@example.com",
+            emailHash: "hash-timestamp-addphone",
+            phone: null,
+            smsStatus: null,
+            properties: {},
+          })
+          .returning();
+
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request(`http://localhost/v1/contacts/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone: "+15550000111" }),
+          })
+        );
+
+        expect(response.status).toBe(200);
+
+        const [updated] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, existing.id));
+        expect(updated.smsStatus).toBe("pending_consent");
+      });
+
+      it("lets an explicit smsStatus win over the phone-branch default in the same request", async () => {
+        const [existing] = await db
+          .insert(contact)
+          .values({
+            organizationId: testOrg.id,
+            email: "timestamp-addphone-explicit@example.com",
+            emailHash: "hash-timestamp-addphone-explicit",
+            phone: null,
+            smsStatus: null,
+            properties: {},
+          })
+          .returning();
+
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request(`http://localhost/v1/contacts/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phone: "+15550000112",
+              smsStatus: "opted_in",
+            }),
+          })
+        );
+
+        expect(response.status).toBe(200);
+
+        const [updated] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, existing.id));
+        expect(updated.smsStatus).toBe("opted_in");
+        expect(updated.smsConsentedAt).not.toBeNull();
+      });
+    });
+  });
 });

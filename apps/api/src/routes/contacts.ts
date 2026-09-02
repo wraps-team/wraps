@@ -460,15 +460,27 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
       // Create contact — onConflictDoNothing covers both unique constraints
       // (contact_unique_org_email_idx and contact_unique_org_phone_idx)
       // so concurrent requests that pass the SELECT checks above won't 500.
+      // Hoisted so the timestamp and the status it describes are computed from
+      // the same value — the dashboard's create action does the same
+      // (apps/web/src/actions/contacts.ts:406-411).
+      const resolvedEmailStatus =
+        body.emailStatus ?? (body.email ? "active" : null);
+      const resolvedSmsStatus =
+        body.smsStatus ?? (body.phone ? "pending_consent" : null);
+
       const newContact = await insertContact({
         organizationId: authContext.organizationId,
         externalId: body.externalId ?? null,
         email: body.email,
         emailHash: body.email ? hashContactValue(body.email) : null,
-        emailStatus: body.emailStatus ?? (body.email ? "active" : null),
+        emailStatus: resolvedEmailStatus,
+        emailVerifiedAt: resolvedEmailStatus === "active" ? new Date() : null,
         phone: body.phone,
         phoneHash: body.phone ? hashContactValue(body.phone) : null,
-        smsStatus: body.smsStatus ?? (body.phone ? "pending_consent" : null),
+        smsStatus: resolvedSmsStatus,
+        smsConsentedAt: resolvedSmsStatus === "opted_in" ? new Date() : null,
+        smsOptedOutAt: resolvedSmsStatus === "opted_out" ? new Date() : null,
+        smsInvalidAt: resolvedSmsStatus === "invalid" ? new Date() : null,
         firstName: body.firstName ?? null,
         lastName: body.lastName ?? null,
         company: body.company ?? null,
@@ -708,10 +720,43 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
         updateValues.phoneHash = body.phone
           ? hashContactValue(body.phone)
           : null;
+        // A contact that gains a phone number needs a consent state. NULL is a
+        // state no other write path produces: it is outside the 'opted_in'
+        // send filter and outside the dashboard's pending-consent filter, so
+        // the contact is invisible to both. Only fills a gap — an existing
+        // decision is left alone, and an explicit body.smsStatus wins because
+        // its branch runs after this one.
+        if (body.phone && body.smsStatus === undefined) {
+          updateValues.smsStatus = sql`COALESCE(${contact.smsStatus}, 'pending_consent')`;
+        }
       }
-      if (body.emailStatus !== undefined)
+      if (body.emailStatus !== undefined) {
         updateValues.emailStatus = body.emailStatus;
-      if (body.smsStatus !== undefined) updateValues.smsStatus = body.smsStatus;
+        // COALESCE, not an unconditional stamp: a contact that bounced and
+        // came back keeps the moment it was first verified.
+        if (body.emailStatus === "active") {
+          updateValues.emailVerifiedAt = sql`COALESCE(${contact.emailVerifiedAt}, now())`;
+        } else if (body.emailStatus === "unsubscribed") {
+          updateValues.emailUnsubscribedAt = new Date();
+        } else if (body.emailStatus === "bounced") {
+          updateValues.emailBouncedAt = new Date();
+        } else if (body.emailStatus === "complained") {
+          updateValues.emailComplainedAt = new Date();
+        }
+      }
+      if (body.smsStatus !== undefined) {
+        updateValues.smsStatus = body.smsStatus;
+        // The consent record is the thing that would have to be produced if
+        // someone disputes an SMS, so a repeated opt-in must not restart its
+        // clock — the earliest recorded consent wins.
+        if (body.smsStatus === "opted_in") {
+          updateValues.smsConsentedAt = sql`COALESCE(${contact.smsConsentedAt}, now())`;
+        } else if (body.smsStatus === "opted_out") {
+          updateValues.smsOptedOutAt = new Date();
+        } else if (body.smsStatus === "invalid") {
+          updateValues.smsInvalidAt = new Date();
+        }
+      }
       if (body.properties !== undefined) {
         const patchProperties = JSON.stringify(body.properties);
         updateValues.properties = sql`(COALESCE(${contact.properties}::jsonb, '{}'::jsonb) || ${patchProperties}::jsonb)::json`;
