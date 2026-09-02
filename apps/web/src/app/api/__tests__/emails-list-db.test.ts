@@ -44,6 +44,19 @@ vi.mock("@/lib/organization", () => ({
   ),
 }));
 
+/**
+ * The list window is clamped by two ceilings: EMAIL_LIST_MAX_DAYS, and the
+ * plan's own retention — whichever is smaller. Which one binds depends on the
+ * org's plan, so the plan lookup is stubbed rather than seeded, and defaults to
+ * the Free tier every other test in this file already ran under.
+ */
+const mockPlanId = vi.fn(async () => "free");
+
+vi.mock("@/lib/plan-limits", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/plan-limits")>()),
+  getOrganizationPlan: (...args: unknown[]) => mockPlanId(...args),
+}));
+
 vi.mock("@/lib/logger", () => ({
   createRequestLogger: () => ({
     info: vi.fn(),
@@ -354,10 +367,34 @@ describe("Emails API - scope", () => {
     expect(to - from).toBe(30 * 24 * 60 * 60 * 1000);
   });
 
-  it("clamps an absurd window to the 365-day ceiling", async () => {
+  it("clamps an absurd window to the plan's retention window", async () => {
+    // Free retains 30 days, so the plan is the binding ceiling here — not
+    // EMAIL_LIST_MAX_DAYS. Before the plan window was enforced on this list, a
+    // Free org could ask for a year and get one.
+    mockPlanId.mockResolvedValueOnce("free");
+
+    const { body } = await callList("days=9000&limit=1");
+
+    expect(body.window.days).toBe(30);
+  });
+
+  it("clamps an absurd window to the 365-day ceiling on a plan that retains longer", async () => {
+    // Business retains 365, so EMAIL_LIST_MAX_DAYS is what stops days=9000.
+    // Without this case nothing exercises that ceiling at all.
+    mockPlanId.mockResolvedValueOnce("business");
+
     const { body } = await callList("days=9000&limit=1");
 
     expect(body.window.days).toBe(365);
+  });
+
+  it("does not shorten a request that already fits inside the plan window", async () => {
+    // Asking for 7 days on a 30-day plan is not a clamp.
+    mockPlanId.mockResolvedValueOnce("free");
+
+    const { body } = await callList("days=7&limit=1");
+
+    expect(body.window.days).toBe(7);
   });
 });
 
