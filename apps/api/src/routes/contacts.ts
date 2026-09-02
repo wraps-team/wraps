@@ -26,6 +26,7 @@ import {
   hashContactValue,
   insertContact,
   insertContactTopics,
+  isContactTopicConflict,
   listContacts,
   reactivateContactSubscriptions,
   resolveContactId,
@@ -874,29 +875,43 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
           const ownedNewTopicIds = newTopicIds.filter((id) => topicMap.has(id));
           const now = new Date();
 
-          await insertContactTopics(
-            ownedNewTopicIds.map((topicId) => {
-              const topicInfo = topicMap.get(topicId)!;
-              const requiresConfirmation = topicInfo.doubleOptIn;
-              const previouslyConfirmed = confirmedTopics.has(topicId);
-              const needsConfirmation =
-                requiresConfirmation && !previouslyConfirmed;
+          const rows = ownedNewTopicIds.map((topicId) => {
+            const topicInfo = topicMap.get(topicId)!;
+            const requiresConfirmation = topicInfo.doubleOptIn;
+            const previouslyConfirmed = confirmedTopics.has(topicId);
+            const needsConfirmation =
+              requiresConfirmation && !previouslyConfirmed;
 
-              if (needsConfirmation) pendingTopics.push(topicId);
+            if (needsConfirmation) pendingTopics.push(topicId);
 
-              return {
-                contactId,
-                topicId,
-                status: needsConfirmation ? "pending" : "subscribed",
-                subscribedAt: needsConfirmation ? null : now,
-                confirmedAt: needsConfirmation
-                  ? null
-                  : previouslyConfirmed
-                    ? (confirmedTopics.get(topicId) ?? now)
-                    : now,
-              };
-            })
-          );
+            return {
+              contactId,
+              topicId,
+              status: needsConfirmation ? "pending" : "subscribed",
+              subscribedAt: needsConfirmation ? null : now,
+              confirmedAt: needsConfirmation
+                ? null
+                : previouslyConfirmed
+                  ? (confirmedTopics.get(topicId) ?? now)
+                  : now,
+            };
+          });
+
+          try {
+            await insertContactTopics(rows);
+          } catch (err) {
+            // Race: a concurrent request subscribed this contact to one of
+            // these topics between the read above and this insert. Anything
+            // else is a real failure and must keep propagating, rather than
+            // being reported as a conflict that did not happen.
+            if (!isContactTopicConflict(err)) {
+              throw err;
+            }
+            ctx.set.status = 409;
+            return {
+              error: "Contact is already subscribed to one of these topics",
+            };
+          }
 
           if (pendingTopics.length > 0 && updated.email) {
             const updatedEmail = updated.email;

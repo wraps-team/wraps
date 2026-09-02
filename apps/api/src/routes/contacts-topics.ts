@@ -99,11 +99,6 @@ export const contactsTopicsRoutes = createAuthenticatedRoutes("/v1/contacts")
         (s) => s.status === "subscribed"
       );
 
-      // Remove all existing subscriptions
-      await db
-        .delete(contactTopic)
-        .where(eq(contactTopic.contactId, params.id));
-
       // Add new subscriptions with double opt-in check
       const pendingTopics: string[] = [];
       if (topicIds.length > 0) {
@@ -124,33 +119,43 @@ export const contactsTopicsRoutes = createAuthenticatedRoutes("/v1/contacts")
           .where(eq(contact.id, params.id))
           .limit(1);
 
-        await db.insert(contactTopic).values(
-          ownedTopicIds.map((topicId) => {
-            const topicInfo = topicMap.get(topicId)!;
-            const requiresConfirmation = topicInfo.doubleOptIn;
-            const previouslyConfirmed = confirmedTopics.has(topicId);
+        const rows = ownedTopicIds.map((topicId) => {
+          const topicInfo = topicMap.get(topicId)!;
+          const requiresConfirmation = topicInfo.doubleOptIn;
+          const previouslyConfirmed = confirmedTopics.has(topicId);
 
-            // Skip confirmation if previously confirmed (re-subscription)
-            const needsConfirmation =
-              requiresConfirmation && !previouslyConfirmed;
+          // Skip confirmation if previously confirmed (re-subscription)
+          const needsConfirmation =
+            requiresConfirmation && !previouslyConfirmed;
 
-            if (needsConfirmation) {
-              pendingTopics.push(topicId);
-            }
+          if (needsConfirmation) {
+            pendingTopics.push(topicId);
+          }
 
-            return {
-              contactId: params.id,
-              topicId,
-              status: needsConfirmation ? "pending" : "subscribed",
-              subscribedAt: needsConfirmation ? null : now,
-              confirmedAt: needsConfirmation
-                ? null
-                : previouslyConfirmed
-                  ? confirmedTopics.get(topicId)
-                  : now,
-            };
-          })
-        );
+          return {
+            contactId: params.id,
+            topicId,
+            status: needsConfirmation ? "pending" : "subscribed",
+            subscribedAt: needsConfirmation ? null : now,
+            confirmedAt: needsConfirmation
+              ? null
+              : previouslyConfirmed
+                ? confirmedTopics.get(topicId)
+                : now,
+          };
+        });
+
+        // Replace atomically. These used to be two statements on the bare
+        // client: the delete committed on its own, so an insert that failed
+        // for any reason left the contact with no subscriptions at all.
+        await db.transaction(async (tx) => {
+          await tx
+            .delete(contactTopic)
+            .where(eq(contactTopic.contactId, params.id));
+          if (rows.length > 0) {
+            await tx.insert(contactTopic).values(rows);
+          }
+        });
 
         // Send confirmation emails for newly pending topics
         if (pendingTopics.length > 0 && contactData?.email) {
@@ -198,6 +203,12 @@ export const contactsTopicsRoutes = createAuthenticatedRoutes("/v1/contacts")
             });
           })
         );
+      } else {
+        // Replacing with an empty list unsubscribes from everything. Nothing
+        // follows the delete here, so it needs no transaction of its own.
+        await db
+          .delete(contactTopic)
+          .where(eq(contactTopic.contactId, params.id));
       }
 
       // Emit topic_unsubscribed events for removed topics (were actively subscribed, not in new list)

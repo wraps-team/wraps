@@ -59,16 +59,18 @@ const CONTACT_UNIQUE_CONSTRAINTS = {
 export type ContactUniqueField = keyof typeof CONTACT_UNIQUE_CONSTRAINTS;
 
 /**
- * Identifies which contact field a Postgres unique violation came from, so
- * callers can answer 409 instead of 500. Returns null for anything else —
- * including unique violations on other indexes — so callers re-throw rather
- * than reporting a conflict that did not happen.
+ * Composite primary key on `contact_topic`. Named by Drizzle rather than
+ * Postgres, so it is not `contact_topic_pkey`.
  */
-export function contactUniqueViolationField(
-  error: unknown
-): ContactUniqueField | null {
-  // Drizzle wraps driver errors in DrizzleQueryError, so the Postgres `code`
-  // and `constraint` sit on `.cause` rather than on the thrown error itself.
+const CONTACT_TOPIC_PK = "contact_topic_contact_id_topic_id_pk";
+
+/**
+ * Finds the Postgres uniqueness violation in a thrown error, if there is one.
+ *
+ * Drizzle wraps driver errors in DrizzleQueryError, so the Postgres `code` and
+ * `constraint` sit on `.cause` rather than on the thrown error itself.
+ */
+function uniqueViolationConstraint(error: unknown): string | null {
   let current: unknown = error;
   let depth = 0;
 
@@ -80,10 +82,7 @@ export function contactUniqueViolationField(
     };
 
     if (code === "23505") {
-      const match = Object.entries(CONTACT_UNIQUE_CONSTRAINTS).find(
-        ([, indexName]) => constraint === indexName
-      );
-      return match ? (match[0] as ContactUniqueField) : null;
+      return constraint ?? null;
     }
 
     current = cause;
@@ -91,6 +90,35 @@ export function contactUniqueViolationField(
   }
 
   return null;
+}
+
+/**
+ * Identifies which contact field a Postgres unique violation came from, so
+ * callers can answer 409 instead of 500. Returns null for anything else —
+ * including unique violations on other indexes — so callers re-throw rather
+ * than reporting a conflict that did not happen.
+ */
+export function contactUniqueViolationField(
+  error: unknown
+): ContactUniqueField | null {
+  const constraint = uniqueViolationConstraint(error);
+  if (!constraint) {
+    return null;
+  }
+
+  const match = Object.entries(CONTACT_UNIQUE_CONSTRAINTS).find(
+    ([, indexName]) => constraint === indexName
+  );
+  return match ? (match[0] as ContactUniqueField) : null;
+}
+
+/**
+ * True when the error is a collision on an existing topic subscription, so
+ * callers can answer 409 instead of 500. Reachable by racing two subscribe
+ * requests: both read the contact's subscriptions before either writes.
+ */
+export function isContactTopicConflict(error: unknown): boolean {
+  return uniqueViolationConstraint(error) === CONTACT_TOPIC_PK;
 }
 
 export function detectContactIdType(
