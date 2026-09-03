@@ -15,6 +15,7 @@ import pc from "picocolors";
 import { DeploymentProgress } from "../utils/shared/output.js";
 
 const REPO = "wraps-team/wraps";
+const CLI_TAG_PREFIX = "cli-v";
 const INSTALL_DIR = join(homedir(), ".wraps");
 const WHITESPACE_RE = /\s+/;
 
@@ -44,8 +45,8 @@ async function fetchLatestVersion(): Promise<{
   const releases = (await res.json()) as Release[];
 
   for (const release of releases) {
-    if (release.tag_name.startsWith("cli@")) {
-      const version = release.tag_name.replace("cli@", "");
+    if (release.tag_name.startsWith(CLI_TAG_PREFIX)) {
+      const version = release.tag_name.slice(CLI_TAG_PREFIX.length);
       return { version, release };
     }
   }
