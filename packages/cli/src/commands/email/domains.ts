@@ -25,6 +25,13 @@ import {
 } from "../../utils/dns/index.js";
 import { domainToConfigSetName } from "../../utils/email/config-set-slug.js";
 import {
+  defaultTrackingDomain,
+  isTrackingDomainNotReady,
+  putTrackingDomain,
+  TRACKING_DOMAIN_NONE,
+  validateTrackingDomain,
+} from "../../utils/email/tracking-domain.js";
+import {
   getAWSRegion,
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
@@ -49,6 +56,7 @@ import {
   promptDomainPurpose,
   promptMailFromSubdomain,
   promptSubdomainSuggestions,
+  promptTrackingSubdomain,
 } from "../../utils/shared/prompts.js";
 
 type DNSResult = {
@@ -74,7 +82,8 @@ type VerifyCheckResult = {
 async function checkVerification(
   domain: string,
   sesClient: SESv2Client,
-  region: string
+  region: string,
+  trackingDomain?: string
 ): Promise<VerifyCheckResult> {
   const identity = await sesClient.send(
     new GetEmailIdentityCommand({ EmailIdentity: domain })
@@ -266,9 +275,44 @@ async function checkVerification(
   const dkimStatus = identity.DkimAttributes?.Status || "PENDING";
   const mailFromStatus =
     identity.MailFromAttributes?.MailFromDomainStatus || "NOT_CONFIGURED";
+  // A missing tracking CNAME must not block "ready to send" — compute
+  // allVerified before adding its row to dnsResults.
   const allVerified =
     verificationStatus === "verified" &&
     dnsResults.every((r) => r.status === "verified");
+
+  // Check custom tracking domain CNAME (if configured) — informational only.
+  if (trackingDomain) {
+    try {
+      const records = await resolver.resolveCname(trackingDomain);
+      const expected = `r.${region}.awstrack.me`;
+      const found = records.some((r) => r === expected || r === `${expected}.`);
+      dnsResults.push({
+        name: trackingDomain,
+        type: "CNAME",
+        status: found ? "verified" : "incorrect",
+        records,
+      });
+    } catch (error) {
+      const dnsClass = classifyDNSError(error);
+      if (dnsClass === "missing") {
+        dnsResults.push({
+          name: trackingDomain,
+          type: "CNAME",
+          status: "missing",
+        });
+      } else if (dnsClass === "network") {
+        dnsResults.push({
+          name: trackingDomain,
+          type: "CNAME",
+          status: "missing",
+          records: ["DNS lookup failed (network issue)"],
+        });
+      } else {
+        throw error;
+      }
+    }
+  }
 
   return {
     dnsResults,
@@ -366,12 +410,62 @@ export async function verifyDomain(options: EmailVerifyOptions): Promise<void> {
   const region = await getAWSRegion();
   const sesClient = new SESv2Client({ region });
 
+  // Load metadata to find a pending tracking domain (non-fatal if unavailable)
+  let metadata: Awaited<ReturnType<typeof loadConnectionMetadata>> = null;
+  try {
+    const awsIdentity = await validateAWSCredentials();
+    metadata = await loadConnectionMetadata(awsIdentity.accountId, region);
+    // baseline:allow-next-line no-swallowed-errors — metadata unavailable is non-fatal, verify proceeds without a tracking domain check
+  } catch {}
+
+  const domainInfo = metadata
+    ? getDomainFromMetadata(metadata, options.domain)
+    : null;
+  const trackedEntry =
+    domainInfo?.isPrimary === false ? domainInfo.entry : undefined;
+
+  async function applyPendingTrackingDomain(): Promise<void> {
+    if (
+      !(metadata && trackedEntry?.trackingDomain) ||
+      trackedEntry.trackingDomainAppliedAt
+    ) {
+      return;
+    }
+    const targetConfigSetName =
+      trackedEntry.configSetName ?? domainToConfigSetName(options.domain);
+    await progress.execute("Applying tracking domain", async () => {
+      try {
+        await putTrackingDomain(
+          sesClient,
+          targetConfigSetName,
+          trackedEntry.trackingDomain!
+        );
+        trackedEntry.trackingDomainAppliedAt = new Date().toISOString();
+        addDomainToMetadata(metadata!, trackedEntry);
+        await saveConnectionMetadata(metadata!);
+      } catch (error) {
+        if (!isTrackingDomainNotReady(error)) throw error;
+        if (!isJsonMode()) {
+          clack.log.warn(
+            `Tracking domain ${trackedEntry.trackingDomain} not yet applied — ${options.domain} isn't fully verified in SES yet.`
+          );
+        }
+      }
+    });
+  }
+
   // 1. Initial check — also validates domain exists in SES
   let result: VerifyCheckResult;
   try {
     result = await progress.execute(
       "Checking SES verification status",
-      async () => checkVerification(options.domain, sesClient, region)
+      async () =>
+        checkVerification(
+          options.domain,
+          sesClient,
+          region,
+          trackedEntry?.trackingDomain
+        )
     );
   } catch (error) {
     if (isAWSNotFoundError(error)) {
@@ -395,6 +489,9 @@ export async function verifyDomain(options: EmailVerifyOptions): Promise<void> {
 
   // JSON mode: output and return (no --wait polling in JSON mode)
   if (isJsonMode()) {
+    if (result.allVerified) {
+      await applyPendingTrackingDomain();
+    }
     jsonSuccess("email.domains.verify", {
       domain: options.domain,
       verified: result.allVerified,
@@ -436,7 +533,13 @@ export async function verifyDomain(options: EmailVerifyOptions): Promise<void> {
       try {
         result = await progress.execute(
           `Check #${attempt} (${elapsedStr} elapsed)`,
-          async () => checkVerification(options.domain, sesClient, region)
+          async () =>
+            checkVerification(
+              options.domain,
+              sesClient,
+              region,
+              trackedEntry?.trackingDomain
+            )
         );
         // baseline:allow-next-line no-swallowed-errors — DNS/SES check failure during polling is non-fatal, will retry
       } catch {
@@ -448,6 +551,7 @@ export async function verifyDomain(options: EmailVerifyOptions): Promise<void> {
       progress.stop();
 
       if (result.allVerified) {
+        await applyPendingTrackingDomain();
         displayVerifyResults(options.domain, result);
         clack.outro(
           pc.green("✓ Domain is fully verified and ready to send emails!")
@@ -498,6 +602,7 @@ export async function verifyDomain(options: EmailVerifyOptions): Promise<void> {
   const someIncorrect = result.dnsResults.some((r) => r.status === "incorrect");
 
   if (allVerified) {
+    await applyPendingTrackingDomain();
     clack.outro(
       pc.green("✓ Domain is fully verified and ready to send emails!")
     );
@@ -547,6 +652,7 @@ export async function addDomain(options: {
   domain?: string;
   region?: string;
   yes?: boolean;
+  trackingDomain?: string;
 }): Promise<void> {
   if (!isJsonMode()) {
     clack.intro(pc.bold("Add Email Domain"));
@@ -780,6 +886,49 @@ export async function addDomain(options: {
       });
     }
 
+    // 5b. Tracking domain (custom redirect domain on this domain's config set)
+    let trackingDomain: string | undefined;
+    if (options.trackingDomain) {
+      if (options.trackingDomain !== TRACKING_DOMAIN_NONE) {
+        const problem = validateTrackingDomain(options.trackingDomain, domain);
+        if (problem) {
+          throw new WrapsError(
+            `Invalid --tracking-domain: ${problem}`,
+            "INVALID_TRACKING_DOMAIN",
+            `Use a subdomain of ${domain}, e.g. ${defaultTrackingDomain(domain)}`
+          );
+        }
+        trackingDomain = options.trackingDomain.toLowerCase();
+      }
+    } else if (options.yes) {
+      // Non-interactive: same default posture as MAIL FROM above.
+      trackingDomain = defaultTrackingDomain(domain);
+    } else {
+      trackingDomain = await promptTrackingSubdomain(domain);
+    }
+
+    let trackingDomainAppliedAt: string | undefined;
+    if (trackingDomain) {
+      await progress.execute("Setting custom tracking domain", async () => {
+        try {
+          await putTrackingDomain(sesClient, configSetName, trackingDomain!);
+          trackingDomainAppliedAt = new Date().toISOString();
+        } catch (error) {
+          if (!isTrackingDomainNotReady(error)) throw error;
+          // SES refuses a redirect domain under an unverified identity. The
+          // CNAME still gets created below; `domains verify` applies it once
+          // the domain verifies.
+        }
+      });
+      if (!(trackingDomainAppliedAt || isJsonMode())) {
+        clack.log.info(
+          pc.dim(
+            `SES will accept ${trackingDomain} once ${domain} is verified — run ${pc.cyan(`wraps email domains verify --domain ${domain}`)} afterwards.`
+          )
+        );
+      }
+    }
+
     // 6. DNS automation
     const cachedDnsProvider = metadata.services.email.dnsProvider;
     let dnsAutoCreated = false;
@@ -815,6 +964,7 @@ export async function addDomain(options: {
             domain,
             dkimTokens,
             mailFromDomain,
+            customTrackingDomain: trackingDomain,
             region,
           };
 
@@ -851,6 +1001,7 @@ export async function addDomain(options: {
         domain,
         dkimTokens,
         mailFromDomain,
+        customTrackingDomain: trackingDomain,
         region,
       });
       const displayRecords = formatDNSRecordsForDisplay(dnsRecords);
@@ -875,6 +1026,8 @@ export async function addDomain(options: {
       purpose,
       configSetName,
       trackingConfig,
+      trackingDomain,
+      trackingDomainAppliedAt,
       addedAt: new Date().toISOString(),
     };
     addDomainToMetadata(metadata, entry);
@@ -888,6 +1041,7 @@ export async function addDomain(options: {
       success: true,
       dns_auto_created: dnsAutoCreated,
       has_mail_from: !!mailFromDomain,
+      has_tracking_domain: !!trackingDomain,
       purpose,
     });
     trackFeature("domain_added", {
@@ -901,6 +1055,8 @@ export async function addDomain(options: {
         mailFromDomain,
         purpose,
         dnsAutoCreated,
+        trackingDomain,
+        trackingDomainApplied: !!trackingDomainAppliedAt,
       });
       return;
     }
@@ -917,7 +1073,13 @@ export async function addDomain(options: {
     console.log(
       `  Verify: ${pc.cyan(`wraps email domains verify --domain ${domain}`)}`
     );
-    console.log(`  Status: ${pc.cyan("wraps email status")}\n`);
+    console.log(`  Status: ${pc.cyan("wraps email status")}`);
+    if (trackingDomain && !trackingDomainAppliedAt) {
+      console.log(
+        `  Tracking: applied automatically by ${pc.cyan("wraps email domains verify")}`
+      );
+    }
+    console.log();
   } catch (error) {
     progress.stop();
     trackCommand("email:domains:add", { success: false });
@@ -1041,6 +1203,7 @@ export async function listDomains(): Promise<void> {
             managed: !!tracked,
             isPrimary: tracked?.isPrimary ?? false,
             purpose: tracked?.purpose,
+            trackingDomain: tracked?.trackingDomain ?? null,
           };
         }),
         totalCount: sesDomains.length,
@@ -1061,7 +1224,10 @@ export async function listDomains(): Promise<void> {
         const label = tracked.isPrimary
           ? pc.dim("Primary")
           : pc.dim(PURPOSE_LABELS[tracked.purpose || "other"] || "General");
-        return `  ${statusIcon} ${pc.bold(d.name.padEnd(30))} ${label.padEnd(24)} DKIM: ${dkimIcon}`;
+        const trackingSuffix = tracked.trackingDomain
+          ? ` ${pc.dim("→")} ${tracked.trackingDomain}`
+          : "";
+        return `  ${statusIcon} ${pc.bold(d.name.padEnd(30))} ${label.padEnd(24)} DKIM: ${dkimIcon}${trackingSuffix}`;
       });
 
       clack.note(managedLines.join("\n"), "Managed by Wraps");

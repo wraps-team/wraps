@@ -35,9 +35,23 @@ vi.mock("@clack/prompts", () => ({
   })),
 }));
 
-// Mock getAWSRegion
-vi.mock("../../utils/aws.js", () => ({
+// Mock AWS credential/region helpers (verifyDomain loads metadata via
+// validateAWSCredentials to look up a pending tracking domain)
+vi.mock("../../utils/shared/aws.js", () => ({
   getAWSRegion: vi.fn().mockResolvedValue("us-east-1"),
+  validateAWSCredentials: vi.fn().mockResolvedValue({
+    accountId: "123456789012",
+    arn: "arn:aws:iam::123456789012:user/test",
+    userId: "AIDATEST",
+  }),
+}));
+
+// Mock metadata lookups (no tracking domain configured in these tests)
+vi.mock("../../utils/shared/metadata.js", () => ({
+  loadConnectionMetadata: vi.fn().mockResolvedValue(null),
+  getDomainFromMetadata: vi.fn().mockReturnValue(null),
+  addDomainToMetadata: vi.fn(),
+  saveConnectionMetadata: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock DeploymentProgress

@@ -7,6 +7,7 @@ import {
   GetConfigurationSetEventDestinationsCommand,
   GetEmailIdentityCommand,
   ListEmailIdentitiesCommand,
+  PutConfigurationSetTrackingOptionsCommand,
   PutEmailIdentityConfigurationSetAttributesCommand,
   PutEmailIdentityMailFromAttributesCommand,
   SESv2Client,
@@ -25,6 +26,24 @@ import {
 } from "../email/domains";
 
 const sesClientMock = mockClient(SESv2Client);
+
+// Deterministic DNS resolver mock — checkVerification's `new Resolver()` uses
+// this instead of hitting real nameservers. Default: everything "missing"
+// (ENOTFOUND), non-fatal per classifyDNSError. Individual tests override
+// specific lookups to make a domain fully verified.
+const notFound = () =>
+  Object.assign(new Error("not found"), { code: "ENOTFOUND" });
+const dnsResolverMock = {
+  setServers: vi.fn(),
+  resolveCname: vi.fn().mockRejectedValue(notFound()),
+  resolveTxt: vi.fn().mockRejectedValue(notFound()),
+  resolveMx: vi.fn().mockRejectedValue(notFound()),
+};
+vi.mock("node:dns/promises", () => ({
+  Resolver: vi.fn(function MockResolver() {
+    return dnsResolverMock;
+  }),
+}));
 
 // Mock process.exit
 const mockExit = vi
@@ -99,6 +118,7 @@ vi.mock("../../utils/shared/prompts", () => ({
   promptDomainPurpose: vi.fn().mockResolvedValue("transactional"),
   promptMailFromSubdomain: vi.fn().mockResolvedValue("mail.test.com"),
   promptDNSProvider: vi.fn().mockResolvedValue("manual"),
+  promptTrackingSubdomain: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe("Domain Management Commands", () => {
@@ -112,6 +132,12 @@ describe("Domain Management Commands", () => {
     sesClientMock.reset();
     vi.clearAllMocks();
     mockExit.mockClear();
+
+    // Reset the DNS resolver mock to its "everything missing" default.
+    dnsResolverMock.setServers.mockReset();
+    dnsResolverMock.resolveCname.mockReset().mockRejectedValue(notFound());
+    dnsResolverMock.resolveTxt.mockReset().mockRejectedValue(notFound());
+    dnsResolverMock.resolveMx.mockReset().mockRejectedValue(notFound());
 
     // Mock spinner
     mockSpinner = {
@@ -757,6 +783,47 @@ describe("Domain Management Commands", () => {
 
       expect(mockExit).toHaveBeenCalledWith(1);
     });
+
+    it("Unit 12: applies a pending tracking domain once the domain is fully verified", async () => {
+      sesClientMock.on(GetEmailIdentityCommand).resolves({
+        VerifiedForSendingStatus: true,
+        DkimAttributes: { Tokens: [], Status: "SUCCESS" },
+      });
+      sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+
+      dnsResolverMock.resolveTxt.mockImplementation(async (name: string) => {
+        if (name === "test.com") return [["v=spf1 include:amazonses.com ~all"]];
+        if (name === "_dmarc.test.com") return [["v=DMARC1; p=none;"]];
+        throw notFound();
+      });
+      dnsResolverMock.resolveCname.mockImplementation(async (name: string) => {
+        if (name === "track.test.com") return ["r.us-east-1.awstrack.me"];
+        throw notFound();
+      });
+
+      const metadata = await import("../../utils/shared/metadata");
+      vi.mocked(metadata.getDomainFromMetadata).mockReturnValueOnce({
+        isPrimary: false,
+        entry: {
+          domain: "test.com",
+          configSetName: domainToConfigSetName("test.com"),
+          trackingDomain: "track.test.com",
+          addedAt: new Date().toISOString(),
+        },
+      });
+
+      await verifyDomain({ domain: "test.com" });
+
+      const putCalls = sesClientMock.commandCalls(
+        PutConfigurationSetTrackingOptionsCommand
+      );
+      expect(putCalls.length).toBe(1);
+      expect(putCalls[0].args[0].input).toMatchObject({
+        ConfigurationSetName: domainToConfigSetName("test.com"),
+        CustomRedirectDomain: "track.test.com",
+      });
+      expect(metadata.saveConnectionMetadata).toHaveBeenCalled();
+    });
   });
 
   describe("addDomain - per-domain config sets", () => {
@@ -1030,6 +1097,139 @@ describe("Domain Management Commands", () => {
       await expect(
         addDomain({ domain: "test.com", yes: true })
       ).resolves.not.toThrow();
+    });
+  });
+
+  describe("addDomain - tracking domain", () => {
+    beforeEach(() => {
+      const notFoundError = new Error("Not found");
+      notFoundError.name = "NotFoundException";
+      sesClientMock
+        .on(GetEmailIdentityCommand)
+        .rejectsOnce(notFoundError)
+        .resolvesOnce({
+          DkimAttributes: { Tokens: ["tok1"], Status: "PENDING" },
+        });
+      sesClientMock.on(CreateConfigurationSetCommand).resolves({});
+      sesClientMock
+        .on(CreateConfigurationSetEventDestinationCommand)
+        .resolves({});
+      sesClientMock.on(CreateEmailIdentityCommand).resolves({});
+      sesClientMock.on(PutEmailIdentityMailFromAttributesCommand).resolves({});
+    });
+
+    it("Unit 1: --yes defaults to track.<domain> and applies it", async () => {
+      sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+
+      const metadata = await import("../../utils/shared/metadata");
+
+      await addDomain({ domain: "test.com", yes: true });
+
+      const putCalls = sesClientMock.commandCalls(
+        PutConfigurationSetTrackingOptionsCommand
+      );
+      expect(putCalls.length).toBe(1);
+      expect(putCalls[0].args[0].input).toEqual({
+        ConfigurationSetName: domainToConfigSetName("test.com"),
+        CustomRedirectDomain: "track.test.com",
+      });
+      expect(metadata.addDomainToMetadata).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({
+          trackingDomain: "track.test.com",
+          trackingDomainAppliedAt: expect.any(String),
+        })
+      );
+    });
+
+    it("Unit 2: --tracking-domain none skips the SES call and metadata field", async () => {
+      const metadata = await import("../../utils/shared/metadata");
+
+      await addDomain({
+        domain: "test.com",
+        yes: true,
+        trackingDomain: "none",
+      });
+
+      expect(
+        sesClientMock.commandCalls(PutConfigurationSetTrackingOptionsCommand)
+          .length
+      ).toBe(0);
+      expect(metadata.addDomainToMetadata).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ trackingDomain: undefined })
+      );
+    });
+
+    it("Unit 3: --tracking-domain <host> uses the given host", async () => {
+      sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+
+      await addDomain({
+        domain: "test.com",
+        yes: true,
+        trackingDomain: "links.test.com",
+      });
+
+      const putCalls = sesClientMock.commandCalls(
+        PutConfigurationSetTrackingOptionsCommand
+      );
+      expect(putCalls.length).toBe(1);
+      expect(putCalls[0].args[0].input).toMatchObject({
+        CustomRedirectDomain: "links.test.com",
+      });
+    });
+
+    it("Unit 4: a tracking domain outside the sending domain is rejected", async () => {
+      await expect(
+        addDomain({
+          domain: "test.com",
+          yes: true,
+          trackingDomain: "track.other.com",
+        })
+      ).rejects.toMatchObject({ code: "INVALID_TRACKING_DOMAIN" });
+
+      expect(
+        sesClientMock.commandCalls(PutConfigurationSetTrackingOptionsCommand)
+          .length
+      ).toBe(0);
+    });
+
+    it("Unit 5: SES BadRequestException (domain not verified yet) does not throw", async () => {
+      const badRequest = Object.assign(new Error("not verified"), {
+        name: "BadRequestException",
+      });
+      sesClientMock
+        .on(PutConfigurationSetTrackingOptionsCommand)
+        .rejects(badRequest);
+
+      const metadata = await import("../../utils/shared/metadata");
+
+      await expect(
+        addDomain({ domain: "test.com", yes: true })
+      ).resolves.not.toThrow();
+
+      expect(metadata.addDomainToMetadata).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({
+          trackingDomain: "track.test.com",
+          trackingDomainAppliedAt: undefined,
+        })
+      );
+    });
+
+    it("Unit 6: the tracking domain is passed through to buildEmailDNSRecords", async () => {
+      const dns = await import("../../utils/dns/index");
+      vi.mocked(dns.getDNSCredentials).mockResolvedValueOnce({
+        valid: false,
+        credentials: undefined,
+      } as never);
+      sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+
+      await addDomain({ domain: "test.com", yes: true });
+
+      expect(dns.buildEmailDNSRecords).toHaveBeenCalledWith(
+        expect.objectContaining({ customTrackingDomain: "track.test.com" })
+      );
     });
   });
 
