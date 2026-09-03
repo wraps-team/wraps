@@ -446,6 +446,28 @@ export function createConnectionMetadata(
   };
 }
 
+/**
+ * Metadata for an account whose infrastructure exists in AWS but was not
+ * deployed by this CLI — a CloudFormation-first connection, or a machine that
+ * never had the local file and has no S3 state bucket to sync from. Carries
+ * identity only: `services` is deliberately empty, which is what stops
+ * `updatePlatformRole` from rewriting an inline policy it cannot reconstruct.
+ */
+export function createAdoptedConnectionMetadata(
+  accountId: string,
+  region: string,
+  provider: Provider
+): ConnectionMetadata {
+  return {
+    version: "1.0.0",
+    accountId,
+    region,
+    provider,
+    timestamp: new Date().toISOString(),
+    services: {},
+  };
+}
+
 function setConfigValue<K extends keyof WrapsEmailConfig>(
   config: WrapsEmailConfig,
   key: K,

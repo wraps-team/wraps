@@ -1,3 +1,11 @@
+import {
+  CreateRoleCommand,
+  GetRoleCommand,
+  IAMClient,
+  PutRolePolicyCommand,
+  UpdateAssumeRolePolicyCommand,
+} from "@aws-sdk/client-iam";
+import { mockClient } from "aws-sdk-client-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setJsonMode } from "../../utils/shared/json-output.js";
 
@@ -17,7 +25,9 @@ vi.mock("@pulumi/pulumi/automation", () => ({
   installPulumiCli: vi.fn(),
 }));
 vi.mock("@clack/prompts");
-vi.mock("@aws-sdk/client-iam");
+// Do NOT vi.mock("@aws-sdk/client-iam") — mockClient patches the prototype
+// directly (see the adoption regression-guard tests below, which assert on
+// exactly which IAM commands were sent).
 vi.mock("../../utils/shared/aws.js");
 vi.mock("../../utils/shared/fs.js");
 vi.mock("../../utils/shared/metadata.js");
@@ -38,12 +48,23 @@ import * as pulumiUtils from "../../utils/shared/pulumi.js";
 // Import after mocks
 import { connect } from "../platform/connect.js";
 
+const iamMock = mockClient(IAMClient);
+
 describe("platform connect - import collision fix", () => {
   let capturedStackConfig: EmailStackConfig | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    iamMock.reset();
     capturedStackConfig = undefined;
+
+    // Role exists by default — the update-in-place path most tests exercise.
+    iamMock.on(GetRoleCommand).resolves({
+      Role: { RoleName: "wraps-console-access-role" } as any,
+    });
+    iamMock.on(CreateRoleCommand).resolves({});
+    iamMock.on(PutRolePolicyCommand).resolves({});
+    iamMock.on(UpdateAssumeRolePolicyCommand).resolves({});
 
     // Mock prompts
     const mockSpinner = {
@@ -249,6 +270,17 @@ describe("platform connect - import collision fix", () => {
     expect(exportOrder).toBeLessThan(upOrder);
   });
 
+  it("still writes the inline policy for a normal (non-adopted) connect", async () => {
+    // Regression guard for the opposite direction of the adoption tests
+    // below: step 1's `hasPolicySource` guard must not silently disable
+    // policy updates for a connection that has real service config.
+    await setupPulumiMock({ hasExistingResources: true });
+
+    await connect({ yes: true });
+
+    expect(iamMock.commandCalls(PutRolePolicyCommand)).toHaveLength(1);
+  });
+
   describe("JSON output", () => {
     let consoleLogSpy: ReturnType<typeof vi.spyOn>;
 
@@ -282,6 +314,67 @@ describe("platform connect - import collision fix", () => {
       expect(output.data).toBeDefined();
       expect(output.data.accountId).toBeDefined();
       expect(output.data.connectionId).toBeDefined();
+    });
+  });
+
+  describe("adoption — no local deployment record", () => {
+    beforeEach(() => {
+      // No local/S3 metadata for this account/region — the dead-end case
+      // this plan replaces.
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(undefined);
+      vi.mocked(metadata.createAdoptedConnectionMetadata).mockImplementation(
+        (accountId, region, provider) =>
+          ({
+            version: "1.0.0",
+            accountId,
+            region,
+            provider,
+            timestamp: "2026-09-02T00:00:00.000Z",
+            services: {},
+          }) as any
+      );
+    });
+
+    it("repairs the trust policy using the External ID from registration", async () => {
+      await connect({ yes: true });
+
+      const updateCalls = iamMock.commandCalls(UpdateAssumeRolePolicyCommand);
+      expect(updateCalls).toHaveLength(1);
+      const trustPolicy = JSON.parse(
+        updateCalls[0].args[0].input.PolicyDocument!
+      );
+      expect(
+        trustPolicy.Statement[0].Condition.StringEquals["sts:ExternalId"]
+      ).toBe("ext-123");
+    });
+
+    it("does NOT rewrite the inline permissions policy (regression guard)", async () => {
+      // Without step 1's `hasPolicySource` guard, this call would replace a
+      // working (possibly CloudFormation-owned) permissions policy with a
+      // narrower one built from empty config.
+      await connect({ yes: true });
+
+      expect(iamMock.commandCalls(PutRolePolicyCommand)).toHaveLength(0);
+    });
+
+    it("deploys no infrastructure", async () => {
+      await connect({ yes: true });
+
+      const pulumi = await import("@pulumi/pulumi");
+      expect(
+        pulumi.automation.LocalWorkspace.createOrSelectStack
+      ).not.toHaveBeenCalled();
+    });
+
+    it("persists metadata for the caller's account and region", async () => {
+      await connect({ yes: true });
+
+      expect(metadata.saveConnectionMetadata).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountId: "123456789012",
+          region: "us-east-1",
+        })
+      );
     });
   });
 });

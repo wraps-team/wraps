@@ -52,6 +52,7 @@ import {
 import type { ConnectionMetadata } from "../../utils/shared/metadata.js";
 import {
   buildEmailStackConfig,
+  createAdoptedConnectionMetadata,
   generateWebhookSecret,
   loadConnectionMetadata,
   saveConnectionMetadata,
@@ -284,6 +285,11 @@ async function validateAndLoadMetadata(
   identity: { accountId: string };
   region: string;
   metadata: ConnectionMetadata;
+  // True when no local/S3 deployment record existed for this account/region
+  // and the caller adopted the account instead — infrastructure exists in
+  // AWS (e.g. deployed via the dashboard's CloudFormation flow) but this CLI
+  // never recorded it. Callers must not deploy anything on an adopted run.
+  adopted: boolean;
 }> {
   // Check Pulumi CLI
   const wasAutoInstalled = await progress.execute(
@@ -309,21 +315,56 @@ async function validateAndLoadMetadata(
   });
 
   // Load metadata
-  const metadata = await loadConnectionMetadata(identity.accountId, region);
+  let metadata = await loadConnectionMetadata(identity.accountId, region);
+  let adopted = false;
   if (!metadata) {
-    progress.stop();
-    log.error(
-      `No Wraps deployment found for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
+    // No local record. This is expected for a CloudFormation-first customer
+    // (or a machine with no local file and no S3 state bucket to sync from):
+    // registration is idempotent on the External ID
+    // (`apps/api/src/routes/connections.ts`), so re-registering an
+    // already-connected account is safe and returns the account's existing
+    // identity rather than rotating it.
+    if (!isJsonMode()) {
+      progress.stop();
+      log.warn(
+        `No Wraps deployment found for account ${pc.cyan(identity.accountId)} in region ${pc.cyan(region)}`
+      );
+      console.log(
+        `\nThis is expected if infrastructure here was deployed another way — for example, through the dashboard's CloudFormation flow instead of ${pc.cyan("wraps email init")}.\n`
+      );
+    }
+
+    const shouldAdopt =
+      options.yes === true ||
+      isJsonMode() ||
+      (await confirm({
+        message: `Register AWS account ${identity.accountId} with Wraps without deploying new infrastructure?`,
+        initialValue: true,
+      }));
+
+    if (isCancel(shouldAdopt) || !shouldAdopt) {
+      if (!isJsonMode()) {
+        log.error(
+          `No Wraps deployment found for account ${identity.accountId}.`
+        );
+        console.log(
+          `\nRun ${pc.cyan("wraps email init")} to deploy infrastructure first.\n`
+        );
+      }
+      process.exit(0);
+    }
+
+    metadata = createAdoptedConnectionMetadata(
+      identity.accountId,
+      region,
+      "other"
     );
-    console.log(
-      `\nRun ${pc.cyan("wraps email init")} to deploy infrastructure first.\n`
-    );
-    process.exit(1);
+    adopted = true;
   }
 
   const hasEmail = !!metadata.services.email?.config;
   const hasSms = !!metadata.services.sms?.config;
-  if (!(hasEmail || hasSms)) {
+  if (!(adopted || hasEmail || hasSms)) {
     progress.stop();
     log.error("No services deployed in this region.");
     console.log(
@@ -332,11 +373,17 @@ async function validateAndLoadMetadata(
     process.exit(1);
   }
 
-  progress.info(
-    `Found services: ${[hasEmail && "email", hasSms && "sms"].filter(Boolean).join(", ")}`
-  );
+  if (adopted) {
+    progress.info(
+      "Adopting existing AWS infrastructure — no new resources will be deployed."
+    );
+  } else {
+    progress.info(
+      `Found services: ${[hasEmail && "email", hasSms && "sms"].filter(Boolean).join(", ")}`
+    );
+  }
 
-  return { identity, region, metadata };
+  return { identity, region, metadata, adopted };
 }
 
 /**
@@ -464,18 +511,27 @@ async function updatePlatformRole(
 
   const emailConfig = metadata.services.email?.config;
   const smsConfig = metadata.services.sms?.config;
-  const policy = buildConsolePolicyDocument(emailConfig, smsConfig);
+  // An adopted connection carries no service config, and
+  // buildConsolePolicyDocument() tolerates undefined by omitting the
+  // conditional blocks. Writing that result would REPLACE a working
+  // permissions policy (often one CloudFormation owns) with a narrower one.
+  // Only write the inline policy when metadata actually describes the
+  // deployment; the trust-policy repair below is what adoption needs.
+  const hasPolicySource = Boolean(emailConfig || smsConfig);
 
   if (roleExists) {
-    await progress.execute("Updating platform access role", async () => {
-      await iam.send(
-        new PutRolePolicyCommand({
-          RoleName: roleName,
-          PolicyName: "wraps-console-access-policy",
-          PolicyDocument: JSON.stringify(policy, null, 2),
-        })
-      );
-    });
+    if (hasPolicySource) {
+      const policy = buildConsolePolicyDocument(emailConfig, smsConfig);
+      await progress.execute("Updating platform access role", async () => {
+        await iam.send(
+          new PutRolePolicyCommand({
+            RoleName: roleName,
+            PolicyName: "wraps-console-access-policy",
+            PolicyDocument: JSON.stringify(policy, null, 2),
+          })
+        );
+      });
+    }
 
     if (externalId) {
       const trustPolicy = {
@@ -539,6 +595,7 @@ async function updatePlatformRole(
         })
       );
 
+      const policy = buildConsolePolicyDocument(emailConfig, smsConfig);
       await iam.send(
         new PutRolePolicyCommand({
           RoleName: roleName,
@@ -665,10 +722,8 @@ async function authenticatedConnect(
 
   try {
     // 1. Validate AWS + load metadata
-    const { identity, region, metadata } = await validateAndLoadMetadata(
-      options,
-      progress
-    );
+    const { identity, region, metadata, adopted } =
+      await validateAndLoadMetadata(options, progress);
 
     // Self-hosted connects target the customer's own control plane, not the
     // Wraps SaaS. Both URLs come from the selfhost deployment metadata.
@@ -886,8 +941,10 @@ async function authenticatedConnect(
     }
     await saveConnectionMetadata(metadata);
 
-    // 6. Deploy EventBridge with server-provided webhook secret
-    if (hasEmail) {
+    // 6. Deploy EventBridge with server-provided webhook secret. Never on an
+    // adopted run — adoption registers and repairs access only, it deploys
+    // nothing.
+    if (hasEmail && !adopted) {
       await deployEventBridge(
         metadata,
         region,
@@ -931,9 +988,26 @@ async function authenticatedConnect(
         region,
         organizationId: org.id,
         connectionId: result.connectionId,
-        webhookConnected: true,
+        webhookConnected: !adopted,
         selfhosted,
+        adopted,
       });
+    } else if (adopted) {
+      outro(pc.green("AWS account adopted!"));
+
+      console.log();
+      console.log(
+        pc.dim(
+          "Registered this account and repaired the IAM trust policy so the dashboard can reach it."
+        )
+      );
+      console.log(
+        pc.dim(
+          "No infrastructure was deployed and no event wiring was changed."
+        )
+      );
+      console.log(`  Dashboard: ${pc.cyan(dashboardUrl)}`);
+      console.log();
     } else {
       outro(
         pc.green(
