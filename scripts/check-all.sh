@@ -15,7 +15,7 @@ trap 'rm -rf "$LOGDIR"' EXIT
 export TURBO_UI=stream
 
 typeset -a STEPS CMDS
-STEPS=(lint migrations typecheck infra baseline build test scripts)
+STEPS=(lint migrations typecheck infra baseline deadcode build test scripts)
 CMDS=(
   "pnpm check:errors"
   "pnpm --filter @wraps/db exec drizzle-kit check"
@@ -26,6 +26,10 @@ CMDS=(
   # platform version pinned under infra/.sst, and nothing caught it.
   "pnpm typecheck:infra"
   "pnpm test:baseline"
+  # Ratchet on knip's unused-file count for apps/web routes/components — see
+  # scripts/check-dead-ui.sh. Deliberately not in check:fast: knip's runtime
+  # is much longer than the ~10-15s budget that gate is built to protect.
+  "pnpm check:deadcode"
   "pnpm build"
   "pnpm test"
   # scripts/ is outside the pnpm workspace, so `pnpm test` (turbo) never sees

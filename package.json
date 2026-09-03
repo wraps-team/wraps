@@ -25,6 +25,7 @@
     "check:all": "./scripts/check-all.sh",
     "check:cfn": "bash scripts/check-cloudformation-published.sh",
     "knip": "knip",
+    "check:deadcode": "bash scripts/check-dead-ui.sh",
     "fix": "pnpm dlx ultracite@6.3.2 fix",
     "clean": "turbo run clean && rm -rf node_modules",
     "cli": "node packages/cli/dist/cli.js",
