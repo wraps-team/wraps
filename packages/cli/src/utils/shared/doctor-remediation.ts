@@ -226,6 +226,23 @@ export const remediations = {
     summary:
       "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must both be set, or neither.",
   }),
+
+  /**
+   * Resources exist in AWS but this machine has no connection record.
+   * `listConnections()` reads only the local ~/.wraps directory — it never
+   * syncs the S3 state bucket that `loadConnectionMetadata()` falls back to —
+   * so this fires for a CloudFormation-first connection AND for a second
+   * machine. `wraps platform connect` adopts the existing deployment: it
+   * registers the connection, repairs the trust policy and writes the local
+   * record, without deploying anything.
+   */
+  adoptConnection: (region?: string): Remediation => ({
+    id: "platform.connect.adopt",
+    level: "auto",
+    command: withRegion("wraps platform connect", region),
+    summary:
+      "Register this account and write a local connection record — adopts the existing AWS resources without deploying anything.",
+  }),
 };
 
 /**

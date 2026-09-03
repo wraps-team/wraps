@@ -90,7 +90,10 @@ function awsResult(overrides: Partial<{ findings: DoctorFinding[] }> = {}) {
   };
 }
 
-function emailResult(findings?: DoctorFinding[]): EmailFindings {
+function emailResult(
+  findings?: DoctorFinding[],
+  overrides: Partial<{ totalResources: number }> = {}
+): EmailFindings {
   return {
     findings: findings ?? [
       {
@@ -101,7 +104,14 @@ function emailResult(findings?: DoctorFinding[]): EmailFindings {
         remediation: remediations.syncStack(),
       },
     ],
-    totalResources: 3,
+    // Defaults to 0, not the AWS scan's real count for the fixture above:
+    // most tests in this file don't care about resource counts, and the
+    // aggregate command's own no-local-connection-record finding (see the
+    // "adoption" describe block) fires whenever totalResources > 0 with no
+    // matching connection — the default `mockFindConnections` resolves `[]`,
+    // so a nonzero default here would silently add that finding to every
+    // other test's output.
+    totalResources: overrides.totalResources ?? 0,
     hasStack: true,
     wrapsResources: {} as AWSResourceScan,
   };
@@ -629,5 +639,68 @@ describe("wrapsDoctor", () => {
     const props = mockTrackCommand.mock.calls[0][1];
     expect(props.remediation_ids).toBe("email.domains.add,email.sync");
     expect(props.remediation_ids).not.toContain("extra.com");
+  });
+
+  describe("adoption — resources in AWS with no local connection record", () => {
+    it("fires when wraps-* resources exist but this machine has no connection", async () => {
+      mockFindConnections.mockResolvedValue([]);
+      mockCollectEmailFindings.mockResolvedValue(
+        emailResult(undefined, { totalResources: 3 })
+      );
+      mockIsJsonMode.mockReturnValue(true);
+      const { wrapsDoctor } = await import("../doctor.js");
+
+      await wrapsDoctor({ json: true });
+
+      const [, payload] = mockJsonSuccess.mock.calls[0] as [
+        string,
+        DoctorPayload,
+      ];
+      const finding = payload.findings.find(
+        (f) => f.remediation?.id === "platform.connect.adopt"
+      );
+      expect(finding).toBeDefined();
+      expect(finding?.status).toBe("warn");
+    });
+
+    it("stays silent when a local connection record exists for the account", async () => {
+      mockFindConnections.mockResolvedValue([{ region: "us-west-2" }]);
+      mockCollectEmailFindings.mockResolvedValue(
+        emailResult(undefined, { totalResources: 3 })
+      );
+      mockIsJsonMode.mockReturnValue(true);
+      const { wrapsDoctor } = await import("../doctor.js");
+
+      await wrapsDoctor({ json: true });
+
+      const [, payload] = mockJsonSuccess.mock.calls[0] as [
+        string,
+        DoctorPayload,
+      ];
+      const finding = payload.findings.find(
+        (f) => f.remediation?.id === "platform.connect.adopt"
+      );
+      expect(finding).toBeUndefined();
+    });
+
+    it("stays silent on a genuinely empty account (no resources, no connection)", async () => {
+      mockFindConnections.mockResolvedValue([]);
+      mockCollectEmailFindings.mockResolvedValue(
+        emailResult(undefined, { totalResources: 0 })
+      );
+      mockIsJsonMode.mockReturnValue(true);
+      const { wrapsDoctor } = await import("../doctor.js");
+
+      await wrapsDoctor({ json: true });
+
+      const [, payload] = mockJsonSuccess.mock.calls[0] as [
+        string,
+        DoctorPayload,
+      ];
+      const finding = payload.findings.find(
+        (f) => f.remediation?.id === "platform.connect.adopt"
+      );
+      expect(finding).toBeUndefined();
+    });
   });
 });

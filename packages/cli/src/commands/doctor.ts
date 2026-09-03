@@ -193,6 +193,21 @@ export async function wrapsDoctor(options: WrapsDoctorOptions): Promise<void> {
           })
       );
       findings.push(...email.findings);
+
+      // doctor resolves connections from the local ~/.wraps directory only
+      // (listConnections never syncs the S3 state bucket), so a
+      // CloudFormation-first connection — or simply a second machine — scans
+      // real wraps-* resources while believing nothing is deployed. Reporting
+      // that as clean is the most misleading output this command produces.
+      if (email.totalResources > 0 && emailConnections.length === 0) {
+        findings.push({
+          status: "warn",
+          category: "Email",
+          name: "Wraps resources found in AWS, but no connection record on this machine",
+          details: `Found ${email.totalResources} wraps-* resource(s) in ${region}, with no local deployment record for account ${state.accountId}. CLI commands that resolve connection metadata will not see this deployment.`,
+          remediation: remediations.adoptConnection(region),
+        });
+      }
     } catch (error) {
       findings.push({
         status: "warn",
