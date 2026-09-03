@@ -21,6 +21,14 @@
  * an ongoing episode notifies once per day rather than once per hour.
  * Per-account errors are logged and skipped — one broken role must not
  * abort the sweep.
+ *
+ * `aws.role_unreachable` additionally raises an internal Sentry signal (not
+ * an exception — a customer's broken role is not a Wraps defect) when the
+ * organization has an active paid subscription. Sending is blocked outright
+ * for that customer, so Wraps needs to know even though the customer was
+ * already notified. It inherits the same 24h dedupe as the customer-facing
+ * notification and the same never-reachable silence rule, so it cannot page
+ * hourly through a multi-day episode or fire for an abandoned free signup.
  */
 
 // Initialize Sentry before all other imports
@@ -35,13 +43,18 @@ import {
   type GetAccountCommandOutput,
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
-import { captureException, wrapHandler } from "@sentry/aws-serverless";
+import {
+  captureException,
+  captureMessage,
+  wrapHandler,
+} from "@sentry/aws-serverless";
 import {
   awsAccount,
   db,
   hasRecentNotification,
   notifyOrg,
   organization,
+  subscription,
 } from "@wraps/db";
 import type { Handler } from "aws-lambda";
 import { and, eq, isNotNull } from "drizzle-orm";
@@ -99,6 +112,38 @@ async function getOrgSlug(organizationId: string): Promise<string | null> {
     .where(eq(organization.id, organizationId))
     .limit(1);
   return row?.slug ?? null;
+}
+
+/**
+ * Whether an organization has an active, non-free subscription. Used only to
+ * gate the internal Sentry signal below — never the customer-facing
+ * notification, which fires regardless of plan. Errors here must never break
+ * the sweep, so a lookup failure resolves to `false` (no internal alert)
+ * rather than throwing.
+ */
+async function hasActivePaidSubscription(
+  organizationId: string
+): Promise<boolean> {
+  try {
+    const [row] = await db
+      .select({ plan: subscription.plan })
+      .from(subscription)
+      .where(
+        and(
+          eq(subscription.referenceId, organizationId),
+          eq(subscription.status, "active")
+        )
+      )
+      .limit(1);
+    return row !== undefined && row.plan !== "free";
+  } catch (error) {
+    log.error(
+      "[account-health] Paid-subscription lookup failed, treating as free",
+      error,
+      { organizationId }
+    );
+    return false;
+  }
 }
 
 async function notifyOnce(params: {
@@ -220,23 +265,54 @@ async function checkAccount(account: AccountRow): Promise<void> {
       );
       return;
     }
-    await notifyOnce({
+    const reason = error instanceof Error ? error.name : "unknown";
+    const lastReachableAt = account.roleLastReachableAt.toISOString();
+    const notified = await notifyOnce({
       account,
       type: "aws.role_unreachable",
       title: "Wraps can no longer reach your AWS account",
       body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) cannot be assumed or is missing SES permissions. Sending uses this same role, so email is blocked until it is repaired — and health checks (sending paused, reputation, and quota alerts) are not running either. Open this account in Wraps and choose "Repair IAM Role" for the steps: update your CloudFormation stack if you deployed one, or run \`wraps platform update-role\` if you connected with the CLI (\`wraps platform connect\` if the role was deleted).`,
       href: accountHref,
-      data: {
-        reason: error instanceof Error ? error.name : "unknown",
-        lastReachableAt: account.roleLastReachableAt.toISOString(),
-      },
+      data: { reason, lastReachableAt },
     });
     log.warn("[account-health] Customer role unusable, skipping account", {
       accountId: account.id,
       organizationId: account.organizationId,
       awsAccountId: account.accountId,
-      lastReachableAt: account.roleLastReachableAt.toISOString(),
+      lastReachableAt,
     });
+    // Internal signal: only for an episode that actually notified (not
+    // deduped) and only for a paying org, so this cannot page hourly through
+    // a multi-day episode or fire for an abandoned free signup.
+    if (notified && (await hasActivePaidSubscription(account.organizationId))) {
+      log.warn(
+        "[account-health] Paying customer's console-access role is unreachable",
+        {
+          accountId: account.id,
+          organizationId: account.organizationId,
+          awsAccountId: account.accountId,
+          region: account.region,
+          reason,
+          lastReachableAt,
+        }
+      );
+      captureMessage("Paying customer's console-access role is unreachable", {
+        level: "warning",
+        tags: {
+          worker: "account-health",
+          organizationId: account.organizationId,
+          awsAccountId: account.accountId,
+        },
+        extra: {
+          accountId: account.id,
+          organizationId: account.organizationId,
+          awsAccountId: account.accountId,
+          region: account.region,
+          reason,
+          lastReachableAt,
+        },
+      });
+    }
     return;
   }
 

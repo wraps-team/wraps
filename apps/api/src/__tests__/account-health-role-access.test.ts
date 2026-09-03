@@ -44,6 +44,14 @@ const CREDENTIAL_ROW = {
   region: "us-east-1",
 };
 
+/**
+ * The org's subscription row, as read by hasActivePaidSubscription. `null`
+ * means no active subscription row at all; `{ plan: "free" }` means an
+ * active free-tier subscription (the common case per subscription-gate.ts) —
+ * both must be treated as "not paying".
+ */
+const SUBSCRIPTION_STATE: { row: { plan: string } | null } = { row: null };
+
 const mockStsSend = vi.fn();
 const mockSesSend = vi.fn();
 const mockCloudWatchSend = vi.fn();
@@ -76,8 +84,10 @@ vi.mock("@aws-sdk/client-cloudwatch", () => ({
 }));
 
 const mockCaptureException = vi.fn();
+const mockCaptureMessage = vi.fn();
 vi.mock("@sentry/aws-serverless", () => ({
   captureException: mockCaptureException,
+  captureMessage: mockCaptureMessage,
   wrapHandler: (handler: unknown) => handler,
 }));
 
@@ -96,12 +106,19 @@ const mockDbSet = vi.fn();
 vi.mock("@wraps/db", () => {
   const awsAccountTable = { __table: "awsAccount" };
   const organizationTable = { __table: "organization" };
+  const subscriptionTable = { __table: "subscription" };
 
   // Route results by target table, and by whether the caller narrows with
   // .limit() — the sweep awaits where() directly, the single-row reads do not.
   const chainFor = (table: { __table: string }) => {
-    const rows =
-      table.__table === "organization" ? [{ slug: "acme" }] : [CREDENTIAL_ROW];
+    let rows: unknown[];
+    if (table.__table === "organization") {
+      rows = [{ slug: "acme" }];
+    } else if (table.__table === "subscription") {
+      rows = SUBSCRIPTION_STATE.row ? [SUBSCRIPTION_STATE.row] : [];
+    } else {
+      rows = [CREDENTIAL_ROW];
+    }
     return {
       where: () => ({
         limit: () => Promise.resolve(rows),
@@ -125,6 +142,7 @@ vi.mock("@wraps/db", () => {
     },
     awsAccount: awsAccountTable,
     organization: organizationTable,
+    subscription: subscriptionTable,
     notifyOrg: mockNotifyOrg,
     hasRecentNotification: mockHasRecentNotification,
     eq: vi.fn(),
@@ -169,6 +187,9 @@ describe("account-health with an unusable customer role", () => {
     // Default: an account that has passed a check before, so the broken role
     // is a genuine regression. The never-worked case sets this to null.
     ACCOUNT_ROW.roleLastReachableAt = new Date("2026-07-01T00:00:00Z");
+    // Default: no active subscription row — not a paying org. Individual
+    // tests opt into "paying" or "free-tier active" explicitly.
+    SUBSCRIPTION_STATE.row = null;
     // getCredentials caches per `${accountId}:${orgId}` in module scope with
     // the credential's own expiry, so a test that assumes the role successfully
     // would serve every later test from cache and stop them reaching STS at
@@ -311,5 +332,80 @@ describe("account-health with an unusable customer role", () => {
     expect(mockNotifyOrg).toHaveBeenCalledTimes(1);
     expect(mockNotifyOrg.mock.calls[0][0].type).toBe("aws.role_unreachable");
     expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  describe("internal signal for a paying customer", () => {
+    it("fires a Sentry warning message for a paying org", async () => {
+      SUBSCRIPTION_STATE.row = { plan: "pro" };
+      mockStsSend.mockRejectedValue(accessDeniedError());
+
+      await invoke();
+
+      // Customer notification still fires — this signal is additive.
+      expect(mockNotifyOrg).toHaveBeenCalledTimes(1);
+      expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+      const [message, context] = mockCaptureMessage.mock.calls[0];
+      expect(message).toContain("unreachable");
+      expect(context.level).toBe("warning");
+      expect(
+        `${JSON.stringify(context.tags)} ${JSON.stringify(context.extra)}`
+      ).toContain("org-1");
+      expect(
+        `${JSON.stringify(context.tags)} ${JSON.stringify(context.extra)}`
+      ).toContain(ACCOUNT_ROW.accountId);
+      // Not an exception — a customer misconfiguration is not a Wraps defect.
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it("stays silent for a free-tier org", async () => {
+      // The common case per subscription-gate.ts: a free-tier org carries an
+      // active `free` subscription row, not the absence of one.
+      SUBSCRIPTION_STATE.row = { plan: "free" };
+      mockStsSend.mockRejectedValue(accessDeniedError());
+
+      await invoke();
+
+      expect(mockNotifyOrg).toHaveBeenCalledTimes(1);
+      expect(mockCaptureMessage).not.toHaveBeenCalled();
+    });
+
+    it("stays silent when the customer notification was deduped", async () => {
+      SUBSCRIPTION_STATE.row = { plan: "pro" };
+      mockStsSend.mockRejectedValue(accessDeniedError());
+      mockHasRecentNotification.mockResolvedValue(true);
+
+      await invoke();
+
+      // Proves the internal signal inherits notifyOnce's real return value —
+      // not a mocked boolean that would pass regardless — because dedupe is
+      // driven here through hasRecentNotification, the actual dedupe check.
+      expect(mockNotifyOrg).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).not.toHaveBeenCalled();
+    });
+
+    it("stays silent when the role has never once been reachable, even for a paying org", async () => {
+      SUBSCRIPTION_STATE.row = { plan: "pro" };
+      ACCOUNT_ROW.roleLastReachableAt = null;
+      mockStsSend.mockRejectedValue(accessDeniedError());
+
+      await invoke();
+
+      expect(mockNotifyOrg).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).not.toHaveBeenCalled();
+    });
+
+    it("never includes the external id or webhook secret in the captured payload", async () => {
+      SUBSCRIPTION_STATE.row = { plan: "pro" };
+      mockStsSend.mockRejectedValue(accessDeniedError());
+
+      await invoke();
+
+      expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+      const [, context] = mockCaptureMessage.mock.calls[0];
+      const serialized = JSON.stringify(context);
+      expect(serialized).not.toContain("externalId");
+      expect(serialized).not.toContain("ext-1");
+      expect(serialized).not.toContain("webhookSecret");
+    });
   });
 });
