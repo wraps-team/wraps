@@ -9,12 +9,14 @@ import {
   FileText,
   Inbox,
   KeyRound,
+  ListChecks,
   Mail,
   Network,
   Receipt,
   Send,
   Server,
   Shield,
+  Unlock,
   Zap,
 } from "lucide-react";
 import Image from "next/image";
@@ -36,6 +38,28 @@ type BlogPost = {
 };
 
 const posts: BlogPost[] = [
+  {
+    slug: "email-vendor-lock-in",
+    title: "Email Vendor Lock-In: The Five Things That Actually Trap You",
+    description:
+      "Exporting your contacts is the easy part. The five assets you build up as a customer that turn out to belong to the vendor, each with a check you can run before you sign.",
+    category: "Buying guide",
+    date: "September 2026",
+    readTime: "7 min read",
+    author: "Wraps Team",
+    icon: <Unlock className="h-6 w-6" />,
+  },
+  {
+    slug: "developer-first-email-api-checklist",
+    title: "What to Look For in a Developer-First Transactional Email API",
+    description:
+      "Seven things that separate an email API you enjoy from one you tolerate, each with a test you can run in an afternoon. Includes the item Wraps fails.",
+    category: "Buying guide",
+    date: "September 2026",
+    readTime: "9 min read",
+    author: "Wraps Team",
+    icon: <ListChecks className="h-6 w-6" />,
+  },
   {
     slug: "reduce-transactional-email-costs",
     title: "At 100K Emails a Month, the Send Rate Is the Small Number",

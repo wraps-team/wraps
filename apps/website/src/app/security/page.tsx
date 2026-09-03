@@ -341,6 +341,86 @@ export default function SecurityPage() {
             </div>
           </section>
 
+          {/* ================= ZERO STORED CREDENTIALS ================= */}
+          <section className="mb-16">
+            <h2 className="mb-3 font-heading font-semibold text-2xl tracking-tight">
+              Zero stored credentials, and what that phrase does not mean
+            </h2>
+            <p className="mb-4 max-w-2xl text-muted-foreground">
+              The phrase gets used for two unrelated things. In authentication
+              it usually means passwordless login: no password hashes sitting in
+              a user table for somebody to crack offline. That is not what it
+              means here.
+            </p>
+            <p className="mb-6 max-w-2xl text-muted-foreground">
+              On this page it is a claim about infrastructure access. Wraps
+              holds no AWS access key or secret key belonging to you, at any
+              point. Reaching your account requires assuming a role you created,
+              from one named AWS account, gated on an external ID, for
+              credentials that expire on their own. There is no long-lived
+              secret of yours in our database to steal, because one was never
+              issued.
+            </p>
+            <p className="mb-6 max-w-2xl text-muted-foreground">
+              The practical difference shows up on the worst day either party
+              has.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[40rem] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-border border-b">
+                    <th className="w-1/3 py-3 pr-4 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                      If this is breached
+                    </th>
+                    <th className="py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                      What the attacker walks away with
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-border/60 border-b align-top">
+                    <th className="py-4 pr-4 font-medium text-sm" scope="row">
+                      A provider that stores your SES keys
+                    </th>
+                    <td className="py-4 text-muted-foreground">
+                      Long-lived AWS credentials for your account, usable from
+                      anywhere on the internet until somebody notices and
+                      rotates them.
+                    </td>
+                  </tr>
+                  <tr className="border-border/60 border-b align-top">
+                    <th className="py-4 pr-4 font-medium text-sm" scope="row">
+                      Wraps
+                    </th>
+                    <td className="py-4 text-muted-foreground">
+                      A role ARN and an external ID. Neither works without the
+                      ability to call <code>sts:AssumeRole</code> as AWS account{" "}
+                      <code>905130073023</code>, and you can end that by
+                      deleting the role.
+                    </td>
+                  </tr>
+                  <tr className="border-border/60 border-b align-top">
+                    <th className="py-4 pr-4 font-medium text-sm" scope="row">
+                      Your own AWS account
+                    </th>
+                    <td className="py-4 text-muted-foreground">
+                      The same blast radius either way. Moving sending into your
+                      account moves that risk to you, which is the trade BYOC
+                      asks you to make.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-6 max-w-2xl text-muted-foreground">
+              The limit worth stating: this covers the sending path only. Your
+              contacts, templates, and workflows live in the Wraps database, and
+              a breach there is a breach of that data. Zero stored credentials
+              is a statement about access to your AWS account, not a claim that
+              we hold nothing of yours.
+            </p>
+          </section>
+
           {/* ================= DATA ================= */}
           <section className="mb-16">
             <h2 className="mb-3 font-heading font-semibold text-2xl tracking-tight">

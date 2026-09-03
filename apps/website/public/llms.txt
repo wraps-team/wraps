@@ -420,8 +420,10 @@ Wraps publishes Claude Code skills at `https://wraps.dev/.well-known/skills/`:
 ## Blog
 
 - [AWS SES Simplified](https://wraps.dev/blog/aws-ses-simplified)
+- [Developer-First Email API Checklist](https://wraps.dev/blog/developer-first-email-api-checklist)
 - [How Email Works](https://wraps.dev/blog/how-email-works)
 - [Templates and Workflows as Code](https://wraps.dev/blog/email-templates-react-workflows-typescript)
+- [Email Vendor Lock-In: The Five Things That Trap You](https://wraps.dev/blog/email-vendor-lock-in)
 - [Inbound Email Guide](https://wraps.dev/blog/inbound-email-guide)
 - [Next.js + Vercel + SES Guide](https://wraps.dev/blog/nextjs-vercel-ses-guide)
 - [SES Production Architecture](https://wraps.dev/blog/ses-production-architecture)
