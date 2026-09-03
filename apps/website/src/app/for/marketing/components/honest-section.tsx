@@ -60,6 +60,18 @@ export function MarketingHonestSection() {
           </Link>{" "}
           is worth agreeing on up front.
         </p>
+
+        <p className="mt-4 text-muted-foreground">
+          Comparing us against the rest of the category?{" "}
+          <Link
+            className="text-primary underline"
+            href="/blog/aws-ses-marketing-tools"
+          >
+            Sendy, EmailOctopus, MailBluster and Mailblast
+          </Link>{" "}
+          all put a campaign UI on SES you own, and they differ mostly in how
+          much of it you end up operating.
+        </p>
       </div>
     </section>
   );

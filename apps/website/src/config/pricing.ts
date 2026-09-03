@@ -222,7 +222,7 @@ export const PRICING_TIERS: PricingTier[] = [
       "Unlimited AWS accounts",
       "1,000 AI generations/mo",
       "1-year history",
-      "SSO + SCIM, audit log & export",
+      "SSO + SCIM, audit logs",
       "Priority support",
     ],
   },

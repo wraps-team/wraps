@@ -428,6 +428,8 @@ Wraps publishes Claude Code skills at `https://wraps.dev/.well-known/skills/`:
 ## Blog
 
 - [AWS SES Simplified](https://wraps.dev/blog/aws-ses-simplified)
+- [Marketing Tools On Your Own AWS SES](https://wraps.dev/blog/aws-ses-marketing-tools)
+- [The Five Pricing Models for High-Volume Email](https://wraps.dev/blog/email-pricing-models)
 - [Developer-First Email API Checklist](https://wraps.dev/blog/developer-first-email-api-checklist)
 - [How Email Works](https://wraps.dev/blog/how-email-works)
 - [Templates and Workflows as Code](https://wraps.dev/blog/email-templates-react-workflows-typescript)
@@ -438,6 +440,7 @@ Wraps publishes Claude Code skills at `https://wraps.dev/.well-known/skills/`:
 - [Get Out of SES Sandbox](https://wraps.dev/blog/ses-sandbox-guide)
 - [SPF Record Guide](https://wraps.dev/blog/spf-guide)
 - [Supabase Email Guide](https://wraps.dev/blog/supabase-email-guide)
+- [Why Email Providers Cost More Than SES](https://wraps.dev/blog/why-email-providers-cost-more-than-ses)
 - [Your DMARC Policy Is Useless](https://wraps.dev/blog/your-dmarc-policy-is-useless)
 
 ## Optional

@@ -9,10 +9,12 @@ import {
   FileText,
   Inbox,
   KeyRound,
+  Layers,
   ListChecks,
   Mail,
   Network,
   Receipt,
+  Scale,
   Send,
   Server,
   Shield,
@@ -38,6 +40,40 @@ type BlogPost = {
 };
 
 const posts: BlogPost[] = [
+  {
+    slug: "why-email-providers-cost-more-than-ses",
+    title:
+      "Why Transactional Email Providers Cost More Than Sending Through SES",
+    description:
+      "At 100K emails a month SES is about $10 and SendGrid, Resend and Postmark are $35 to $132. A line-by-line account of what the difference buys, and when it is worth paying.",
+    category: "Research",
+    date: "September 2026",
+    readTime: "8 min read",
+    author: "Wraps Team",
+    icon: <Receipt className="h-6 w-6" />,
+  },
+  {
+    slug: "email-pricing-models",
+    title: "The Five Pricing Models for High-Volume Email",
+    description:
+      "Per-email tiers, per-contact, per-event, committed volume, and infrastructure pass-through. What each does to your bill as you grow, and the behaviour each one quietly encourages.",
+    category: "Buying guide",
+    date: "September 2026",
+    readTime: "6 min read",
+    author: "Wraps Team",
+    icon: <Scale className="h-6 w-6" />,
+  },
+  {
+    slug: "aws-ses-marketing-tools",
+    title: "Tools That Run Marketing Campaigns On Your Own AWS SES",
+    description:
+      "Sendy, EmailOctopus, MailBluster, Mailblast and Wraps all put a campaign UI on top of SES you own. How they differ on deployment, and where the delivery events actually go.",
+    category: "Roundup",
+    date: "September 2026",
+    readTime: "7 min read",
+    author: "Wraps Team",
+    icon: <Layers className="h-6 w-6" />,
+  },
   {
     slug: "email-vendor-lock-in",
     title: "Email Vendor Lock-In: The Five Things That Actually Trap You",

@@ -200,12 +200,26 @@ export default function ComparePage() {
               tolerate, each with a test you can run in an afternoon. The
               scoring includes the item Wraps fails.
             </p>
-            <Link
-              className="text-primary underline"
-              href="/blog/developer-first-email-api-checklist"
-            >
-              The developer-first email API checklist
-            </Link>
+            <div className="flex flex-col gap-2">
+              <Link
+                className="text-primary underline"
+                href="/blog/developer-first-email-api-checklist"
+              >
+                The developer-first email API checklist
+              </Link>
+              <Link
+                className="text-primary underline"
+                href="/blog/why-email-providers-cost-more-than-ses"
+              >
+                Why providers cost more than sending through SES directly
+              </Link>
+              <Link
+                className="text-primary underline"
+                href="/blog/email-pricing-models"
+              >
+                The five pricing models, and what each does to your bill
+              </Link>
+            </div>
           </section>
 
           {/* The Wraps Difference */}
