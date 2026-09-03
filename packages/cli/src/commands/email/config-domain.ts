@@ -36,6 +36,11 @@ import {
   validateTrackingDomain,
 } from "../../utils/email/tracking-domain.js";
 import {
+  describeTrackingHttpsError,
+  disableDistribution,
+  provisionTrackingHttps,
+} from "../../utils/email/tracking-https.js";
+import {
   getAWSRegion,
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
@@ -53,6 +58,7 @@ type DomainCandidate = {
   configSetName: string;
   trackingConfig?: { opens: boolean; clicks: boolean };
   trackingDomain?: string;
+  trackingHttps?: import("../../types/index.js").AdditionalDomain["trackingHttps"];
   additionalIndex?: number;
   tlsRequired?: boolean;
   reputationMetrics?: boolean;
@@ -205,6 +211,7 @@ export async function configDomain(
           configSetName: d.configSetName!,
           trackingConfig: d.trackingConfig,
           trackingDomain: d.trackingDomain,
+          trackingHttps: d.trackingHttps,
           additionalIndex: i,
           tlsRequired: d.tlsRequired,
           reputationMetrics: d.reputationMetrics,
@@ -314,6 +321,10 @@ export async function configDomain(
     );
     const vdmInboxFlag = flag(options.vdmInbox, "--no-vdm-inbox");
     const trackingDomainFlag = options.trackingDomain;
+    const trackingHttpsFlag = flag(
+      options.trackingHttps,
+      "--no-tracking-https"
+    );
 
     const hasGroupFlags =
       [
@@ -327,6 +338,7 @@ export async function configDomain(
         sendingEnabledFlag,
         vdmEngagementFlag,
         vdmInboxFlag,
+        trackingHttpsFlag,
       ].some((f) => f !== undefined) || trackingDomainFlag !== undefined;
 
     const sesClient = new SESv2Client({ region });
@@ -349,6 +361,7 @@ export async function configDomain(
         vdmEngagementFlag,
         vdmInboxFlag,
         trackingDomainFlag,
+        trackingHttpsFlag,
         progress,
       });
       return;
@@ -451,6 +464,10 @@ function persistCandidateField<K extends keyof DomainCandidate>(
       case "trackingDomain":
         // Primary is Pulumi-managed; never reached — applyTrackingDomain
         // refuses the primary domain before calling persistCandidateField.
+        break;
+      case "trackingHttps":
+        // Primary's HTTPS tracking is Pulumi-managed; never reached — the
+        // trackingHttps flag/menu refuses the primary domain the same way.
         break;
     }
   }
@@ -663,14 +680,23 @@ async function applyTrackingDomain(
   await saveMetadata(ctx);
 }
 
+/**
+ * Create (or, with `replaceExisting`, swap) the tracking domain's CNAME via
+ * the cached DNS provider, falling back to a manual instruction. `cnameTarget`
+ * defaults to the plain SES tracking endpoint; pass the CloudFront
+ * distribution domain to point at HTTPS tracking instead.
+ */
 async function offerTrackingCname(
   ctx: ApplyContext,
-  trackingDomain: string
+  trackingDomain: string,
+  cnameTarget?: string,
+  replaceExisting?: boolean
 ): Promise<void> {
+  const targetValue = cnameTarget ?? `r.${ctx.region}.awstrack.me`;
   const record = {
     name: trackingDomain,
     type: "CNAME",
-    value: `r.${ctx.region}.awstrack.me`,
+    value: targetValue,
   };
   const provider = ctx.metadata.services.email?.dnsProvider;
   if (provider && provider !== "manual") {
@@ -686,12 +712,14 @@ async function offerTrackingCname(
           dkimTokens: [],
           region: ctx.region,
           customTrackingDomain: trackingDomain,
+          trackingCnameTarget: cnameTarget,
         },
-        new Set(["tracking"])
+        new Set(["tracking"]),
+        replaceExisting ? { replaceExisting: true } : undefined
       );
       if (result.success && result.recordsCreated > 0) {
         clack.log.success(
-          `Created ${record.name} CNAME via ${getDNSProviderDisplayName(provider)}`
+          `${replaceExisting ? "Updated" : "Created"} ${record.name} CNAME via ${getDNSProviderDisplayName(provider)}`
         );
         return;
       }
@@ -700,6 +728,74 @@ async function offerTrackingCname(
   clack.log.info(
     `Add this DNS record:\n  ${pc.cyan(record.name)}\n    Type: CNAME  Value: ${record.value}`
   );
+}
+
+async function applyTrackingHttps(
+  ctx: ApplyContext,
+  enable: boolean
+): Promise<{
+  pendingValidationRecord?: { name: string; type: string; value: string };
+}> {
+  if (ctx.candidate.additionalIndex === undefined) {
+    throw new WrapsError(
+      `${ctx.candidate.domain} is the primary domain — its HTTPS tracking is managed by ${pc.cyan("wraps email upgrade")} (choose "tracking").`,
+      "PRIMARY_TRACKING_HTTPS_MANAGED_BY_PULUMI",
+      "Run wraps email upgrade"
+    );
+  }
+  if (!ctx.candidate.trackingDomain) {
+    throw new WrapsError(
+      `${ctx.candidate.domain} has no tracking domain yet.`,
+      "TRACKING_DOMAIN_REQUIRED",
+      `Set one first: wraps email domains config --domain ${ctx.candidate.domain} --tracking-domain <host>`
+    );
+  }
+  const trackingDomain = ctx.candidate.trackingDomain;
+
+  if (!enable) {
+    await putTrackingDomain(
+      ctx.sesClient,
+      ctx.candidate.configSetName,
+      trackingDomain,
+      "OPTIONAL"
+    );
+    if (ctx.candidate.trackingHttps?.distributionId) {
+      await disableDistribution(ctx.candidate.trackingHttps.distributionId);
+    }
+    persistCandidateField(ctx, "trackingHttps", undefined);
+    await saveMetadata(ctx);
+    await offerTrackingCname(ctx, trackingDomain, undefined, true);
+    return {};
+  }
+
+  let result: Awaited<ReturnType<typeof provisionTrackingHttps>>;
+  try {
+    result = await provisionTrackingHttps({
+      domain: ctx.candidate.domain,
+      trackingDomain,
+      configSetName: ctx.candidate.configSetName,
+      sesRegion: ctx.region,
+      sesv2: ctx.sesClient,
+      metadataDnsProvider: ctx.metadata.services.email?.dnsProvider,
+      existing: ctx.candidate.trackingHttps,
+      progress: ctx.progress,
+    });
+  } catch (error) {
+    throw new WrapsError(
+      `Failed to provision HTTPS for tracking domain: ${describeTrackingHttpsError(error)}`,
+      "TRACKING_HTTPS_PROVISION_FAILED"
+    );
+  }
+
+  const wasActive = ctx.candidate.trackingHttps?.status === "active";
+  persistCandidateField(ctx, "trackingHttps", result.trackingHttps);
+  await saveMetadata(ctx);
+
+  if (result.trackingHttps.status === "active" && !wasActive) {
+    await offerTrackingCname(ctx, trackingDomain, result.cnameTarget, true);
+  }
+
+  return { pendingValidationRecord: result.dnsRecordsToShow[0] };
 }
 
 // --- Flag mode ---
@@ -717,6 +813,7 @@ async function applyFlagMode(
     vdmEngagementFlag: boolean | undefined;
     vdmInboxFlag: boolean | undefined;
     trackingDomainFlag: string | undefined;
+    trackingHttpsFlag: boolean | undefined;
     targetDomain?: string;
   }
 ): Promise<void> {
@@ -732,6 +829,7 @@ async function applyFlagMode(
     vdmEngagementFlag,
     vdmInboxFlag,
     trackingDomainFlag,
+    trackingHttpsFlag,
     candidate,
     region,
   } = args;
@@ -867,6 +965,56 @@ async function applyFlagMode(
           trackingDomainFlag === TRACKING_DOMAIN_NONE
             ? null
             : trackingDomainFlag,
+      });
+      return;
+    }
+  }
+
+  if (trackingHttpsFlag !== undefined) {
+    let httpsResult: Awaited<ReturnType<typeof applyTrackingHttps>>;
+    try {
+      httpsResult = await applyTrackingHttps(ctx, trackingHttpsFlag);
+    } catch (error) {
+      args.progress.stop();
+      if (error instanceof WrapsError) {
+        clack.log.error(error.message);
+        process.exit(1);
+        return;
+      }
+      throw error;
+    }
+    args.progress.stop();
+    if (trackingHttpsFlag) {
+      const status = candidate.trackingHttps?.status;
+      if (status === "active") {
+        clack.log.success(
+          `HTTPS active for ${candidate.trackingDomain} (${candidate.trackingHttps?.distributionDomain})`
+        );
+      } else {
+        clack.log.info(
+          pc.dim(
+            `Certificate validation usually takes 5–30 minutes. Re-run ${pc.cyan(`wraps email domains config --domain ${candidate.domain} --tracking-https`)} once it's ISSUED.`
+          )
+        );
+        if (httpsResult.pendingValidationRecord) {
+          clack.log.info(
+            `Add this DNS record to validate the certificate:\n  ${pc.cyan(httpsResult.pendingValidationRecord.name)}\n    Type: ${httpsResult.pendingValidationRecord.type}  Value: ${httpsResult.pendingValidationRecord.value}`
+          );
+        }
+      }
+    } else {
+      clack.log.success("HTTPS disabled for tracking links");
+    }
+    trackCommand("email:domains:config", {
+      success: true,
+      tracking_https: trackingHttpsFlag,
+    });
+    if (isJsonMode()) {
+      jsonSuccess("email.domains.config", {
+        domain: candidate.domain,
+        trackingHttps: trackingHttpsFlag
+          ? (candidate.trackingHttps?.status ?? null)
+          : null,
       });
       return;
     }
@@ -1045,7 +1193,16 @@ async function applyInteractiveMode(
                 defaultTrackingDomain(candidate.domain),
             },
             ...(candidate.trackingDomain
-              ? [{ value: "clear", label: "Clear (use SES default)" }]
+              ? [
+                  { value: "clear", label: "Clear (use SES default)" },
+                  {
+                    value: "https",
+                    label: candidate.trackingHttps
+                      ? "Disable HTTPS"
+                      : "Enable HTTPS",
+                    hint: candidate.trackingHttps?.status ?? "disabled",
+                  },
+                ]
               : []),
             { value: "back", label: "Back" },
           ],
@@ -1061,6 +1218,47 @@ async function applyInteractiveMode(
           clack.log.success(
             "Tracking domain cleared — links use the SES default"
           );
+          break;
+        }
+
+        if (choice === "https") {
+          const enabling = !candidate.trackingHttps;
+          const httpsProgress = new DeploymentProgress();
+          let httpsResult: Awaited<ReturnType<typeof applyTrackingHttps>>;
+          try {
+            httpsResult = await httpsProgress.execute(
+              enabling ? "Enabling HTTPS" : "Disabling HTTPS",
+              async () => applyTrackingHttps(ctx, enabling)
+            );
+          } catch (error) {
+            httpsProgress.stop();
+            if (error instanceof WrapsError) {
+              clack.log.error(error.message);
+              break;
+            }
+            throw error;
+          }
+          httpsProgress.stop();
+          if (enabling) {
+            if (candidate.trackingHttps?.status === "active") {
+              clack.log.success(
+                `HTTPS active (${candidate.trackingHttps.distributionDomain})`
+              );
+            } else {
+              clack.log.info(
+                pc.dim(
+                  "Certificate validation usually takes 5–30 minutes. Reopen this menu once it's ISSUED."
+                )
+              );
+              if (httpsResult.pendingValidationRecord) {
+                clack.log.info(
+                  `Add this DNS record to validate the certificate:\n  ${pc.cyan(httpsResult.pendingValidationRecord.name)}\n    Type: ${httpsResult.pendingValidationRecord.type}  Value: ${httpsResult.pendingValidationRecord.value}`
+                );
+              }
+            }
+          } else {
+            clack.log.success("HTTPS disabled for tracking links");
+          }
           break;
         }
 

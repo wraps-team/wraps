@@ -89,6 +89,22 @@ vi.mock("../../telemetry/events", () => ({
   trackCommand: vi.fn(),
 }));
 
+vi.mock("../../utils/email/tracking-https", () => ({
+  provisionTrackingHttps: vi.fn(),
+  disableDistribution: vi.fn().mockResolvedValue(undefined),
+  describeTrackingHttpsError: vi.fn(
+    (error: unknown) => (error as Error)?.message ?? "Unknown AWS error"
+  ),
+}));
+
+vi.mock("../../utils/dns/index", () => ({
+  getDNSCredentials: vi.fn().mockResolvedValue({ valid: false }),
+  createDNSRecordsForProvider: vi
+    .fn()
+    .mockResolvedValue({ success: true, recordsCreated: 1 }),
+  getDNSProviderDisplayName: vi.fn().mockReturnValue("Vercel"),
+}));
+
 const additionalConfigSetName = domainToConfigSetName("test.com");
 const primaryConfigSetName = domainToConfigSetName("primary.com");
 const testArchiveArn =
@@ -97,6 +113,14 @@ const testArchiveArn =
 function makeMetadata(overrides?: {
   primaryOnly?: boolean;
   suppressedReasons?: ("BOUNCE" | "COMPLAINT")[];
+  trackingDomain?: string;
+  trackingHttps?: {
+    certificateArn: string;
+    status: "pending" | "active";
+    distributionId?: string;
+    distributionDomain?: string;
+  };
+  dnsProvider?: "vercel" | "cloudflare" | "route53" | "manual";
 }) {
   const additionalDomains = overrides?.primaryOnly
     ? []
@@ -105,6 +129,8 @@ function makeMetadata(overrides?: {
           domain: "test.com",
           configSetName: additionalConfigSetName,
           addedAt: new Date().toISOString(),
+          trackingDomain: overrides?.trackingDomain,
+          trackingHttps: overrides?.trackingHttps,
         },
       ];
   return {
@@ -119,6 +145,7 @@ function makeMetadata(overrides?: {
           domain: "primary.com",
           additionalDomains,
         },
+        dnsProvider: overrides?.dnsProvider,
         deployedAt: new Date().toISOString(),
       },
     },
@@ -689,5 +716,110 @@ describe("configDomain — extended config set options", () => {
     expect(clack.log.error).toHaveBeenCalledWith(
       expect.stringContaining("subdomain of test.com")
     );
+  });
+
+  it("Unit 18: flag mode: trackingHttps:true with no tracking domain set is refused", async () => {
+    const clack = await import("@clack/prompts");
+
+    await configDomain({ domain: "test.com", trackingHttps: true });
+
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(clack.log.error).toHaveBeenCalledWith(
+      expect.stringContaining("no tracking domain")
+    );
+  });
+
+  it("Unit 19: flag mode: pending → active transition re-creates the tracking CNAME with replaceExisting", async () => {
+    const metadata = await import("../../utils/shared/metadata");
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValueOnce(
+      makeMetadata({
+        trackingDomain: "track.test.com",
+        dnsProvider: "vercel",
+      }) as never
+    );
+
+    const trackingHttps = await import("../../utils/email/tracking-https");
+    vi.mocked(trackingHttps.provisionTrackingHttps).mockResolvedValueOnce({
+      trackingHttps: {
+        certificateArn: "arn:aws:acm:x",
+        status: "active",
+        distributionId: "DIST1",
+        distributionDomain: "dabc.cloudfront.net",
+      },
+      cnameTarget: "dabc.cloudfront.net",
+      dnsRecordsToShow: [],
+    });
+
+    const dns = await import("../../utils/dns/index");
+    vi.mocked(dns.getDNSCredentials).mockResolvedValueOnce({
+      valid: true,
+      credentials: { provider: "vercel", token: "tok" },
+    } as never);
+
+    await configDomain({ domain: "test.com", trackingHttps: true });
+
+    expect(trackingHttps.provisionTrackingHttps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        trackingDomain: "track.test.com",
+        configSetName: additionalConfigSetName,
+      })
+    );
+
+    const createCalls = vi.mocked(dns.createDNSRecordsForProvider).mock.calls;
+    expect(createCalls.length).toBe(1);
+    expect(createCalls[0][1]).toMatchObject({
+      customTrackingDomain: "track.test.com",
+      trackingCnameTarget: "dabc.cloudfront.net",
+    });
+    expect(createCalls[0][2]).toEqual(new Set(["tracking"]));
+    expect(createCalls[0][3]).toEqual({ replaceExisting: true });
+
+    expect(metadata.saveConnectionMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        services: expect.objectContaining({
+          email: expect.objectContaining({
+            config: expect.objectContaining({
+              additionalDomains: expect.arrayContaining([
+                expect.objectContaining({
+                  domain: "test.com",
+                  trackingHttps: expect.objectContaining({ status: "active" }),
+                }),
+              ]),
+            }),
+          }),
+        }),
+      })
+    );
+  });
+
+  it("Unit 20: flag mode: trackingHttps:false sets HttpsPolicy OPTIONAL and disables the distribution", async () => {
+    const metadata = await import("../../utils/shared/metadata");
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValueOnce(
+      makeMetadata({
+        trackingDomain: "track.test.com",
+        trackingHttps: {
+          certificateArn: "arn:aws:acm:x",
+          status: "active",
+          distributionId: "DIST1",
+          distributionDomain: "dabc.cloudfront.net",
+        },
+      }) as never
+    );
+    sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+
+    const trackingHttps = await import("../../utils/email/tracking-https");
+
+    await configDomain({ domain: "test.com", trackingHttps: false });
+
+    const putCalls = sesClientMock.commandCalls(
+      PutConfigurationSetTrackingOptionsCommand
+    );
+    expect(putCalls.length).toBe(1);
+    expect(putCalls[0].args[0].input).toMatchObject({
+      ConfigurationSetName: additionalConfigSetName,
+      CustomRedirectDomain: "track.test.com",
+      HttpsPolicy: "OPTIONAL",
+    });
+    expect(trackingHttps.disableDistribution).toHaveBeenCalledWith("DIST1");
   });
 });
