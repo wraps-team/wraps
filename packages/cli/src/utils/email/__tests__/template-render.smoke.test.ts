@@ -79,6 +79,18 @@ async function compileTemplateFromFile(filePath: string, slug: string) {
   return renderTemplateWithProxy(Component);
 }
 
+/**
+ * Every test in the two loops below runs a real esbuild build of one template
+ * plus a React Email render — genuine CPU work, ~270ms each here and up to ~1s
+ * for the heaviest template. CPU-bound cost scales with how loaded the machine
+ * is, and a CI runner has fewer cores than a laptop while running the whole
+ * monorepo's suites at once, so the slowest template can approach the 5s
+ * default from a comfortable-looking local number. The budget below is set from
+ * what these tests actually do, matching how the package's subprocess tests
+ * (one-event-per-invocation, telemetry-command-name) declare theirs.
+ */
+const RENDER_TIMEOUT_MS = 30_000;
+
 describe("wraps/templates/*.tsx plain-text smoke test", () => {
   if (!existsSync(TEMPLATES_DIR)) {
     // Loud skip: a silent skip would mean a CI configuration regression
@@ -104,19 +116,23 @@ describe("wraps/templates/*.tsx plain-text smoke test", () => {
 
   for (const file of templateFiles) {
     const slug = file.replace(/\.tsx$/, "");
-    it(`${slug}: plain text contains no uppercase Handlebars tokens`, async () => {
-      const { text } = await compileTemplateFromFile(
-        join(TEMPLATES_DIR, file),
-        slug
-      );
+    it(
+      `${slug}: plain text contains no uppercase Handlebars tokens`,
+      { timeout: RENDER_TIMEOUT_MS },
+      async () => {
+        const { text } = await compileTemplateFromFile(
+          join(TEMPLATES_DIR, file),
+          slug
+        );
 
-      for (const { label, pattern } of UPPERCASE_HELPER_PATTERNS) {
-        expect(
-          text,
-          `${slug}: found ${label} in plain text (SES will reject this)`
-        ).not.toMatch(pattern);
+        for (const { label, pattern } of UPPERCASE_HELPER_PATTERNS) {
+          expect(
+            text,
+            `${slug}: found ${label} in plain text (SES will reject this)`
+          ).not.toMatch(pattern);
+        }
       }
-    });
+    );
   }
 });
 
@@ -149,55 +165,59 @@ describe("wraps/templates/*.tsx render contract", () => {
   for (const file of templateFiles) {
     const slug = file.replace(/\.tsx$/, "");
 
-    it(`${slug}: subject, preview, html, and text render clean with empty data and testData`, async () => {
-      const Handlebars = (await import("handlebars")).default;
-      const modPath = join(TEMPLATES_DIR, file);
-      const rendered = await compileTemplateFromFile(modPath, slug);
+    it(
+      `${slug}: subject, preview, html, and text render clean with empty data and testData`,
+      { timeout: RENDER_TIMEOUT_MS },
+      async () => {
+        const Handlebars = (await import("handlebars")).default;
+        const modPath = join(TEMPLATES_DIR, file);
+        const rendered = await compileTemplateFromFile(modPath, slug);
 
-      // Re-import the compiled module for its metadata exports
-      const tmpPath = join(
-        TEMPLATES_DIR,
-        "..",
-        "..",
-        "node_modules",
-        ".wraps-compiled",
-        `${slug}.smoke.mjs`
-      );
-      const mod = await import(`${tmpPath}?meta=${Date.now()}`);
-      const testData = (mod.testData ?? {}) as Record<string, unknown>;
+        // Re-import the compiled module for its metadata exports
+        const tmpPath = join(
+          TEMPLATES_DIR,
+          "..",
+          "..",
+          "node_modules",
+          ".wraps-compiled",
+          `${slug}.smoke.mjs`
+        );
+        const mod = await import(`${tmpPath}?meta=${Date.now()}`);
+        const testData = (mod.testData ?? {}) as Record<string, unknown>;
 
-      const parts: Array<[string, string]> = [
-        ["subject", String(mod.subject ?? "")],
-        ["previewText", String(mod.previewText ?? "")],
-        ["html", rendered.html],
-        ["text", rendered.text],
-      ];
+        const parts: Array<[string, string]> = [
+          ["subject", String(mod.subject ?? "")],
+          ["previewText", String(mod.previewText ?? "")],
+          ["html", rendered.html],
+          ["text", rendered.text],
+        ];
 
-      for (const [partName, content] of parts) {
-        // Assert on what SES actually receives. Push transforms authoring
-        // syntax before publishing, so compiling the raw stored string would
-        // reject `{{var|fallback}}` (a Handlebars parse error, since `|` is
-        // block-params) for a template that sends perfectly well.
-        const sesContent = transformVariablesForSes(content);
-        for (const data of [EMPTY_DATA, testData]) {
-          // Strict compile: a template SES or our renderer can't parse is a
-          // failure here, not at send time.
-          const out = Handlebars.compile(sesContent)(data);
-          expect(
-            out.includes("{{"),
-            `${slug} ${partName}: rendered output contains literal {{ with data=${JSON.stringify(
-              Object.keys(data)
-            )}`
-          ).toBe(false);
-          expect(
-            out.includes("}}"),
-            `${slug} ${partName}: rendered output contains literal }} with data=${JSON.stringify(
-              Object.keys(data)
-            )}`
-          ).toBe(false);
+        for (const [partName, content] of parts) {
+          // Assert on what SES actually receives. Push transforms authoring
+          // syntax before publishing, so compiling the raw stored string would
+          // reject `{{var|fallback}}` (a Handlebars parse error, since `|` is
+          // block-params) for a template that sends perfectly well.
+          const sesContent = transformVariablesForSes(content);
+          for (const data of [EMPTY_DATA, testData]) {
+            // Strict compile: a template SES or our renderer can't parse is a
+            // failure here, not at send time.
+            const out = Handlebars.compile(sesContent)(data);
+            expect(
+              out.includes("{{"),
+              `${slug} ${partName}: rendered output contains literal {{ with data=${JSON.stringify(
+                Object.keys(data)
+              )}`
+            ).toBe(false);
+            expect(
+              out.includes("}}"),
+              `${slug} ${partName}: rendered output contains literal }} with data=${JSON.stringify(
+                Object.keys(data)
+              )}`
+            ).toBe(false);
+          }
         }
       }
-    });
+    );
   }
 });
 

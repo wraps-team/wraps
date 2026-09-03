@@ -543,7 +543,20 @@ describe("upgrade per-domain-config-sets migration", () => {
       );
       vi.mocked(clack.confirm).mockResolvedValue(true as never);
 
-      await upgrade({ yes: true });
+      // The migration sleeps 1s between domains to stay inside the SES rate
+      // limit (upgrade.ts, "Rate limit: 1-second delay between domains"). This
+      // is the only test here with more than one unmigrated domain, so it was
+      // the only one paying it — a real second of wall clock, and it grows by
+      // another second for every domain a future case adds. Fake timers keep
+      // the assertion about the per-domain loop rather than about the clock.
+      vi.useFakeTimers();
+      try {
+        const run = upgrade({ yes: true });
+        await vi.runAllTimersAsync();
+        await run;
+      } finally {
+        vi.useRealTimers();
+      }
 
       const createCalls = mockSesClientSend.mock.calls.filter(
         (call: any[]) => call[0] instanceof CreateConfigurationSetCommand

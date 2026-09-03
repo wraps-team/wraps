@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { emailDestroy } from "../commands/email/destroy.js";
+import { init } from "../commands/email/init.js";
 
 /**
  * Test: destroy → init leaves user stuck in inconsistent state
@@ -15,6 +17,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * ~/.wraps/connections/{accountId}-{region}.json but does NOT delete the
  * metadata from S3 (wraps-state-* bucket). loadConnectionMetadata() has
  * S3 fallback that re-downloads and re-saves the metadata locally.
+ *
+ * WHY THE TWO COMMANDS ARE IMPORTED STATICALLY. Both used to be pulled in with
+ * `await import(...)` inside the first test. The modules are cached, so only
+ * that test paid — but it paid for both command graphs at once, ~1s of it, all
+ * billed against a per-test timeout. That is why this test carried a
+ * `{ timeout: 15_000 }` bump whose comment blamed "parallel suite load": the
+ * load was real, but it was module loading, not the assertions, and raising the
+ * ceiling hid it instead of removing it.
+ *
+ * Importing statically moves that cost into the file's import phase, which no
+ * test timeout governs. The first test went from ~1017ms to ~13ms, so the bump
+ * is gone. It needs `vi.hoisted()` for the mock functions, because `vi.mock`
+ * factories are hoisted above imports and would otherwise close over consts
+ * that have not been initialized yet. Reverting either half brings back both
+ * the slow test and the need for the bump.
  */
 
 // ---- Mocks ----
@@ -239,61 +256,112 @@ vi.mock("../commands/email/test.js", () => ({
 let localMetadataStore: Record<string, any> = {};
 let s3MetadataStore: Record<string, any> = {};
 
-const mockLoadConnectionMetadata = vi.fn(
-  async (accountId: string, region: string) => {
-    const key = `${accountId}-${region}`;
-    // First check local
-    if (localMetadataStore[key]) {
-      return localMetadataStore[key];
+/**
+ * Declared inside `vi.hoisted` so the `vi.mock` factories below can close over
+ * them while still allowing the two commands under test to be imported
+ * statically at the top of this file. See the header for why that matters.
+ *
+ * The closures here read `localMetadataStore` / `s3MetadataStore`, which stay
+ * module-scoped `let`s so `beforeEach` can reassign them. That is safe: this
+ * factory only *creates* the closures, and nothing calls one until a test runs,
+ * by which point the module body has initialized both stores.
+ */
+const {
+  mockLoadConnectionMetadata,
+  mockSaveConnectionMetadata,
+  mockDeleteConnectionMetadata,
+  mockCreateConnectionMetadata,
+  mockStackDestroy,
+  mockStackRefresh,
+  mockStackRemove,
+  mockStackUp,
+  mockSetConfig,
+  mockSelectStack,
+} = vi.hoisted(() => {
+  const mockLoadConnectionMetadata = vi.fn(
+    async (accountId: string, region: string) => {
+      const key = `${accountId}-${region}`;
+      // First check local
+      if (localMetadataStore[key]) {
+        return localMetadataStore[key];
+      }
+      // Fall back to S3 (simulating the real loadConnectionMetadata behavior)
+      if (s3MetadataStore[key]) {
+        // Re-save locally (as the real code does at line 235-236 of metadata.ts)
+        localMetadataStore[key] = s3MetadataStore[key];
+        return s3MetadataStore[key];
+      }
+      return null;
     }
-    // Fall back to S3 (simulating the real loadConnectionMetadata behavior)
-    if (s3MetadataStore[key]) {
-      // Re-save locally (as the real code does at line 235-236 of metadata.ts)
-      localMetadataStore[key] = s3MetadataStore[key];
-      return s3MetadataStore[key];
+  );
+
+  const mockSaveConnectionMetadata = vi.fn(async (metadata: any) => {
+    const key = `${metadata.accountId}-${metadata.region}`;
+    localMetadataStore[key] = metadata;
+    // Simulate S3 write-through (as the real code does)
+    s3MetadataStore[key] = metadata;
+  });
+
+  const mockDeleteConnectionMetadata = vi.fn(
+    async (accountId: string, region: string) => {
+      const key = `${accountId}-${region}`;
+      // FIX: Deletes both local and S3 (matches fixed implementation)
+      delete localMetadataStore[key];
+      delete s3MetadataStore[key];
     }
-    return null;
-  }
-);
+  );
 
-const mockSaveConnectionMetadata = vi.fn(async (metadata: any) => {
-  const key = `${metadata.accountId}-${metadata.region}`;
-  localMetadataStore[key] = metadata;
-  // Simulate S3 write-through (as the real code does)
-  s3MetadataStore[key] = metadata;
-});
-
-const mockDeleteConnectionMetadata = vi.fn(
-  async (accountId: string, region: string) => {
-    const key = `${accountId}-${region}`;
-    // FIX: Deletes both local and S3 (matches fixed implementation)
-    delete localMetadataStore[key];
-    delete s3MetadataStore[key];
-  }
-);
-
-const mockCreateConnectionMetadata = vi.fn(
-  (
-    accountId: string,
-    region: string,
-    provider: string,
-    emailConfig: any,
-    preset?: string
-  ) => ({
-    version: "1.0.0",
-    accountId,
-    region,
-    provider,
-    timestamp: new Date().toISOString(),
-    services: {
-      email: {
-        preset,
-        config: emailConfig,
-        deployedAt: new Date().toISOString(),
+  const mockCreateConnectionMetadata = vi.fn(
+    (
+      accountId: string,
+      region: string,
+      provider: string,
+      emailConfig: any,
+      preset?: string
+    ) => ({
+      version: "1.0.0",
+      accountId,
+      region,
+      provider,
+      timestamp: new Date().toISOString(),
+      services: {
+        email: {
+          preset,
+          config: emailConfig,
+          deployedAt: new Date().toISOString(),
+        },
       },
+    })
+  );
+
+  const mockStackDestroy = vi.fn();
+  const mockStackRefresh = vi.fn().mockResolvedValue(undefined);
+  const mockStackRemove = vi.fn();
+  const mockStackUp = vi.fn().mockResolvedValue({
+    outputs: {
+      roleArn: { value: "arn:aws:iam::123456789012:role/wraps-email-role" },
+      configSetName: { value: "wraps-email-config" },
+      region: { value: "us-east-1" },
+      domain: { value: "example.com" },
+      dkimTokens: { value: [] },
     },
-  })
-);
+  });
+  const mockSetConfig = vi.fn().mockResolvedValue(undefined);
+  const mockSelectStack = vi.fn().mockResolvedValue(undefined);
+
+  return {
+    mockLoadConnectionMetadata,
+    mockSaveConnectionMetadata,
+    mockDeleteConnectionMetadata,
+    mockCreateConnectionMetadata,
+    mockStackDestroy,
+    mockStackRefresh,
+    mockStackRemove,
+    mockStackUp,
+    mockSetConfig,
+    mockSelectStack,
+  };
+});
 
 vi.mock("../utils/shared/metadata.js", () => ({
   loadConnectionMetadata: mockLoadConnectionMetadata,
@@ -350,20 +418,6 @@ vi.mock("../utils/shared/prompts.js", () => ({
 }));
 
 // Mock Pulumi
-const mockStackDestroy = vi.fn();
-const mockStackRefresh = vi.fn().mockResolvedValue(undefined);
-const mockStackRemove = vi.fn();
-const mockStackUp = vi.fn().mockResolvedValue({
-  outputs: {
-    roleArn: { value: "arn:aws:iam::123456789012:role/wraps-email-role" },
-    configSetName: { value: "wraps-email-config" },
-    region: { value: "us-east-1" },
-    domain: { value: "example.com" },
-    dkimTokens: { value: [] },
-  },
-});
-const mockSetConfig = vi.fn().mockResolvedValue(undefined);
-const mockSelectStack = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@pulumi/pulumi", () => ({
   automation: {
@@ -422,87 +476,77 @@ describe("destroy → init inconsistent state bug", () => {
     mockProcessExit.mockClear();
   });
 
-  // Bumped from the 5s default — this test exercises destroy + init end-to-end
-  // through a chain of mocked AWS clients and runs in ~3s in isolation, but
-  // pushes past the default timeout under parallel suite load.
-  it(
-    "should allow init after destroy partial failure (destroy clears both local and S3 metadata)",
-    { timeout: 15_000 },
-    async () => {
-      // Step 1: Simulate existing deployment by seeding metadata in both stores
-      // (as saveConnectionMetadata would have done during the initial init)
-      const existingMetadata = {
-        version: "1.0.0",
-        accountId: "123456789012",
-        region: "us-east-1",
-        provider: "other",
-        timestamp: "2024-01-01T00:00:00.000Z",
-        services: {
-          email: {
-            preset: "starter",
-            config: {
-              domain: "example.com",
-              sendingEnabled: true,
-              tracking: { enabled: true },
-            },
-            pulumiStackName: "wraps-123456789012-us-east-1",
-            deployedAt: "2024-01-01T00:00:00.000Z",
-          },
-        },
-      };
-
-      localMetadataStore["123456789012-us-east-1"] = existingMetadata;
-      s3MetadataStore["123456789012-us-east-1"] = existingMetadata;
-
-      // Step 2: Run destroy with partial failure
-      mockStackDestroy.mockRejectedValue(
-        new Error(
-          "Command failed with exit code 255: pulumi destroy --yes --skip-preview"
-        )
-      );
-
-      const { emailDestroy } = await import("../commands/email/destroy.js");
-      await emailDestroy({ force: true, region: "us-east-1" });
-
-      // Verify destroy deleted local metadata
-      expect(mockDeleteConnectionMetadata).toHaveBeenCalledWith(
-        "123456789012",
-        "us-east-1"
-      );
-
-      // Step 3: Run init — it should NOT find existing metadata
-      // BUG: loadConnectionMetadata will re-download from S3 and return the old metadata
-      const { init } = await import("../commands/email/init.js");
-
-      // Reset the loadConnectionMetadata call count so we can track the init call
-      mockLoadConnectionMetadata.mockClear();
-
-      // init should proceed with deployment, NOT exit with "Connection already exists"
-      // If it exits (process.exit), the test will throw "process.exit called"
-      let initExitedEarly = false;
-      try {
-        await init({
-          provider: "other",
-          region: "us-east-1",
-          domain: "example.com",
+  it("should allow init after destroy partial failure (destroy clears both local and S3 metadata)", async () => {
+    // Step 1: Simulate existing deployment by seeding metadata in both stores
+    // (as saveConnectionMetadata would have done during the initial init)
+    const existingMetadata = {
+      version: "1.0.0",
+      accountId: "123456789012",
+      region: "us-east-1",
+      provider: "other",
+      timestamp: "2024-01-01T00:00:00.000Z",
+      services: {
+        email: {
           preset: "starter",
-          yes: true,
-          quick: true,
-        });
-      } catch (error) {
-        if (error instanceof Error && error.message === "process.exit called") {
-          initExitedEarly = true;
-        } else {
-          throw error;
-        }
-      }
+          config: {
+            domain: "example.com",
+            sendingEnabled: true,
+            tracking: { enabled: true },
+          },
+          pulumiStackName: "wraps-123456789012-us-east-1",
+          deployedAt: "2024-01-01T00:00:00.000Z",
+        },
+      },
+    };
 
-      // The bug: init finds metadata from S3 fallback and exits early
-      // This assertion should PASS when the bug is fixed (init should NOT exit early)
-      // Currently it FAILS because loadConnectionMetadata returns the S3 copy
-      expect(initExitedEarly).toBe(false);
+    localMetadataStore["123456789012-us-east-1"] = existingMetadata;
+    s3MetadataStore["123456789012-us-east-1"] = existingMetadata;
+
+    // Step 2: Run destroy with partial failure
+    mockStackDestroy.mockRejectedValue(
+      new Error(
+        "Command failed with exit code 255: pulumi destroy --yes --skip-preview"
+      )
+    );
+
+    await emailDestroy({ force: true, region: "us-east-1" });
+
+    // Verify destroy deleted local metadata
+    expect(mockDeleteConnectionMetadata).toHaveBeenCalledWith(
+      "123456789012",
+      "us-east-1"
+    );
+
+    // Step 3: Run init — it should NOT find existing metadata
+    // BUG: loadConnectionMetadata will re-download from S3 and return the old metadata
+    // Reset the loadConnectionMetadata call count so we can track the init call
+    mockLoadConnectionMetadata.mockClear();
+
+    // init should proceed with deployment, NOT exit with "Connection already exists"
+    // If it exits (process.exit), the test will throw "process.exit called"
+    let initExitedEarly = false;
+    try {
+      await init({
+        provider: "other",
+        region: "us-east-1",
+        domain: "example.com",
+        preset: "starter",
+        yes: true,
+        quick: true,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "process.exit called") {
+        initExitedEarly = true;
+      } else {
+        throw error;
+      }
     }
-  );
+
+    // The bug: init finds metadata from S3 fallback and exits early
+    // This assertion should PASS when the bug is fixed (init should NOT exit early)
+    // Currently it FAILS because loadConnectionMetadata returns the S3 copy
+    expect(initExitedEarly).toBe(false);
+  });
 
   it("deleteConnectionMetadata should remove S3 metadata too", async () => {
     // Seed metadata in both stores

@@ -25,6 +25,17 @@ export default defineConfig(async ({ mode }) => {
       setupFiles: ["./src/lib/permissions/__tests__/setup.ts"],
       // Sequential execution required when using shared database with afterEach cleanup
       fileParallelism: false,
+      // These suites run against the same shared remote Neon branch apps/api
+      // uses, where a single round-trip costs seconds. `fileParallelism: false`
+      // serializes them but does nothing about latency, so any test doing
+      // several writes — creating an org, seeding rows, then asserting — lands
+      // just past the 5s default. apps/api measured exactly that (5005-5562ms
+      // failures that passed in full at 60s) and gave itself this headroom;
+      // this app has the same database, the same serialization and ten
+      // `*-db.test.ts` files, but was still on the default. Matches
+      // apps/api/vitest.config.ts and packages/auth/vitest.config.ts.
+      testTimeout: 30_000,
+      hookTimeout: 30_000,
       coverage: {
         provider: "v8",
         reporter: ["text", "json", "html"],

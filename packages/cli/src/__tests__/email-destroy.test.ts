@@ -1,7 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { emailDestroy } from "../commands/email/destroy.js";
 
 /**
  * Test: wraps email destroy handles pulumi failures gracefully
+ *
+ * WHY THE IMPORT BELOW IS STATIC, AND MUST STAY THAT WAY. Every test here used
+ * to open with `const { emailDestroy } = await import("../commands/email/destroy.js")`.
+ * That looks harmless — the module is cached, so only the first test pays — but
+ * "only the first test pays" is the bug: loading the command's whole module
+ * graph costs ~550ms on an idle machine, and all of it is billed to whichever
+ * test runs first, against vitest's 5s per-test timeout. The other four tests
+ * cost 1ms each.
+ *
+ * That margin is not as wide as it looks. Measured on this file: ~550ms idle,
+ * 1.9s at 2x CPU oversubscription, 3.0s at 6.4x. A CI runner has fewer cores
+ * than a laptop and runs the whole monorepo's suites at once, so the first test
+ * crosses 5s there and nowhere else — which is exactly the shape of the "fails
+ * often in CI, passes locally" flake this file kept producing.
+ *
+ * A static import moves that cost into the file's import phase, which no test
+ * timeout governs. It needs `vi.hoisted()` for the mock functions: `vi.mock`
+ * factories are hoisted above imports, so a factory closing over a plain
+ * `const` declared further down would run before that const is initialized.
+ * `vi.hoisted` is what makes the consts available that early. Reverting either
+ * half — the static import or the hoisted block — brings the flake back.
  *
  * Previously, when `stack.destroy()` failed with exit code 255 (partial destruction),
  * the error was thrown and `deleteConnectionMetadata` was never reached.
@@ -15,6 +37,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 // ---- Mocks ----
+
+/**
+ * Declared via `vi.hoisted` so the `vi.mock` factories below — which vitest
+ * lifts above the static import — can close over them. See the file header.
+ */
+const {
+  mockDeleteConnectionMetadata,
+  mockSqsSend,
+  mockStackDestroy,
+  mockStackRefresh,
+  mockRemoveStack,
+} = vi.hoisted(() => ({
+  mockDeleteConnectionMetadata: vi.fn(),
+  mockSqsSend: vi.fn(),
+  mockStackDestroy: vi.fn(),
+  mockStackRefresh: vi.fn(),
+  mockRemoveStack: vi.fn(),
+}));
 
 // Mock clack prompts (used for UI)
 vi.mock("@clack/prompts", () => ({
@@ -79,7 +119,6 @@ vi.mock("../utils/shared/fs.js", () => ({
 }));
 
 // Mock metadata utilities
-const mockDeleteConnectionMetadata = vi.fn().mockResolvedValue(undefined);
 vi.mock("../utils/shared/metadata.js", () => ({
   loadConnectionMetadata: vi.fn().mockResolvedValue({
     version: "1.0.0",
@@ -131,12 +170,6 @@ vi.mock("@aws-sdk/client-sesv2", () => ({
  * usually already gone by the time this runs — so rejecting is the honest
  * default, and it keeps the swallowing `catch` on the path it really takes.
  */
-const mockSqsSend = vi.fn().mockRejectedValue(
-  Object.assign(new Error("AWS.SimpleQueueService.NonExistentQueue"), {
-    name: "QueueDoesNotExist",
-  })
-);
-
 vi.mock("@aws-sdk/client-sqs", () => ({
   SQSClient: vi.fn().mockImplementation(() => ({ send: mockSqsSend })),
   GetQueueUrlCommand: vi.fn(),
@@ -144,10 +177,6 @@ vi.mock("@aws-sdk/client-sqs", () => ({
 }));
 
 // Track whether stack methods were called and mock Pulumi automation
-const mockStackDestroy = vi.fn();
-const mockStackRefresh = vi.fn().mockResolvedValue(undefined);
-const mockRemoveStack = vi.fn();
-
 vi.mock("@pulumi/pulumi", () => ({
   automation: {
     LocalWorkspace: {
@@ -186,6 +215,24 @@ vi.mock("../utils/shared/errors.js", async () => {
   };
 });
 
+/**
+ * Mock the control-plane client.
+ *
+ * Unreached today — the metadata fixture below has no agents, so the agent
+ * status sync is skipped — but this is the same trap the SQS note above
+ * describes, with one extra tooth: `createAgentApiClient` calls
+ * `resolveApiTarget`, which reads the developer's real auth config from disk,
+ * and then talks to the API over `fetch`. The no-real-network guard patches
+ * `http.request`/`https.request`, and `fetch` is undici, which does not go
+ * through either — so a live call on this path would not be blocked or
+ * reported, just slow. Adding one agent to the fixture is all it would take.
+ */
+vi.mock("../utils/shared/agent-api.js", () => ({
+  createAgentApiClient: vi
+    .fn()
+    .mockResolvedValue({ ok: false, reason: "not-authenticated" }),
+}));
+
 // Mock the output module
 vi.mock("../utils/shared/output.js", async () => {
   const actual = (await vi.importActual("../utils/shared/output.js")) as any;
@@ -201,6 +248,11 @@ describe("wraps email destroy - exit code 255 bug", () => {
     mockStackRefresh.mockReset().mockResolvedValue(undefined);
     mockRemoveStack.mockReset();
     mockDeleteConnectionMetadata.mockReset().mockResolvedValue(undefined);
+    mockSqsSend.mockReset().mockRejectedValue(
+      Object.assign(new Error("AWS.SimpleQueueService.NonExistentQueue"), {
+        name: "QueueDoesNotExist",
+      })
+    );
   });
 
   it("should clean up metadata when pulumi destroy fails with exit code 255", async () => {
@@ -209,8 +261,6 @@ describe("wraps email destroy - exit code 255 bug", () => {
     );
 
     mockStackDestroy.mockRejectedValue(pulumiError);
-
-    const { emailDestroy } = await import("../commands/email/destroy.js");
 
     // Should NOT throw — partial failure is handled gracefully
     await emailDestroy({ force: true, region: "us-east-1" });
@@ -233,8 +283,6 @@ describe("wraps email destroy - exit code 255 bug", () => {
 
     mockStackDestroy.mockRejectedValue(partialDestroyError);
 
-    const { emailDestroy } = await import("../commands/email/destroy.js");
-
     await emailDestroy({ force: true, region: "us-east-1" });
 
     expect(mockDeleteConnectionMetadata).toHaveBeenCalledWith(
@@ -246,8 +294,6 @@ describe("wraps email destroy - exit code 255 bug", () => {
   it("should call stack.refresh() before stack.destroy()", async () => {
     mockStackDestroy.mockResolvedValue(undefined);
     mockRemoveStack.mockResolvedValue(undefined);
-
-    const { emailDestroy } = await import("../commands/email/destroy.js");
 
     await emailDestroy({ force: true, region: "us-east-1" });
 
@@ -264,8 +310,6 @@ describe("wraps email destroy - exit code 255 bug", () => {
     mockStackDestroy.mockResolvedValue(undefined);
     mockRemoveStack.mockResolvedValue(undefined);
 
-    const { emailDestroy } = await import("../commands/email/destroy.js");
-
     await emailDestroy({ force: true, region: "us-east-1" });
 
     expect(mockStackDestroy).toHaveBeenCalledWith(
@@ -276,8 +320,6 @@ describe("wraps email destroy - exit code 255 bug", () => {
   it("should attempt lock clear and retry for stack lock errors", async () => {
     const lockError = new Error("the stack is currently locked by 1 lock(s)");
     mockStackDestroy.mockRejectedValue(lockError);
-
-    const { emailDestroy } = await import("../commands/email/destroy.js");
 
     // With --force, withLockRetry auto-clears and retries once.
     // If retry also fails, destroy treats it as a partial failure and still cleans metadata.
