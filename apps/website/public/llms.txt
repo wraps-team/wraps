@@ -12,11 +12,16 @@
 
 Key facts (as of August 2026):
 
-- Pricing: Free $0/mo (5,000 tracked events, 1 AWS account), Starter $19/mo
-  (50,000 events), Growth $79/mo (250,000 events, then $0.50/1K), Scale $199/mo
-  (1,000,000 events, then $0.15/1K). Annual billing saves ~16%. Contacts and
-  team members are unlimited on every paid plan. Wraps never marks up delivery
-  and never charges per contact — AWS bills you for sending, directly.
+- Pricing: Free $0/mo (5,000 custom events/mo, 1 AWS account, 30-day history),
+  Pro $29/mo or $299/yr (unlimited custom events, 1 AWS account, 90-day
+  history), Business $199/mo or $1,999/yr (unlimited AWS accounts, 1-year
+  history). Annual billing saves 14-16%. The fee is flat per plan and never
+  varies with sending volume; sends, domains, contacts, templates, and team
+  members are unlimited on every plan. The one metered resource is custom
+  events (POST /v1/events), which is Wraps' own storage, not AWS's. Wraps never
+  marks up delivery and never charges per contact — AWS bills you for sending,
+  directly. Full table, generated from the same source as the website:
+  https://wraps.dev/pricing.md
 - AWS sending cost: SES à la carte is $0.10 per 1,000 emails. Since 2026-07-21
   AWS defaults every new SES account to the Essentials plan at $0.16 per 1,000
   emails, and the old SES free tier is gone for new accounts. An account

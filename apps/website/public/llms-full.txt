@@ -80,9 +80,9 @@ await sms.send({
 ### Platform (app.wraps.dev)
 Visual dashboard with progressive feature unlocks:
 
-**Starter ($10/mo):** Templates with AI generation, batch sending, analytics, 30-day history, 5 workflows
-**Growth ($49/mo):** Topics (subscription management), Segments, Campaigns, 25 workflows
-**Scale ($149/mo):** Unlimited workflows, event tracking, advanced segments, multi-tenant orchestration
+**Free ($0/mo):** Unlimited sends, domains, contacts and team members; 5,000 custom events/mo; 1 AWS account; 2 workflows; 30-day history
+**Pro ($29/mo, $299/yr):** Everything in Free, plus unlimited workflows and custom events; topics, segments, batch and campaigns; 250 AI generations/mo; 90-day history
+**Business ($199/mo, $1,999/yr):** Everything in Pro, plus unlimited AWS accounts; 1,000 AI generations/mo; 1-year history; SSO, SCIM and audit logs; priority support
 
 ## Key Differentiators
 
@@ -718,18 +718,25 @@ npx @wraps.dev/cli email upgrade
 
 ## Pricing
 
-| | Free | Starter | Growth | Scale |
-|--|------|---------|--------|-------|
-| **Price** | $0 | $10/mo | $49/mo | $149/mo |
-| **Dashboard** | Self-host | Hosted | Hosted | Hosted |
-| **Contacts** | Unlimited | Unlimited | Unlimited | Unlimited |
-| **Workflows** | -- | 5 | 25 | Unlimited |
-| **Features** | CLI/SDK | + Templates, Analytics | + Topics, Segments, Campaigns | + Events, Advanced Segments |
+| | Free | Pro | Business |
+|--|------|-----|----------|
+| **Price** | $0 | $29/mo ($299/yr) | $199/mo ($1,999/yr) |
+| **Custom events** | 5,000/mo | Unlimited | Unlimited |
+| **Workflows** | 2 | Unlimited | Unlimited |
+| **AWS accounts** | 1 | 1 | Unlimited |
+| **Dashboard history** | 30 days | 90 days | 1 year |
+| **AI generations** | -- | 250/mo | 1,000/mo |
+| **Contacts, domains, templates, sends** | Unlimited | Unlimited | Unlimited |
+| **SSO, SCIM, audit logs** | -- | -- | Yes |
+| **Support** | Community | Email | Priority |
 
-You pay Wraps for tooling. You pay AWS for infrastructure. No surprises.
+The fee is flat per plan and never varies with sending volume. You pay Wraps
+for tooling. You pay AWS for infrastructure. No surprises.
 
-**Example**: 100K emails/month = $10-49 (Wraps) + ~$10 (AWS) = $20-59 total.
-Managed services charge $80-150+ for the same volume.
+**Example**: 100K emails/month = $29 (Wraps Pro) + ~$10-16 (AWS SES) = $39-45
+total. Managed services charge $80-150+ for the same volume.
+
+Full table, generated from the same source as the website: https://wraps.dev/pricing.md
 
 ## Available Packages
 
