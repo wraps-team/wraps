@@ -926,6 +926,7 @@ export type TrackedDomain = {
   addedAt?: string;
   configSetName?: string;
   trackingConfig?: AdditionalDomain["trackingConfig"];
+  trackingDomain?: string;
 };
 
 /**
@@ -1026,6 +1027,7 @@ export function getAllTrackedDomains(
       isPrimary: true,
       managed: true,
       mailFromDomain: config.mailFromDomain,
+      trackingDomain: config.tracking?.customRedirectDomain,
     });
   }
 
@@ -1040,6 +1042,7 @@ export function getAllTrackedDomains(
       addedAt: d.addedAt,
       configSetName: d.configSetName,
       trackingConfig: d.trackingConfig,
+      trackingDomain: d.trackingDomain,
     });
   }
 

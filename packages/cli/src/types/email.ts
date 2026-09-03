@@ -23,6 +23,10 @@ export type AdditionalDomain = {
   purpose?: DomainPurpose;
   configSetName?: string;
   trackingConfig?: { opens: boolean; clicks: boolean };
+  /** Custom redirect domain for open/click links, e.g. "track.news.example.com". */
+  trackingDomain?: string;
+  /** ISO time SES accepted `trackingDomain`; absent while the sending domain is unverified. */
+  trackingDomainAppliedAt?: string;
   tlsRequired?: boolean;
   reputationMetrics?: boolean;
   suppressionReasons?: ("BOUNCE" | "COMPLAINT")[];
@@ -38,6 +42,8 @@ export type EmailDomainsConfigOptions = {
   domain?: string;
   opens?: boolean;
   clicks?: boolean;
+  /** A hostname to set, or the literal "none" to clear. */
+  trackingDomain?: string;
   tlsRequired?: boolean;
   reputationMetrics?: boolean;
   suppressBounce?: boolean;

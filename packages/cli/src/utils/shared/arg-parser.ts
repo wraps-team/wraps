@@ -67,6 +67,7 @@ export type CliFlags = {
   // Domain config
   opens?: boolean;
   clicks?: boolean;
+  trackingDomain?: string;
   tlsRequired?: boolean;
   reputationMetrics?: boolean;
   suppressBounce?: boolean;
@@ -129,6 +130,7 @@ const STRING_FLAGS = [
   "provider",
   "region",
   "domain",
+  "tracking-domain",
   "account",
   "preset",
   "port",
