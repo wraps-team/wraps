@@ -1,13 +1,20 @@
 import { type NextRequest, NextResponse } from "next/server";
 import {
-  hasMarkdown,
   markdownUrlFor,
   pageForMarkdownUrl,
   prefersMarkdown,
 } from "@/lib/agent-content-paths";
 import { setAttributionCookie } from "@/lib/attribution";
+import { DERIVE_MARKER_HEADER } from "@/lib/derive-markdown";
 
 export async function middleware(request: NextRequest) {
+  // /api/md renders the page it is about to convert. That request must reach
+  // the HTML untouched — it asks for text/html and carries no crawler UA, so it
+  // would anyway, but a loop here would be a hang rather than a bad response.
+  if (request.headers.get(DERIVE_MARKER_HEADER) !== null) {
+    return NextResponse.next();
+  }
+
   const accept = request.headers.get("accept") ?? "";
 
   // /mcp is two things at one URL: the product page for people, and the
@@ -35,14 +42,18 @@ export async function middleware(request: NextRequest) {
   const wantsMarkdown =
     accept.includes("text/markdown") ||
     prefersMarkdown(request.headers.get("user-agent") ?? "");
-  const isCovered = hasMarkdown(pathname);
 
-  const response = routeResponse(request, { wantsMarkdown, isCovered });
+  const response = routeResponse(request, { wantsMarkdown });
 
-  if (!wantsMarkdown && isCovered) {
+  if (!wantsMarkdown) {
     // Tell agents a markdown representation exists — pointing at the `.md`
     // URL, which serves markdown to anyone. Advertising this path instead sent
     // them back to the HTML they already had.
+    //
+    // Advertised for every page, not just the hand-authored ones: /api/md
+    // derives markdown from the page's own render, so the representation is
+    // real either way. A URL that is not a page at all gets a header pointing
+    // at a markdown 404, which is the same answer its HTML gave.
     response.headers.set(
       "Link",
       `<${markdownUrlFor(pathname)}>; rel="alternate"; type="text/markdown"`
@@ -61,7 +72,7 @@ const PRICING_PATH = "/pricing";
 
 function routeResponse(
   request: NextRequest,
-  { wantsMarkdown, isCovered }: { wantsMarkdown: boolean; isCovered: boolean }
+  { wantsMarkdown }: { wantsMarkdown: boolean }
 ): NextResponse {
   // /pricing is the #pricing section of the homepage, not a page of its own,
   // so a plain GET used to 404 on the most-guessed URL on the site. The
@@ -70,7 +81,10 @@ function routeResponse(
   if (request.nextUrl.pathname === PRICING_PATH && !wantsMarkdown) {
     return NextResponse.redirect(new URL("/#pricing", request.nextUrl.origin));
   }
-  if (wantsMarkdown && isCovered) {
+  if (wantsMarkdown) {
+    // Every page, not only the hand-authored ones — /api/md falls back to
+    // deriving markdown from the page's own render, and answers with a
+    // markdown 404 naming the sitemap when there is no page at all.
     return markdownRewrite(request, request.nextUrl.pathname);
   }
   return NextResponse.next();

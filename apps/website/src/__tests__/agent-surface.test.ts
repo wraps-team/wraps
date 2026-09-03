@@ -1,7 +1,7 @@
 import { globSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { NextRequest } from "next/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AGENT_CONTENT } from "@/lib/agent-content";
 import { AGENT_CONTENT_PATHS } from "@/lib/agent-content-paths";
 import { middleware } from "@/middleware";
@@ -101,10 +101,10 @@ describe("llms.txt lists every docs/compare/alternatives page — no page an age
   });
 });
 
-describe("middleware only rewrites requests for paths AGENT_CONTENT actually serves", () => {
+describe("middleware negotiates markdown for every page, hand-authored or derived", () => {
   // Fixture sanity: if these drift out of AGENT_CONTENT, the tests below stop
   // proving anything. Fail loudly instead of silently passing on a no-op.
-  it("fixtures: COVERED_PATH is covered, UNCOVERED_PATH is a real page that isn't", () => {
+  it("fixtures: COVERED_PATH is hand-authored, UNCOVERED_PATH is a real page that isn't", () => {
     expect(AGENT_CONTENT_PATHS).toContain(COVERED_PATH);
     expect(AGENT_CONTENT_PATHS).not.toContain(UNCOVERED_PATH);
     expect(
@@ -114,14 +114,25 @@ describe("middleware only rewrites requests for paths AGENT_CONTENT actually ser
     ).toBe(true);
   });
 
-  it("does NOT rewrite an uncovered path even when the client asks for markdown — it falls through to the normal HTML page", async () => {
+  it("rewrites a path with no hand-authored entry too — /api/md derives markdown from that page's own render", async () => {
     const request = new NextRequest(`https://wraps.dev${UNCOVERED_PATH}`, {
       headers: { accept: "text/markdown" },
     });
     const response = await middleware(request);
 
-    // Next.js signals a middleware rewrite via this response header; its
-    // absence means the request passed through to the normal page render.
+    // This used to fall through to HTML. Coverage was ~20 of ~130 routes, so
+    // an agent asking for markdown got it on one page in six.
+    expect(response.headers.get("x-middleware-rewrite")).toBe(
+      `https://wraps.dev/api/md${UNCOVERED_PATH}`
+    );
+  });
+
+  it("passes the derivation render itself through to HTML — a loop here would hang, not 404", async () => {
+    const request = new NextRequest(`https://wraps.dev${UNCOVERED_PATH}`, {
+      headers: { accept: "text/markdown", "x-wraps-md-derive": "1" },
+    });
+    const response = await middleware(request);
+
     expect(response.headers.get("x-middleware-rewrite")).toBeNull();
   });
 
@@ -159,11 +170,14 @@ describe("middleware only rewrites requests for paths AGENT_CONTENT actually ser
     );
   });
 
-  it("does not advertise a markdown alternate for an uncovered path", async () => {
+  it("advertises the markdown alternate for a page with no hand-authored entry as well", async () => {
     const request = new NextRequest(`https://wraps.dev${UNCOVERED_PATH}`);
     const response = await middleware(request);
 
-    expect(response.headers.get("link")).toBeNull();
+    // The representation is real either way — derived rather than written.
+    expect(response.headers.get("link")).toBe(
+      `<${UNCOVERED_PATH}.md>; rel="alternate"; type="text/markdown"`
+    );
   });
 
   it("still sets the attribution cookie on a markdown-rewrite response, not just the plain HTML branch", async () => {
@@ -186,7 +200,7 @@ describe("middleware only rewrites requests for paths AGENT_CONTENT actually ser
   });
 });
 
-describe("GET /api/md/[...path] serves only what AGENT_CONTENT covers", () => {
+describe("GET /api/md/[...path] serves hand-authored markdown, then derived, then a 404", () => {
   it("returns 200 and the real markdown for a covered path", async () => {
     const { GET } = await import("@/app/api/md/[...path]/route");
     const response = await GET(
@@ -199,22 +213,60 @@ describe("GET /api/md/[...path] serves only what AGENT_CONTENT covers", () => {
     expect(body).toBe(AGENT_CONTENT[COVERED_PATH]);
   });
 
-  it("returns 404 (not the llms.txt index) for an uncovered path", async () => {
-    const { GET } = await import("@/app/api/md/[...path]/route");
-    const response = await GET(
-      new NextRequest(`https://wraps.dev/api/md${UNCOVERED_PATH}`),
-      {
-        params: Promise.resolve({
-          path: UNCOVERED_PATH.slice(1).split("/"),
-        }),
-      }
-    );
+  it("derives markdown from the page render when there is no hand-authored entry", async () => {
+    const html = `<html><head><title>Migration Guide | Wraps</title></head>
+      <body><nav>Docs</nav><main><h1>Migration Guide</h1>
+      <p>${"Move an existing SES setup onto Wraps without changing domains. ".repeat(6)}</p>
+      </main><footer>&copy; Wraps</footer></body></html>`;
 
-    expect(response.status).toBe(404);
-    const body = await response.text();
-    // Distinctive to the llms.txt index — proves this is NOT a silent
-    // fallback to the full index if the old behavior is ever reintroduced.
-    expect(body).not.toContain("When to Use Wraps");
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(html, { status: 200 }));
+
+    try {
+      const { GET } = await import("@/app/api/md/[...path]/route");
+      const response = await GET(
+        new NextRequest(`https://wraps.dev/api/md${UNCOVERED_PATH}`),
+        {
+          params: Promise.resolve({
+            path: UNCOVERED_PATH.slice(1).split("/"),
+          }),
+        }
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.text();
+      expect(body).toContain("# Migration Guide");
+      expect(body).toContain(`Source: https://wraps.dev${UNCOVERED_PATH}`);
+      // Chrome is dropped, not converted alongside the content.
+      expect(body).not.toContain("Docs");
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("returns 404 (not the llms.txt index) when the page does not exist either", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("Not found", { status: 404 }));
+
+    try {
+      const { GET } = await import("@/app/api/md/[...path]/route");
+      const response = await GET(
+        new NextRequest("https://wraps.dev/api/md/docs/not-a-real-page"),
+        {
+          params: Promise.resolve({ path: ["docs", "not-a-real-page"] }),
+        }
+      );
+
+      expect(response.status).toBe(404);
+      const body = await response.text();
+      // Distinctive to the llms.txt index — proves this is NOT a silent
+      // fallback to the full index if the old behavior is ever reintroduced.
+      expect(body).not.toContain("When to Use Wraps");
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });
 

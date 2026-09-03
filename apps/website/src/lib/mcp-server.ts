@@ -419,7 +419,7 @@ function runGetDoc(args: Record<string, unknown>): ToolResult {
       content: [
         {
           type: "text",
-          text: `No markdown source for "${path}". Paths with markdown: ${[...AGENT_CONTENT_PATHS].sort().join(", ")}. Every other page is reachable as HTML at ${SITE}${path}, and the whole corpus is at ${SITE}/llms-full.txt.`,
+          text: `No hand-authored markdown for "${path}". Fetch ${SITE}${path}.md — every page on the site serves markdown, derived from its own render when there is no hand-authored source. Pages with a hand-authored version: ${[...AGENT_CONTENT_PATHS].sort().join(", ")}. The whole corpus is at ${SITE}/llms-full.txt.`,
         },
       ],
       isError: true,

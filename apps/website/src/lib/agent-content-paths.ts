@@ -1,4 +1,10 @@
-// Paths that have a real markdown representation in AGENT_CONTENT.
+// Paths with hand-authored markdown in AGENT_CONTENT.
+//
+// This is no longer the site's markdown coverage — every page is served as
+// markdown, derived from its own render when it has no entry here (see
+// lib/derive-markdown.ts). What this list still decides is which pages get the
+// better, hand-written version instead of the derived one.
+//
 // Kept separate from agent-content.ts so middleware (edge bundle) doesn't
 // pull in the full content strings.
 export const AGENT_CONTENT_PATHS: readonly string[] = [
@@ -36,14 +42,17 @@ export function hasMarkdown(path: string): boolean {
 }
 
 /**
- * The `.md` URL for a page, or undefined when it has no markdown source.
+ * The `.md` URL for a page.
+ *
+ * Defined for every path, not just the hand-authored ones: /api/md derives
+ * markdown from the page's own render when AGENT_CONTENT has no entry, so a
+ * `.md` URL is a real representation of any page on the site. For a path that
+ * is not a page at all it resolves to a markdown 404 — the same answer the
+ * HTML gives, in the format the caller asked for.
  *
  * The root is `/index.md` because `/.md` is not a URL anyone would guess.
  */
-export function markdownUrlFor(path: string): string | undefined {
-  if (!hasMarkdown(path)) {
-    return;
-  }
+export function markdownUrlFor(path: string): string {
   if (path.endsWith(".md")) {
     return path;
   }
