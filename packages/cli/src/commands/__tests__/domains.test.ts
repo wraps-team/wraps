@@ -121,6 +121,17 @@ vi.mock("../../utils/shared/prompts", () => ({
   promptTrackingSubdomain: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("../../utils/email/tracking-https", () => ({
+  provisionTrackingHttps: vi.fn().mockResolvedValue({
+    trackingHttps: { certificateArn: "arn:aws:acm:pending", status: "pending" },
+    cnameTarget: "r.us-east-1.awstrack.me",
+    dnsRecordsToShow: [],
+  }),
+  describeTrackingHttpsError: vi.fn(
+    (error: unknown) => (error as Error)?.message ?? "Unknown AWS error"
+  ),
+}));
+
 describe("Domain Management Commands", () => {
   let mockSpinner: {
     start: ReturnType<typeof vi.fn>;
@@ -1229,6 +1240,114 @@ describe("Domain Management Commands", () => {
 
       expect(dns.buildEmailDNSRecords).toHaveBeenCalledWith(
         expect.objectContaining({ customTrackingDomain: "track.test.com" })
+      );
+    });
+  });
+
+  describe("addDomain - tracking HTTPS", () => {
+    beforeEach(() => {
+      const notFoundError = new Error("Not found");
+      notFoundError.name = "NotFoundException";
+      sesClientMock
+        .on(GetEmailIdentityCommand)
+        .rejectsOnce(notFoundError)
+        .resolvesOnce({
+          DkimAttributes: { Tokens: ["tok1"], Status: "PENDING" },
+        });
+      sesClientMock.on(CreateConfigurationSetCommand).resolves({});
+      sesClientMock
+        .on(CreateConfigurationSetEventDestinationCommand)
+        .resolves({});
+      sesClientMock.on(CreateEmailIdentityCommand).resolves({});
+      sesClientMock.on(PutEmailIdentityMailFromAttributesCommand).resolves({});
+      sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+    });
+
+    it("Unit 1: --yes defaults HTTPS on — provisionTrackingHttps is called and the metadata entry carries trackingHttps", async () => {
+      const trackingHttps = await import("../../utils/email/tracking-https");
+      const metadata = await import("../../utils/shared/metadata");
+
+      await addDomain({ domain: "test.com", yes: true });
+
+      expect(trackingHttps.provisionTrackingHttps).toHaveBeenCalledWith(
+        expect.objectContaining({
+          domain: "test.com",
+          trackingDomain: "track.test.com",
+        })
+      );
+      expect(metadata.addDomainToMetadata).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({
+          trackingHttps: expect.objectContaining({ status: "pending" }),
+        })
+      );
+    });
+
+    it("Unit 2: --no-tracking-https skips provisionTrackingHttps entirely", async () => {
+      const originalArgv = process.argv;
+      process.argv = [...originalArgv, "--no-tracking-https"];
+      try {
+        const trackingHttps = await import("../../utils/email/tracking-https");
+        const metadata = await import("../../utils/shared/metadata");
+
+        await addDomain({ domain: "test.com", yes: true });
+
+        expect(trackingHttps.provisionTrackingHttps).not.toHaveBeenCalled();
+        expect(metadata.addDomainToMetadata).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.objectContaining({ trackingHttps: undefined })
+        );
+      } finally {
+        process.argv = originalArgv;
+      }
+    });
+
+    it("Unit 3: pending HTTPS prints the config --tracking-https hint and uses the awstrack.me CNAME target", async () => {
+      const dns = await import("../../utils/dns/index");
+      vi.mocked(dns.getDNSCredentials).mockResolvedValueOnce({
+        valid: false,
+        credentials: undefined,
+      } as never);
+      const clack = await import("@clack/prompts");
+      const infoSpy = vi.mocked(clack.log.info);
+
+      await addDomain({ domain: "test.com", yes: true });
+
+      expect(dns.buildEmailDNSRecords).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trackingCnameTarget: "r.us-east-1.awstrack.me",
+        })
+      );
+      const hinted = infoSpy.mock.calls.some((call) =>
+        String(call[0]).includes("wraps email domains config")
+      );
+      expect(hinted).toBe(true);
+    });
+
+    it("Unit 4: active HTTPS uses the CloudFront distribution domain as the CNAME target", async () => {
+      const trackingHttps = await import("../../utils/email/tracking-https");
+      vi.mocked(trackingHttps.provisionTrackingHttps).mockResolvedValueOnce({
+        trackingHttps: {
+          certificateArn: "arn:aws:acm:active",
+          status: "active",
+          distributionId: "DIST123",
+          distributionDomain: "dabc123.cloudfront.net",
+        },
+        cnameTarget: "dabc123.cloudfront.net",
+        dnsRecordsToShow: [],
+      });
+      const dns = await import("../../utils/dns/index");
+      vi.mocked(dns.getDNSCredentials).mockResolvedValueOnce({
+        valid: false,
+        credentials: undefined,
+      } as never);
+
+      await addDomain({ domain: "test.com", yes: true });
+
+      expect(dns.buildEmailDNSRecords).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trackingCnameTarget: "dabc123.cloudfront.net",
+        })
       );
     });
   });

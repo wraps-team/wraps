@@ -32,6 +32,11 @@ import {
   validateTrackingDomain,
 } from "../../utils/email/tracking-domain.js";
 import {
+  describeTrackingHttpsError,
+  disableDistribution,
+  provisionTrackingHttps,
+} from "../../utils/email/tracking-https.js";
+import {
   getAWSRegion,
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
@@ -653,6 +658,7 @@ export async function addDomain(options: {
   region?: string;
   yes?: boolean;
   trackingDomain?: string;
+  trackingHttps?: boolean;
 }): Promise<void> {
   if (!isJsonMode()) {
     clack.intro(pc.bold("Add Email Domain"));
@@ -929,6 +935,61 @@ export async function addDomain(options: {
       }
     }
 
+    // 5c. HTTPS for the tracking domain (CloudFront + ACM)
+    let trackingHttpsResult:
+      | Awaited<ReturnType<typeof provisionTrackingHttps>>
+      | undefined;
+    if (trackingDomain) {
+      let wantsHttps: boolean;
+      if (process.argv.includes("--no-tracking-https")) {
+        wantsHttps = false;
+      } else if (options.trackingHttps !== undefined) {
+        wantsHttps = options.trackingHttps;
+      } else if (options.yes) {
+        wantsHttps = true;
+      } else {
+        const confirmed = await clack.confirm({
+          message: `Enable HTTPS for tracking links? ${pc.dim("(creates a CloudFront distribution + certificate in your account)")}`,
+          initialValue: true,
+        });
+        if (clack.isCancel(confirmed)) {
+          clack.cancel("Operation cancelled.");
+          process.exit(0);
+        }
+        wantsHttps = confirmed;
+      }
+
+      if (wantsHttps) {
+        try {
+          trackingHttpsResult = await provisionTrackingHttps({
+            domain,
+            trackingDomain,
+            configSetName,
+            sesRegion: region,
+            sesv2: sesClient,
+            metadataDnsProvider: metadata.services.email.dnsProvider,
+            progress,
+          });
+        } catch (error) {
+          throw new WrapsError(
+            `Failed to provision HTTPS for tracking domain: ${describeTrackingHttpsError(error)}`,
+            "TRACKING_HTTPS_PROVISION_FAILED"
+          );
+        }
+
+        if (
+          trackingHttpsResult.trackingHttps.status === "pending" &&
+          !isJsonMode()
+        ) {
+          clack.log.info(
+            pc.dim(
+              `Certificate validation usually takes 5–30 minutes. Then run: ${pc.cyan(`wraps email domains config --domain ${domain} --tracking-https`)}`
+            )
+          );
+        }
+      }
+    }
+
     // 6. DNS automation
     const cachedDnsProvider = metadata.services.email.dnsProvider;
     let dnsAutoCreated = false;
@@ -965,6 +1026,7 @@ export async function addDomain(options: {
             dkimTokens,
             mailFromDomain,
             customTrackingDomain: trackingDomain,
+            trackingCnameTarget: trackingHttpsResult?.cnameTarget,
             region,
           };
 
@@ -1002,6 +1064,7 @@ export async function addDomain(options: {
         dkimTokens,
         mailFromDomain,
         customTrackingDomain: trackingDomain,
+        trackingCnameTarget: trackingHttpsResult?.cnameTarget,
         region,
       });
       const displayRecords = formatDNSRecordsForDisplay(dnsRecords);
@@ -1019,6 +1082,27 @@ export async function addDomain(options: {
       }
     }
 
+    // ACM certificate validation record (pending HTTPS only) — separate from
+    // the DNS automation above since it may not have been pushed automatically.
+    if (
+      trackingHttpsResult &&
+      trackingHttpsResult.dnsRecordsToShow.length > 0
+    ) {
+      progress.stop();
+      console.log();
+      clack.log.info(
+        pc.bold("Add this DNS record to validate the certificate:")
+      );
+      console.log();
+      for (const record of trackingHttpsResult.dnsRecordsToShow) {
+        console.log(`  ${pc.cyan(record.name)}`);
+        console.log(
+          `    ${pc.dim("Type:")} ${record.type}  ${pc.dim("Value:")} ${record.value}`
+        );
+        console.log();
+      }
+    }
+
     // 7. Save to metadata
     const entry: AdditionalDomain = {
       domain,
@@ -1028,6 +1112,7 @@ export async function addDomain(options: {
       trackingConfig,
       trackingDomain,
       trackingDomainAppliedAt,
+      trackingHttps: trackingHttpsResult?.trackingHttps,
       addedAt: new Date().toISOString(),
     };
     addDomainToMetadata(metadata, entry);
@@ -1042,6 +1127,7 @@ export async function addDomain(options: {
       dns_auto_created: dnsAutoCreated,
       has_mail_from: !!mailFromDomain,
       has_tracking_domain: !!trackingDomain,
+      tracking_https: !!trackingHttpsResult,
       purpose,
     });
     trackFeature("domain_added", {
@@ -1057,6 +1143,7 @@ export async function addDomain(options: {
         dnsAutoCreated,
         trackingDomain,
         trackingDomainApplied: !!trackingDomainAppliedAt,
+        trackingHttps: trackingHttpsResult?.trackingHttps.status ?? null,
       });
       return;
     }
@@ -1394,8 +1481,9 @@ export async function removeDomain(options: {
       // baseline:allow-next-line no-swallowed-errors — metadata unavailable is non-fatal, proceed without guard
     } catch {}
 
+    let domainInfo: ReturnType<typeof getDomainFromMetadata> = null;
     if (metadata) {
-      const domainInfo = getDomainFromMetadata(metadata, options.domain);
+      domainInfo = getDomainFromMetadata(metadata, options.domain);
 
       if (domainInfo?.isPrimary && !options.force) {
         progress.stop();
@@ -1410,6 +1498,27 @@ export async function removeDomain(options: {
         );
         process.exit(1);
         return;
+      }
+    }
+
+    const trackingDistributionId =
+      domainInfo?.entry?.trackingHttps?.distributionId;
+    if (trackingDistributionId) {
+      try {
+        await progress.execute(
+          "Disabling tracking CloudFront distribution",
+          async () => disableDistribution(trackingDistributionId)
+        );
+        if (!isJsonMode()) {
+          console.log(
+            `\n${pc.dim(`Distribution ${trackingDistributionId} is disabled; delete it from the CloudFront console once it shows Deployed (10-15 min). Certificate ${domainInfo?.entry?.trackingHttps?.certificateArn} can then be deleted in ACM (us-east-1).`)}`
+          );
+        }
+        // baseline:allow-next-line no-swallowed-errors — a CloudFront disable failure must not block domain removal
+      } catch (error) {
+        clack.log.warn(
+          `Could not disable the tracking CloudFront distribution: ${describeTrackingHttpsError(error)}`
+        );
       }
     }
 

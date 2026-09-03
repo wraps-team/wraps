@@ -913,6 +913,7 @@ async function run() {
                 region: flags.region,
                 yes: flags.yes,
                 trackingDomain: flags.trackingDomain,
+                trackingHttps: flags.trackingHttps,
               });
               break;
             }
@@ -963,6 +964,7 @@ async function run() {
                 opens: flags.opens,
                 clicks: flags.clicks,
                 trackingDomain: flags.trackingDomain,
+                trackingHttps: flags.trackingHttps,
                 tlsRequired: flags.tlsRequired,
                 reputationMetrics: flags.reputationMetrics,
                 suppressBounce: flags.suppressBounce,
