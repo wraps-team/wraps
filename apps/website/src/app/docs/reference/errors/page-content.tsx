@@ -259,7 +259,8 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
       {
         code: "RESOURCE_CONFLICT",
         message: "Resource already exists: <resourceName>",
-        solution: "Diagnose and clean up: wraps email doctor --cleanup",
+        solution:
+          "Diagnose first: wraps email doctor. Only run --cleanup if it lists orphaned resources.",
       },
       {
         code: "S3_STATE_BUCKET_CREATION_FAILED",

@@ -1346,10 +1346,14 @@ export default function CLIReferenceEmailPageContent() {
               <div>
                 <code className="rounded bg-muted px-2 py-1">--cleanup</code>
                 <p className="mt-2 text-muted-foreground text-sm">
-                  Interactively delete orphaned{" "}
+                  Delete{" "}
                   <code className="rounded bg-muted px-1 py-0.5">wraps-*</code>{" "}
-                  resources that have no Pulumi stack. Prompts for confirmation
-                  before deleting. If a Pulumi stack exists, suggests using{" "}
+                  resources that Wraps has proved are orphaned — no Pulumi
+                  stack, no CloudFormation stack, and not recorded in connection
+                  metadata. Lists every resource it will delete (and every one
+                  it is keeping because it is managed) and asks for confirmation
+                  before deleting anything. Refuses to delete anything when a
+                  Pulumi stack exists (suggests{" "}
                   <code className="rounded bg-muted px-1 py-0.5">
                     wraps email destroy
                   </code>{" "}
@@ -1357,7 +1361,8 @@ export default function CLIReferenceEmailPageContent() {
                   <code className="rounded bg-muted px-1 py-0.5">
                     wraps email upgrade
                   </code>{" "}
-                  instead.
+                  instead), when Pulumi state could not be read, or when
+                  CloudFormation ownership could not be checked.
                 </p>
               </div>
               <div>
