@@ -61,6 +61,37 @@ describe("remediations", () => {
     expect(remediation.level).toBe("manual");
     expect(remediation.command).toBeUndefined();
   });
+
+  it("points an unprovable Pulumi probe at wraps aws doctor, never at --cleanup", () => {
+    const remediation = remediations.stackStateUnknown();
+
+    expect(remediation.id).toBe("email.doctor.stack-state-unknown");
+    expect(remediation.level).toBe("manual");
+    // The command is what a user runs, and it is never the destructive sweep.
+    expect(remediation.command).toBe("wraps aws doctor");
+    expect(remediation.command).not.toContain("--cleanup");
+  });
+
+  it("names the owning CloudFormation stack, informationally, with no command", () => {
+    const remediation = remediations.cloudFormationManaged(
+      "wraps-email-infrastructure"
+    );
+
+    expect(remediation.id).toBe("email.doctor.cloudformation-managed");
+    expect(remediation.level).toBe("informational");
+    expect(remediation.command).toBeUndefined();
+    expect(remediation.summary).toContain("wraps-email-infrastructure");
+  });
+
+  it("repairs a stale console role policy with platform update-role, targeting the scanned region", () => {
+    expect(remediations.platformUpdateRole().command).toBe(
+      "wraps platform update-role"
+    );
+    expect(remediations.platformUpdateRole("eu-west-1").command).toBe(
+      "wraps platform update-role --region eu-west-1"
+    );
+    expect(remediations.platformUpdateRole().level).toBe("auto");
+  });
 });
 
 describe("formatRemediation", () => {

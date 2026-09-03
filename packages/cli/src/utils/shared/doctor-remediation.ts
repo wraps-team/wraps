@@ -167,6 +167,35 @@ export const remediations = {
       "Delete the wraps-* resources left behind with no Pulumi state. This permanently removes them.",
   }),
 
+  /**
+   * The Pulumi probe failed for a reason other than "no such stack" — Pulumi not
+   * installed, S3 state bucket unreachable, credentials expired. Ownership of the
+   * scanned resources is unknown, so nothing here may recommend deleting them.
+   */
+  stackStateUnknown: (): Remediation => ({
+    id: "email.doctor.stack-state-unknown",
+    level: "manual",
+    command: "wraps aws doctor",
+    summary:
+      "Could not read Pulumi state for this region, so these resources may be owned by a stack this machine cannot see. Fix the AWS setup first; do not run --cleanup.",
+  }),
+
+  /** A Wraps CloudFormation stack owns resources in this region. */
+  cloudFormationManaged: (stackName: string): Remediation => ({
+    id: "email.doctor.cloudformation-managed",
+    level: "informational",
+    summary: `Managed by CloudFormation stack ${stackName} — change or delete it in the CloudFormation console, never with --cleanup.`,
+  }),
+
+  /** The console role's inline policy is behind the CLI's current builder. */
+  platformUpdateRole: (region?: string): Remediation => ({
+    id: "platform.update-role",
+    level: "auto",
+    command: withRegion("wraps platform update-role", region),
+    summary:
+      "Rewrite the dashboard's IAM role policy with the permissions this CLI version expects.",
+  }),
+
   // --- aws doctor ---
 
   installAwsCli: (): Remediation => ({
