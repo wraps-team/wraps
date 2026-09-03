@@ -191,6 +191,23 @@ export default function ComparePage() {
             ))}
           </div>
 
+          <section className="mb-16 rounded-2xl border bg-muted/30 p-6">
+            <h2 className="mb-2 font-heading font-semibold text-xl tracking-tight">
+              Before the head-to-heads, decide what you are comparing on
+            </h2>
+            <p className="mb-4 text-muted-foreground">
+              Seven things separate an email API you enjoy from one you
+              tolerate, each with a test you can run in an afternoon. The
+              scoring includes the item Wraps fails.
+            </p>
+            <Link
+              className="text-primary underline"
+              href="/blog/developer-first-email-api-checklist"
+            >
+              The developer-first email API checklist
+            </Link>
+          </section>
+
           {/* The Wraps Difference */}
           <section className="mb-16">
             <h2 className="mb-6 font-heading font-semibold text-2xl tracking-tight">

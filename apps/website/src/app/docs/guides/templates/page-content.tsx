@@ -431,6 +431,25 @@ export default function TemplatesPageContent() {
               </Button>
             </CardContent>
           </Card>
+          <Card className="transition-colors hover:border-primary/50">
+            <CardHeader>
+              <CardTitle className="text-lg">
+                Sharing Templates With Marketing
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4 text-muted-foreground text-sm">
+                What happens when somebody edits a template in the dashboard
+                after you pushed it, and how to split copy from structure.
+              </p>
+              <Button asChild variant="outline">
+                <Link href="/docs/guides/template-handoff">
+                  Handoff Guide
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
 
           <Card className="transition-colors hover:border-primary/50">
             <CardHeader>

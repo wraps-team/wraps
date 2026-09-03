@@ -482,6 +482,25 @@ export default function WorkflowsPageContent() {
               </Button>
             </CardContent>
           </Card>
+          <Card className="transition-colors hover:border-primary/50">
+            <CardHeader>
+              <CardTitle className="text-lg">
+                Preventing Duplicate Sends
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4 text-muted-foreground text-sm">
+                Workflow steps deduplicate themselves. Sends from your own
+                background workers do not — here is how to make them.
+              </p>
+              <Button asChild variant="outline">
+                <Link href="/docs/guides/idempotency">
+                  Idempotency Guide
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
 
           <Card className="transition-colors hover:border-primary/50">
             <CardHeader>

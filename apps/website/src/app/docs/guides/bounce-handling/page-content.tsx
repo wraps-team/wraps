@@ -608,6 +608,23 @@ export default function BounceHandlingPageContent() {
               </Button>
             </CardContent>
           </Card>
+          <Card className="transition-colors hover:border-primary/50">
+            <CardHeader>
+              <CardTitle className="text-lg">Domain Reputation</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4 text-muted-foreground text-sm">
+                Keeping the rates on this page low in the first place, and the
+                runbook for when one starts climbing.
+              </p>
+              <Button asChild variant="outline">
+                <Link href="/docs/guides/reputation">
+                  Reputation Guide
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </section>
     </DocsLayout>

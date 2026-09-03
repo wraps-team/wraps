@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 
 export function LeavingSection() {
@@ -17,9 +18,20 @@ export function LeavingSection() {
             DynamoDB table stay in your AWS account. Your SDK code keeps
             sending. None of that requires an active Wraps subscription.
           </p>
-          <p className="text-muted-foreground">
+          <p className="mb-4 text-muted-foreground">
             Contacts, templates, and workflows live on the Wraps platform.
             Export them before you go.
+          </p>
+          <p className="text-muted-foreground">
+            Which half of a provider you can actually take with you is the whole
+            question worth asking before signing with anyone:{" "}
+            <Link
+              className="text-primary underline"
+              href="/blog/email-vendor-lock-in"
+            >
+              the five things that actually trap you
+            </Link>
+            .
           </p>
         </div>
       </div>

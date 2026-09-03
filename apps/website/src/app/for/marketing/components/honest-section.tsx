@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 
 // Deliberately on the page. A marketer who discovers these in week two churns;
@@ -47,6 +48,18 @@ export function MarketingHonestSection() {
             </div>
           ))}
         </div>
+
+        <p className="mt-8 text-muted-foreground">
+          One more thing worth reading before your first week: engineers push
+          templates from the repo and you edit copy in the dashboard, so{" "}
+          <Link
+            className="text-primary underline"
+            href="/docs/guides/template-handoff"
+          >
+            what happens when you both edit the same one
+          </Link>{" "}
+          is worth agreeing on up front.
+        </p>
       </div>
     </section>
   );

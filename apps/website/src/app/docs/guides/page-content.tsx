@@ -12,11 +12,14 @@ import {
   ArrowRight,
   ArrowRightLeft,
   Cloud,
+  CopyCheck,
   FileCode2,
+  Gauge,
   Globe,
   Rocket,
   ShieldCheck,
   Sliders,
+  Users,
   Workflow,
 } from "lucide-react";
 import { DocsLayout } from "@/components/docs-layout";
@@ -85,6 +88,30 @@ const guides = [
     href: "/docs/guides/migration",
     icon: ArrowRightLeft,
     readTime: "5 min read",
+  },
+  {
+    title: "Domain Reputation",
+    description:
+      "What actually moves a complaint rate on SES, how to watch it per configuration set, and the runbook for a rate that starts climbing.",
+    href: "/docs/guides/reputation",
+    icon: Gauge,
+    readTime: "6 min read",
+  },
+  {
+    title: "Preventing Duplicate Sends",
+    description:
+      "SQS is at-least-once, so a retried worker sends the email twice. Dedupe keys, a DynamoDB claim table, and the queue settings that cause duplicates.",
+    href: "/docs/guides/idempotency",
+    icon: CopyCheck,
+    readTime: "7 min read",
+  },
+  {
+    title: "Sharing Templates With Marketing",
+    description:
+      "Engineers own the template in git, marketing edits copy in the dashboard, and lastEditedFrom is where the two meet.",
+    href: "/docs/guides/template-handoff",
+    icon: Users,
+    readTime: "6 min read",
   },
 ];
 
