@@ -259,6 +259,19 @@ export default function CLIReferenceEmailPageContent() {
                     (required) Domain name to add
                   </span>
                 </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --tracking-domain &lt;host|none&gt;
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Custom redirect domain for open/click links. Defaults to{" "}
+                    <code className="rounded bg-muted px-1">
+                      track.&lt;domain&gt;
+                    </code>
+                    ; pass <code className="rounded bg-muted px-1">none</code>{" "}
+                    to skip.
+                  </span>
+                </li>
               </ul>
             </CardContent>
           </Card>
@@ -447,6 +460,20 @@ export default function CLIReferenceEmailPageContent() {
                     Enable or disable click tracking
                   </span>
                 </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --tracking-domain &lt;host|none&gt;
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Set or clear the custom redirect domain on this
+                    domain&apos;s configuration set. Must be a subdomain of the
+                    domain. Not available for the primary domain — use{" "}
+                    <code className="rounded bg-muted px-1">
+                      wraps email upgrade
+                    </code>
+                    .
+                  </span>
+                </li>
                 <li className="pt-1 font-medium text-foreground">Delivery</li>
                 <li>
                   <code className="rounded bg-muted px-2 py-1">
@@ -602,6 +629,12 @@ export default function CLIReferenceEmailPageContent() {
                   Enable archiving and suppress bounces:
                 </p>
                 <CLICommand command="npx @wraps.dev/cli email domains config -d yourdomain.com --archive --suppress-bounce" />
+              </div>
+              <div className="mt-4">
+                <p className="mb-2 text-muted-foreground text-sm">
+                  Set a custom tracking domain for open/click links:
+                </p>
+                <CLICommand command="npx @wraps.dev/cli email domains config -d news.yourdomain.com --tracking-domain track.news.yourdomain.com" />
               </div>
             </CardContent>
           </Card>

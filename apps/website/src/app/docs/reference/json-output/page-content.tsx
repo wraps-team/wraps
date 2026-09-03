@@ -121,7 +121,7 @@ ${usageExamplesCode}
 | \`email destroy\` | \`email.destroy\` | \`destroyed\`, \`region\` |
 | \`email config\` | \`email.config\` | \`updated\`, \`region\` |
 | \`email restore\` | \`email.restore\` | \`restored\`, \`region\` |
-| \`email domains add\` | \`email.domains.add\` | \`domain\`, \`dkimTokens\` |
+| \`email domains add\` | \`email.domains.add\` | \`domain\`, \`dkimTokens\`, \`trackingDomain\`, \`trackingDomainApplied\` |
 | \`email domains list\` | \`email.domains.list\` | \`domains[]\` |
 | \`email domains verify\` | \`email.domains.verify\` | \`domain\`, \`verified\` |
 | \`email domains get-dkim\` | \`email.domains.get-dkim\` | \`domain\`, \`dkimTokens\` |
