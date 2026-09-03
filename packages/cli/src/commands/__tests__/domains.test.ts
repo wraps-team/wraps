@@ -1350,6 +1350,34 @@ describe("Domain Management Commands", () => {
         })
       );
     });
+
+    it("Unit 5: an AccessDenied failure degrades instead of aborting — metadata is still saved with no trackingHttps", async () => {
+      const trackingHttps = await import("../../utils/email/tracking-https");
+      const accessDenied = Object.assign(new Error("not authorized"), {
+        name: "AccessDenied",
+      });
+      vi.mocked(trackingHttps.provisionTrackingHttps).mockRejectedValueOnce(
+        accessDenied
+      );
+      const dns = await import("../../utils/dns/index");
+      vi.mocked(dns.getDNSCredentials).mockResolvedValueOnce({
+        valid: false,
+        credentials: undefined,
+      } as never);
+      const metadata = await import("../../utils/shared/metadata");
+
+      await expect(
+        addDomain({ domain: "test.com", yes: true })
+      ).resolves.not.toThrow();
+
+      expect(metadata.addDomainToMetadata).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ trackingHttps: undefined })
+      );
+      expect(dns.buildEmailDNSRecords).toHaveBeenCalledWith(
+        expect.objectContaining({ trackingCnameTarget: undefined })
+      );
+    });
   });
 
   describe("configDomain", () => {

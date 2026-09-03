@@ -971,14 +971,26 @@ export async function addDomain(options: {
             progress,
           });
         } catch (error) {
-          throw new WrapsError(
-            `Failed to provision HTTPS for tracking domain: ${describeTrackingHttpsError(error)}`,
-            "TRACKING_HTTPS_PROVISION_FAILED"
-          );
+          // Never abort the domain add over HTTPS: the SES identity, config
+          // set, and tracking domain are already created by this point, and
+          // failing here would leave them orphaned with nothing saved to
+          // metadata. Degrade to 238's plain HTTP tracking behavior instead
+          // — trackingHttpsResult stays undefined, so the tracking CNAME
+          // falls back to r.<region>.awstrack.me below.
+          if (!isJsonMode()) {
+            clack.log.warn(
+              `Could not enable HTTPS for tracking links: ${describeTrackingHttpsError(error)}`
+            );
+            clack.log.info(
+              pc.dim(
+                `Retry later with: ${pc.cyan(`wraps email domains config --domain ${domain} --tracking-https`)}`
+              )
+            );
+          }
         }
 
         if (
-          trackingHttpsResult.trackingHttps.status === "pending" &&
+          trackingHttpsResult?.trackingHttps.status === "pending" &&
           !isJsonMode()
         ) {
           clack.log.info(

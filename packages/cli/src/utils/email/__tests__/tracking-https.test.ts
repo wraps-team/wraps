@@ -19,7 +19,25 @@ import {
   disableDistribution,
   ensureCertificate,
   ensureDistribution,
+  provisionTrackingHttps,
 } from "../tracking-https.js";
+
+vi.mock("../../dns/index.js", () => ({
+  getDNSCredentials: vi.fn().mockResolvedValue({
+    valid: true,
+    credentials: { provider: "vercel", token: "tok" },
+  }),
+}));
+
+vi.mock("../../dns/vercel.js", () => ({
+  VercelDNSClient: vi.fn(function MockVercelDNSClient(this: {
+    createRecords: () => Promise<never>;
+  }) {
+    this.createRecords = vi
+      .fn()
+      .mockRejectedValue(new Error("connection reset"));
+  }),
+}));
 
 const acmMock = mockClient(ACMClient);
 const cloudfrontMock = mockClient(CloudFrontClient);
@@ -241,6 +259,54 @@ describe("disableDistribution", () => {
       IfMatch: "E123ETAG",
       DistributionConfig: expect.objectContaining({ Enabled: false }),
     });
+  });
+});
+
+describe("provisionTrackingHttps", () => {
+  const fakeProgress = {
+    execute: async (_msg: string, fn: () => Promise<unknown>) => fn(),
+  } as never;
+
+  it("stays pending with the validation record shown even when the DNS provider push fails", async () => {
+    acmMock
+      .on(ListCertificatesCommand)
+      .resolves({ CertificateSummaryList: [] });
+    acmMock.on(RequestCertificateCommand).resolves({
+      CertificateArn: "arn:aws:acm:pending",
+    });
+    acmMock.on(DescribeCertificateCommand).resolves({
+      Certificate: {
+        Status: "PENDING_VALIDATION",
+        DomainValidationOptions: [
+          {
+            ResourceRecord: {
+              Name: "_abc.track.a.com.",
+              Type: "CNAME",
+              Value: "_xyz.acm-validations.aws.",
+            },
+          },
+        ],
+      },
+    });
+
+    const result = await provisionTrackingHttps({
+      domain: "a.com",
+      trackingDomain: "track.a.com",
+      configSetName: "wraps-email-a-com",
+      sesRegion: "us-east-1",
+      sesv2: {} as never,
+      metadataDnsProvider: "vercel",
+      progress: fakeProgress,
+    });
+
+    expect(result.trackingHttps.status).toBe("pending");
+    expect(result.dnsRecordsToShow).toEqual([
+      {
+        name: "_abc.track.a.com.",
+        type: "CNAME",
+        value: "_xyz.acm-validations.aws.",
+      },
+    ]);
   });
 });
 

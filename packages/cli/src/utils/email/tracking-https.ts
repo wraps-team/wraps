@@ -242,58 +242,69 @@ async function pushValidationRecord(
   sesRegion: string,
   record: { name: string; type: string; value: string }
 ): Promise<boolean> {
-  const domainParts = sendingDomain.split(".");
-  const parentDomain =
-    domainParts.length > 2 ? domainParts.slice(-2).join(".") : sendingDomain;
+  try {
+    const domainParts = sendingDomain.split(".");
+    const parentDomain =
+      domainParts.length > 2 ? domainParts.slice(-2).join(".") : sendingDomain;
 
-  const credResult = await getDNSCredentials(provider, parentDomain, sesRegion);
-  if (!(credResult.valid && credResult.credentials)) {
+    const credResult = await getDNSCredentials(
+      provider,
+      parentDomain,
+      sesRegion
+    );
+    if (!(credResult.valid && credResult.credentials)) {
+      return false;
+    }
+
+    if (credResult.credentials.provider === "vercel") {
+      const client = new VercelDNSClient(
+        parentDomain,
+        credResult.credentials.token,
+        credResult.credentials.teamId
+      );
+      const result = await client.createRecords([record]);
+      return result.success;
+    }
+
+    if (credResult.credentials.provider === "cloudflare") {
+      const client = new CloudflareDNSClient(
+        credResult.credentials.zoneId,
+        credResult.credentials.token
+      );
+      const result = await client.createRecords([record]);
+      return result.success;
+    }
+
+    if (credResult.credentials.provider === "route53") {
+      const route53 = new Route53Client({ region: sesRegion });
+      await route53.send(
+        new ChangeResourceRecordSetsCommand({
+          HostedZoneId: credResult.credentials.hostedZoneId,
+          ChangeBatch: {
+            Changes: [
+              {
+                Action: "UPSERT",
+                ResourceRecordSet: {
+                  Name: record.name,
+                  Type: "CNAME",
+                  TTL: 300,
+                  ResourceRecords: [{ Value: record.value }],
+                },
+              },
+            ],
+          },
+        })
+      );
+      return true;
+    }
+
+    return false;
+    // baseline:allow-next-line no-swallowed-errors — best-effort DNS push;
+    // the caller already shows the validation record for manual creation
+    // regardless of whether this succeeds (see provisionTrackingHttps).
+  } catch {
     return false;
   }
-
-  if (credResult.credentials.provider === "vercel") {
-    const client = new VercelDNSClient(
-      parentDomain,
-      credResult.credentials.token,
-      credResult.credentials.teamId
-    );
-    const result = await client.createRecords([record]);
-    return result.success;
-  }
-
-  if (credResult.credentials.provider === "cloudflare") {
-    const client = new CloudflareDNSClient(
-      credResult.credentials.zoneId,
-      credResult.credentials.token
-    );
-    const result = await client.createRecords([record]);
-    return result.success;
-  }
-
-  if (credResult.credentials.provider === "route53") {
-    const route53 = new Route53Client({ region: sesRegion });
-    await route53.send(
-      new ChangeResourceRecordSetsCommand({
-        HostedZoneId: credResult.credentials.hostedZoneId,
-        ChangeBatch: {
-          Changes: [
-            {
-              Action: "UPSERT",
-              ResourceRecordSet: {
-                Name: record.name,
-                Type: "CNAME",
-                TTL: 300,
-                ResourceRecords: [{ Value: record.value }],
-              },
-            },
-          ],
-        },
-      })
-    );
-    return true;
-  }
-
-  return false;
 }
 
 /** Human-readable text for the ACM/CloudFront errors this feature can hit. */
