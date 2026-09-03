@@ -73,6 +73,10 @@ const mockIamSend = vi
 const mockSesv2Send = vi.fn().mockResolvedValue({});
 const mockEventBridgeSend = vi.fn().mockResolvedValue({});
 const mockSqsSend = vi.fn().mockResolvedValue({});
+// CloudFormation ownership probe (findWrapsCloudFormationStacks). Defaults to
+// "no Wraps stacks found, and the check succeeded" so existing orphan-path
+// tests keep behaving as before this plan's CloudFormation guard was added.
+const mockCfnSend = vi.fn().mockResolvedValue({ Stacks: [] });
 
 vi.mock("@aws-sdk/client-ses", () => ({
   SESClient: class {
@@ -129,6 +133,17 @@ vi.mock("@aws-sdk/client-iam", () => ({
     constructor(public input: unknown) {}
   },
   DeleteRoleCommand: class {
+    constructor(public input: unknown) {}
+  },
+  GetRolePolicyCommand: class {
+    constructor(public input: unknown) {}
+  },
+}));
+vi.mock("@aws-sdk/client-cloudformation", () => ({
+  CloudFormationClient: class {
+    send = mockCfnSend;
+  },
+  DescribeStacksCommand: class {
     constructor(public input: unknown) {}
   },
 }));
@@ -225,6 +240,7 @@ describe("emailDoctor", () => {
     mockSesv2Send.mockResolvedValue({});
     mockEventBridgeSend.mockResolvedValue({});
     mockSqsSend.mockResolvedValue({});
+    mockCfnSend.mockResolvedValue({ Stacks: [] });
     mockIsJsonMode.mockReturnValue(false);
 
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -399,8 +415,322 @@ describe("emailDoctor", () => {
     expect(mockIamSend).toHaveBeenCalledTimes(5);
   });
 
-  it("should handle non-standard Pulumi errors gracefully", async () => {
-    // Simulate an error other than "no stack named" (e.g., missing Pulumi.yaml, S3 issues)
+  it("never deletes wraps-console-access-role during --cleanup, even with no Pulumi state", async () => {
+    // The incident: `platform connect` creates this role, Pulumi never touches
+    // it, so it always looked orphaned and `--cleanup` deleted it — breaking
+    // the customer's dashboard connection.
+    const filteredScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [
+        {
+          name: "wraps-console-access-role",
+          arn: "arn:aws:iam::123456789012:role/wraps-console-access-role",
+          assumeRolePolicyDocument: "",
+        },
+        {
+          name: "wraps-email-role",
+          arn: "arn:aws:iam::123456789012:role/wraps-email-role",
+          assumeRolePolicyDocument: "",
+        },
+      ],
+    };
+    mockScanFn.mockResolvedValue(filteredScan);
+    mockFilterFn.mockReturnValue(filteredScan);
+    vi.mocked(prompts.confirm).mockResolvedValue(true as never);
+
+    mockIamSend
+      .mockResolvedValueOnce({ PolicyNames: [] }) // ListRolePolicies (wraps-email-role)
+      .mockResolvedValueOnce({ AttachedPolicies: [] }) // ListAttachedRolePolicies
+      .mockResolvedValueOnce({}); // DeleteRole
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({ cleanup: true });
+
+    for (const call of mockIamSend.mock.calls) {
+      const input = (call[0] as { input?: { RoleName?: string } }).input;
+      if (input?.RoleName) {
+        expect(input.RoleName).not.toBe("wraps-console-access-role");
+      }
+    }
+    expect(allUserFacingOutput()).toContain(
+      "Skipped wraps-console-access-role"
+    );
+  });
+
+  it("never deletes a per-domain configuration set recorded in connection metadata", async () => {
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: {
+          email: {
+            config: {
+              domain: "example.com",
+              additionalDomains: [
+                {
+                  domain: "news.example.com",
+                  configSetName: "wraps-email-news-example-com",
+                },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const filteredScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [
+        { name: "wraps-email-news-example-com", eventDestinations: [] },
+        { name: "wraps-email-old", eventDestinations: [] },
+      ],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(filteredScan);
+    mockFilterFn.mockReturnValue(filteredScan);
+    vi.mocked(prompts.confirm).mockResolvedValue(true as never);
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({ cleanup: true });
+
+    expect(mockSesSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: { ConfigurationSetName: "wraps-email-old" },
+      })
+    );
+    expect(mockSesSend).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: { ConfigurationSetName: "wraps-email-news-example-com" },
+      })
+    );
+
+    const allOutput = consoleLogSpy.mock.calls
+      .map((c) => c.join(" "))
+      .join("\n");
+    expect(allOutput).toContain("recorded in connection metadata");
+  });
+
+  it("treats every wraps-* resource as CloudFormation-managed, not orphaned, when a Wraps stack exists", async () => {
+    mockCfnSend.mockResolvedValue({
+      Stacks: [
+        {
+          StackName: "wraps-email-infrastructure",
+          StackStatus: "CREATE_COMPLETE",
+        },
+      ],
+    });
+
+    const filteredScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [
+        { name: "wraps-email-config-set", eventDestinations: [] },
+      ],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(filteredScan);
+    mockFilterFn.mockReturnValue(filteredScan);
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({ cleanup: true });
+
+    const allOutput = allUserFacingOutput();
+    expect(allOutput).not.toContain("orphan");
+    expect(allOutput).toContain("managed by CloudFormation stack");
+    expect(vi.mocked(prompts.confirm)).not.toHaveBeenCalled();
+    expect(mockSesSend).not.toHaveBeenCalled();
+  });
+
+  it("refuses --cleanup when CloudFormation ownership could not be checked", async () => {
+    mockCfnSend.mockRejectedValue(
+      new Error("AccessDenied: cloudformation:DescribeStacks")
+    );
+
+    const filteredScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [
+        { name: "wraps-email-config-set", eventDestinations: [] },
+      ],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(filteredScan);
+    mockFilterFn.mockReturnValue(filteredScan);
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({ cleanup: true });
+
+    const allOutput = allUserFacingOutput();
+    expect(allOutput).toContain("DescribeStacks");
+    expect(vi.mocked(prompts.confirm)).not.toHaveBeenCalled();
+    expect(mockSesSend).not.toHaveBeenCalled();
+  });
+
+  it("enumerates exactly what --cleanup will delete, and what it will keep", async () => {
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: { email: { config: { domain: "example.com" } } },
+      },
+    ]);
+
+    const filteredScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [
+        { name: "wraps-email-example-com", eventDestinations: [] },
+        { name: "wraps-email-orphaned-set", eventDestinations: [] },
+      ],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [
+        {
+          name: "wraps-console-access-role",
+          arn: "arn:aws:iam::123456789012:role/wraps-console-access-role",
+          assumeRolePolicyDocument: "",
+        },
+      ],
+    };
+    mockScanFn.mockResolvedValue(filteredScan);
+    mockFilterFn.mockReturnValue(filteredScan);
+    vi.mocked(prompts.confirm).mockResolvedValue(false as never);
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({ cleanup: true });
+
+    const allOutput = consoleLogSpy.mock.calls
+      .map((c) => c.join(" "))
+      .join("\n");
+    const willDeleteIndex = allOutput.indexOf("Will delete:");
+    expect(willDeleteIndex).toBeGreaterThan(-1);
+    expect(allOutput).toContain("wraps-email-orphaned-set");
+    expect(allOutput).toContain("Will keep (managed):");
+    expect(allOutput).toContain("wraps-console-access-role");
+    // The primary domain's config set is not in the deletion list, only the
+    // orphaned one — confirms enumeration filters the same way deletion does.
+    const deleteSection = allOutput.slice(
+      willDeleteIndex,
+      allOutput.indexOf("Will keep (managed):")
+    );
+    expect(deleteSection).not.toContain("wraps-email-example-com");
+  });
+
+  it("reports a stale console role policy and points at platform update-role", async () => {
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: { email: { config: { domain: "example.com" } } },
+        platform: { externalId: "ext-123", connectionId: "conn-1" },
+      },
+    ]);
+
+    const emptyScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(emptyScan);
+    mockFilterFn.mockReturnValue(emptyScan);
+
+    mockIamSend.mockImplementation((cmd: { constructor: { name: string } }) => {
+      if (cmd.constructor.name === "GetRolePolicyCommand") {
+        return Promise.resolve({
+          PolicyDocument: encodeURIComponent(
+            JSON.stringify({
+              Version: "2012-10-17",
+              Statement: [
+                {
+                  Effect: "Allow",
+                  Action: ["ses:GetAccount", "ses:GetSendStatistics"],
+                  Resource: "*",
+                },
+              ],
+            })
+          ),
+        });
+      }
+      return Promise.resolve({ PolicyNames: [], AttachedPolicies: [] });
+    });
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({});
+
+    const allOutput = allUserFacingOutput();
+    expect(allOutput).toContain("wraps-console-access-role is missing");
+    expect(allOutput).toContain(
+      "wraps platform update-role --region us-east-1"
+    );
+  });
+
+  it("reports the console role policy as current when it matches the builder's output", async () => {
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: { email: { config: { domain: "example.com" } } },
+        platform: { externalId: "ext-123", connectionId: "conn-1" },
+      },
+    ]);
+
+    const emptyScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(emptyScan);
+    mockFilterFn.mockReturnValue(emptyScan);
+
+    const { buildConsolePolicyDocument } = await import(
+      "../platform/update-role.js"
+    );
+    mockIamSend.mockImplementation((cmd: { constructor: { name: string } }) => {
+      if (cmd.constructor.name === "GetRolePolicyCommand") {
+        const policy = buildConsolePolicyDocument(
+          { domain: "example.com" },
+          undefined
+        );
+        return Promise.resolve({
+          PolicyDocument: encodeURIComponent(JSON.stringify(policy)),
+        });
+      }
+      return Promise.resolve({ PolicyNames: [], AttachedPolicies: [] });
+    });
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({});
+
+    const allOutput = allUserFacingOutput();
+    expect(allOutput).toContain(
+      "wraps-console-access-role permissions current"
+    );
+  });
+
+  it("should handle non-standard Pulumi errors gracefully, without calling them orphans", async () => {
+    // Simulate an error other than "no stack named" (e.g., missing Pulumi.yaml, S3
+    // issues, a laptop that cannot reach the S3 state bucket). Ownership is
+    // UNKNOWN here, not proven absent — treating it as an orphan is the exact
+    // bug this plan fixes: a customer with a working CloudFormation deployment
+    // looks identical to one with no stack at all, and both used to be offered
+    // deletion.
     vi.mocked(
       pulumi.automation.LocalWorkspace.selectStack
     ).mockRejectedValueOnce(
@@ -426,11 +756,46 @@ describe("emailDoctor", () => {
     // Should NOT throw — doctor should handle this gracefully
     await expect(emailDoctor({})).resolves.not.toThrow();
 
-    // Should treat resources as orphaned (no stack)
     const allOutput = consoleLogSpy.mock.calls
       .map((c) => c.join(" "))
       .join("\n");
-    expect(allOutput).toContain("orphan");
+    expect(allOutput).toContain("ownership unknown");
+    expect(allOutput).not.toContain("orphan");
+  });
+
+  it("refuses --cleanup and deletes nothing when the Pulumi probe fails for a reason other than a missing stack", async () => {
+    // `Once`, not a standing override: this file's default mock (see the
+    // top-level vi.mock("@pulumi/pulumi", ...)) rejects with "no stack named"
+    // for every later test, and vi.clearAllMocks() in beforeEach does not
+    // restore that — only the next test's own override does.
+    vi.mocked(
+      pulumi.automation.LocalWorkspace.selectStack
+    ).mockRejectedValueOnce(new Error("connect ECONNREFUSED s3"));
+
+    const filteredScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [
+        { name: "wraps-email-config-set", eventDestinations: [] },
+      ],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(filteredScan);
+    mockFilterFn.mockReturnValue(filteredScan);
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({ cleanup: true });
+
+    expect(vi.mocked(prompts.confirm)).not.toHaveBeenCalled();
+    expect(mockSesSend).not.toHaveBeenCalled();
+    expect(mockSnsSend).not.toHaveBeenCalled();
+    expect(mockDynamoSend).not.toHaveBeenCalled();
+    expect(mockLambdaSend).not.toHaveBeenCalled();
+    expect(mockIamSend).not.toHaveBeenCalled();
+    expect(allUserFacingOutput()).toContain("Refusing to delete");
+    expect(allUserFacingOutput()).not.toContain("wraps email doctor --cleanup");
   });
 
   it("should auto-detect region from metadata when no region flag or env var is set", async () => {

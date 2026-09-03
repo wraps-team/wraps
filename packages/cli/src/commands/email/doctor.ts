@@ -3,6 +3,7 @@ import {
   DeleteRoleCommand,
   DeleteRolePolicyCommand,
   DetachRolePolicyCommand,
+  GetRolePolicyCommand,
   IAMClient,
   ListAttachedRolePoliciesCommand,
   ListRolePoliciesCommand,
@@ -12,8 +13,10 @@ import { DeleteConfigurationSetCommand, SESClient } from "@aws-sdk/client-ses";
 import { DeleteTopicCommand, SNSClient } from "@aws-sdk/client-sns";
 import * as clack from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
+import { StackNotFoundError } from "@pulumi/pulumi/automation/index.js";
 import pc from "picocolors";
 import { trackCommand } from "../../telemetry/events.js";
+import { domainToConfigSetName } from "../../utils/email/config-set-slug.js";
 import {
   checkEventPipeline,
   type PipelineCheck,
@@ -22,6 +25,7 @@ import {
   getAWSRegion,
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
+import { findWrapsCloudFormationStacks } from "../../utils/shared/cloudformation.js";
 import {
   collectRemediations,
   type DoctorFinding,
@@ -43,6 +47,12 @@ import {
   filterWrapsResources,
   scanAWSResources,
 } from "../../utils/shared/scanner.js";
+import { buildConsolePolicyDocument } from "../platform/update-role.js";
+
+/** The role `wraps platform connect` creates — never Pulumi-managed, never an orphan. */
+const CONSOLE_ACCESS_ROLE = "wraps-console-access-role";
+/** Pulumi's `notFoundRegex` (automation/errors.js) — a positive proof of absence. */
+const NO_STACK_NAMED_REGEX = /no stack named/i;
 
 export type EmailDoctorOptions = {
   region?: string;
@@ -62,75 +72,141 @@ function pipelineChecksToFindings(
   }));
 }
 
+/**
+ * What the Pulumi probe proved. Only `absent` licenses the word "orphan":
+ * `unknown` covers Pulumi-not-installed, S3 backend unreachable, expired
+ * credentials — every case where a resource may well be owned by a stack this
+ * machine cannot see.
+ */
+export type StackState = "present" | "absent" | "unknown";
+
+type RowClassification = {
+  status: DoctorFinding["status"];
+  /** Undefined means "use this resource type's normal detail text". */
+  details?: string;
+  remediation?: DoctorFinding["remediation"];
+};
+
+/**
+ * Decide what a single wraps-* resource's row says, in priority order:
+ * something the CLI itself is known to have created on purpose (protected by
+ * name) beats a CloudFormation stack owning it, which beats what the Pulumi
+ * probe found. Only the last of those may ever say "orphan".
+ */
+function classifyResource(
+  name: string,
+  ctx: {
+    protectedNames: Set<string>;
+    stackState: StackState;
+    region: string;
+    cfStackName?: string;
+  }
+): RowClassification {
+  if (ctx.protectedNames.has(name)) {
+    return {
+      status: "pass",
+      details:
+        name === CONSOLE_ACCESS_ROLE
+          ? "managed by wraps platform connect"
+          : "per-domain configuration set recorded in connection metadata",
+    };
+  }
+
+  if (ctx.cfStackName) {
+    return {
+      status: "pass",
+      details: `managed by CloudFormation stack ${ctx.cfStackName}`,
+      remediation: remediations.cloudFormationManaged(ctx.cfStackName),
+    };
+  }
+
+  if (ctx.stackState === "present") {
+    return { status: "pass" };
+  }
+
+  if (ctx.stackState === "absent") {
+    return {
+      status: "warn",
+      details: "orphan — no Pulumi state",
+      // The scanned region is carried in the command: an orphan is by
+      // definition a region with no connection metadata, so nothing
+      // downstream can re-derive it and the bare command would target the
+      // hardcoded default instead.
+      remediation: remediations.cleanupOrphans(ctx.region),
+    };
+  }
+
+  return {
+    status: "info",
+    details: "ownership unknown — could not read Pulumi state",
+    remediation: remediations.stackStateUnknown(),
+  };
+}
+
 function runResourceDiagnostics(
   wrapsResources: AWSResourceScan,
-  hasStack: boolean,
-  region: string
+  stackState: StackState,
+  region: string,
+  protectedNames: Set<string>,
+  cfStackName?: string
 ): DoctorFinding[] {
   const results: DoctorFinding[] = [];
-
-  // When no Pulumi stack exists, all wraps-* resources are orphaned
-  const orphanSuffix = hasStack ? undefined : " (orphan — no Pulumi state)";
-  const orphanStatus = hasStack ? "pass" : "warn";
-  // Attached only to orphan rows. `--cleanup` deletes wraps-* resources with
-  // no Pulumi state and nothing else, so this is the only finding class that
-  // may ever recommend it. The scanned region is carried in the command: an
-  // orphan is by definition a region with no connection metadata, so nothing
-  // downstream can re-derive it and the bare command would target the
-  // hardcoded default instead.
-  const orphanRemediation = hasStack
-    ? undefined
-    : remediations.cleanupOrphans(region);
+  const ctx = { protectedNames, stackState, region, cfStackName };
 
   for (const cs of wrapsResources.configurationSets) {
+    const c = classifyResource(cs.name, ctx);
     results.push({
-      status: orphanStatus,
+      status: c.status,
       category: "SES Config Set",
       name: cs.name,
       details:
-        orphanSuffix || `${cs.eventDestinations.length} event destination(s)`,
-      remediation: orphanRemediation,
+        c.details ?? `${cs.eventDestinations.length} event destination(s)`,
+      remediation: c.remediation,
     });
   }
 
   for (const topic of wrapsResources.snsTopics) {
+    const c = classifyResource(topic.name, ctx);
     results.push({
-      status: orphanStatus,
+      status: c.status,
       category: "SNS Topic",
       name: topic.name,
-      details: orphanSuffix,
-      remediation: orphanRemediation,
+      details: c.details,
+      remediation: c.remediation,
     });
   }
 
   for (const table of wrapsResources.dynamoTables) {
-    const baseStatus = table.status === "ACTIVE" ? orphanStatus : "warn";
+    const c = classifyResource(table.name, ctx);
+    const status = table.status === "ACTIVE" ? c.status : "warn";
     results.push({
-      status: baseStatus,
+      status,
       category: "DynamoDB Table",
       name: table.name,
-      details: orphanSuffix || `Status: ${table.status}`,
-      remediation: orphanRemediation,
+      details: c.details ?? `Status: ${table.status}`,
+      remediation: c.remediation,
     });
   }
 
   for (const fn of wrapsResources.lambdaFunctions) {
+    const c = classifyResource(fn.name, ctx);
     results.push({
-      status: orphanStatus,
+      status: c.status,
       category: "Lambda Function",
       name: fn.name,
-      details: orphanSuffix || fn.runtime,
-      remediation: orphanRemediation,
+      details: c.details ?? fn.runtime,
+      remediation: c.remediation,
     });
   }
 
   for (const role of wrapsResources.iamRoles) {
+    const c = classifyResource(role.name, ctx);
     results.push({
-      status: orphanStatus,
+      status: c.status,
       category: "IAM Role",
       name: role.name,
-      details: orphanSuffix,
-      remediation: orphanRemediation,
+      details: c.details,
+      remediation: c.remediation,
     });
   }
 
@@ -216,9 +292,133 @@ function displayRemediations(results: DoctorFinding[]): void {
 export type EmailFindings = {
   findings: DoctorFinding[];
   totalResources: number;
-  hasStack: boolean;
+  stackState: StackState;
+  /** Only when the caller re-reads it: the raw probe failure, for the refusal message. */
+  stackProbeError?: string;
+  /**
+   * `--cleanup` may run only when this is true: the Pulumi probe positively
+   * proved "no stack" (not merely "could not tell"), and CloudFormation
+   * ownership was checked and came back empty. Anything else means ownership
+   * of at least one resource is unproven, and `--cleanup` must refuse.
+   */
+  cleanupAllowed: boolean;
   wrapsResources: AWSResourceScan;
+  /** Resource names `--cleanup` must never delete, regardless of stack state. */
+  protectedNames: Set<string>;
 };
+
+/**
+ * Names that are NEVER orphans regardless of Pulumi state, because something
+ * other than Pulumi created them on purpose and the CLI can prove it:
+ *   - the console role `platform connect` creates,
+ *   - every per-domain configuration set recorded in connection metadata
+ *     (created imperatively by `domains add`, plus the primary's set name).
+ */
+function protectedResourceNames(
+  connection: ConnectionMetadata | undefined
+): Set<string> {
+  const names = new Set<string>([CONSOLE_ACCESS_ROLE]);
+  if (!connection) {
+    return names;
+  }
+  for (const d of getAllTrackedDomains(connection)) {
+    names.add(d.configSetName ?? domainToConfigSetName(d.domain));
+  }
+  return names;
+}
+
+/**
+ * The finding the incident actually needed: is the console role's inline
+ * policy current with what this CLI version expects? Only runs when the
+ * account is actually connected to the platform — an unconnected account has
+ * no role to check. Never recommends `--cleanup` and is unaffected by
+ * `stackState`: a stale policy is a permissions problem, not an ownership one.
+ */
+async function checkConsoleRolePolicy(
+  connection: ConnectionMetadata,
+  region: string
+): Promise<DoctorFinding | undefined> {
+  if (!connection.platform?.externalId) {
+    return;
+  }
+
+  const iam = new IAMClient({ region }); // IAM is global — region is cosmetic
+  try {
+    const resp = await iam.send(
+      new GetRolePolicyCommand({
+        RoleName: CONSOLE_ACCESS_ROLE,
+        PolicyName: "wraps-console-access-policy",
+      })
+    );
+    const parsed = JSON.parse(
+      decodeURIComponent(resp.PolicyDocument ?? "{}")
+    ) as { Statement?: Array<{ Action?: string | string[] }> };
+
+    const expected = new Set(
+      buildConsolePolicyDocument(
+        connection.services.email?.config,
+        connection.services.sms?.config
+      ).Statement.flatMap((s) => s.Action)
+    );
+    const live = new Set(
+      (parsed.Statement ?? []).flatMap((s) => {
+        if (Array.isArray(s.Action)) {
+          return s.Action;
+        }
+        return s.Action ? [s.Action] : [];
+      })
+    );
+    const missing = [...expected].filter((a) => !live.has(a));
+
+    if (missing.length === 0) {
+      return {
+        status: "pass",
+        category: "Platform Role",
+        name: `${CONSOLE_ACCESS_ROLE} permissions current`,
+      };
+    }
+
+    return {
+      status: "warn",
+      category: "Platform Role",
+      name: `${CONSOLE_ACCESS_ROLE} is missing ${missing.length} permission(s)`,
+      details:
+        missing.slice(0, 5).join(", ") + (missing.length > 5 ? ", …" : ""),
+      remediation: remediations.platformUpdateRole(region),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const notFound =
+      error instanceof Error &&
+      (error.name === "NoSuchEntityException" ||
+        error.name === "NoSuchEntity" ||
+        message.includes("NoSuchEntity"));
+    if (notFound) {
+      return {
+        status: "fail",
+        category: "Platform Role",
+        name: `${CONSOLE_ACCESS_ROLE} not found`,
+        remediation: remediations.platformUpdateRole(region),
+      };
+    }
+
+    const accessDenied =
+      error instanceof Error &&
+      (error.name === "AccessDeniedException" ||
+        error.name === "AccessDenied" ||
+        message.includes("AccessDenied"));
+    if (accessDenied) {
+      return {
+        status: "info",
+        category: "Platform Role",
+        name: `${CONSOLE_ACCESS_ROLE}: could not read the role policy (iam:GetRolePolicy)`,
+        remediation: remediations.reviewPermissions(),
+      };
+    }
+
+    throw error;
+  }
+}
 
 /**
  * Everything `wraps email doctor` knows, with no rendering, no prompting and
@@ -236,7 +436,7 @@ export async function collectEmailFindings(params: {
   connections: ConnectionMetadata[];
   /**
    * Force the Pulumi/S3 stack probe even when the scan found nothing. Only
-   * `--cleanup` needs that: it reads `hasStack` to decide between "a stack
+   * `--cleanup` needs that: it reads `stackState` to decide between "a stack
    * exists, use destroy/upgrade" and the orphan sweep, and it has to be able
    * to say so on an account with zero wraps-* resources.
    */
@@ -255,13 +455,14 @@ export async function collectEmailFindings(params: {
     wrapsResources.iamRoles.length;
 
   // Try to load the Pulumi stack to detect orphaned resources. Skipped when
-  // its answer cannot matter: `hasStack` only labels orphan rows, and there
+  // its answer cannot matter: `stackState` only labels orphan rows, and there
   // are none to label when the scan came back empty. The probe is not cheap —
   // `ensurePulumiWorkDir` resolves credentials and will CREATE the
   // `wraps-state-*` bucket on a miss, then Pulumi is spawned against that S3
   // backend — and `wraps doctor` runs this leg for every user with working
   // credentials, including ones who have never deployed anything.
-  let hasStack = false;
+  let stackState: StackState = "unknown";
+  let stackProbeError: string | undefined;
   if (totalResources > 0 || params.probeStack) {
     try {
       await ensurePulumiWorkDir({ accountId, region });
@@ -269,20 +470,53 @@ export async function collectEmailFindings(params: {
         stackName: `wraps-${accountId}-${region}`,
         workDir: getPulumiWorkDir(),
       });
-      hasStack = true;
+      stackState = "present";
       // baseline:allow-next-line no-swallowed-errors — stack may not exist, Pulumi may not be installed
-    } catch (_error) {
-      // Any failure (stack not found, Pulumi not installed, missing project file,
-      // S3 backend issues) means we can't confirm stack state — treat resources as
-      // potentially orphaned. Doctor is a diagnostic tool and must not fail here.
-      hasStack = false;
+    } catch (error) {
+      // "no stack named ... found" is a positive proof of absence — anything
+      // else (Pulumi not installed, missing project file, S3 backend issues,
+      // expired credentials) means we could not confirm stack state at all,
+      // and a resource may well be owned by a stack this machine cannot see.
+      // Doctor is a diagnostic tool and must not throw here.
+      const message = error instanceof Error ? error.message : String(error);
+      const notFound =
+        error instanceof StackNotFoundError ||
+        NO_STACK_NAMED_REGEX.test(message);
+      stackState = notFound ? "absent" : "unknown";
+      stackProbeError = notFound ? undefined : message;
     }
   }
 
+  const emailConnection = connections.find((c) => c.region === region);
+  const protectedNames = protectedResourceNames(emailConnection);
+
+  // A Wraps CloudFormation stack owns resources the Pulumi probe never sees.
+  // Only worth checking when the Pulumi probe did not already prove
+  // ownership and there is something to protect.
+  let cfStackName: string | undefined;
+  let cfChecked = true;
+  const findings: DoctorFinding[] = [];
+  if (stackState !== "present" && totalResources > 0) {
+    const cf = await findWrapsCloudFormationStacks(region);
+    cfChecked = cf.checked;
+    cfStackName = cf.stacks[0];
+    if (!cf.checked) {
+      findings.push({
+        status: "info",
+        category: "Email",
+        name: "Could not list CloudFormation stacks (no cloudformation:DescribeStacks)",
+        details: "Orphan detection is incomplete.",
+        remediation: remediations.reviewPermissions(),
+      });
+    }
+  }
+
+  const cleanupAllowed = stackState === "absent" && !cfStackName && cfChecked;
+
   // If an email connection exists for this region, verify the SES ->
   // EventBridge -> SQS -> Lambda -> DynamoDB pipeline can actually deliver
-  // events (see event-pipeline-check.ts for the hop-by-hop breakdown).
-  const emailConnection = connections.find((c) => c.region === region);
+  // events (see event-pipeline-check.ts for the hop-by-hop breakdown), and
+  // whether the platform's console role permissions are current.
   let pipelineResults: DoctorFinding[] = [];
   if (emailConnection) {
     const emailService = emailConnection.services.email;
@@ -300,16 +534,31 @@ export async function collectEmailFindings(params: {
     pipelineResults = pipelineChecksToFindings(
       await checkEventPipeline({ region, domains, expectPlatformWebhook })
     );
+
+    const roleFinding = await checkConsoleRolePolicy(emailConnection, region);
+    if (roleFinding) {
+      findings.push(roleFinding);
+    }
   }
 
   return {
     findings: [
-      ...runResourceDiagnostics(wrapsResources, hasStack, region),
+      ...runResourceDiagnostics(
+        wrapsResources,
+        stackState,
+        region,
+        protectedNames,
+        cfStackName
+      ),
       ...pipelineResults,
+      ...findings,
     ],
     totalResources,
-    hasStack,
+    stackState,
+    stackProbeError,
+    cleanupAllowed,
     wrapsResources,
+    protectedNames,
   };
 }
 
@@ -371,14 +620,17 @@ export async function emailDoctor(options: EmailDoctorOptions): Promise<void> {
   const {
     findings: results,
     totalResources,
-    hasStack,
+    stackState,
+    stackProbeError,
+    cleanupAllowed,
     wrapsResources,
+    protectedNames,
   } = await progress.execute("Checking email infrastructure", async () =>
     collectEmailFindings({
       region,
       accountId: identity.accountId,
       connections: emailConnections,
-      // The `--cleanup` branch below reads `hasStack` even when the scan is
+      // The `--cleanup` branch below reads `stackState` even when the scan is
       // empty, so it is the one caller that must pay for the probe regardless.
       probeStack: Boolean(options.cleanup),
     })
@@ -446,30 +698,99 @@ export async function emailDoctor(options: EmailDoctorOptions): Promise<void> {
 
     // 8. Cleanup orphaned resources if requested
     if (options.cleanup) {
-      if (hasStack) {
-        clack.log.warn(
-          // remediation:allow-literal — the --cleanup flag's own precondition message, not a finding's remedy
-          `A Pulumi stack exists for this region. Use ${pc.cyan("wraps email destroy")} to remove managed resources, or ${pc.cyan("wraps email upgrade")} to reconcile.`
-        );
-      } else {
+      if (cleanupAllowed) {
         // Structural, not a substring test on free text: the old gate
         // searched a finding's `details` for the word orphan, which could
         // never match an Event Pipeline finding, so `--cleanup` was a
         // guaranteed no-op every time the summary line recommended it.
-        const cleanupId = remediations.cleanupOrphans().id;
-        const orphanCount = results.filter(
-          (r) => r.remediation?.id === cleanupId
-        ).length;
+        // Filtered straight off the scan (not off `results`) so the printed
+        // enumeration and the actual deletion loop iterate the same lists.
+        const toDelete = {
+          configurationSets: wrapsResources.configurationSets.filter(
+            (r) => !protectedNames.has(r.name)
+          ),
+          snsTopics: wrapsResources.snsTopics.filter(
+            (r) => !protectedNames.has(r.name)
+          ),
+          dynamoTables: wrapsResources.dynamoTables.filter(
+            (r) => !protectedNames.has(r.name)
+          ),
+          lambdaFunctions: wrapsResources.lambdaFunctions.filter(
+            (r) => !protectedNames.has(r.name)
+          ),
+          iamRoles: wrapsResources.iamRoles.filter(
+            (r) => !protectedNames.has(r.name)
+          ),
+        };
+        const kept = [
+          ...wrapsResources.configurationSets,
+          ...wrapsResources.snsTopics,
+          ...wrapsResources.dynamoTables,
+          ...wrapsResources.lambdaFunctions,
+          ...wrapsResources.iamRoles,
+        ]
+          .map((r) => r.name)
+          .filter((name) => protectedNames.has(name));
+
+        const orphanCount =
+          toDelete.configurationSets.length +
+          toDelete.snsTopics.length +
+          toDelete.dynamoTables.length +
+          toDelete.lambdaFunctions.length +
+          toDelete.iamRoles.length;
 
         if (orphanCount > 0) {
+          console.log(`\n  ${pc.bold("Will delete:")}`);
+          for (const cs of toDelete.configurationSets) {
+            console.log(`    ${pc.dim("SES config set:")}   ${cs.name}`);
+          }
+          for (const topic of toDelete.snsTopics) {
+            console.log(`    ${pc.dim("SNS topic:")}        ${topic.name}`);
+          }
+          for (const table of toDelete.dynamoTables) {
+            console.log(`    ${pc.dim("DynamoDB table:")}   ${table.name}`);
+          }
+          for (const fn of toDelete.lambdaFunctions) {
+            console.log(`    ${pc.dim("Lambda function:")}  ${fn.name}`);
+          }
+          for (const role of toDelete.iamRoles) {
+            console.log(`    ${pc.dim("IAM role:")}         ${role.name}`);
+          }
+          if (kept.length > 0) {
+            console.log(
+              `  ${pc.bold("Will keep (managed):")} ${kept.join(", ")}`
+            );
+          }
+          console.log();
+
           const confirmed = await clack.confirm({
-            message: `Delete ${orphanCount} orphaned wraps-* resource(s)?`,
+            message: `Delete these ${orphanCount} resource(s)? This cannot be undone.`,
+            initialValue: false,
           });
 
           if (!clack.isCancel(confirmed) && confirmed) {
-            await cleanupOrphanedResources(wrapsResources, region);
+            await cleanupOrphanedResources(
+              wrapsResources,
+              region,
+              protectedNames
+            );
           }
         }
+      } else if (stackState === "present") {
+        clack.log.warn(
+          // remediation:allow-literal — the --cleanup flag's own precondition message, not a finding's remedy
+          `A Pulumi stack exists for this region. Use ${pc.cyan("wraps email destroy")} to remove managed resources, or ${pc.cyan("wraps email upgrade")} to reconcile.`
+        );
+      } else if (stackState === "unknown") {
+        clack.log.warn(
+          // remediation:allow-literal — the --cleanup flag's own precondition message, not a finding's remedy
+          `Could not confirm Pulumi state${stackProbeError ? ` (${stackProbeError})` : ""}. Refusing to delete anything — fix the probe first (${pc.cyan("wraps aws doctor")}) or use ${pc.cyan("wraps email destroy")}.`
+        );
+      } else {
+        clack.log.warn(
+          // remediation:allow-literal — the --cleanup flag's own precondition message, not a finding's remedy
+          "Could not confirm CloudFormation ownership for this region (no cloudformation:DescribeStacks). Refusing to delete anything."
+        );
       }
     }
 
@@ -479,7 +800,8 @@ export async function emailDoctor(options: EmailDoctorOptions): Promise<void> {
 
 async function cleanupOrphanedResources(
   resources: AWSResourceScan,
-  region: string
+  region: string,
+  protectedNames: Set<string>
 ): Promise<void> {
   const ses = new SESClient({ region });
   const sns = new SNSClient({ region });
@@ -488,6 +810,10 @@ async function cleanupOrphanedResources(
   const iam = new IAMClient({ region });
 
   for (const cs of resources.configurationSets) {
+    if (protectedNames.has(cs.name)) {
+      clack.log.info(`Skipped ${cs.name} (managed)`);
+      continue;
+    }
     try {
       await ses.send(
         new DeleteConfigurationSetCommand({ ConfigurationSetName: cs.name })
@@ -501,6 +827,10 @@ async function cleanupOrphanedResources(
   }
 
   for (const topic of resources.snsTopics) {
+    if (protectedNames.has(topic.name)) {
+      clack.log.info(`Skipped ${topic.name} (managed)`);
+      continue;
+    }
     try {
       await sns.send(new DeleteTopicCommand({ TopicArn: topic.arn }));
       clack.log.success(`Deleted SNS topic: ${topic.name}`);
@@ -512,6 +842,10 @@ async function cleanupOrphanedResources(
   }
 
   for (const table of resources.dynamoTables) {
+    if (protectedNames.has(table.name)) {
+      clack.log.info(`Skipped ${table.name} (managed)`);
+      continue;
+    }
     try {
       await dynamo.send(new DeleteTableCommand({ TableName: table.name }));
       clack.log.success(`Deleted DynamoDB table: ${table.name}`);
@@ -523,6 +857,10 @@ async function cleanupOrphanedResources(
   }
 
   for (const fn of resources.lambdaFunctions) {
+    if (protectedNames.has(fn.name)) {
+      clack.log.info(`Skipped ${fn.name} (managed)`);
+      continue;
+    }
     try {
       await lambda.send(new DeleteFunctionCommand({ FunctionName: fn.name }));
       clack.log.success(`Deleted Lambda function: ${fn.name}`);
@@ -535,6 +873,10 @@ async function cleanupOrphanedResources(
 
   // Delete IAM roles (must remove all policies first)
   for (const role of resources.iamRoles) {
+    if (protectedNames.has(role.name)) {
+      clack.log.info(`Skipped ${role.name} (managed)`);
+      continue;
+    }
     try {
       // Delete inline policies
       const inlineResp = await iam.send(

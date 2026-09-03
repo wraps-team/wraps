@@ -33,6 +33,18 @@ vi.mock("../../utils/shared/metadata.js", () => ({
   findConnectionsWithService: vi.fn().mockResolvedValue([]),
   getAllTrackedDomains: vi.fn().mockReturnValue([]),
 }));
+// findWrapsCloudFormationStacks: collectEmailFindings calls it whenever the
+// Pulumi probe did not already prove ownership and the scan found something,
+// which is true for the "still probes" cases below.
+const mockCfnSend = vi.fn().mockResolvedValue({ Stacks: [] });
+vi.mock("@aws-sdk/client-cloudformation", () => ({
+  CloudFormationClient: class {
+    send = mockCfnSend;
+  },
+  DescribeStacksCommand: class {
+    constructor(public input: unknown) {}
+  },
+}));
 
 import * as pulumi from "@pulumi/pulumi";
 import { ensurePulumiWorkDir } from "../../utils/shared/fs.js";
@@ -99,11 +111,31 @@ describe("collectEmailFindings stack probe", () => {
 
     expect(mockEnsureWorkDir).toHaveBeenCalled();
     expect(mockSelectStack).toHaveBeenCalled();
-    expect(result.hasStack).toBe(false);
+    expect(result.stackState).toBe("absent");
     expect(result.findings[0].details).toContain("orphan");
   });
 
-  it("still probes on an empty account when the caller needs hasStack for --cleanup", async () => {
+  it("treats a Pulumi probe failure other than a missing stack as unknown, never orphan", async () => {
+    mockSelectStack.mockRejectedValue(new Error("connect ECONNREFUSED s3"));
+    const scan = scanWith({
+      configurationSets: [{ name: "wraps-email-cs", eventDestinations: [] }],
+    });
+    mockScan.mockResolvedValue(scan);
+    mockFilter.mockReturnValue(scan);
+
+    const result = await collectEmailFindings({
+      region: "us-east-1",
+      accountId: "123456789012",
+      connections: [],
+    });
+
+    expect(result.stackState).toBe("unknown");
+    expect(result.cleanupAllowed).toBe(false);
+    expect(result.findings[0].details).not.toContain("orphan");
+    expect(result.findings[0].details).toContain("ownership unknown");
+  });
+
+  it("still probes on an empty account when the caller needs stackState for --cleanup", async () => {
     mockScan.mockResolvedValue(emptyScan);
     mockFilter.mockReturnValue(emptyScan);
     mockSelectStack.mockResolvedValue({});
@@ -117,6 +149,6 @@ describe("collectEmailFindings stack probe", () => {
 
     expect(mockEnsureWorkDir).toHaveBeenCalled();
     expect(mockSelectStack).toHaveBeenCalled();
-    expect(result.hasStack).toBe(true);
+    expect(result.stackState).toBe("present");
   });
 });
