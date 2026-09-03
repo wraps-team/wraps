@@ -1560,3 +1560,41 @@ export async function promptMailFromSubdomain(domain: string): Promise<string> {
   const sub = (subdomain as string) || "mail";
   return `${sub}.${domain}`;
 }
+
+/**
+ * Prompt for the tracking subdomain (defaults to `track.{domain}`). Returns
+ * undefined when the user opts out.
+ */
+export async function promptTrackingSubdomain(
+  domain: string
+): Promise<string | undefined> {
+  ensureInteractive("Tracking domain", "--tracking-domain <host|none>");
+
+  const wants = await clack.confirm({
+    message: `Use a custom tracking domain for open & click links on ${pc.cyan(domain)}? ${pc.dim("(recommended — links show your brand, not awstrack.me)")}`,
+    initialValue: true,
+  });
+  if (clack.isCancel(wants)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+  if (!wants) return;
+
+  const sub = await clack.text({
+    message: `Tracking subdomain for ${pc.cyan(domain)}:`,
+    placeholder: "track",
+    defaultValue: "track",
+    validate: (value) => {
+      const v = value || "track";
+      if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/i.test(v)) {
+        return "Invalid subdomain format";
+      }
+      return;
+    },
+  });
+  if (clack.isCancel(sub)) {
+    clack.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+  return `${(sub as string) || "track"}.${domain}`;
+}
