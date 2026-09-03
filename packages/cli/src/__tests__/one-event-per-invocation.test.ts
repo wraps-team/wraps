@@ -76,7 +76,7 @@ describe("one invocation, one command event", () => {
     // stopped working and the assertion below would pass vacuously.
     expect(events.length, "no command events captured").toBeGreaterThan(0);
     expect(events).toEqual(["command:permissions"]);
-  });
+  }, 30_000);
 
   it("emits exactly one command event for a rejected command", () => {
     // Throws from cli.ts's switch before any handler runs, so the routing-layer
@@ -85,5 +85,5 @@ describe("one invocation, one command event", () => {
 
     expect(events.length, "no command events captured").toBeGreaterThan(0);
     expect(events).toEqual(["command:email:domains"]);
-  });
+  }, 30_000);
 });

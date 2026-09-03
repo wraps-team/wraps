@@ -33,6 +33,18 @@ const COMMAND_WORD = /^[a-z][a-z0-9-]{0,31}$/;
 const COMMANDS_WITH_DATA_SECOND_POSITIONAL: readonly string[] = ["push"];
 
 /**
+ * Routed pairs whose *third* positional is user data, not a subcommand.
+ *
+ * `wraps email check <domain>` (cli.ts:641) reads `sub[2]` as the domain to
+ * audit. A bare hostname can be word-shaped (`acme`), so COMMAND_WORD alone
+ * would let it through — this list is what stops it.
+ *
+ * Every other `sub[2]` in cli.ts selects a subcommand, so this stays a
+ * one-entry list until a command starts reading data from that position.
+ */
+const PAIRS_WITH_DATA_THIRD_POSITIONAL: readonly string[] = ["email:check"];
+
+/**
  * Build the name a command is reported under, from the raw positionals.
  *
  * The tokens come straight off argv, so on the unknown-command path they are
@@ -45,7 +57,8 @@ const COMMANDS_WITH_DATA_SECOND_POSITIONAL: readonly string[] = ["push"];
  */
 export function telemetryCommandName(
   primaryCommand?: string,
-  subCommand?: string
+  subCommand?: string,
+  thirdPositional?: string
 ): string {
   if (
     !(
@@ -66,7 +79,23 @@ export function telemetryCommandName(
     return primaryCommand;
   }
 
-  return COMMAND_WORD.test(subCommand)
-    ? `${primaryCommand}:${subCommand}`
-    : `${primaryCommand}:${UNKNOWN}`;
+  if (!COMMAND_WORD.test(subCommand)) {
+    return `${primaryCommand}:${UNKNOWN}`;
+  }
+
+  const pair = `${primaryCommand}:${subCommand}`;
+
+  // A failure thrown before the handler runs is named here, so without the
+  // third token every `email domains *` rejection collapsed into
+  // `email:domains` and the dashboard could not tell which subcommand died.
+  // An unusable token is dropped rather than reported as ":unknown" — the pair
+  // on its own is the more accurate name.
+  if (
+    !(thirdPositional && COMMAND_WORD.test(thirdPositional)) ||
+    PAIRS_WITH_DATA_THIRD_POSITIONAL.includes(pair)
+  ) {
+    return pair;
+  }
+
+  return `${pair}:${thirdPositional}`;
 }

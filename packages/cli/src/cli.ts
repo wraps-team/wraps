@@ -1694,7 +1694,11 @@ async function run() {
     }
     // Track successful command execution
     const duration = Date.now() - startTime;
-    const commandName = telemetryCommandName(primaryCommand, subCommand);
+    const commandName = telemetryCommandName(
+      primaryCommand,
+      subCommand,
+      sub[2]
+    );
 
     trackCommandFallback(commandName, {
       success: true,
@@ -1703,7 +1707,11 @@ async function run() {
   } catch (error) {
     // Track failed command execution
     const duration = Date.now() - startTime;
-    const commandName = telemetryCommandName(primaryCommand, subCommand);
+    const commandName = telemetryCommandName(
+      primaryCommand,
+      subCommand,
+      sub[2]
+    );
 
     trackCommandFallback(commandName, {
       success: false,

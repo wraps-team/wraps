@@ -191,6 +191,45 @@ describe("telemetryCommandName", () => {
     expect(telemetryCommandName("push", undefined)).toBe("push");
   });
 
+  it("reports the subcommand a failure actually died in", () => {
+    // Without the third positional every `email domains *` failure collapsed
+    // into `email:domains`, so the dashboard could not tell a failing
+    // `verify` from a failing `remove`.
+    expect(telemetryCommandName("email", "domains", "verify")).toBe(
+      "email:domains:verify"
+    );
+    expect(telemetryCommandName("email", "domains", "get-dkim")).toBe(
+      "email:domains:get-dkim"
+    );
+    expect(telemetryCommandName("email", "templates", "push")).toBe(
+      "email:templates:push"
+    );
+    expect(telemetryCommandName("email", "domains", undefined)).toBe(
+      "email:domains"
+    );
+  });
+
+  it("omits a third positional that is user data, rather than echoing it", () => {
+    // `wraps email check <domain>` (cli.ts:641) is the one routed pair whose
+    // third positional is data, not a subcommand. Omit it — appending
+    // ":unknown" would be a worse name than the pair alone.
+    expect(telemetryCommandName("email", "check", "acme-corp.com")).toBe(
+      "email:check"
+    );
+    // Word-shaped, so the shape guard alone would let it through.
+    expect(telemetryCommandName("email", "check", "acme")).toBe("email:check");
+    // Shape guard catches the rest.
+    expect(telemetryCommandName("email", "test", "alice@acme-corp.com")).toBe(
+      "email:test"
+    );
+    expect(telemetryCommandName("email", "domains", "acme-corp.com")).toBe(
+      "email:domains"
+    );
+    expect(
+      telemetryCommandName("email", "domains", "arn:aws:ses:us-east-1:1234:x")
+    ).toBe("email:domains");
+  });
+
   it("replaces a second positional that is not a command word", () => {
     // Routed service, user data where a subcommand belongs.
     expect(telemetryCommandName("email", "acme-corp.com")).toBe(
