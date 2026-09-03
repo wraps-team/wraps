@@ -95,8 +95,14 @@ export const DNS_RECORD_DESCRIPTIONS: Record<
 export function buildEmailDNSRecords(
   data: EmailDNSRecordData
 ): DNSRecordInfo[] {
-  const { domain, dkimTokens, mailFromDomain, customTrackingDomain, region } =
-    data;
+  const {
+    domain,
+    dkimTokens,
+    mailFromDomain,
+    customTrackingDomain,
+    trackingCnameTarget,
+    region,
+  } = data;
   const records: DNSRecordInfo[] = [];
 
   // DKIM CNAME records (3 records)
@@ -131,7 +137,7 @@ export function buildEmailDNSRecords(
     records.push({
       name: customTrackingDomain,
       type: "CNAME",
-      value: `r.${region}.awstrack.me`,
+      value: trackingCnameTarget ?? `r.${region}.awstrack.me`,
       category: "tracking",
     });
   }
@@ -231,12 +237,20 @@ export function formatManualDNSInstructions(records: DNSRecordInfo[]): string {
 }
 
 /**
- * Create DNS records using the appropriate provider
+ * Create DNS records using the appropriate provider.
+ *
+ * `options.replaceExisting`: Route53's UPSERT already replaces a record with
+ * the same name+type, but Vercel's and Cloudflare's `createRecord` always
+ * POSTs a new one — calling it again for a name that already exists (e.g.
+ * swapping the tracking CNAME from awstrack.me to a CloudFront domain once
+ * HTTPS activates) would leave two records instead of one. Pass `true` to
+ * delete any existing record with the same name+type first.
  */
 export async function createDNSRecordsForProvider(
   credentials: DNSCredentials,
   data: EmailDNSRecordData,
-  selectedCategories?: Set<ProposedDNSRecord["category"]>
+  selectedCategories?: Set<ProposedDNSRecord["category"]>,
+  options?: { replaceExisting?: boolean }
 ): Promise<DNSCreationResult> {
   switch (credentials.provider) {
     case "route53": {
@@ -262,7 +276,8 @@ export async function createDNSRecordsForProvider(
           data.region,
           categories,
           data.customTrackingDomain,
-          data.mailFromDomain
+          data.mailFromDomain,
+          data.trackingCnameTarget
         );
 
         // Count records created based on selected categories
@@ -312,6 +327,11 @@ export async function createDNSRecordsForProvider(
         const filtered = records.filter((r) =>
           selectedCategories.has(r.category)
         );
+        if (options?.replaceExisting) {
+          for (const record of filtered) {
+            await client.deleteRecordIfExists(record.name, record.type);
+          }
+        }
         return client.createRecords(filtered);
       }
       return client.createEmailRecords(data);
@@ -327,6 +347,11 @@ export async function createDNSRecordsForProvider(
         const filtered = records.filter((r) =>
           selectedCategories.has(r.category)
         );
+        if (options?.replaceExisting) {
+          for (const record of filtered) {
+            await client.deleteRecordIfExists(record.name, record.type);
+          }
+        }
         return client.createRecords(filtered);
       }
       return client.createEmailRecords(data);

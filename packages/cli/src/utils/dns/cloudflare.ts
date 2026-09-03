@@ -110,6 +110,19 @@ export class CloudflareDNSClient implements DNSProviderClient {
   }
 
   /**
+   * Delete an existing record by name+type, if one exists. `createRecord`
+   * always POSTs a new record rather than upserting, so callers that need
+   * to change an existing record's value (e.g. swapping the tracking CNAME
+   * target) must delete the old one first to avoid ending up with two.
+   */
+  async deleteRecordIfExists(name: string, type: string): Promise<void> {
+    const existing = await this.findRecord(name, type);
+    if (existing) {
+      await this.deleteRecord(existing.id);
+    }
+  }
+
+  /**
    * Create arbitrary DNS records from a list
    */
   async createRecords(
@@ -147,8 +160,14 @@ export class CloudflareDNSClient implements DNSProviderClient {
   async createEmailRecords(
     data: EmailDNSRecordData
   ): Promise<DNSCreationResult> {
-    const { domain, dkimTokens, mailFromDomain, customTrackingDomain, region } =
-      data;
+    const {
+      domain,
+      dkimTokens,
+      mailFromDomain,
+      customTrackingDomain,
+      trackingCnameTarget,
+      region,
+    } = data;
     const errors: string[] = [];
     let recordsCreated = 0;
 
@@ -197,7 +216,7 @@ export class CloudflareDNSClient implements DNSProviderClient {
         const trackingSuccess = await this.createRecord(
           customTrackingDomain,
           "CNAME",
-          `r.${region}.awstrack.me`
+          trackingCnameTarget ?? `r.${region}.awstrack.me`
         );
         if (trackingSuccess) {
           recordsCreated++;

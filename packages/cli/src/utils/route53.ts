@@ -380,7 +380,8 @@ export async function createSelectedDNSRecords(
   region: string,
   selectedCategories: Set<ProposedDNSRecord["category"]>,
   customTrackingDomain?: string,
-  mailFromDomain?: string
+  mailFromDomain?: string,
+  trackingCnameTarget?: string
 ): Promise<void> {
   const client = new Route53Client({ region });
   const changes: Change[] = [];
@@ -462,7 +463,9 @@ export async function createSelectedDNSRecords(
         Name: customTrackingDomain,
         Type: "CNAME",
         TTL: 1800,
-        ResourceRecords: [{ Value: `r.${region}.awstrack.me` }],
+        ResourceRecords: [
+          { Value: trackingCnameTarget ?? `r.${region}.awstrack.me` },
+        ],
       },
     });
   }

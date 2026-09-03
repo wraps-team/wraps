@@ -27,6 +27,15 @@ export type AdditionalDomain = {
   trackingDomain?: string;
   /** ISO time SES accepted `trackingDomain`; absent while the sending domain is unverified. */
   trackingDomainAppliedAt?: string;
+  /** HTTPS tracking resources, present once the user opted in. */
+  trackingHttps?: {
+    certificateArn: string;
+    /** pending = cert not yet ISSUED; active = distribution created + HttpsPolicy REQUIRE. */
+    status: "pending" | "active";
+    distributionId?: string;
+    distributionDomain?: string;
+    validationRecord?: { name: string; type: string; value: string };
+  };
   tlsRequired?: boolean;
   reputationMetrics?: boolean;
   suppressionReasons?: ("BOUNCE" | "COMPLAINT")[];
@@ -44,6 +53,8 @@ export type EmailDomainsConfigOptions = {
   clicks?: boolean;
   /** A hostname to set, or the literal "none" to clear. */
   trackingDomain?: string;
+  /** Enable/disable CloudFront+ACM HTTPS for the tracking domain. */
+  trackingHttps?: boolean;
   tlsRequired?: boolean;
   reputationMetrics?: boolean;
   suppressBounce?: boolean;

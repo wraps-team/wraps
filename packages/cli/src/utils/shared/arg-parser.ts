@@ -68,6 +68,7 @@ export type CliFlags = {
   opens?: boolean;
   clicks?: boolean;
   trackingDomain?: string;
+  trackingHttps?: boolean;
   tlsRequired?: boolean;
   reputationMetrics?: boolean;
   suppressBounce?: boolean;
@@ -192,6 +193,7 @@ const BOOLEAN_FLAGS = [
   "reveal-secret",
   "opens",
   "clicks",
+  "tracking-https",
   "tls-required",
   "reputation-metrics",
   "suppress-bounce",

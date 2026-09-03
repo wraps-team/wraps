@@ -15,7 +15,9 @@ export type CloudFrontTrackingConfig = {
 /**
  * Find existing CloudFront distribution by alias (CNAME)
  */
-async function findDistributionByAlias(alias: string): Promise<string | null> {
+export async function findDistributionByAlias(
+  alias: string
+): Promise<string | null> {
   try {
     const { CloudFrontClient, ListDistributionsCommand } = await import(
       "@aws-sdk/client-cloudfront"

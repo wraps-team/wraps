@@ -12,6 +12,8 @@ export type EmailDNSRecordData = {
   dkimTokens: string[];
   mailFromDomain?: string;
   customTrackingDomain?: string;
+  /** CNAME target for `customTrackingDomain`. Defaults to `r.<region>.awstrack.me` when omitted — set this to a CloudFront distribution domain for HTTPS tracking. */
+  trackingCnameTarget?: string;
   region: string;
 };
 

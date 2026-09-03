@@ -48,12 +48,14 @@ export function isTrackingDomainNotReady(error: unknown): boolean {
 export async function putTrackingDomain(
   sesv2: SESv2Client,
   configSetName: string,
-  trackingDomain: string
+  trackingDomain: string,
+  httpsPolicy?: "REQUIRE" | "OPTIONAL"
 ): Promise<void> {
   await sesv2.send(
     new PutConfigurationSetTrackingOptionsCommand({
       ConfigurationSetName: configSetName,
       CustomRedirectDomain: trackingDomain,
+      ...(httpsPolicy ? { HttpsPolicy: httpsPolicy } : {}),
     })
   );
 }
