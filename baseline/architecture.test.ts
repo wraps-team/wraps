@@ -976,6 +976,10 @@ describe("no hardcoded us-east-1 outside allow-list", () => {
     /^packages\/cli\/src\/infrastructure\/resources\/acm\.ts$/,
     /^packages\/cli\/src\/infrastructure\/resources\/cloudfront\.ts$/,
     /^packages\/cli\/src\/infrastructure\/resources\/s3-cdn\.ts$/,
+    // SDK-managed (non-Pulumi) equivalent of acm.ts/cloudfront.ts above, for
+    // additional domains' HTTPS tracking: same ACM-for-CloudFront and
+    // CloudFront-control-plane us-east-1 requirement.
+    /^packages\/cli\/src\/utils\/email\/tracking-https\.ts$/,
     /^packages\/cli\/src\/commands\/cdn\//,
     /^packages\/cli\/src\/commands\/selfhost\//,
     /^packages\/cli\/src\/utils\/shared\/s3-state\.ts$/,
