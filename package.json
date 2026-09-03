@@ -23,6 +23,7 @@
     "test:baseline": "pnpm test:architecture && pnpm baseline",
     "check:fast": "pnpm check:errors && pnpm test:baseline",
     "check:all": "./scripts/check-all.sh",
+    "check:cfn": "bash scripts/check-cloudformation-published.sh",
     "knip": "knip",
     "fix": "pnpm dlx ultracite@6.3.2 fix",
     "clean": "turbo run clean && rm -rf node_modules",

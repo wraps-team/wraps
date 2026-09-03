@@ -1,0 +1,28 @@
+name: CloudFormation publish drift
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudformation/**'
+      - 'scripts/upload-cloudformation-template.sh'
+      - 'scripts/check-cloudformation-published.sh'
+      - '.github/workflows/cloudformation-drift.yml'
+  schedule:
+    # Weekday mornings. Catches a stale hand-upload or a restored object,
+    # which the push trigger cannot see.
+    - cron: '0 14 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    if: github.repository == 'wraps-team/wraps'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Compare published templates against the repo
+        run: bash scripts/check-cloudformation-published.sh
