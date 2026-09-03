@@ -22,7 +22,19 @@ import * as clack from "@clack/prompts";
 import pc from "picocolors";
 import { trackCommand } from "../../telemetry/events.js";
 import type { EmailDomainsConfigOptions } from "../../types/index.js";
+import {
+  createDNSRecordsForProvider,
+  getDNSCredentials,
+  getDNSProviderDisplayName,
+} from "../../utils/dns/index.js";
 import { domainToConfigSetName } from "../../utils/email/config-set-slug.js";
+import {
+  clearTrackingDomain,
+  defaultTrackingDomain,
+  putTrackingDomain,
+  TRACKING_DOMAIN_NONE,
+  validateTrackingDomain,
+} from "../../utils/email/tracking-domain.js";
 import {
   getAWSRegion,
   validateAWSCredentials,
@@ -40,6 +52,7 @@ type DomainCandidate = {
   domain: string;
   configSetName: string;
   trackingConfig?: { opens: boolean; clicks: boolean };
+  trackingDomain?: string;
   additionalIndex?: number;
   tlsRequired?: boolean;
   reputationMetrics?: boolean;
@@ -179,6 +192,8 @@ export async function configDomain(
               vdmInbox:
                 metadata.services.email.config.vdmOptions
                   ?.optimizedSharedDeliveryEnabled,
+              trackingDomain:
+                metadata.services.email.config.tracking?.customRedirectDomain,
             },
           ]
         : []),
@@ -189,6 +204,7 @@ export async function configDomain(
           domain: d.domain,
           configSetName: d.configSetName!,
           trackingConfig: d.trackingConfig,
+          trackingDomain: d.trackingDomain,
           additionalIndex: i,
           tlsRequired: d.tlsRequired,
           reputationMetrics: d.reputationMetrics,
@@ -297,19 +313,21 @@ export async function configDomain(
       "--no-vdm-engagement"
     );
     const vdmInboxFlag = flag(options.vdmInbox, "--no-vdm-inbox");
+    const trackingDomainFlag = options.trackingDomain;
 
-    const hasGroupFlags = [
-      opensFlag,
-      clicksFlag,
-      tlsFlag,
-      reputationFlag,
-      suppressBounceFlag,
-      suppressComplaintFlag,
-      archiveFlag,
-      sendingEnabledFlag,
-      vdmEngagementFlag,
-      vdmInboxFlag,
-    ].some((f) => f !== undefined);
+    const hasGroupFlags =
+      [
+        opensFlag,
+        clicksFlag,
+        tlsFlag,
+        reputationFlag,
+        suppressBounceFlag,
+        suppressComplaintFlag,
+        archiveFlag,
+        sendingEnabledFlag,
+        vdmEngagementFlag,
+        vdmInboxFlag,
+      ].some((f) => f !== undefined) || trackingDomainFlag !== undefined;
 
     const sesClient = new SESv2Client({ region });
 
@@ -330,6 +348,7 @@ export async function configDomain(
         sendingEnabledFlag,
         vdmEngagementFlag,
         vdmInboxFlag,
+        trackingDomainFlag,
         progress,
       });
       return;
@@ -428,6 +447,10 @@ function persistCandidateField<K extends keyof DomainCandidate>(
         if (!emailConfig.vdmOptions) emailConfig.vdmOptions = {};
         emailConfig.vdmOptions.optimizedSharedDeliveryEnabled =
           value as boolean;
+        break;
+      case "trackingDomain":
+        // Primary is Pulumi-managed; never reached — applyTrackingDomain
+        // refuses the primary domain before calling persistCandidateField.
         break;
     }
   }
@@ -597,6 +620,88 @@ async function applyVdm(
   await saveMetadata(ctx);
 }
 
+async function applyTrackingDomain(
+  ctx: ApplyContext,
+  value: string
+): Promise<void> {
+  if (ctx.candidate.additionalIndex === undefined) {
+    throw new WrapsError(
+      `${ctx.candidate.domain} is the primary domain — its tracking domain is managed by ${pc.cyan("wraps email upgrade")} (choose "tracking").`,
+      "PRIMARY_TRACKING_DOMAIN_MANAGED_BY_PULUMI",
+      "Run wraps email upgrade"
+    );
+  }
+  if (value === TRACKING_DOMAIN_NONE) {
+    await clearTrackingDomain(ctx.region, ctx.candidate.configSetName);
+    persistCandidateField(ctx, "trackingDomain", undefined);
+    (
+      ctx.additionalDomains[ctx.candidate.additionalIndex] as Record<
+        string,
+        unknown
+      >
+    ).trackingDomainAppliedAt = undefined;
+    await saveMetadata(ctx);
+    return;
+  }
+  const problem = validateTrackingDomain(value, ctx.candidate.domain);
+  if (problem) {
+    throw new WrapsError(
+      `Invalid tracking domain: ${problem}`,
+      "INVALID_TRACKING_DOMAIN",
+      `Use a subdomain of ${ctx.candidate.domain}`
+    );
+  }
+  const host = value.toLowerCase();
+  await putTrackingDomain(ctx.sesClient, ctx.candidate.configSetName, host);
+  persistCandidateField(ctx, "trackingDomain", host);
+  (
+    ctx.additionalDomains[ctx.candidate.additionalIndex] as Record<
+      string,
+      unknown
+    >
+  ).trackingDomainAppliedAt = new Date().toISOString();
+  await saveMetadata(ctx);
+}
+
+async function offerTrackingCname(
+  ctx: ApplyContext,
+  trackingDomain: string
+): Promise<void> {
+  const record = {
+    name: trackingDomain,
+    type: "CNAME",
+    value: `r.${ctx.region}.awstrack.me`,
+  };
+  const provider = ctx.metadata.services.email?.dnsProvider;
+  if (provider && provider !== "manual") {
+    const parts = ctx.candidate.domain.split(".");
+    const rootDomain =
+      parts.length > 2 ? parts.slice(-2).join(".") : ctx.candidate.domain;
+    const cred = await getDNSCredentials(provider, rootDomain, ctx.region);
+    if (cred.valid && cred.credentials) {
+      const result = await createDNSRecordsForProvider(
+        cred.credentials,
+        {
+          domain: ctx.candidate.domain,
+          dkimTokens: [],
+          region: ctx.region,
+          customTrackingDomain: trackingDomain,
+        },
+        new Set(["tracking"])
+      );
+      if (result.success && result.recordsCreated > 0) {
+        clack.log.success(
+          `Created ${record.name} CNAME via ${getDNSProviderDisplayName(provider)}`
+        );
+        return;
+      }
+    }
+  }
+  clack.log.info(
+    `Add this DNS record:\n  ${pc.cyan(record.name)}\n    Type: CNAME  Value: ${record.value}`
+  );
+}
+
 // --- Flag mode ---
 
 async function applyFlagMode(
@@ -611,6 +716,7 @@ async function applyFlagMode(
     sendingEnabledFlag: boolean | undefined;
     vdmEngagementFlag: boolean | undefined;
     vdmInboxFlag: boolean | undefined;
+    trackingDomainFlag: string | undefined;
     targetDomain?: string;
   }
 ): Promise<void> {
@@ -625,6 +731,7 @@ async function applyFlagMode(
     sendingEnabledFlag,
     vdmEngagementFlag,
     vdmInboxFlag,
+    trackingDomainFlag,
     candidate,
     region,
   } = args;
@@ -728,6 +835,43 @@ async function applyFlagMode(
     );
   }
 
+  if (trackingDomainFlag !== undefined) {
+    try {
+      await args.progress.execute("Updating tracking domain", async () =>
+        applyTrackingDomain(ctx, trackingDomainFlag)
+      );
+    } catch (error) {
+      args.progress.stop();
+      if (error instanceof WrapsError) {
+        clack.log.error(error.message);
+        process.exit(1);
+        return;
+      }
+      throw error;
+    }
+    args.progress.stop();
+    if (trackingDomainFlag === TRACKING_DOMAIN_NONE) {
+      clack.log.success("Tracking domain cleared — links use the SES default");
+    } else {
+      clack.log.success(`Tracking domain set to ${trackingDomainFlag}`);
+      await offerTrackingCname(ctx, trackingDomainFlag.toLowerCase());
+    }
+    trackCommand("email:domains:config", {
+      success: true,
+      tracking_domain: trackingDomainFlag !== TRACKING_DOMAIN_NONE,
+    });
+    if (isJsonMode()) {
+      jsonSuccess("email.domains.config", {
+        domain: candidate.domain,
+        trackingDomain:
+          trackingDomainFlag === TRACKING_DOMAIN_NONE
+            ? null
+            : trackingDomainFlag,
+      });
+      return;
+    }
+  }
+
   args.progress.stop();
 
   if (candidate.additionalIndex === undefined) {
@@ -796,6 +940,11 @@ async function applyInteractiveMode(
           hint: trackingCfg
             ? `opens ${trackingCfg.opens ? "on" : "off"} · clicks ${trackingCfg.clicks ? "on" : "off"}`
             : "not configured",
+        },
+        {
+          value: "tracking-domain",
+          label: "Tracking domain",
+          hint: candidate.trackingDomain ?? "SES default (awstrack.me)",
         },
         {
           value: "delivery",
@@ -875,6 +1024,74 @@ async function applyInteractiveMode(
         );
         if (candidate.additionalIndex === undefined)
           primaryDomainChanged = true;
+        break;
+      }
+
+      case "tracking-domain": {
+        if (candidate.additionalIndex === undefined) {
+          clack.log.info(
+            `Managed by ${pc.cyan("wraps email upgrade")} (choose "tracking").`
+          );
+          break;
+        }
+        const choice = await clack.select({
+          message: `Tracking domain for ${pc.cyan(candidate.domain)}`,
+          options: [
+            {
+              value: "set",
+              label: "Set / change",
+              hint:
+                candidate.trackingDomain ??
+                defaultTrackingDomain(candidate.domain),
+            },
+            ...(candidate.trackingDomain
+              ? [{ value: "clear", label: "Clear (use SES default)" }]
+              : []),
+            { value: "back", label: "Back" },
+          ],
+        });
+        if (clack.isCancel(choice) || choice === "back") break;
+
+        if (choice === "clear") {
+          const clearProgress = new DeploymentProgress();
+          await clearProgress.execute("Clearing tracking domain", async () =>
+            applyTrackingDomain(ctx, TRACKING_DOMAIN_NONE)
+          );
+          clearProgress.stop();
+          clack.log.success(
+            "Tracking domain cleared — links use the SES default"
+          );
+          break;
+        }
+
+        const value = await clack.text({
+          message: `Tracking subdomain for ${pc.cyan(candidate.domain)}:`,
+          initialValue:
+            candidate.trackingDomain ?? defaultTrackingDomain(candidate.domain),
+          validate: (v) => validateTrackingDomain(v, candidate.domain),
+        });
+        if (clack.isCancel(value)) break;
+
+        const trackingDomainProgress = new DeploymentProgress();
+        try {
+          await trackingDomainProgress.execute(
+            "Setting tracking domain",
+            async () =>
+              applyTrackingDomain(ctx, (value as string).toLowerCase())
+          );
+        } catch (error) {
+          trackingDomainProgress.stop();
+          if (error instanceof WrapsError) {
+            clack.log.error(error.message);
+            break;
+          }
+          throw error;
+        }
+        trackingDomainProgress.stop();
+        clack.log.success(
+          `Tracking domain set to ${(value as string).toLowerCase()}`
+        );
+        await offerTrackingCname(ctx, (value as string).toLowerCase());
         break;
       }
 

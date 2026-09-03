@@ -5,6 +5,10 @@ import {
   MailManagerClient,
 } from "@aws-sdk/client-mailmanager";
 import {
+  DeleteConfigurationSetTrackingOptionsCommand,
+  SESClient,
+} from "@aws-sdk/client-ses";
+import {
   GetAccountCommand,
   GetConfigurationSetCommand,
   GetConfigurationSetEventDestinationsCommand,
@@ -13,6 +17,7 @@ import {
   PutConfigurationSetReputationOptionsCommand,
   PutConfigurationSetSendingOptionsCommand,
   PutConfigurationSetSuppressionOptionsCommand,
+  PutConfigurationSetTrackingOptionsCommand,
   PutConfigurationSetVdmOptionsCommand,
   SESv2Client,
   UpdateConfigurationSetEventDestinationCommand,
@@ -23,6 +28,7 @@ import { domainToConfigSetName } from "../../utils/email/config-set-slug";
 import { configDomain } from "../email/domains";
 
 const sesClientMock = mockClient(SESv2Client);
+const sesV1ClientMock = mockClient(SESClient);
 const mailManagerMock = mockClient(MailManagerClient);
 
 const mockExit = vi
@@ -128,6 +134,7 @@ describe("configDomain — extended config set options", () => {
 
   beforeEach(async () => {
     sesClientMock.reset();
+    sesV1ClientMock.reset();
     mailManagerMock.reset();
     vi.clearAllMocks();
     mockExit.mockClear();
@@ -596,6 +603,91 @@ describe("configDomain — extended config set options", () => {
           }),
         }),
       })
+    );
+  });
+
+  it("Unit 14: flag mode: trackingDomain set → PutConfigurationSetTrackingOptions on the additional domain's set", async () => {
+    sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+
+    const metadata = await import("../../utils/shared/metadata");
+
+    await configDomain({
+      domain: "test.com",
+      trackingDomain: "track.test.com",
+    });
+
+    const putCalls = sesClientMock.commandCalls(
+      PutConfigurationSetTrackingOptionsCommand
+    );
+    expect(putCalls.length).toBe(1);
+    expect(putCalls[0].args[0].input).toEqual({
+      ConfigurationSetName: additionalConfigSetName,
+      CustomRedirectDomain: "track.test.com",
+    });
+    expect(metadata.saveConnectionMetadata).toHaveBeenCalled();
+
+    const clack = await import("@clack/prompts");
+    expect(vi.mocked(clack.select)).not.toHaveBeenCalled();
+  });
+
+  it('Unit 15: flag mode: trackingDomain "none" → v1 DeleteConfigurationSetTrackingOptions, no Put', async () => {
+    sesV1ClientMock
+      .on(DeleteConfigurationSetTrackingOptionsCommand)
+      .resolves({});
+
+    await configDomain({ domain: "test.com", trackingDomain: "none" });
+
+    const deleteCalls = sesV1ClientMock.commandCalls(
+      DeleteConfigurationSetTrackingOptionsCommand
+    );
+    expect(deleteCalls.length).toBe(1);
+    expect(deleteCalls[0].args[0].input).toMatchObject({
+      ConfigurationSetName: additionalConfigSetName,
+    });
+    expect(
+      sesClientMock.commandCalls(PutConfigurationSetTrackingOptionsCommand)
+        .length
+    ).toBe(0);
+  });
+
+  it("Unit 16: flag mode: trackingDomain on the primary domain is refused", async () => {
+    const metadata = await import("../../utils/shared/metadata");
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValueOnce(
+      makeMetadata({ primaryOnly: true }) as never
+    );
+
+    const clack = await import("@clack/prompts");
+
+    await configDomain({
+      domain: "primary.com",
+      trackingDomain: "track.primary.com",
+    });
+
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(clack.log.error).toHaveBeenCalledWith(
+      expect.stringContaining("wraps email upgrade")
+    );
+    expect(
+      sesClientMock.commandCalls(PutConfigurationSetTrackingOptionsCommand)
+        .length
+    ).toBe(0);
+    expect(
+      sesV1ClientMock.commandCalls(DeleteConfigurationSetTrackingOptionsCommand)
+        .length
+    ).toBe(0);
+  });
+
+  it("Unit 17: flag mode: trackingDomain outside the sending domain is refused", async () => {
+    const clack = await import("@clack/prompts");
+
+    await configDomain({
+      domain: "test.com",
+      trackingDomain: "track.elsewhere.com",
+    });
+
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(clack.log.error).toHaveBeenCalledWith(
+      expect.stringContaining("subdomain of test.com")
     );
   });
 });
