@@ -33,6 +33,7 @@ import {
 } from "@/actions/organizations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toastAwsActionError } from "@/lib/aws-permission-toast";
 
 type AwsAccount = {
   id: string;
@@ -165,14 +166,11 @@ export function SenderDefaultsForm({
               setCurrentFromDomain(firstDomain.identity);
             }
           }
-        } else if (result.errorCode === "PERMISSION_DENIED") {
-          toast.error("Permission Update Required", {
-            description:
-              "Your IAM role needs updated permissions. Run: wraps platform update-role",
-            duration: Number.POSITIVE_INFINITY,
-          });
         } else {
-          toast.error("Failed to load verified domains");
+          toastAwsActionError(
+            result.errorCode,
+            "Failed to load verified domains"
+          );
         }
       } catch {
         toast.error("Failed to load verified domains");
@@ -213,7 +211,7 @@ export function SenderDefaultsForm({
             form.setFieldValue("senderId", result.phoneNumbers[0].phoneNumber);
           }
         } else {
-          toast.error("Failed to load phone numbers");
+          toastAwsActionError(result.errorCode, "Failed to load phone numbers");
         }
       } catch {
         toast.error("Failed to load phone numbers");

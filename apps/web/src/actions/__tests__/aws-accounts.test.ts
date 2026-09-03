@@ -863,6 +863,46 @@ describe("getSMSPhoneNumbers", () => {
     expect(mockLogError).not.toHaveBeenCalled();
     expect(mockLogWarn).toHaveBeenCalled();
   });
+
+  it("tells the client the role needs repair so the UI can offer a remediation", async () => {
+    currentMockUserId = testUser.id;
+    mockGetOrAssumeRole.mockRejectedValueOnce(
+      new AssumeRoleError(
+        "INVALID_TRUST_POLICY",
+        "Wraps could not assume the IAM role. Check that the CloudFormation stack deployed successfully and that the External ID matches the stack output."
+      )
+    );
+
+    const result = await getSMSPhoneNumbers(
+      testAwsAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.errorCode).toBe("PERMISSION_DENIED");
+    }
+  });
+
+  it("reports a Wraps-side credential failure as UNKNOWN", async () => {
+    currentMockUserId = testUser.id;
+    mockGetOrAssumeRole.mockRejectedValueOnce(
+      new AssumeRoleError(
+        "INVALID_BACKEND_CREDENTIALS",
+        "Wraps could not authenticate to AWS to validate your connection. This is a Wraps-side issue — please try again shortly."
+      )
+    );
+
+    const result = await getSMSPhoneNumbers(
+      testAwsAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.errorCode).toBe("UNKNOWN");
+    }
+  });
 });
 
 describe("listAWSAccounts", () => {

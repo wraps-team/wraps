@@ -1592,6 +1592,7 @@ export type GetSMSPhoneNumbersResult =
   | {
       success: false;
       error: string;
+      errorCode?: "PERMISSION_DENIED" | "UNKNOWN";
     };
 
 /**
@@ -1705,6 +1706,7 @@ export async function getSMSPhoneNumbers(
         error instanceof Error
           ? error.message
           : "Failed to fetch phone numbers",
+      errorCode: isAccessDenied ? "PERMISSION_DENIED" : "UNKNOWN",
     };
   }
 }
