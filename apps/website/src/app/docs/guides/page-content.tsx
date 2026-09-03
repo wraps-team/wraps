@@ -9,17 +9,27 @@ import {
   CardTitle,
 } from "@wraps/ui/components/ui/card";
 import {
+  Activity,
   ArrowRight,
   ArrowRightLeft,
+  Ban,
+  Bot,
   Cloud,
   CopyCheck,
   FileCode2,
   Gauge,
   Globe,
+  KeyRound,
+  MailWarning,
+  MessagesSquare,
+  Network,
+  Plug,
   Rocket,
+  Server,
   ShieldCheck,
   Sliders,
   Users,
+  Webhook,
   Workflow,
 } from "lucide-react";
 import { DocsLayout } from "@/components/docs-layout";
@@ -112,6 +122,86 @@ const guides = [
     href: "/docs/guides/template-handoff",
     icon: Users,
     readTime: "6 min read",
+  },
+  {
+    title: "Webhooks",
+    description:
+      "Receive real-time SES email events at your HTTPS endpoint. Set up delivery, authenticate requests, and handle events in your application.",
+    href: "/docs/guides/webhooks",
+    icon: Webhook,
+    readTime: "5 min read",
+  },
+  {
+    title: "Bounce & Complaint Handling",
+    description:
+      "What bounceType and bounceSubType mean, why transient bounces should not suppress, the AWS rate thresholds that pause sending, and how to test with the mailbox simulator.",
+    href: "/docs/guides/bounce-handling",
+    icon: MailWarning,
+    readTime: "8 min read",
+  },
+  {
+    title: "Suppression Lists",
+    description:
+      "Manage the SES account-level suppression list from the SDK: check, add, remove, and list addresses, filter campaigns before sending, and know when removal is safe.",
+    href: "/docs/guides/suppression-lists",
+    icon: Ban,
+    readTime: "6 min read",
+  },
+  {
+    title: "Custom Events",
+    description:
+      "Emit custom events from your application to trigger workflows, track user behavior, and resume waiting automation steps.",
+    href: "/docs/guides/custom-events",
+    icon: Activity,
+    readTime: "5 min read",
+  },
+  {
+    title: "Cross-Channel Orchestration",
+    description:
+      "Build cascading notification flows that try email first and fall back to SMS using the cascade() helper.",
+    href: "/docs/guides/orchestration",
+    icon: Network,
+    readTime: "5 min read",
+  },
+  {
+    title: "Reply Threading",
+    description:
+      "Thread inbound replies to the original conversation with HMAC-signed reply-to addresses, per-domain secrets, and auto-reply detection.",
+    href: "/docs/guides/reply-threading",
+    icon: MessagesSquare,
+    readTime: "6 min read",
+  },
+  {
+    title: "Better Auth",
+    description:
+      "Sync Better Auth signups to Wraps contacts and send verification, password reset, magic link, OTP, and invitation emails from your own SES account.",
+    href: "/docs/guides/better-auth",
+    icon: KeyRound,
+    readTime: "6 min read",
+  },
+  {
+    title: "SMTP Credentials",
+    description:
+      "Generate SMTP credentials for your SES infrastructure. Use with WordPress, Nodemailer, PHPMailer, or any SMTP-compatible system.",
+    href: "/docs/guides/smtp",
+    icon: Plug,
+    readTime: "4 min read",
+  },
+  {
+    title: "AI-Assisted Development",
+    description:
+      "Give your AI coding assistant current Wraps documentation. Set up Context7 in Cursor, Claude Code, Windsurf, or any MCP-compatible editor.",
+    href: "/docs/guides/context7",
+    icon: Bot,
+    readTime: "3 min read",
+  },
+  {
+    title: "Self-Hosted Deployment",
+    description:
+      "Deploy the full Wraps control plane to your own AWS account: API, dashboard, database, and email infrastructure.",
+    href: "/docs/guides/self-hosted",
+    icon: Server,
+    readTime: "10 min read",
   },
 ];
 
