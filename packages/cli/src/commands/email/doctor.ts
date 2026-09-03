@@ -305,6 +305,10 @@ export type EmailFindings = {
   wrapsResources: AWSResourceScan;
   /** Resource names `--cleanup` must never delete, regardless of stack state. */
   protectedNames: Set<string>;
+  /** Set when a Wraps CloudFormation stack was found to own this region's resources. */
+  cfStackName?: string;
+  /** False when CloudFormation ownership could not be checked (no cloudformation:DescribeStacks). */
+  cfChecked: boolean;
 };
 
 /**
@@ -416,7 +420,17 @@ async function checkConsoleRolePolicy(
       };
     }
 
-    throw error;
+    // Anything else — throttling, a transient network failure, an error-name
+    // variant the two checks above don't recognize — must not crash a
+    // diagnostic command. Doctor is read-only and must always finish with a
+    // report, even a degraded one.
+    return {
+      status: "info",
+      category: "Platform Role",
+      name: `${CONSOLE_ACCESS_ROLE}: could not check the role policy`,
+      details: message,
+      remediation: remediations.reviewPermissions(),
+    };
   }
 }
 
@@ -559,6 +573,8 @@ export async function collectEmailFindings(params: {
     cleanupAllowed,
     wrapsResources,
     protectedNames,
+    cfStackName,
+    cfChecked,
   };
 }
 
@@ -625,6 +641,7 @@ export async function emailDoctor(options: EmailDoctorOptions): Promise<void> {
     cleanupAllowed,
     wrapsResources,
     protectedNames,
+    cfStackName,
   } = await progress.execute("Checking email infrastructure", async () =>
     collectEmailFindings({
       region,
@@ -785,6 +802,11 @@ export async function emailDoctor(options: EmailDoctorOptions): Promise<void> {
         clack.log.warn(
           // remediation:allow-literal — the --cleanup flag's own precondition message, not a finding's remedy
           `Could not confirm Pulumi state${stackProbeError ? ` (${stackProbeError})` : ""}. Refusing to delete anything — fix the probe first (${pc.cyan("wraps aws doctor")}) or use ${pc.cyan("wraps email destroy")}.`
+        );
+      } else if (cfStackName) {
+        clack.log.warn(
+          // remediation:allow-literal — the --cleanup flag's own precondition message, not a finding's remedy
+          `CloudFormation stack ${pc.cyan(cfStackName)} owns the wraps-* resources in this region. Refusing to delete anything — change or delete the stack in the CloudFormation console.`
         );
       } else {
         clack.log.warn(

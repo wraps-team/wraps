@@ -546,6 +546,13 @@ describe("emailDoctor", () => {
     const allOutput = allUserFacingOutput();
     expect(allOutput).not.toContain("orphan");
     expect(allOutput).toContain("managed by CloudFormation stack");
+    // Pins the refusal to the CloudFormation-owned branch specifically, not
+    // merely "nothing was deleted": the refusal must name the stack that
+    // owns these resources, and must NOT claim the check failed — a
+    // customer whose stack was found should never be told to go fix
+    // cloudformation:DescribeStacks, a permission they already have.
+    expect(allOutput).toContain("wraps-email-infrastructure");
+    expect(allOutput).not.toContain("DescribeStacks");
     expect(vi.mocked(prompts.confirm)).not.toHaveBeenCalled();
     expect(mockSesSend).not.toHaveBeenCalled();
   });
@@ -572,7 +579,11 @@ describe("emailDoctor", () => {
     await emailDoctor({ cleanup: true });
 
     const allOutput = allUserFacingOutput();
-    expect(allOutput).toContain("DescribeStacks");
+    // Wording unique to the genuinely-unchecked case — the CloudFormation-
+    // owned case above also used to make "DescribeStacks" appear in output,
+    // which proved nothing about which branch actually ran.
+    expect(allOutput).toContain("Could not confirm CloudFormation ownership");
+    expect(allOutput).toContain("no cloudformation:DescribeStacks");
     expect(vi.mocked(prompts.confirm)).not.toHaveBeenCalled();
     expect(mockSesSend).not.toHaveBeenCalled();
   });
@@ -722,6 +733,51 @@ describe("emailDoctor", () => {
     expect(allOutput).toContain(
       "wraps-console-access-role permissions current"
     );
+  });
+
+  it("degrades to an info finding, without crashing, when the role policy check hits an unrecognized IAM error", async () => {
+    // Doctor is a read-only diagnostic and must always finish with a report,
+    // even a degraded one — throttling, a transient network failure, or an
+    // error-name variant the NoSuchEntity/AccessDenied checks don't
+    // recognize must not turn this into an uncaught rejection.
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: { email: { config: { domain: "example.com" } } },
+        platform: { externalId: "ext-123", connectionId: "conn-1" },
+      },
+    ]);
+
+    const emptyScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(emptyScan);
+    mockFilterFn.mockReturnValue(emptyScan);
+
+    mockIamSend.mockImplementation((cmd: { constructor: { name: string } }) => {
+      if (cmd.constructor.name === "GetRolePolicyCommand") {
+        const err = new Error("Rate exceeded");
+        err.name = "ThrottlingException";
+        return Promise.reject(err);
+      }
+      return Promise.resolve({ PolicyNames: [], AttachedPolicies: [] });
+    });
+
+    const { emailDoctor } = await import("../email/doctor.js");
+
+    await expect(emailDoctor({})).resolves.not.toThrow();
+
+    const allOutput = allUserFacingOutput();
+    expect(allOutput).toContain(
+      "wraps-console-access-role: could not check the role policy"
+    );
+    expect(allOutput).toContain("Rate exceeded");
   });
 
   it("should handle non-standard Pulumi errors gracefully, without calling them orphans", async () => {
