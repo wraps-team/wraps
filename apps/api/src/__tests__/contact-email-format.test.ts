@@ -10,7 +10,12 @@ import { Elysia } from "elysia";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 // Mocks must be declared before any imports that use them
-vi.mock("@wraps/db", () => ({
+vi.mock("@wraps/db", async () => ({
+  // Real constant, not a copy: routes/contacts.ts builds its emailStatus
+  // validators from it.
+  EMAIL_STATUSES: (
+    await vi.importActual<typeof import("@wraps/db")>("@wraps/db")
+  ).EMAIL_STATUSES,
   contact: {
     id: "id",
     organizationId: "organization_id",

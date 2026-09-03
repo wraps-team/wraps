@@ -19,7 +19,11 @@ import {
   MESSAGE_SEND_UNACCEPTED_STATUSES,
   messageSend,
 } from "../schema/batch";
-import { contact, contactTopic } from "../schema/contacts";
+import {
+  contact,
+  contactTopic,
+  SENDABLE_EMAIL_STATUSES,
+} from "../schema/contacts";
 import type { FilterCondition } from "../schema/segments";
 import { template } from "../schema/templates";
 import { buildConditionSQL } from "../segment-filter";
@@ -570,17 +574,27 @@ export async function checkSegmentUsable(
  * sender applies before anything else.
  *
  * Exported because every count the dashboard shows has to be this same
- * predicate. Segment and topic counts used to omit it and so reported an
- * audience larger than any send could reach: a segment counted unsubscribed
- * and email-less contacts, a topic counted subscribers who had since bounced.
- * The fix is one predicate, not four copies of it.
+ * predicate, and so does the sender itself — `getContactsChunk` in the
+ * batch-sender worker built its own inline copy until it was pointed here.
+ * Segment and topic counts used to omit it and so reported an audience larger
+ * than any send could reach: a segment counted unsubscribed and email-less
+ * contacts, a topic counted subscribers who had since bounced. The fix is one
+ * predicate, not five copies of it.
+ *
+ * The sendable statuses are derived from `SENDABLE_EMAIL_STATUSES` rather than
+ * spelled out, so this predicate and the in-memory `isEmailSendable` cannot
+ * disagree about a status added later.
  *
  * Self-contained (parenthesised) so it can be dropped into a `count(*) FILTER
  * (WHERE …)` as readily as into a `WHERE`.
  */
 export function channelEligibilitySQL(channel: Channel): SQL {
   if (channel === "email") {
-    return sql`(${contact.email} IS NOT NULL AND (${contact.emailStatus} = 'active' OR ${contact.emailStatus} IS NULL))`;
+    // The IS NULL arm is separate from the IN list on purpose: under SQL's
+    // three-valued logic `NULL IN ('active')` is NULL, not false, so folding
+    // it into the list would silently drop every null-status contact from
+    // audiences they are currently part of.
+    return sql`(${contact.email} IS NOT NULL AND (${contact.emailStatus} IS NULL OR ${inArray(contact.emailStatus, SENDABLE_EMAIL_STATUSES)}))`;
   }
   return sql`(${contact.phone} IS NOT NULL AND ${contact.smsStatus} = 'opted_in')`;
 }

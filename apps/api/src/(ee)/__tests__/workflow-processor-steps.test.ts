@@ -633,6 +633,31 @@ describe("handleSendEmail", () => {
     expect(sesSendCalls).toHaveLength(0);
   });
 
+  it("skips when contact complained", async () => {
+    setupEmailTest({ contact: { emailStatus: "complained" } });
+    await handler(makeSQSEvent(emailJob));
+    expect(sesSendCalls).toHaveLength(0);
+  });
+
+  // The gap the allowlist closed. This gate listed unsubscribed, bounced and
+  // complained by hand and so had no opinion about "suppressed" — the status
+  // processSuppression writes for every address SES refuses at the account
+  // suppression list. The send left here, SES rejected it, and it returned as
+  // a synthetic bounce counted against this workflow.
+  it("skips when contact suppressed", async () => {
+    setupEmailTest({ contact: { emailStatus: "suppressed" } });
+    await handler(makeSQSEvent(emailJob));
+    expect(sesSendCalls).toHaveLength(0);
+  });
+
+  // The property, not the enumeration: a status no build knows about must not
+  // reach SES either.
+  it("skips a status the allowlist does not name", async () => {
+    setupEmailTest({ contact: { emailStatus: "quarantined" } });
+    await handler(makeSQSEvent(emailJob));
+    expect(sesSendCalls).toHaveLength(0);
+  });
+
   it("skips when no AWS account configured", async () => {
     setupEmailTest();
     // Override 3rd select to return no awsAccountId

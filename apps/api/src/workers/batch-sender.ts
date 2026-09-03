@@ -29,6 +29,7 @@ import {
   batchSend,
   buildConditionSQL,
   type Channel,
+  channelEligibilitySQL,
   contact,
   contactTopic,
   countBroadcastRecipients,
@@ -64,7 +65,6 @@ import {
   exists,
   ilike,
   inArray,
-  isNotNull,
   isNull,
   lte,
   ne,
@@ -1969,17 +1969,13 @@ export async function getContactsChunk(
     eq(contact.organizationId, organizationId),
   ];
 
-  if (channel === "email") {
-    conditions.push(isNotNull(contact.email));
-    conditions.push(
-      sql`(${contact.emailStatus} = 'active' OR ${contact.emailStatus} IS NULL)`
-    );
-  } else if (channel === "sms") {
-    conditions.push(isNotNull(contact.phone));
-    conditions.push(eq(contact.smsStatus, "opted_in"));
-  } else {
+  // Same predicate the dashboard counts with, not a copy of it: a broadcast
+  // that previews 412 recipients has to send to those 412. This used to be
+  // inline SQL here, which is how the count and the send could drift.
+  if (channel !== "email" && channel !== "sms") {
     return [];
   }
+  conditions.push(channelEligibilitySQL(channel));
 
   // Apply recipient filter
   if (filter?.audienceType === "topic" && filter.topicId) {

@@ -18,6 +18,7 @@ import {
   contactTopic,
   db,
   eq,
+  isEmailSendable,
   messageSend,
   organization,
   organizationExtension,
@@ -125,12 +126,13 @@ export async function handleSendEmail(
     };
   }
 
-  // Check contact email status
-  if (
-    contactRecord.emailStatus === "unsubscribed" ||
-    contactRecord.emailStatus === "bounced" ||
-    contactRecord.emailStatus === "complained"
-  ) {
+  // Allowlist, not a denylist. This read `unsubscribed || bounced ||
+  // complained` and so missed "suppressed", which processSuppression has been
+  // writing since it shipped: those contacts reached SES, were refused at the
+  // account suppression list, and came back as synthetic bounces that counted
+  // against the workflow's send stats. A status this build has not heard of
+  // must not be sendable by default.
+  if (!isEmailSendable(contactRecord.emailStatus)) {
     log.info("Workflow: contact email suppressed, skipping", {
       contactId: contactRecord.id,
       emailStatus: contactRecord.emailStatus,

@@ -17,6 +17,7 @@ import {
   contact,
   contactUniqueViolationField,
   deleteContact,
+  EMAIL_STATUSES,
   fetchContactSubscriptions,
   fetchTopicsForSubscription,
   findContact,
@@ -52,6 +53,18 @@ import {
 const errorResponse = t.Object({
   error: t.String({ description: "Error message" }),
 });
+
+/**
+ * Derived from EMAIL_STATUSES rather than re-listed. Three copies of this union
+ * were written out by hand and every one of them lost "suppressed" — the status
+ * the bounce webhook itself writes — so a status the product sets internally
+ * could not be set or filtered for through the API at all.
+ */
+const emailStatusSchema = (description: string) =>
+  t.Union(
+    EMAIL_STATUSES.map((status) => t.Literal(status)),
+    { description }
+  );
 
 // OpenAPI 3.0 compatible arbitrary properties object
 const propertiesSchema = t.Optional(
@@ -114,17 +127,7 @@ const createContactSchema = t.Object({
     t.String({ description: "Company name", maxLength: 200 })
   ),
   jobTitle: t.Optional(t.String({ description: "Job title", maxLength: 200 })),
-  emailStatus: t.Optional(
-    t.Union(
-      [
-        t.Literal("active"),
-        t.Literal("unsubscribed"),
-        t.Literal("bounced"),
-        t.Literal("complained"),
-      ],
-      { description: "Email subscription status" }
-    )
-  ),
+  emailStatus: t.Optional(emailStatusSchema("Email subscription status")),
   smsStatus: t.Optional(
     t.Union(
       [
@@ -185,17 +188,7 @@ const updateContactSchema = t.Object({
       description: "Job title",
     })
   ),
-  emailStatus: t.Optional(
-    t.Union(
-      [
-        t.Literal("active"),
-        t.Literal("unsubscribed"),
-        t.Literal("bounced"),
-        t.Literal("complained"),
-      ],
-      { description: "Email subscription status" }
-    )
-  ),
+  emailStatus: t.Optional(emailStatusSchema("Email subscription status")),
   smsStatus: t.Optional(
     t.Union(
       [
@@ -235,17 +228,7 @@ const listContactsQuerySchema = t.Object({
       maxLength: 10,
     })
   ),
-  emailStatus: t.Optional(
-    t.Union(
-      [
-        t.Literal("active"),
-        t.Literal("unsubscribed"),
-        t.Literal("bounced"),
-        t.Literal("complained"),
-      ],
-      { description: "Filter by email status" }
-    )
-  ),
+  emailStatus: t.Optional(emailStatusSchema("Filter by email status")),
   smsStatus: t.Optional(
     t.Union(
       [
@@ -742,6 +725,8 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
           updateValues.emailBouncedAt = new Date();
         } else if (body.emailStatus === "complained") {
           updateValues.emailComplainedAt = new Date();
+        } else if (body.emailStatus === "suppressed") {
+          updateValues.emailSuppressedAt = new Date();
         }
       }
       if (body.smsStatus !== undefined) {

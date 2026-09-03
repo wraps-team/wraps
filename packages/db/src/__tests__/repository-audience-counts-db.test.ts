@@ -56,6 +56,16 @@ const unsubscribed = makeContact("unsubscribed", {
   emailStatus: "unsubscribed" as const,
 });
 const bounced = makeContact("bounced", { emailStatus: "bounced" as const });
+// The two statuses this file's own docstring claimed to cover and did not.
+// "suppressed" is the one that matters: it is written by processSuppression on
+// every hard bounce SES refuses, and it is the value every hand-written list of
+// statuses in this repo has managed to lose at least once.
+const complained = makeContact("complained", {
+  emailStatus: "complained" as const,
+});
+const suppressed = makeContact("suppressed", {
+  emailStatus: "suppressed" as const,
+});
 const emailless = makeContact("emailless", {
   email: null,
   emailHash: null,
@@ -111,7 +121,15 @@ beforeAll(async () => {
 
   await db
     .insert(contact)
-    .values([sendableA, sendableB, unsubscribed, bounced, emailless])
+    .values([
+      sendableA,
+      sendableB,
+      unsubscribed,
+      bounced,
+      complained,
+      suppressed,
+      emailless,
+    ])
     .onConflictDoNothing();
 
   await db
@@ -130,6 +148,8 @@ beforeAll(async () => {
       { contactId: sendableA.id, topicId, status: "subscribed" },
       { contactId: unsubscribed.id, topicId, status: "subscribed" },
       { contactId: bounced.id, topicId, status: "subscribed" },
+      { contactId: complained.id, topicId, status: "subscribed" },
+      { contactId: suppressed.id, topicId, status: "subscribed" },
       { contactId: emailless.id, topicId, status: "subscribed" },
       // Double opt-in leaves people here until they confirm. They are not
       // subscribers and they are not nothing.
@@ -187,10 +207,10 @@ describe("segment counts equal what a broadcast to that segment would send", () 
     expect(picker.find((s) => s.id === segmentId)?.memberCount).not.toBe(999);
   });
 
-  it("excludes unsubscribed, bounced and email-less contacts", async () => {
+  it("excludes unsubscribed, bounced, complained, suppressed and email-less contacts", async () => {
     const counts = await countRecipientsBySegment(orgId, "email", [segmentId]);
 
-    // 5 contacts match the condition; 2 of them can be emailed.
+    // 7 contacts match the condition; 2 of them can be emailed.
     expect(counts.get(segmentId)).toBe(2);
   });
 
@@ -227,7 +247,7 @@ describe("condition preview equals what a broadcast to the saved segment would s
     });
 
     expect(preview?.sendable).toBe(sendCount);
-    expect(preview?.matched).toBe(5);
+    expect(preview?.matched).toBe(7);
   });
 
   it("samples only contacts that could actually receive the broadcast", async () => {
@@ -258,7 +278,7 @@ describe("topic counts equal what a broadcast to that topic would send", () => {
     const picker = await listTopicsWithSubscriberCounts(orgId);
     const row = picker.find((t) => t.id === topicId);
 
-    // 4 subscribed rows, 1 of which is a sendable contact.
+    // 6 subscribed rows, 1 of which is a sendable contact.
     expect(sendCount).toBe(1);
     expect(row?.subscriberCount).toBe(sendCount);
   });
@@ -268,7 +288,7 @@ describe("topic counts equal what a broadcast to that topic would send", () => {
     const row = counts.get(topicId);
 
     expect(row).toEqual({
-      subscribed: 4,
+      subscribed: 6,
       pending: 1,
       unsubscribed: 0,
       sendable: 1,

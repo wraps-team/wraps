@@ -1,18 +1,32 @@
 // Contacts types and constants - shared between server actions and client components
 
+// Type-only, so it is erased at build. A value import of @wraps/db would pull
+// the pg Pool that packages/db/src/index.ts opens at module scope into every
+// client bundle that touches this file — contact-form-dialog.tsx and friends
+// are "use client".
+import type { EmailStatus as SchemaEmailStatus } from "@wraps/db";
+
 // ═══════════════════════════════════════════════════════════════════════════
 // EMAIL STATUS
 // ═══════════════════════════════════════════════════════════════════════════
 
+export type EmailStatus = SchemaEmailStatus;
+
+/**
+ * The runtime list stays local (see the import note above), but it is checked
+ * against the schema's type rather than trusted: `satisfies` rejects a value
+ * the schema does not have, and EMAIL_STATUS_LABELS below is a
+ * `Record<EmailStatus, string>`, so a status added to the schema and forgotten
+ * here fails the build there. This file and the schema each used to declare
+ * their own `EmailStatus` with nothing comparing them.
+ */
 export const EMAIL_STATUSES = [
   "active",
   "unsubscribed",
   "bounced",
   "complained",
   "suppressed",
-] as const;
-
-export type EmailStatus = (typeof EMAIL_STATUSES)[number];
+] as const satisfies readonly EmailStatus[];
 
 /**
  * Is this raw query-string value one of the five statuses the filter can serve?

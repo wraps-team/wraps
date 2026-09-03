@@ -46,7 +46,13 @@ const {
   mockSetPendingContactSubscriptions: vi.fn(async () => {}),
 }));
 
-vi.mock("@wraps/db", () => ({
+vi.mock("@wraps/db", async () => ({
+  // Pulled from the real module, never re-listed: the route derives its
+  // emailStatus validators from this constant, and a hand-written copy here
+  // would be the drift the constant exists to stop.
+  EMAIL_STATUSES: (
+    await vi.importActual<typeof import("@wraps/db")>("@wraps/db")
+  ).EMAIL_STATUSES,
   listContacts: mockListContacts,
   findContact: mockFindContact,
   findContactByEmailHash: mockFindContactByEmailHash,

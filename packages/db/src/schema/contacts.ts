@@ -18,12 +18,60 @@ import { template } from "./templates";
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type EmailStatus =
-  | "active"
-  | "unsubscribed"
-  | "bounced"
-  | "complained"
-  | "suppressed";
+export const EMAIL_STATUSES = [
+  "active",
+  "unsubscribed",
+  "bounced",
+  "complained",
+  "suppressed",
+] as const;
+
+export type EmailStatus = (typeof EMAIL_STATUSES)[number];
+
+/**
+ * Whether a status may be sent to. Total by construction: adding a sixth
+ * `EmailStatus` fails the build here until someone answers the question for it.
+ *
+ * The map exists because this repo has drifted on this enum three times, each
+ * the same way — a hand-written list of statuses that lost "suppressed" after
+ * `processSuppression` started writing it (webhooks.ts). The workflow send gate
+ * checked `unsubscribed || bounced || complained` and so let suppressed
+ * contacts through; the form schema in apps/web omitted it and failed
+ * validation the moment a suppressed contact opened the sheet. A denylist
+ * answers "send it" for anything it has not heard of, which is the wrong
+ * default when the unknown value arrives from a bounce.
+ */
+const EMAIL_STATUS_SENDABLE: Record<EmailStatus, boolean> = {
+  active: true,
+  unsubscribed: false,
+  bounced: false,
+  complained: false,
+  suppressed: false,
+};
+
+export const SENDABLE_EMAIL_STATUSES = EMAIL_STATUSES.filter(
+  (status) => EMAIL_STATUS_SENDABLE[status]
+);
+
+/**
+ * In-memory half of the send gate, for callers holding a contact row (the
+ * workflow step handler). The SQL half is `channelEligibilitySQL` in
+ * repositories/broadcasts.ts — both derive from `SENDABLE_EMAIL_STATUSES`.
+ *
+ * A null status is sendable: `emailStatus` is only written null when the
+ * contact has no email at all (routes/contacts.ts), and every caller checks for
+ * an address first. Rows that carry both an address and a null status predate
+ * the column, and have always been treated as reachable.
+ */
+export function isEmailSendable(
+  status: EmailStatus | null | undefined
+): boolean {
+  return (
+    status == null ||
+    (SENDABLE_EMAIL_STATUSES as readonly string[]).includes(status)
+  );
+}
+
 export type SmsStatus =
   | "pending_consent"
   | "opted_in"
