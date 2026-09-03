@@ -163,7 +163,8 @@ export function WorkflowSettingsPanel({
         } else {
           toastAwsActionError(
             result.errorCode,
-            "Failed to load verified domains"
+            "Failed to load verified domains",
+            orgSlug
           );
         }
       } catch {
@@ -172,7 +173,7 @@ export function WorkflowSettingsPanel({
         setDomainsLoading(false);
       }
     },
-    [organizationId, fromDomain]
+    [organizationId, fromDomain, orgSlug]
   );
 
   // Fetch phone numbers for account
@@ -203,7 +204,11 @@ export function WorkflowSettingsPanel({
             setSenderId(result.phoneNumbers[0].phoneNumber);
           }
         } else {
-          toastAwsActionError(result.errorCode, "Failed to load phone numbers");
+          toastAwsActionError(
+            result.errorCode,
+            "Failed to load phone numbers",
+            orgSlug
+          );
         }
       } catch {
         toast.error("Failed to load phone numbers");
@@ -211,7 +216,7 @@ export function WorkflowSettingsPanel({
         setPhoneNumbersLoading(false);
       }
     },
-    [organizationId, awsAccounts, senderId]
+    [organizationId, awsAccounts, senderId, orgSlug]
   );
 
   // Load domains and phone numbers on mount and when account changes

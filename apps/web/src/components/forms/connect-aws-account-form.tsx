@@ -41,6 +41,10 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  CONSOLE_ACCESS_STACK_NAME,
+  CONSOLE_ACCESS_TEMPLATE_URL,
+} from "@/lib/aws/cloudformation-url";
 import { connectAWSAccountFormOpts } from "@/lib/forms/connect-aws-account";
 
 const AWS_REGIONS = [
@@ -74,10 +78,7 @@ type ConnectAWSAccountFormProps = {
  * self-hosted deployment cannot serve its own from this link.
  */
 function buildPlatformCloudFormationUrl(externalId: string) {
-  const templateUrl =
-    "https://wraps-assets.s3.amazonaws.com/cloudformation/wraps-console-access-role.yaml";
-
-  return `https://console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=wraps-console-access&templateURL=${encodeURIComponent(templateUrl)}&param_ExternalId=${externalId}`;
+  return `https://console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=${CONSOLE_ACCESS_STACK_NAME}&templateURL=${encodeURIComponent(CONSOLE_ACCESS_TEMPLATE_URL)}&param_ExternalId=${externalId}`;
 }
 
 // Submit button component that uses useFormStatus

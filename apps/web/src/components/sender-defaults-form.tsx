@@ -169,7 +169,8 @@ export function SenderDefaultsForm({
         } else {
           toastAwsActionError(
             result.errorCode,
-            "Failed to load verified domains"
+            "Failed to load verified domains",
+            orgSlug
           );
         }
       } catch {
@@ -178,7 +179,7 @@ export function SenderDefaultsForm({
         setDomainsLoading(false);
       }
     },
-    [organizationId, currentFromDomain, form]
+    [organizationId, currentFromDomain, form, orgSlug]
   );
 
   // Fetch phone numbers for account
@@ -211,7 +212,11 @@ export function SenderDefaultsForm({
             form.setFieldValue("senderId", result.phoneNumbers[0].phoneNumber);
           }
         } else {
-          toastAwsActionError(result.errorCode, "Failed to load phone numbers");
+          toastAwsActionError(
+            result.errorCode,
+            "Failed to load phone numbers",
+            orgSlug
+          );
         }
       } catch {
         toast.error("Failed to load phone numbers");
@@ -219,7 +224,7 @@ export function SenderDefaultsForm({
         setPhoneNumbersLoading(false);
       }
     },
-    [organizationId, awsAccounts, form, defaults?.defaultSenderId]
+    [organizationId, awsAccounts, form, defaults?.defaultSenderId, orgSlug]
   );
 
   // Load domains and phone numbers on mount and when account changes

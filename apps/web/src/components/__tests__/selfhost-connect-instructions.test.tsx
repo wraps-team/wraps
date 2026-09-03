@@ -120,7 +120,7 @@ describe("self-hosted AWS connect instructions", () => {
   });
 
   describe("AWSAccountList", () => {
-    it("renders the update-stack link on the hosted platform", () => {
+    it("sends repair to the account page, not a CloudFormation quick-create", () => {
       render(
         <AWSAccountList
           accounts={[account]}
@@ -130,10 +130,15 @@ describe("self-hosted AWS connect instructions", () => {
         />
       );
 
-      const link = screen.getByRole("link", { name: /update iam role/i });
-      expect(link.getAttribute("href")).toContain(
-        `${CFN_CONSOLE_HOST}/cloudformation`
+      const link = screen.getByRole("link", { name: /repair iam role/i });
+      expect(link.getAttribute("href")).toBe(
+        "/acme/settings/aws-accounts/acct-1#iam-role"
       );
+      // Every account in this list is already connected, and a quick-create
+      // link can only create: `stackName` must be unique per region and the
+      // template declares a fixed RoleName, so pointing repair at one returns
+      // AlreadyExists. The fix must not regress to that.
+      expect(renderedMarkup()).not.toContain("stacks/create/review");
     });
 
     it("renders no CloudFormation link and shows the CLI command when self-hosted", () => {
@@ -147,7 +152,7 @@ describe("self-hosted AWS connect instructions", () => {
       );
 
       expect(
-        screen.queryByRole("link", { name: /update iam role/i })
+        screen.queryByRole("link", { name: /repair iam role/i })
       ).not.toBeInTheDocument();
       expect(renderedMarkup()).not.toContain(CFN_CONSOLE_HOST);
       expect(renderedMarkup()).not.toContain(WRAPS_TEMPLATE_BUCKET);

@@ -2,21 +2,8 @@ import type { awsAccount } from "@wraps/db";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Card, CardContent } from "@wraps/ui/components/ui/card";
 import type { InferSelectModel } from "drizzle-orm";
-import { ExternalLink } from "lucide-react";
 import { SelfhostConnectInstructions } from "@/components/selfhost-connect-instructions";
 import { Button } from "@/components/ui/button";
-
-/**
- * Builds the CloudFormation quick-create link used to update an existing
- * stack. Only called when `selfHosted` is false — the S3-hosted template
- * creates a role trusting the Wraps platform account.
- */
-function buildPlatformCloudFormationUrl(region: string, externalId: string) {
-  const templateUrl =
-    "https://wraps-assets.s3.amazonaws.com/cloudformation/wraps-console-access-role.yaml";
-
-  return `https://console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/create/review?templateURL=${encodeURIComponent(templateUrl)}&stackName=wraps-console-access&param_ExternalId=${externalId}`;
-}
 
 type AWSAccountListProps = {
   accounts: Array<
@@ -31,8 +18,8 @@ type AWSAccountListProps = {
   organizationId: string;
   orgSlug?: string;
   /**
-   * True on self-hosted deployments. The CloudFormation stack link is not
-   * offered there — it would create a role trusting the Wraps platform account.
+   * True on self-hosted deployments. The repair flow is not offered there —
+   * it rewrites a role trusting the Wraps platform account.
    */
   selfHosted: boolean;
 };
@@ -126,17 +113,15 @@ export function AWSAccountList({
                     </Button>
                     {selfHosted ? null : (
                       <Button asChild size="sm" variant="ghost">
+                        {/* Points at the detail page rather than a
+                            CloudFormation quick-create link: this account is
+                            already connected, and quick-create can only
+                            create. See buildPlatformCloudFormationUrl. */}
                         <a
-                          href={buildPlatformCloudFormationUrl(
-                            account.region,
-                            account.externalId
-                          )}
-                          rel="noopener noreferrer"
-                          target="_blank"
-                          title="Update CloudFormation stack with latest IAM permissions (will prompt to update existing stack)"
+                          href={`${baseUrl}/${account.id}#iam-role`}
+                          title="Rewrite this role's trust policy and permissions"
                         >
-                          <ExternalLink className="mr-2 h-4 w-4" />
-                          Update IAM Role
+                          Repair IAM Role
                         </a>
                       </Button>
                     )}

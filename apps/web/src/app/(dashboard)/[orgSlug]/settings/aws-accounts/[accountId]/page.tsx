@@ -4,9 +4,11 @@ import { redirect } from "next/navigation";
 import { AccountHeader } from "@/components/account-header";
 import { getOrganizationBySlug } from "@/lib/organization";
 import { checkAWSAccountAccess } from "@/lib/permissions/check-access";
+import { isSelfHosted } from "@/lib/plan-limits";
 import { AccountDetails } from "./components/account-details";
 import { AccountFeatures } from "./components/account-features";
 import { EventFeedStaleBanner } from "./components/event-feed-stale-banner";
+import { IAMConfiguration } from "./components/iam-configuration";
 import { QuotaReserve } from "./components/quota-reserve";
 import { WebhookConfiguration } from "./components/webhook-configuration";
 
@@ -102,6 +104,13 @@ export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
 
       {/* Account Details */}
       <AccountDetails account={account} />
+
+      {/* IAM role repair - the landing spot for the aws.role_unreachable
+          notification, so the CloudFormation fix has to live here and not
+          only on the account list. Managers only: it rewrites the role. */}
+      {permissions.canManage && (
+        <IAMConfiguration account={account} selfHosted={isSelfHosted()} />
+      )}
 
       {/* Platform Connection - only show to managers */}
       {permissions.canManage && <WebhookConfiguration account={account} />}

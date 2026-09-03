@@ -224,7 +224,7 @@ async function checkAccount(account: AccountRow): Promise<void> {
       account,
       type: "aws.role_unreachable",
       title: "Wraps can no longer reach your AWS account",
-      body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) cannot be assumed or is missing SES permissions, so health checks — sending paused, reputation, and quota alerts — are not running for this account. Run \`wraps platform update-role\` to repair the role's trust policy and permissions, or \`wraps platform connect\` if the role was deleted.`,
+      body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) cannot be assumed or is missing SES permissions. Sending uses this same role, so email is blocked until it is repaired — and health checks (sending paused, reputation, and quota alerts) are not running either. Open this account in Wraps and choose "Repair IAM Role" for the steps: update your CloudFormation stack if you deployed one, or run \`wraps platform update-role\` if you connected with the CLI (\`wraps platform connect\` if the role was deleted).`,
       href: accountHref,
       data: {
         reason: error instanceof Error ? error.name : "unknown",
