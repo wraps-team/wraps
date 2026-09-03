@@ -104,7 +104,7 @@ import {
 import { workflowInit } from "./commands/workflow/init.js";
 import { getTelemetryClient } from "./telemetry/client.js";
 import { telemetryCommandName } from "./telemetry/command-name.js";
-import { trackCommand } from "./telemetry/events.js";
+import { trackCommand, trackCommandFallback } from "./telemetry/events.js";
 import { parseCliArgs } from "./utils/shared/arg-parser.js";
 import {
   printCompletionScript,
@@ -1143,7 +1143,7 @@ async function run() {
       // Track email commands (they return early, so track here)
       const emailDuration = Date.now() - startTime;
       const emailCommandName = `email:${subCommand}`;
-      trackCommand(emailCommandName, {
+      trackCommandFallback(emailCommandName, {
         success: true,
         duration_ms: emailDuration,
         service: "email",
@@ -1170,7 +1170,7 @@ async function run() {
             "Run wraps --help for available commands."
           );
       }
-      trackCommand(`license:${subCommand}`, {
+      trackCommandFallback(`license:${subCommand}`, {
         success: true,
         duration_ms: Date.now() - startTime,
         service: "license",
@@ -1254,7 +1254,7 @@ async function run() {
       // Track selfhost commands
       const selfhostDuration = Date.now() - startTime;
       const selfhostCommandName = `selfhost:${subCommand}`;
-      trackCommand(selfhostCommandName, {
+      trackCommandFallback(selfhostCommandName, {
         success: true,
         duration_ms: selfhostDuration,
         service: "selfhost",
@@ -1349,7 +1349,7 @@ async function run() {
       // Track SMS commands
       const smsDuration = Date.now() - startTime;
       const smsCommandName = `sms:${subCommand}`;
-      trackCommand(smsCommandName, {
+      trackCommandFallback(smsCommandName, {
         success: true,
         duration_ms: smsDuration,
         service: "sms",
@@ -1420,7 +1420,7 @@ async function run() {
       // Track CDN commands
       const cdnDuration = Date.now() - startTime;
       const cdnCommandName = `cdn:${subCommand}`;
-      trackCommand(cdnCommandName, {
+      trackCommandFallback(cdnCommandName, {
         success: true,
         duration_ms: cdnDuration,
         service: "cdn",
@@ -1447,7 +1447,7 @@ async function run() {
       // Track workflow commands
       const workflowDuration = Date.now() - startTime;
       const workflowCommandName = `workflow:${subCommand}`;
-      trackCommand(workflowCommandName, {
+      trackCommandFallback(workflowCommandName, {
         success: true,
         duration_ms: workflowDuration,
         service: "workflow",
@@ -1461,7 +1461,7 @@ async function run() {
         // Show platform info when no subcommand
         await platformInfo();
         const platformDuration = Date.now() - startTime;
-        trackCommand("platform", {
+        trackCommandFallback("platform", {
           success: true,
           duration_ms: platformDuration,
         });
@@ -1505,7 +1505,7 @@ async function run() {
       // Track platform commands (they return early, so track here)
       const platformDuration = Date.now() - startTime;
       const platformCommandName = `platform:${subCommand}`;
-      trackCommand(platformCommandName, {
+      trackCommandFallback(platformCommandName, {
         success: true,
         duration_ms: platformDuration,
       });
@@ -1558,7 +1558,7 @@ async function run() {
       // Track aws commands
       const awsDuration = Date.now() - startTime;
       const awsCommandName = `aws:${subCommand}`;
-      trackCommand(awsCommandName, {
+      trackCommandFallback(awsCommandName, {
         success: true,
         duration_ms: awsDuration,
       });
@@ -1696,7 +1696,7 @@ async function run() {
     const duration = Date.now() - startTime;
     const commandName = telemetryCommandName(primaryCommand, subCommand);
 
-    trackCommand(commandName, {
+    trackCommandFallback(commandName, {
       success: true,
       duration_ms: duration,
     });
@@ -1705,7 +1705,7 @@ async function run() {
     const duration = Date.now() - startTime;
     const commandName = telemetryCommandName(primaryCommand, subCommand);
 
-    trackCommand(commandName, {
+    trackCommandFallback(commandName, {
       success: false,
       duration_ms: duration,
     });

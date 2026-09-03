@@ -600,13 +600,6 @@ function displaySummary(
 export async function permissions(options: PermissionsOptions): Promise<void> {
   const startTime = Date.now();
 
-  // Track command
-  trackCommand("permissions", {
-    json: options.json,
-    preset: options.preset,
-    service: options.service,
-  });
-
   const policy = buildPolicy(options.service, options.preset);
 
   if (isJsonMode()) {
@@ -632,8 +625,15 @@ export async function permissions(options: PermissionsOptions): Promise<void> {
     );
   }
 
+  // Reported once, on completion. Tracking on entry as well put two
+  // `command:permissions` events on the wire for a single run; the flags below
+  // are the metadata that entry-time call carried. A throw before this point is
+  // reported by cli.ts's fallback instead.
   trackCommand("permissions", {
     success: true,
     duration_ms: Date.now() - startTime,
+    json: options.json,
+    preset: options.preset,
+    service: options.service,
   });
 }

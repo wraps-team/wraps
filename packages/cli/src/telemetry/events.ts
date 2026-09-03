@@ -6,6 +6,38 @@
 import { getTelemetryClient } from "./client.js";
 
 /**
+ * What has already been reported about this invocation's outcome.
+ *
+ * cli.ts routes a command and then reports the outcome itself, but ~90 handlers
+ * report their own first. Without this, one run of `wraps email domains add`
+ * emitted two events 1ms apart — `email:domains:add` from the handler and
+ * `email:domains` from cli.ts, whose fallback name is built from only two
+ * positionals and so drops the subcommand. See `trackCommandFallback`.
+ */
+let reportedOutcome: "none" | "success" | "failure" = "none";
+
+/**
+ * Report a command outcome from cli.ts's routing layer, unless the handler
+ * already reported one.
+ *
+ * A failure still goes out after a reported *success*: a handler that reports
+ * success and then throws has genuinely failed, and swallowing that would hide
+ * it. Only a second report of the same failure is dropped.
+ */
+export function trackCommandFallback(
+  command: string,
+  metadata?: Parameters<typeof trackCommand>[1]
+): void {
+  const failing = metadata?.success === false;
+
+  if (failing ? reportedOutcome === "failure" : reportedOutcome !== "none") {
+    return;
+  }
+
+  trackCommand(command, metadata);
+}
+
+/**
  * Track CLI command execution
  *
  * @param command - Command name (e.g., "email:init", "status")
@@ -32,6 +64,11 @@ export function trackCommand(
   }
 ): void {
   const client = getTelemetryClient();
+
+  reportedOutcome =
+    metadata?.success === false || reportedOutcome === "failure"
+      ? "failure"
+      : "success";
 
   // Sanitize metadata to ensure no PII
   const sanitized = metadata ? { ...metadata } : {};
