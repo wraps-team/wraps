@@ -272,6 +272,18 @@ export default function CLIReferenceEmailPageContent() {
                     to skip.
                   </span>
                 </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --tracking-https / --no-tracking-https
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Serve tracking links over HTTPS via a CloudFront
+                    distribution + free ACM certificate in your account
+                    (defaults to on when a tracking domain is set). Costs a
+                    CloudFront distribution: fractions of a cent per 10k
+                    tracking requests; the certificate is free.
+                  </span>
+                </li>
               </ul>
             </CardContent>
           </Card>
@@ -472,6 +484,18 @@ export default function CLIReferenceEmailPageContent() {
                       wraps email upgrade
                     </code>
                     .
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --tracking-https / --no-tracking-https
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Enable or disable HTTPS for the tracking domain, backed by a
+                    CloudFront distribution and an ACM certificate in your
+                    account. Requires a tracking domain to already be set. Costs
+                    a CloudFront distribution: fractions of a cent per 10k
+                    tracking requests; the certificate is free.
                   </span>
                 </li>
                 <li className="pt-1 font-medium text-foreground">Delivery</li>
