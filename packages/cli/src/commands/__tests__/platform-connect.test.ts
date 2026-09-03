@@ -47,6 +47,7 @@ import * as metadata from "../../utils/shared/metadata.js";
 import * as pulumiUtils from "../../utils/shared/pulumi.js";
 // Import after mocks
 import { connect } from "../platform/connect.js";
+import { buildConsolePolicyDocument } from "../platform/update-role.js";
 
 const iamMock = mockClient(IAMClient);
 
@@ -375,6 +376,78 @@ describe("platform connect - import collision fix", () => {
           region: "us-east-1",
         })
       );
+    });
+  });
+
+  describe("platform connect — console role policy", () => {
+    // Regression guard for plan 240: `connect` used to build the inline
+    // console-role policy from a private, stale copy of
+    // buildConsolePolicyDocument that never learned ses:ListConfigurationSets
+    // (added to the real one by e9354ceb). `connect` now imports the same
+    // function `update-role.ts` exports — these tests pin that both the
+    // update-in-place and create-role paths grant the same actions the
+    // exported builder produces.
+    function grantedActions(): string[] {
+      const calls = iamMock.commandCalls(PutRolePolicyCommand);
+      expect(calls.length).toBeGreaterThan(0);
+      const lastCall = calls[calls.length - 1];
+      // biome-ignore lint/style/noNonNullAssertion: the SDK input is always set here
+      const doc = JSON.parse(lastCall.args[0].input.PolicyDocument!);
+      return doc.Statement.flatMap((s: { Action: string[] }) => s.Action);
+    }
+
+    it("update-in-place path grants ses:ListConfigurationSets and friends, and no dynamodb:PutItem", async () => {
+      // Default beforeEach: GetRoleCommand resolves — role exists.
+      await setupPulumiMock({ hasExistingResources: true });
+
+      await connect({ yes: true });
+
+      const actions = grantedActions();
+      expect(actions).toContain("ses:ListConfigurationSets");
+      expect(actions).toContain("ses:GetConfigurationSet");
+      expect(actions).toContain("ses:GetConfigurationSetEventDestinations");
+      expect(actions).toContain("ses:GetDedicatedIps");
+      expect(actions).toContain("s3:HeadBucket");
+      expect(actions).not.toContain("dynamodb:PutItem");
+    });
+
+    it("create path (role does not exist) grants the same actions", async () => {
+      iamMock.on(GetRoleCommand).rejects(
+        Object.assign(new Error("NoSuchEntity"), {
+          name: "NoSuchEntityException",
+        })
+      );
+      await setupPulumiMock({ hasExistingResources: true });
+
+      await connect({ yes: true });
+
+      expect(iamMock.commandCalls(CreateRoleCommand)).toHaveLength(1);
+
+      const actions = grantedActions();
+      expect(actions).toContain("ses:ListConfigurationSets");
+      expect(actions).toContain("ses:GetConfigurationSet");
+      expect(actions).toContain("ses:GetConfigurationSetEventDestinations");
+      expect(actions).toContain("ses:GetDedicatedIps");
+      expect(actions).toContain("s3:HeadBucket");
+      expect(actions).not.toContain("dynamodb:PutItem");
+    });
+
+    it("grants exactly the actions buildConsolePolicyDocument produces for the same config", async () => {
+      await setupPulumiMock({ hasExistingResources: true });
+
+      await connect({ yes: true });
+
+      const emailConfig = {
+        sendingEnabled: true,
+        tracking: { enabled: true },
+        eventTracking: { enabled: true, events: ["SEND", "DELIVERY"] },
+      };
+      const expected = buildConsolePolicyDocument(
+        emailConfig,
+        undefined
+      ).Statement.flatMap((s) => s.Action);
+
+      expect([...grantedActions()].sort()).toEqual([...expected].sort());
     });
   });
 });
