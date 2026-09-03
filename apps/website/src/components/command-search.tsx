@@ -303,6 +303,30 @@ export function CommandSearch({ open, onOpenChange }: CommandSearchProps) {
       icon: Zap,
     },
     {
+      title: "Domain Reputation",
+      description:
+        "What moves the complaint rate, and the runbook when it climbs",
+      url: "/docs/guides/reputation",
+      group: "Email",
+      icon: Zap,
+    },
+    {
+      title: "Preventing Duplicate Sends",
+      description:
+        "Idempotency for background workers and at-least-once queues",
+      url: "/docs/guides/idempotency",
+      group: "Email",
+      icon: Zap,
+    },
+    {
+      title: "Sharing Templates With Marketing",
+      description:
+        "Engineers in git, marketing in the dashboard, and the conflict between",
+      url: "/docs/guides/template-handoff",
+      group: "Email",
+      icon: Zap,
+    },
+    {
       title: "Suppression Lists",
       description: "Manage the SES account-level suppression list",
       url: "/docs/guides/suppression-lists",

@@ -136,7 +136,16 @@ export const navItems: NavSection[] = [
             title: "Suppression Lists",
             href: "/docs/guides/suppression-lists",
           },
+          { title: "Domain Reputation", href: "/docs/guides/reputation" },
+          {
+            title: "Preventing Duplicate Sends",
+            href: "/docs/guides/idempotency",
+          },
           { title: "Templates as Code", href: "/docs/guides/templates" },
+          {
+            title: "Sharing Templates With Marketing",
+            href: "/docs/guides/template-handoff",
+          },
           { title: "Building Workflows", href: "/docs/guides/workflows" },
           { title: "Better Auth", href: "/docs/guides/better-auth" },
           {
