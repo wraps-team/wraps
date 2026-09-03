@@ -413,11 +413,15 @@ export default function SecurityPage() {
               </table>
             </div>
             <p className="mt-6 max-w-2xl text-muted-foreground">
-              The limit worth stating: this covers the sending path only. Your
-              contacts, templates, and workflows live in the Wraps database, and
-              a breach there is a breach of that data. Zero stored credentials
-              is a statement about access to your AWS account, not a claim that
-              we hold nothing of yours.
+              The limit worth stating: this covers access to your AWS account
+              and nothing else. Your contacts, templates, and workflows live in
+              the Wraps database. So does a record of every message sent through
+              the platform, which carries the recipient address, the subject
+              line, the sender, the template variables merged into it, and the
+              delivery, open, click, bounce and complaint timestamps that
+              follow. A breach of our database is a breach of all of that. Zero
+              stored credentials is a statement about your AWS account, not a
+              claim that we hold nothing of yours.
             </p>
           </section>
 

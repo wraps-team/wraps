@@ -107,7 +107,7 @@ const TOOLS: Tool[] = [
     name: "Wraps",
     site: "wraps.dev",
     shape: "Deploys the infrastructure, not just a UI over it",
-    body: "Ours, so weigh it accordingly. The difference from everything above is that the others connect to SES you already set up; Wraps deploys the sending infrastructure — SES, EventBridge, SQS, Lambda, DynamoDB, IAM — into your account with one CLI command, and the delivery events land in your own DynamoDB table rather than a vendor's database. Templates are React Email components in your repo. Contacts, templates and workflows live in our database, not yours.",
+    body: "Ours, so weigh it accordingly. The difference from everything above is that the others connect to SES you already set up; Wraps deploys the sending infrastructure — SES, EventBridge, SQS, Lambda, DynamoDB, IAM — into your account with one CLI command, and on the Production and Enterprise presets the raw delivery events land in a DynamoDB table you own. Templates are React Email components in your repo. Contacts, templates, workflows and a per-message send record live in our database, not yours, so this is a copy in your account rather than the only copy.",
     forYou:
       "You have engineers, you are already on AWS, and you want transactional and marketing on one pipeline you own. Not for you if nobody wants an AWS account.",
   },
@@ -184,11 +184,15 @@ export default function Page() {
               The question that separates them
             </h2>
             <p className="mb-4 text-muted-foreground">
-              Ask where the delivery events go. Most of this category connects
-              to your SES for sending and then keeps the opens, clicks and
-              bounces in the vendor&apos;s own database, which means the
-              economics are yours but the data still is not. That is a perfectly
-              reasonable trade, and it is worth making knowingly.
+              Ask where the delivery events go, and specifically whether you get
+              a copy or the only copy. Most of this category connects to your
+              SES for sending and then keeps the opens, clicks and bounces in
+              the vendor&apos;s own database, which means the economics are
+              yours but the data is not. Wraps writes them to a table in your
+              account and keeps its own copy to render the dashboard, which is
+              better than one but is not the same as sole custody. That is a
+              perfectly reasonable trade either way, and it is worth making
+              knowingly.
             </p>
             <p className="text-muted-foreground">
               Second question: what happens to your campaigns if the vendor goes

@@ -266,7 +266,7 @@ email.send(
     reply_to="support@yourdomain.com",
     subject="Hi",
     text="hi",
-    configuration_set_name="wraps-email-default",
+    configuration_set_name="wraps-email-tracking",
     tags={"campaign": "welcome"},
 )`}
               lang="python"

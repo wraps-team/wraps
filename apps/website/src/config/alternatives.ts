@@ -149,7 +149,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
     name: "Resend",
     category: "Developer-first email API built on SES",
     pricing:
-      "Free 3,000/mo (100/day). Pro $20 at 50K and $35 at 100K. Scale $350 at 500K. Overage $0.65–0.90 per 1,000. Marketing contacts billed separately at $40/mo per 5,000.",
+      "Free 3,000/mo (100/day). Pro $20 at 50K and $35 at 100K. Scale starts at $90 for the same 100K and runs to $350 at 500K. Overage $0.65–0.90 per 1,000. Marketing contacts billed separately at $40/mo per 5,000.",
     bestFor:
       "The fastest path from an empty project to a sent email, especially with React Email.",
     watchOut:

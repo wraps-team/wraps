@@ -17,17 +17,23 @@ import {
   CodeBlockItem,
 } from "@/components/ui/shadcn-io/code-block";
 
-const separateStreamsCode = `# Reputation is scored on the account, but SES publishes CloudWatch metrics
-# per configuration set. Wraps turns that on by default
-# (reputationMetricsEnabled), so a second configuration set gives you a
-# second, separately visible reputation signal.
-#
-# Send marketing from its own subdomain and its own configuration set. A bad
-# campaign then shows up as its own number instead of hiding inside the
-# account average that your password resets also live in.
+const separateStreamsCode = `# Reputation is scored on the account, but SES can publish CloudWatch metrics
+# per configuration set. Adding a domain gives you the configuration set for
+# free — Wraps creates one per domain and names it after the domain.
 
-  transactional   →  mail.yourdomain.com    →  wraps-email-default
-  marketing       →  news.yourdomain.com    →  your-marketing-set
+  wraps email domains add news.yourdomain.com
+
+  transactional   →  mail.yourdomain.com   →  wraps-email-tracking
+  marketing       →  news.yourdomain.com   →  wraps-email-news-yourdomain-com
+
+# The metrics are the part you have to turn on. Wraps enables reputation
+# metrics on the default configuration set for the Production and Enterprise
+# presets only, and never on the per-domain sets it creates. Until you enable
+# them, SES publishes no per-set Reputation.* metrics at all:
+
+  aws sesv2 put-configuration-set-reputation-options \\
+    --configuration-set-name wraps-email-news-yourdomain-com \\
+    --reputation-metrics-enabled
 
 # The account rate is still the one AWS acts on. Splitting the streams does
 # not protect you from a suspension; it tells you which stream caused it,
@@ -37,7 +43,7 @@ const cwCode = `# Complaint and bounce rate for one configuration set, hourly, l
 aws cloudwatch get-metric-statistics \\
   --namespace AWS/SES \\
   --metric-name Reputation.ComplaintRate \\
-  --dimensions Name=ses:configuration-set,Value=wraps-email-default \\
+  --dimensions Name=ses:configuration-set,Value=wraps-email-tracking \\
   --start-time "$(date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ')" \\
   --end-time "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \\
   --period 3600 \\
@@ -191,9 +197,11 @@ export default function ReputationPageContent() {
           </CodeBlockBody>
         </CodeBlock>
         <p className="text-muted-foreground">
-          Wraps does not create the second configuration set for you or split
-          the streams by default. It enables reputation metrics on the one it
-          deploys, which is what makes the split legible once you make it.
+          Wraps does not split the streams for you. It gives you the pieces: a
+          configuration set per domain, and reputation metrics on the default
+          set for the Production and Enterprise presets. Turning the metrics on
+          for the second set is a one-line AWS call, and until you make it the
+          split is real but invisible.
         </p>
       </section>
 

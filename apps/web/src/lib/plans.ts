@@ -863,7 +863,9 @@ export function getWorkflowLimit(planId: PlanId | string): number {
  */
 export function getHistoryRetentionDays(planId: PlanId | string): number {
   const plan = PLANS[planId as PlanId];
-  return plan?.historyRetentionDays ?? 7; // Default to Free retention
+  // Unknown plan id: fall back to the shortest window rather than Free's 30,
+  // so a bad id never widens what a caller is allowed to read.
+  return plan?.historyRetentionDays ?? 7;
 }
 
 /**

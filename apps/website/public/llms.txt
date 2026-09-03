@@ -17,11 +17,13 @@ Key facts (as of August 2026):
   history), Business $199/mo or $1,999/yr (unlimited AWS accounts, 1-year
   history). Annual billing saves 14-16%. The fee is flat per plan and never
   varies with sending volume; sends, domains, contacts, templates, and team
-  members are unlimited on every plan. The one metered resource is custom
-  events (POST /v1/events), which is Wraps' own storage, not AWS's. Wraps never
-  marks up delivery and never charges per contact — AWS bills you for sending,
-  directly. Full table, generated from the same source as the website:
-  https://wraps.dev/pricing.md
+  members are unlimited on every plan. What does carry a monthly allowance:
+  custom events (POST /v1/events) at 5,000/mo on Free and unlimited on paid
+  plans, AI template generations at 10/250/1,000 per month across Free/Pro/
+  Business, and connected AWS accounts at 1 on Free and Pro. Those are Wraps'
+  own storage and compute, not AWS's. Wraps never marks up delivery and never
+  charges per contact — AWS bills you for sending, directly. Full table,
+  generated from the same source as the website: https://wraps.dev/pricing.md
 - AWS sending cost: SES à la carte is $0.10 per 1,000 emails. Since 2026-07-21
   AWS defaults every new SES account to the Essentials plan at $0.16 per 1,000
   emails, and the old SES free tier is gone for new accounts. An account

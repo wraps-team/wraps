@@ -93,7 +93,7 @@ const MODELS: Model[] = [
     how: "Billing follows tracked events (opens, clicks, custom events emitted from your app) rather than messages or people.",
     breaks:
       "Instrumenting your product makes the bill go up, so teams under-instrument to stay cheap and end up with worse data than they started with. Watch for whether delivery events count or only custom ones.",
-    who: "Usage-based analytics and messaging platforms. Wraps meters custom events this way and nothing else.",
+    who: "Usage-based analytics and messaging platforms. Wraps uses it in one place only: custom events on the free plan, capped at 5,000 a month. Paid plans do not meter events at all.",
   },
   {
     n: "04",
@@ -201,12 +201,19 @@ export default function Page() {
               Where Wraps sits, plainly
             </h2>
             <p className="mb-4 text-muted-foreground">
-              Model five, with a bit of model three. The platform fee is flat
-              per plan and does not move with sending volume. AWS bills you
-              directly for delivery at its own rate. Sends, domains, contacts,
-              templates and team members are unlimited on every plan. The one
-              metered resource is custom events posted from your own
-              application, which are our storage rather than AWS&apos;s.
+              Model five, almost entirely. The platform fee is flat per plan and
+              does not move with sending volume. AWS bills you directly for
+              delivery at its own rate. Sends, domains, contacts, templates and
+              team members are unlimited on every plan, paid or not.
+            </p>
+            <p className="mb-4 text-muted-foreground">
+              Three things do carry a monthly allowance, and none of them is
+              sending. Custom events posted from your own application are capped
+              at 5,000 a month on the free plan and unlimited on paid ones. AI
+              template generations run 10, 250 and 1,000 a month across Free,
+              Pro and Business. Connected AWS accounts are one on Free and Pro,
+              unlimited on Business. All three are our storage and our compute,
+              not AWS&apos;s, which is why they are the parts we meter.
             </p>
             <p className="text-muted-foreground">
               The cost of that model is the second invoice. You have an AWS bill

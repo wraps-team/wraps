@@ -10,7 +10,7 @@ import { JsonLd } from "@/components/json-ld";
 const TITLE =
   "Why Transactional Email Providers Cost More Than Sending Through SES";
 const DESCRIPTION =
-  "At 100,000 emails a month SES costs about $10 and SendGrid, Resend and Postmark cost $35 to $132. A line-by-line account of what the difference buys, and when it is worth paying.";
+  "At 100,000 emails a month SES costs about $10 and SendGrid, Resend and Postmark cost $35 to $133.50. A line-by-line account of what the difference buys, and when it is worth paying.";
 const URL = "https://wraps.dev/blog/why-email-providers-cost-more-than-ses";
 const PUBLISHED = "2026-09-03T00:00:00.000Z";
 
@@ -75,24 +75,34 @@ const PRICES: { provider: string; monthly: string; note: string }[] = [
     note: "$0.16 per 1,000. The plan AWS puts new accounts on by default since July 2026.",
   },
   {
-    provider: "SendGrid Essentials",
-    monthly: "$34.95",
-    note: "100K tier. Two webhooks, seven days of activity history.",
+    provider: "Resend Pro",
+    monthly: "$35",
+    note: "100K included. Logs are purged at 30 days on every plan below Enterprise.",
   },
   {
-    provider: "Resend Scale",
-    monthly: "$90",
-    note: "100K included. Seven days of retention.",
+    provider: "SendGrid Essentials",
+    monthly: "$34.95",
+    note: "100K tier. Three days of activity history; longer is a paid add-on.",
   },
   {
     provider: "SendGrid Pro",
     monthly: "$89.95",
-    note: "100K tier. Adds a dedicated IP, SSO, and subuser management.",
+    note: "100K tier. Adds a dedicated IP, seven days of history, and subuser management.",
+  },
+  {
+    provider: "Resend Scale",
+    monthly: "$90",
+    note: "Also 100K. The step up from Pro at the same volume, not a bigger bucket.",
+  },
+  {
+    provider: "Postmark Platform",
+    monthly: "$126",
+    note: "$18 base for 10K, then $1.20 per additional 1,000.",
   },
   {
     provider: "Postmark Pro",
-    monthly: "~$132",
-    note: "$16.50 base for 10K, then about $1.30 per additional 1,000.",
+    monthly: "$133.50",
+    note: "$16.50 base for 10K, then $1.30 per additional 1,000.",
   },
 ];
 
@@ -153,8 +163,9 @@ export default function Page() {
           <section>
             <p className="mb-6 text-lg text-muted-foreground">
               Sending 100,000 transactional emails through Amazon SES costs
-              about $10. The same volume is $34.95 on SendGrid Essentials, $90
-              on Resend Scale, and around $132 on Postmark Pro.
+              about $10. The same volume is $35 on Resend Pro, $34.95 on
+              SendGrid Essentials, and $126 on the cheapest Postmark plan that
+              reaches it.
             </p>
             <p className="text-muted-foreground">
               That spread is not a markup on bandwidth. Sending an email is
@@ -203,8 +214,9 @@ export default function Page() {
               </table>
             </div>
             <p className="mt-4 text-muted-foreground text-sm">
-              List prices as published, September 2026. Every one of these
-              changes; check before quoting them back at anyone.
+              List prices read off each vendor&apos;s own pricing page in
+              September 2026. Every one of these changes; check before quoting
+              them back at anyone.
             </p>
           </section>
 
@@ -228,7 +240,7 @@ export default function Page() {
 
           <section>
             <h2 className="mb-4 font-bold text-2xl">
-              The comparison is not $10 against $90
+              The comparison is not $10 against $35
             </h2>
             <p className="mb-4 text-muted-foreground">
               This is where the SES argument usually cheats. The $10 buys an API

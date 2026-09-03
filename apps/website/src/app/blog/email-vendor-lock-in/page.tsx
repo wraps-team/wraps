@@ -131,7 +131,7 @@ const ANSWERS: { q: string; managed: string; byoc: string }[] = [
   {
     q: "Delivery events",
     managed: "Their store, plan-limited retention.",
-    byoc: "Your DynamoDB table, your retention policy.",
+    byoc: "Your DynamoDB table on the Production and Enterprise presets, your retention policy. We keep a copy too — see below.",
   },
   {
     q: "Templates",
@@ -282,10 +282,11 @@ export default function Page() {
                   Solved by the architecture
                 </div>
                 <p className="text-muted-foreground text-sm">
-                  Your sending identity, reputation, suppression list, and event
-                  history sit in your AWS account under your own IAM. Stop
-                  paying Wraps and the sending infrastructure keeps running,
-                  because it was never ours to switch off.
+                  Your sending identity, reputation, and suppression list sit in
+                  your AWS account under your own IAM, and so does the raw event
+                  history on the Production and Enterprise presets. Stop paying
+                  Wraps and the sending infrastructure keeps running, because it
+                  was never ours to switch off.
                 </p>
               </div>
               <div className="rounded-xl border p-6">
@@ -295,7 +296,9 @@ export default function Page() {
                 </div>
                 <p className="text-muted-foreground text-sm">
                   Contacts, templates, and workflow definitions live in the
-                  Wraps database, not yours. Export them before you leave.
+                  Wraps database, not yours, and so does a per-message record of
+                  everything sent through the platform: recipient, subject,
+                  sender, merge variables, and the engagement timestamps.
                   Templates are the softer case since they are React Email in
                   your repo if you author them that way, but the platform data
                   is platform data and moving off us means moving it.

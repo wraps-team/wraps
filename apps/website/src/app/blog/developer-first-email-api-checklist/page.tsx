@@ -118,7 +118,7 @@ const ITEMS: Item[] = [
     test: "Take a message id from a send you made last week and pull its full event trace. Count the clicks it took.",
     wraps: {
       verdict: "pass",
-      note: "Per-message event timelines, with send, delivery, open, click, bounce, complaint and reject. Retention is plan-fixed rather than configurable: 7 days on Free, 30 on Starter, 90 on Growth, 365 on Scale. The raw events also land in a DynamoDB table in your account, so a longer window is yours to build.",
+      note: "Per-message event timelines, with send, delivery, open, click, bounce, complaint and reject. Retention is plan-fixed rather than configurable: 30 days on Free, 90 on Pro, 365 on Business. On the Production and Enterprise presets the raw events also land in a DynamoDB table in your account, so a longer window is yours to build. The Starter preset does not deploy that table.",
     },
   },
   {

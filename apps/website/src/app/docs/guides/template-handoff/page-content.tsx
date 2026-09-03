@@ -74,7 +74,14 @@ const conflictCode = `$ wraps email templates push
 
 # The push did not fail. Four templates went out and one was refused,
 # because somebody changed it in the dashboard after your last push and
-# the CLI will not silently throw that away.`;
+# the CLI will not silently throw that away.
+#
+# Note the exit code: it is 0. A refused template does not fail the
+# command, so a CI job that only checks the exit status goes green and
+# nobody reads the line above. If you push from CI, grep for it:
+
+  wraps email templates push | tee push.log
+  ! grep -q "Use --force to overwrite" push.log`;
 
 export default function TemplateHandoffPageContent() {
   return (
@@ -317,7 +324,8 @@ export default function TemplateHandoffPageContent() {
             When CI reports a conflict, whoever owns the template copies the
             dashboard wording into the repo, opens a small pull request, and
             pushes with <code>--force</code> after it merges. The repo becomes
-            true again.
+            true again. Make CI actually report it — the push exits 0 on a
+            conflict, so the job has to check the output rather than the status.
           </li>
           <li className="flex gap-2.5">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-500" />
