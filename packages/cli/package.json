@@ -1,6 +1,6 @@
 {
   "name": "@wraps.dev/cli",
-  "version": "3.5.0",
+  "version": "3.5.1",
   "description": "Deploy email, SMS, and CDN infrastructure to your AWS account with one command. Sets up SES with DKIM/SPF/DMARC, event processing, and history automatically.",
   "type": "module",
   "main": "./dist/cli.js",
