@@ -274,6 +274,13 @@ export type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
   data: CodeBlockData[];
 };
 
+export function resolveDefaultCodeBlockValue(
+  defaultValue: string | undefined,
+  data: CodeBlockData[]
+): string {
+  return defaultValue ?? data[0]?.language ?? "";
+}
+
 export const CodeBlock = ({
   value: controlledValue,
   onValueChange: controlledOnValueChange,
@@ -283,7 +290,7 @@ export const CodeBlock = ({
   ...props
 }: CodeBlockProps) => {
   const [value, onValueChange] = useControllableState({
-    defaultProp: defaultValue ?? "",
+    defaultProp: resolveDefaultCodeBlockValue(defaultValue, data),
     prop: controlledValue,
     onChange: controlledOnValueChange,
   });
