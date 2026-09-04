@@ -5,7 +5,7 @@
  * Aggregates from the `message_send` table with bot open filtering.
  */
 
-import { db } from "@wraps/db";
+import { db, queryMessageMetricBuckets } from "@wraps/db";
 import { messageSend } from "@wraps/db/schema/batch";
 import { and, desc, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
 import { BOT_UA_KEYWORDS } from "./email-bot-detection";
@@ -43,43 +43,27 @@ export async function getEmailMetricsFromPostgres(
   endTime: Date,
   timezone = "UTC"
 ): Promise<Map<string, DailyEmailMetrics>> {
-  const tzLiteral = sql.raw(`'${timezone}'`);
-  const rows = await db
-    .select({
-      date: sql<string>`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC' AT TIME ZONE ${tzLiteral}, 'YYYY-MM-DD')`,
-      sent: sql<number>`count(*) filter (where ${messageSend.status} != 'failed')::int`,
-      delivered: sql<number>`count(*) filter (where ${messageSend.deliveredAt} is not null)::int`,
-      bounced: sql<number>`count(*) filter (where ${messageSend.bouncedAt} is not null)::int`,
-      complaints: sql<number>`count(*) filter (where ${messageSend.complainedAt} is not null)::int`,
-      opens: sql<number>`count(*) filter (where ${messageSend.openedAt} is not null and ${isNotBotOpen})::int`,
-      clicks: sql<number>`count(*) filter (where ${messageSend.clickedAt} is not null)::int`,
-      renderingFailures: sql<number>`count(*) filter (where ${messageSend.status} = 'failed')::int`,
-    })
-    .from(messageSend)
-    .where(
-      and(
-        eq(messageSend.organizationId, organizationId),
-        eq(messageSend.channel, "email"),
-        isNotNull(messageSend.sentAt),
-        gte(messageSend.sentAt, startTime),
-        lte(messageSend.sentAt, endTime)
-      )
-    )
-    .groupBy(
-      sql`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC' AT TIME ZONE ${tzLiteral}, 'YYYY-MM-DD')`
-    );
+  const rows = await queryMessageMetricBuckets({
+    organizationId,
+    startTime,
+    endTime,
+    timezone,
+    dimensions: ["period"],
+    granularity: "daily",
+  });
 
   const map = new Map<string, DailyEmailMetrics>();
   for (const row of rows) {
-    map.set(row.date, {
-      date: row.date,
+    const date = row.period as string;
+    map.set(date, {
+      date,
       sent: row.sent,
       delivered: row.delivered,
       bounced: row.bounced,
-      complaints: row.complaints,
-      opens: row.opens,
-      clicks: row.clicks,
-      renderingFailures: row.renderingFailures,
+      complaints: row.complained,
+      opens: row.opened,
+      clicks: row.clicked,
+      renderingFailures: row.failed,
     });
   }
   return map;
@@ -102,35 +86,22 @@ export async function getBounceMetricsFromPostgres(
   endTime: Date,
   timezone = "UTC"
 ): Promise<Map<string, DailyBounceMetrics>> {
-  const tzLiteral = sql.raw(`'${timezone}'`);
-  const rows = await db
-    .select({
-      date: sql<string>`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC' AT TIME ZONE ${tzLiteral}, 'YYYY-MM-DD')`,
-      sent: sql<number>`count(*) filter (where ${messageSend.status} != 'failed')::int`,
-      permanent: sql<number>`count(*) filter (where ${messageSend.bounceType} = 'Permanent')::int`,
-      transient: sql<number>`count(*) filter (where ${messageSend.bounceType} = 'Transient')::int`,
-      undetermined: sql<number>`count(*) filter (where ${messageSend.bouncedAt} is not null and (${messageSend.bounceType} is null or ${messageSend.bounceType} not in ('Permanent', 'Transient')))::int`,
-    })
-    .from(messageSend)
-    .where(
-      and(
-        eq(messageSend.organizationId, organizationId),
-        eq(messageSend.channel, "email"),
-        isNotNull(messageSend.sentAt),
-        gte(messageSend.sentAt, startTime),
-        lte(messageSend.sentAt, endTime)
-      )
-    )
-    .groupBy(
-      sql`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC' AT TIME ZONE ${tzLiteral}, 'YYYY-MM-DD')`
-    );
+  const rows = await queryMessageMetricBuckets({
+    organizationId,
+    startTime,
+    endTime,
+    timezone,
+    dimensions: ["period"],
+    granularity: "daily",
+  });
 
   const map = new Map<string, DailyBounceMetrics>();
   for (const row of rows) {
-    map.set(row.date, {
-      permanent: row.permanent,
-      transient: row.transient,
-      undetermined: row.undetermined,
+    const date = row.period as string;
+    map.set(date, {
+      permanent: row.bouncedPermanent,
+      transient: row.bouncedTransient,
+      undetermined: row.bouncedUndetermined,
       sent: row.sent,
     });
   }
@@ -152,30 +123,19 @@ export async function getComplaintMetricsFromPostgres(
   endTime: Date,
   timezone = "UTC"
 ): Promise<Map<string, DailyComplaintMetrics>> {
-  const tzLiteral = sql.raw(`'${timezone}'`);
-  const rows = await db
-    .select({
-      date: sql<string>`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC' AT TIME ZONE ${tzLiteral}, 'YYYY-MM-DD')`,
-      sent: sql<number>`count(*) filter (where ${messageSend.status} != 'failed')::int`,
-      complaints: sql<number>`count(*) filter (where ${messageSend.complainedAt} is not null)::int`,
-    })
-    .from(messageSend)
-    .where(
-      and(
-        eq(messageSend.organizationId, organizationId),
-        eq(messageSend.channel, "email"),
-        isNotNull(messageSend.sentAt),
-        gte(messageSend.sentAt, startTime),
-        lte(messageSend.sentAt, endTime)
-      )
-    )
-    .groupBy(
-      sql`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC' AT TIME ZONE ${tzLiteral}, 'YYYY-MM-DD')`
-    );
+  const rows = await queryMessageMetricBuckets({
+    organizationId,
+    startTime,
+    endTime,
+    timezone,
+    dimensions: ["period"],
+    granularity: "daily",
+  });
 
   const map = new Map<string, DailyComplaintMetrics>();
   for (const row of rows) {
-    map.set(row.date, { complaints: row.complaints, sent: row.sent });
+    const date = row.period as string;
+    map.set(date, { complaints: row.complained, sent: row.sent });
   }
   return map;
 }
@@ -195,30 +155,19 @@ export async function getSuppressionMetricsFromPostgres(
   endTime: Date,
   timezone = "UTC"
 ): Promise<Map<string, DailySuppressionMetrics>> {
-  const tzLiteral = sql.raw(`'${timezone}'`);
-  const rows = await db
-    .select({
-      date: sql<string>`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC' AT TIME ZONE ${tzLiteral}, 'YYYY-MM-DD')`,
-      sent: sql<number>`count(*) filter (where ${messageSend.status} != 'failed')::int`,
-      suppressed: sql<number>`count(*) filter (where ${messageSend.suppressedAt} is not null)::int`,
-    })
-    .from(messageSend)
-    .where(
-      and(
-        eq(messageSend.organizationId, organizationId),
-        eq(messageSend.channel, "email"),
-        isNotNull(messageSend.sentAt),
-        gte(messageSend.sentAt, startTime),
-        lte(messageSend.sentAt, endTime)
-      )
-    )
-    .groupBy(
-      sql`to_char(${messageSend.sentAt} AT TIME ZONE 'UTC' AT TIME ZONE ${tzLiteral}, 'YYYY-MM-DD')`
-    );
+  const rows = await queryMessageMetricBuckets({
+    organizationId,
+    startTime,
+    endTime,
+    timezone,
+    dimensions: ["period"],
+    granularity: "daily",
+  });
 
   const map = new Map<string, DailySuppressionMetrics>();
   for (const row of rows) {
-    map.set(row.date, { suppressed: row.suppressed, sent: row.sent });
+    const date = row.period as string;
+    map.set(date, { suppressed: row.suppressed, sent: row.sent });
   }
   return map;
 }
