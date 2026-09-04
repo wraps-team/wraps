@@ -330,6 +330,7 @@ API keys are created in the Wraps dashboard under Settings > API Keys.`,
 | Workflows | API-triggered workflow execution | Yes |
 | Connections | AWS account connection management | Yes |
 | Domains | Sending identity (domain) verification state, read live from SES | Yes |
+| Segments | Audience segment CRUD and condition preview (Pro plan required) | Yes |
 | Webhooks | Receive SES delivery events | Secret-based |
 | Unsubscribe | RFC 8058 one-click unsubscribe | Token-based |
 | Tools | Free email deliverability tools | No |`,
@@ -536,6 +537,38 @@ The API does **not** compile TSX -- \`compiledHtml\`/\`compiledText\` must be su
 
 \`GET /v1/templates/pull\` (the CLI's push/pull protocol) is unchanged by default -- omit \`limit\` and you get every template in one response, exactly as before. Pass \`limit\` to opt into cursor pagination (adds \`nextCursor\` to the response) and \`source=false\` to omit the TSX source from every row.`,
 
+  segments: `## Segments
+
+Every \`/v1/segments\` route requires the Pro plan or above -- including reads. This is stricter than the dashboard, which only gates creating a segment: a Free org gets 403 on every verb here, so a downgraded org's only path to its own segments is the dashboard.
+
+A segment is a saved audience filter used for broadcast targeting and workflow entry/exit. The \`condition\` field is the same filter-condition tree the dashboard's segment builder produces -- a tree of AND/OR groups, each holding one or more \`{ field, operator, value }\` filters, with optional nesting via \`group.nested\`. This reference does not re-list every field and operator (that list lives in the dashboard's segment builder, and changes there); \`POST /v1/segments/preview\` is the fastest way to check whether a condition you constructed is valid before saving it.
+
+### List Segments
+
+\`GET /v1/segments\` -- \`limit\` (default 20, max 100), \`offset\`, and \`search\` (matches segment name).
+
+**Response (200):** \`{ segments: Segment[], total, limit, offset }\`. Each list item's \`memberCount\` is computed live against current contacts at request time -- it is never the segment's stored/cached count, which can drift from what a broadcast would actually send to. \`createdBy\` is never included in any response from this API.
+
+### Get a Segment
+
+\`GET /v1/segments/:id\` -- Full detail including \`condition\`, org-scoped, 404 if not found. \`memberCount\` is computed live, same as the list route.
+
+### Create a Segment
+
+\`POST /v1/segments\` -- \`name\` (required), \`description\`, \`condition\` (required), \`trackMembership\`. The condition is validated before saving; an invalid condition returns 400 with the specific reason. \`memberCount\` is snapshotted from a live count at creation time.
+
+### Update a Segment
+
+\`PATCH /v1/segments/:id\` -- Partial update, org-scoped. Passing \`condition\` re-validates it and re-snapshots \`memberCount\`.
+
+### Delete a Segment
+
+\`DELETE /v1/segments/:id\` -- Org-scoped, 404 if not found. **Returns 409 instead of deleting** when a \`scheduled\`, \`queued\`, or \`processing\` broadcast still targets the segment -- deleting out from under a live send would silently strand its targeting. A segment referenced only by a \`draft\`, \`completed\`, \`failed\`, or \`cancelled\` broadcast can be deleted.
+
+### Preview a Condition
+
+\`POST /v1/segments/preview\` -- \`{ condition, limit? }\` (limit capped at 100) -- returns \`{ count, sample }\` for an unsaved condition, without creating a segment. Use this to validate a condition and see roughly who it would reach before committing to \`POST /v1/segments\`.`,
+
   contactTopics: `## Contact Topics: PATCH vs PUT
 
 Topic subscriptions support two update strategies:
@@ -579,6 +612,8 @@ ${SECTION_MD.metrics}
 ${SECTION_MD.domains}
 
 ${SECTION_MD.templates}
+
+${SECTION_MD.segments}
 
 ${SECTION_MD.contactTopics}
 
@@ -651,6 +686,13 @@ const endpointGroups = [
     description: "Email/SMS template CRUD, publish to SES, and CLI sync",
     auth: true,
     methods: ["GET", "POST", "PATCH"],
+  },
+  {
+    name: "Segments",
+    description:
+      "Audience segment CRUD and condition preview (Pro plan required)",
+    auth: true,
+    methods: ["GET", "POST", "PATCH", "DELETE"],
   },
   {
     name: "Webhooks",
@@ -2158,6 +2200,102 @@ export default function PageContent() {
           </code>{" "}
           to omit the TSX source from every row.
         </p>
+      </section>
+
+      {/* Segments */}
+      <section className="mb-12">
+        <SectionHeading
+          className="mb-6"
+          id="segments"
+          markdown={SECTION_MD.segments}
+          title="Segments"
+        />
+        <div className="mb-4 rounded-lg border-yellow-500 border-l-4 bg-yellow-500/10 p-4">
+          <p className="font-medium text-sm">
+            Every /v1/segments route requires the Pro plan or above
+          </p>
+          <p className="mt-2 text-muted-foreground text-sm">
+            This includes reads — a Free org gets 403 on every verb here, not
+            just create. Stricter than the dashboard, which only gates creating
+            a segment. A downgraded org's only path to its own segments is the
+            dashboard.
+          </p>
+        </div>
+        <p className="mb-4 text-muted-foreground">
+          A segment is a saved audience filter used for broadcast targeting and
+          workflow entry/exit. The{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            condition
+          </code>{" "}
+          field is the same filter-condition tree the dashboard's segment
+          builder produces — AND/OR groups, each holding one or more{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            {"{ field, operator, value }"}
+          </code>{" "}
+          filters, with optional nesting. This reference doesn't re-list every
+          field and operator — that list lives in the dashboard's segment
+          builder, where it can change. Use{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            POST /v1/segments/preview
+          </code>{" "}
+          to check whether a condition you constructed is valid before saving
+          it.
+        </p>
+        <p className="mb-4 text-muted-foreground">
+          Both{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            GET /v1/segments
+          </code>{" "}
+          and{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            GET /v1/segments/:id
+          </code>{" "}
+          compute{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            memberCount
+          </code>{" "}
+          live against current contacts at request time — never the segment's
+          stored/cached count, which can drift from what a broadcast would
+          actually send to. No response from this API ever includes{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            createdBy
+          </code>
+          .
+        </p>
+        <div className="mb-4 rounded-lg border-primary border-l-4 bg-primary/10 p-4">
+          <p className="font-medium text-sm">
+            Deleting a segment can return 409
+          </p>
+          <p className="mt-2 text-muted-foreground text-sm">
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              DELETE /v1/segments/:id
+            </code>{" "}
+            refuses with 409 instead of deleting when a{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              scheduled
+            </code>
+            ,{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">queued</code>
+            , or{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              processing
+            </code>{" "}
+            broadcast still targets the segment — deleting out from under a live
+            send would silently strand its targeting. A segment referenced only
+            by a{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">draft</code>,{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              completed
+            </code>
+            ,{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">failed</code>
+            , or{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              cancelled
+            </code>{" "}
+            broadcast can be deleted.
+          </p>
+        </div>
       </section>
 
       {/* Contact Topics */}

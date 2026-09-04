@@ -35,6 +35,7 @@ import { eventsRoutes } from "./routes/events";
 import { healthRoutes } from "./routes/health";
 import { metricsRoutes } from "./routes/metrics";
 import { preferenceEventsRoutes } from "./routes/preference-events";
+import { segmentsRoutes } from "./routes/segments";
 import { templatesRoutes } from "./routes/templates";
 import { templatesSyncRoutes } from "./routes/templates-sync";
 import { toolsRoutes } from "./routes/tools";
@@ -116,6 +117,11 @@ const openApiDocumentation = {
     {
       name: "templates",
       description: "Email template CRUD, publish to SES, and CLI sync",
+    },
+    {
+      name: "segments",
+      description:
+        "Audience segment CRUD and condition preview. Requires a Pro plan or higher.",
     },
     {
       name: "email-logs",
@@ -257,6 +263,7 @@ export const app = new Elysia()
   .use(contactsRoutes)
   .use(contactsTopicsRoutes)
   .use(batchRoutes)
+  .use(segmentsRoutes)
   .use(eventsRoutes)
   .use(workflowsRoutes)
   .use(webhooksRoutes)
