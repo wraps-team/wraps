@@ -32,6 +32,7 @@ import { contactsTopicsRoutes } from "./routes/contacts-topics";
 import { emailLogsRoutes } from "./routes/email-logs";
 import { eventsRoutes } from "./routes/events";
 import { healthRoutes } from "./routes/health";
+import { metricsRoutes } from "./routes/metrics";
 import { preferenceEventsRoutes } from "./routes/preference-events";
 import { templatesSyncRoutes } from "./routes/templates-sync";
 import { toolsRoutes } from "./routes/tools";
@@ -240,6 +241,7 @@ export const app = new Elysia()
   .use(healthRoutes)
   .use(connectionsRoutes)
   .use(emailLogsRoutes)
+  .use(metricsRoutes)
   .use(contactsRoutes)
   .use(contactsTopicsRoutes)
   .use(batchRoutes)

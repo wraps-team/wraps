@@ -92,6 +92,52 @@ curl -X PUT https://api.wraps.dev/v1/contacts/:id/topics \\
   -H "Content-Type: application/json" \\
   -d '{ "topicIds": ["topic_a", "topic_b"] }'`;
 
+const metricsExample = `curl -X GET "https://api.wraps.dev/v1/email/metrics?start_date=2026-08-25&end_date=2026-08-31&dimensions=period&granularity=daily" \\
+  -H "Authorization: Bearer wraps_your_api_key"`;
+
+const metricsResponseExample = `// GET /v1/email/metrics response
+{
+  "object": "metrics",
+  "totals": {
+    "sent": 1234,
+    "delivered": 1200,
+    "bounced": 12,
+    "bouncedPermanent": 8,
+    "bouncedTransient": 4,
+    "bouncedUndetermined": 0,
+    "complained": 1,
+    "suppressed": 3,
+    "opened": 640,
+    "openedRaw": 705,
+    "clicked": 210,
+    "failed": 22
+  },
+  "data": [
+    {
+      "period": "2026-08-30",
+      "sent": 180,
+      "delivered": 176,
+      "bounced": 1,
+      "bouncedPermanent": 1,
+      "bouncedTransient": 0,
+      "bouncedUndetermined": 0,
+      "complained": 0,
+      "suppressed": 0,
+      "opened": 92,
+      "openedRaw": 101,
+      "clicked": 30,
+      "failed": 2
+    }
+  ],
+  "meta": {
+    "start_date": "2026-08-25T00:00:00.000Z",
+    "end_date": "2026-08-31T00:00:00.000Z",
+    "timezone": "UTC",
+    "granularity": "daily",
+    "dimensions": ["period"]
+  }
+}`;
+
 // ============================================================================
 // MARKDOWN CONTENT FOR AI COPY
 // ============================================================================
@@ -131,6 +177,7 @@ API keys are created in the Wraps dashboard under Settings > API Keys.`,
 | Health | Health check and API info | No |
 | Contacts | Create, update, delete, and list contacts | Yes |
 | Batch | Batch email sending for broadcasts | Yes |
+| Email Metrics | Aggregate email metrics (sent, delivered, opens, clicks, bounces) | Yes |
 | Events | Custom event ingestion for triggering workflows | Yes |
 | Workflows | API-triggered workflow execution | Yes |
 | Connections | AWS account connection management | Yes |
@@ -228,6 +275,27 @@ Cancels an active workflow execution. Cleans up any pending schedulers and adjus
 
 \`DELETE /v1/batch/:id\` -- Cancels a batch in \`scheduled\`, \`queued\`, or \`processing\` status. Scheduled batches also have their EventBridge schedule deleted.`,
 
+  metrics: `## Email Metrics
+
+\`GET /v1/email/metrics\` -- Returns aggregate email metrics for the organization: sent, delivered, bounces (with permanent/transient/undetermined breakdown), complaints, suppressions, opens, clicks, and rendering failures. Optionally grouped by dimension and time granularity. Shares the same per-minute API rate limit as every other endpoint -- reading your own numbers is not a paid feature.
+
+**Query parameters (all optional):**
+| Param | Type | Default |
+|-------|------|---------|
+| \`start_date\` | ISO 8601 date or datetime | 6 days before \`end_date\` |
+| \`end_date\` | ISO 8601 date or datetime | now |
+| \`timezone\` | IANA timezone name | \`UTC\` |
+| \`granularity\` | \`hourly\`, \`daily\`, \`weekly\`, or \`monthly\` | \`daily\` |
+| \`dimensions\` | Comma-separated: \`period\`, \`domain\`, \`broadcast\`, \`template\`, \`source\`, \`account\`, \`region\` | none (totals only) |
+| \`broadcast_id\`, \`template_id\`, \`aws_account_id\`, \`domain\` | Comma-separated, max 100 values each | -- |
+
+**Response (200):**
+\`\`\`json
+{ "object": "metrics", "totals": { "sent": 1234, "delivered": 1200 }, "data": [{ "period": "2026-08-30", "sent": 180 }], "meta": { "start_date": "...", "end_date": "...", "timezone": "UTC", "granularity": "daily", "dimensions": ["period"] } }
+\`\`\`
+
+\`opened\` excludes user agents matching a known-bot list; \`openedRaw\` reports the same count with no bot filter applied. \`clicked\` is currently unfiltered. There is no \`tags\` dimension -- SES message tags are not persisted on sends. The \`template\`, \`source\`, \`account\`, and \`region\` dimensions have no equivalent in other providers' email APIs.`,
+
   contactTopics: `## Contact Topics: PATCH vs PUT
 
 Topic subscriptions support two update strategies:
@@ -266,6 +334,8 @@ ${SECTION_MD.workflows}
 
 ${SECTION_MD.batch}
 
+${SECTION_MD.metrics}
+
 ${SECTION_MD.contactTopics}
 
 ${SECTION_MD.openapi}
@@ -299,6 +369,13 @@ const endpointGroups = [
     description: "Batch email sending for broadcasts",
     auth: true,
     methods: ["POST", "GET", "DELETE"],
+  },
+  {
+    name: "Email Metrics",
+    description:
+      "Aggregate email metrics (sent, delivered, opens, clicks, bounces)",
+    auth: true,
+    methods: ["GET"],
   },
   {
     name: "Events",
@@ -1027,6 +1104,191 @@ export default function PageContent() {
             processing
           </code>{" "}
           status.
+        </p>
+      </section>
+
+      {/* Email Metrics */}
+      <section className="mb-12">
+        <SectionHeading
+          className="mb-6"
+          id="email-metrics"
+          markdown={SECTION_MD.metrics}
+          title="Email Metrics"
+        />
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            GET /v1/email/metrics
+          </code>{" "}
+          returns aggregate email metrics for the organization -- sent,
+          delivered, bounces, complaints, suppressions, opens, clicks, and
+          rendering failures -- optionally grouped by dimension and time
+          granularity. It shares the same per-minute API rate limit as every
+          other endpoint; reading your own numbers is not a paid feature.
+        </p>
+        <Card className="mb-4">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="px-4 py-2 text-left font-medium">Param</th>
+                    <th className="px-4 py-2 text-left font-medium">Type</th>
+                    <th className="px-4 py-2 text-left font-medium">Default</th>
+                  </tr>
+                </thead>
+                <tbody className="text-muted-foreground">
+                  {[
+                    {
+                      field: "start_date",
+                      type: "ISO 8601 date or datetime",
+                      desc: "6 days before end_date",
+                    },
+                    {
+                      field: "end_date",
+                      type: "ISO 8601 date or datetime",
+                      desc: "now",
+                    },
+                    {
+                      field: "timezone",
+                      type: "IANA timezone name",
+                      desc: "UTC",
+                    },
+                    {
+                      field: "granularity",
+                      type: "hourly | daily | weekly | monthly",
+                      desc: "daily",
+                    },
+                    {
+                      field: "dimensions",
+                      type: "comma-separated dimension names",
+                      desc: "none (totals only)",
+                    },
+                    {
+                      field:
+                        "broadcast_id, template_id, aws_account_id, domain",
+                      type: "comma-separated, max 100 each",
+                      desc: "--",
+                    },
+                  ].map((row, i) => (
+                    <tr className={i < 5 ? "border-b" : ""} key={row.field}>
+                      <td className="px-4 py-2">
+                        <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                          {row.field}
+                        </code>
+                      </td>
+                      <td className="px-4 py-2 font-mono text-xs">
+                        {row.type}
+                      </td>
+                      <td className="px-4 py-2">{row.desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+        <p className="mb-3 text-muted-foreground text-sm">
+          Dimensions:{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">period</code>,{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">domain</code>,{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            broadcast
+          </code>
+          ,{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">template</code>
+          , <code className="rounded bg-muted px-1 py-0.5 text-xs">source</code>
+          ,{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">account</code>,
+          and{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">region</code>.
+          There is no{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">tags</code>{" "}
+          dimension -- SES message tags are not persisted on sends. The{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">template</code>
+          , <code className="rounded bg-muted px-1 py-0.5 text-xs">source</code>
+          ,{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">account</code>,
+          and{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">region</code>{" "}
+          dimensions have no equivalent in other providers&apos; email APIs.
+        </p>
+        <CodeBlock
+          className="mb-4 h-auto"
+          data={[
+            {
+              language: "bash",
+              filename: "terminal.sh",
+              code: metricsExample,
+            },
+          ]}
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+        <CodeBlock
+          className="h-auto"
+          data={[
+            {
+              language: "json",
+              filename: "metrics response",
+              code: metricsResponseExample,
+            },
+          ]}
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+        <p className="mt-3 text-muted-foreground text-sm">
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">opened</code>{" "}
+          excludes user agents matching a known-bot list;{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            openedRaw
+          </code>{" "}
+          reports the same count with no bot filter applied.{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">clicked</code>{" "}
+          is currently unfiltered.
         </p>
       </section>
 
