@@ -3,6 +3,7 @@ export * from "./api-keys";
 export * from "./broadcasts";
 export * from "./contacts";
 export * from "./events";
+export * from "./message-metrics";
 export * from "./message-sends";
 export * from "./notifications";
 export * from "./subscriptions";
