@@ -2321,6 +2321,7 @@ describe("apps/api plan allowances match apps/web", () => {
     "Behavioral segments": "advancedSegments",
     "SSO + SCIM": "sso",
     "Audit log": "auditLog",
+    "Audit log export": "auditLogExport",
   };
 
   test.each(Object.entries(COMPARISON_FEATURE_ROWS))(

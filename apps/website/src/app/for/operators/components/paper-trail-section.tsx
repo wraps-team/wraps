@@ -25,7 +25,7 @@ const artifacts = [
     icon: ClipboardList,
     title: "Who changed what",
     description:
-      "Audit logs capture the mutations behind the send — who edited the template, who cancelled the broadcast, who unsubscribed a contact by hand. Viewable and filterable from the dashboard.",
+      "Audit logs capture the mutations behind the send — who edited the template, who cancelled the broadcast, who unsubscribed a contact by hand. Viewable and filterable from the dashboard, and exportable to CSV on Business.",
   },
 ];
 

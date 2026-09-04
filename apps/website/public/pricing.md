@@ -113,6 +113,7 @@ These appear on your AWS bill, not your Wraps bill. You keep AWS volume discount
 | Behavioral segments | — | — | Yes |
 | SSO + SCIM | — | — | Yes |
 | Audit log | — | — | Yes |
+| Audit log export | — | — | Yes |
 | Support | Community | Email | Priority |
 
 Every plan includes: the CLI, the TypeScript SDKs (`@wraps.dev/email`, `@wraps.dev/sms`, `@wraps.dev/client`), the MCP server (`@wraps.dev/mcp`), React Email templates, the dashboard, DKIM/SPF/DMARC setup, bounce and complaint handling, suppression lists, webhooks, and infrastructure deployed into your own AWS account under `wraps-*` namespaced resources.

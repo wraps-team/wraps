@@ -222,7 +222,7 @@ export const PRICING_TIERS: PricingTier[] = [
       "Unlimited AWS accounts",
       "1,000 AI generations/mo",
       "1-year history",
-      "SSO + SCIM, audit logs",
+      "SSO + SCIM, audit log + CSV export",
       "Priority support",
     ],
   },
@@ -556,6 +556,15 @@ export const FEATURE_COMPARISON: FeatureComparison[] = [
     // differentiator it needs a row, or the pricing page still never mentions
     // the audit log outside one bullet on the Business card.
     name: "Audit log",
+    free: false,
+    pro: false,
+    business: true,
+  },
+  {
+    // Separate row rather than folding "+ export" into the one above: viewer
+    // and export are two PlanFeature flags (auditLog, auditLogExport), and the
+    // comparison-row guardrail binds one row to one flag.
+    name: "Audit log export",
     free: false,
     pro: false,
     business: true,
