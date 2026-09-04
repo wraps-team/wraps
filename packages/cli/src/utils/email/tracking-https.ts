@@ -379,6 +379,13 @@ export async function provisionTrackingHttps(args: {
   trackingHttps: NonNullable<AdditionalDomain["trackingHttps"]>;
   cnameTarget: string;
   dnsRecordsToShow: Array<{ name: string; type: string; value: string }>;
+  /**
+   * Whether the ACM validation record in `dnsRecordsToShow` was pushed to the
+   * DNS provider automatically. False means the user has to add it by hand —
+   * and since that record is what gates certificate issuance, saying nothing
+   * leaves HTTPS stuck at "pending" forever with no visible cause.
+   */
+  validationRecordPushed: boolean;
 }> {
   const {
     domain,
@@ -404,13 +411,14 @@ export async function provisionTrackingHttps(args: {
       type: string;
       value: string;
     }> = [];
+    let validationRecordPushed = false;
     if (cert.validationRecord) {
       dnsRecordsToShow.push(cert.validationRecord);
       if (metadataDnsProvider && metadataDnsProvider !== "manual") {
-        await progress.execute(
+        validationRecordPushed = await progress.execute(
           "Creating ACM validation DNS record",
-          async () => {
-            await pushValidationRecord(
+          async () =>
+            pushValidationRecord(
               metadataDnsProvider,
               domain,
               sesRegion,
@@ -419,8 +427,7 @@ export async function provisionTrackingHttps(args: {
                 type: string;
                 value: string;
               }
-            );
-          }
+            )
         );
       }
     }
@@ -432,6 +439,7 @@ export async function provisionTrackingHttps(args: {
       },
       cnameTarget: awstrackTarget,
       dnsRecordsToShow,
+      validationRecordPushed,
     };
   }
 
@@ -458,5 +466,6 @@ export async function provisionTrackingHttps(args: {
     },
     cnameTarget: distribution.domainName,
     dnsRecordsToShow: [],
+    validationRecordPushed: true,
   };
 }

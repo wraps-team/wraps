@@ -112,23 +112,41 @@ async function checkVercelDomain(
 }
 
 /**
- * Validate Cloudflare credentials
+ * Validate Cloudflare credentials.
+ *
+ * Two probes, because one is not sufficient on its own:
+ *
+ * `/user/tokens/verify` is the direct answer, but it requires the token to
+ * carry `User → API Tokens → Read`. A zone-scoped token with nothing but
+ * `Zone → DNS → Edit` — the correct least-privilege token for everything this
+ * CLI does with Cloudflare — is refused there with `1000 Invalid API Token`,
+ * even though it can create every record we ask it to. Gating on that endpoint
+ * alone rejected working tokens, and the failure was near-silent: callers fell
+ * back to printing records for manual entry, and the ACM validation push
+ * (best-effort by design) dropped its record with no message at all.
+ *
+ * So on failure, fall back to listing zones — the capability the feature
+ * actually exercises. A token that can enumerate zones can be used; one that
+ * cannot is no use to us whatever `/user/tokens/verify` thinks.
  */
 async function validateCloudflareCredentials(token: string): Promise<boolean> {
-  try {
-    const response = await fetch(
-      "https://api.cloudflare.com/client/v4/user/tokens/verify",
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-    const data = (await response.json()) as { success: boolean };
-    return data.success === true;
-  } catch {
-    return false;
+  const probe = async (url: string): Promise<boolean> => {
+    try {
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = (await response.json()) as { success?: boolean };
+      return data.success === true;
+      // baseline:allow-next-line no-swallowed-errors — a probe answers yes/no; the caller reports "authentication failed"
+    } catch {
+      return false;
+    }
+  };
+
+  if (await probe("https://api.cloudflare.com/client/v4/user/tokens/verify")) {
+    return true;
   }
+  return probe("https://api.cloudflare.com/client/v4/zones?per_page=1");
 }
 
 /**

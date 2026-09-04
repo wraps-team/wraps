@@ -713,6 +713,11 @@ async function offerTrackingCname(
     value: targetValue,
   };
   const provider = ctx.metadata.services.email?.dnsProvider;
+  // Why the automatic push did not happen, when it did not. Falling back to
+  // the manual record silently is indistinguishable from "this provider has no
+  // automation", so a rejected token reads as normal output and the user walks
+  // away thinking DNS is handled.
+  let degradedReason: string | undefined;
   if (provider && provider !== "manual") {
     const parts = ctx.candidate.domain.split(".");
     const rootDomain =
@@ -737,7 +742,17 @@ async function offerTrackingCname(
         );
         return;
       }
+      degradedReason =
+        result.errors?.join("; ") ??
+        `${getDNSProviderDisplayName(provider)} created no record`;
+    } else {
+      degradedReason =
+        cred.error ?? `${getDNSProviderDisplayName(provider)} credentials`;
     }
+  }
+
+  if (degradedReason) {
+    clack.log.warn(`Could not update DNS automatically: ${degradedReason}`);
   }
   clack.log.info(
     `Add this DNS record:\n  ${pc.cyan(record.name)}\n    Type: CNAME  Value: ${record.value}`
@@ -749,6 +764,8 @@ async function applyTrackingHttps(
   enable: boolean
 ): Promise<{
   pendingValidationRecord?: { name: string; type: string; value: string };
+  /** False means the user still has to add `pendingValidationRecord` by hand. */
+  validationRecordPushed?: boolean;
 }> {
   if (ctx.candidate.additionalIndex === undefined) {
     throw new WrapsError(
@@ -809,7 +826,10 @@ async function applyTrackingHttps(
     await offerTrackingCname(ctx, trackingDomain, result.cnameTarget, true);
   }
 
-  return { pendingValidationRecord: result.dnsRecordsToShow[0] };
+  return {
+    pendingValidationRecord: result.dnsRecordsToShow[0],
+    validationRecordPushed: result.validationRecordPushed,
+  };
 }
 
 // --- Flag mode ---
@@ -1012,7 +1032,7 @@ async function applyFlagMode(
         );
         if (httpsResult.pendingValidationRecord) {
           clack.log.info(
-            `Add this DNS record to validate the certificate:\n  ${pc.cyan(httpsResult.pendingValidationRecord.name)}\n    Type: ${httpsResult.pendingValidationRecord.type}  Value: ${httpsResult.pendingValidationRecord.value}`
+            `${httpsResult.validationRecordPushed ? "Certificate validation record (created for you):" : "Add this DNS record to validate the certificate:"}\n  ${pc.cyan(httpsResult.pendingValidationRecord.name)}\n    Type: ${httpsResult.pendingValidationRecord.type}  Value: ${httpsResult.pendingValidationRecord.value}`
           );
         }
       }
@@ -1266,7 +1286,7 @@ async function applyInteractiveMode(
               );
               if (httpsResult.pendingValidationRecord) {
                 clack.log.info(
-                  `Add this DNS record to validate the certificate:\n  ${pc.cyan(httpsResult.pendingValidationRecord.name)}\n    Type: ${httpsResult.pendingValidationRecord.type}  Value: ${httpsResult.pendingValidationRecord.value}`
+                  `${httpsResult.validationRecordPushed ? "Certificate validation record (created for you):" : "Add this DNS record to validate the certificate:"}\n  ${pc.cyan(httpsResult.pendingValidationRecord.name)}\n    Type: ${httpsResult.pendingValidationRecord.type}  Value: ${httpsResult.pendingValidationRecord.value}`
                 );
               }
             }

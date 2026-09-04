@@ -1114,7 +1114,11 @@ export async function addDomain(options: {
       progress.stop();
       console.log();
       clack.log.info(
-        pc.bold("Add this DNS record to validate the certificate:")
+        pc.bold(
+          trackingHttpsResult.validationRecordPushed
+            ? "Certificate validation record (created for you):"
+            : "Add this DNS record to validate the certificate:"
+        )
       );
       console.log();
       for (const record of trackingHttpsResult.dnsRecordsToShow) {
