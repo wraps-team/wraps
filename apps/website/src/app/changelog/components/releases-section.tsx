@@ -48,6 +48,162 @@ const Code = ({ children }: { children: ReactNode }) => (
 
 const releases: Release[] = [
   {
+    version: "CLI v3.6.0",
+    date: "September 2026",
+    icon: Lock,
+    title: "Custom Tracking Domains & Proven-Orphan Cleanup",
+    items: [
+      <>
+        <Code>wraps email domains add</Code> and{" "}
+        <Code>wraps email domains config</Code> accept{" "}
+        <Code>--tracking-domain</Code>, so open and click links resolve through
+        a host under your own domain instead of{" "}
+        <Code>r.&lt;region&gt;.awstrack.me</Code>. SES sets this per
+        configuration set, so every managed domain needs its own
+      </>,
+      <>
+        <Code>--tracking-https</Code> requests an ACM certificate and puts a
+        CloudFront distribution in front of that host. ACM validation takes 5 to
+        30 minutes, so it is two runs: the first prints the validation record,
+        the second finishes once the certificate is ISSUED
+      </>,
+      <>
+        The five tracking-domain error codes are documented at{" "}
+        <Code>/docs/reference/errors</Code>, and the domain verification guide
+        explains the CNAME to publish and why a subdomain that was never added
+        separately inherits the primary domain&rsquo;s tracking host
+      </>,
+      <>
+        Fix: <Code>wraps email doctor --cleanup</Code> offered to delete
+        resources it had never proved were orphans. Any failure of the Pulumi
+        stack probe &mdash; stack not found, Pulumi not installed, an
+        unreachable state bucket &mdash; read the same as a proven-absent stack,
+        which swept in the console access role and the configuration sets{" "}
+        <Code>domains add</Code> creates. Stack state is now three-valued, and
+        only a positive absent may call anything an orphan
+      </>,
+      <>
+        Fix: doctor checks CloudFormation for a Wraps-owned stack before
+        labelling anything orphaned, so a dashboard quick-create deployment is
+        no longer mistaken for loose resources. An account it cannot check
+        refuses <Code>--cleanup</Code> rather than assuming, and names the
+        owning stack when it finds one
+      </>,
+      <>
+        Fix: disabling and re-enabling HTTPS handed back a CloudFront
+        distribution the CLI had switched off. SES rewrites every link in
+        outbound mail through the tracking domain, so recipients got CloudFront
+        errors on click rather than losing tracking. ACM and CloudFront listings
+        are paginated too, so a second page no longer causes a fresh certificate
+        request on every run
+      </>,
+      <>
+        Fix: a failure to provision HTTPS during <Code>domains add</Code> warns
+        and falls back to plain HTTP tracking instead of aborting the command
+        and orphaning the identity and configuration set it had already created
+      </>,
+    ],
+  },
+  {
+    version: "CLI v3.5.3",
+    date: "August 2026",
+    icon: Terminal,
+    title: "Adopting a Deployment the CLI Did Not Create",
+    items: [
+      <>
+        <Code>wraps platform connect</Code> and{" "}
+        <Code>wraps platform update-role</Code> adopt an existing deployment. A
+        CloudFormation quick-create customer has no local state file and no S3
+        state bucket to sync from, so both commands dead-ended &mdash; including
+        on the documented repair path for a broken IAM trust policy.
+        Registration is idempotent on the External ID, so adoption registers the
+        account and repairs the trust policy without deploying anything
+      </>,
+      <>
+        <Code>wraps doctor</Code> reports <Code>wraps-*</Code> resources it
+        finds in AWS with no local connection record, instead of announcing no
+        email deployment. That is what a CloudFormation-first connection looks
+        like, and what a second machine looks like
+      </>,
+      <>
+        Fix: <Code>wraps update</Code> never resolved a release. It matched tags
+        beginning <Code>cli@</Code>; every release is tagged <Code>cli-v</Code>.
+        Standalone installs only ever saw &ldquo;Could not determine latest
+        version from GitHub releases&rdquo;
+      </>,
+      <>
+        Fix: one telemetry event per invocation. <Code>wraps permissions</Code>{" "}
+        emitted three and <Code>wraps email domains add</Code> emitted two names
+        a millisecond apart, which inflated the reported failure rate and split
+        one command across two names
+      </>,
+      <>
+        Fix: a failure thrown before the handler runs is named by its third
+        positional, so a failing <Code>email domains verify</Code> is
+        distinguishable from a failing <Code>email domains remove</Code> rather
+        than collapsing into <Code>email:domains</Code>
+      </>,
+    ],
+  },
+  {
+    version: "Platform v0.26.0",
+    date: "August 2026",
+    icon: Tags,
+    title: "Free, Pro & Business",
+    items: [
+      <>
+        The starter, growth and scale ladder is replaced by three purchasable
+        plans: Free at $0, Pro at $29 a month, Business at $199 a month. Each is
+        a flat fee with no Wraps-side overage. Live subscriptions on the old
+        names keep their limits, mapped to the successor plan and never
+        displayed again
+      </>,
+      <>
+        Free includes 5,000 custom events a month, warns as the allowance runs
+        down, and blocks at 110% of it. Sends are unmetered on every plan: SES
+        bills you directly, so metering them would tax the pass-through the
+        product is built on
+      </>,
+      <>
+        The daily request meter is retired on every plan and removed from the
+        rate-limit reference. The per-minute limiter stays, because that one
+        protects the API from bursts rather than metering the customer
+      </>,
+      <>
+        Dashboard history is enforced where it is sold: 30 days on Free, 90 on
+        Pro, 365 on Business. The emails list clamps to the plan window on the
+        fresh request and on the cursor, which carries its own bounds and could
+        otherwise widen page 2 after page 1 was cut back
+      </>,
+      <>
+        Both surfaces now name the window instead of stopping silently, and the
+        upgrade path is resolved server-side: Pro gets a self-serve link,
+        Business is pointed at Enterprise
+      </>,
+      <>
+        Audit logs move to Business, including the required-plan copy on the
+        gated page and the feature list on the Business card. SES event
+        ingestion now requires a live subscription, keyed on subscription status
+        rather than plan name so free-tier organizations are unaffected, and it
+        fails open &mdash; a database blip must not drop a paying
+        customer&rsquo;s events
+      </>,
+      <>
+        Fix: the dashboard&rsquo;s IAM role repair is reachable and works.
+        Assume-role failures are classified by error code rather than by
+        matching message text, and the SMS phone-number query can tell the
+        client the role needs repairing
+      </>,
+      <>
+        Fix: workflow sends skip contacts SES has already suppressed. The gate
+        asked whether a contact was unsubscribed, bounced or complained and had
+        no opinion about <Code>suppressed</Code>, so those addresses reached
+        SES, were rejected, and returned as bounces charged to the
+        workflow&rsquo;s own stats
+      </>,
+    ],
+  },
+  {
     version: "Platform v0.25.0",
     date: "August 2026",
     icon: Bot,
