@@ -76,7 +76,15 @@ const mockSqsSend = vi.fn().mockResolvedValue({});
 // CloudFormation ownership probe (findWrapsCloudFormationStacks). Defaults to
 // "no Wraps stacks found, and the check succeeded" so existing orphan-path
 // tests keep behaving as before this plan's CloudFormation guard was added.
-const mockCfnSend = vi.fn().mockResolvedValue({ Stacks: [] });
+const mockCfnSend = vi
+  .fn()
+  .mockImplementation((cmd: { constructor: { name: string } }) =>
+    cmd.constructor.name === "DescribeStackResourcesCommand"
+      ? // findStackOwningResource: no stack owns the console role.
+        Promise.resolve({ StackResources: [] })
+      : // findWrapsCloudFormationStacks: no Wraps stacks in the region.
+        Promise.resolve({ Stacks: [] })
+  );
 
 vi.mock("@aws-sdk/client-ses", () => ({
   SESClient: class {
@@ -144,6 +152,9 @@ vi.mock("@aws-sdk/client-cloudformation", () => ({
     send = mockCfnSend;
   },
   DescribeStacksCommand: class {
+    constructor(public input: unknown) {}
+  },
+  DescribeStackResourcesCommand: class {
     constructor(public input: unknown) {}
   },
 }));
@@ -685,6 +696,129 @@ describe("emailDoctor", () => {
     const allOutput = allUserFacingOutput();
     expect(allOutput).toContain("wraps-console-access-role is missing");
     expect(allOutput).toContain(
+      "wraps platform update-role --region us-east-1"
+    );
+  });
+
+  it("sends a CloudFormation-owned console role to the console, not to update-role", async () => {
+    // cloudformation/wraps-console-access-role.yaml creates this same role name
+    // with this same policy name under CFN Conditions, so a stack-provisioned
+    // role legitimately carries a different action set from what local metadata
+    // implies. `wraps platform update-role` PutRolePolicy's over it — stack
+    // drift for a change the next stack update silently reverts.
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: { email: { config: { domain: "example.com" } } },
+        platform: { externalId: "ext-123", connectionId: "conn-1" },
+      },
+    ]);
+
+    const emptyScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(emptyScan);
+    mockFilterFn.mockReturnValue(emptyScan);
+
+    mockCfnSend.mockImplementation((cmd: { constructor: { name: string } }) =>
+      cmd.constructor.name === "DescribeStackResourcesCommand"
+        ? Promise.resolve({
+            StackResources: [{ StackName: "wraps-console-access" }],
+          })
+        : Promise.resolve({ Stacks: [] })
+    );
+
+    mockIamSend.mockImplementation((cmd: { constructor: { name: string } }) => {
+      if (cmd.constructor.name === "GetRolePolicyCommand") {
+        return Promise.resolve({
+          PolicyDocument: encodeURIComponent(
+            JSON.stringify({
+              Version: "2012-10-17",
+              Statement: [
+                {
+                  Effect: "Allow",
+                  Action: ["ses:GetAccount"],
+                  Resource: "*",
+                },
+              ],
+            })
+          ),
+        });
+      }
+      return Promise.resolve({ PolicyNames: [], AttachedPolicies: [] });
+    });
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({});
+
+    const allOutput = allUserFacingOutput();
+    expect(allOutput).toContain("wraps-console-access-role is missing");
+    expect(allOutput).toContain(
+      "Managed by CloudFormation stack wraps-console-access"
+    );
+    expect(allOutput).not.toContain("wraps platform update-role");
+  });
+
+  it("keeps the ordinary repair when stack ownership could not be proved", async () => {
+    // The same positive-proof rule stackState follows: "could not tell" is not
+    // "CloudFormation owns it", so the role still gets its actionable fix.
+    mockFindConnections.mockResolvedValueOnce([
+      {
+        accountId: "123456789012",
+        region: "us-east-1",
+        services: { email: { config: { domain: "example.com" } } },
+        platform: { externalId: "ext-123", connectionId: "conn-1" },
+      },
+    ]);
+
+    const emptyScan: AWSResourceScan = {
+      identities: [],
+      configurationSets: [],
+      snsTopics: [],
+      dynamoTables: [],
+      lambdaFunctions: [],
+      iamRoles: [],
+    };
+    mockScanFn.mockResolvedValue(emptyScan);
+    mockFilterFn.mockReturnValue(emptyScan);
+
+    mockCfnSend.mockImplementation((cmd: { constructor: { name: string } }) => {
+      if (cmd.constructor.name === "DescribeStackResourcesCommand") {
+        return Promise.reject(
+          Object.assign(new Error("User is not authorized"), {
+            name: "AccessDeniedException",
+          })
+        );
+      }
+      return Promise.resolve({ Stacks: [] });
+    });
+
+    mockIamSend.mockImplementation((cmd: { constructor: { name: string } }) => {
+      if (cmd.constructor.name === "GetRolePolicyCommand") {
+        return Promise.resolve({
+          PolicyDocument: encodeURIComponent(
+            JSON.stringify({
+              Version: "2012-10-17",
+              Statement: [
+                { Effect: "Allow", Action: ["ses:GetAccount"], Resource: "*" },
+              ],
+            })
+          ),
+        });
+      }
+      return Promise.resolve({ PolicyNames: [], AttachedPolicies: [] });
+    });
+
+    const { emailDoctor } = await import("../email/doctor.js");
+    await emailDoctor({});
+
+    expect(allUserFacingOutput()).toContain(
       "wraps platform update-role --region us-east-1"
     );
   });

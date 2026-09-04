@@ -1,10 +1,14 @@
 import {
   CloudFormationClient,
+  DescribeStackResourcesCommand,
   DescribeStacksCommand,
 } from "@aws-sdk/client-cloudformation";
 import { mockClient } from "aws-sdk-client-mock";
 import { beforeEach, describe, expect, it } from "vitest";
-import { findWrapsCloudFormationStacks } from "../cloudformation.js";
+import {
+  findStackOwningResource,
+  findWrapsCloudFormationStacks,
+} from "../cloudformation.js";
 
 const cfnMock = mockClient(CloudFormationClient);
 
@@ -125,5 +129,60 @@ describe("findWrapsCloudFormationStacks", () => {
     const result = await findWrapsCloudFormationStacks("us-east-1");
 
     expect(result).toEqual({ stacks: [], checked: false });
+  });
+});
+
+describe("findStackOwningResource", () => {
+  beforeEach(() => {
+    cfnMock.reset();
+  });
+
+  it("names the stack that owns the resource", async () => {
+    cfnMock.on(DescribeStackResourcesCommand).resolves({
+      StackResources: [
+        {
+          StackName: "wraps-console-access",
+          LogicalResourceId: "ConsoleAccessRole",
+          ResourceType: "AWS::IAM::Role",
+          ResourceStatus: "CREATE_COMPLETE",
+          Timestamp: new Date(),
+        },
+      ],
+    });
+
+    await expect(
+      findStackOwningResource("us-east-1", "wraps-console-access-role")
+    ).resolves.toEqual({ stackName: "wraps-console-access", proved: true });
+  });
+
+  it("proves absence when CloudFormation says the resource is in no stack", async () => {
+    // CloudFormation reports "not part of any stack" as a ValidationError,
+    // which is a real answer rather than a failure to read.
+    cfnMock
+      .on(DescribeStackResourcesCommand)
+      .rejects(
+        Object.assign(
+          new Error("Stack for wraps-console-access-role does not exist"),
+          { name: "ValidationError" }
+        )
+      );
+
+    await expect(
+      findStackOwningResource("us-east-1", "wraps-console-access-role")
+    ).resolves.toEqual({ proved: true });
+  });
+
+  it("reports unproved — never 'no stack' — when the call is denied", async () => {
+    // The distinction the caller depends on: "could not tell" must not license
+    // a remedy that rewrites a possibly stack-managed resource.
+    cfnMock.on(DescribeStackResourcesCommand).rejects(
+      Object.assign(new Error("User is not authorized"), {
+        name: "AccessDeniedException",
+      })
+    );
+
+    await expect(
+      findStackOwningResource("us-east-1", "wraps-console-access-role")
+    ).resolves.toEqual({ proved: false });
   });
 });

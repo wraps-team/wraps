@@ -835,6 +835,88 @@ describe("Domain Management Commands", () => {
       });
       expect(metadata.saveConnectionMetadata).toHaveBeenCalled();
     });
+
+    it("checks the tracking CNAME against CloudFront, not awstrack.me, when HTTPS tracking is active", async () => {
+      // With HTTPS on, SES serves tracking links through the distribution, so
+      // the CNAME correctly points at CloudFront. Comparing against
+      // r.<region>.awstrack.me marked every correctly-configured HTTPS domain
+      // "incorrect" and told the user to break their own working setup.
+      sesClientMock.on(GetEmailIdentityCommand).resolves({
+        VerifiedForSendingStatus: true,
+        DkimAttributes: { Tokens: [], Status: "SUCCESS" },
+      });
+      dnsResolverMock.resolveCname.mockImplementation(async (name: string) => {
+        if (name === "track.test.com") return ["d111.cloudfront.net"];
+        throw notFound();
+      });
+
+      const metadata = await import("../../utils/shared/metadata");
+      vi.mocked(metadata.getDomainFromMetadata).mockReturnValueOnce({
+        isPrimary: false,
+        entry: {
+          domain: "test.com",
+          configSetName: domainToConfigSetName("test.com"),
+          trackingDomain: "track.test.com",
+          trackingHttps: {
+            certificateArn: "arn:aws:acm:issued",
+            status: "active",
+            distributionId: "D111",
+            distributionDomain: "d111.cloudfront.net",
+          },
+          addedAt: new Date().toISOString(),
+        },
+      });
+
+      await verifyDomain({ domain: "test.com" });
+
+      const clack = await import("@clack/prompts");
+      const dnsNote = vi
+        .mocked(clack.note)
+        .mock.calls.find(([, title]) => title === "DNS Records");
+      expect(dnsNote?.[0]).toContain("track.test.com");
+      expect(dnsNote?.[0]).toContain("verified");
+      expect(dnsNote?.[0]).not.toContain("incorrect");
+    });
+
+    it("still flags the tracking CNAME when HTTPS is active but DNS points at awstrack.me", async () => {
+      // The genuinely wrong state after enabling HTTPS: the record was never
+      // swapped, so tracking links resolve to the plain SES endpoint and the
+      // REQUIRE policy has nothing to serve.
+      sesClientMock.on(GetEmailIdentityCommand).resolves({
+        VerifiedForSendingStatus: true,
+        DkimAttributes: { Tokens: [], Status: "SUCCESS" },
+      });
+      dnsResolverMock.resolveCname.mockImplementation(async (name: string) => {
+        if (name === "track.test.com") return ["r.us-east-1.awstrack.me"];
+        throw notFound();
+      });
+
+      const metadata = await import("../../utils/shared/metadata");
+      vi.mocked(metadata.getDomainFromMetadata).mockReturnValueOnce({
+        isPrimary: false,
+        entry: {
+          domain: "test.com",
+          configSetName: domainToConfigSetName("test.com"),
+          trackingDomain: "track.test.com",
+          trackingHttps: {
+            certificateArn: "arn:aws:acm:issued",
+            status: "active",
+            distributionId: "D111",
+            distributionDomain: "d111.cloudfront.net",
+          },
+          addedAt: new Date().toISOString(),
+        },
+      });
+
+      await verifyDomain({ domain: "test.com" });
+
+      const clack = await import("@clack/prompts");
+      const dnsNote = vi
+        .mocked(clack.note)
+        .mock.calls.find(([, title]) => title === "DNS Records");
+      expect(dnsNote?.[0]).toContain("track.test.com");
+      expect(dnsNote?.[0]).toContain("incorrect");
+    });
   });
 
   describe("addDomain - per-domain config sets", () => {

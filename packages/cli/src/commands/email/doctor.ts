@@ -25,7 +25,10 @@ import {
   getAWSRegion,
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
-import { findWrapsCloudFormationStacks } from "../../utils/shared/cloudformation.js";
+import {
+  findStackOwningResource,
+  findWrapsCloudFormationStacks,
+} from "../../utils/shared/cloudformation.js";
 import {
   collectRemediations,
   type DoctorFinding,
@@ -337,6 +340,15 @@ function protectedResourceNames(
  * account is actually connected to the platform — an unconnected account has
  * no role to check. Never recommends `--cleanup` and is unaffected by
  * `stackState`: a stale policy is a permissions problem, not an ownership one.
+ *
+ * CloudFormation ownership does change the *remedy*, though.
+ * `cloudformation/wraps-console-access-role.yaml` creates this same role name
+ * with this same policy name, under CloudFormation Conditions — so a
+ * stack-provisioned role legitimately carries a different action set from what
+ * local metadata implies. `wraps platform update-role` would PutRolePolicy over
+ * it, putting the stack into drift for a change the next stack update reverts.
+ * Ownership is asked of CloudFormation directly rather than inferred from stack
+ * names, because the quick-create link lets the user rename the stack.
  */
 async function checkConsoleRolePolicy(
   connection: ConnectionMetadata,
@@ -345,6 +357,13 @@ async function checkConsoleRolePolicy(
   if (!connection.platform?.externalId) {
     return;
   }
+
+  // Only a *proved* owning stack redirects the remedy — the same positive-proof
+  // rule `stackState` follows. "Could not tell" keeps the ordinary repair.
+  const owner = await findStackOwningResource(region, CONSOLE_ACCESS_ROLE);
+  const repair = owner.stackName
+    ? remediations.cloudFormationManaged(owner.stackName)
+    : remediations.platformUpdateRole(region);
 
   const iam = new IAMClient({ region }); // IAM is global — region is cosmetic
   try {
@@ -388,7 +407,7 @@ async function checkConsoleRolePolicy(
       name: `${CONSOLE_ACCESS_ROLE} is missing ${missing.length} permission(s)`,
       details:
         missing.slice(0, 5).join(", ") + (missing.length > 5 ? ", …" : ""),
-      remediation: remediations.platformUpdateRole(region),
+      remediation: repair,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -402,7 +421,7 @@ async function checkConsoleRolePolicy(
         status: "fail",
         category: "Platform Role",
         name: `${CONSOLE_ACCESS_ROLE} not found`,
-        remediation: remediations.platformUpdateRole(region),
+        remediation: repair,
       };
     }
 

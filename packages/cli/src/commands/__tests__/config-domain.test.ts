@@ -677,6 +677,50 @@ describe("configDomain — extended config set options", () => {
     ).toBe(0);
   });
 
+  it("defers instead of failing when SES has not verified the identity yet", async () => {
+    // Same degradation `domains add` performs. Without it, the documented
+    // `domains config --tracking-domain` path threw a raw BadRequestException
+    // while the identical operation through `domains add` deferred cleanly.
+    const notVerified = Object.assign(
+      new Error("Domain test.com is not verified"),
+      { name: "BadRequestException" }
+    );
+    sesClientMock
+      .on(PutConfigurationSetTrackingOptionsCommand)
+      .rejects(notVerified);
+
+    const metadata = await import("../../utils/shared/metadata");
+    const clack = await import("@clack/prompts");
+
+    await configDomain({
+      domain: "test.com",
+      trackingDomain: "track.test.com",
+    });
+
+    expect(mockExit).not.toHaveBeenCalled();
+    expect(clack.log.warn).toHaveBeenCalledWith(
+      expect.stringContaining("wraps email domains verify")
+    );
+    // The domain is still recorded, so `domains verify` has something to apply.
+    expect(metadata.saveConnectionMetadata).toHaveBeenCalled();
+  });
+
+  it("still fails loudly on a BadRequestException that is not about verification", async () => {
+    // A missing configuration set never resolves into "applied once verified",
+    // so swallowing it would hide the failure behind a deferral that never comes.
+    const missingConfigSet = Object.assign(
+      new Error("Configuration set wraps-email-typo does not exist"),
+      { name: "BadRequestException" }
+    );
+    sesClientMock
+      .on(PutConfigurationSetTrackingOptionsCommand)
+      .rejects(missingConfigSet);
+
+    await expect(
+      configDomain({ domain: "test.com", trackingDomain: "track.test.com" })
+    ).rejects.toThrow("does not exist");
+  });
+
   it("Unit 16: flag mode: trackingDomain on the primary domain is refused", async () => {
     const metadata = await import("../../utils/shared/metadata");
     vi.mocked(metadata.loadConnectionMetadata).mockResolvedValueOnce(

@@ -243,6 +243,28 @@ const ALIAS: Record<string, string> = {
 };
 
 /**
+ * Resolve a tri-state boolean option: `true`, explicitly `false`, or unset.
+ *
+ * `parseCliArgs` only surfaces booleans that are true (see the BOOLEAN_FLAGS
+ * loop below — the legacy "omit when absent" shape), so `--no-thing` reaches a
+ * command as `undefined` and its "off" intent survives only in argv. Commands
+ * that need to tell "off" from "not mentioned" — every setting a user can
+ * toggle back — must read it back through here rather than testing argv inline.
+ *
+ * `argv` is injectable so callers are testable without mutating `process.argv`.
+ */
+export function resolveNegatableFlag(
+  value: boolean | undefined,
+  negatedArg: string,
+  argv: string[] = process.argv
+): boolean | undefined {
+  if (value !== undefined) {
+    return value;
+  }
+  return argv.includes(negatedArg) ? false : undefined;
+}
+
+/**
  * Convert a kebab-cased option name to camelCase.
  */
 const toCamel = (name: string): string =>

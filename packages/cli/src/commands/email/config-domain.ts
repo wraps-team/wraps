@@ -31,6 +31,7 @@ import { domainToConfigSetName } from "../../utils/email/config-set-slug.js";
 import {
   clearTrackingDomain,
   defaultTrackingDomain,
+  isTrackingDomainNotReady,
   putTrackingDomain,
   TRACKING_DOMAIN_NONE,
   validateTrackingDomain,
@@ -40,6 +41,7 @@ import {
   disableDistribution,
   provisionTrackingHttps,
 } from "../../utils/email/tracking-https.js";
+import { resolveNegatableFlag } from "../../utils/shared/arg-parser.js";
 import {
   getAWSRegion,
   validateAWSCredentials,
@@ -284,16 +286,8 @@ export async function configDomain(
     }
 
     // Detect group flags — `options.*` can be true/false from direct calls;
-    // `--no-X` in argv covers the CLI negated-flag path.
-    const flag = (
-      val: boolean | undefined,
-      noArgv: string
-    ): boolean | undefined =>
-      val !== undefined
-        ? val
-        : process.argv.includes(noArgv)
-          ? false
-          : undefined;
+    // `--no-X` in argv covers the CLI negated-flag path (see the helper).
+    const flag = resolveNegatableFlag;
 
     const opensFlag = flag(options.opens, "--no-opens");
     const clicksFlag = flag(options.clicks, "--no-clicks");
@@ -669,14 +663,34 @@ async function applyTrackingDomain(
     );
   }
   const host = value.toLowerCase();
-  await putTrackingDomain(ctx.sesClient, ctx.candidate.configSetName, host);
+
+  // Same degradation `domains add` performs: SES refuses a redirect domain
+  // under an identity it has not verified yet, and that is a "not yet", not a
+  // failure. Without this the documented `domains config --tracking-domain`
+  // path threw a raw BadRequestException while the identical operation through
+  // `domains add` deferred cleanly to `domains verify`.
+  let appliedAt: string | undefined;
+  try {
+    await putTrackingDomain(ctx.sesClient, ctx.candidate.configSetName, host);
+    appliedAt = new Date().toISOString();
+  } catch (error) {
+    if (!isTrackingDomainNotReady(error)) {
+      throw error;
+    }
+    if (!isJsonMode()) {
+      clack.log.warn(
+        `Saved ${host}, but SES will not accept it until ${ctx.candidate.domain} is verified — run ${pc.cyan(`wraps email domains verify --domain ${ctx.candidate.domain}`)} to apply it.`
+      );
+    }
+  }
+
   persistCandidateField(ctx, "trackingDomain", host);
   (
     ctx.additionalDomains[ctx.candidate.additionalIndex] as Record<
       string,
       unknown
     >
-  ).trackingDomainAppliedAt = new Date().toISOString();
+  ).trackingDomainAppliedAt = appliedAt;
   await saveMetadata(ctx);
 }
 

@@ -79,16 +79,28 @@ export async function ensureCertificate(
   domain: string
 ): Promise<CertificateState> {
   const acm = new ACMClient({ region: US_EAST_1 });
-  const listResponse = await acm.send(
-    new ListCertificatesCommand({
-      CertificateStatuses: ["PENDING_VALIDATION", "ISSUED"],
-    })
-  );
-  const existing = listResponse.CertificateSummaryList?.find(
-    (c) => c.DomainName === domain
-  );
-  if (existing?.CertificateArn) {
-    return describeCertificate(existing.CertificateArn);
+
+  // Paginated: ACM returns 100 certificates per page. Missing an existing cert
+  // is worse than slow — RequestCertificate would fire on every run, and each
+  // new certificate carries a *different* validation CNAME, so the record the
+  // user already added never validates and HTTPS never leaves "pending".
+  let existingArn: string | undefined;
+  let nextToken: string | undefined;
+  do {
+    const page = await acm.send(
+      new ListCertificatesCommand({
+        CertificateStatuses: ["PENDING_VALIDATION", "ISSUED"],
+        NextToken: nextToken,
+      })
+    );
+    existingArn = page.CertificateSummaryList?.find(
+      (c) => c.DomainName === domain
+    )?.CertificateArn;
+    nextToken = existingArn ? undefined : page.NextToken;
+  } while (nextToken);
+
+  if (existingArn) {
+    return describeCertificate(existingArn);
   }
 
   const requestResponse = await acm.send(
@@ -137,6 +149,14 @@ export async function ensureDistribution(args: {
       throw new Error(
         `CloudFront distribution ${existingId} has no DomainName`
       );
+    }
+    // A disabled distribution keeps its alias, so findDistributionByAlias
+    // still matches one this CLI turned off. Returning it as-is would set
+    // HttpsPolicy REQUIRE against a dead origin — SES rewrites every link in
+    // outbound mail through the tracking domain, so recipients would get
+    // CloudFront errors on every click, not merely lose tracking.
+    if (existing.Distribution?.DistributionConfig?.Enabled === false) {
+      await enableDistribution(cloudfront, existingId);
     }
     return { id: existingId, domainName, created: false };
   }
@@ -211,9 +231,12 @@ export async function ensureDistribution(args: {
   return { id, domainName, created: true };
 }
 
-/** UpdateDistribution Enabled:false. Never deletes — see plan maintenance notes. */
-export async function disableDistribution(id: string): Promise<void> {
-  const cloudfront = new CloudFrontClient({ region: US_EAST_1 });
+/** Read-modify-write of just the `Enabled` field, preserving everything else. */
+async function setDistributionEnabled(
+  cloudfront: CloudFrontClient,
+  id: string,
+  enabled: boolean
+): Promise<void> {
   const current = await cloudfront.send(
     new GetDistributionConfigCommand({ Id: id })
   );
@@ -224,9 +247,23 @@ export async function disableDistribution(id: string): Promise<void> {
     new UpdateDistributionCommand({
       Id: id,
       IfMatch: current.ETag,
-      DistributionConfig: { ...current.DistributionConfig, Enabled: false },
+      DistributionConfig: { ...current.DistributionConfig, Enabled: enabled },
     })
   );
+}
+
+/** Turn a distribution this CLI previously disabled back on. */
+async function enableDistribution(
+  cloudfront: CloudFrontClient,
+  id: string
+): Promise<void> {
+  await setDistributionEnabled(cloudfront, id, true);
+}
+
+/** UpdateDistribution Enabled:false. Never deletes — see plan maintenance notes. */
+export async function disableDistribution(id: string): Promise<void> {
+  const cloudfront = new CloudFrontClient({ region: US_EAST_1 });
+  await setDistributionEnabled(cloudfront, id, false);
 }
 
 /**

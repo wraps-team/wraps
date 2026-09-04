@@ -36,6 +36,7 @@ import {
   disableDistribution,
   provisionTrackingHttps,
 } from "../../utils/email/tracking-https.js";
+import { resolveNegatableFlag } from "../../utils/shared/arg-parser.js";
 import {
   getAWSRegion,
   validateAWSCredentials,
@@ -88,7 +89,13 @@ async function checkVerification(
   domain: string,
   sesClient: SESv2Client,
   region: string,
-  trackingDomain?: string
+  trackingDomain?: string,
+  /**
+   * What the tracking CNAME is expected to point at. Defaults to the plain SES
+   * endpoint; pass the CloudFront distribution domain when HTTPS tracking is
+   * active, or every correctly-configured HTTPS domain reads as "incorrect".
+   */
+  trackingCnameTarget?: string
 ): Promise<VerifyCheckResult> {
   const identity = await sesClient.send(
     new GetEmailIdentityCommand({ EmailIdentity: domain })
@@ -290,7 +297,7 @@ async function checkVerification(
   if (trackingDomain) {
     try {
       const records = await resolver.resolveCname(trackingDomain);
-      const expected = `r.${region}.awstrack.me`;
+      const expected = trackingCnameTarget ?? `r.${region}.awstrack.me`;
       const found = records.some((r) => r === expected || r === `${expected}.`);
       dnsResults.push({
         name: trackingDomain,
@@ -469,7 +476,8 @@ export async function verifyDomain(options: EmailVerifyOptions): Promise<void> {
           options.domain,
           sesClient,
           region,
-          trackedEntry?.trackingDomain
+          trackedEntry?.trackingDomain,
+          trackedEntry?.trackingHttps?.distributionDomain
         )
     );
   } catch (error) {
@@ -543,7 +551,8 @@ export async function verifyDomain(options: EmailVerifyOptions): Promise<void> {
               options.domain,
               sesClient,
               region,
-              trackedEntry?.trackingDomain
+              trackedEntry?.trackingDomain,
+              trackedEntry?.trackingHttps?.distributionDomain
             )
         );
         // baseline:allow-next-line no-swallowed-errors — DNS/SES check failure during polling is non-fatal, will retry
@@ -941,10 +950,12 @@ export async function addDomain(options: {
       | undefined;
     if (trackingDomain) {
       let wantsHttps: boolean;
-      if (process.argv.includes("--no-tracking-https")) {
-        wantsHttps = false;
-      } else if (options.trackingHttps !== undefined) {
-        wantsHttps = options.trackingHttps;
+      const httpsFlag = resolveNegatableFlag(
+        options.trackingHttps,
+        "--no-tracking-https"
+      );
+      if (httpsFlag !== undefined) {
+        wantsHttps = httpsFlag;
       } else if (options.yes) {
         wantsHttps = true;
       } else {

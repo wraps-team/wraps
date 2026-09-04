@@ -146,6 +146,53 @@ describe("ensureCertificate", () => {
       vi.useRealTimers();
     }
   });
+
+  it("pages past the first 100 certificates before deciding to request one", async () => {
+    // ACM returns 100 per page. Missing an existing cert is not merely slow:
+    // every new certificate carries a different validation CNAME, so the
+    // record the user already added never validates and HTTPS never leaves
+    // "pending" — while unused certs pile up against the account quota.
+    acmMock
+      .on(ListCertificatesCommand)
+      .resolvesOnce({
+        CertificateSummaryList: [
+          { DomainName: "other.com", CertificateArn: "arn:aws:acm:other" },
+        ],
+        NextToken: "page2",
+      })
+      .resolvesOnce({
+        CertificateSummaryList: [
+          { DomainName: "track.a.com", CertificateArn: "arn:aws:acm:page2" },
+        ],
+      });
+    acmMock.on(DescribeCertificateCommand).resolves({
+      Certificate: { Status: "ISSUED" },
+    });
+
+    const result = await ensureCertificate("track.a.com");
+
+    expect(result.arn).toBe("arn:aws:acm:page2");
+    expect(acmMock.commandCalls(RequestCertificateCommand).length).toBe(0);
+    expect(
+      acmMock.commandCalls(ListCertificatesCommand)[1].args[0].input.NextToken
+    ).toBe("page2");
+  });
+
+  it("stops paging as soon as it finds the certificate", async () => {
+    acmMock.on(ListCertificatesCommand).resolves({
+      CertificateSummaryList: [
+        { DomainName: "track.a.com", CertificateArn: "arn:aws:acm:page1" },
+      ],
+      NextToken: "page2",
+    });
+    acmMock.on(DescribeCertificateCommand).resolves({
+      Certificate: { Status: "ISSUED" },
+    });
+
+    await ensureCertificate("track.a.com");
+
+    expect(acmMock.commandCalls(ListCertificatesCommand).length).toBe(1);
+  });
 });
 
 describe("describeCertificate", () => {
@@ -239,6 +286,120 @@ describe("ensureDistribution", () => {
     expect(
       config?.DefaultCacheBehavior?.ForwardedValues?.Headers?.Items
     ).toContain("*");
+  });
+
+  it("re-enables a distribution this CLI had disabled before reusing it", async () => {
+    // disableDistribution leaves the alias attached, so the alias lookup still
+    // matches a distribution that is switched off. Handing it back as-is would
+    // put HttpsPolicy REQUIRE in front of a dead origin — SES rewrites every
+    // link in outbound mail through the tracking domain, so recipients would
+    // get CloudFront errors on every click, not merely lose tracking.
+    cloudfrontMock.on(ListDistributionsCommand).resolves({
+      DistributionList: {
+        Items: [
+          { Id: "OFF123", Aliases: { Quantity: 1, Items: ["track.c.com"] } },
+        ],
+      },
+    });
+    cloudfrontMock.on(GetDistributionCommand).resolves({
+      Distribution: {
+        Id: "OFF123",
+        DomainName: "doff.cloudfront.net",
+        DistributionConfig: { Enabled: false } as never,
+      },
+    });
+    cloudfrontMock.on(GetDistributionConfigCommand).resolves({
+      DistributionConfig: { Enabled: false, CallerReference: "x" } as never,
+      ETag: "EOFFTAG",
+    });
+    cloudfrontMock.on(UpdateDistributionCommand).resolves({});
+
+    const result = await ensureDistribution({
+      trackingDomain: "track.c.com",
+      sesRegion: "us-east-1",
+      certificateArn: "arn:aws:acm:z",
+    });
+
+    expect(result).toEqual({
+      id: "OFF123",
+      domainName: "doff.cloudfront.net",
+      created: false,
+    });
+    const updates = cloudfrontMock.commandCalls(UpdateDistributionCommand);
+    expect(updates.length).toBe(1);
+    expect(updates[0].args[0].input).toMatchObject({
+      Id: "OFF123",
+      IfMatch: "EOFFTAG",
+      DistributionConfig: expect.objectContaining({ Enabled: true }),
+    });
+  });
+
+  it("leaves an already-enabled distribution alone", async () => {
+    cloudfrontMock.on(ListDistributionsCommand).resolves({
+      DistributionList: {
+        Items: [
+          { Id: "ON123", Aliases: { Quantity: 1, Items: ["track.d.com"] } },
+        ],
+      },
+    });
+    cloudfrontMock.on(GetDistributionCommand).resolves({
+      Distribution: {
+        Id: "ON123",
+        DomainName: "don.cloudfront.net",
+        DistributionConfig: { Enabled: true } as never,
+      },
+    });
+
+    await ensureDistribution({
+      trackingDomain: "track.d.com",
+      sesRegion: "us-east-1",
+      certificateArn: "arn:aws:acm:z",
+    });
+
+    expect(cloudfrontMock.commandCalls(UpdateDistributionCommand).length).toBe(
+      0
+    );
+  });
+
+  it("pages past the first 100 distributions when matching the alias", async () => {
+    // A miss here creates a second distribution for an alias CloudFront will
+    // refuse (CNAMEAlreadyExists), breaking HTTPS tracking outright.
+    cloudfrontMock
+      .on(ListDistributionsCommand)
+      .resolvesOnce({
+        DistributionList: {
+          Items: [
+            { Id: "OTHER", Aliases: { Quantity: 1, Items: ["nope.com"] } },
+          ],
+          IsTruncated: true,
+          NextMarker: "marker2",
+        },
+      })
+      .resolvesOnce({
+        DistributionList: {
+          Items: [
+            { Id: "PAGE2", Aliases: { Quantity: 1, Items: ["track.e.com"] } },
+          ],
+        },
+      });
+    cloudfrontMock.on(GetDistributionCommand).resolves({
+      Distribution: {
+        Id: "PAGE2",
+        DomainName: "dpage2.cloudfront.net",
+        DistributionConfig: { Enabled: true } as never,
+      },
+    });
+
+    const result = await ensureDistribution({
+      trackingDomain: "track.e.com",
+      sesRegion: "us-east-1",
+      certificateArn: "arn:aws:acm:z",
+    });
+
+    expect(result.id).toBe("PAGE2");
+    expect(
+      cloudfrontMock.commandCalls(CreateDistributionWithTagsCommand).length
+    ).toBe(0);
   });
 });
 

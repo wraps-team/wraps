@@ -53,8 +53,12 @@ describe("validateTrackingDomain", () => {
 });
 
 describe("isTrackingDomainNotReady", () => {
-  it("is true only for name === BadRequestException", () => {
-    const err = Object.assign(new Error("domain not verified"), {
+  it.each([
+    "Domain example.com is not verified",
+    "The custom redirect domain must be a verified identity",
+    "Identity verification pending",
+  ])("is true for the unverified-identity message %j", (message) => {
+    const err = Object.assign(new Error(message), {
       name: "BadRequestException",
     });
     expect(isTrackingDomainNotReady(err)).toBe(true);
@@ -62,6 +66,17 @@ describe("isTrackingDomainNotReady", () => {
 
   it("is false for other error names", () => {
     const err = Object.assign(new Error("boom"), { name: "NotFoundException" });
+    expect(isTrackingDomainNotReady(err)).toBe(false);
+  });
+
+  it("is false for a BadRequestException that is not about verification", () => {
+    // The reason the name alone is not enough: callers treat "not ready" as
+    // "will apply once the domain verifies", and a missing configuration set
+    // never resolves that way.
+    const err = Object.assign(
+      new Error("Configuration set wraps-email-typo does not exist"),
+      { name: "BadRequestException" }
+    );
     expect(isTrackingDomainNotReady(err)).toBe(false);
   });
 

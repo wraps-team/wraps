@@ -42,10 +42,6 @@ describe("SENDABLE_EMAIL_STATUSES", () => {
 });
 
 describe("isEmailSendable", () => {
-  it("refuses a suppressed contact", () => {
-    expect(isEmailSendable("suppressed")).toBe(false);
-  });
-
   it.each(["unsubscribed", "bounced", "complained", "suppressed"] as const)(
     "refuses %s",
     (status) => {

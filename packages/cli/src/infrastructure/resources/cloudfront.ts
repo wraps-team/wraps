@@ -13,7 +13,12 @@ export type CloudFrontTrackingConfig = {
 };
 
 /**
- * Find existing CloudFront distribution by alias (CNAME)
+ * Find existing CloudFront distribution by alias (CNAME).
+ *
+ * Paginated: ListDistributions returns 100 per page. A miss here is not
+ * harmless — the caller creates a second distribution for an alias CloudFront
+ * will refuse (CNAMEAlreadyExists), so an account past one page would break
+ * HTTPS tracking outright.
  */
 export async function findDistributionByAlias(
   alias: string
@@ -24,14 +29,23 @@ export async function findDistributionByAlias(
     );
     const cloudfront = new CloudFrontClient({ region: "us-east-1" }); // CloudFront is global but API is in us-east-1
 
-    const response = await cloudfront.send(new ListDistributionsCommand({}));
+    let marker: string | undefined;
+    do {
+      const response = await cloudfront.send(
+        new ListDistributionsCommand({ Marker: marker })
+      );
+      const distribution = response.DistributionList?.Items?.find((dist) =>
+        dist.Aliases?.Items?.includes(alias)
+      );
+      if (distribution?.Id) {
+        return distribution.Id;
+      }
+      marker = response.DistributionList?.IsTruncated
+        ? response.DistributionList.NextMarker
+        : undefined;
+    } while (marker);
 
-    // Find distribution with matching alias
-    const distribution = response.DistributionList?.Items?.find((dist) =>
-      dist.Aliases?.Items?.includes(alias)
-    );
-
-    return distribution?.Id || null;
+    return null;
   } catch (error) {
     console.error("Error finding CloudFront distribution:", error);
     return null;

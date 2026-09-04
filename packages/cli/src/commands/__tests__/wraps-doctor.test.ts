@@ -112,7 +112,10 @@ function emailResult(
     // so a nonzero default here would silently add that finding to every
     // other test's output.
     totalResources: overrides.totalResources ?? 0,
-    hasStack: true,
+    stackState: "present",
+    cleanupAllowed: false,
+    protectedNames: new Set<string>(),
+    cfChecked: true,
     wrapsResources: {} as AWSResourceScan,
   };
 }
