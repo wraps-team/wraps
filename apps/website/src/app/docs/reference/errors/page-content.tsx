@@ -365,6 +365,43 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
     ],
   },
   {
+    id: "tracking-domains",
+    title: "Tracking Domains",
+    rows: [
+      {
+        code: "INVALID_TRACKING_DOMAIN",
+        message: "Invalid --tracking-domain: <problem>",
+        solution:
+          "A tracking domain must be a hostname under the sending domain, e.g. track.news.example.com for news.example.com",
+      },
+      {
+        code: "PRIMARY_TRACKING_DOMAIN_MANAGED_BY_PULUMI",
+        message:
+          "<domain> is the primary domain — its tracking domain is managed by wraps email upgrade",
+        solution:
+          'Run wraps email upgrade and choose "tracking". domains config sets tracking domains on additional domains only.',
+      },
+      {
+        code: "TRACKING_DOMAIN_REQUIRED",
+        message: "<domain> has no tracking domain yet",
+        solution:
+          "Set one before enabling HTTPS: wraps email domains config --domain <domain> --tracking-domain <host>",
+      },
+      {
+        code: "PRIMARY_TRACKING_HTTPS_MANAGED_BY_PULUMI",
+        message:
+          "<domain> is the primary domain — its HTTPS tracking is managed by wraps email upgrade",
+        solution: 'Run wraps email upgrade and choose "tracking"',
+      },
+      {
+        code: "TRACKING_HTTPS_PROVISION_FAILED",
+        message: "Failed to provision HTTPS for tracking domain: <detail>",
+        solution:
+          "Usually the ACM certificate is not ISSUED yet (validation takes 5-30 minutes), the tracking domain is already claimed by another CloudFront distribution, or the account lacks acm:RequestCertificate / cloudfront:CreateDistributionWithTags. Retry with wraps email domains config --domain <domain> --tracking-https.",
+      },
+    ],
+  },
+  {
     id: "inbound-email",
     title: "Inbound Email",
     rows: [
