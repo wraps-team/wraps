@@ -29,6 +29,7 @@ import { batchRoutes } from "./routes/batch";
 import { connectionsRoutes } from "./routes/connections";
 import { contactsRoutes } from "./routes/contacts";
 import { contactsTopicsRoutes } from "./routes/contacts-topics";
+import { domainsRoutes } from "./routes/domains";
 import { emailLogsRoutes } from "./routes/email-logs";
 import { eventsRoutes } from "./routes/events";
 import { healthRoutes } from "./routes/health";
@@ -105,6 +106,11 @@ const openApiDocumentation = {
     {
       name: "connections",
       description: "AWS account connection management",
+    },
+    {
+      name: "domains",
+      description:
+        "Sending identity (domain) verification state, read live from SES",
     },
     {
       name: "email-logs",
@@ -240,6 +246,7 @@ export const app = new Elysia()
   .use(wellKnownRoutes)
   .use(healthRoutes)
   .use(connectionsRoutes)
+  .use(domainsRoutes)
   .use(emailLogsRoutes)
   .use(metricsRoutes)
   .use(contactsRoutes)

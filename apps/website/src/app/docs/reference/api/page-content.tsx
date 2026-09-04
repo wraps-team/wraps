@@ -148,6 +148,49 @@ const batchClicksExample = `// GET /v1/batch/:id/clicks response
   "truncated": false
 }`;
 
+const domainsListExample = `// GET /v1/domains response
+{
+  "data": [
+    {
+      "identity": "example.com",
+      "identityType": "DOMAIN",
+      "sendingEnabled": true,
+      "verificationStatus": "SUCCESS",
+      "awsAccountId": "aws_1",
+      "region": "us-east-1"
+    }
+  ],
+  "accounts": [
+    { "id": "aws_1", "accountId": "123456789012", "region": "us-east-1", "reachable": true }
+  ]
+}`;
+
+const domainsDetailExample = `// GET /v1/domains/example.com response
+{
+  "identity": "example.com",
+  "identityType": "DOMAIN",
+  "verifiedForSending": true,
+  "verificationStatus": "SUCCESS",
+  "dkim": {
+    "status": "SUCCESS",
+    "signingAttributesOrigin": "AWS_SES",
+    "tokens": ["abc123", "def456", "ghi789"]
+  },
+  "mailFromDomain": { "domain": "mail.example.com", "status": "SUCCESS" },
+  "feedbackForwarding": true,
+  "configurationSet": "wraps-email-default",
+  "awsAccountId": "aws_1",
+  "region": "us-east-1",
+  "unreachableAccountIds": []
+}`;
+
+const domainsUnreachableExample = `// GET /v1/domains/example.com response (503)
+{
+  "error": "aws_account_unreachable",
+  "message": "The wraps-console-access-role could not be assumed in any connected AWS account. Run \`wraps platform update-role\`.",
+  "code": "INTERNAL_ERROR"
+}`;
+
 const contactTopicPatchExample = `# PATCH adds topics without removing existing ones
 curl -X PATCH https://api.wraps.dev/v1/contacts/:id \\
   -H "Authorization: Bearer wraps_your_api_key" \\
@@ -249,6 +292,7 @@ API keys are created in the Wraps dashboard under Settings > API Keys.`,
 | Events | Custom event ingestion for triggering workflows | Yes |
 | Workflows | API-triggered workflow execution | Yes |
 | Connections | AWS account connection management | Yes |
+| Domains | Sending identity (domain) verification state, read live from SES | Yes |
 | Webhooks | Receive SES delivery events | Secret-based |
 | Unsubscribe | RFC 8058 one-click unsubscribe | Token-based |
 | Tools | Free email deliverability tools | No |`,
@@ -401,6 +445,24 @@ Counts are maintained incrementally during the send and reflect SES events recei
 
 \`opened\` excludes user agents matching a known-bot list; \`openedRaw\` reports the same count with no bot filter applied. \`clicked\` is currently unfiltered. There is no \`tags\` dimension -- SES message tags are not persisted on sends. The \`template\`, \`source\`, \`account\`, and \`region\` dimensions have no equivalent in other providers' email APIs.`,
 
+  domains: `## Domains
+
+Sending identity (domain and email address) verification state, read live from SES -- there is no domain table, and no caching layer. Every call fans out to SES across the organization's connected AWS accounts, so this endpoint is slower and more rate-sensitive than the rest of the API. It is read-only: there is no create, verify, or delete route here.
+
+### List Sending Identities
+
+\`GET /v1/domains\` -- Lists SES sending identities across the organization's connected AWS accounts. Optional \`?awsAccountId=\` narrows to one connected account (404 if it doesn't belong to your organization).
+
+**Response (200):** \`{ data: Identity[], accounts: AccountStatus[] }\`. Each identity is \`{ identity, identityType, sendingEnabled, verificationStatus, awsAccountId, region }\`. An account whose console-access role could not be assumed is reported with \`reachable: false\` in \`accounts\` rather than failing the whole request -- check \`accounts\` before assuming \`data\` is complete.
+
+### Get Sending Identity Detail
+
+\`GET /v1/domains/:identity\` -- Full verification and DKIM detail for one identity (a domain or an email address), searching the organization's connected AWS accounts and stopping at the first that has it.
+
+**Response (200):** \`{ identity, identityType, verifiedForSending, verificationStatus, dkim: { status, signingAttributesOrigin, tokens } | null, mailFromDomain: { domain, status } | null, feedbackForwarding, configurationSet, awsAccountId, region, unreachableAccountIds }\`. \`unreachableAccountIds\` lists accounts whose role could not be assumed while searching -- a 200 from one account doesn't mean every connected account was consulted.
+
+**Response (503):** \`{ error: "aws_account_unreachable", message }\` -- only when *every* connected account is unreachable. Fix by running \`wraps platform update-role\` against the affected AWS account.`,
+
   contactTopics: `## Contact Topics: PATCH vs PUT
 
 Topic subscriptions support two update strategies:
@@ -440,6 +502,8 @@ ${SECTION_MD.workflows}
 ${SECTION_MD.batch}
 
 ${SECTION_MD.metrics}
+
+${SECTION_MD.domains}
 
 ${SECTION_MD.contactTopics}
 
@@ -499,6 +563,13 @@ const endpointGroups = [
     description: "AWS account connection management",
     auth: true,
     methods: ["GET", "POST", "DELETE"],
+  },
+  {
+    name: "Domains",
+    description:
+      "Sending identity (domain) verification state, read live from SES",
+    auth: true,
+    methods: ["GET"],
   },
   {
     name: "Webhooks",
@@ -1590,6 +1661,177 @@ export default function PageContent() {
           <code className="rounded bg-muted px-1 py-0.5 text-xs">clicked</code>{" "}
           is currently unfiltered.
         </p>
+      </section>
+
+      {/* Domains */}
+      <section className="mb-12">
+        <SectionHeading
+          className="mb-6"
+          id="domains"
+          markdown={SECTION_MD.domains}
+          title="Domains"
+        />
+        <p className="mb-4 text-muted-foreground">
+          Sending identity (domain and email address) verification state, read
+          live from SES on every call — there is no domain table and no caching
+          layer, so this endpoint is slower and more rate-sensitive than the
+          rest of the API. It is read-only: there is no create, verify, or
+          delete route here.
+        </p>
+
+        <h3 className="mb-3 font-medium text-lg">List Sending Identities</h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            GET /v1/domains
+          </code>{" "}
+          lists SES sending identities across the organization's connected AWS
+          accounts. Optional{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            ?awsAccountId=
+          </code>{" "}
+          narrows to one connected account. An account whose console-access role
+          could not be assumed is reported with{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            reachable: false
+          </code>{" "}
+          in{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">accounts</code>{" "}
+          rather than failing the whole request — check{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">accounts</code>{" "}
+          before assuming{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">data</code> is
+          complete.
+        </p>
+        <CodeBlock
+          className="mb-8 h-auto"
+          data={[
+            {
+              language: "json",
+              filename: "domains list response",
+              code: domainsListExample,
+            },
+          ]}
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+
+        <h3 className="mb-3 font-medium text-lg">
+          Get Sending Identity Detail
+        </h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            GET /v1/domains/:identity
+          </code>{" "}
+          returns full verification and DKIM detail for one identity (a domain
+          or an email address), searching the organization's connected AWS
+          accounts and stopping at the first that has it.{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            unreachableAccountIds
+          </code>{" "}
+          lists accounts whose role could not be assumed while searching — a 200
+          from one account doesn't mean every connected account was consulted.
+        </p>
+        <CodeBlock
+          className="mb-4 h-auto"
+          data={[
+            {
+              language: "json",
+              filename: "domain detail response",
+              code: domainsDetailExample,
+            },
+          ]}
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+
+        <p className="mb-4 text-muted-foreground text-sm">
+          A <code className="rounded bg-muted px-1 py-0.5 text-xs">503</code> is
+          returned — not thrown — only when{" "}
+          <strong className="text-foreground">every</strong> connected AWS
+          account is unreachable. Fix by running{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            wraps platform update-role
+          </code>{" "}
+          against the affected AWS account.
+        </p>
+        <CodeBlock
+          className="h-auto"
+          data={[
+            {
+              language: "json",
+              filename: "domain detail response (503)",
+              code: domainsUnreachableExample,
+            },
+          ]}
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
       </section>
 
       {/* Contact Topics */}
