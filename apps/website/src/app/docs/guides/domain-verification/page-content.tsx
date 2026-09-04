@@ -48,6 +48,26 @@ Name:  _dmarc.yourdomain.com
 Type:  TXT
 Value: v=DMARC1; p=quarantine; sp=quarantine; np=reject; rua=mailto:dmarc@yourdomain.com`;
 
+const trackingConfigCommands = `# 1. Set the tracking domain
+npx @wraps.dev/cli email domains config -d mail.yourdomain.com \\
+  --tracking-domain track.mail.yourdomain.com
+
+# 2. Then turn on HTTPS for it
+npx @wraps.dev/cli email domains config -d mail.yourdomain.com --tracking-https`;
+
+const trackingRecordExample = `# CNAME for the tracking domain (plain HTTP tracking):
+Name:  track.mail.yourdomain.com
+Type:  CNAME
+Value: r.us-east-1.awstrack.me`;
+
+const trackingBulkCommand = `npx @wraps.dev/cli email domains list --json \\
+  | jq -r '.data.domains[]
+      | select(.managed and (.isPrimary | not) and (.trackingDomain == null))
+      | .domain' \\
+  | while read -r d; do
+      npx @wraps.dev/cli email domains config -d "$d" --tracking-domain "track.$d"
+    done`;
+
 export default function DomainVerificationPageContent() {
   return (
     <DocsLayout>
@@ -65,7 +85,7 @@ export default function DomainVerificationPageContent() {
         </p>
         <div className="mt-4 flex items-center gap-4 text-muted-foreground text-sm">
           <span className="flex items-center gap-1">
-            <Clock className="h-4 w-4" />4 min read
+            <Clock className="h-4 w-4" />6 min read
           </span>
         </div>
       </div>
@@ -754,6 +774,269 @@ export CLOUDFLARE_ZONE_ID=your_zone_id`,
         </div>
       </section>
 
+      {/* Custom Tracking Domains */}
+      <section className="mb-12">
+        <h2 className="mb-4 font-bold text-2xl">Custom Tracking Domains</h2>
+        <p className="mb-4 text-muted-foreground">
+          SES rewrites every tracked link to{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            r.us-east-1.awstrack.me
+          </code>{" "}
+          before it reaches the inbox. That host is shared by every SES
+          customer, and it is what your recipients see when they hover a link. A
+          custom tracking domain replaces it with a hostname under your own
+          domain, such as{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            track.mail.yourdomain.com
+          </code>
+          .
+        </p>
+        <p className="mb-6 text-muted-foreground">
+          This only matters when open or click tracking is on. With both off,
+          SES leaves your links alone and there is nothing to rewrite.
+        </p>
+
+        <h3 className="mb-3 font-medium text-lg">
+          One tracking domain per domain you add
+        </h3>
+        <p className="mb-4 text-muted-foreground">
+          The redirect domain is a property of the SES configuration set, not of
+          the domain identity. Wraps creates one configuration set per domain
+          you add, so every added domain carries its own tracking domain. SES
+          also requires the redirect domain to sit under the sending domain, and
+          the CLI enforces that:{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            track.mail.yourdomain.com
+          </code>{" "}
+          is valid for{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            mail.yourdomain.com
+          </code>
+          , while{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            track.yourdomain.com
+          </code>{" "}
+          is not. The default suggestion is always{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            track.&lt;domain&gt;
+          </code>
+          .
+        </p>
+        <p className="mb-6 text-muted-foreground">
+          That rule decides what happens with subdomains. If you added{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            mail.yourdomain.com
+          </code>{" "}
+          with{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            wraps email domains add
+          </code>
+          , it has its own configuration set and needs its own tracking domain.
+          If you only added{" "}
+          <code className="rounded bg-muted px-1 text-sm">yourdomain.com</code>{" "}
+          and send as a subdomain of it, the send falls back to your primary
+          domain&apos;s configuration set and those links use the primary&apos;s
+          tracking domain. Several sending domains cannot share one tracking
+          host.
+        </p>
+
+        <h3 className="mb-3 font-medium text-lg">
+          Set one on a domain you already added
+        </h3>
+        <p className="mb-4 text-muted-foreground">
+          Run it as two commands. The HTTPS step refuses to start until a
+          tracking domain exists.
+        </p>
+        <CodeBlock
+          className="mb-4 h-auto"
+          data={[
+            {
+              language: "bash",
+              filename: "terminal.sh",
+              code: trackingConfigCommands,
+            },
+          ]}
+          defaultValue="bash"
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+        <p className="mb-6 text-muted-foreground">
+          Your primary domain is the exception. Its tracking domain belongs to
+          the Pulumi stack, so{" "}
+          <code className="rounded bg-muted px-1 text-sm">domains config</code>{" "}
+          rejects it. Use{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            wraps email upgrade
+          </code>{" "}
+          and choose &quot;Add/change custom tracking domain&quot; instead. To
+          go back to the shared SES host, pass{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            --tracking-domain none
+          </code>
+          .
+        </p>
+
+        <h3 className="mb-3 font-medium text-lg">The DNS record</h3>
+        <p className="mb-4 text-muted-foreground">
+          A tracking domain needs one CNAME. Wraps creates it for you on Route
+          53, Vercel, and Cloudflare. On every other provider the CLI prints the
+          record and you add it by hand.
+        </p>
+        <CodeBlock
+          className="mb-4 h-auto"
+          data={[
+            {
+              language: "text",
+              filename: "dns-record.txt",
+              code: trackingRecordExample,
+            },
+          ]}
+          defaultValue="text"
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+        <p className="mb-6 text-muted-foreground">
+          The value is{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            r.&lt;region&gt;.awstrack.me
+          </code>{" "}
+          for plain HTTP tracking. With HTTPS enabled it becomes your CloudFront
+          distribution domain instead, and the CLI swaps the record for you.
+        </p>
+
+        <h3 className="mb-3 font-medium text-lg">HTTPS tracking links</h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1 text-sm">
+            --tracking-https
+          </code>{" "}
+          requests an ACM certificate and puts a CloudFront distribution in
+          front of the tracking domain, both in your own AWS account.
+          Certificate validation takes 5 to 30 minutes. The distribution is
+          created only once the certificate reaches ISSUED, so run the same
+          command again after that to finish the switch.
+        </p>
+        <div className="mb-6 flex items-start gap-4 rounded-lg border p-4">
+          <Clock className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="font-medium">
+              HTTPS costs one CloudFront distribution
+            </p>
+            <p className="mt-1 text-muted-foreground text-sm">
+              Fractions of a cent per 10,000 tracking requests, and the
+              certificate is free. It is still one more piece of infrastructure
+              in your account to keep track of. Plain HTTP tracking works
+              without it, and the links say http:// when recipients hover them.
+            </p>
+          </div>
+        </div>
+
+        <h3 className="mb-3 font-medium text-lg">Every domain at once</h3>
+        <p className="mb-4 text-muted-foreground">
+          There is no flag that covers all your domains, because each one needs
+          its own hostname.{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            wraps email domains list --json
+          </code>{" "}
+          reports every managed domain and its current tracking domain, so a
+          loop covers the rest.
+        </p>
+        <CodeBlock
+          className="mb-4 h-auto"
+          data={[
+            {
+              language: "bash",
+              filename: "terminal.sh",
+              code: trackingBulkCommand,
+            },
+          ]}
+          defaultValue="bash"
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+        <p className="mb-4 text-muted-foreground">
+          The <code className="rounded bg-muted px-1 text-sm">--domain</code>{" "}
+          flag is required in JSON mode, which is why this loops rather than
+          running one command. Add a second pass with{" "}
+          <code className="rounded bg-muted px-1 text-sm">
+            --tracking-https
+          </code>{" "}
+          once the CNAMEs resolve. Full flag details live in the{" "}
+          <Link
+            className="text-primary hover:underline"
+            href="/docs/cli-reference/email"
+          >
+            email CLI reference
+          </Link>
+          .
+        </p>
+      </section>
+
       {/* Troubleshooting */}
       <section className="mb-12">
         <h2 className="mb-4 font-bold text-2xl">Troubleshooting</h2>
@@ -795,6 +1078,67 @@ export CLOUDFLARE_ZONE_ID=your_zone_id`,
                 <li>Check that you're sending from a verified identity</li>
                 <li>
                   If using a custom MAIL FROM domain, verify SPF is configured
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">
+                Links still point at awstrack.me
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-muted-foreground text-sm">
+              <ul className="list-disc space-y-1 pl-4">
+                <li>
+                  Check the tracking CNAME exists and resolves. Until it does,
+                  SES keeps using the shared host
+                </li>
+                <li>
+                  SES only accepts a redirect domain once its sending domain is
+                  verified. If you set one on an unverified domain, re-run{" "}
+                  <code className="rounded bg-muted px-1">
+                    wraps email domains verify
+                  </code>{" "}
+                  after verification to apply it
+                </li>
+                <li>
+                  Confirm you are sending from the domain you configured. A
+                  subdomain that was never added uses your primary domain&apos;s
+                  tracking domain
+                </li>
+                <li>
+                  Open and click tracking must be enabled, otherwise SES never
+                  rewrites the link
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">
+                HTTPS tracking stays pending
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-muted-foreground text-sm">
+              <ul className="list-disc space-y-1 pl-4">
+                <li>
+                  ACM validation takes 5 to 30 minutes. Re-run{" "}
+                  <code className="rounded bg-muted px-1">
+                    --tracking-https
+                  </code>{" "}
+                  once the certificate is ISSUED to create the distribution
+                </li>
+                <li>
+                  A CAA record on your domain that omits{" "}
+                  <code className="rounded bg-muted px-1">amazon.com</code>{" "}
+                  blocks ACM from issuing the certificate
+                </li>
+                <li>
+                  The validation CNAME that ACM asks for has to be published
+                  like any other record
                 </li>
               </ul>
             </CardContent>

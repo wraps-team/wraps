@@ -660,6 +660,30 @@ export default function CLIReferenceEmailPageContent() {
                 </p>
                 <CLICommand command="npx @wraps.dev/cli email domains config -d news.yourdomain.com --tracking-domain track.news.yourdomain.com" />
               </div>
+              <div className="mt-4">
+                <p className="mb-2 text-muted-foreground text-sm">
+                  Then serve those links over HTTPS. The tracking domain has to
+                  exist first, and the certificate takes 5 to 30 minutes to
+                  validate:
+                </p>
+                <CLICommand command="npx @wraps.dev/cli email domains config -d news.yourdomain.com --tracking-https" />
+              </div>
+              <div className="mt-4">
+                <p className="mb-2 text-muted-foreground text-sm">
+                  Give every managed domain its own tracking domain.{" "}
+                  <code className="rounded bg-muted px-1">--domain</code> is
+                  required in JSON mode, so this loops instead of running once:
+                </p>
+                <CLICommand
+                  command={`npx @wraps.dev/cli email domains list --json \\
+  | jq -r '.data.domains[]
+      | select(.managed and (.isPrimary | not) and (.trackingDomain == null))
+      | .domain' \\
+  | while read -r d; do
+      npx @wraps.dev/cli email domains config -d "$d" --tracking-domain "track.$d"
+    done`}
+                />
+              </div>
             </CardContent>
           </Card>
         </div>
