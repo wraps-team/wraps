@@ -25,7 +25,7 @@ const articleSchema = {
   headline: "AWS SES Production Architecture Guide",
   description:
     "Everything you need to deploy SES at scale: dedicated IPs, bounce handling, rate limiting, configuration sets, and the patterns that protect your sender reputation.",
-  image: "https://wraps.dev/blog/ses-production-architecture.png",
+  image: "https://wraps.dev/og-image.png",
   datePublished: "2026-01-21T00:00:00.000Z",
   dateModified: "2026-01-21T00:00:00.000Z",
   author: {
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     url: "https://wraps.dev/blog/ses-production-architecture",
     images: [
       {
-        url: "https://wraps.dev/blog/ses-production-architecture.png",
+        url: "https://wraps.dev/og-image.png",
         width: 1200,
         height: 630,
         alt: "AWS SES Production Architecture Guide",
@@ -76,7 +76,7 @@ export const metadata: Metadata = {
     title: "AWS SES Production Architecture Guide | Wraps",
     description:
       "Everything you need to deploy SES at scale: dedicated IPs, bounce handling, rate limiting, and monitoring.",
-    images: ["https://wraps.dev/blog/ses-production-architecture.png"],
+    images: ["https://wraps.dev/og-image.png"],
   },
   alternates: {
     canonical: "https://wraps.dev/blog/ses-production-architecture",

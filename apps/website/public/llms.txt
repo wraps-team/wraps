@@ -262,6 +262,8 @@ Named, predictable URLs. Each one is a stable entry point.
 
 ## Docs
 
+- [Docs Home](https://wraps.dev/docs): Documentation index
+- [Quickstart Hub](https://wraps.dev/docs/quickstart): Every quickstart, by service and framework
 - [Quickstart: Email](https://wraps.dev/docs/quickstart/email): Deploy email in 30 seconds
 - [Quickstart: SMS](https://wraps.dev/docs/quickstart/sms): Deploy SMS infrastructure
 - [Quickstart: CDN](https://wraps.dev/docs/quickstart/cdn): Deploy CDN infrastructure
@@ -287,6 +289,7 @@ Named, predictable URLs. Each one is a stable entry point.
 
 ## Infrastructure
 
+- [Infrastructure Hub](https://wraps.dev/docs/infrastructure): What Wraps deploys, by service
 - [What Gets Deployed: Email](https://wraps.dev/docs/infrastructure/email): All AWS resources by preset
 - [What Gets Deployed: SMS](https://wraps.dev/docs/infrastructure/sms): SMS infrastructure details
 - [What Gets Deployed: CDN](https://wraps.dev/docs/infrastructure/cdn): CDN infrastructure details
@@ -294,6 +297,7 @@ Named, predictable URLs. Each one is a stable entry point.
 
 ## Reference
 
+- [Reference Hub](https://wraps.dev/docs/reference): API, error codes, limits, and configuration
 - [API Reference](https://wraps.dev/docs/reference/api): OpenAPI reference with interactive Swagger UI
 - [OpenAPI Spec (JSON)](https://api.wraps.dev/swagger/json): Machine-readable OpenAPI 3.0.3 specification
 - [Error Codes](https://wraps.dev/docs/reference/errors): All CLI and SDK error codes with solutions
@@ -314,6 +318,7 @@ Named, predictable URLs. Each one is a stable entry point.
 
 ## Guides
 
+- [Guides Hub](https://wraps.dev/docs/guides): Every guide, by task
 - [AWS Setup](https://wraps.dev/docs/guides/aws-setup): Configure AWS credentials
 - [AWS Setup: Quick](https://wraps.dev/docs/guides/aws-setup/quick): Quick credential setup
 - [AWS Setup: Full](https://wraps.dev/docs/guides/aws-setup/full): Full IAM configuration
@@ -349,6 +354,9 @@ Named, predictable URLs. Each one is a stable entry point.
 - [Agents](https://wraps.dev/agents): Email infrastructure your agent owns
 - [MCP Server](https://wraps.dev/mcp): MCP server for AWS SES email — read tools plus guarded sending
 - [Why Wraps](https://wraps.dev/why-wraps): Value proposition and differentiators
+- [BYOC](https://wraps.dev/byoc): SES, EventBridge, and DynamoDB deployed into your own AWS with one CLI command
+- [For Marketing](https://wraps.dev/for/marketing): Broadcasts, segments, topics, and a hosted preference center, priced flat by plan rather than by contacts stored
+- [For Operators](https://wraps.dev/for/operators): Preflight a broadcast, hold consent as a record, and trace a single message end to end
 
 ## Alternatives
 
@@ -403,6 +411,7 @@ stated catch on every entry including ours, and the incumbent kept on the list.
 
 ## Tools
 
+- [Email Deliverability Checker](https://wraps.dev/tools): Check a domain's SPF, DKIM, DMARC, and MX records
 - [SES Calculator](https://wraps.dev/tools/ses-calculator): Estimate AWS SES costs
 - [SPF Builder](https://wraps.dev/tools/spf-builder): Build SPF DNS records
 
@@ -444,8 +453,24 @@ Wraps publishes Claude Code skills at `https://wraps.dev/.well-known/skills/`:
 - [Supabase Email Guide](https://wraps.dev/blog/supabase-email-guide)
 - [Why Email Providers Cost More Than SES](https://wraps.dev/blog/why-email-providers-cost-more-than-ses)
 - [Your DMARC Policy Is Useless](https://wraps.dev/blog/your-dmarc-policy-is-useless)
+- [At 100K Emails a Month, the Send Rate Is the Small Number](https://wraps.dev/blog/reduce-transactional-email-costs)
+- [AWS SES Pricing Plans: What Actually Changed](https://wraps.dev/blog/ses-pricing-plans-2026)
+- [A Python Email SDK for Your Own SES](https://wraps.dev/blog/python-email-sdk)
+- [Agent Mailboxes: A Leash the Agent Can't Reach](https://wraps.dev/blog/agent-mailboxes)
+- [DMARC Is Finally an Actual Standard: What RFC 9989 Changes](https://wraps.dev/blog/dmarcbis-what-changes)
+- [Making Our Docs Agent-Readable](https://wraps.dev/blog/agent-readable-docs)
+- [SSO, Behavioral Segments, and What's Next: Inside the Scale Plan](https://wraps.dev/blog/scale-plan-enterprise-features)
+- [Sending Email from AI-Built Apps (Lovable, Bolt, Base44, Replit)](https://wraps.dev/blog/vibe-coding-email)
+- [How to Send Email from Your Lovable App](https://wraps.dev/blog/lovable-send-email)
+- [How to Send Email from Your Bolt.new App](https://wraps.dev/blog/bolt-send-email)
+- [How to Send Email from Your Base44 App](https://wraps.dev/blog/base44-send-email)
+- [How to Send Email from Your Replit App](https://wraps.dev/blog/replit-send-email)
+- [Signed Reply-To for Agents](https://wraps.dev/blog/signed-reply-threading)
+- [We Graded 200 YC W26 Companies on Email Security. Only 23% Got an A.](https://wraps.dev/blog/yc-w26-email-security-audit)
 
 ## Optional
 
 - [Blog](https://wraps.dev/blog): Product updates
 - [Changelog](https://wraps.dev/changelog): Release notes
+- [About](https://wraps.dev/about): Who builds Wraps, and the model it is built on
+- [Contact](https://wraps.dev/contact): Book a call, or reach the team on Discord or GitHub

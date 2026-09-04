@@ -74,23 +74,29 @@ describe("every AGENT_CONTENT_PATHS entry resolves to a real page (or a named ex
   });
 });
 
-describe("llms.txt lists every docs/compare/alternatives page — no page an agent can't discover from the index", () => {
+describe("llms.txt lists every page — no page an agent can't discover from the index", () => {
   // Named, commented exclusions for pages intentionally not given their own
-  // llms.txt bullet (e.g. index/hub pages whose children are all listed).
-  // Start empty: everything else must be reachable from llms.txt.
+  // llms.txt bullet. Empty: everything must be reachable from llms.txt.
   const INTENTIONALLY_UNLISTED: readonly string[] = [];
 
-  it("contains every /docs, /compare and /alternatives route from the page.tsx glob", () => {
-    const llms = read("public/llms.txt");
-    const indexedRoutes = [
-      ...pageRoutes("docs"),
-      ...pageRoutes("compare"),
-      ...pageRoutes("alternatives"),
-    ].filter((route) => !INTENTIONALLY_UNLISTED.includes(route));
+  /**
+   * A substring test passes on any longer URL that starts the same way, so
+   * `https://wraps.dev/docs` was satisfied by `/docs/quickstart/email` and
+   * `/tools` by `/tools/spf-builder`. That hole is why /byoc and the two
+   * /for/* pages sat unlisted for weeks. Require the URL to actually end.
+   */
+  const lists = (llms: string, route: string): boolean =>
+    new RegExp(
+      `https://wraps\\.dev${route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w/-])`
+    ).test(llms);
 
-    const missing = indexedRoutes.filter(
-      (route) => !llms.includes(`https://wraps.dev${route}`)
+  it("contains every route from the page.tsx glob, as a URL that ends where the route ends", () => {
+    const llms = read("public/llms.txt");
+    const indexedRoutes = [...pageRoutes("")].filter(
+      (route) => route !== "/" && !INTENTIONALLY_UNLISTED.includes(route)
     );
+
+    const missing = indexedRoutes.filter((route) => !lists(llms, route));
     expect(missing).toEqual([]);
   });
 

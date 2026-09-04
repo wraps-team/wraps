@@ -230,6 +230,11 @@ export const navItems: NavSection[] = [
     title: "Reference",
     items: [
       {
+        title: "Overview",
+        href: "/docs/reference",
+        icon: BookOpen,
+      },
+      {
         title: "API Reference",
         href: "/docs/reference/api",
         icon: FileCode2,

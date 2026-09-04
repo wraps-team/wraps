@@ -10,6 +10,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "pricing:md": "tsx scripts/generate-pricing-md.ts",
+    "sitemap:dates": "tsx scripts/generate-page-dates.ts",
     "deploy:vercel": "vercel --prod",
     "deploy:vercel:preview": "vercel"
   },
