@@ -58,6 +58,17 @@
  *      permission) means no evidence and must never be read as zero sends.
  *      Its window starts at ceilToMinute(...) — see that helper for why an
  *      un-rounded start counts the very send that proves the feed alive.
+ *   4. Attribution gate on #3: a positive probe count only flags the account
+ *      once hasForeignSesTraffic agrees the mail it counted was plausibly
+ *      Wraps'. `Send` is undimensioned, so on an account that shares SES with
+ *      its owner's own application it reports that application's traffic and
+ *      keeps reporting it — Propiedata's 2026-09-02 flag read
+ *      `total:0, sesSendCount:15804` against zero Wraps sends, and re-fires
+ *      every time their last Wraps send ages out of #2's window. The gate
+ *      compares the account-wide count against message_send over a baseline
+ *      ending at lastEventReceivedAt, when events were demonstrably arriving
+ *      and the table therefore holds a fair record of what Wraps sent. See
+ *      that function for why every uncertain answer resolves to "stay quiet".
  *
  * Transitions:
  *   - stale && eventFeedStaleSince IS NULL -> set eventFeedStaleSince = now.
@@ -123,6 +134,20 @@ const UNACKNOWLEDGED_RATIO_THRESHOLD = 1;
 // interval, so a real stall is observed with a full window of both sends
 // and silence rather than a sliver that could read either way.
 const SES_METRIC_WINDOW_MS = 3 * 60 * 60 * 1000; // 3h
+// How far back of known-good history the attribution check reads. It ends at
+// lastEventReceivedAt — the last instant the feed demonstrably worked — so a
+// week is not an arbitrary round number: it has to outlast an ordinary sending
+// pause, or a low-volume sender shows zero account traffic in the baseline and
+// gets treated as unattributable on nothing more than its own quietness.
+const ATTRIBUTION_BASELINE_MS = 7 * 24 * 60 * 60 * 1000; // 7d
+// The account-wide count is called foreign once it exceeds what Wraps can
+// account for by more than this. Both terms are deliberately loose: SES counts
+// send *calls* and message_send counts rows, so the two never agree exactly,
+// and every unit of slack here costs at most a suppressed alert on an account
+// that was already borderline — while too tight a bound resurrects the false
+// alert this gate exists to stop.
+const ATTRIBUTION_RATIO = 1.5;
+const ATTRIBUTION_SLACK = 5;
 
 /**
  * STS/CloudWatch codes that all mean the same thing operationally: the
@@ -325,6 +350,119 @@ async function getSesSendCountSince(
   }
 }
 
+/** Accepted sends (SES took them) for this account strictly between `from`
+ * and `to` — the same exclusive bounds hasUnacknowledgedSend uses. */
+async function countAcceptedSends(
+  organizationId: string,
+  awsAccountId: string,
+  from: Date,
+  to: Date
+): Promise<number> {
+  const unaccepted = sql.raw(
+    MESSAGE_SEND_UNACCEPTED_STATUSES.map((s) => `'${s}'`).join(", ")
+  );
+  const [row] = await db
+    .select({
+      total: sql<number>`count(*) filter (where ${messageSend.status} not in (${unaccepted}))::int`,
+    })
+    .from(messageSend)
+    .where(
+      and(
+        eq(messageSend.organizationId, organizationId),
+        eq(messageSend.awsAccountId, awsAccountId),
+        eq(messageSend.channel, "email"),
+        gt(messageSend.sentAt, from),
+        lt(messageSend.sentAt, to)
+      )
+    );
+  return row?.total ?? 0;
+}
+
+type AttributionCheck = {
+  /** True when the account-wide metric counts mail Wraps did not send. */
+  foreign: boolean;
+  baselineStart: Date;
+  /** Account-and-region-wide SES sends over the baseline. Null = unreadable. */
+  baselineAccountSends: number | null;
+  /** What Wraps sent through this account over the same baseline. */
+  baselineWrapsSends: number;
+};
+
+/**
+ * Decides whether getSesSendCountSince's answer is evidence about *Wraps'*
+ * feed at all (Propiedata, 2026-09-02).
+ *
+ * The probe reads `AWS/SES Send`, which SES publishes undimensioned: it is
+ * account-and-region-wide and counts every message the account sent, including
+ * mail from identities and applications that have nothing to do with Wraps and
+ * were never owed an event. Scoping it to the Wraps configuration set is not
+ * possible — verified against a live Wraps-deployed account, the only
+ * `AWS/SES` metrics carrying a `ses:configuration-set` dimension are
+ * `Reputation.*`, and none of those is a send count. apps/web/src/lib/aws/
+ * cloudwatch.ts documents the same trap for the dashboard's readers and ends
+ * "Do not add count metrics back here"; this is the same hazard on the alerting
+ * side, so the count stays but its answer now has to be earned.
+ *
+ * On an account that shares SES with its owner's own application, the metric
+ * reports that application's traffic forever. Propiedata's flag on 2026-09-02
+ * read `total:0, sesSendCount:15804` — 15,804 sends from *their* app, zero
+ * from Wraps, reported as "mail is flowing and no events are arriving". The
+ * account-and-region-wide reading cannot tell that apart from a genuine stall,
+ * so on those accounts it must not be allowed to speak.
+ *
+ * The discriminator is a baseline over history we know was healthy: the window
+ * ENDS at lastEventReceivedAt, so events were demonstrably arriving throughout
+ * it and message_send therefore holds a fair record of what Wraps sent. If the
+ * account sent materially more than that over the same stretch, the surplus is
+ * someone else's mail and the metric is not attributable.
+ *
+ * Every uncertain answer resolves to `foreign: true`, i.e. stay quiet. A
+ * suppressed alert on a shared account leaves the dashboard banner and the
+ * per-message DB signal intact; a false one tells a paying customer their
+ * integration is broken when it is not. That asymmetry is the whole reason
+ * this gate exists, and it is the same instinct as the probe's own contract
+ * that `null` means "no evidence", never "sent nothing".
+ */
+async function hasForeignSesTraffic(
+  account: { id: string; organizationId: string },
+  lastEventAt: Date
+): Promise<AttributionCheck> {
+  const baselineStart = ceilToMinute(
+    new Date(lastEventAt.getTime() - ATTRIBUTION_BASELINE_MS)
+  );
+  const baselineWrapsSends = await countAcceptedSends(
+    account.organizationId,
+    account.id,
+    baselineStart,
+    lastEventAt
+  );
+  const baselineAccountSends = await getSesSendCountSince(
+    account,
+    baselineStart,
+    lastEventAt
+  );
+
+  // Unreadable, or an account that sent nothing at all while its feed was
+  // working: neither is a baseline, and neither says the metric tracks Wraps.
+  if (baselineAccountSends === null || baselineAccountSends === 0) {
+    return {
+      foreign: true,
+      baselineStart,
+      baselineAccountSends,
+      baselineWrapsSends,
+    };
+  }
+
+  return {
+    foreign:
+      baselineAccountSends >
+      baselineWrapsSends * ATTRIBUTION_RATIO + ATTRIBUTION_SLACK,
+    baselineStart,
+    baselineAccountSends,
+    baselineWrapsSends,
+  };
+}
+
 async function clearStaleFlags(accountId: string): Promise<void> {
   await db
     .update(awsAccount)
@@ -524,6 +662,7 @@ export const handler: Handler = wrapHandler(async () => {
   let totalUnacknowledgedSends = 0;
   let sesProbeCount = 0;
   let sesFlaggedCount = 0;
+  let sesForeignSkipCount = 0;
 
   for (const account of connectedAccounts) {
     // "Stalled" is only a meaningful word for a feed that once worked. An
@@ -599,8 +738,31 @@ export const handler: Handler = wrapHandler(async () => {
         // null means "couldn't check" (no role, no permission) — never treat
         // it as "sent nothing". Only a positive count is evidence of a stall.
         if (sesSendCount !== null && sesSendCount > 0) {
-          stale = true;
-          sesFlaggedCount++;
+          // ...and only if those sends were plausibly Wraps' own. The metric
+          // is account-and-region-wide, so on an account that shares SES with
+          // its owner's application it reports that application's traffic and
+          // never stops. Checked here rather than before the probe so the
+          // extra CloudWatch call only happens on the handful of accounts
+          // actually about to be flagged.
+          const attribution = await hasForeignSesTraffic(account, lastEventAt);
+          if (attribution.foreign) {
+            sesForeignSkipCount++;
+            log.info(
+              "[event-feed-staleness] Account-wide SES sends not attributable to Wraps, not flagging",
+              {
+                accountId: account.id,
+                organizationId: account.organizationId,
+                sesSendCount,
+                baselineStart: attribution.baselineStart.toISOString(),
+                baselineEnd: lastEventAt.toISOString(),
+                baselineAccountSends: attribution.baselineAccountSends,
+                baselineWrapsSends: attribution.baselineWrapsSends,
+              }
+            );
+          } else {
+            stale = true;
+            sesFlaggedCount++;
+          }
         }
       }
     }
@@ -661,6 +823,7 @@ export const handler: Handler = wrapHandler(async () => {
     totalUnacknowledgedSends,
     sesProbeCount,
     sesFlaggedCount,
+    sesForeignSkipCount,
   });
   await flushLogger();
 });

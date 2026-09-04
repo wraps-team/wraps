@@ -120,13 +120,33 @@ const ORG_ROW = { slug: "acme" };
 
 /** Thenable chain builder: from()/innerJoin()/where()/limit() all return
  * itself, and awaiting the chain resolves to whatever result was set once
- * .from(table) matched a configured table -> rows mapping. */
-function makeSelectDispatcher(resultsByTable: Map<unknown, unknown[]>) {
-  return () => {
+ * .from(table) matched a configured table -> rows mapping.
+ *
+ * The worker reads messageSend twice per account and the two reads ask
+ * different questions — hasUnacknowledgedSend's {total, unacknowledged} over
+ * the recent window, then countAcceptedSends' {total} over the attribution
+ * baseline — so `baselineByTable` holds the second answer. They are told
+ * apart by the projection db.select() was handed, deliberately not by call
+ * order: the baseline read only happens for accounts that reach the fallback
+ * and are about to be flagged, so in a multi-account sweep the calls do not
+ * arrive in any fixed sequence. */
+function makeSelectDispatcher(
+  resultsByTable: Map<unknown, unknown[]>,
+  baselineByTable: Map<unknown, unknown[]> = new Map()
+) {
+  return (fields?: unknown) => {
     let result: unknown[] = [];
+    const wantsBaseline =
+      typeof fields === "object" &&
+      fields !== null &&
+      !("unacknowledged" in fields);
     const chain: PromiseLike<unknown[]> & Record<string, unknown> = {
       from: vi.fn((table: unknown) => {
-        result = resultsByTable.get(table) ?? [];
+        const baseline = baselineByTable.get(table);
+        result =
+          baseline !== undefined && wantsBaseline
+            ? baseline
+            : (resultsByTable.get(table) ?? []);
         return chain;
       }),
       innerJoin: vi.fn(() => chain),
@@ -183,6 +203,11 @@ function setupUpdateCapture(): UpdateCall[] {
 function setupSelects(opts: {
   connectedAccounts: (typeof BASE_ACCOUNT)[];
   unacknowledgedSend?: boolean | "acknowledged";
+  /** countAcceptedSends' answer over the attribution baseline: what Wraps
+   * sent through this account while its feed was demonstrably working. The
+   * default pairs with queueMetrics' default account-wide figure to describe
+   * an ordinary account whose SES traffic is all its own. */
+  baselineWrapsSends?: number;
   ownerEmail?: string | null;
   orgSlug?: string | null;
 }) {
@@ -210,7 +235,25 @@ function setupSelects(opts: {
       opts.orgSlug === null ? [] : [{ slug: opts.orgSlug ?? ORG_ROW.slug }],
     ],
   ]);
-  mockDbSelect.mockImplementation(makeSelectDispatcher(resultsByTable));
+  const baselineByTable = new Map<unknown, unknown[]>([
+    [messageSend, [{ total: opts.baselineWrapsSends ?? 10 }]],
+  ]);
+  mockDbSelect.mockImplementation(
+    makeSelectDispatcher(resultsByTable, baselineByTable)
+  );
+}
+
+/**
+ * Queue the two CloudWatch reads the fallback makes when it is about to flag:
+ * the probe window first, then the attribution baseline. The default baseline
+ * is a figure setupSelects' default baselineWrapsSends accounts for, i.e. an
+ * account whose SES traffic is all Wraps' own — pass a bigger one to describe
+ * an account sharing SES with its owner's other applications.
+ */
+function queueMetrics(probe: number[], baselineAccountSends = 10) {
+  mockCloudWatchSend
+    .mockResolvedValueOnce(metricResult(probe))
+    .mockResolvedValueOnce(metricResult([baselineAccountSends]));
 }
 
 describe("event-feed-staleness worker", () => {
@@ -461,7 +504,7 @@ describe("event-feed-staleness worker", () => {
       connectedAccounts: [{ ...BASE_ACCOUNT }],
       unacknowledgedSend: false,
     });
-    mockCloudWatchSend.mockResolvedValueOnce(metricResult([3, 2]));
+    queueMetrics([3, 2]);
     const updateCalls = setupUpdateCapture();
 
     await handler({} as never, {} as never, {} as never);
@@ -485,6 +528,101 @@ describe("event-feed-staleness worker", () => {
 
     expect(updateCalls).toHaveLength(0);
     expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+  });
+
+  // ─── The attribution gate on the fallback (Propiedata, 2026-09-02) ────
+
+  it("[Propiedata regression] does not flag an account whose SES traffic is not Wraps' own", async () => {
+    // The production shape exactly: an account sharing SES with its owner's
+    // own transactional app. `AWS/SES Send` is undimensioned, so it reports
+    // that app's volume forever while Wraps' own share of the account is
+    // almost nothing. The pre-gate sweep read this as "mail is flowing and
+    // no events are arriving" and flagged them on 2026-09-02 with
+    // total:0, sesSendCount:15804.
+    setupSelects({
+      connectedAccounts: [{ ...BASE_ACCOUNT }],
+      unacknowledgedSend: false,
+      baselineWrapsSends: 1,
+    });
+    queueMetrics([15_804], 280_000);
+    const updateCalls = setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(updateCalls).toHaveLength(0);
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
+    expect(mockNotifyOrg).not.toHaveBeenCalled();
+  });
+
+  it("still flags when the baseline shows the account's SES traffic is Wraps' own", async () => {
+    // The other half of the gate: a genuine SDK sender, whose baseline
+    // account-wide volume matches what Wraps sent while the feed worked.
+    // Suppressing this one would give the fallback away entirely.
+    setupSelects({
+      connectedAccounts: [{ ...BASE_ACCOUNT }],
+      unacknowledgedSend: false,
+      baselineWrapsSends: 40,
+    });
+    queueMetrics([12], 44);
+    const updateCalls = setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(updateCalls).toHaveLength(1);
+    expect(updateCalls[0].set).toHaveBeenCalledWith(
+      expect.objectContaining({ eventFeedStaleSince: expect.any(Date) })
+    );
+  });
+
+  it("stays quiet when the attribution baseline cannot be read at all", async () => {
+    // Same contract as the probe's own `null`: unreadable is no evidence,
+    // never "all of it was Wraps'". A role that loses cloudwatch access must
+    // not become a licence to flag.
+    setupSelects({
+      connectedAccounts: [{ ...BASE_ACCOUNT }],
+      unacknowledgedSend: false,
+    });
+    mockCloudWatchSend
+      .mockResolvedValueOnce(metricResult([9]))
+      .mockRejectedValueOnce(accessDeniedError());
+    const updateCalls = setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(updateCalls).toHaveLength(0);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet when the account sent nothing at all over the baseline", async () => {
+    // An account that was silent while its feed worked gives the comparison
+    // nothing to stand on — zero is not a demonstration that the metric
+    // tracks Wraps, it is the absence of one.
+    setupSelects({
+      connectedAccounts: [{ ...BASE_ACCOUNT }],
+      unacknowledgedSend: false,
+      baselineWrapsSends: 0,
+    });
+    queueMetrics([9], 0);
+    const updateCalls = setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  it("does not pay for the baseline read when the probe reports no sends", async () => {
+    // The gate runs after the probe, not before it, so the extra CloudWatch
+    // call only lands on the few accounts actually about to be flagged.
+    setupSelects({
+      connectedAccounts: [{ ...BASE_ACCOUNT }],
+      unacknowledgedSend: false,
+    });
+    mockCloudWatchSend.mockResolvedValue(metricResult([]));
+    setupUpdateCapture();
+
+    await handler({} as never, {} as never, {} as never);
+
+    expect(mockCloudWatchSend).toHaveBeenCalledTimes(1);
   });
 
   it("leaves the account untouched, logs, and does not report to Sentry when the customer role cannot be assumed (plan 195)", async () => {
@@ -618,7 +756,7 @@ describe("event-feed-staleness worker", () => {
       ownerEmail: OWNER_ROW.email,
       orgSlug: ORG_ROW.slug,
     });
-    mockCloudWatchSend.mockResolvedValueOnce(metricResult([4, 1]));
+    queueMetrics([4, 1]);
     setupUpdateCapture();
 
     await handler({} as never, {} as never, {} as never);

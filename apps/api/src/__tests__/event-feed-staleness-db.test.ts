@@ -452,13 +452,48 @@ describe("event-feed-staleness detection (real DB)", () => {
     // own SES -- it never calls the Wraps API, so message_send rows only
     // exist once an event has already arrived (the webhook's "message not
     // found" branch). A broken feed for this population therefore produces
-    // real absence of rows, not fabricated ones -- no seedSend call here.
+    // real absence of rows in the recent window, not fabricated ones -- no
+    // seedSend inside the 24h the DB signal judges.
+    //
+    // The older rows are not a fudge. Events were arriving right up to
+    // lastEventReceivedAt, and every one of them materialized a row, so an
+    // account that genuinely just broke necessarily has history behind it.
+    // Seeding none at all would describe an account whose feed was already
+    // dead throughout the baseline -- a different case, and one the
+    // attribution gate correctly declines to judge.
+    await seedSends(
+      10,
+      ago(3 * 24 * HOUR),
+      24 * HOUR,
+      "sdk-history",
+      "delivered"
+    );
     await setFeedState({ lastEventReceivedAt: ago(3 * HOUR) });
     primeSesSends([7, 5]);
 
     await runSweep();
 
     expect((await readFeedState())?.eventFeedStaleSince).toBeInstanceOf(Date);
+  });
+
+  // ─── The attribution gate on the fallback (Propiedata, 2026-09-02) ────
+
+  it("[Propiedata regression] never flags an account whose SES traffic is not Wraps' own", async () => {
+    // An account sharing SES with its owner's own transactional app. The
+    // `AWS/SES Send` metric is undimensioned, so it reports that app's whole
+    // volume while Wraps' share of the account is a rounding error -- and it
+    // keeps reporting it every hour, forever. Read literally that is "mail is
+    // flowing and no events are arriving", which is what flagged Propiedata
+    // on 2026-09-02 with total:0, sesSendCount:15804 and would have emailed
+    // their owner that their integration was broken.
+    await seedSends(1, ago(3 * 24 * HOUR), 0, "shared-history", "delivered");
+    await setFeedState({ lastEventReceivedAt: ago(3 * HOUR) });
+    primeSesSends([15_804]);
+
+    await runSweep();
+
+    expect((await readFeedState())?.eventFeedStaleSince).toBeNull();
+    expect(mockSendEventFeedStaleEmail).not.toHaveBeenCalled();
   });
 
   // ─── Plan 197: the fallback must not overturn a healthy account ───────
