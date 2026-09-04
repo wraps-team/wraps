@@ -2,6 +2,7 @@ import {
   A,
   Code,
   DarkCta,
+  Figure,
   H1,
   H2,
   Kicker,
@@ -46,7 +47,11 @@ export default function JulyAugustUpdateEmail({
       preview={previewText}
       unsubscribeUrl={unsubscribeUrl}
     >
-      <Kicker>July + August 2026</Kicker>
+      <Figure
+        alt="A Wraps card reading: July + August 2026 — 19 releases, one price change. The price change is AWS's. No line item names it."
+        height={240}
+        src="https://wraps.dev/email/2026-08-two-months.png"
+      />
 
       <H1>Two months in one issue.</H1>
 
@@ -158,6 +163,14 @@ export default function JulyAugustUpdateEmail({
         subject, with the status filter in the URL, so a view survives a reload
         and can be handed to a colleague mid-send.
       </P>
+
+      <Figure
+        alt="A broadcast finishing, with the delivery funnel filling in from sent through delivered, opened, and clicked"
+        caption="A completed broadcast, on its detail page"
+        height={404}
+        src="https://wraps.dev/email/2026-08-broadcast-send.gif"
+        width={535}
+      />
 
       <Panel label="Broadcasts of any size">
         <P>

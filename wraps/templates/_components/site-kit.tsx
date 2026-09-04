@@ -366,6 +366,88 @@ export function Panel({
   );
 }
 
+// ── Figure ────────────────────────────────────────────────────────────────
+
+/**
+ * An image inside the message, with an optional caption.
+ *
+ * Assets are rendered in `wraps-private` (`scripts/render-email.zsh`) and
+ * served from `apps/website/public/email/`, so the website has to be deployed
+ * before the send — a message already in someone's inbox cannot be repointed.
+ *
+ * Four rules the markup encodes, all of them things that break in a real client
+ * rather than in a preview:
+ *
+ *   - `width` is 552, the Shell's content box. Anything wider is scaled down by
+ *     the client at whatever quality it feels like.
+ *   - `width`/`height` are HTML attributes, not just CSS. Outlook needs the
+ *     attribute, and without a height the message reflows as images load.
+ *   - `alt` is required and reads as a sentence. Outlook blocks remote images
+ *     by default, so for a real share of the list the alt text IS the figure.
+ *   - No webp and no mp4. Outlook renders neither. PNG, JPG, or GIF only.
+ */
+export function Figure({
+  src,
+  alt,
+  height,
+  caption,
+  href,
+  width = 552,
+}: {
+  src: string;
+  alt: string;
+  /** Displayed height in px — the rendered file's height halved, at 2x. */
+  height: number;
+  caption?: string;
+  /** Wraps the figure in a link. Worth it when the image shows a page. */
+  href?: string;
+  width?: number;
+}) {
+  const image = (
+    <Img
+      alt={alt}
+      height={height}
+      src={src}
+      style={{
+        display: "block",
+        width: "100%",
+        maxWidth: `${width}px`,
+        height: "auto",
+        border: `1px solid ${color.border}`,
+        /* Alt text lands on the client's own background when images are off;
+           the border alone reads as an empty box without this. */
+        backgroundColor: color.surface,
+      }}
+      width={width}
+    />
+  );
+
+  return (
+    <Section style={{ margin: "24px 0" }}>
+      {href ? (
+        <Link href={href} style={{ textDecoration: "none" }}>
+          {image}
+        </Link>
+      ) : (
+        image
+      )}
+      {caption ? (
+        <Text
+          style={{
+            margin: "8px 0 0",
+            fontFamily: font.mono,
+            fontSize: "12px",
+            lineHeight: "1.5",
+            color: color.muted,
+          }}
+        >
+          {caption}
+        </Text>
+      ) : null}
+    </Section>
+  );
+}
+
 // ── Dark CTA band ─────────────────────────────────────────────────────────
 
 /**

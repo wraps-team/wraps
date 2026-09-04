@@ -30,7 +30,24 @@ import {
   Wrench,
   Zap,
 } from "lucide-react";
+import Image from "next/image";
 import type { ReactNode } from "react";
+
+/**
+ * The figure at the top of an entry, when the release has something worth
+ * showing. Rendered in `wraps-private` and installed under `public/email/` by
+ * its `scripts/sync-email.zsh`, so the same file backs the changelog entry and
+ * the month's update email — one asset, one crop decision, two places.
+ */
+type ReleaseMedia = {
+  /** Path under public/, e.g. `/email/2026-09-tracking-domains.png`. */
+  src: string;
+  /** Describes what the figure shows. Not the release title again. */
+  alt: string;
+  /** Intrinsic size of the file — 2x the display size it was authored for. */
+  width: number;
+  height: number;
+};
 
 type Release = {
   version: string;
@@ -38,6 +55,7 @@ type Release = {
   icon: LucideIcon;
   title: string;
   items: ReactNode[];
+  media?: ReleaseMedia;
 };
 
 const Code = ({ children }: { children: ReactNode }) => (
@@ -52,6 +70,12 @@ const releases: Release[] = [
     date: "September 2026",
     icon: Lock,
     title: "Custom Tracking Domains & Proven-Orphan Cleanup",
+    media: {
+      src: "/email/2026-09-tracking-domains.png",
+      alt: "A Wraps card reading: CLI v3.6.0 — Custom tracking domains. Open and click links resolve through a host you own.",
+      width: 1104,
+      height: 480,
+    },
     items: [
       <>
         <Code>wraps email domains add</Code> and{" "}
@@ -439,6 +463,12 @@ const releases: Release[] = [
     date: "August 2026",
     icon: Send,
     title: "Test Sends, Recipient Results & Resume",
+    media: {
+      src: "/email/2026-08-broadcast-send.gif",
+      alt: "A broadcast finishing, with the delivery funnel filling in from sent through delivered, opened, and clicked",
+      width: 535,
+      height: 404,
+    },
     items: [
       <>
         Send a test before committing to the whole list: one rendered copy to
@@ -621,6 +651,12 @@ const releases: Release[] = [
     date: "August 2026",
     icon: Sparkles,
     title: "Preference Center Theming & Multi-Day Broadcasts",
+    media: {
+      src: "/email/2026-08-schedule.png",
+      alt: "The When to Send step of a broadcast, offering send immediately or schedule for later with a date and time",
+      width: 1104,
+      height: 620,
+    },
     items: [
       "Theme your preference center: an accent-derived color ramp, live inline preview, CSS import, and contrast checking so a brand color cannot quietly ship unreadable text. Subscribers can switch light, dark, or system themselves",
       "Organization logo uploads are backed by S3, with a dedicated preference-center logo that falls back to the org logo",
@@ -1592,6 +1628,20 @@ export function ChangelogReleasesSection() {
                           {release.title}
                         </h3>
                       </div>
+
+                      {/* Figure, when the release has one */}
+                      {release.media ? (
+                        <Image
+                          alt={release.media.alt}
+                          className="block w-full border-border border-b"
+                          height={release.media.height}
+                          /* An animated GIF goes through the optimizer as a
+                             single still frame. Nothing else here needs it. */
+                          src={release.media.src}
+                          unoptimized={release.media.src.endsWith(".gif")}
+                          width={release.media.width}
+                        />
+                      ) : null}
 
                       {/* Items */}
                       <div className="p-6">
