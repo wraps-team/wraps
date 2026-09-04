@@ -25,27 +25,21 @@ import {
   subscription,
   user,
 } from "@wraps/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, like } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-const TEST_PREFIX = `msg-cleanup-${Date.now()}`;
+// Shared by every run of this file; TEST_PREFIX adds a per-run timestamp on
+// top. Purges match the family, not one run — see purgeFixtures.
+const FIXTURE_PREFIX = "msg-cleanup-";
+const FIXTURE_MATCH = `${FIXTURE_PREFIX}%`;
+
+const TEST_PREFIX = `${FIXTURE_PREFIX}${Date.now()}`;
 
 function daysAgo(n: number): Date {
   const d = new Date();
   d.setDate(d.getDate() - n);
   return d;
 }
-
-// ─── Tracked ids for teardown ──────────────────────────────────────────────
-
-const orgIds: string[] = [];
-const userIds: string[] = [];
-const memberIds: string[] = [];
-const awsAccountIds: string[] = [];
-const subscriptionIds: string[] = [];
-const messageSendIds: string[] = [];
-const contactIds: string[] = [];
-const contactEventIds: string[] = [];
 
 // ─── Fixture builders ───────────────────────────────────────────────────────
 
@@ -65,7 +59,6 @@ async function createUser(key: string): Promise<string> {
       stripeCustomerId: null,
     } as typeof user.$inferInsert)
     .onConflictDoUpdate({ target: user.id, set: { updatedAt: new Date() } });
-  userIds.push(id);
   return id;
 }
 
@@ -100,7 +93,6 @@ async function createOrg(
       target: organization.id,
       set: { name: `Retention Org ${spec.key}` },
     });
-  orgIds.push(orgId);
 
   const ownerMemberId = `${TEST_PREFIX}-member-${spec.key}-owner`;
   await db
@@ -113,7 +105,6 @@ async function createOrg(
       createdAt: new Date(),
     } as typeof member.$inferInsert)
     .onConflictDoUpdate({ target: member.id, set: { role: "owner" } });
-  memberIds.push(ownerMemberId);
 
   for (const extra of spec.extraMembers ?? []) {
     const extraMemberId = `${TEST_PREFIX}-member-${spec.key}-${extra.userId}`;
@@ -127,7 +118,6 @@ async function createOrg(
         createdAt: new Date(),
       } as typeof member.$inferInsert)
       .onConflictDoUpdate({ target: member.id, set: { role: extra.role } });
-    memberIds.push(extraMemberId);
   }
 
   const accountNumber = accountId
@@ -155,7 +145,6 @@ async function createOrg(
       target: awsAccount.id,
       set: { name: "Retention Test AWS" },
     });
-  awsAccountIds.push(accountId);
 
   if (!spec.skipSubscription) {
     const subId = `${TEST_PREFIX}-sub-${spec.key}`;
@@ -186,7 +175,6 @@ async function createOrg(
           periodEnd: spec.periodEnd ?? null,
         },
       });
-    subscriptionIds.push(subId);
   }
 
   return { orgId, awsAccountId: accountId, ownerUserId };
@@ -221,7 +209,6 @@ async function insertSubscription(
     createdAt: new Date(),
     updatedAt: new Date(),
   } as typeof subscription.$inferInsert);
-  subscriptionIds.push(subId);
   return subId;
 }
 
@@ -247,7 +234,6 @@ async function insertSend(
     sentAt: createdAt,
     createdAt,
   } as typeof messageSend.$inferInsert);
-  messageSendIds.push(id);
   return id;
 }
 
@@ -265,7 +251,6 @@ async function insertContact(orgId: string, key: string): Promise<string> {
       updatedAt: new Date(),
     } as typeof contact.$inferInsert)
     .onConflictDoUpdate({ target: contact.id, set: { updatedAt: new Date() } });
-  contactIds.push(id);
   return id;
 }
 
@@ -284,7 +269,6 @@ async function insertContactEvent(
     createdAt: new Date(),
     expiresAt,
   } as typeof contactEvent.$inferInsert);
-  contactEventIds.push(id);
   return id;
 }
 
@@ -335,44 +319,53 @@ async function importHandler(dryRun: boolean) {
   return mod.handler;
 }
 
-// ─── Teardown ────────────────────────────────────────────────────────────────
+// ─── Fixture purge ─────────────────────────────────────────────────────────
+
+/**
+ * Delete every row this file's fixtures can create, matched by the shared
+ * `msg-cleanup-` id prefix rather than by ids tracked during the run.
+ *
+ * Prefix-based on purpose. Teardown used to delete by tracked-id arrays, so a
+ * run that died before `afterAll` finished — a vitest timeout, a killed CI
+ * job — left its orgs behind permanently. That residue is not inert: the
+ * handler under test scans *every* org present in `message_send`, so each
+ * leak made the next run slower. 17 leaked runs (94 orgs, 3.7k rows) had
+ * dragged all 16 tests here from ~1s to ~22s against a 30s timeout — which
+ * then timed out and leaked again. Sweeping the whole prefix family on the
+ * way *in* makes the suite self-healing, so one bad run cannot compound.
+ */
+async function purgeFixtures(): Promise<void> {
+  await db
+    .delete(contactEvent)
+    .where(like(contactEvent.organizationId, FIXTURE_MATCH));
+  await db
+    .delete(messageSend)
+    .where(like(messageSend.organizationId, FIXTURE_MATCH));
+  await db.delete(contact).where(like(contact.organizationId, FIXTURE_MATCH));
+  await db
+    .delete(notification)
+    .where(like(notification.organizationId, FIXTURE_MATCH));
+  await db
+    .delete(subscription)
+    .where(like(subscription.referenceId, FIXTURE_MATCH));
+  await db
+    .delete(awsAccount)
+    .where(like(awsAccount.organizationId, FIXTURE_MATCH));
+  await db.delete(member).where(like(member.organizationId, FIXTURE_MATCH));
+  await db.delete(organization).where(like(organization.id, FIXTURE_MATCH));
+  await db.delete(user).where(like(user.id, FIXTURE_MATCH));
+}
+
+// ─── Setup / teardown ──────────────────────────────────────────────────────
+
+// Clear residue from any earlier run before this one seeds its own fixtures.
+beforeAll(async () => {
+  await purgeFixtures();
+});
 
 afterAll(async () => {
   delete process.env.RETENTION_DRY_RUN;
-
-  if (contactEventIds.length > 0) {
-    await db
-      .delete(contactEvent)
-      .where(inArray(contactEvent.id, contactEventIds));
-  }
-  if (messageSendIds.length > 0) {
-    await db.delete(messageSend).where(inArray(messageSend.id, messageSendIds));
-  }
-  if (contactIds.length > 0) {
-    await db.delete(contact).where(inArray(contact.id, contactIds));
-  }
-  if (orgIds.length > 0) {
-    await db
-      .delete(notification)
-      .where(inArray(notification.organizationId, orgIds));
-  }
-  if (subscriptionIds.length > 0) {
-    await db
-      .delete(subscription)
-      .where(inArray(subscription.id, subscriptionIds));
-  }
-  if (awsAccountIds.length > 0) {
-    await db.delete(awsAccount).where(inArray(awsAccount.id, awsAccountIds));
-  }
-  if (memberIds.length > 0) {
-    await db.delete(member).where(inArray(member.id, memberIds));
-  }
-  if (orgIds.length > 0) {
-    await db.delete(organization).where(inArray(organization.id, orgIds));
-  }
-  if (userIds.length > 0) {
-    await db.delete(user).where(inArray(user.id, userIds));
-  }
+  await purgeFixtures();
 });
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -564,7 +557,6 @@ describe("message-send-cleanup handler — deletion (RETENTION_DRY_RUN=false)", 
       } as typeof messageSend.$inferInsert);
     }
     await db.insert(messageSend).values(rows);
-    messageSendIds.push(...ids);
 
     const setTimeoutSpy = vi.spyOn(global, "setTimeout");
     await handler({} as never, {} as never, () => {});
@@ -706,7 +698,6 @@ describe("message-send-cleanup handler — deletion (RETENTION_DRY_RUN=false)", 
       } as typeof messageSend.$inferInsert);
     }
     await db.insert(messageSend).values(rows);
-    messageSendIds.push(...ids);
 
     await handler({} as never, {} as never, () => {});
 
@@ -803,7 +794,6 @@ describe("message-send-cleanup handler — DRY_RUN safety guard", () => {
       } as typeof messageSend.$inferInsert);
     }
     await db.insert(messageSend).values(rows);
-    messageSendIds.push(...ids);
 
     // Own reset+import (rather than the shared describe-level `handler`) so
     // we can spy on the logger the freshly-imported worker module resolves
