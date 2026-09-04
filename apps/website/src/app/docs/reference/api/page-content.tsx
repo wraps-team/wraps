@@ -74,10 +74,78 @@ const batchStatusExample = `// GET /v1/batch/:id response
   "totalRecipients": 5000,
   "processedRecipients": 5000,
   "sent": 4985,
+  "delivered": 4970,
   "failed": 15,
+  "opened": 3102,
+  "clicked": 540,
+  "bounced": 12,
+  "complained": 1,
+  "suppressed": 2,
   "startedAt": "2026-04-06T10:00:00.000Z",
   "completedAt": "2026-04-06T10:05:32.000Z",
   "createdAt": "2026-04-06T09:59:58.000Z"
+}`;
+
+const batchListExample = `// GET /v1/batch?pageSize=1 response
+{
+  "data": [
+    {
+      "id": "batch_abc123",
+      "name": "Spring Campaign",
+      "status": "completed",
+      "channel": "email",
+      "subject": "Spring is here",
+      "totalRecipients": 5000,
+      "processedRecipients": 5000,
+      "sent": 4985,
+      "delivered": 4970,
+      "opened": 3102,
+      "clicked": 540,
+      "bounced": 12,
+      "complained": 1,
+      "suppressed": 2,
+      "failed": 15,
+      "scheduledFor": null,
+      "startedAt": "2026-04-06T10:00:00.000Z",
+      "completedAt": "2026-04-06T10:05:32.000Z",
+      "createdAt": "2026-04-06T09:59:58.000Z",
+      "template": { "id": "tmpl_1", "name": "Spring Newsletter" },
+      "awsAccount": { "id": "aws_1", "name": "Production", "region": "us-east-1" }
+    }
+  ],
+  "page": 1,
+  "pageSize": 1,
+  "total": 42
+}`;
+
+const batchRecipientsExample = `// GET /v1/batch/:id/recipients response
+{
+  "data": [
+    {
+      "id": "msg_1",
+      "recipient": "user@example.com",
+      "status": "bounced",
+      "error": null,
+      "bounceType": "Permanent",
+      "bounceSubType": "General",
+      "sentAt": "2026-04-06T10:00:01.000Z",
+      "createdAt": "2026-04-06T10:00:00.000Z"
+    }
+  ],
+  "limit": 50,
+  "offset": 0,
+  "total": 15
+}`;
+
+const batchClicksExample = `// GET /v1/batch/:id/clicks response
+{
+  "data": [
+    { "url": "https://example.com/product", "count": 312 },
+    { "url": "https://example.com/blog", "count": 88 }
+  ],
+  "unsubscribeCount": 19,
+  "totalDistinctUrls": 2,
+  "truncated": false
 }`;
 
 const contactTopicPatchExample = `# PATCH adds topics without removing existing ones
@@ -248,9 +316,26 @@ Cancels an active workflow execution. Cleans up any pending schedulers and adjus
 
   batch: `## Batch Sending
 
+Every \`/v1/batch\` route requires the Pro plan or above.
+
 ### Create Batch Send
 
 \`POST /v1/batch\` -- Creates a batch send job and queues it for processing. Supports immediate and scheduled sends.
+
+### List Batch Sends
+
+\`GET /v1/batch\` -- Lists batch sends for the organization, newest first.
+
+**Query parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| \`page\` | number | Page number, default 1 |
+| \`pageSize\` | number | Results per page, default 20, max 100 |
+| \`status\` | string | Filter by \`draft\`, \`scheduled\`, \`queued\`, \`processing\`, \`completed\`, \`failed\`, or \`cancelled\` |
+| \`channel\` | string | Filter by \`email\` or \`sms\` |
+| \`search\` | string | Matches against name and subject |
+
+**Response (200):** \`{ data: BatchSend[], page, pageSize, total }\` -- each item carries the same fields as \`GET /v1/batch/:id\` below, plus \`template\` and \`awsAccount\` summaries. \`total\` is the full filtered count, not the page length.
 
 ### Get Batch Status
 
@@ -266,10 +351,30 @@ Cancels an active workflow execution. Cleans up any pending schedulers and adjus
 | \`totalRecipients\` | number | Total number of targeted recipients |
 | \`processedRecipients\` | number | Recipients processed so far |
 | \`sent\` | number | Successfully sent count |
+| \`delivered\` | number | Delivered count |
 | \`failed\` | number | Failed send count |
+| \`opened\` | number | Opened count |
+| \`clicked\` | number | Clicked count |
+| \`bounced\` | number | Bounced count |
+| \`complained\` | number | Spam complaint count |
+| \`suppressed\` | number | Suppressed (SES suppression list) count |
 | \`startedAt\` | string or null | ISO 8601 timestamp when processing began |
 | \`completedAt\` | string or null | ISO 8601 timestamp when processing finished |
 | \`createdAt\` | string | ISO 8601 creation timestamp |
+
+Counts are maintained incrementally during the send and reflect SES events received so far.
+
+### List Recipients
+
+\`GET /v1/batch/:id/recipients\` -- Returns per-recipient outcomes for a batch send. \`limit\` defaults to 50 and is capped at **1000** -- this route returns JSON through Lambda, which has a response-size ceiling a larger page could exceed. \`status\` filters by any \`message_send\` status (\`pending\`, \`queued\`, \`sent\`, \`delivered\`, \`opened\`, \`clicked\`, \`bounced\`, \`complained\`, \`suppressed\`, \`failed\`, \`opted_out\`). Returns 404 -- not an empty list -- for a batch id that doesn't belong to your organization.
+
+**Response (200):** \`{ data: Recipient[], limit, offset, total }\` -- each recipient is \`{ id, recipient, status, error, bounceType, bounceSubType, sentAt, createdAt }\`.
+
+### Clicked Links
+
+\`GET /v1/batch/:id/clicks\` -- Returns the top clicked links for a batch send, ordered by click count and capped at **50 URLs**. \`truncated\` is \`true\` when more distinct URLs exist than were returned. Per-recipient unsubscribe and preference-centre links are aggregated into \`unsubscribeCount\` and excluded from \`data\`.
+
+**Response (200):** \`{ data: { url, count }[], unsubscribeCount, totalDistinctUrls, truncated }\`.
 
 ### Cancel Batch Send
 
@@ -1018,9 +1123,39 @@ export default function PageContent() {
                       desc: "Successfully sent count",
                     },
                     {
+                      field: "delivered",
+                      type: "number",
+                      desc: "Delivered count",
+                    },
+                    {
                       field: "failed",
                       type: "number",
                       desc: "Failed send count",
+                    },
+                    {
+                      field: "opened",
+                      type: "number",
+                      desc: "Opened count",
+                    },
+                    {
+                      field: "clicked",
+                      type: "number",
+                      desc: "Clicked count",
+                    },
+                    {
+                      field: "bounced",
+                      type: "number",
+                      desc: "Bounced count",
+                    },
+                    {
+                      field: "complained",
+                      type: "number",
+                      desc: "Spam complaint count",
+                    },
+                    {
+                      field: "suppressed",
+                      type: "number",
+                      desc: "Suppressed (SES suppression list) count",
                     },
                     {
                       field: "startedAt",
@@ -1037,8 +1172,11 @@ export default function PageContent() {
                       type: "string",
                       desc: "ISO 8601 creation timestamp",
                     },
-                  ].map((row, i) => (
-                    <tr className={i < 10 ? "border-b" : ""} key={row.field}>
+                  ].map((row, i, arr) => (
+                    <tr
+                      className={i < arr.length - 1 ? "border-b" : ""}
+                      key={row.field}
+                    >
                       <td className="px-4 py-2">
                         <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
                           {row.field}
@@ -1089,6 +1227,168 @@ export default function PageContent() {
             )}
           </CodeBlockBody>
         </CodeBlock>
+        <p className="mt-3 mb-8 text-muted-foreground text-sm">
+          Counts are maintained incrementally during the send and reflect SES
+          events received so far.
+        </p>
+
+        <h3 className="mb-3 font-medium text-lg">List Batch Sends</h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            GET /v1/batch
+          </code>{" "}
+          lists batch sends for the organization, newest first. Query with{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">page</code>,{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">pageSize</code>{" "}
+          (max 100),{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">status</code>,{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">channel</code>,
+          or{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">search</code>{" "}
+          (matches name and subject). The response envelope is{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            {"{ data, page, pageSize, total }"}
+          </code>{" "}
+          — <code className="rounded bg-muted px-1 py-0.5 text-xs">total</code>{" "}
+          is the full filtered count, not the page length.
+        </p>
+        <CodeBlock
+          className="mb-8 h-auto"
+          data={[
+            {
+              language: "json",
+              filename: "batch list response",
+              code: batchListExample,
+            },
+          ]}
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+
+        <h3 className="mb-3 font-medium text-lg">List Recipients</h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            GET /v1/batch/:id/recipients
+          </code>{" "}
+          returns per-recipient outcomes.{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">limit</code>{" "}
+          defaults to 50 and is capped at{" "}
+          <strong className="text-foreground">1000</strong> — this route returns
+          JSON through Lambda, which has a response-size ceiling a larger page
+          could exceed. Returns 404 (not an empty list) for a batch id that
+          doesn't belong to your organization.
+        </p>
+        <CodeBlock
+          className="mb-8 h-auto"
+          data={[
+            {
+              language: "json",
+              filename: "batch recipients response",
+              code: batchRecipientsExample,
+            },
+          ]}
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+
+        <h3 className="mb-3 font-medium text-lg">Clicked Links</h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            GET /v1/batch/:id/clicks
+          </code>{" "}
+          returns the top clicked links for a batch send, ordered by click count
+          and capped at <strong className="text-foreground">50 URLs</strong> —{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            truncated
+          </code>{" "}
+          is <code className="rounded bg-muted px-1 py-0.5 text-xs">true</code>{" "}
+          when more distinct URLs exist than were returned. Per-recipient
+          unsubscribe and preference-centre links are aggregated into{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            unsubscribeCount
+          </code>{" "}
+          and excluded from{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">data</code>.
+        </p>
+        <CodeBlock
+          className="mb-4 h-auto"
+          data={[
+            {
+              language: "json",
+              filename: "batch clicks response",
+              code: batchClicksExample,
+            },
+          ]}
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+
         <p className="mt-3 text-muted-foreground text-sm">
           Use{" "}
           <code className="rounded bg-muted px-1.5 py-0.5 text-xs">

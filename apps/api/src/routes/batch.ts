@@ -15,6 +15,9 @@ import {
   eq,
   findAwsAccountForOrg,
   findBroadcast,
+  getBroadcastClickBreakdown,
+  listBroadcastRecipients,
+  listBroadcasts,
   markBroadcastNotScheduled,
   promoteBroadcast,
 } from "@wraps/db";
@@ -314,6 +317,130 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
     }
   )
   .get(
+    "/",
+    async (ctx) => {
+      const { query } = ctx;
+      const authContext = getAuth(ctx);
+
+      const { batches, total } = await listBroadcasts(
+        authContext.organizationId,
+        {
+          page: query.page,
+          pageSize: query.pageSize,
+          status: query.status,
+          channel: query.channel,
+          search: query.search,
+        }
+      );
+
+      return {
+        data: batches.map((batch) => ({
+          id: batch.id,
+          name: batch.name,
+          status: batch.status,
+          channel: batch.channel,
+          subject: batch.subject,
+          totalRecipients: batch.totalRecipients,
+          processedRecipients: batch.processedRecipients,
+          sent: batch.sent,
+          delivered: batch.delivered,
+          opened: batch.opened,
+          clicked: batch.clicked,
+          bounced: batch.bounced,
+          complained: batch.complained,
+          suppressed: batch.suppressed,
+          failed: batch.failed,
+          scheduledFor: batch.scheduledFor?.toISOString() ?? null,
+          startedAt: batch.startedAt?.toISOString() ?? null,
+          completedAt: batch.completedAt?.toISOString() ?? null,
+          createdAt: batch.createdAt.toISOString(),
+          template: batch.emailTemplate
+            ? { id: batch.emailTemplate.id, name: batch.emailTemplate.name }
+            : null,
+          awsAccount: batch.awsAccount
+            ? {
+                id: batch.awsAccount.id,
+                name: batch.awsAccount.name,
+                region: batch.awsAccount.region,
+              }
+            : null,
+        })),
+        page: query.page ?? 1,
+        pageSize: query.pageSize ?? 20,
+        total,
+      };
+    },
+    {
+      query: t.Object({
+        page: t.Optional(t.Number({ default: 1, minimum: 1 })),
+        pageSize: t.Optional(
+          t.Number({ default: 20, minimum: 1, maximum: 100 })
+        ),
+        status: t.Optional(
+          t.Union([
+            t.Literal("draft"),
+            t.Literal("scheduled"),
+            t.Literal("queued"),
+            t.Literal("processing"),
+            t.Literal("completed"),
+            t.Literal("failed"),
+            t.Literal("cancelled"),
+          ])
+        ),
+        channel: t.Optional(t.Union([t.Literal("email"), t.Literal("sms")])),
+        search: t.Optional(t.String({ maxLength: 200 })),
+      }),
+      response: {
+        200: t.Object({
+          data: t.Array(
+            t.Object({
+              id: t.String(),
+              name: t.Union([t.String(), t.Null()]),
+              status: t.String(),
+              channel: t.String(),
+              subject: t.Union([t.String(), t.Null()]),
+              totalRecipients: t.Number(),
+              processedRecipients: t.Number(),
+              sent: t.Number(),
+              delivered: t.Number(),
+              opened: t.Number(),
+              clicked: t.Number(),
+              bounced: t.Number(),
+              complained: t.Number(),
+              suppressed: t.Number(),
+              failed: t.Number(),
+              scheduledFor: t.Union([t.String(), t.Null()]),
+              startedAt: t.Union([t.String(), t.Null()]),
+              completedAt: t.Union([t.String(), t.Null()]),
+              createdAt: t.String(),
+              template: t.Union([
+                t.Object({ id: t.String(), name: t.String() }),
+                t.Null(),
+              ]),
+              awsAccount: t.Union([
+                t.Object({
+                  id: t.String(),
+                  name: t.String(),
+                  region: t.String(),
+                }),
+                t.Null(),
+              ]),
+            })
+          ),
+          page: t.Number(),
+          pageSize: t.Number(),
+          total: t.Number(),
+        }),
+      },
+      detail: {
+        tags: ["batch"],
+        summary: "List batch sends",
+        description:
+          "Lists batch sends for the organization, paginated and optionally filtered by status, channel, or search.",
+      },
+    }
+  )
+  .get(
     "/:id",
     async (ctx) => {
       const { params, set } = ctx;
@@ -334,7 +461,13 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
         totalRecipients: batch.totalRecipients,
         processedRecipients: batch.processedRecipients,
         sent: batch.sent,
+        delivered: batch.delivered,
         failed: batch.failed,
+        opened: batch.opened,
+        clicked: batch.clicked,
+        bounced: batch.bounced,
+        complained: batch.complained,
+        suppressed: batch.suppressed,
         startedAt: batch.startedAt?.toISOString() ?? null,
         completedAt: batch.completedAt?.toISOString() ?? null,
         createdAt: batch.createdAt.toISOString(),
@@ -353,7 +486,13 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
           totalRecipients: t.Number(),
           processedRecipients: t.Number(),
           sent: t.Number(),
+          delivered: t.Number(),
           failed: t.Number(),
+          opened: t.Number(),
+          clicked: t.Number(),
+          bounced: t.Number(),
+          complained: t.Number(),
+          suppressed: t.Number(),
           startedAt: t.Union([t.String(), t.Null()]),
           completedAt: t.Union([t.String(), t.Null()]),
           createdAt: t.String(),
@@ -362,7 +501,147 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
       detail: {
         tags: ["batch"],
         summary: "Get batch status",
-        description: "Returns the current status of a batch send job",
+        description:
+          "Returns the current status of a batch send job. Counts are maintained incrementally during the send and reflect SES events received so far.",
+      },
+    }
+  )
+  .get(
+    "/:id/recipients",
+    async (ctx) => {
+      const { params, query, set } = ctx;
+      const authContext = getAuth(ctx);
+
+      const batch = await findBroadcast(params.id, authContext.organizationId);
+
+      if (!batch) {
+        set.status = 404;
+        throw new Error("Batch not found");
+      }
+
+      const { rows, total } = await listBroadcastRecipients(
+        params.id,
+        authContext.organizationId,
+        {
+          status: query.status,
+          limit: query.limit,
+          offset: query.offset,
+        }
+      );
+
+      return {
+        data: rows.map((row) => ({
+          id: row.id,
+          recipient: row.recipient,
+          status: row.status,
+          error: row.error,
+          bounceType: row.bounceType,
+          bounceSubType: row.bounceSubType,
+          sentAt: row.sentAt?.toISOString() ?? null,
+          createdAt: row.createdAt.toISOString(),
+        })),
+        limit: query.limit ?? 50,
+        offset: query.offset ?? 0,
+        total,
+      };
+    },
+    {
+      params: t.Object({
+        id: t.String({ description: "Batch ID", maxLength: 36 }),
+      }),
+      query: t.Object({
+        status: t.Optional(
+          t.Union([
+            t.Literal("pending"),
+            t.Literal("queued"),
+            t.Literal("sent"),
+            t.Literal("delivered"),
+            t.Literal("opened"),
+            t.Literal("clicked"),
+            t.Literal("bounced"),
+            t.Literal("complained"),
+            t.Literal("suppressed"),
+            t.Literal("failed"),
+            t.Literal("opted_out"),
+          ])
+        ),
+        limit: t.Optional(t.Number({ default: 50, minimum: 1, maximum: 1000 })),
+        offset: t.Optional(t.Number({ default: 0, minimum: 0 })),
+      }),
+      response: {
+        200: t.Object({
+          data: t.Array(
+            t.Object({
+              id: t.String(),
+              recipient: t.String(),
+              status: t.String(),
+              error: t.Union([t.String(), t.Null()]),
+              bounceType: t.Union([t.String(), t.Null()]),
+              bounceSubType: t.Union([t.String(), t.Null()]),
+              sentAt: t.Union([t.String(), t.Null()]),
+              createdAt: t.String(),
+            })
+          ),
+          limit: t.Number(),
+          offset: t.Number(),
+          total: t.Number(),
+        }),
+      },
+      detail: {
+        tags: ["batch"],
+        summary: "List batch recipients",
+        description:
+          "Returns per-recipient outcomes for a batch send. `limit` is capped at 1000 rows per page — this route returns JSON through Lambda, which has a response-size ceiling that a larger page could exceed.",
+      },
+    }
+  )
+  .get(
+    "/:id/clicks",
+    async (ctx) => {
+      const { params, set } = ctx;
+      const authContext = getAuth(ctx);
+
+      const batch = await findBroadcast(params.id, authContext.organizationId);
+
+      if (!batch) {
+        set.status = 404;
+        throw new Error("Batch not found");
+      }
+
+      const breakdown = await getBroadcastClickBreakdown(
+        params.id,
+        authContext.organizationId
+      );
+
+      return {
+        data: breakdown.clicksByUrl,
+        unsubscribeCount: breakdown.unsubscribeCount,
+        totalDistinctUrls: breakdown.totalDistinctUrls,
+        truncated: breakdown.totalDistinctUrls > breakdown.clicksByUrl.length,
+      };
+    },
+    {
+      params: t.Object({
+        id: t.String({ description: "Batch ID", maxLength: 36 }),
+      }),
+      response: {
+        200: t.Object({
+          data: t.Array(
+            t.Object({
+              url: t.String(),
+              count: t.Number(),
+            })
+          ),
+          unsubscribeCount: t.Number(),
+          totalDistinctUrls: t.Number(),
+          truncated: t.Boolean(),
+        }),
+      },
+      detail: {
+        tags: ["batch"],
+        summary: "Clicked links",
+        description:
+          "Returns the top clicked links for a batch send, ordered by click count and capped at 50 URLs — `truncated` is true when more distinct URLs exist than are returned. Per-recipient unsubscribe and preference-centre links are aggregated into `unsubscribeCount` and excluded from `data`.",
       },
     }
   )
