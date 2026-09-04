@@ -6,4 +6,5 @@ export * from "./events";
 export * from "./message-metrics";
 export * from "./message-sends";
 export * from "./notifications";
+export * from "./segments";
 export * from "./subscriptions";

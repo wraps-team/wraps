@@ -69,6 +69,12 @@ export function escapeIlike(value: string): string {
 export * from "./repositories";
 // Re-export all schemas for use elsewhere
 export * from "./schema";
+// Re-export segment condition validation
+export {
+  MAX_BUCKETS,
+  validateBucketValue,
+  validateCondition,
+} from "./segment-condition";
 // Re-export segment evaluator (SQL-based)
 export {
   contactIdsMatchingCondition,

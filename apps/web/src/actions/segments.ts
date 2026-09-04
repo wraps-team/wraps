@@ -7,10 +7,16 @@ import {
   contact,
   countRecipientsBySegment,
   db,
+  deleteSegmentRow,
+  findSegment,
+  insertSegment,
+  listContactPropertyKeys,
+  listSegmentsForOrg,
   previewConditionAudience,
   segment,
+  updateSegmentFields,
 } from "@wraps/db";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { serializeError } from "@/lib/logger";
 import { checkFeatureAccess } from "@/lib/plan-limits";
@@ -78,11 +84,7 @@ export const listSegments = orgAction(
     onError: "Failed to fetch segments",
   },
   async (ctx, organizationId: string): Promise<ListSegmentsResult> => {
-    const segments = await db
-      .select()
-      .from(segment)
-      .where(eq(segment.organizationId, organizationId))
-      .orderBy(desc(segment.createdAt));
+    const { segments } = await listSegmentsForOrg(organizationId);
 
     // One grouped scan for the whole list, so the table costs the same as it
     // did reading the cached column.
@@ -126,16 +128,7 @@ export const getSegment = orgAction(
     segmentId: string,
     organizationId: string
   ): Promise<GetSegmentResult> => {
-    const [s] = await db
-      .select()
-      .from(segment)
-      .where(
-        and(
-          eq(segment.id, segmentId),
-          eq(segment.organizationId, organizationId)
-        )
-      )
-      .limit(1);
+    const s = await findSegment(segmentId, organizationId);
 
     if (!s) {
       return { success: false, error: "Segment not found" };
@@ -225,11 +218,10 @@ export const createSegment = orgAction(
     const memberCount = audience.sendable;
 
     // Create segment
-    const [newSegment] = await ctx.audited(
-      async (tx) => {
-        const [r] = await tx
-          .insert(segment)
-          .values({
+    const newSegment = await ctx.audited(
+      (tx) =>
+        insertSegment(
+          {
             organizationId,
             name: data.name.trim(),
             description: data.description?.trim() || null,
@@ -238,11 +230,10 @@ export const createSegment = orgAction(
             memberCount,
             lastComputedAt: new Date(),
             createdBy: ctx.access.userId,
-          })
-          .returning();
-        return [r];
-      },
-      ([r]) => ({
+          },
+          tx
+        ),
+      (r) => ({
         action: "segment.created" as const,
         resource: "segment",
         resourceId: r.id,
@@ -439,16 +430,7 @@ export const updateSegment = orgAction(
     }
   ): Promise<UpdateSegmentResult> => {
     // Verify segment exists
-    const [existing] = await db
-      .select()
-      .from(segment)
-      .where(
-        and(
-          eq(segment.id, segmentId),
-          eq(segment.organizationId, organizationId)
-        )
-      )
-      .limit(1);
+    const existing = await findSegment(segmentId, organizationId);
 
     if (!existing) {
       return { success: false, error: "Segment not found" };
@@ -496,17 +478,7 @@ export const updateSegment = orgAction(
 
     // Update segment
     await ctx.audited(
-      async (tx) => {
-        await tx
-          .update(segment)
-          .set(updateData)
-          .where(
-            and(
-              eq(segment.id, segmentId),
-              eq(segment.organizationId, organizationId)
-            )
-          );
-      },
+      (tx) => updateSegmentFields(segmentId, organizationId, updateData, tx),
       () => ({
         action: "segment.updated" as const,
         resource: "segment",
@@ -540,16 +512,7 @@ export const deleteSegment = orgAction(
     organizationId: string
   ): Promise<DeleteSegmentResult> => {
     // Verify segment exists
-    const [existing] = await db
-      .select()
-      .from(segment)
-      .where(
-        and(
-          eq(segment.id, segmentId),
-          eq(segment.organizationId, organizationId)
-        )
-      )
-      .limit(1);
+    const existing = await findSegment(segmentId, organizationId);
 
     if (!existing) {
       return { success: false, error: "Segment not found" };
@@ -557,16 +520,7 @@ export const deleteSegment = orgAction(
 
     // Delete segment
     await ctx.audited(
-      async (tx) => {
-        await tx
-          .delete(segment)
-          .where(
-            and(
-              eq(segment.id, segmentId),
-              eq(segment.organizationId, organizationId)
-            )
-          );
-      },
+      (tx) => deleteSegmentRow(segmentId, organizationId, tx),
       () => ({
         action: "segment.deleted" as const,
         resource: "segment",
@@ -653,14 +607,7 @@ export const getPropertyKeys = orgAction(
     onError: "Failed to get property keys",
   },
   async (ctx, organizationId: string): Promise<GetPropertyKeysResult> => {
-    const rows = await db.execute<{ key: string }>(
-      sql`SELECT DISTINCT json_object_keys(${contact.properties}) AS key
-          FROM ${contact}
-          WHERE ${contact.organizationId} = ${organizationId}
-            AND ${contact.properties} IS NOT NULL`
-    );
-
-    const keys = rows.rows.map((r) => r.key).sort();
+    const keys = await listContactPropertyKeys(organizationId);
 
     return { success: true, keys };
   }

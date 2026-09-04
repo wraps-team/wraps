@@ -231,6 +231,32 @@ describe("Segments Server Actions", () => {
 
       expect(result.success).toBe(false);
     });
+
+    it("does not create a segment for another organization", async () => {
+      const result = await createSegment("some-other-org-id", {
+        name: "Cross Org Create",
+        condition: {
+          logic: "AND",
+          groups: [
+            {
+              filters: [
+                { field: "status", operator: "equals", value: "active" },
+              ],
+            },
+          ],
+        },
+      });
+
+      expect(result.success).toBe(false);
+
+      const list = await listSegments(testOrganization.id);
+      expect(list.success).toBe(true);
+      if (list.success) {
+        expect(list.segments.map((s) => s.name)).not.toContain(
+          "Cross Org Create"
+        );
+      }
+    });
   });
 
   describe("listSegments", () => {
@@ -282,6 +308,30 @@ describe("Segments Server Actions", () => {
         expect(result.segments).toHaveLength(0);
       }
     });
+
+    it("does not list another organization's segments", async () => {
+      const created = await createSegment(testOrganization.id, {
+        name: "Owned By Test Org",
+        condition: {
+          logic: "AND",
+          groups: [
+            {
+              filters: [
+                { field: "status", operator: "equals", value: "active" },
+              ],
+            },
+          ],
+        },
+      });
+      expect(created.success).toBe(true);
+      if (!created.success) {
+        throw new Error("Failed to set up segment for cross-org test");
+      }
+
+      const result = await listSegments("some-other-org-id");
+
+      expect(result.success).toBe(false);
+    });
   });
 
   describe("getSegment", () => {
@@ -324,6 +374,30 @@ describe("Segments Server Actions", () => {
       if (!result.success) {
         expect(result.error).toContain("not found");
       }
+    });
+
+    it("does not get another organization's segment", async () => {
+      const created = await createSegment(testOrganization.id, {
+        name: "Get Cross Org",
+        condition: {
+          logic: "AND",
+          groups: [
+            {
+              filters: [
+                { field: "status", operator: "equals", value: "active" },
+              ],
+            },
+          ],
+        },
+      });
+      expect(created.success).toBe(true);
+      if (!created.success) {
+        throw new Error("Failed to set up segment for cross-org test");
+      }
+
+      const result = await getSegment(created.segment.id, "some-other-org-id");
+
+      expect(result.success).toBe(false);
     });
   });
 
@@ -419,6 +493,43 @@ describe("Segments Server Actions", () => {
         expect(result.error).toContain("not found");
       }
     });
+
+    it("does not update another organization's segment", async () => {
+      const created = await createSegment(testOrganization.id, {
+        name: "Update Cross Org",
+        condition: {
+          logic: "AND",
+          groups: [
+            {
+              filters: [
+                { field: "status", operator: "equals", value: "active" },
+              ],
+            },
+          ],
+        },
+      });
+      expect(created.success).toBe(true);
+      if (!created.success) {
+        throw new Error("Failed to set up segment for cross-org test");
+      }
+
+      const result = await updateSegment(
+        created.segment.id,
+        "some-other-org-id",
+        { name: "Hijacked Name" }
+      );
+
+      expect(result.success).toBe(false);
+
+      const unchanged = await getSegment(
+        created.segment.id,
+        testOrganization.id
+      );
+      expect(unchanged.success).toBe(true);
+      if (unchanged.success) {
+        expect(unchanged.segment.name).toBe("Update Cross Org");
+      }
+    });
   });
 
   describe("deleteSegment", () => {
@@ -466,6 +577,39 @@ describe("Segments Server Actions", () => {
       if (!result.success) {
         expect(result.error).toContain("not found");
       }
+    });
+
+    it("does not delete another organization's segment", async () => {
+      const created = await createSegment(testOrganization.id, {
+        name: "Delete Cross Org",
+        condition: {
+          logic: "AND",
+          groups: [
+            {
+              filters: [
+                { field: "status", operator: "equals", value: "active" },
+              ],
+            },
+          ],
+        },
+      });
+      expect(created.success).toBe(true);
+      if (!created.success) {
+        throw new Error("Failed to set up segment for cross-org test");
+      }
+
+      const result = await deleteSegment(
+        created.segment.id,
+        "some-other-org-id"
+      );
+
+      expect(result.success).toBe(false);
+
+      const stillThere = await getSegment(
+        created.segment.id,
+        testOrganization.id
+      );
+      expect(stillThere.success).toBe(true);
     });
   });
 
@@ -1211,6 +1355,26 @@ describe("Segments Server Actions", () => {
       if (result.success) {
         expect(result.keys).toEqual([]);
       }
+    });
+
+    it("does not return property keys for another organization", async () => {
+      const crypto = await import("node:crypto");
+      await db.insert(contact).values({
+        id: crypto.randomUUID(),
+        organizationId: testOrganization.id,
+        email: "cross-org-props@example.com",
+        emailHash: crypto
+          .createHash("sha256")
+          .update("cross-org-props@example.com")
+          .digest("hex"),
+        emailStatus: "active",
+        status: "active",
+        properties: { onlyOnTestOrg: "yes" },
+      });
+
+      const result = await getPropertyKeys("some-other-org-id");
+
+      expect(result.success).toBe(false);
     });
   });
 });
