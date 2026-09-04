@@ -283,10 +283,9 @@ const releases: Release[] = [
         what it would delete and deletes nothing
       </>,
       <>
-        Custom event ingestion is gated on the Starter plan, matching what the
-        pricing page has always said. The unreachable per-org volume block it
-        replaced is gone, and the tracked-events definition is corrected
-        everywhere agents read it
+        The unreachable per-org event volume block is retired, and the
+        tracked-events definition is corrected everywhere agents read it: the
+        docs, <Code>llms.txt</Code> and the generated <Code>pricing.md</Code>
       </>,
       <>
         wraps.dev serves a markdown representation of every page the three ways
