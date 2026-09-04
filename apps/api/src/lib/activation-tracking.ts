@@ -259,7 +259,7 @@ async function setContactProperties(
 export async function trackFirstResourceCreated(
   organizationId: string,
   resource: "template" | "workflow",
-  source: "cli" | "dashboard",
+  source: "cli" | "dashboard" | "api",
   userId?: string | null,
   resourceName?: string | null
 ) {

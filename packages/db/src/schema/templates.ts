@@ -110,7 +110,9 @@ export const template = pgTable(
     pushedFromCli: boolean("pushed_from_cli").default(false).notNull(),
     lastPushedAt: timestamp("last_pushed_at"),
     cliProjectPath: text("cli_project_path"), // e.g. "templates/welcome.tsx"
-    lastEditedFrom: text("last_edited_from").$type<"cli" | "dashboard">(),
+    lastEditedFrom: text("last_edited_from").$type<
+      "cli" | "dashboard" | "api"
+    >(),
   },
   (table) => [
     index("template_org_idx").on(table.organizationId),

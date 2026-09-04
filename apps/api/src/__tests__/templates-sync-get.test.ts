@@ -21,7 +21,18 @@ vi.mock("@wraps/db", () => ({
   db: {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
-        where: vi.fn(() => Promise.resolve(mockTemplates)),
+        where: vi.fn(() => ({
+          // Unpaginated path awaits `.where(...)` directly (thenable via
+          // Promise.resolve below). Paginated path chains `.orderBy().limit()`
+          // before awaiting — both must resolve to the same mock rows.
+          then: (
+            resolve: (value: unknown) => unknown,
+            reject: (reason: unknown) => unknown
+          ) => Promise.resolve(mockTemplates).then(resolve, reject),
+          orderBy: vi.fn(() => ({
+            limit: vi.fn(() => Promise.resolve(mockTemplates)),
+          })),
+        })),
       })),
     })),
     insert: vi.fn(),
@@ -56,6 +67,12 @@ vi.mock("@wraps/db", () => ({
   },
   eq: vi.fn((a, b) => ({ eq: [a, b] })),
   and: vi.fn((...args) => ({ and: args })),
+  desc: vi.fn((...args) => ({ op: args })),
+  or: vi.fn((...args) => ({ op: args })),
+  lt: vi.fn((...args) => ({ op: args })),
+  gt: vi.fn((...args) => ({ op: args })),
+  encodeCursor: vi.fn(() => "cursor"),
+  decodeCursor: vi.fn(() => null),
 }));
 
 vi.mock("../lib/activation-tracking", () => ({

@@ -35,6 +35,7 @@ import { eventsRoutes } from "./routes/events";
 import { healthRoutes } from "./routes/health";
 import { metricsRoutes } from "./routes/metrics";
 import { preferenceEventsRoutes } from "./routes/preference-events";
+import { templatesRoutes } from "./routes/templates";
 import { templatesSyncRoutes } from "./routes/templates-sync";
 import { toolsRoutes } from "./routes/tools";
 import { unsubscribeRoutes } from "./routes/unsubscribe";
@@ -111,6 +112,10 @@ const openApiDocumentation = {
       name: "domains",
       description:
         "Sending identity (domain) verification state, read live from SES",
+    },
+    {
+      name: "templates",
+      description: "Email template CRUD, publish to SES, and CLI sync",
     },
     {
       name: "email-logs",
@@ -258,6 +263,7 @@ export const app = new Elysia()
   .use(unsubscribeRoutes)
   .use(preferenceEventsRoutes)
   .use(templatesSyncRoutes)
+  .use(templatesRoutes)
   .use(workflowsSyncRoutes)
   .use(toolsRoutes)
   .use(workflowScheduleRoutes)

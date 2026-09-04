@@ -191,6 +191,43 @@ const domainsUnreachableExample = `// GET /v1/domains/example.com response (503)
   "code": "INTERNAL_ERROR"
 }`;
 
+const templateDetailExample = `// GET /v1/templates/:id response
+{
+  "id": "tmpl_abc123",
+  "name": "Welcome Email",
+  "description": null,
+  "subject": "Welcome to Acme!",
+  "previewText": "Let's get you set up",
+  "emailType": "transactional",
+  "channel": "email",
+  "status": "PUBLISHED",
+  "slug": "welcome",
+  "publishedAt": "2026-04-06T10:05:32.000Z",
+  "createdAt": "2026-04-01T09:00:00.000Z",
+  "updatedAt": "2026-04-06T10:05:32.000Z",
+  "sourceHash": "8f14e45fceea167a5a36dedd4bea2543",
+  "variables": [{ "name": "firstName", "fallback": "there" }],
+  "lastEditedFrom": "api",
+  "source": "export default function Welcome() { ... }",
+  "compiledHtml": "<html>...</html>",
+  "compiledText": "Welcome to Acme!..."
+}`;
+
+const templatePatchConflictExample = `// PATCH /v1/templates/:id response (409)
+{
+  "error": "conflict",
+  "message": "Template was modified after ifUnmodifiedSince",
+  "lastEditedFrom": "dashboard",
+  "updatedAt": "2026-04-06T11:00:00.000Z"
+}`;
+
+const templatePublishExample = `// POST /v1/templates/:id/publish response
+{
+  "success": true,
+  "sesTemplateName": "wraps-welcome-email",
+  "publishedAt": "2026-04-06T10:05:32.000Z"
+}`;
+
 const contactTopicPatchExample = `# PATCH adds topics without removing existing ones
 curl -X PATCH https://api.wraps.dev/v1/contacts/:id \\
   -H "Authorization: Bearer wraps_your_api_key" \\
@@ -463,6 +500,42 @@ Sending identity (domain and email address) verification state, read live from S
 
 **Response (503):** \`{ error: "aws_account_unreachable", message }\` -- only when *every* connected account is unreachable. Fix by running \`wraps platform update-role\` against the affected AWS account.`,
 
+  templates: `## Templates
+
+CRUD, publish, and duplicate for email/SMS templates. Same table the dashboard's React Email editor and the CLI's \`wraps push\`/\`wraps pull\` protocol read and write -- an API-created template shows up in the editor, and an editor-saved template is readable here.
+
+The API does **not** compile TSX -- \`compiledHtml\`/\`compiledText\` must be supplied by the caller (the CLI renders locally with React Email; the dashboard compiles in the editor). \`POST /v1/templates/:id/publish\` refuses a template with no \`compiledHtml\`. AI generation is dashboard-only; there is no generation endpoint here. There is intentionally no \`DELETE\` -- templates are referenced by \`messageSend.emailTemplateId\` and \`batchSend.emailTemplateId\`, so deleting one would silently detach send history.
+
+### List Templates
+
+\`GET /v1/templates\` -- Cursor-paginated (\`limit\`, \`cursor\`), optionally filtered by \`status\` (\`DRAFT\`/\`PUBLISHED\`/\`ARCHIVED\`), \`channel\` (\`email\`/\`sms\`), or a \`search\` on name. Never returns \`source\`, \`content\`, \`compiledHtml\`, \`compiledText\`, \`createdBy\`, or \`lastEditedBy\` -- use \`GET /:id\` for the full record.
+
+**Response (200):** \`{ data: TemplateSummary[], nextCursor }\`.
+
+### Get a Template
+
+\`GET /v1/templates/:id\` -- Full detail, org-scoped, 404 if not found. \`?source=false\` omits \`source\`, \`compiledHtml\`, and \`compiledText\` -- \`sourceHash\` still comes back so a caller can tell whether the source changed without fetching it.
+
+### Create a Template
+
+\`POST /v1/templates\` -- Creates a \`DRAFT\`, always \`react-email\` format. A duplicate \`slug\` in the org returns 409. \`variables\` is an array of \`{ name, fallback? }\`.
+
+### Update a Template
+
+\`PATCH /v1/templates/:id\` -- Partial update, org-scoped. **Last-write-wins unless you send \`ifUnmodifiedSince\`** (an ISO 8601 timestamp) -- when present and the stored \`updatedAt\` is later, the update is rejected with 409 instead of silently overwriting. When \`source\` changes, a new template-version row is written (skipped when the source is unchanged from the latest version). A template last edited via this route or the dashboard cannot be silently overwritten by a CLI \`push\` without \`force\`.
+
+### Publish to SES
+
+\`POST /v1/templates/:id/publish\` -- Creates or updates the SES email template from the row's \`compiledHtml\`/\`compiledText\`, then marks the template \`PUBLISHED\`. Requires a \`subject\`, a connected AWS account (optionally \`{ awsAccountId }\` in the body to pick one), and \`compiledHtml\` already set via \`PATCH\`.
+
+### Duplicate a Template
+
+\`POST /v1/templates/:id/duplicate\` -- Copies content, channel, and previewText into a new \`DRAFT\` named \`"<name> (Copy)"\`. \`slug\`, \`sesTemplateName\`, and \`publishedAt\` are never copied.
+
+### CLI Sync: \`/pull\` Pagination
+
+\`GET /v1/templates/pull\` (the CLI's push/pull protocol) is unchanged by default -- omit \`limit\` and you get every template in one response, exactly as before. Pass \`limit\` to opt into cursor pagination (adds \`nextCursor\` to the response) and \`source=false\` to omit the TSX source from every row.`,
+
   contactTopics: `## Contact Topics: PATCH vs PUT
 
 Topic subscriptions support two update strategies:
@@ -504,6 +577,8 @@ ${SECTION_MD.batch}
 ${SECTION_MD.metrics}
 
 ${SECTION_MD.domains}
+
+${SECTION_MD.templates}
 
 ${SECTION_MD.contactTopics}
 
@@ -570,6 +645,12 @@ const endpointGroups = [
       "Sending identity (domain) verification state, read live from SES",
     auth: true,
     methods: ["GET"],
+  },
+  {
+    name: "Templates",
+    description: "Email/SMS template CRUD, publish to SES, and CLI sync",
+    auth: true,
+    methods: ["GET", "POST", "PATCH"],
   },
   {
     name: "Webhooks",
@@ -1832,6 +1913,251 @@ export default function PageContent() {
             )}
           </CodeBlockBody>
         </CodeBlock>
+      </section>
+
+      {/* Templates */}
+      <section className="mb-12">
+        <SectionHeading
+          className="mb-6"
+          id="templates"
+          markdown={SECTION_MD.templates}
+          title="Templates"
+        />
+        <p className="mb-4 text-muted-foreground">
+          CRUD, publish, and duplicate for email/SMS templates — the same table
+          the dashboard editor and the CLI's{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            wraps push
+          </code>
+          /
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            wraps pull
+          </code>{" "}
+          protocol read and write.
+        </p>
+        <div className="mb-4 rounded-lg border-yellow-500 border-l-4 bg-yellow-500/10 p-4">
+          <p className="font-medium text-sm">The API does not compile TSX</p>
+          <p className="mt-2 text-muted-foreground text-sm">
+            Supply{" "}
+            <code className="rounded bg-muted px-1 py-0.5">compiledHtml</code>/
+            <code className="rounded bg-muted px-1 py-0.5">compiledText</code>{" "}
+            yourself (the CLI renders locally; the dashboard compiles in the
+            editor).{" "}
+            <code className="rounded bg-muted px-1 py-0.5">
+              POST /:id/publish
+            </code>{" "}
+            refuses a template with no{" "}
+            <code className="rounded bg-muted px-1 py-0.5">compiledHtml</code>.
+            AI generation is dashboard-only — there is no generation endpoint
+            here, and there is no{" "}
+            <code className="rounded bg-muted px-1 py-0.5">DELETE</code>{" "}
+            (templates are referenced by send history, so deleting one would
+            silently detach it).
+          </p>
+        </div>
+
+        <h3 className="mb-3 font-medium text-lg">Get a Template</h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            GET /v1/templates/:id
+          </code>{" "}
+          returns full detail, org-scoped.{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            ?source=false
+          </code>{" "}
+          omits{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">source</code>,{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            compiledHtml
+          </code>
+          , and{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            compiledText
+          </code>{" "}
+          —{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            sourceHash
+          </code>{" "}
+          still comes back so a caller can tell whether the source changed
+          without fetching it. The list route (
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            GET /v1/templates
+          </code>
+          ) never returns source, content, compiledHtml, compiledText,
+          createdBy, or lastEditedBy — those five stay on this detail route
+          only.
+        </p>
+        <CodeBlock
+          className="mb-8 h-auto"
+          data={[
+            {
+              language: "json",
+              filename: "template detail response",
+              code: templateDetailExample,
+            },
+          ]}
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+
+        <h3 className="mb-3 font-medium text-lg">
+          Update a Template — Last-Write-Wins Unless You Opt Out
+        </h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            PATCH /v1/templates/:id
+          </code>{" "}
+          is a partial update. By default it's last-write-wins. Send{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            ifUnmodifiedSince
+          </code>{" "}
+          (an ISO 8601 timestamp) to reject the update with 409 instead, when
+          the stored{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            updatedAt
+          </code>{" "}
+          is later. When{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">source</code>{" "}
+          changes, a new template-version row is written (skipped if the source
+          is unchanged from the latest version) — and a template last edited via
+          this route or the dashboard cannot be silently overwritten by a CLI{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">push</code>{" "}
+          without{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">force</code>.
+        </p>
+        <CodeBlock
+          className="mb-8 h-auto"
+          data={[
+            {
+              language: "json",
+              filename: "PATCH conflict response",
+              code: templatePatchConflictExample,
+            },
+          ]}
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+
+        <h3 className="mb-3 font-medium text-lg">Publish to SES</h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            POST /v1/templates/:id/publish
+          </code>{" "}
+          creates or updates the SES email template from the row's compiled
+          HTML/text, then marks the template PUBLISHED. Requires a subject, a
+          connected AWS account (optionally{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            {"{ awsAccountId }"}
+          </code>{" "}
+          in the body to pick one), and compiledHtml already set via PATCH.
+        </p>
+        <CodeBlock
+          className="mb-4 h-auto"
+          data={[
+            {
+              language: "json",
+              filename: "publish response",
+              code: templatePublishExample,
+            },
+          ]}
+        >
+          <CodeBlockHeader>
+            <CodeBlockFiles>
+              {(item) => (
+                <CodeBlockFilename key={item.language} value={item.language}>
+                  {item.filename}
+                </CodeBlockFilename>
+              )}
+            </CodeBlockFiles>
+            <CodeBlockCopyButton />
+          </CodeBlockHeader>
+          <CodeBlockBody>
+            {(item) => (
+              <CodeBlockItem
+                key={item.language}
+                lineNumbers={false}
+                value={item.language}
+              >
+                <CodeBlockContent language={item.language}>
+                  {item.code}
+                </CodeBlockContent>
+              </CodeBlockItem>
+            )}
+          </CodeBlockBody>
+        </CodeBlock>
+
+        <p className="text-muted-foreground text-sm">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            POST /v1/templates
+          </code>{" "}
+          creates a DRAFT (always react-email format — a{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            sourceFormat
+          </code>{" "}
+          in the body is ignored) and 409s on a duplicate slug in the org.{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            POST /v1/templates/:id/duplicate
+          </code>{" "}
+          copies content, channel, and previewText into a new DRAFT named
+          "&lt;name&gt; (Copy)" — slug, sesTemplateName, and publishedAt are
+          never copied. The CLI's{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            GET /v1/templates/pull
+          </code>{" "}
+          is unchanged by default (omit{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">limit</code>{" "}
+          for every template in one response); pass{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">limit</code> to
+          opt into cursor pagination and{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            source=false
+          </code>{" "}
+          to omit the TSX source from every row.
+        </p>
       </section>
 
       {/* Contact Topics */}

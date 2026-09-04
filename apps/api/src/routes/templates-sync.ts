@@ -8,7 +8,17 @@
  * GET  /v1/templates/pull       - List all code-pushed templates with source
  */
 
-import { and, db, eq, template } from "@wraps/db";
+import {
+  and,
+  db,
+  decodeCursor,
+  desc,
+  encodeCursor,
+  eq,
+  or,
+  template,
+} from "@wraps/db";
+import { lt } from "drizzle-orm";
 import { t } from "elysia";
 import { trackFirstResourceCreated } from "../lib/activation-tracking";
 import type { AuthContext } from "../middleware/auth";
@@ -222,8 +232,86 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
     "/pull",
     async (ctx) => {
       const authContext = getAuth(ctx);
+      const { limit, cursor, source } = ctx.query;
+      const includeSource = source ?? true;
 
-      const templates = await db
+      type PullRow = {
+        id: string;
+        slug: string | null;
+        source: string | null;
+        subject: string | null;
+        emailType: string;
+        channel: string;
+        variables: Record<string, unknown>[] | null;
+        sourceHash: string | null;
+        status: string;
+        updatedAt: Date;
+        lastEditedFrom: string | null;
+      };
+      const mapRow = (row: PullRow) => {
+        const { source: rowSource, ...rest } = row;
+        return {
+          ...rest,
+          ...(includeSource ? { source: rowSource } : {}),
+          updatedAt: row.updatedAt.toISOString(),
+        };
+      };
+
+      if (limit === undefined) {
+        // Unpaginated path — the CLI's only consumer. Same select, same
+        // where, no orderBy, no limit: byte-for-byte today's query, so a
+        // template-heavy org's `wraps push` still sees every slug.
+        const templates = await db
+          .select({
+            id: template.id,
+            slug: template.slug,
+            source: template.source,
+            subject: template.subject,
+            emailType: template.emailType,
+            channel: template.channel,
+            variables: template.variables,
+            sourceHash: template.sourceHash,
+            status: template.status,
+            updatedAt: template.updatedAt,
+            lastEditedFrom: template.lastEditedFrom,
+          })
+          .from(template)
+          .where(
+            and(
+              eq(template.organizationId, authContext.organizationId),
+              eq(template.sourceFormat, "react-email")
+            )
+          );
+
+        return {
+          templates: templates
+            .filter((row) => row.source != null)
+            .map((row) => mapRow(row)),
+        };
+      }
+
+      // Paginated path — opt-in only, for a template-heavy org that wants
+      // bounded reads instead of one multi-MB response.
+      const conditions = [
+        eq(template.organizationId, authContext.organizationId),
+        eq(template.sourceFormat, "react-email"),
+      ];
+      const decoded = cursor ? decodeCursor(cursor) : null;
+      if (decoded) {
+        const keyset = or(
+          lt(template.updatedAt, decoded.createdAt),
+          and(
+            eq(template.updatedAt, decoded.createdAt),
+            lt(template.id, decoded.id)
+          )
+        );
+        if (keyset) {
+          conditions.push(keyset);
+        }
+      }
+
+      // biome-ignore lint/plugin: conditions' first entry is always the org predicate built above — the org-scope plugin can't trace it through the spread.
+      const rawRows = await db
         .select({
           id: template.id,
           slug: template.slug,
@@ -238,28 +326,53 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
           lastEditedFrom: template.lastEditedFrom,
         })
         .from(template)
-        .where(
-          and(
-            eq(template.organizationId, authContext.organizationId),
-            eq(template.sourceFormat, "react-email")
-          )
-        );
+        .where(and(...conditions))
+        .orderBy(desc(template.updatedAt), desc(template.id))
+        .limit(limit + 1);
+
+      const hasNextPage = rawRows.length > limit;
+      const page = hasNextPage ? rawRows.slice(0, limit) : rawRows;
+      const lastRow = page.at(-1);
+      const nextCursor =
+        hasNextPage && lastRow
+          ? encodeCursor(lastRow.updatedAt, lastRow.id)
+          : null;
 
       return {
-        templates: templates
-          .filter((t) => t.source != null)
-          .map((t) => ({
-            ...t,
-            updatedAt: t.updatedAt.toISOString(),
-          })),
+        templates: page
+          .filter((row) => row.source != null)
+          .map((row) => mapRow(row)),
+        nextCursor,
       };
     },
     {
+      query: t.Object({
+        limit: t.Optional(
+          t.Number({
+            minimum: 1,
+            maximum: 200,
+            description:
+              "Page size. Omit for the legacy unpaginated behaviour the CLI relies on — every template in one response, no nextCursor.",
+          })
+        ),
+        cursor: t.Optional(
+          t.String({
+            description: "Opaque cursor from a previous page's nextCursor",
+          })
+        ),
+        source: t.Optional(
+          t.Boolean({
+            default: true,
+            description:
+              "Set to false to omit the TSX source from every row (sourceHash still lets a caller diff).",
+          })
+        ),
+      }),
       detail: {
         tags: ["templates"],
         summary: "Pull templates for CLI sync",
         description:
-          "Returns all templates pushed from CLI with their React Email source.",
+          "Returns code-pushed templates with their React Email source. With no `limit`, returns every template in one response (the CLI's push/pull protocol depends on this). Pass `limit` to opt into cursor pagination — the response then includes `nextCursor` (null on the last page). `source=false` omits the `source` field from every row.",
       },
     }
   );
@@ -315,7 +428,11 @@ export async function upsertTemplateFromCli(
 
   if (existing) {
     // Conflict check: if last edited from dashboard and not forcing, reject
-    if (existing.lastEditedFrom === "dashboard" && !body.force) {
+    if (
+      (existing.lastEditedFrom === "dashboard" ||
+        existing.lastEditedFrom === "api") &&
+      !body.force
+    ) {
       return {
         id: existing.id,
         slug: body.slug,
