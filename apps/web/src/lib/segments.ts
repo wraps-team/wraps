@@ -348,7 +348,7 @@ export function createEmptyGroup(): FilterGroup {
 // Partition filters carry { buckets, index } rather than a scalar value.
 // Validation now lives in @wraps/db so the public API shares one validator
 // with the dashboard — re-exported here so existing callers are untouched.
-export { MAX_BUCKETS, validateBucketValue } from "@wraps/db";
+export { MAX_BUCKETS, validateBucketValue } from "@wraps/db/segment-condition";
 
 // Splitting creates one segment per partition, so the ceiling is much lower
 // than MAX_BUCKETS — this bounds how many rows one click can insert.
@@ -415,4 +415,4 @@ export function withPartitionFilter(
 // Condition validation now lives in @wraps/db so the public API shares one
 // validator with the dashboard — re-exported here so existing callers
 // (server actions, the segment form dialog) are untouched.
-export { validateCondition } from "@wraps/db";
+export { validateCondition } from "@wraps/db/segment-condition";
