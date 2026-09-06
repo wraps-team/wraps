@@ -116,6 +116,7 @@ jobs:
           UNSUBSCRIBE_SECRET: ${{ secrets.UNSUBSCRIBE_SECRET }}
           NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
           POSTHOG_KEY: ${{ secrets.POSTHOG_KEY }}
+          WRAPS_API_KEY: ${{ secrets.WRAPS_API_KEY }}
           ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 

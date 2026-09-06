@@ -82,6 +82,14 @@ const apiHandler = new sst.aws.Function("ApiHandler", {
       (() => {
         throw new Error("UNSUBSCRIBE_SECRET is required");
       })(),
+    // Activation events to the platform. Fail the deploy rather than ship an
+    // unset key — an empty key silently turns every activation event emit into
+    // a no-op. `||` not `??`: CI forwards an unset secret as an empty string.
+    WRAPS_API_KEY:
+      process.env.WRAPS_API_KEY ||
+      (() => {
+        throw new Error("WRAPS_API_KEY is required");
+      })(),
     // `||` not `??`: CI passes an unset secret through as an empty string,
     // which `??` would forward verbatim and resolveAppUrl rejects as unset.
     NEXT_PUBLIC_APP_URL:
