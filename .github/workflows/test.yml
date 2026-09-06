@@ -225,6 +225,49 @@ jobs:
       - name: Run selfhost script tests
         run: pnpm test:scripts
 
+  # These ten packages have test scripts that `turbo run test` runs locally
+  # but no CI job ran until this one. Between them they hold the
+  # agent-enforcer Lambda's security tests, the unsubscribe-token signing
+  # suite, and the website's pricing-copy regression net. None needs a
+  # database or any secret. Keep the filter list in sync with the
+  # architecture test that guards it.
+  test-packages:
+    if: github.repository == 'wraps-team/wraps'
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace deps
+        run: pnpm turbo run build --filter=@wraps/core --filter=@wraps/db --filter=@wraps.dev/email-check
+
+      - name: Run package tests
+        run: |
+          pnpm turbo run test \
+            --filter=wraps-website \
+            --filter=@wraps/ai \
+            --filter=@wraps/core \
+            --filter=@wraps/email \
+            --filter=@wraps.dev/email-check \
+            --filter=@wraps.dev/pulumi \
+            --filter=mail-audit \
+            --filter=@wraps/template-render \
+            --filter=@wraps/unsubscribe-token \
+            --filter=@wraps.dev/cdk
+
   baseline:
     if: github.repository == 'wraps-team/wraps'
     runs-on: blacksmith-2vcpu-ubuntu-2404

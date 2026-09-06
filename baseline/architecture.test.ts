@@ -1601,6 +1601,55 @@ describe("pnpm config is not stranded in package.json", () => {
 });
 
 // ─────────────────────────────────────────────────────────
+// Every workspace package with a test script is run in CI
+// ─────────────────────────────────────────────────────────
+
+describe("every workspace package with a test script is run in CI", () => {
+  // Packages deliberately not exercised by .github/workflows/test.yml today.
+  // Keep this list short and comment why each entry is here — it exists so
+  // this guard stays honest rather than getting deleted the first time it's
+  // inconvenient. (Currently empty: every package with a test script has a
+  // CI job.)
+  const CI_TEST_OPT_OUT = new Set<string>([]);
+
+  // Bare substring matching would let "@wraps/email-send" satisfy a search
+  // for "@wraps/email" — this repo has exactly that pair — so dropping
+  // "@wraps/email" from a filter list would go unnoticed. Require the name
+  // to not be immediately extended by another name character on either side.
+  function namedInWorkflow(name: string, workflow: string): boolean {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?<![\\w@./-])${escaped}(?![\\w./-])`).test(workflow);
+  }
+
+  test("every package.json with scripts.test is named in .github/workflows/test.yml", () => {
+    const manifestPaths = [
+      ...findFiles("apps/*/package.json"),
+      ...findFiles("packages/*/package.json"),
+      "wraps/package.json",
+    ];
+
+    const testedPackages = manifestPaths
+      .map((file) => ({ file, pkg: JSON.parse(readFile(file)) }))
+      .filter(({ pkg }) => typeof pkg.scripts?.test === "string")
+      .map(({ file, pkg }) => ({ file, name: pkg.name as string }));
+
+    const workflow = readFile(".github/workflows/test.yml");
+
+    const missing = testedPackages
+      .filter(({ name }) => !CI_TEST_OPT_OUT.has(name))
+      .filter(({ name }) => !namedInWorkflow(name, workflow))
+      .map(
+        ({ file, name }) =>
+          `${file} (${name}) has a "test" script but is not named anywhere ` +
+          "in .github/workflows/test.yml. Add it to an existing job's filter " +
+          "list, give it its own job, or add it to CI_TEST_OPT_OUT with a reason."
+      );
+
+    expect(missing, missing.join("\n")).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────
 // Test: clickable table rows must be reachable by keyboard
 // (This cannot be a baseline.toml GritQL rule: deciding whether a row is
 //  reachable requires reading the SIBLING columns.tsx, because cells are
