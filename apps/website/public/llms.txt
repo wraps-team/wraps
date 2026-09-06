@@ -334,6 +334,7 @@ Named, predictable URLs. Each one is a stable entry point.
 - [Bounce Handling](https://wraps.dev/docs/guides/bounce-handling): Hard vs soft bounces, complaint handling, SES bounce/complaint rate thresholds (5%/0.1%), and testing with the SES mailbox simulator
 - [Suppression Lists](https://wraps.dev/docs/guides/suppression-lists): Manage the SES account-level suppression list (BOUNCE and COMPLAINT), filter campaigns pre-send, and know when removal is safe
 - [Domain Reputation](https://wraps.dev/docs/guides/reputation): Keep complaint rates low on SES — what moves the number, watching it per configuration set, and the runbook when a rate climbs
+- [Account Health API](https://wraps.dev/docs/guides/account-health): Query GET /v1/account/health to check whether an SES account is safe to send from right now — status, thresholds, and quota, refreshed hourly
 - [Preventing Duplicate Sends](https://wraps.dev/docs/guides/idempotency): Idempotency for background workers on at-least-once queues — dedupe keys, a DynamoDB claim table, and SQS settings that cause duplicates
 - [Sharing Templates With Marketing](https://wraps.dev/docs/guides/template-handoff): Split structure from copy, who edits where, and how CLI pushes and dashboard edits detect each other
 - [Reply Threading](https://wraps.dev/docs/guides/reply-threading): HMAC-signed reply-to addresses for verified conversation threading on inbound email

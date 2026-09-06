@@ -23,6 +23,7 @@ import { getPostHogClient } from "./lib/posthog";
 import { resolveApiUrl } from "./lib/urls";
 import { getAuthOptional } from "./middleware/auth";
 import { errorContract } from "./middleware/error-contract";
+import { accountRoutes } from "./routes/account";
 import { agentsRoutes } from "./routes/agents";
 import { agentsWebhookRoutes } from "./routes/agents-webhook";
 import { batchRoutes } from "./routes/batch";
@@ -256,6 +257,7 @@ export const app = new Elysia()
   )
   .use(wellKnownRoutes)
   .use(healthRoutes)
+  .use(accountRoutes)
   .use(connectionsRoutes)
   .use(domainsRoutes)
   .use(emailLogsRoutes)

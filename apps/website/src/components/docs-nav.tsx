@@ -138,6 +138,10 @@ export const navItems: NavSection[] = [
           },
           { title: "Domain Reputation", href: "/docs/guides/reputation" },
           {
+            title: "Account Health API",
+            href: "/docs/guides/account-health",
+          },
+          {
             title: "Preventing Duplicate Sends",
             href: "/docs/guides/idempotency",
           },

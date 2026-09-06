@@ -73,6 +73,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/docs/client-sdk-reference": "2026-04-14T13:00:57-06:00",
   "/docs/cookbook": "2026-04-14T13:00:57-06:00",
   "/docs/guides": "2026-09-03T12:10:22-06:00",
+  "/docs/guides/account-health": "2026-09-06T10:10:34-06:00",
   "/docs/guides/aws-setup": "2026-07-24T16:20:53-05:00",
   "/docs/guides/aws-setup/full": "2026-07-24T16:20:53-05:00",
   "/docs/guides/aws-setup/permissions": "2026-04-14T13:00:57-06:00",
