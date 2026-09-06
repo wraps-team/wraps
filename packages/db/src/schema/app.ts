@@ -112,6 +112,44 @@ export const awsAccount = pgTable(
     // Cleared together with eventFeedStaleSince so a NEW episode re-alerts.
     eventFeedAlertedAt: timestamp("event_feed_alerted_at"),
 
+    // The verdict the hourly account-health sweep reaches, persisted so the
+    // dashboard can answer "am I okay?" with zero AWS calls. Written only on a
+    // sweep that successfully assumed the role AND read SES + CloudWatch — the
+    // early-return paths (no org slug, role unreachable) deliberately leave the
+    // previous verdict in place rather than overwriting it with a false
+    // "healthy".
+    //
+    // NULL = no sweep has ever completed for this account. The UI renders that
+    // as "unknown", never as healthy: an account nobody has been able to check
+    // is exactly the account most likely to be in trouble.
+    healthStatus: text("health_status").$type<
+      "healthy" | "at_risk" | "in_danger"
+    >(),
+    healthCheckedAt: timestamp("health_checked_at"),
+    // The numbers behind the verdict, so the UI — and the public API in plan
+    // 218 — can explain it without re-reading AWS. Every field here is already
+    // on the GetAccount response the sweep holds when it writes this row;
+    // storing the raw numbers alongside the derived ratio costs nothing now and
+    // saves a second migration later.
+    //
+    // Rates are DECIMALS (0–1), matching what CloudWatch returns and what the
+    // worker compares against — not percentages.
+    healthDetail: json("health_detail").$type<{
+      bounceRate: number | null;
+      complaintRate: number | null;
+      quotaUsedRatio: number | null;
+      sendingEnabled: boolean | null;
+      enforcementStatus: string | null;
+      /** SES production access — false means the account is in the sandbox. */
+      productionAccessEnabled: boolean | null;
+      /** Raw SendQuota figures, so a caller can compute its own headroom. */
+      max24HourSend: number | null;
+      sentLast24Hours: number | null;
+      maxSendRate: number | null;
+      /** Machine-readable reasons, worst first. Empty when healthy. */
+      reasons: string[];
+    }>(),
+
     // Quick product flags for navigation/menus
     emailEnabled: boolean("email_enabled").default(false).notNull(),
     smsEnabled: boolean("sms_enabled").default(false).notNull(),

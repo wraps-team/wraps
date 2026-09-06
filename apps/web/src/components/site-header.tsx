@@ -5,6 +5,7 @@ import { InboxButton } from "better-inbox/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CommandSearch, SearchTrigger } from "@/components/command-search";
+import { SesHealthPill } from "@/components/ses-health-pill";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useActiveOrganization } from "@/contexts/organization-context";
 import { authClient } from "@/lib/auth-client";
@@ -121,7 +122,8 @@ export function SiteHeader() {
           <div className="max-w-sm flex-1">
             <SearchTrigger onClick={() => setSearchOpen(true)} />
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <SesHealthPill orgSlug={orgSlug} />
             <InboxButton
               client={authClient}
               onNavigate={(href) => router.push(href)}

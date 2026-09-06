@@ -59,12 +59,10 @@ import {
 import type { Handler } from "aws-lambda";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { flushLogger, log } from "../lib/logger";
+import { classifySesHealth, SES_THRESHOLDS } from "../lib/ses-health.js";
 import { type AwsCredentials, getCredentials } from "../services/credentials";
 
 const DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000; // once per day per account
-const BOUNCE_RATE_WARN = 0.05; // SES review threshold
-const COMPLAINT_RATE_WARN = 0.001; // SES review threshold
-const QUOTA_WARN_RATIO = 0.8;
 
 /**
  * STS/SES codes that all mean the same thing operationally: the customer's
@@ -375,7 +373,7 @@ async function checkAccount(account: AccountRow): Promise<void> {
   // 3. Daily quota approaching.
   const max24h = info.SendQuota?.Max24HourSend ?? 0;
   const sent24h = info.SendQuota?.SentLast24Hours ?? 0;
-  if (max24h > 0 && sent24h / max24h >= QUOTA_WARN_RATIO) {
+  if (max24h > 0 && sent24h / max24h >= SES_THRESHOLDS.quotaWarnRatio) {
     const pct = Math.round((sent24h / max24h) * 100);
     await notifyOnce({
       account,
@@ -387,7 +385,13 @@ async function checkAccount(account: AccountRow): Promise<void> {
     });
   }
 
-  // 4. Reputation thresholds.
+  // 4. Reputation thresholds. Deliberately NOT wrapped in a try/catch: a
+  // CloudWatch failure (throttle, 5xx, or a role missing
+  // cloudwatch:GetMetricData) should still abort this account's checks and
+  // propagate to the per-account catch in the sweep handler below — but only
+  // after blocks 1-3 above have already run, so a role that can reach SES but
+  // not CloudWatch still gets its sending-paused/sandbox/quota alerts exactly
+  // as it would on a sweep with no persisted-verdict feature at all.
   const cloudwatch = new CloudWatchClient({
     region: credentials.region,
     credentials: {
@@ -397,9 +401,10 @@ async function checkAccount(account: AccountRow): Promise<void> {
     },
   });
   const { bounceRate, complaintRate } = await getReputationRates(cloudwatch);
-  const bounceHigh = bounceRate !== null && bounceRate >= BOUNCE_RATE_WARN;
+  const bounceHigh =
+    bounceRate !== null && bounceRate >= SES_THRESHOLDS.bounce.review;
   const complaintHigh =
-    complaintRate !== null && complaintRate >= COMPLAINT_RATE_WARN;
+    complaintRate !== null && complaintRate >= SES_THRESHOLDS.complaint.review;
   if (bounceHigh || complaintHigh) {
     const parts: string[] = [];
     if (bounceHigh) {
@@ -421,6 +426,49 @@ async function checkAccount(account: AccountRow): Promise<void> {
       data: { bounceRate, complaintRate },
     });
   }
+
+  // Persisted health verdict, written last and separately from the
+  // roleLastReachableAt stamp above: this write depends on the CloudWatch
+  // read that can throw (aborting before this point, per the comment on
+  // block 4), and the stamp — plus blocks 1-3's alerts — must survive even
+  // when this write never runs.
+  const quotaMax24h = info.SendQuota?.Max24HourSend ?? null;
+  const quotaSent24h = info.SendQuota?.SentLast24Hours ?? null;
+  const quotaUsedRatio =
+    quotaMax24h !== null && quotaSent24h !== null && quotaMax24h > 0
+      ? quotaSent24h / quotaMax24h
+      : null;
+  const verdict = classifySesHealth({
+    sendingEnabled: info.SendingEnabled ?? null,
+    enforcementStatus: info.EnforcementStatus ?? null,
+    bounceRate,
+    complaintRate,
+    quotaUsedRatio,
+  });
+  await db
+    .update(awsAccount)
+    .set({
+      healthStatus: verdict.status,
+      healthCheckedAt: new Date(),
+      healthDetail: {
+        bounceRate,
+        complaintRate,
+        quotaUsedRatio,
+        sendingEnabled: info.SendingEnabled ?? null,
+        enforcementStatus: info.EnforcementStatus ?? null,
+        productionAccessEnabled: info.ProductionAccessEnabled ?? null,
+        max24HourSend: quotaMax24h,
+        sentLast24Hours: quotaSent24h,
+        maxSendRate: info.SendQuota?.MaxSendRate ?? null,
+        reasons: verdict.reasons,
+      },
+    })
+    .where(
+      and(
+        eq(awsAccount.id, account.id),
+        eq(awsAccount.organizationId, account.organizationId)
+      )
+    );
 }
 
 export const handler: Handler = wrapHandler(async () => {
