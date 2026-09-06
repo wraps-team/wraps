@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  auditLog,
   contact,
   contactTopic,
   db,
@@ -11,6 +12,9 @@ import {
 import { determineSubscriptionStatus } from "@wraps/email";
 import { and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { auditLogEntry, getAuditContext } from "@/lib/audit";
+import { maskPhone, SMS_CONSENT_TEXT } from "@/lib/sms-consent";
+import { orgCanSendSms } from "@/lib/sms-consent.server";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe-token";
 
 type ActionResult = {
@@ -57,7 +61,8 @@ export async function updatePreferences(
   contactId: string,
   organizationId: string,
   subscriptions: Record<string, boolean>,
-  preferredChannel?: PreferredChannel | null
+  preferredChannel?: PreferredChannel | null,
+  smsOptIn?: boolean
 ): Promise<ActionResult> {
   // Verify token matches the contact
   const payload = await verifyUnsubscribeToken(token);
@@ -80,11 +85,21 @@ export async function updatePreferences(
     const pendingTopics: string[] = [];
     const topicChanges: TopicChange[] = [];
 
-    // Get contact email for confirmation emails
+    // Contact email for confirmation emails; phone and SMS state for the
+    // consent branch below.
     const [contactRecord] = await db
-      .select({ email: contact.email })
+      .select({
+        email: contact.email,
+        phone: contact.phone,
+        smsStatus: contact.smsStatus,
+      })
       .from(contact)
-      .where(eq(contact.id, contactId))
+      .where(
+        and(
+          eq(contact.id, contactId),
+          eq(contact.organizationId, organizationId)
+        )
+      )
       .limit(1);
 
     if (!contactRecord?.email) {
@@ -233,6 +248,86 @@ export async function updatePreferences(
             eq(contact.organizationId, organizationId)
           )
         );
+    }
+
+    // SMS consent. The client is not trusted: it decided whether to *show* the
+    // checkbox, this decides whether to honour it.
+    //
+    // Granting is gated on the org actually being able to send. Withdrawing
+    // never is — a contact must be able to take consent back even if the org's
+    // SMS setup has since gone away, so the `false` path checks nothing beyond
+    // "there is a consent to withdraw".
+    if (smsOptIn !== undefined && contactRecord.phone) {
+      const alreadyOptedIn = contactRecord.smsStatus === "opted_in";
+
+      if (
+        smsOptIn &&
+        !alreadyOptedIn &&
+        (await orgCanSendSms(organizationId))
+      ) {
+        await db
+          .update(contact)
+          .set({
+            smsStatus: "opted_in",
+            smsConsentedAt: now,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(contact.id, contactId),
+              eq(contact.organizationId, organizationId)
+            )
+          );
+
+        const auditCtx = await getAuditContext();
+        await db.insert(auditLog).values(
+          auditLogEntry(auditCtx, {
+            organizationId,
+            actorId: null,
+            actorEmail: contactRecord.email,
+            action: "contact.sms_consent_granted",
+            resource: "contact",
+            resourceId: contactId,
+            metadata: {
+              source: "preference_center",
+              // The sentence they actually agreed to, kept with the consent —
+              // this copy will change and the record must not.
+              consentText: SMS_CONSENT_TEXT,
+              phone: maskPhone(contactRecord.phone),
+            },
+          })
+        );
+      } else if (!smsOptIn && alreadyOptedIn) {
+        await db
+          .update(contact)
+          .set({
+            smsStatus: "opted_out",
+            smsOptedOutAt: now,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(contact.id, contactId),
+              eq(contact.organizationId, organizationId)
+            )
+          );
+
+        const auditCtx = await getAuditContext();
+        await db.insert(auditLog).values(
+          auditLogEntry(auditCtx, {
+            organizationId,
+            actorId: null,
+            actorEmail: contactRecord.email,
+            action: "contact.sms_consent_withdrawn",
+            resource: "contact",
+            resourceId: contactId,
+            metadata: {
+              source: "preference_center",
+              phone: maskPhone(contactRecord.phone),
+            },
+          })
+        );
+      }
     }
 
     // Emit workflow events for topic changes (fire-and-forget)

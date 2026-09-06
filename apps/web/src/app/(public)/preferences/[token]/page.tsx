@@ -1,5 +1,4 @@
 import {
-  awsAccount,
   contact,
   contactTopic,
   db,
@@ -14,6 +13,8 @@ import { notFound } from "next/navigation";
 import { PreferenceCenterShell } from "@/components/preference-center/shell";
 import { PreferenceThemeToggle } from "@/components/preference-center/theme-toggle";
 import { resolvePreferenceCenterTheme } from "@/lib/preference-theme/resolve";
+import { maskPhone } from "@/lib/sms-consent";
+import { orgCanSendSms } from "@/lib/sms-consent.server";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe-token";
 import { PreferencesForm } from "./preferences-form";
 
@@ -113,6 +114,7 @@ export default async function PreferencesPage({
       phone: contact.phone,
       emailStatus: contact.emailStatus,
       preferredChannel: contact.preferredChannel,
+      smsStatus: contact.smsStatus,
     })
     .from(contact)
     .where(
@@ -183,18 +185,7 @@ export default async function PreferencesPage({
   );
 
   // Check if org has SMS enabled on any AWS account
-  const [smsEnabledAccount] = await db
-    .select({ id: awsAccount.id })
-    .from(awsAccount)
-    .where(
-      and(
-        eq(awsAccount.organizationId, organizationId),
-        eq(awsAccount.smsEnabled, true)
-      )
-    )
-    .limit(1);
-
-  const orgHasSms = !!smsEnabledAccount;
+  const orgHasSms = await orgCanSendSms(organizationId);
 
   // Build topic list with subscription status
   const topicsWithStatus = topics.map((t) => {
@@ -210,6 +201,17 @@ export default async function PreferencesPage({
   const maskedEmail = contactRecord.email
     ? maskEmail(contactRecord.email)
     : "your email";
+
+  // Consent can be *granted* only when there is a number to text and the org
+  // can actually send. It can always be *withdrawn*: a contact who is opted in
+  // must be able to opt out even if the org's SMS setup has since gone away.
+  //
+  // An email is required too: `updatePreferences` returns early with
+  // "Contact email not found" before any write, so a checkbox rendered for an
+  // email-less contact could never save.
+  const smsOptedIn = contactRecord.smsStatus === "opted_in";
+  const canManageSms =
+    !!contactRecord.phone && !!contactRecord.email && (orgHasSms || smsOptedIn);
 
   const theme = resolvePreferenceCenterTheme({
     theme: orgWithSettings?.preferenceCenterTheme ?? null,
@@ -238,14 +240,19 @@ export default async function PreferencesPage({
       title={orgWithSettings?.preferenceCenterTitle || "Email Preferences"}
     >
       <PreferencesForm
+        canManageSms={canManageSms}
         contactId={contactId}
         hasMultipleChannels={
           !!(contactRecord.email && contactRecord.phone && orgHasSms)
         }
         isGloballyUnsubscribed={contactRecord.emailStatus === "unsubscribed"}
+        maskedPhone={
+          contactRecord.phone ? maskPhone(contactRecord.phone) : null
+        }
         organizationId={organizationId}
         orgName={orgWithSettings?.name || undefined}
         preferredChannel={contactRecord.preferredChannel}
+        smsOptedIn={smsOptedIn}
         token={token}
         topics={topicsWithStatus}
       />

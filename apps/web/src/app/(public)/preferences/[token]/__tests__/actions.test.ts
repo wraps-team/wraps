@@ -1,4 +1,6 @@
 import {
+  auditLog,
+  awsAccount,
   contact,
   contactTopic,
   db,
@@ -24,6 +26,14 @@ import {
   unsubscribeGlobally,
   updatePreferences,
 } from "../actions";
+
+// Mock next/headers — updatePreferences' SMS consent branch calls
+// getAuditContext(), which awaits headers(). Outside a Next request scope
+// that throws and the action's own try/catch swallows it into an opaque
+// "Failed to update preferences" error.
+vi.mock("next/headers", () => ({
+  headers: () => new Headers(),
+}));
 
 // Mock next/cache
 vi.mock("next/cache", () => ({
@@ -140,6 +150,17 @@ const testContact = {
   updatedAt: new Date(),
 };
 
+const testAwsAccount = {
+  id: "test-pref-aws-1",
+  organizationId: testOrganization.id,
+  name: "Test Account",
+  accountId: "123456789012",
+  region: "us-east-1",
+  roleArn: "arn:aws:iam::123456789012:role/wraps-console-access-role",
+  externalId: "test-pref-external-id-1",
+  smsEnabled: true,
+};
+
 // Set up test database
 beforeAll(async () => {
   // Insert test user
@@ -200,6 +221,15 @@ beforeAll(async () => {
       target: contact.id,
       set: { updatedAt: new Date() },
     });
+
+  // Insert test AWS account (SMS-enabled) for the SMS consent tests
+  await db
+    .insert(awsAccount)
+    .values(testAwsAccount)
+    .onConflictDoUpdate({
+      target: awsAccount.id,
+      set: { smsEnabled: true },
+    });
 });
 
 // Clean up contact topics before each test
@@ -214,6 +244,10 @@ afterAll(async () => {
   await db
     .delete(contactTopic)
     .where(eq(contactTopic.contactId, testContact.id));
+  await db.delete(awsAccount).where(eq(awsAccount.id, testAwsAccount.id));
+  await db
+    .delete(auditLog)
+    .where(eq(auditLog.organizationId, testOrganization.id));
   await db.delete(contact).where(eq(contact.id, testContact.id));
   await db.delete(topic).where(eq(topic.id, testRegularTopic.id));
   await db.delete(topic).where(eq(topic.id, testDoubleOptInTopic.id));
@@ -969,5 +1003,387 @@ describe("Workflow event emission from preference center", () => {
       .limit(1);
 
     expect(subscription.status).toBe("unsubscribed");
+  });
+});
+
+async function resetSms(state: {
+  phone: string | null;
+  smsStatus: "pending_consent" | "opted_in" | "opted_out" | null;
+}) {
+  await db
+    .update(contact)
+    .set({
+      phone: state.phone,
+      smsStatus: state.smsStatus,
+      smsConsentedAt: null,
+      smsOptedOutAt: null,
+    })
+    .where(eq(contact.id, testContact.id));
+  await db
+    .delete(auditLog)
+    .where(eq(auditLog.organizationId, testOrganization.id));
+}
+
+describe("updatePreferences — SMS consent", () => {
+  afterAll(async () => {
+    // Make sure smsEnabled is restored regardless of which test ran last.
+    await db
+      .update(awsAccount)
+      .set({ smsEnabled: true })
+      .where(eq(awsAccount.id, testAwsAccount.id));
+  });
+
+  it("grants consent", async () => {
+    await resetSms({ phone: "+15551234567", smsStatus: "pending_consent" });
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    const result = await updatePreferences(
+      token,
+      testContact.id,
+      testOrganization.id,
+      {},
+      undefined,
+      true
+    );
+
+    expect(result.success).toBe(true);
+
+    const [row] = await db
+      .select({
+        smsStatus: contact.smsStatus,
+        smsConsentedAt: contact.smsConsentedAt,
+      })
+      .from(contact)
+      .where(eq(contact.id, testContact.id))
+      .limit(1);
+
+    expect(row.smsStatus).toBe("opted_in");
+    expect(row.smsConsentedAt).not.toBeNull();
+  });
+
+  it("writes an audit record", async () => {
+    await resetSms({ phone: "+15551234567", smsStatus: "pending_consent" });
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    await updatePreferences(
+      token,
+      testContact.id,
+      testOrganization.id,
+      {},
+      undefined,
+      true
+    );
+
+    const rows = await db
+      .select()
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.organizationId, testOrganization.id),
+          eq(auditLog.action, "contact.sms_consent_granted")
+        )
+      );
+
+    expect(rows).toHaveLength(1);
+    const [row] = rows;
+    expect(row.userId).toBeNull();
+    expect(row.actorEmail).toBe(testContact.email);
+    expect(row.resourceId).toBe(testContact.id);
+    expect((row.metadata as Record<string, unknown> | null)?.source).toBe(
+      "preference_center"
+    );
+    expect(
+      (row.metadata as Record<string, unknown> | null)?.consentText
+    ).toBeTruthy();
+  });
+
+  it("is idempotent — saving twice writes no extra audit rows", async () => {
+    await resetSms({ phone: "+15551234567", smsStatus: "opted_in" });
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    const result = await updatePreferences(
+      token,
+      testContact.id,
+      testOrganization.id,
+      {},
+      undefined,
+      true
+    );
+
+    expect(result.success).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(auditLog)
+      .where(eq(auditLog.organizationId, testOrganization.id));
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it("withdraws consent", async () => {
+    await resetSms({ phone: "+15551234567", smsStatus: "opted_in" });
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    const result = await updatePreferences(
+      token,
+      testContact.id,
+      testOrganization.id,
+      {},
+      undefined,
+      false
+    );
+
+    expect(result.success).toBe(true);
+
+    const [row] = await db
+      .select({
+        smsStatus: contact.smsStatus,
+        smsOptedOutAt: contact.smsOptedOutAt,
+      })
+      .from(contact)
+      .where(eq(contact.id, testContact.id))
+      .limit(1);
+
+    expect(row.smsStatus).toBe("opted_out");
+    expect(row.smsOptedOutAt).not.toBeNull();
+
+    const auditRows = await db
+      .select()
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.organizationId, testOrganization.id),
+          eq(auditLog.action, "contact.sms_consent_withdrawn")
+        )
+      );
+    expect(auditRows).toHaveLength(1);
+  });
+
+  it("withdrawal is not gated on the org's SMS setup", async () => {
+    await resetSms({ phone: "+15551234567", smsStatus: "opted_in" });
+    await db
+      .update(awsAccount)
+      .set({ smsEnabled: false })
+      .where(eq(awsAccount.id, testAwsAccount.id));
+
+    try {
+      const token = await generateUnsubscribeToken(
+        testContact.id,
+        testOrganization.id
+      );
+
+      const result = await updatePreferences(
+        token,
+        testContact.id,
+        testOrganization.id,
+        {},
+        undefined,
+        false
+      );
+
+      expect(result.success).toBe(true);
+
+      const [row] = await db
+        .select({ smsStatus: contact.smsStatus })
+        .from(contact)
+        .where(eq(contact.id, testContact.id))
+        .limit(1);
+
+      expect(row.smsStatus).toBe("opted_out");
+    } finally {
+      await db
+        .update(awsAccount)
+        .set({ smsEnabled: true })
+        .where(eq(awsAccount.id, testAwsAccount.id));
+    }
+  });
+
+  it("granting is gated on the org's SMS setup", async () => {
+    await resetSms({ phone: "+15551234567", smsStatus: "pending_consent" });
+    await db
+      .update(awsAccount)
+      .set({ smsEnabled: false })
+      .where(eq(awsAccount.id, testAwsAccount.id));
+
+    try {
+      const token = await generateUnsubscribeToken(
+        testContact.id,
+        testOrganization.id
+      );
+
+      const result = await updatePreferences(
+        token,
+        testContact.id,
+        testOrganization.id,
+        {},
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+
+      const [row] = await db
+        .select({ smsStatus: contact.smsStatus })
+        .from(contact)
+        .where(eq(contact.id, testContact.id))
+        .limit(1);
+
+      expect(row.smsStatus).toBe("pending_consent");
+
+      const auditRows = await db
+        .select()
+        .from(auditLog)
+        .where(eq(auditLog.organizationId, testOrganization.id));
+      expect(auditRows).toHaveLength(0);
+    } finally {
+      await db
+        .update(awsAccount)
+        .set({ smsEnabled: true })
+        .where(eq(awsAccount.id, testAwsAccount.id));
+    }
+  });
+
+  it("re-consent after withdrawal stamps a fresh timestamp", async () => {
+    await resetSms({ phone: "+15551234567", smsStatus: "opted_out" });
+    const pastDate = new Date("2020-01-01T00:00:00.000Z");
+    await db
+      .update(contact)
+      .set({ smsConsentedAt: pastDate })
+      .where(eq(contact.id, testContact.id));
+
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    const result = await updatePreferences(
+      token,
+      testContact.id,
+      testOrganization.id,
+      {},
+      undefined,
+      true
+    );
+
+    expect(result.success).toBe(true);
+
+    const [row] = await db
+      .select({
+        smsStatus: contact.smsStatus,
+        smsConsentedAt: contact.smsConsentedAt,
+      })
+      .from(contact)
+      .where(eq(contact.id, testContact.id))
+      .limit(1);
+
+    expect(row.smsStatus).toBe("opted_in");
+    expect(row.smsConsentedAt).not.toBeNull();
+    expect((row.smsConsentedAt as Date).getTime()).toBeGreaterThan(
+      pastDate.getTime()
+    );
+  });
+
+  it("no phone, no consent", async () => {
+    await resetSms({ phone: null, smsStatus: null });
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    const result = await updatePreferences(
+      token,
+      testContact.id,
+      testOrganization.id,
+      {},
+      undefined,
+      true
+    );
+
+    expect(result.success).toBe(true);
+
+    const [row] = await db
+      .select({ smsStatus: contact.smsStatus })
+      .from(contact)
+      .where(eq(contact.id, testContact.id))
+      .limit(1);
+
+    expect(row.smsStatus).toBeNull();
+
+    const auditRows = await db
+      .select()
+      .from(auditLog)
+      .where(eq(auditLog.organizationId, testOrganization.id));
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it("omitting smsOptIn leaves SMS state untouched", async () => {
+    await resetSms({ phone: "+15551234567", smsStatus: "opted_in" });
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    const result = await updatePreferences(
+      token,
+      testContact.id,
+      testOrganization.id,
+      {}
+    );
+
+    expect(result.success).toBe(true);
+
+    const [row] = await db
+      .select({ smsStatus: contact.smsStatus })
+      .from(contact)
+      .where(eq(contact.id, testContact.id))
+      .limit(1);
+
+    expect(row.smsStatus).toBe("opted_in");
+
+    const auditRows = await db
+      .select()
+      .from(auditLog)
+      .where(eq(auditLog.organizationId, testOrganization.id));
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it("a bad token still refuses the SMS write", async () => {
+    await resetSms({ phone: "+15551234567", smsStatus: "pending_consent" });
+    // Token generated for a different contact id
+    const badToken = await generateUnsubscribeToken(
+      "some-other-contact-id",
+      testOrganization.id
+    );
+
+    const result = await updatePreferences(
+      badToken,
+      testContact.id,
+      testOrganization.id,
+      {},
+      undefined,
+      true
+    );
+
+    expect(result).toEqual({ success: false, error: "Invalid token" });
+
+    const [row] = await db
+      .select({ smsStatus: contact.smsStatus })
+      .from(contact)
+      .where(eq(contact.id, testContact.id))
+      .limit(1);
+
+    expect(row.smsStatus).toBe("pending_consent");
   });
 });

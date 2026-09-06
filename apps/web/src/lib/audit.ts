@@ -83,7 +83,9 @@ export type AuditLogAction =
   | "agent.send_pending"
   | "agent.send_approved"
   | "agent.send_rejected"
-  | "agent.send_blocked";
+  | "agent.send_blocked"
+  | "contact.sms_consent_granted"
+  | "contact.sms_consent_withdrawn";
 
 export async function getAuditContext(): Promise<{
   ipAddress: string | null;
@@ -101,7 +103,7 @@ export function auditLogEntry(
   ctx: { ipAddress: string | null; userAgent: string | null },
   params: {
     organizationId: string;
-    actorId: string;
+    actorId: string | null;
     actorEmail: string;
     action: AuditLogAction;
     resource: string;

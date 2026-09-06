@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { SMS_CONSENT_TEXT } from "@/lib/sms-consent";
 import {
   resendConfirmation,
   unsubscribeGlobally,
@@ -25,6 +26,9 @@ type PreferencesFormProps = {
   hasMultipleChannels: boolean;
   preferredChannel: "email" | "sms" | null;
   orgName?: string;
+  canManageSms: boolean;
+  maskedPhone: string | null;
+  smsOptedIn: boolean;
 };
 
 export function PreferencesForm({
@@ -36,6 +40,9 @@ export function PreferencesForm({
   hasMultipleChannels,
   preferredChannel: initialPreferredChannel,
   orgName,
+  canManageSms,
+  maskedPhone,
+  smsOptedIn,
 }: PreferencesFormProps) {
   const [isPending, startTransition] = useTransition();
   const [subscriptions, setSubscriptions] = useState<Record<string, boolean>>(
@@ -54,6 +61,7 @@ export function PreferencesForm({
   const [selectedChannel, setSelectedChannel] = useState<
     "email" | "sms" | null
   >(initialPreferredChannel);
+  const [smsOptIn, setSmsOptIn] = useState(smsOptedIn);
   const [resendingFor, setResendingFor] = useState<string | null>(null);
   const [isGloballyUnsubscribed, setIsGloballyUnsubscribed] = useState(
     initiallyUnsubscribed
@@ -83,7 +91,8 @@ export function PreferencesForm({
         contactId,
         organizationId,
         subscriptions,
-        hasMultipleChannels ? selectedChannel : undefined
+        hasMultipleChannels ? selectedChannel : undefined,
+        canManageSms ? smsOptIn : undefined
       );
       if (result.success) {
         // Update pending topics state
@@ -339,6 +348,62 @@ export function PreferencesForm({
         </div>
       )}
 
+      {/* Text messages */}
+      {canManageSms && (
+        <div className="space-y-1">
+          <h2 className="mb-3 font-medium text-foreground text-sm">
+            Text Messages
+          </h2>
+          <div className="divide-y divide-border rounded-xl border border-border">
+            <div className="p-4">
+              <label className="flex cursor-pointer items-start gap-4 transition-colors hover:bg-muted/50">
+                <div className="relative flex h-5 items-center">
+                  <input
+                    checked={smsOptIn}
+                    className={`peer h-4 w-4 cursor-pointer appearance-none rounded border-2 border-input transition-all checked:border-transparent focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                      smsOptIn ? "bg-primary" : ""
+                    }`}
+                    onChange={(e) => {
+                      setSmsOptIn(e.target.checked);
+                      if (!e.target.checked && selectedChannel === "sms") {
+                        setSelectedChannel(null);
+                      }
+                    }}
+                    type="checkbox"
+                  />
+                  {smsOptIn && (
+                    <svg
+                      className="pointer-events-none absolute left-0 h-4 w-4 text-primary-foreground"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M5 13l4 4L19 7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <span className="font-medium text-foreground text-sm">
+                    {SMS_CONSENT_TEXT}
+                  </span>
+                  {maskedPhone && (
+                    <div className="mt-0.5 text-muted-foreground text-sm">
+                      Sent to {maskedPhone}
+                      {orgName ? ` by ${orgName}` : ""}.
+                    </div>
+                  )}
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Channel preference */}
       {hasMultipleChannels && (
         <div className="space-y-1">
@@ -353,7 +418,12 @@ export function PreferencesForm({
               [
                 { value: null, label: "No preference" },
                 { value: "email", label: "Email" },
-                { value: "sms", label: "SMS" },
+                // Offering SMS to someone who has not consented advertises a
+                // channel no send can use: every SMS audience filters on
+                // `opted_in`.
+                ...(smsOptIn
+                  ? ([{ value: "sms", label: "SMS" }] as const)
+                  : []),
               ] as const
             ).map((option) => (
               <label
@@ -387,7 +457,7 @@ export function PreferencesForm({
 
       {/* Actions */}
       <div className="space-y-3 pt-2">
-        {topics.length > 0 && (
+        {(topics.length > 0 || canManageSms) && (
           <button
             className="w-full rounded-xl bg-primary px-4 py-3 font-medium text-primary-foreground text-sm transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50"
             disabled={isPending}

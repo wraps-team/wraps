@@ -118,6 +118,8 @@ const ACTION_LABELS: Record<AuditLogAction, string> = {
   "contact.topic_unsubscribed": "Topic Unsubscribed",
   "contact.topics_bulk_subscribed": "Topics Bulk Subscribed",
   "contact.topics_bulk_unsubscribed": "Topics Bulk Unsubscribed",
+  "contact.sms_consent_granted": "SMS Consent Granted",
+  "contact.sms_consent_withdrawn": "SMS Consent Withdrawn",
   "settings.sender_defaults_updated": "Sender Defaults Updated",
   "settings.webhook_secret_saved": "Webhook Secret Saved",
   "settings.webhook_secret_removed": "Webhook Secret Removed",
