@@ -126,8 +126,15 @@ const batchSenderSubscription = batchQueue.subscribe(
       BATCH_QUEUE_URL: batchQueue.url,
       // PostHog for activation tracking
       POSTHOG_KEY: process.env.POSTHOG_KEY ?? "",
-      // Wraps platform for activation event emission
-      WRAPS_API_KEY: process.env.WRAPS_API_KEY ?? "",
+      // Wraps platform for activation event emission. Fail the deploy rather
+      // than ship an unset key — an empty key silently turns every activation
+      // event emit into a no-op. `||` not `??`: CI forwards an unset secret
+      // as an empty string, which `??` would pass through.
+      WRAPS_API_KEY:
+        process.env.WRAPS_API_KEY ||
+        (() => {
+          throw new Error("WRAPS_API_KEY is required");
+        })(),
       // Post-send bookkeeping failures are swallowed so one bad row cannot
       // abort a broadcast — they only reach Sentry.
       SENTRY_DSN: sentryDsn.value,
@@ -295,8 +302,15 @@ workflowQueue.subscribe(
         })(),
       // PostHog for activation tracking
       POSTHOG_KEY: process.env.POSTHOG_KEY ?? "",
-      // Wraps platform for activation event emission
-      WRAPS_API_KEY: process.env.WRAPS_API_KEY ?? "",
+      // Wraps platform for activation event emission. Fail the deploy rather
+      // than ship an unset key — an empty key silently turns every activation
+      // event emit into a no-op. `||` not `??`: CI forwards an unset secret
+      // as an empty string, which `??` would pass through.
+      WRAPS_API_KEY:
+        process.env.WRAPS_API_KEY ||
+        (() => {
+          throw new Error("WRAPS_API_KEY is required");
+        })(),
       // A broken cron chain is never retried by SQS — the workflow just stops
       // firing. That capture is the only warning.
       SENTRY_DSN: sentryDsn.value,
