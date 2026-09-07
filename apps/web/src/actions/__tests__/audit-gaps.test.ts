@@ -9,6 +9,7 @@
 import {
   auditLog,
   awsAccount,
+  awsAccountPermission,
   contact,
   contactTopic,
   db,
@@ -44,18 +45,6 @@ vi.mock("next/cache", () => ({
 vi.mock("@tanstack/react-form-nextjs", () => ({
   createServerValidate: vi.fn(),
   formOptions: vi.fn((opts: unknown) => opts),
-}));
-
-vi.mock("@/lib/permissions/check-access", () => ({
-  checkAWSAccountAccess: vi.fn(async () => ({ authorized: true })),
-}));
-
-vi.mock("@/lib/permissions/grant-access", () => ({
-  grantAWSAccountAccess: vi.fn(async () => undefined),
-}));
-
-vi.mock("@/lib/permissions/revoke-access", () => ({
-  revokeAWSAccountAccess: vi.fn(async () => undefined),
 }));
 
 vi.mock("@wraps/auth", () => ({
@@ -170,9 +159,88 @@ const fixTopic = {
   updatedAt: new Date(),
 };
 
+// grantAccessAction's `serverValidateGrant` is bound once, at module import
+// time, to whatever `createServerValidate` returns at that moment — later
+// `mockReturnValue` calls have no effect on it. Route every test's "form
+// data" through this mutable box instead so each test can vary it.
+let grantFormValues: {
+  userId: string;
+  awsAccountId: string;
+  permissions: "READ_ONLY" | "FULL_ACCESS" | "ADMIN";
+  expiresAt: string | undefined;
+} = {
+  userId: "",
+  awsAccountId: "",
+  permissions: "READ_ONLY",
+  expiresAt: undefined,
+};
+
+// --- Fixtures for permissions.ts denial-path tests ---
+
+const fixUserNonOwner = {
+  id: "audit-gaps-user-nonowner",
+  email: "audit-gaps-user-nonowner@example.com",
+  name: "Audit Gaps Non-Owner",
+  emailVerified: true,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  image: null,
+  twoFactorEnabled: false,
+  stripeCustomerId: null,
+};
+
+const fixUserOutsider = {
+  id: "audit-gaps-user-outsider",
+  email: "audit-gaps-user-outsider@example.com",
+  name: "Audit Gaps Outsider",
+  emailVerified: true,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  image: null,
+  twoFactorEnabled: false,
+  stripeCustomerId: null,
+};
+
+const fixMemberNonOwner = {
+  id: "audit-gaps-member-nonowner",
+  organizationId: fixOrg.id,
+  userId: fixUserNonOwner.id,
+  role: "member" as const,
+  createdAt: new Date(),
+};
+
+const fixOrgB = {
+  id: "audit-gaps-org-b",
+  name: "Audit Gaps Org B",
+  slug: "audit-gaps-org-b",
+  createdAt: new Date(),
+  logo: null,
+  metadata: null,
+};
+
+const fixAwsAccountB = {
+  id: "audit-gaps-aws-b",
+  organizationId: fixOrgB.id,
+  name: "Audit Gaps AWS B",
+  accountId: "210987654321",
+  region: "us-east-1",
+  roleArn: "arn:aws:iam::210987654321:role/wraps-console-access-role",
+  externalId: "audit-gaps-ext-id-b",
+  isVerified: true,
+  emailEnabled: true,
+  smsEnabled: false,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
 // --- DB setup & teardown ---
 
 beforeAll(async () => {
+  const { createServerValidate } = await import("@tanstack/react-form-nextjs");
+  vi.mocked(createServerValidate).mockReturnValue(
+    (async () => grantFormValues) as ReturnType<typeof createServerValidate>
+  );
+
   await db
     .insert(user)
     .values(fixUser)
@@ -230,6 +298,48 @@ beforeAll(async () => {
       target: topic.id,
       set: { name: fixTopic.name },
     });
+
+  // Second org + cross-org caller/target fixtures for the permissions.ts
+  // denial-path tests — these run against the real authorization checks.
+  await db
+    .insert(user)
+    .values(fixUserNonOwner)
+    .onConflictDoUpdate({
+      target: user.id,
+      set: { updatedAt: new Date() },
+    });
+
+  await db
+    .insert(user)
+    .values(fixUserOutsider)
+    .onConflictDoUpdate({
+      target: user.id,
+      set: { updatedAt: new Date() },
+    });
+
+  await db
+    .insert(member)
+    .values(fixMemberNonOwner)
+    .onConflictDoUpdate({
+      target: member.id,
+      set: { role: fixMemberNonOwner.role },
+    });
+
+  await db
+    .insert(organization)
+    .values(fixOrgB)
+    .onConflictDoUpdate({
+      target: organization.id,
+      set: { name: fixOrgB.name },
+    });
+
+  await db
+    .insert(awsAccount)
+    .values(fixAwsAccountB)
+    .onConflictDoUpdate({
+      target: awsAccount.id,
+      set: { updatedAt: new Date() },
+    });
 });
 
 afterAll(async () => {
@@ -239,14 +349,24 @@ afterAll(async () => {
     .where(eq(contactTopic.contactId, fixContact.id));
   await db.delete(contact).where(eq(contact.id, fixContact.id));
   await db.delete(topic).where(eq(topic.id, fixTopic.id));
+  await db
+    .delete(awsAccountPermission)
+    .where(eq(awsAccountPermission.awsAccountId, fixAwsAccount.id));
+  await db
+    .delete(awsAccountPermission)
+    .where(eq(awsAccountPermission.awsAccountId, fixAwsAccountB.id));
   await db.delete(awsAccount).where(eq(awsAccount.id, fixAwsAccount.id));
+  await db.delete(awsAccount).where(eq(awsAccount.id, fixAwsAccountB.id));
   await db.delete(subscription).where(eq(subscription.id, fixSubscription.id));
   await db.delete(member).where(eq(member.organizationId, fixOrg.id));
   await db
     .delete(organizationExtension)
     .where(eq(organizationExtension.organizationId, fixOrg.id));
   await db.delete(organization).where(eq(organization.id, fixOrg.id));
+  await db.delete(organization).where(eq(organization.id, fixOrgB.id));
   await db.delete(user).where(eq(user.id, fixUser.id));
+  await db.delete(user).where(eq(user.id, fixUserNonOwner.id));
+  await db.delete(user).where(eq(user.id, fixUserOutsider.id));
 });
 
 // ============================================================
@@ -255,17 +375,12 @@ afterAll(async () => {
 
 describe("grantAccessAction — writes permissions.granted audit log", () => {
   it("inserts a permissions.granted audit log row with correct fields", async () => {
-    const { createServerValidate } = await import(
-      "@tanstack/react-form-nextjs"
-    );
-    vi.mocked(createServerValidate).mockReturnValue(
-      vi.fn(async () => ({
-        userId: fixUser.id,
-        awsAccountId: fixAwsAccount.id,
-        permissions: "READ_ONLY" as const,
-        expiresAt: undefined,
-      })) as ReturnType<typeof createServerValidate>
-    );
+    grantFormValues = {
+      userId: fixUser.id,
+      awsAccountId: fixAwsAccount.id,
+      permissions: "READ_ONLY",
+      expiresAt: undefined,
+    };
 
     const { grantAccessAction } = await import("../permissions");
     const result = await grantAccessAction(undefined, new FormData());
@@ -325,6 +440,104 @@ describe("revokeAccessAction — writes permissions.revoked audit log", () => {
       awsAccountId: fixAwsAccount.id,
       targetUserId: fixUser.id,
     });
+  });
+});
+
+describe("grantAccessAction — denial paths", () => {
+  it("denies a caller without manage permission on the account", async () => {
+    const { auth } = await import("@wraps/auth");
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
+      user: {
+        id: fixUserNonOwner.id,
+        email: fixUserNonOwner.email,
+        name: fixUserNonOwner.name,
+      },
+      session: {
+        id: "audit-gaps-session-nonowner-grant",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userId: fixUserNonOwner.id,
+        expiresAt: new Date(Date.now() + 86_400_000),
+        token: "audit-gaps-token-nonowner-grant",
+      },
+    } as any);
+
+    grantFormValues = {
+      userId: fixUser.id,
+      awsAccountId: fixAwsAccount.id,
+      permissions: "READ_ONLY",
+      expiresAt: undefined,
+    };
+
+    const { grantAccessAction } = await import("../permissions");
+    const result = await grantAccessAction(undefined, new FormData());
+
+    expect(result).toMatchObject({ error: "Access denied" });
+  });
+
+  it("denies a caller whose org does not own the AWS account", async () => {
+    grantFormValues = {
+      userId: fixUser.id,
+      awsAccountId: fixAwsAccountB.id,
+      permissions: "READ_ONLY",
+      expiresAt: undefined,
+    };
+
+    const { grantAccessAction } = await import("../permissions");
+    const result = await grantAccessAction(undefined, new FormData());
+
+    expect(result).toMatchObject({ error: "Access denied" });
+    expect((result as { error?: string }).error).not.toBe("Internal error");
+  });
+
+  it("denies granting to a user who is not a member of the account's org", async () => {
+    grantFormValues = {
+      userId: fixUserOutsider.id,
+      awsAccountId: fixAwsAccount.id,
+      permissions: "READ_ONLY",
+      expiresAt: undefined,
+    };
+
+    const { grantAccessAction } = await import("../permissions");
+    const result = await grantAccessAction(undefined, new FormData());
+
+    expect(result).toMatchObject({ error: "User not found in organization" });
+  });
+});
+
+describe("revokeAccessAction — denial paths", () => {
+  it("denies a caller without manage permission on the account", async () => {
+    const { auth } = await import("@wraps/auth");
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
+      user: {
+        id: fixUserNonOwner.id,
+        email: fixUserNonOwner.email,
+        name: fixUserNonOwner.name,
+      },
+      session: {
+        id: "audit-gaps-session-nonowner-revoke",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userId: fixUserNonOwner.id,
+        expiresAt: new Date(Date.now() + 86_400_000),
+        token: "audit-gaps-token-nonowner-revoke",
+      },
+    } as any);
+
+    const { revokeAccessAction } = await import("../permissions");
+    const result = await revokeAccessAction(fixUser.id, fixAwsAccount.id);
+
+    expect(result).toMatchObject({ error: "Access denied" });
+  });
+
+  it("denies a caller whose org does not own the AWS account", async () => {
+    const { revokeAccessAction } = await import("../permissions");
+    const result = await revokeAccessAction(fixUser.id, fixAwsAccountB.id);
+
+    expect(result).toMatchObject({ error: "Access denied" });
+    expect((result as { error?: string }).error).not.toBe(
+      "Something went wrong. Please try again."
+    );
   });
 });
 

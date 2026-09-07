@@ -183,15 +183,25 @@ describe("Members IDOR Vulnerabilities", () => {
       // Attempt to change the role of Member B (who belongs to Org B)
       // by passing Org A's ID as the organizationId parameter.
       //
-      // BUG: Line 207 looks up the target member by `member.id` alone,
-      // without scoping to the provided organizationId. This means the
-      // lookup succeeds for ANY member across ALL orgs, and the update
-      // on line 238 proceeds without verifying org ownership.
+      // Guards: the target-member lookup and the role-update write are both
+      // scoped by `and(eq(member.id, memberId), eq(member.organizationId,
+      // organizationId))`, so a caller authorized for org A cannot reach or
+      // mutate a member row that belongs to org B.
       const result = await updateMemberRole(memberB.id, "owner", orgA.id);
 
-      // The action should fail because memberB does not belong to orgA.
-      // If this assertion fails, the IDOR vulnerability is confirmed.
       expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe("Member not found");
+      }
+
+      // Prove the write never happened: re-read memberB before the
+      // afterAll restore hook below would mask the exploit succeeding.
+      const stillMember = await db
+        .select()
+        .from(member)
+        .where(eq(member.id, memberB.id));
+      expect(stillMember).toHaveLength(1);
+      expect(stillMember[0]?.role).toBe(memberB.role);
     });
 
     afterAll(async () => {
@@ -231,15 +241,25 @@ describe("Members IDOR Vulnerabilities", () => {
       // Attempt to remove the sacrificial member of Org B
       // by passing Org A's ID as the organizationId parameter.
       //
-      // BUG: Line 496 looks up the target member by `member.id` alone,
-      // without scoping to the provided organizationId. The delete on
-      // line 524 also uses only `member.id`, so the member is removed
-      // from Org B even though the caller only has access to Org A.
+      // Guards: the target-member lookup and the delete are both scoped by
+      // `and(eq(member.id, memberId), eq(member.organizationId,
+      // organizationId))`, so a caller authorized for org A cannot reach or
+      // remove a member row that belongs to org B.
       const result = await removeMember(sacrificialMember.id, orgA.id);
 
-      // The action should fail because the sacrificial member does not belong to orgA.
-      // If this assertion fails, the IDOR vulnerability is confirmed.
       expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe("Member not found");
+      }
+
+      // Prove the row was never deleted, before the afterAll restore hook
+      // below would mask the exploit succeeding.
+      const stillThere = await db
+        .select()
+        .from(member)
+        .where(eq(member.id, sacrificialMember.id));
+      expect(stillThere).toHaveLength(1);
+      expect(stillThere[0]?.organizationId).toBe(orgB.id);
     });
 
     afterAll(async () => {
@@ -260,15 +280,25 @@ describe("Members IDOR Vulnerabilities", () => {
       // Attempt to cancel Org B's invitation by passing Org A's ID
       // as the organizationId parameter.
       //
-      // BUG: Line 603 deletes by `invitation.id` alone without
-      // verifying the invitation's organizationId matches the
-      // provided organizationId. An admin of any org can delete
-      // invitations belonging to any other org.
+      // Guard: the target-invitation lookup and the delete are both scoped
+      // by `and(eq(invitation.id, invitationId), eq(invitation.organizationId,
+      // organizationId))`, so a caller authorized for org A cannot reach or
+      // delete an invitation that belongs to org B.
       const result = await cancelInvitation(invitationB.id, orgA.id);
 
-      // The action should fail because the invitation does not belong to orgA.
-      // If this assertion fails, the IDOR vulnerability is confirmed.
       expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe("Invitation not found");
+      }
+
+      // Prove the invitation was never deleted, before the afterAll restore
+      // hook below would mask the exploit succeeding.
+      const stillThere = await db
+        .select()
+        .from(invitation)
+        .where(eq(invitation.id, invitationB.id));
+      expect(stillThere).toHaveLength(1);
+      expect(stillThere[0]?.status).toBe("pending");
     });
 
     afterAll(async () => {

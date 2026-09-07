@@ -15,7 +15,7 @@ import {
   subscription,
   user,
 } from "@wraps/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   afterAll,
   afterEach,
@@ -50,6 +50,15 @@ const testOrg = {
   id: "audit-v2-contact-org-1",
   name: "Audit V2 Contact Org",
   slug: "audit-v2-contact-org",
+  createdAt: new Date(),
+  logo: null,
+  metadata: null,
+};
+
+const otherOrg = {
+  id: "audit-v2-contact-org-2",
+  name: "Audit V2 Contact Org 2",
+  slug: "audit-v2-contact-org-2",
   createdAt: new Date(),
   logo: null,
   metadata: null,
@@ -133,9 +142,11 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.delete(auditLog).where(eq(auditLog.organizationId, testOrg.id));
   await db.delete(contact).where(eq(contact.organizationId, testOrg.id));
+  await db.delete(contact).where(eq(contact.organizationId, otherOrg.id));
   await db.delete(subscription).where(eq(subscription.referenceId, testOrg.id));
   await db.delete(member).where(eq(member.id, testMember.id));
   await db.delete(organization).where(eq(organization.id, testOrg.id));
+  await db.delete(organization).where(eq(organization.id, otherOrg.id));
   await db.delete(user).where(eq(user.id, testUser.id));
 });
 
@@ -334,6 +345,58 @@ describe("bulkDeleteContacts — writes contact.deleted_bulk audit log", () => {
     expect(row.action).toBe("contact.deleted_bulk");
     expect(row.resource).toBe("contact");
     expect(row.metadata).toMatchObject({ count: contactIds.length });
+
+    const remaining = await db
+      .select()
+      .from(contact)
+      .where(inArray(contact.id, contactIds));
+    expect(remaining).toHaveLength(0);
+  });
+
+  it("does not delete another organization's contact", async () => {
+    await db
+      .insert(organization)
+      .values(otherOrg)
+      .onConflictDoUpdate({
+        target: organization.id,
+        set: { name: otherOrg.name },
+      });
+
+    const ownContact = await createContact(testOrg.id, {
+      email: "audit-v2-bulk-del-own@example.com",
+      emailStatus: "active",
+    });
+    expect(ownContact.success).toBe(true);
+    if (!ownContact.success) {
+      throw new Error("Expected success");
+    }
+
+    // testUser is not a member of otherOrg, so this contact must be seeded
+    // directly rather than through the createContact action.
+    const foreignContactId = "audit-v2-bulk-del-foreign-1";
+    await db.insert(contact).values({
+      id: foreignContactId,
+      organizationId: otherOrg.id,
+      email: "audit-v2-bulk-del-foreign@example.com",
+      emailStatus: "active",
+      status: "active",
+    });
+
+    const result = await bulkDeleteContacts(testOrg.id, [
+      ownContact.contact.id,
+      foreignContactId,
+    ]);
+
+    expect(result.success).toBe(true);
+
+    const stillThere = await db
+      .select()
+      .from(contact)
+      .where(eq(contact.id, foreignContactId));
+    expect(stillThere).toHaveLength(1);
+
+    await db.delete(contact).where(eq(contact.organizationId, otherOrg.id));
+    await db.delete(organization).where(eq(organization.id, otherOrg.id));
   });
 });
 

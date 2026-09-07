@@ -19,6 +19,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { UNAUTHORIZED } from "@/actions/shared/org-action";
 import {
   createSegment,
   deleteSegment,
@@ -248,6 +249,9 @@ describe("Segments Server Actions", () => {
       });
 
       expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe(UNAUTHORIZED);
+      }
 
       const list = await listSegments(testOrganization.id);
       expect(list.success).toBe(true);
@@ -331,6 +335,9 @@ describe("Segments Server Actions", () => {
       const result = await listSegments("some-other-org-id");
 
       expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe(UNAUTHORIZED);
+      }
     });
   });
 
@@ -398,6 +405,9 @@ describe("Segments Server Actions", () => {
       const result = await getSegment(created.segment.id, "some-other-org-id");
 
       expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe(UNAUTHORIZED);
+      }
     });
   });
 
@@ -520,6 +530,9 @@ describe("Segments Server Actions", () => {
       );
 
       expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe(UNAUTHORIZED);
+      }
 
       const unchanged = await getSegment(
         created.segment.id,
@@ -604,6 +617,9 @@ describe("Segments Server Actions", () => {
       );
 
       expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe(UNAUTHORIZED);
+      }
 
       const stillThere = await getSegment(
         created.segment.id,
@@ -1187,7 +1203,10 @@ describe("Segments Server Actions", () => {
             ],
           },
         });
-        if (!source.success) return;
+        expect(source.success).toBe(true);
+        if (!source.success) {
+          throw new Error("Failed to set up segment for cross-org test");
+        }
 
         const result = await splitSegment(
           source.segment.id,
@@ -1212,7 +1231,10 @@ describe("Segments Server Actions", () => {
           ],
         },
       });
-      if (!source.success) return;
+      expect(source.success).toBe(true);
+      if (!source.success) {
+        throw new Error("Failed to set up segment for cross-org test");
+      }
 
       const result = await splitSegment(
         source.segment.id,
@@ -1221,6 +1243,9 @@ describe("Segments Server Actions", () => {
       );
 
       expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe(UNAUTHORIZED);
+      }
     });
   });
 
@@ -1375,6 +1400,9 @@ describe("Segments Server Actions", () => {
       const result = await getPropertyKeys("some-other-org-id");
 
       expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe(UNAUTHORIZED);
+      }
     });
   });
 });
