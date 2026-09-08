@@ -21,6 +21,7 @@
     "@aws-sdk/client-dynamodb": "catalog:",
     "@aws-sdk/client-eventbridge": "catalog:",
     "@aws-sdk/client-mailmanager": "catalog:",
+    "@aws-sdk/client-marketplace-metering": "catalog:",
     "@aws-sdk/client-pinpoint-sms-voice-v2": "catalog:",
     "@aws-sdk/client-s3": "catalog:",
     "@aws-sdk/client-ses": "catalog:",

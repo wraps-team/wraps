@@ -2,6 +2,7 @@
 export * from "./agents";
 export * from "./app";
 export * from "./auth";
+export * from "./aws-marketplace";
 export * from "./batch";
 export * from "./contacts";
 export * from "./events";
