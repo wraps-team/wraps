@@ -836,6 +836,94 @@ describe("Domain Management Commands", () => {
       expect(metadata.saveConnectionMetadata).toHaveBeenCalled();
     });
 
+    it("applies a pending tracking domain with HttpsPolicy REQUIRE when its CloudFront distribution is already active (regression: verify must not downgrade an HTTPS tracking domain)", async () => {
+      sesClientMock.on(GetEmailIdentityCommand).resolves({
+        VerifiedForSendingStatus: true,
+        DkimAttributes: { Tokens: [], Status: "SUCCESS" },
+      });
+      sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+
+      dnsResolverMock.resolveTxt.mockImplementation(async (name: string) => {
+        if (name === "test.com") return [["v=spf1 include:amazonses.com ~all"]];
+        if (name === "_dmarc.test.com") return [["v=DMARC1; p=none;"]];
+        throw notFound();
+      });
+      dnsResolverMock.resolveCname.mockImplementation(async (name: string) => {
+        if (name === "track.test.com") return ["d111.cloudfront.net"];
+        throw notFound();
+      });
+
+      const metadata = await import("../../utils/shared/metadata");
+      vi.mocked(metadata.getDomainFromMetadata).mockReturnValueOnce({
+        isPrimary: false,
+        entry: {
+          domain: "test.com",
+          configSetName: domainToConfigSetName("test.com"),
+          trackingDomain: "track.test.com",
+          trackingHttps: {
+            certificateArn: "arn:aws:acm:issued",
+            status: "active",
+            distributionId: "D111",
+            distributionDomain: "d111.cloudfront.net",
+          },
+          addedAt: new Date().toISOString(),
+        },
+      });
+
+      await verifyDomain({ domain: "test.com" });
+
+      const putCalls = sesClientMock.commandCalls(
+        PutConfigurationSetTrackingOptionsCommand
+      );
+      expect(putCalls.length).toBe(1);
+      expect(putCalls[0].args[0].input).toMatchObject({
+        ConfigurationSetName: domainToConfigSetName("test.com"),
+        CustomRedirectDomain: "track.test.com",
+        HttpsPolicy: "REQUIRE",
+      });
+    });
+
+    it("applies a pending tracking domain with HttpsPolicy OPTIONAL when there is no HTTPS tracking configured", async () => {
+      sesClientMock.on(GetEmailIdentityCommand).resolves({
+        VerifiedForSendingStatus: true,
+        DkimAttributes: { Tokens: [], Status: "SUCCESS" },
+      });
+      sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+
+      dnsResolverMock.resolveTxt.mockImplementation(async (name: string) => {
+        if (name === "test.com") return [["v=spf1 include:amazonses.com ~all"]];
+        if (name === "_dmarc.test.com") return [["v=DMARC1; p=none;"]];
+        throw notFound();
+      });
+      dnsResolverMock.resolveCname.mockImplementation(async (name: string) => {
+        if (name === "track.test.com") return ["r.us-east-1.awstrack.me"];
+        throw notFound();
+      });
+
+      const metadata = await import("../../utils/shared/metadata");
+      vi.mocked(metadata.getDomainFromMetadata).mockReturnValueOnce({
+        isPrimary: false,
+        entry: {
+          domain: "test.com",
+          configSetName: domainToConfigSetName("test.com"),
+          trackingDomain: "track.test.com",
+          addedAt: new Date().toISOString(),
+        },
+      });
+
+      await verifyDomain({ domain: "test.com" });
+
+      const putCalls = sesClientMock.commandCalls(
+        PutConfigurationSetTrackingOptionsCommand
+      );
+      expect(putCalls.length).toBe(1);
+      expect(putCalls[0].args[0].input).toMatchObject({
+        ConfigurationSetName: domainToConfigSetName("test.com"),
+        CustomRedirectDomain: "track.test.com",
+        HttpsPolicy: "OPTIONAL",
+      });
+    });
+
     it("checks the tracking CNAME against CloudFront, not awstrack.me, when HTTPS tracking is active", async () => {
       // With HTTPS on, SES serves tracking links through the distribution, so
       // the CNAME correctly points at CloudFront. Comparing against
@@ -1225,6 +1313,7 @@ describe("Domain Management Commands", () => {
       expect(putCalls[0].args[0].input).toEqual({
         ConfigurationSetName: domainToConfigSetName("test.com"),
         CustomRedirectDomain: "track.test.com",
+        HttpsPolicy: "OPTIONAL",
       });
       expect(metadata.addDomainToMetadata).toHaveBeenCalledWith(
         expect.any(Object),

@@ -26,9 +26,11 @@ import {
 import { domainToConfigSetName } from "../../utils/email/config-set-slug.js";
 import {
   defaultTrackingDomain,
+  HTTP_TRACKING_CONSEQUENCE,
   isTrackingDomainNotReady,
   putTrackingDomain,
   TRACKING_DOMAIN_NONE,
+  trackingHttpsPolicy,
   validateTrackingDomain,
 } from "../../utils/email/tracking-domain.js";
 import {
@@ -450,7 +452,8 @@ export async function verifyDomain(options: EmailVerifyOptions): Promise<void> {
         await putTrackingDomain(
           sesClient,
           targetConfigSetName,
-          trackedEntry.trackingDomain!
+          trackedEntry.trackingDomain!,
+          trackingHttpsPolicy(trackedEntry.trackingHttps)
         );
         trackedEntry.trackingDomainAppliedAt = new Date().toISOString();
         addDomainToMetadata(metadata!, trackedEntry);
@@ -926,7 +929,15 @@ export async function addDomain(options: {
     if (trackingDomain) {
       await progress.execute("Setting custom tracking domain", async () => {
         try {
-          await putTrackingDomain(sesClient, configSetName, trackingDomain!);
+          // No CloudFront distribution can exist yet at this point in the
+          // flow — the HTTPS block below provisions one and, on success,
+          // upgrades this to REQUIRE via a later Put.
+          await putTrackingDomain(
+            sesClient,
+            configSetName,
+            trackingDomain!,
+            "OPTIONAL"
+          );
           trackingDomainAppliedAt = new Date().toISOString();
         } catch (error) {
           if (!isTrackingDomainNotReady(error)) throw error;
@@ -994,7 +1005,7 @@ export async function addDomain(options: {
             );
             clack.log.info(
               pc.dim(
-                `Retry later with: ${pc.cyan(`wraps email domains config --domain ${domain} --tracking-https`)}`
+                `Retry later with: ${pc.cyan(`wraps email domains config --domain ${domain} --tracking-https`)}. ${HTTP_TRACKING_CONSEQUENCE}`
               )
             );
           }
@@ -1006,7 +1017,7 @@ export async function addDomain(options: {
         ) {
           clack.log.info(
             pc.dim(
-              `Certificate validation usually takes 5–30 minutes. Then run: ${pc.cyan(`wraps email domains config --domain ${domain} --tracking-https`)}`
+              `Certificate validation usually takes 5–30 minutes. Then run: ${pc.cyan(`wraps email domains config --domain ${domain} --tracking-https`)}. ${HTTP_TRACKING_CONSEQUENCE}`
             )
           );
         }

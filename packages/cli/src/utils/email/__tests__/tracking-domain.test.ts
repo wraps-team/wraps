@@ -13,6 +13,7 @@ import {
   defaultTrackingDomain,
   isTrackingDomainNotReady,
   putTrackingDomain,
+  trackingHttpsPolicy,
   validateTrackingDomain,
 } from "../tracking-domain.js";
 
@@ -86,11 +87,16 @@ describe("isTrackingDomainNotReady", () => {
 });
 
 describe("putTrackingDomain", () => {
-  it("sends PutConfigurationSetTrackingOptionsCommand with both fields", async () => {
+  it("always sends HttpsPolicy: REQUIRE when passed REQUIRE", async () => {
     sesv2Mock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
     const client = new SESv2Client({ region: "us-east-1" });
 
-    await putTrackingDomain(client, "wraps-email-a-com", "track.a.com");
+    await putTrackingDomain(
+      client,
+      "wraps-email-a-com",
+      "track.a.com",
+      "REQUIRE"
+    );
 
     const calls = sesv2Mock.commandCalls(
       PutConfigurationSetTrackingOptionsCommand
@@ -99,7 +105,48 @@ describe("putTrackingDomain", () => {
     expect(calls[0].args[0].input).toEqual({
       ConfigurationSetName: "wraps-email-a-com",
       CustomRedirectDomain: "track.a.com",
+      HttpsPolicy: "REQUIRE",
     });
+  });
+
+  it("always sends HttpsPolicy: OPTIONAL when passed OPTIONAL", async () => {
+    sesv2Mock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+    const client = new SESv2Client({ region: "us-east-1" });
+
+    await putTrackingDomain(
+      client,
+      "wraps-email-a-com",
+      "track.a.com",
+      "OPTIONAL"
+    );
+
+    const calls = sesv2Mock.commandCalls(
+      PutConfigurationSetTrackingOptionsCommand
+    );
+    expect(calls.length).toBe(1);
+    expect(calls[0].args[0].input).toEqual({
+      ConfigurationSetName: "wraps-email-a-com",
+      CustomRedirectDomain: "track.a.com",
+      HttpsPolicy: "OPTIONAL",
+    });
+  });
+});
+
+describe("trackingHttpsPolicy", () => {
+  it('returns "REQUIRE" for an active distribution', () => {
+    expect(trackingHttpsPolicy({ status: "active" })).toBe("REQUIRE");
+  });
+
+  it('returns "OPTIONAL" for a pending certificate', () => {
+    expect(trackingHttpsPolicy({ status: "pending" })).toBe("OPTIONAL");
+  });
+
+  it('returns "OPTIONAL" for an empty object', () => {
+    expect(trackingHttpsPolicy({})).toBe("OPTIONAL");
+  });
+
+  it('returns "OPTIONAL" for undefined', () => {
+    expect(trackingHttpsPolicy(undefined)).toBe("OPTIONAL");
   });
 });
 

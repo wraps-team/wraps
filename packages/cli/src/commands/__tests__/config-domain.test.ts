@@ -650,6 +650,7 @@ describe("configDomain — extended config set options", () => {
     expect(putCalls[0].args[0].input).toEqual({
       ConfigurationSetName: additionalConfigSetName,
       CustomRedirectDomain: "track.test.com",
+      HttpsPolicy: "OPTIONAL",
     });
     expect(metadata.saveConnectionMetadata).toHaveBeenCalled();
 
@@ -865,5 +866,139 @@ describe("configDomain — extended config set options", () => {
       HttpsPolicy: "OPTIONAL",
     });
     expect(trackingHttps.disableDistribution).toHaveBeenCalledWith("DIST1");
+  });
+
+  it("Unit 21: flag mode: --tracking-domain with no HTTPS flag offers HTTPS by default — Put carries OPTIONAL and provisionTrackingHttps is invoked", async () => {
+    sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+    const trackingHttps = await import("../../utils/email/tracking-https");
+    vi.mocked(trackingHttps.provisionTrackingHttps).mockResolvedValueOnce({
+      trackingHttps: {
+        certificateArn: "arn:aws:acm:pending",
+        status: "pending",
+      },
+      cnameTarget: "r.us-east-1.awstrack.me",
+      dnsRecordsToShow: [],
+    });
+
+    await configDomain({
+      domain: "test.com",
+      trackingDomain: "track.test.com",
+    });
+
+    const putCalls = sesClientMock.commandCalls(
+      PutConfigurationSetTrackingOptionsCommand
+    );
+    expect(putCalls.length).toBe(1);
+    expect(putCalls[0].args[0].input).toMatchObject({
+      HttpsPolicy: "OPTIONAL",
+    });
+    expect(trackingHttps.provisionTrackingHttps).toHaveBeenCalledWith(
+      expect.objectContaining({ trackingDomain: "track.test.com" })
+    );
+  });
+
+  it("Unit 22: flag mode: --tracking-domain --no-tracking-https skips HTTPS provisioning", async () => {
+    sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+    const trackingHttps = await import("../../utils/email/tracking-https");
+    const originalArgv = process.argv;
+    process.argv = [...originalArgv, "--no-tracking-https"];
+    try {
+      await configDomain({
+        domain: "test.com",
+        trackingDomain: "track.test.com",
+      });
+
+      // An explicit --no-tracking-https still runs the pre-existing, separate
+      // trackingHttpsFlag block (disable is idempotent when nothing is
+      // enabled yet) — the only thing this plan changes is that the DEFAULT
+      // offer (when no flag is given at all) is skipped. Every Put made
+      // still carries an explicit HttpsPolicy, and the HTTPS *provisioning*
+      // path (ACM/CloudFront) is never reached either way.
+      const putCalls = sesClientMock.commandCalls(
+        PutConfigurationSetTrackingOptionsCommand
+      );
+      expect(putCalls.length).toBeGreaterThan(0);
+      for (const call of putCalls) {
+        expect(call.args[0].input).toMatchObject({ HttpsPolicy: "OPTIONAL" });
+      }
+      expect(trackingHttps.provisionTrackingHttps).not.toHaveBeenCalled();
+    } finally {
+      process.argv = originalArgv;
+    }
+  });
+
+  it("Unit 23: flag mode: changing the tracking domain host while HTTPS is already active carries HttpsPolicy REQUIRE", async () => {
+    const metadata = await import("../../utils/shared/metadata");
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValueOnce(
+      makeMetadata({
+        trackingDomain: "old.test.com",
+        trackingHttps: {
+          certificateArn: "arn:aws:acm:x",
+          status: "active",
+          distributionId: "DIST1",
+          distributionDomain: "dabc.cloudfront.net",
+        },
+      }) as never
+    );
+    sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+    const trackingHttps = await import("../../utils/email/tracking-https");
+    vi.mocked(trackingHttps.provisionTrackingHttps).mockResolvedValueOnce({
+      trackingHttps: {
+        certificateArn: "arn:aws:acm:x",
+        status: "active",
+        distributionId: "DIST1",
+        distributionDomain: "dabc.cloudfront.net",
+      },
+      cnameTarget: "dabc.cloudfront.net",
+      dnsRecordsToShow: [],
+    });
+
+    await configDomain({
+      domain: "test.com",
+      trackingDomain: "new.test.com",
+    });
+
+    const putCalls = sesClientMock.commandCalls(
+      PutConfigurationSetTrackingOptionsCommand
+    );
+    // Only one real SESv2 Put happens here: applyTrackingDomain's own write.
+    // The default HTTPS offer that follows goes through the mocked
+    // provisionTrackingHttps, which does not issue a second Put.
+    expect(putCalls.length).toBe(1);
+    expect(putCalls[0].args[0].input).toMatchObject({
+      CustomRedirectDomain: "new.test.com",
+      HttpsPolicy: "REQUIRE",
+    });
+  });
+
+  it("Unit 24: HTTPS provisioning throwing does not fail the command — the tracking domain is still persisted", async () => {
+    sesClientMock.on(PutConfigurationSetTrackingOptionsCommand).resolves({});
+    const trackingHttps = await import("../../utils/email/tracking-https");
+    vi.mocked(trackingHttps.provisionTrackingHttps).mockRejectedValueOnce(
+      Object.assign(new Error("not authorized"), { name: "AccessDenied" })
+    );
+    const metadata = await import("../../utils/shared/metadata");
+
+    await expect(
+      configDomain({ domain: "test.com", trackingDomain: "track.test.com" })
+    ).resolves.not.toThrow();
+
+    expect(mockExit).not.toHaveBeenCalled();
+    expect(metadata.saveConnectionMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        services: expect.objectContaining({
+          email: expect.objectContaining({
+            config: expect.objectContaining({
+              additionalDomains: expect.arrayContaining([
+                expect.objectContaining({
+                  domain: "test.com",
+                  trackingDomain: "track.test.com",
+                }),
+              ]),
+            }),
+          }),
+        }),
+      })
+    );
   });
 });

@@ -31,9 +31,11 @@ import { domainToConfigSetName } from "../../utils/email/config-set-slug.js";
 import {
   clearTrackingDomain,
   defaultTrackingDomain,
+  HTTP_TRACKING_CONSEQUENCE,
   isTrackingDomainNotReady,
   putTrackingDomain,
   TRACKING_DOMAIN_NONE,
+  trackingHttpsPolicy,
   validateTrackingDomain,
 } from "../../utils/email/tracking-domain.js";
 import {
@@ -671,7 +673,12 @@ async function applyTrackingDomain(
   // `domains add` deferred cleanly to `domains verify`.
   let appliedAt: string | undefined;
   try {
-    await putTrackingDomain(ctx.sesClient, ctx.candidate.configSetName, host);
+    await putTrackingDomain(
+      ctx.sesClient,
+      ctx.candidate.configSetName,
+      host,
+      trackingHttpsPolicy(ctx.candidate.trackingHttps)
+    );
     appliedAt = new Date().toISOString();
   } catch (error) {
     if (!isTrackingDomainNotReady(error)) {
@@ -832,6 +839,36 @@ async function applyTrackingHttps(
   };
 }
 
+/**
+ * Reports the outcome of enabling HTTPS for a tracking domain — active now,
+ * or still pending certificate validation (with the DNS record to add, if
+ * any). Shared by every place that calls `applyTrackingHttps(ctx, true)` so
+ * the messaging — including what HTTP-only tracking costs the recipient in
+ * the meantime — cannot drift between them.
+ */
+function reportTrackingHttpsEnabled(
+  candidate: DomainCandidate,
+  httpsResult: Awaited<ReturnType<typeof applyTrackingHttps>>,
+  reopenHint: string
+): void {
+  if (candidate.trackingHttps?.status === "active") {
+    clack.log.success(
+      `HTTPS active (${candidate.trackingHttps.distributionDomain})`
+    );
+    return;
+  }
+  clack.log.info(
+    pc.dim(
+      `Certificate validation usually takes 5–30 minutes. ${reopenHint} ${HTTP_TRACKING_CONSEQUENCE}`
+    )
+  );
+  if (httpsResult.pendingValidationRecord) {
+    clack.log.info(
+      `${httpsResult.validationRecordPushed ? "Certificate validation record (created for you):" : "Add this DNS record to validate the certificate:"}\n  ${pc.cyan(httpsResult.pendingValidationRecord.name)}\n    Type: ${httpsResult.pendingValidationRecord.type}  Value: ${httpsResult.pendingValidationRecord.value}`
+    );
+  }
+}
+
 // --- Flag mode ---
 
 async function applyFlagMode(
@@ -987,6 +1024,30 @@ async function applyFlagMode(
     } else {
       clack.log.success(`Tracking domain set to ${trackingDomainFlag}`);
       await offerTrackingCname(ctx, trackingDomainFlag.toLowerCase());
+
+      // Same default posture `domains add` takes: offer HTTPS in the same
+      // breath unless the caller already said yes/no via --tracking-https /
+      // --no-tracking-https. A failure here must not fail the command — the
+      // tracking domain write above already succeeded.
+      if (trackingHttpsFlag === undefined) {
+        try {
+          const httpsResult = await applyTrackingHttps(ctx, true);
+          reportTrackingHttpsEnabled(
+            candidate,
+            httpsResult,
+            `Re-run ${pc.cyan(`wraps email domains config --domain ${candidate.domain} --tracking-https`)} once it's ISSUED.`
+          );
+        } catch (error) {
+          clack.log.warn(
+            `Could not enable HTTPS for tracking links: ${describeTrackingHttpsError(error)}`
+          );
+          clack.log.info(
+            pc.dim(
+              `Retry later with: ${pc.cyan(`wraps email domains config --domain ${candidate.domain} --tracking-https`)}. ${HTTP_TRACKING_CONSEQUENCE}`
+            )
+          );
+        }
+      }
     }
     trackCommand("email:domains:config", {
       success: true,
@@ -1274,22 +1335,11 @@ async function applyInteractiveMode(
           }
           httpsProgress.stop();
           if (enabling) {
-            if (candidate.trackingHttps?.status === "active") {
-              clack.log.success(
-                `HTTPS active (${candidate.trackingHttps.distributionDomain})`
-              );
-            } else {
-              clack.log.info(
-                pc.dim(
-                  "Certificate validation usually takes 5–30 minutes. Reopen this menu once it's ISSUED."
-                )
-              );
-              if (httpsResult.pendingValidationRecord) {
-                clack.log.info(
-                  `${httpsResult.validationRecordPushed ? "Certificate validation record (created for you):" : "Add this DNS record to validate the certificate:"}\n  ${pc.cyan(httpsResult.pendingValidationRecord.name)}\n    Type: ${httpsResult.pendingValidationRecord.type}  Value: ${httpsResult.pendingValidationRecord.value}`
-                );
-              }
-            }
+            reportTrackingHttpsEnabled(
+              candidate,
+              httpsResult,
+              "Reopen this menu once it's ISSUED."
+            );
           } else {
             clack.log.success("HTTPS disabled for tracking links");
           }
@@ -1324,6 +1374,38 @@ async function applyInteractiveMode(
           `Tracking domain set to ${(value as string).toLowerCase()}`
         );
         await offerTrackingCname(ctx, (value as string).toLowerCase());
+
+        // First time setting a tracking domain for this candidate: offer
+        // HTTPS in the same breath instead of making the user reopen this
+        // menu and find the (only now visible) "https" item themselves.
+        if (!candidate.trackingHttps) {
+          const wantsHttps = await clack.confirm({
+            message: `Enable HTTPS for tracking links? ${pc.dim("(creates a CloudFront distribution + certificate in your account)")}`,
+            initialValue: true,
+          });
+          if (!clack.isCancel(wantsHttps) && wantsHttps) {
+            const setupHttpsProgress = new DeploymentProgress();
+            try {
+              const httpsResult = await setupHttpsProgress.execute(
+                "Enabling HTTPS",
+                async () => applyTrackingHttps(ctx, true)
+              );
+              setupHttpsProgress.stop();
+              reportTrackingHttpsEnabled(
+                candidate,
+                httpsResult,
+                "Reopen this menu once it's ISSUED."
+              );
+            } catch (error) {
+              setupHttpsProgress.stop();
+              if (error instanceof WrapsError) {
+                clack.log.error(error.message);
+              } else {
+                throw error;
+              }
+            }
+          }
+        }
         break;
       }
 
