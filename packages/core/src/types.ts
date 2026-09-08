@@ -75,9 +75,23 @@ export type TrackingConfig = {
   opens?: boolean;
   /** Track link clicks @default true */
   clicks?: boolean;
-  /** Custom redirect domain for tracking links (e.g., "track.example.com") */
+  /**
+   * Custom redirect domain for tracking links (e.g., "track.example.com").
+   *
+   * Requires `httpsEnabled: true` in practice. Without it the configuration
+   * set is written with SES's `OPTIONAL` HTTPS policy, which wraps click links
+   * in the original link's protocol — so an `https://` link resolves against
+   * this domain, which CNAMEs to `r.<region>.awstrack.me` and presents a
+   * certificate covering only `*.r.<region>.awstrack.me`. Recipients get a
+   * certificate warning instead of the destination.
+   */
   customRedirectDomain?: string;
-  /** Enable HTTPS for custom tracking domain (deploys CloudFront + ACM) */
+  /**
+   * Enable HTTPS for the custom tracking domain (deploys CloudFront + ACM).
+   *
+   * @default false — but set it to `true` whenever `customRedirectDomain` is
+   * set, unless every link you send is plain, unencrypted HTTP.
+   */
   httpsEnabled?: boolean;
   /** Enable AWS WAF with rate limiting for HTTPS tracking CDN */
   wafEnabled?: boolean;

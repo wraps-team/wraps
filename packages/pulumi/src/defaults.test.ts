@@ -125,6 +125,33 @@ describe("applyDefaults", () => {
     });
   });
 
+  describe("tracking misconfiguration", () => {
+    it("a customRedirectDomain with no httpsEnabled resolves to the exact combination WrapsEmail warns on (customRedirectDomain set, httpsEnabled false)", () => {
+      const args: WrapsEmailArgs = {
+        tracking: {
+          customRedirectDomain: "track.a.com",
+        },
+      };
+      const result = applyDefaults(args);
+
+      expect(result.tracking.customRedirectDomain).toBe("track.a.com");
+      expect(result.tracking.httpsEnabled).toBe(false);
+    });
+
+    it("a customRedirectDomain with httpsEnabled: true does not resolve to the warned-on combination", () => {
+      const args: WrapsEmailArgs = {
+        tracking: {
+          customRedirectDomain: "track.a.com",
+          httpsEnabled: true,
+        },
+      };
+      const result = applyDefaults(args);
+
+      expect(result.tracking.customRedirectDomain).toBe("track.a.com");
+      expect(result.tracking.httpsEnabled).toBe(true);
+    });
+  });
+
   describe("events configuration", () => {
     it("should apply events defaults when events is provided", () => {
       const args: WrapsEmailArgs = {

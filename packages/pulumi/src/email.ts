@@ -291,6 +291,16 @@ export class WrapsEmail extends pulumi.ComponentResource {
     // ============================================
     // 5. CREATE HTTPS TRACKING (if configured)
     // ============================================
+    if (config.tracking.customRedirectDomain && !config.tracking.httpsEnabled) {
+      pulumi.log.warn(
+        `tracking.customRedirectDomain is set to "${config.tracking.customRedirectDomain}" with tracking.httpsEnabled=false. ` +
+          "The configuration set will use SES's OPTIONAL HTTPS policy, which wraps click links in the original link's protocol — " +
+          "so https:// links in your emails will resolve against a domain with no matching certificate and show recipients a warning. " +
+          "Set tracking.httpsEnabled: true to deploy CloudFront + ACM for this domain.",
+        this
+      );
+    }
+
     let httpsTrackingResult: ReturnType<typeof createHTTPSTracking> | undefined;
 
     if (config.tracking.httpsEnabled && config.tracking.customRedirectDomain) {

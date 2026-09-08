@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as cdk from "aws-cdk-lib";
+import { Annotations } from "aws-cdk-lib";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as events from "aws-cdk-lib/aws-events";
 import * as eventsTargets from "aws-cdk-lib/aws-events-targets";
@@ -188,6 +189,18 @@ export class WrapsEmail extends Construct {
         : undefined,
     });
     resources.configSet = configSet;
+
+    // The construct does not yet write TrackingOptions onto the configuration
+    // set — plan 226 owns that work. Until it lands, accepting the option
+    // silently would leave the user believing they have branded tracking.
+    if (config.tracking.customRedirectDomain) {
+      Annotations.of(this).addWarning(
+        `tracking.customRedirectDomain ("${config.tracking.customRedirectDomain}") is not yet implemented by @wraps.dev/cdk: ` +
+          "the SES configuration set is created without tracking options, so open and click links will use the default " +
+          "r.<region>.awstrack.me domain. Use the Wraps CLI (`wraps email domains config --tracking-domain`) or " +
+          "@wraps.dev/pulumi if you need a branded tracking domain today."
+      );
+    }
 
     // ============================================
     // 4. CREATE DOMAIN IDENTITY (if configured)
