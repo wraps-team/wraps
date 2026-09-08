@@ -382,6 +382,24 @@ export type ScanFeaturesResult =
           eventHistoryEnabled?: boolean;
           eventTrackingEnabled?: boolean;
           customTrackingDomain?: string;
+          /**
+           * The configuration set's SES HttpsPolicy. OPTIONAL (SES's default
+           * when the field is omitted) wraps click links in the original
+           * link's protocol, so an https:// link resolves against a tracking
+           * domain with no matching certificate. Absent on rows scanned
+           * before this field.
+           */
+          trackingHttpsPolicy?: "REQUIRE" | "REQUIRE_OPEN_ONLY" | "OPTIONAL";
+          /**
+           * Per-configuration-set tracking state. Only sets with a
+           * CustomRedirectDomain are recorded. Absent on rows scanned before
+           * this field.
+           */
+          trackingBySet?: Array<{
+            configSetName: string;
+            customRedirectDomain?: string;
+            httpsPolicy?: "REQUIRE" | "REQUIRE_OPEN_ONLY" | "OPTIONAL";
+          }>;
           inboundBucketName?: string;
           identities?: Array<{
             identity: string;
@@ -526,7 +544,17 @@ export async function scanAWSAccountFeatures(
     // (wraps-email-tracking) as the canonical name shown in the dashboard.
     let configSetName: string | undefined;
     let customTrackingDomain: string | undefined;
+    let customTrackingHttpsPolicy:
+      | "REQUIRE"
+      | "REQUIRE_OPEN_ONLY"
+      | "OPTIONAL"
+      | undefined;
     let trackedEvents: string[] = [];
+    const trackingBySet: Array<{
+      configSetName: string;
+      customRedirectDomain?: string;
+      httpsPolicy?: "REQUIRE" | "REQUIRE_OPEN_ONLY" | "OPTIONAL";
+    }> = [];
 
     const sesClientForConfigSet = new SESv2Client({
       region: account.region,
@@ -559,6 +587,14 @@ export async function scanAWSAccountFeatures(
           );
           const trackingDomain =
             csResponse.TrackingOptions?.CustomRedirectDomain ?? undefined;
+          const trackingHttpsPolicy = csResponse.TrackingOptions?.HttpsPolicy;
+          if (trackingDomain) {
+            trackingBySet.push({
+              configSetName: setName,
+              customRedirectDomain: trackingDomain,
+              httpsPolicy: trackingHttpsPolicy,
+            });
+          }
           const eventDestResponse = await sesClientForConfigSet.send(
             new GetConfigurationSetEventDestinationsCommand({
               ConfigurationSetName: setName,
@@ -575,9 +611,11 @@ export async function scanAWSAccountFeatures(
           if (!configSetName && hasDestinations) {
             configSetName = setName;
             customTrackingDomain = trackingDomain;
+            customTrackingHttpsPolicy = trackingHttpsPolicy;
           } else if (!configSetName && setsToCheck[0] === setName) {
             configSetName = setName;
             customTrackingDomain = trackingDomain;
+            customTrackingHttpsPolicy = trackingHttpsPolicy;
           }
         } catch (detailError: any) {
           if (detailError.name !== "AccessDeniedException") {
@@ -807,6 +845,8 @@ export async function scanAWSAccountFeatures(
         eventTrackingEnabled,
         trackedEvents,
         customTrackingDomain,
+        trackingHttpsPolicy: customTrackingHttpsPolicy,
+        trackingBySet,
         dedicatedIpCount,
         inboundBucketName,
         identities,

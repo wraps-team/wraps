@@ -16,6 +16,7 @@ import {
 import { mockClient } from "aws-sdk-client-mock";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { domainToConfigSetName } from "../../utils/email/config-set-slug";
+import { setJsonMode } from "../../utils/shared/json-output";
 import {
   addDomain,
   configDomain,
@@ -49,6 +50,9 @@ vi.mock("node:dns/promises", () => ({
 const mockExit = vi
   .spyOn(process, "exit")
   .mockImplementation((() => {}) as any);
+
+// Mock console.log — used to capture jsonSuccess() output in JSON-mode tests
+const mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
 
 // Mock @clack/prompts
 vi.mock("@clack/prompts");
@@ -143,6 +147,8 @@ describe("Domain Management Commands", () => {
     sesClientMock.reset();
     vi.clearAllMocks();
     mockExit.mockClear();
+    mockConsoleLog.mockClear();
+    setJsonMode(false);
 
     // Reset the DNS resolver mock to its "everything missing" default.
     dnsResolverMock.setServers.mockReset();
@@ -462,6 +468,366 @@ describe("Domain Management Commands", () => {
 
       // Should not throw, should handle gracefully
       await expect(listDomains()).resolves.not.toThrow();
+    });
+
+    it("JSON mode: a managed domain with active HTTPS tracking reports trackingHttps: 'active'", async () => {
+      sesClientMock.on(ListEmailIdentitiesCommand).resolves({
+        EmailIdentities: [{ IdentityType: "DOMAIN", IdentityName: "test.com" }],
+      });
+      sesClientMock.on(GetEmailIdentityCommand).resolves({
+        VerifiedForSendingStatus: true,
+        DkimAttributes: { Status: "SUCCESS" },
+      });
+
+      const metadata = await import("../../utils/shared/metadata");
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValueOnce({
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "vercel",
+        timestamp: new Date().toISOString(),
+        services: {
+          email: {
+            config: {
+              domain: "primary.com",
+              additionalDomains: [
+                {
+                  domain: "test.com",
+                  configSetName: domainToConfigSetName("test.com"),
+                  addedAt: new Date().toISOString(),
+                  trackingDomain: "track.test.com",
+                  trackingHttps: {
+                    certificateArn: "arn:aws:acm:issued",
+                    status: "active",
+                    distributionId: "D111",
+                    distributionDomain: "d111.cloudfront.net",
+                  },
+                },
+              ],
+            },
+            deployedAt: new Date().toISOString(),
+          },
+        },
+      } as never);
+      vi.mocked(metadata.getAllTrackedDomains).mockReturnValueOnce([
+        {
+          domain: "test.com",
+          isPrimary: false,
+          managed: true,
+          trackingDomain: "track.test.com",
+          configSetName: domainToConfigSetName("test.com"),
+        },
+      ]);
+
+      setJsonMode(true);
+      await listDomains();
+      setJsonMode(false);
+
+      const payload = JSON.parse(
+        mockConsoleLog.mock.calls[mockConsoleLog.mock.calls.length - 1][0]
+      );
+      const entry = payload.data.domains.find(
+        (d: { domain: string }) => d.domain === "test.com"
+      );
+      expect(entry.trackingDomain).toBe("track.test.com");
+      expect(entry.trackingHttps).toBe("active");
+    });
+
+    it("JSON mode: a managed domain with a tracking domain but no recorded HTTPS reports trackingHttps: null", async () => {
+      sesClientMock.on(ListEmailIdentitiesCommand).resolves({
+        EmailIdentities: [{ IdentityType: "DOMAIN", IdentityName: "test.com" }],
+      });
+      sesClientMock.on(GetEmailIdentityCommand).resolves({
+        VerifiedForSendingStatus: true,
+        DkimAttributes: { Status: "SUCCESS" },
+      });
+
+      const metadata = await import("../../utils/shared/metadata");
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValueOnce({
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "vercel",
+        timestamp: new Date().toISOString(),
+        services: {
+          email: {
+            config: {
+              domain: "primary.com",
+              additionalDomains: [
+                {
+                  domain: "test.com",
+                  configSetName: domainToConfigSetName("test.com"),
+                  addedAt: new Date().toISOString(),
+                  trackingDomain: "track.test.com",
+                },
+              ],
+            },
+            deployedAt: new Date().toISOString(),
+          },
+        },
+      } as never);
+      vi.mocked(metadata.getAllTrackedDomains).mockReturnValueOnce([
+        {
+          domain: "test.com",
+          isPrimary: false,
+          managed: true,
+          trackingDomain: "track.test.com",
+          configSetName: domainToConfigSetName("test.com"),
+        },
+      ]);
+
+      setJsonMode(true);
+      await listDomains();
+      setJsonMode(false);
+
+      const payload = JSON.parse(
+        mockConsoleLog.mock.calls[mockConsoleLog.mock.calls.length - 1][0]
+      );
+      const entry = payload.data.domains.find(
+        (d: { domain: string }) => d.domain === "test.com"
+      );
+      expect(entry.trackingDomain).toBe("track.test.com");
+      expect(entry.trackingHttps).toBeNull();
+    });
+
+    it("JSON mode: a managed domain with no tracking domain reports both fields null", async () => {
+      sesClientMock.on(ListEmailIdentitiesCommand).resolves({
+        EmailIdentities: [{ IdentityType: "DOMAIN", IdentityName: "test.com" }],
+      });
+      sesClientMock.on(GetEmailIdentityCommand).resolves({
+        VerifiedForSendingStatus: true,
+        DkimAttributes: { Status: "SUCCESS" },
+      });
+
+      const metadata = await import("../../utils/shared/metadata");
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValueOnce({
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "vercel",
+        timestamp: new Date().toISOString(),
+        services: {
+          email: {
+            config: {
+              domain: "primary.com",
+              additionalDomains: [
+                {
+                  domain: "test.com",
+                  configSetName: domainToConfigSetName("test.com"),
+                  addedAt: new Date().toISOString(),
+                },
+              ],
+            },
+            deployedAt: new Date().toISOString(),
+          },
+        },
+      } as never);
+      vi.mocked(metadata.getAllTrackedDomains).mockReturnValueOnce([
+        {
+          domain: "test.com",
+          isPrimary: false,
+          managed: true,
+          configSetName: domainToConfigSetName("test.com"),
+        },
+      ]);
+
+      setJsonMode(true);
+      await listDomains();
+      setJsonMode(false);
+
+      const payload = JSON.parse(
+        mockConsoleLog.mock.calls[mockConsoleLog.mock.calls.length - 1][0]
+      );
+      const entry = payload.data.domains.find(
+        (d: { domain: string }) => d.domain === "test.com"
+      );
+      expect(entry.trackingDomain).toBeNull();
+      expect(entry.trackingHttps).toBeNull();
+    });
+
+    it("human mode: an active-HTTPS tracking domain is suffixed (https), an HTTP-only one is suffixed (http)", async () => {
+      sesClientMock.on(ListEmailIdentitiesCommand).resolves({
+        EmailIdentities: [{ IdentityType: "DOMAIN", IdentityName: "test.com" }],
+      });
+      sesClientMock.on(GetEmailIdentityCommand).resolves({
+        VerifiedForSendingStatus: true,
+        DkimAttributes: { Status: "SUCCESS" },
+      });
+
+      const metadata = await import("../../utils/shared/metadata");
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValueOnce({
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "vercel",
+        timestamp: new Date().toISOString(),
+        services: {
+          email: {
+            config: {
+              domain: "primary.com",
+              additionalDomains: [
+                {
+                  domain: "test.com",
+                  configSetName: domainToConfigSetName("test.com"),
+                  addedAt: new Date().toISOString(),
+                  trackingDomain: "track.test.com",
+                },
+              ],
+            },
+            deployedAt: new Date().toISOString(),
+          },
+        },
+      } as never);
+      vi.mocked(metadata.getAllTrackedDomains).mockReturnValueOnce([
+        {
+          domain: "test.com",
+          isPrimary: false,
+          managed: true,
+          trackingDomain: "track.test.com",
+          configSetName: domainToConfigSetName("test.com"),
+        },
+      ]);
+
+      const clack = await import("@clack/prompts");
+
+      await listDomains();
+
+      const noteCall = vi
+        .mocked(clack.note)
+        .mock.calls.find(([, title]) => title === "Managed by Wraps");
+      expect(noteCall?.[0]).toContain("track.test.com");
+      expect(noteCall?.[0]).toContain("(http)");
+    });
+
+    it("regression: a primary domain with HTTPS tracking (Pulumi path) is suffixed (https), not (http)", async () => {
+      // The primary domain's tracking state lives in config.tracking, not in
+      // additionalDomains — it isn't an AdditionalDomain at all. A lookup that
+      // only reads additionalDomains always misses it, which previously made
+      // this render as (http) even when the Pulumi stack had HTTPS live.
+      sesClientMock.on(ListEmailIdentitiesCommand).resolves({
+        EmailIdentities: [
+          { IdentityType: "DOMAIN", IdentityName: "primary.com" },
+        ],
+      });
+      sesClientMock.on(GetEmailIdentityCommand).resolves({
+        VerifiedForSendingStatus: true,
+        DkimAttributes: { Status: "SUCCESS" },
+      });
+
+      const metadata = await import("../../utils/shared/metadata");
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue({
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "vercel",
+        timestamp: new Date().toISOString(),
+        services: {
+          email: {
+            config: {
+              domain: "primary.com",
+              tracking: {
+                enabled: true,
+                customRedirectDomain: "track.primary.com",
+                httpsEnabled: true,
+              },
+            },
+            deployedAt: new Date().toISOString(),
+          },
+        },
+      } as never);
+      vi.mocked(metadata.getAllTrackedDomains).mockReturnValue([
+        {
+          domain: "primary.com",
+          isPrimary: true,
+          managed: true,
+          trackingDomain: "track.primary.com",
+        },
+      ]);
+
+      const clack = await import("@clack/prompts");
+
+      await listDomains();
+
+      const noteCall = vi
+        .mocked(clack.note)
+        .mock.calls.find(([, title]) => title === "Managed by Wraps");
+      expect(noteCall?.[0]).toContain("track.primary.com");
+      expect(noteCall?.[0]).toContain("(https)");
+
+      setJsonMode(true);
+      await listDomains();
+      setJsonMode(false);
+
+      const payload = JSON.parse(
+        mockConsoleLog.mock.calls[mockConsoleLog.mock.calls.length - 1][0]
+      );
+      const entry = payload.data.domains.find(
+        (d: { domain: string }) => d.domain === "primary.com"
+      );
+      expect(entry.trackingHttps).toBe("active");
+    });
+
+    it("a primary domain with a tracking domain but httpsEnabled false/absent is suffixed (http)", async () => {
+      sesClientMock.on(ListEmailIdentitiesCommand).resolves({
+        EmailIdentities: [
+          { IdentityType: "DOMAIN", IdentityName: "primary.com" },
+        ],
+      });
+      sesClientMock.on(GetEmailIdentityCommand).resolves({
+        VerifiedForSendingStatus: true,
+        DkimAttributes: { Status: "SUCCESS" },
+      });
+
+      const metadata = await import("../../utils/shared/metadata");
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue({
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "vercel",
+        timestamp: new Date().toISOString(),
+        services: {
+          email: {
+            config: {
+              domain: "primary.com",
+              tracking: {
+                enabled: true,
+                customRedirectDomain: "track.primary.com",
+              },
+            },
+            deployedAt: new Date().toISOString(),
+          },
+        },
+      } as never);
+      vi.mocked(metadata.getAllTrackedDomains).mockReturnValue([
+        {
+          domain: "primary.com",
+          isPrimary: true,
+          managed: true,
+          trackingDomain: "track.primary.com",
+        },
+      ]);
+
+      const clack = await import("@clack/prompts");
+
+      await listDomains();
+
+      const noteCall = vi
+        .mocked(clack.note)
+        .mock.calls.find(([, title]) => title === "Managed by Wraps");
+      expect(noteCall?.[0]).toContain("track.primary.com");
+      expect(noteCall?.[0]).toContain("(http)");
+
+      setJsonMode(true);
+      await listDomains();
+      setJsonMode(false);
+
+      const payload = JSON.parse(
+        mockConsoleLog.mock.calls[mockConsoleLog.mock.calls.length - 1][0]
+      );
+      const entry = payload.data.domains.find(
+        (d: { domain: string }) => d.domain === "primary.com"
+      );
+      expect(entry.trackingHttps).toBeNull();
     });
   });
 

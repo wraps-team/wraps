@@ -1859,4 +1859,223 @@ describe("scanAWSAccountFeatures — config set detection", () => {
     // A throttle is not a stale role — it must not claim a missing permission.
     expect(configSetWarnings[0][1]).not.toContain("ses:ListConfigurationSets");
   });
+
+  it("records the canonical set's HttpsPolicy as trackingHttpsPolicy", async () => {
+    mockSend.mockImplementation(
+      (command: { _type: string; ConfigurationSetName?: string }) => {
+        if (command._type === "ListConfigurationSetsCommand") {
+          return Promise.resolve({
+            ConfigurationSets: ["wraps-email-example-com"],
+          });
+        }
+        if (command._type === "GetConfigurationSetCommand") {
+          return Promise.resolve({
+            TrackingOptions: {
+              CustomRedirectDomain: "track.example.com",
+              HttpsPolicy: "REQUIRE",
+            },
+          });
+        }
+        switch (command._type) {
+          case "GetConfigurationSetEventDestinationsCommand":
+            return Promise.resolve({
+              EventDestinations: [{ MatchingEventTypes: ["SEND"] }],
+            });
+          case "GetAccountCommand":
+            return Promise.resolve({ ProductionAccessEnabled: true });
+          case "GetDedicatedIpsCommand":
+            return Promise.resolve({ DedicatedIps: [] });
+          case "ListEmailIdentitiesCommand":
+            return Promise.resolve({ EmailIdentities: [] });
+          default:
+            return Promise.reject(
+              new Error(`Unexpected SES command: ${command._type}`)
+            );
+        }
+      }
+    );
+
+    const result = await scanAWSAccountFeatures(
+      scanTestAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.features.email!.trackingHttpsPolicy).toBe("REQUIRE");
+    }
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq }) => eq(a.id, scanTestAccount.id),
+    });
+    expect(row?.features?.email?.trackingHttpsPolicy).toBe("REQUIRE");
+  });
+
+  it("leaves trackingHttpsPolicy undefined (not defaulted to OPTIONAL) when SES reports no policy", async () => {
+    mockSend.mockImplementation(
+      (command: { _type: string; ConfigurationSetName?: string }) => {
+        if (command._type === "ListConfigurationSetsCommand") {
+          return Promise.resolve({
+            ConfigurationSets: ["wraps-email-example-com"],
+          });
+        }
+        if (command._type === "GetConfigurationSetCommand") {
+          return Promise.resolve({
+            TrackingOptions: { CustomRedirectDomain: "track.example.com" },
+          });
+        }
+        switch (command._type) {
+          case "GetConfigurationSetEventDestinationsCommand":
+            return Promise.resolve({
+              EventDestinations: [{ MatchingEventTypes: ["SEND"] }],
+            });
+          case "GetAccountCommand":
+            return Promise.resolve({ ProductionAccessEnabled: true });
+          case "GetDedicatedIpsCommand":
+            return Promise.resolve({ DedicatedIps: [] });
+          case "ListEmailIdentitiesCommand":
+            return Promise.resolve({ EmailIdentities: [] });
+          default:
+            return Promise.reject(
+              new Error(`Unexpected SES command: ${command._type}`)
+            );
+        }
+      }
+    );
+
+    const result = await scanAWSAccountFeatures(
+      scanTestAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // Report what SES said, not a guessed default — the reader treats
+      // absent as unknown, not as OPTIONAL.
+      expect(result.features.email!.trackingHttpsPolicy).toBeUndefined();
+    }
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq }) => eq(a.id, scanTestAccount.id),
+    });
+    expect(row?.features?.email?.trackingHttpsPolicy).toBeUndefined();
+  });
+
+  it("records a per-set tracking entry for every configuration set with a tracking domain, independent of which set is canonical", async () => {
+    mockSend.mockImplementation(
+      (command: { _type: string; ConfigurationSetName?: string }) => {
+        if (command._type === "ListConfigurationSetsCommand") {
+          return Promise.resolve({
+            ConfigurationSets: [
+              "wraps-email-example-com",
+              "wraps-email-secondary-com",
+            ],
+          });
+        }
+        if (command._type === "GetConfigurationSetCommand") {
+          if (command.ConfigurationSetName === "wraps-email-example-com") {
+            return Promise.resolve({
+              TrackingOptions: {
+                CustomRedirectDomain: "track.example.com",
+                HttpsPolicy: "REQUIRE",
+              },
+            });
+          }
+          return Promise.resolve({
+            TrackingOptions: {
+              CustomRedirectDomain: "track.secondary.com",
+            },
+          });
+        }
+        switch (command._type) {
+          case "GetConfigurationSetEventDestinationsCommand":
+            return Promise.resolve({ EventDestinations: [] });
+          case "GetAccountCommand":
+            return Promise.resolve({ ProductionAccessEnabled: true });
+          case "GetDedicatedIpsCommand":
+            return Promise.resolve({ DedicatedIps: [] });
+          case "ListEmailIdentitiesCommand":
+            return Promise.resolve({ EmailIdentities: [] });
+          default:
+            return Promise.reject(
+              new Error(`Unexpected SES command: ${command._type}`)
+            );
+        }
+      }
+    );
+
+    const result = await scanAWSAccountFeatures(
+      scanTestAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // Canonical fields still reflect only the first set checked (pre-plan
+      // behaviour is unchanged) — neither event destinations exist, so the
+      // first set in the list wins.
+      expect(result.features.email!.configSetName).toBe(
+        "wraps-email-example-com"
+      );
+      expect(result.features.email!.customTrackingDomain).toBe(
+        "track.example.com"
+      );
+
+      expect(result.features.email!.trackingBySet).toHaveLength(2);
+      expect(result.features.email!.trackingBySet).toEqual(
+        expect.arrayContaining([
+          {
+            configSetName: "wraps-email-example-com",
+            customRedirectDomain: "track.example.com",
+            httpsPolicy: "REQUIRE",
+          },
+          {
+            configSetName: "wraps-email-secondary-com",
+            customRedirectDomain: "track.secondary.com",
+            httpsPolicy: undefined,
+          },
+        ])
+      );
+    }
+  });
+
+  it("does not record a trackingBySet entry for a set with no CustomRedirectDomain", async () => {
+    mockSend.mockImplementation(
+      (command: { _type: string; ConfigurationSetName?: string }) => {
+        if (command._type === "ListConfigurationSetsCommand") {
+          return Promise.resolve({
+            ConfigurationSets: ["wraps-email-example-com"],
+          });
+        }
+        if (command._type === "GetConfigurationSetCommand") {
+          // No TrackingOptions at all on this set.
+          return Promise.resolve({});
+        }
+        switch (command._type) {
+          case "GetConfigurationSetEventDestinationsCommand":
+            return Promise.resolve({ EventDestinations: [] });
+          case "GetAccountCommand":
+            return Promise.resolve({ ProductionAccessEnabled: true });
+          case "GetDedicatedIpsCommand":
+            return Promise.resolve({ DedicatedIps: [] });
+          case "ListEmailIdentitiesCommand":
+            return Promise.resolve({ EmailIdentities: [] });
+          default:
+            return Promise.reject(
+              new Error(`Unexpected SES command: ${command._type}`)
+            );
+        }
+      }
+    );
+
+    const result = await scanAWSAccountFeatures(
+      scanTestAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.features.email!.trackingBySet).toEqual([]);
+    }
+  });
 });

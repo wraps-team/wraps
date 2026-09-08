@@ -170,6 +170,26 @@ export const awsAccount = pgTable(
         eventTrackingEnabled?: boolean;
         trackedEvents?: string[];
         customTrackingDomain?: string;
+        /**
+         * The configuration set's SES HttpsPolicy. OPTIONAL (SES's default when
+         * the field is omitted) wraps click links in the original link's
+         * protocol, so an https:// link resolves against a tracking domain with
+         * no matching certificate. Absent on rows scanned before this field.
+         */
+        trackingHttpsPolicy?: "REQUIRE" | "REQUIRE_OPEN_ONLY" | "OPTIONAL";
+        /**
+         * Per-configuration-set tracking state. An account with several
+         * per-domain sets has one tracking domain (or none) per set;
+         * customTrackingDomain/trackingHttpsPolicy above only ever reflect the
+         * canonical set. Only sets with a CustomRedirectDomain are recorded, so
+         * an account with no custom tracking anywhere gets an empty array, not
+         * a row per set. Absent on rows scanned before this field.
+         */
+        trackingBySet?: Array<{
+          configSetName: string;
+          customRedirectDomain?: string;
+          httpsPolicy?: "REQUIRE" | "REQUIRE_OPEN_ONLY" | "OPTIONAL";
+        }>;
         dedicatedIpCount?: number;
         inboundBucketName?: string;
         identities?: Array<{

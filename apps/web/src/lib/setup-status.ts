@@ -20,6 +20,23 @@ export type AccountFeatures = {
     eventHistoryEnabled?: boolean;
     eventTrackingEnabled?: boolean;
     customTrackingDomain?: string;
+    /**
+     * The configuration set's SES HttpsPolicy. OPTIONAL (SES's default when
+     * the field is omitted) wraps click links in the original link's
+     * protocol, so an https:// link resolves against a tracking domain with
+     * no matching certificate. Absent on rows scanned before this field.
+     */
+    trackingHttpsPolicy?: "REQUIRE" | "REQUIRE_OPEN_ONLY" | "OPTIONAL";
+    /**
+     * Per-configuration-set tracking state. Only sets with a
+     * CustomRedirectDomain are recorded. Absent on rows scanned before this
+     * field.
+     */
+    trackingBySet?: Array<{
+      configSetName: string;
+      customRedirectDomain?: string;
+      httpsPolicy?: "REQUIRE" | "REQUIRE_OPEN_ONLY" | "OPTIONAL";
+    }>;
     identities?: Array<{
       identity: string;
       type: "DOMAIN" | "EMAIL_ADDRESS";

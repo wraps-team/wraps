@@ -1259,6 +1259,16 @@ export async function listDomains(): Promise<void> {
 
     // Load metadata to cross-reference managed vs unmanaged
     let trackedDomains: ReturnType<typeof getAllTrackedDomains> = [];
+    // getAllTrackedDomains() projects onto TrackedDomain, which doesn't carry
+    // trackingHttps — read it straight off the raw metadata instead of
+    // widening that shared projection. Only `.status` is ever read from this
+    // map, so its value type stays narrower than AdditionalDomain["trackingHttps"]
+    // on purpose — the primary domain entry below has no certificateArn to put
+    // there, because it isn't an AdditionalDomain at all.
+    let trackingHttpsByDomain = new Map<
+      string,
+      { status: "active" | "pending" } | undefined
+    >();
     try {
       const awsIdentity = await validateAWSCredentials();
       const metadata = await loadConnectionMetadata(
@@ -1267,6 +1277,21 @@ export async function listDomains(): Promise<void> {
       );
       if (metadata) {
         trackedDomains = getAllTrackedDomains(metadata);
+        const emailConfig = metadata.services.email?.config;
+        trackingHttpsByDomain = new Map(
+          (emailConfig?.additionalDomains ?? []).map(
+            (d) => [d.domain, d.trackingHttps] as const
+          )
+        );
+        // The primary domain's HTTPS tracking state lives in
+        // config.tracking.httpsEnabled, not in additionalDomains — it's the
+        // same boolean the Pulumi stack gates ACM + CloudFront creation on
+        // (infrastructure/email-stack.ts). There is no "pending" state for
+        // this path in metadata, so the only two outcomes are "active" or
+        // absent (rendered identically to an HTTP-only domain).
+        if (emailConfig?.domain && emailConfig.tracking?.httpsEnabled) {
+          trackingHttpsByDomain.set(emailConfig.domain, { status: "active" });
+        }
       }
       // baseline:allow-next-line no-swallowed-errors — metadata unavailable is non-fatal, domains show as unmanaged
     } catch {}
@@ -1329,6 +1354,7 @@ export async function listDomains(): Promise<void> {
             isPrimary: tracked?.isPrimary ?? false,
             purpose: tracked?.purpose,
             trackingDomain: tracked?.trackingDomain ?? null,
+            trackingHttps: trackingHttpsByDomain.get(d.name)?.status ?? null,
           };
         }),
         totalCount: sesDomains.length,
@@ -1350,7 +1376,11 @@ export async function listDomains(): Promise<void> {
           ? pc.dim("Primary")
           : pc.dim(PURPOSE_LABELS[tracked.purpose || "other"] || "General");
         const trackingSuffix = tracked.trackingDomain
-          ? ` ${pc.dim("→")} ${tracked.trackingDomain}`
+          ? ` ${pc.dim("→")} ${tracked.trackingDomain} ${
+              trackingHttpsByDomain.get(d.name)?.status === "active"
+                ? pc.dim("(https)")
+                : pc.yellow("(http)")
+            }`
           : "";
         return `  ${statusIcon} ${pc.bold(d.name.padEnd(30))} ${label.padEnd(24)} DKIM: ${dkimIcon}${trackingSuffix}`;
       });

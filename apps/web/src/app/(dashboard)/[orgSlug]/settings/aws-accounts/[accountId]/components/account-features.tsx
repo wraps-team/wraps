@@ -160,6 +160,19 @@ export function AccountFeatures({
     inbound: !!emailFeatures?.inboundBucketName,
   };
 
+  // OPTIONAL (SES's default when the field is omitted) wraps click links in
+  // the original link's protocol, so an https:// link resolves against a
+  // tracking domain with no matching certificate — the recipient gets a
+  // certificate warning instead of the landing page. Absent policy means the
+  // row predates the scan field, which is unknown, not broken, so say
+  // nothing extra in that case.
+  const trackingDomainDetail = emailFeatures?.customTrackingDomain
+    ? emailFeatures.trackingHttpsPolicy &&
+      emailFeatures.trackingHttpsPolicy !== "REQUIRE"
+      ? `${emailFeatures.customTrackingDomain} — HTTP only — https:// links may show recipients a certificate warning`
+      : emailFeatures.customTrackingDomain
+    : undefined;
+
   // Count enabled email features (total enabled / total features)
   const emailFeaturesEnabled =
     Object.values(emailFeatureStatus).filter(Boolean).length;
@@ -385,7 +398,7 @@ export function AccountFeatures({
             {/* Custom Tracking Domain */}
             <FeatureItem
               description="Branded tracking URLs"
-              detail={emailFeatures?.customTrackingDomain}
+              detail={trackingDomainDetail}
               enabled={emailFeatureStatus.customTrackingDomain}
               icon={<Globe className="h-4 w-4 text-cyan-600" />}
               iconBgClass="bg-cyan-100 dark:bg-cyan-900"
