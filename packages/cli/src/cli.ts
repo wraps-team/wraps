@@ -168,50 +168,90 @@ function showHelp() {
   );
   console.log("Email Commands:");
   console.log(
-    `  ${pc.cyan("email init")}           Deploy new email infrastructure`
+    `  ${pc.cyan("email init")}              Deploy new email infrastructure`
   );
   console.log(
-    `  ${pc.cyan("email check")}          Check email deliverability for a domain`
+    `  ${pc.cyan("email check")}             Check email deliverability for a domain`
   );
   console.log(
-    `  ${pc.cyan("email connect")}        Connect to existing AWS SES`
+    `  ${pc.cyan("email connect")}           Connect to existing AWS SES`
   );
   console.log(
-    `  ${pc.cyan("email status")}         Show email infrastructure details`
+    `  ${pc.cyan("email status")}            Show email infrastructure details`
   );
   console.log(
-    `  ${pc.cyan("email plan")}           Show SES pricing plan and cheaper options`
+    `  ${pc.cyan("email plan")}              Show SES pricing plan and cheaper options`
   );
-  console.log(`  ${pc.cyan("email test")}           Send a test email`);
-  console.log(`  ${pc.cyan("email verify")}         Verify domain DNS records`);
+  console.log(`  ${pc.cyan("email test")}              Send a test email`);
   console.log(
-    `  ${pc.cyan("email sync")}           Apply CLI updates to infrastructure`
-  );
-  console.log(`  ${pc.cyan("email upgrade")}        Add features`);
-  console.log(
-    `  ${pc.cyan("email restore")}        Restore original configuration`
+    `  ${pc.cyan("email verify")}            Verify domain DNS records`
   );
   console.log(
-    `  ${pc.cyan("email destroy")}        Remove email infrastructure`
+    `  ${pc.cyan("email sync")}              Apply CLI updates to infrastructure`
+  );
+  console.log(`  ${pc.cyan("email upgrade")}           Add features`);
+  console.log(
+    `  ${pc.cyan("email restore")}           Restore original configuration`
   );
   console.log(
-    `  ${pc.cyan("email doctor")}         Diagnose and clean up email infrastructure`
-  );
-  console.log(`  ${pc.cyan("email domains add")}    Add a domain to SES`);
-  console.log(`  ${pc.cyan("email domains list")}   List all domains`);
-  console.log(`  ${pc.cyan("email domains remove")} Remove a domain`);
-  console.log(
-    `  ${pc.cyan("email inbound init")}   Enable inbound email receiving`
-  );
-  console.log(`  ${pc.cyan("email inbound status")} Show inbound email status`);
-  console.log(
-    `  ${pc.cyan("email inbound verify")} Verify inbound DNS records`
+    `  ${pc.cyan("email destroy")}           Remove email infrastructure`
   );
   console.log(
-    `  ${pc.cyan("email inbound test")}   Send test email and verify receipt`
+    `  ${pc.cyan("email doctor")}            Diagnose and clean up email infrastructure`
+  );
+  console.log(`  ${pc.cyan("email domains add")}       Add a domain to SES`);
+  console.log(`  ${pc.cyan("email domains list")}      List all domains`);
+  console.log(`  ${pc.cyan("email domains remove")}    Remove a domain`);
+  console.log(
+    `  ${pc.cyan("email domains verify")}    Check domain verification status`
   );
   console.log(
-    `  ${pc.cyan("email inbound destroy")} Remove inbound email infrastructure\n`
+    `  ${pc.cyan("email domains get-dkim")}  Show DKIM tokens for a domain`
+  );
+  console.log(
+    `  ${pc.cyan("email domains config")}    Configure domain tracking, TLS, and archiving`
+  );
+  console.log(
+    `  ${pc.cyan("email inbound init")}      Enable inbound email receiving`
+  );
+  console.log(
+    `  ${pc.cyan("email inbound status")}    Show inbound email status`
+  );
+  console.log(
+    `  ${pc.cyan("email inbound verify")}    Verify inbound DNS records`
+  );
+  console.log(
+    `  ${pc.cyan("email inbound test")}      Send test email and verify receipt`
+  );
+  console.log(
+    `  ${pc.cyan("email inbound add")}       Add an inbound receiving domain`
+  );
+  console.log(
+    `  ${pc.cyan("email inbound remove")}    Remove an inbound receiving domain`
+  );
+  console.log(
+    `  ${pc.cyan("email inbound destroy")}   Remove inbound email infrastructure`
+  );
+  console.log(
+    `  ${pc.cyan("email reply init")}        Set up signed reply-to threading`
+  );
+  console.log(
+    `  ${pc.cyan("email reply rotate")}      Rotate the reply-threading signing secret`
+  );
+  console.log(
+    `  ${pc.cyan("email reply status")}      Show reply-threading status`
+  );
+  console.log(
+    `  ${pc.cyan("email reply destroy")}     Remove reply-threading infrastructure`
+  );
+  console.log(
+    `  ${pc.cyan("email reply decode")}      Decode a reply-to address`
+  );
+  console.log(
+    `  ${pc.cyan("email logs list")}         List recent email sends`
+  );
+  console.log(
+    `  ${pc.cyan("email logs get")}          Show details for one message\n`
   );
   console.log("Agent Commands:");
   console.log(
@@ -242,7 +282,10 @@ function showHelp() {
     `  ${pc.cyan("email workflows validate")}  Validate workflow files`
   );
   console.log(
-    `  ${pc.cyan("email workflows push")}      Push workflows to dashboard\n`
+    `  ${pc.cyan("email workflows push")}      Push workflows to dashboard`
+  );
+  console.log(
+    `  ${pc.cyan("workflow init")}             Scaffold a cross-channel workflow (email → SMS)\n`
   );
   console.log("SMS Commands:");
   console.log(`  ${pc.cyan("sms init")}             Deploy SMS infrastructure`);
