@@ -66,6 +66,191 @@ const Code = ({ children }: { children: ReactNode }) => (
 
 const releases: Release[] = [
   {
+    version: "CLI v3.7.0",
+    date: "September 2026",
+    icon: Wrench,
+    title: "Tracking Links That Resolve",
+    items: [
+      <>
+        <Code>wraps email domains list</Code> reports whether tracking links are
+        HTTPS, in both human and JSON output, and the dashboard qualifies the
+        tracking-domain row. An HTTPS tracking domain and an HTTP-only one
+        looked identical everywhere Wraps displayed them, and the failure hides
+        well: opens keep working over plain HTTP, so only clicks break and the
+        symptom reads as an unremarkable click-through rate. Tracking state is
+        recorded per configuration set, so a multi-domain account no longer
+        reports one set&rsquo;s state as the whole account&rsquo;s
+      </>,
+      <>
+        <Code>domains config --tracking-domain</Code> offers HTTPS at the point
+        it sets the domain, rather than only on a second trip through the menu
+      </>,
+      <>
+        Fix: every tracking-domain write now carries an explicit{" "}
+        <Code>HttpsPolicy</Code>. SES treats an omitted policy as{" "}
+        <Code>OPTIONAL</Code>, which wraps click links in the original
+        link&rsquo;s protocol &mdash; and every link in modern email is{" "}
+        <Code>https://</Code>, so a recipient got a certificate warning from{" "}
+        <Code>r.&lt;region&gt;.awstrack.me</Code> instead of the destination.
+        Three paths could reach that state, including{" "}
+        <Code>domains verify</Code> re-issuing a policy-less write that
+        downgraded an already-<Code>REQUIRE</Code> configuration set
+      </>,
+      <>
+        Fix: a zone-scoped Cloudflare token works for DNS automation. Validation
+        gated on <Code>GET /user/tokens/verify</Code>, which needs the token to
+        carry User &rarr; API Tokens &rarr; Read, so a token holding only Zone
+        &rarr; DNS &rarr; Edit &mdash; the least-privilege token for everything
+        the CLI asks of Cloudflare &mdash; was refused while being able to
+        create every record needed. Validation now lists zones, which is the
+        capability the feature actually exercises
+      </>,
+      <>
+        Fix: two DNS paths degraded silently. The tracking CNAME printed for
+        manual entry with no hint that a push had been attempted and refused,
+        and the ACM validation push discarded its result, so the record that
+        gates certificate issuance could be dropped while the CLI reported
+        success and HTTPS sat at pending forever. Both now say whether DNS was
+        written
+      </>,
+      <>
+        Fix: <Code>wraps --help</Code> hid thirteen shipped subcommands across
+        five groups, including <Code>wraps email reply</Code>,{" "}
+        <Code>wraps email logs</Code> and <Code>wraps workflow</Code> entirely.
+        A parity test reads the dispatcher and asserts every subcommand appears
+        in the help output
+      </>,
+      <>
+        Fix: both IaC packages accepted{" "}
+        <Code>tracking.customRedirectDomain</Code> and failed differently.{" "}
+        <Code>@wraps.dev/pulumi</Code> deployed it with SES&rsquo;s{" "}
+        <Code>OPTIONAL</Code> policy and no CloudFront &mdash; a
+        successful-looking deploy whose click links break &mdash; and{" "}
+        <Code>@wraps.dev/cdk</Code> ignored the option entirely. Each now warns
+        at deploy time
+      </>,
+    ],
+  },
+  {
+    version: "API v1.2",
+    date: "September 2026",
+    icon: Blocks,
+    title: "The API Catches Up With the Dashboard",
+    media: {
+      src: "/email/2026-09-api-v1-2.png",
+      alt: "A Wraps card reading: API v1.2 — Templates and segments by API key. Domain verification, email metrics and SES account health ship alongside them.",
+      width: 1104,
+      height: 480,
+    },
+    items: [
+      <>
+        The template editor is reachable by API key. <Code>/v1/templates</Code>{" "}
+        adds a cursor-paginated list, full detail, create, partial update,{" "}
+        <Code>/:id/publish</Code> and <Code>/:id/duplicate</Code> &mdash;
+        publish running the same sequence the dashboard uses. The API does not
+        compile TSX, so <Code>compiledHtml</Code> must come from the caller.
+        There is no DELETE: templates are referenced by send history, and
+        removing one would silently detach it
+      </>,
+      <>
+        <Code>GET /v1/templates/pull</Code> gains a bound. It returned every
+        code-pushed template with full TSX source and no pagination, its only
+        ceiling Lambda&rsquo;s response limit. <Code>limit</Code> is opt-in, so
+        the CLI&rsquo;s push/pull protocol is byte-for-byte unchanged when it is
+        omitted
+      </>,
+      <>
+        <Code>/v1/segments</Code> adds list, read, create, update, delete and{" "}
+        <Code>/preview</Code> for an unsaved condition. The whole group sits
+        behind a Pro plan gate on every verb including reads.{" "}
+        <Code>memberCount</Code> is always computed live rather than read from
+        the cached column, and a delete refuses with 409 while a scheduled or
+        processing broadcast still targets the segment
+      </>,
+      <>
+        <Code>/v1/batch</Code> rounds out with a list, per-recipient outcomes
+        and a click breakdown. A caller could create, promote, get, cancel and
+        resume a broadcast but never see who it reached. The status endpoint
+        also reports the delivered, opened, clicked, bounced, complained and
+        suppressed counters the send already tracked
+      </>,
+      <>
+        <Code>GET /v1/domains</Code> answers whether a sending identity is
+        verified and DKIM is live, read from SES with no new IAM. A platform
+        provisioning domains for its own tenants could get that answer from the
+        CLI, the MCP server and onboarding, but never from an API key. An
+        unreachable connected account is marked rather than failing the whole
+        request
+      </>,
+      <>
+        <Code>GET /v1/email/metrics</Code> returns aggregate email numbers with
+        dimension and granularity parameters. No plan gate &mdash; reading your
+        own numbers is not a paid feature
+      </>,
+      <>
+        <Code>GET /v1/account/health</Code> serves the SES verdict: sandbox
+        status, production access, enforcement pauses, the 24-hour quota. A
+        hosted provider cannot describe any of that, because there is no
+        per-customer SES account to describe. Thresholds come from the
+        classifier&rsquo;s exported constants so a caller computes its own
+        headroom without hardcoding AWS&rsquo;s numbers, <Code>unknown</Code>{" "}
+        never collapses to healthy, and the read costs zero AWS calls
+      </>,
+    ],
+  },
+  {
+    version: "Platform v0.27.0",
+    date: "September 2026",
+    icon: ShieldCheck,
+    title: "Audit Export, SMS Consent & Account Health",
+    items: [
+      <>
+        Audit logs export to CSV on Business. The plan was sold on audit export
+        with no export path behind it. The export is scoped to the
+        caller&rsquo;s organization, bounded by the plan&rsquo;s retention
+        window, and self-auditing: exporting the audit trail leaves a row in the
+        audit trail
+      </>,
+      <>
+        The preference center lets a contact grant and withdraw SMS consent. It
+        already offered SMS as a preferred channel whenever a contact had a
+        phone, but nothing let the contact actually consent, so every write to
+        that status was an operator assertion. Both transitions record the exact
+        consent sentence shown, the IP and the user agent. Granting requires the
+        organization to still be able to send; withdrawal never does
+      </>,
+      <>
+        A header pill reports SES account health whenever it is not healthy,
+        from a Postgres-only read. The hourly sweep compared GetAccount and
+        CloudWatch reputation against AWS&rsquo;s enforcement lines and threw
+        every number away, so &ldquo;is my account okay right now?&rdquo; had no
+        answer anywhere unless an alert happened to fire in the last 24 hours
+      </>,
+      <>
+        Fix: the stale-feed alert stops firing on foreign SES traffic. The
+        fallback probe reads the account-wide SES send count, which includes
+        mail from applications that have nothing to do with Wraps and were never
+        owed an event. One customer sharing SES with their own app was flagged
+        with zero Wraps sends against 15,804 account-wide. The probe now
+        measures that count against a seven-day baseline of recorded sends and
+        stays quiet when the surplus is someone else&rsquo;s mail
+      </>,
+      <>
+        Fix: an unauthenticated waitlist endpoint on both the dashboard and
+        wraps.dev wrote into Wraps&rsquo; own contact list. On the
+        already-exists branch it resolved the contact by substring match and
+        took the first result without comparing the address, subscribing the
+        wrong person to a topic. Neither route had a caller; both are removed
+      </>,
+      <>
+        Fix: a documentation code block that omitted its default tab rendered as
+        an empty box, across 95 call sites in 16 files including the base URL on
+        the API reference. The default now falls back to the first item&rsquo;s
+        language
+      </>,
+    ],
+  },
+  {
     version: "CLI v3.6.0",
     date: "September 2026",
     icon: Lock,
