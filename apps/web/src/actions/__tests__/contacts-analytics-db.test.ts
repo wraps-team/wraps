@@ -20,7 +20,16 @@ import {
   user,
 } from "@wraps/db";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { getContactAnalytics, getContactTimeline } from "../contacts-analytics";
 
 const PREFIX = "contacts-analytics-db";
@@ -91,6 +100,32 @@ const agedOutContact = { id: `${PREFIX}-c-agedout`, emailStatus: "active" };
 const deepHistoryContact = { id: `${PREFIX}-c-deep`, emailStatus: "active" };
 const MAX_SOURCE_ROWS = 500;
 
+/**
+ * The aged-out fixtures expire an hour from now, and the tests that need them
+ * aged out move their own clock past that instead of back-dating the rows.
+ *
+ * A row whose real `expires_at` is in the past is not safe to leave lying in
+ * this database: the expired-`contact_event` sweep in apps/api's
+ * message-send-cleanup worker is org-agnostic by design and deletes every such
+ * row it finds, and
+ * `apps/api/src/workers/__tests__/message-send-cleanup.test.ts` runs that sweep
+ * for real against the same database — concurrently, both under `pnpm test`
+ * and in CI. Back-dated rows were measured disappearing mid-test that way.
+ * Rows that expire in the future are invisible to the sweep; `vi.setSystemTime`
+ * is what makes the code under test read them as aged out.
+ *
+ * The 24h gap between expiry and the faked clock is not arbitrary. The aged-out
+ * count in `contacts-analytics.ts` compares the column inside a raw `sql`
+ * template, so the JS `Date` is bound by node-postgres in *local* time while
+ * drizzle stored the column's naive `timestamp` in UTC — the comparison is off
+ * by the runner's UTC offset. A day of headroom clears any real offset, the
+ * same way the original back-dated fixtures did.
+ */
+const HOUR = 60 * 60 * 1000;
+const REAL_NOW = Date.now();
+const AGED_OUT_EXPIRES_AT = new Date(REAL_NOW + 24 * HOUR);
+const AFTER_AGED_OUT_EXPIRY = new Date(REAL_NOW + 48 * HOUR);
+
 vi.mock("next/headers", () => ({
   headers: () => new Headers(),
 }));
@@ -159,23 +194,22 @@ beforeAll(async () => {
     emailsSent: 12,
   });
 
-  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
   await db.insert(contactEvent).values([
     {
       id: `${PREFIX}-ev-expired-1`,
       contactId: agedOutContact.id,
       organizationId: testOrg.id,
       eventName: "checkout.completed",
-      createdAt: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000),
-      expiresAt: yesterday,
+      createdAt: new Date(REAL_NOW - 400 * 24 * 60 * 60 * 1000),
+      expiresAt: AGED_OUT_EXPIRES_AT,
     },
     {
       id: `${PREFIX}-ev-expired-2`,
       contactId: agedOutContact.id,
       organizationId: testOrg.id,
       eventName: "checkout.completed",
-      createdAt: new Date(Date.now() - 401 * 24 * 60 * 60 * 1000),
-      expiresAt: yesterday,
+      createdAt: new Date(REAL_NOW - 401 * 24 * 60 * 60 * 1000),
+      expiresAt: AGED_OUT_EXPIRES_AT,
     },
   ]);
 
@@ -264,6 +298,17 @@ describe("getContactAnalytics — list health (F13)", () => {
 });
 
 describe("getContactTimeline — aged-out events (F12)", () => {
+  // Only `Date` is faked: the pg driver's timers must keep running, and the
+  // action compares `expires_at` against a JS `new Date()` it builds itself.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(AFTER_AGED_OUT_EXPIRY);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("counts expired events instead of rendering nothing at all", async () => {
     const result = await getContactTimeline(agedOutContact.id, testOrg.id);
     expect(result.success).toBe(true);

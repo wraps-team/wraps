@@ -170,7 +170,8 @@ describe("inviteMember — writes member.invited audit log", () => {
           eq(auditLog.organizationId, orgA.id),
           eq(auditLog.action, "member.invited")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -219,7 +220,8 @@ describe("removeMember — writes member.removed audit log", () => {
           eq(auditLog.organizationId, orgA.id),
           eq(auditLog.action, "member.removed")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -273,7 +275,8 @@ describe("updateMemberRole — writes member.role_changed audit log", () => {
           eq(auditLog.organizationId, orgA.id),
           eq(auditLog.action, "member.role_changed")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -341,7 +344,8 @@ describe("acceptInvitation — writes member.invite_accepted audit log", () => {
           eq(auditLog.organizationId, orgA.id),
           eq(auditLog.action, "member.invite_accepted")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];

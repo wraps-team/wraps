@@ -223,7 +223,8 @@ describe("bulkDeleteTemplates — writes template.deleted audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "template.deleted")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -265,7 +266,8 @@ describe("bulkUpdateTemplateType — writes template.type_updated audit log", ()
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "template.type_updated")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -313,7 +315,8 @@ describe("bulkUpdateTemplateStatus — writes template.status_updated audit log"
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "template.status_updated")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -358,7 +361,8 @@ describe("publishTemplateToSES — writes template.published audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "template.published")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];

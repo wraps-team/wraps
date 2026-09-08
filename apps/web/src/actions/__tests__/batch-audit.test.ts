@@ -339,7 +339,8 @@ describe("saveDraftBatchSend — writes broadcast.draft_saved audit log", () => 
           eq(auditLog.organizationId, testOrganization.id),
           eq(auditLog.action, "broadcast.draft_saved")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -386,7 +387,8 @@ describe("updateDraftBatchSend — writes broadcast.draft_updated audit log", ()
           eq(auditLog.organizationId, testOrganization.id),
           eq(auditLog.action, "broadcast.draft_updated")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -427,7 +429,8 @@ describe("deleteDraftBatchSend — writes broadcast.draft_deleted audit log", ()
           eq(auditLog.organizationId, testOrganization.id),
           eq(auditLog.action, "broadcast.draft_deleted")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -472,7 +475,8 @@ describe("duplicateBatchSend — writes broadcast.duplicated audit log", () => {
           eq(auditLog.organizationId, testOrganization.id),
           eq(auditLog.action, "broadcast.duplicated")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -566,7 +570,8 @@ describe("promoteDraftToSend — writes broadcast.sent_from_draft audit log", ()
             eq(auditLog.organizationId, testOrganization.id),
             eq(auditLog.action, "broadcast.sent_from_draft")
           )
-        );
+        )
+        .orderBy(auditLog.createdAt);
 
       expect(rows.length).toBeGreaterThan(0);
       const row = rows[rows.length - 1];
@@ -655,7 +660,8 @@ describe("createBatchSend — writes broadcast.sent audit log (best-effort)", ()
             eq(auditLog.organizationId, testOrganization.id),
             eq(auditLog.action, "broadcast.sent")
           )
-        );
+        )
+        .orderBy(auditLog.createdAt);
 
       expect(rows.length).toBeGreaterThan(0);
       const row = rows[rows.length - 1];
@@ -730,7 +736,8 @@ describe("cancelBatchSend — writes broadcast.cancelled audit log", () => {
             eq(auditLog.organizationId, testOrganization.id),
             eq(auditLog.action, "broadcast.cancelled")
           )
-        );
+        )
+        .orderBy(auditLog.createdAt);
 
       expect(rows.length).toBeGreaterThan(0);
       const row = rows[rows.length - 1];

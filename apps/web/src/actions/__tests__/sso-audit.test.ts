@@ -196,7 +196,8 @@ describe("deleteSsoProvider — writes sso.provider_deleted audit log", () => {
           eq(auditLog.organizationId, testOrganization.id),
           eq(auditLog.action, "sso.provider_deleted")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -227,7 +228,8 @@ describe("requestDomainVerification — writes sso.domain_verification_requested
           eq(auditLog.organizationId, testOrganization.id),
           eq(auditLog.action, "sso.domain_verification_requested")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -258,7 +260,8 @@ describe("verifyDomain — writes sso.domain_verified audit log", () => {
           eq(auditLog.organizationId, testOrganization.id),
           eq(auditLog.action, "sso.domain_verified")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -289,7 +292,8 @@ describe("generateScimToken — writes sso.scim_token_generated audit log", () =
           eq(auditLog.organizationId, testOrganization.id),
           eq(auditLog.action, "sso.scim_token_generated")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -325,7 +329,8 @@ describe("saveSsoProvider — writes sso.provider_saved audit log (best-effort)"
           eq(auditLog.organizationId, testOrganization.id),
           eq(auditLog.action, "sso.provider_saved")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];

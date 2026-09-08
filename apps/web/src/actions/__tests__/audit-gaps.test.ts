@@ -395,7 +395,8 @@ describe("grantAccessAction — writes permissions.granted audit log", () => {
           eq(auditLog.organizationId, fixOrg.id),
           eq(auditLog.action, "permissions.granted")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -427,7 +428,8 @@ describe("revokeAccessAction — writes permissions.revoked audit log", () => {
           eq(auditLog.organizationId, fixOrg.id),
           eq(auditLog.action, "permissions.revoked")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -576,7 +578,8 @@ describe("subscribeContactToTopics — writes contact.topic_subscribed audit log
           eq(auditLog.organizationId, fixOrg.id),
           eq(auditLog.action, "contact.topic_subscribed")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -636,7 +639,8 @@ describe("unsubscribeContactFromTopics — writes contact.topic_unsubscribed aud
           eq(auditLog.organizationId, fixOrg.id),
           eq(auditLog.action, "contact.topic_unsubscribed")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -687,7 +691,8 @@ describe("bulkSubscribeContactsToTopics — writes contact.topics_bulk_subscribe
           eq(auditLog.organizationId, fixOrg.id),
           eq(auditLog.action, "contact.topics_bulk_subscribed")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -748,7 +753,8 @@ describe("bulkUnsubscribeContactsFromTopics — writes contact.topics_bulk_unsub
           eq(auditLog.organizationId, fixOrg.id),
           eq(auditLog.action, "contact.topics_bulk_unsubscribed")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -804,7 +810,8 @@ describe("createOrganizationAction — writes org.created audit log", () => {
           eq(auditLog.organizationId, result.organization.id),
           eq(auditLog.action, "org.created")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -850,7 +857,8 @@ describe("updateSenderDefaultsAction — writes settings.sender_defaults_updated
           eq(auditLog.organizationId, fixOrg.id),
           eq(auditLog.action, "settings.sender_defaults_updated")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -897,7 +905,8 @@ describe("saveWebhookSecretAction — writes settings.webhook_secret_saved audit
           eq(auditLog.organizationId, fixOrg.id),
           eq(auditLog.action, "settings.webhook_secret_saved")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -936,7 +945,8 @@ describe("removeWebhookSecretAction — writes settings.webhook_secret_removed a
           eq(auditLog.organizationId, fixOrg.id),
           eq(auditLog.action, "settings.webhook_secret_removed")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];

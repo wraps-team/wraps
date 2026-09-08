@@ -11,6 +11,19 @@
  * specific value reset the module registry and dynamically re-import the
  * handler with RETENTION_DRY_RUN set first — the same pattern used in
  * apps/api/src/services/__tests__/workflow-queue.test.ts.
+ *
+ * WARNING — this file is globally destructive. The expired-contact_event sweep
+ * it exercises with RETENTION_DRY_RUN=false is org-agnostic by design
+ * (`message-send-cleanup.ts`: "deliberately global, not org-scoped"), so it
+ * deletes EVERY `contact_event` row in the test database whose `expires_at` is
+ * in the past — including rows owned by suites running concurrently in other
+ * packages. That is not hypothetical: apps/web and apps/api share one test
+ * database under `pnpm test` and again in CI (test-web and test-api are
+ * separate jobs against the same TEST_DATABASE_URL), and this sweep was
+ * measured deleting another org's expired row. A test elsewhere that needs an
+ * aged-out `contact_event` must therefore keep the row's real `expires_at` in
+ * the future and move its own clock instead — see `AGED_OUT_EXPIRES_AT` in
+ * apps/web/src/actions/__tests__/contacts-analytics-db.test.ts.
  */
 
 import {

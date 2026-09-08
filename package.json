@@ -11,7 +11,7 @@
     "baseline": "pnpm exec baseline scan .",
     "build": "turbo run build",
     "dev": "turbo run dev --concurrency 12",
-    "test": "turbo run test",
+    "test": "VITEST_MAX_WORKERS=4 turbo run test",
     "test:ee": "turbo run test:ee",
     "test:integration": "turbo run test:integration",
     "test:coverage": "turbo run test:coverage --filter=@wraps.dev/cli",

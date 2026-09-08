@@ -200,7 +200,8 @@ describe("createSegment — writes segment.created audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "segment.created")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -230,7 +231,8 @@ describe("updateSegment — writes segment.updated audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "segment.updated")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -283,7 +285,8 @@ describe("deleteSegment — writes segment.deleted audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "segment.deleted")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -315,7 +318,8 @@ describe("createTopic — writes topic.created audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "topic.created")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -345,7 +349,8 @@ describe("updateTopic — writes topic.updated audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "topic.updated")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -397,7 +402,8 @@ describe("deleteTopic — writes topic.deleted audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "topic.deleted")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];

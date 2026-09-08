@@ -202,9 +202,15 @@ not a mock. `vitest.config.ts` loads `apps/web/.env.test` (gitignored — you mu
 create it) and needs a working `DATABASE_URL`. Without it, tests fail with
 opaque connection/query errors, not a helpful message.
 
-- The suite runs **serially** (`fileParallelism: false`) because tests share one
-  database and clean up in `afterEach`. Never run two vitest processes against
-  the same database — check `ps aux | grep vitest` before blaming a flake.
+- The suite runs as **two vitest projects**. `parallel` holds everything and
+  runs files concurrently; `shared-fixtures` holds the ten files that import the
+  fixed-id fixtures in `src/app/api/__tests__/setup.ts` and runs serially,
+  because those ten can delete each other's rows. Isolation everywhere else
+  comes from per-file fixture prefixes (`setupPermissionFixtures`,
+  `__tests__/fixtures/real-db.ts`) — **any new DB-touching test must namespace
+  its fixtures the same way**, or it will collide under parallelism.
+- Never run two vitest processes against the same database — check
+  `ps aux | grep vitest` before blaming a flake.
 - In a **linked git worktree**, `scripts/test-db/resolve-branch.mjs` gives the
   worktree its own Neon branch (`wt-<name>`) automatically, but only if
   `NEON_API_KEY` and `NEON_PROJECT_ID` are in the env that loads `.env.test`.

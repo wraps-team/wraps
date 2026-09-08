@@ -175,7 +175,8 @@ describe("createContact — writes contact.created audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "contact.created")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -220,7 +221,8 @@ describe("updateContact — writes contact.updated audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "contact.updated")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -259,7 +261,8 @@ describe("deleteContact — writes contact.deleted audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "contact.deleted")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -293,7 +296,8 @@ describe("bulkCreateContactsFromEmails — writes contact.created_bulk audit log
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "contact.created_bulk")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -335,7 +339,8 @@ describe("bulkDeleteContacts — writes contact.deleted_bulk audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "contact.deleted_bulk")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -421,7 +426,8 @@ describe("importContacts — writes contact.imported audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "contact.imported")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];

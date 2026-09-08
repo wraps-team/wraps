@@ -238,7 +238,8 @@ describe("createWorkflow — writes workflow.created audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "workflow.created")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -281,7 +282,8 @@ describe("updateWorkflow — writes workflow.updated audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "workflow.updated")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -323,7 +325,8 @@ describe("deleteWorkflow — writes workflow.deleted audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "workflow.deleted")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -387,7 +390,8 @@ describe("enableWorkflow — writes workflow.enabled audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "workflow.enabled")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -452,7 +456,8 @@ describe("disableWorkflow — writes workflow.disabled audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "workflow.disabled")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -490,7 +495,8 @@ describe("duplicateWorkflow — writes workflow.duplicated audit log", () => {
           eq(auditLog.organizationId, testOrg.id),
           eq(auditLog.action, "workflow.duplicated")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];

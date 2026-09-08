@@ -2,6 +2,17 @@ import { awsAccount, db, member, organization, user } from "@wraps/db";
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, vi } from "vitest";
 
+// Component tests run in jsdom and, since this suite went parallel, share the
+// machine with every other file in the app plus apps/api and packages/cli under
+// `pnpm test`. A React state update can then land well past Testing Library's
+// 1s `waitFor` default — `preference-center-settings-analytics.test.tsx` failed
+// that way on a congested run while passing on four others. Headroom for
+// scheduling, not for slow assertions: an update that never arrives still fails.
+if (typeof document !== "undefined") {
+  const { configure } = await import("@testing-library/dom");
+  configure({ asyncUtilTimeout: 10_000 });
+}
+
 // Global mock: prevent activation-tracking from emitting real events to production.
 // Every exported function returns a resolved Promise (the real functions are async).
 const noop = () => Promise.resolve();

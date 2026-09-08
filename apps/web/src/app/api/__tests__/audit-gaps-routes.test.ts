@@ -206,7 +206,8 @@ describe("POST /api/[orgSlug]/emails/templates/[id]/duplicate — writes templat
           eq(auditLog.organizationId, fixOrg.id),
           eq(auditLog.action, "template.duplicated")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];
@@ -273,7 +274,8 @@ describe("POST /api/[orgSlug]/emails/templates/[id]/versions — writes template
           eq(auditLog.organizationId, fixOrg.id),
           eq(auditLog.action, "template.version_created")
         )
-      );
+      )
+      .orderBy(auditLog.createdAt);
 
     expect(rows.length).toBeGreaterThan(0);
     const row = rows[rows.length - 1];

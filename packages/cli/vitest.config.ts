@@ -8,6 +8,15 @@ export default defineConfig({
     // Fails any test that opens a real socket. See the file for why this is a
     // runtime guard rather than a lint rule.
     setupFiles: ["src/__tests__/setup/no-real-network.ts"],
+    // Headroom for scheduler delay, not for slow tests: every test in this
+    // package runs in single-digit milliseconds. Under `pnpm test` at the repo
+    // root, apps/web and apps/api now run their files in parallel too, and the
+    // machine is oversubscribed enough that a worker here can sit unscheduled
+    // past the 5s default — `email-doctor.test.ts` timed out that way on ~2 of
+    // 3 full-monorepo runs while passing in 4ms standalone. Nothing here can
+    // hang on I/O; `no-real-network.ts` fails any test that opens a socket.
+    testTimeout: 15_000,
+    hookTimeout: 15_000,
     exclude: ["**/node_modules/**", "**/dist/**"],
     coverage: {
       provider: "v8",
