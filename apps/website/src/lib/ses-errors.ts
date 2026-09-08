@@ -350,7 +350,7 @@ export const SES_ERRORS: readonly SesError[] = [
         question:
           "What bounce and complaint rates does AWS enforce on SES accounts?",
         answer:
-          "Roughly 5 percent for bounces and 0.1 percent for complaints. Crossing them puts the account under review or pauses sending, and AWS applies this to every SES user.",
+          "Two levels, not one. A bounce rate of 5 percent or a complaint rate of 0.1 percent places the account under review, and sending continues during that review. AWS says it might pause sending at 10 percent bounces or 0.5 percent complaints. Aim below 2 percent and 0.1 percent respectively.",
       },
       {
         question: "Can I send from a different AWS account while paused?",

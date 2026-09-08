@@ -326,6 +326,16 @@ These document AWS's own exceptions, not Wraps error codes. Remediation is adapt
 - [ExpiredToken](https://wraps.dev/ses/errors/expired-token): Temporary credentials ran out mid-run, and how to refresh them
 - [AccessDenied](https://wraps.dev/ses/errors/access-denied): IAM denied the call — how to read the principal, action, and resource out of the message
 
+## Amazon SES operations
+
+Failures SES throws no exception for. Every percentage is quoted from AWS documentation and linked to its source.
+
+- [SES Bounce Rate](https://wraps.dev/ses/bounce-rate): What SES counts as a bounce, the 5% review and 10% pause thresholds, and the order to fix them in
+- [SES Complaint Rate](https://wraps.dev/ses/complaint-rate): The 0.1% review and 0.5% pause thresholds, and why the visible rate understates the real one
+- [SES Account Under Review or Paused](https://wraps.dev/ses/account-under-review): What each state permits, what AWS wants in the support case reply, and what makes it worse
+- [SES Sending Limits](https://wraps.dev/ses/limits): Sandbox quotas, per-second rate vs rolling 24-hour cap, recipients not messages, and how increases happen
+- [SES Emails Going to Spam](https://wraps.dev/ses/spam-folder): Diagnose authentication, then reputation, then content — and what nobody can promise about inbox placement
+
 ## CLI Commands
 
 - [Email Commands](https://wraps.dev/docs/cli-reference/email): init, status, domains, upgrade, templates, workflows

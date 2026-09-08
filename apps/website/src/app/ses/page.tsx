@@ -78,13 +78,32 @@ const READING: { href: string; label: string; blurb: string }[] = [
   },
 ];
 
-const PLANNED = [
-  "Bounce rate: the threshold AWS enforces and how to get back under it",
-  "Sending limits: rate, daily quota, and how they are raised",
-  "Spam folder: what to check when SES delivers and Gmail files it away",
-  "Complaint rate: why 0.1 percent is the number that matters",
-  "Account under review: what AWS wants to see before it closes one",
-];
+/**
+ * The operational pages are written out as literal hrefs rather than mapped
+ * from an array, so a grep for the route finds it here. `ses-errors.test.ts`
+ * asserts that every /ses/* route appears in this file, which is what keeps the
+ * hub from silently losing a child.
+ */
+function HubCard({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  children: string;
+}) {
+  return (
+    <div className="rounded-lg border p-5">
+      <h3 className="font-semibold">
+        <Link className="text-primary underline underline-offset-4" href={href}>
+          {label}
+        </Link>
+      </h3>
+      <p className="mt-2 text-muted-foreground text-sm">{children}</p>
+    </div>
+  );
+}
 
 export default function Page() {
   return (
@@ -151,14 +170,51 @@ export default function Page() {
             </div>
           </section>
 
-          <section aria-labelledby="reading" className="mt-14">
-            <h2 className="font-bold text-2xl tracking-tight" id="reading">
-              Operating SES
+          <section aria-labelledby="operations" className="mt-14">
+            <h2 className="font-bold text-2xl tracking-tight" id="operations">
+              When something is wrong and there is no error message
             </h2>
             <p className="mt-2 mb-5 text-muted-foreground">
-              The parts of SES that are nobody&apos;s error message: getting out
-              of the sandbox, keeping bounce rates survivable, and knowing what
-              a send costs.
+              The failures SES does not throw an exception for. Every percentage
+              on these pages is quoted from AWS&apos;s own documentation and
+              linked back to it, because the numbers move and a number without a
+              source is not worth acting on.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <HubCard href="/ses/bounce-rate" label="Bounce rate">
+                What SES actually counts, the review and pause thresholds AWS
+                publishes, and the order to work through when the number climbs.
+              </HubCard>
+              <HubCard href="/ses/complaint-rate" label="Complaint rate">
+                Why 0.1 percent is the line, and why the rate SES shows you is
+                lower than the rate recipients are generating.
+              </HubCard>
+              <HubCard
+                href="/ses/account-under-review"
+                label="Account under review or paused"
+              >
+                Two states with two different consequences. What each permits,
+                what to put in the reply to AWS, and what makes it worse.
+              </HubCard>
+              <HubCard href="/ses/limits" label="Sending limits">
+                Sandbox quotas, the per-second rate against the rolling 24-hour
+                cap, and how increases actually happen.
+              </HubCard>
+              <HubCard href="/ses/spam-folder" label="Mail going to spam">
+                Authentication first, then reputation, then content. In that
+                order, because the first one is cheap to settle.
+              </HubCard>
+            </div>
+          </section>
+
+          <section aria-labelledby="reading" className="mt-14">
+            <h2 className="font-bold text-2xl tracking-tight" id="reading">
+              Further reading
+            </h2>
+            <p className="mt-2 mb-5 text-muted-foreground">
+              The depth behind the pages above: the sandbox request in full, the
+              event pipeline behind bounce handling, and what a given volume
+              costs.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               {READING.map((item) => (
@@ -177,22 +233,6 @@ export default function Page() {
                 </div>
               ))}
             </div>
-          </section>
-
-          <section aria-labelledby="planned" className="mt-14">
-            <h2 className="font-bold text-2xl tracking-tight" id="planned">
-              Not written yet
-            </h2>
-            <p className="mt-2 mb-4 text-muted-foreground">
-              The operational pages this hub is being built to hold. Listed so
-              the shape of the reference is visible, not linked, because they do
-              not exist yet.
-            </p>
-            <ul className="list-disc space-y-2 pl-6 text-muted-foreground">
-              {PLANNED.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
           </section>
 
           <section

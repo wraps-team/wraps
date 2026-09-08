@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { globSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SES_ERRORS } from "@/lib/ses-errors";
@@ -99,5 +99,36 @@ describe("SES error entries are well formed", () => {
 
   it("covers at least the twelve errors the cluster shipped with", () => {
     expect(SES_ERRORS.length).toBeGreaterThanOrEqual(12);
+  });
+});
+
+describe("the /ses hub links every page directly under it", () => {
+  // Only the direct children. /ses/errors/<slug> pages are reached from the
+  // /ses/errors index, which the hub does link, and the hub renders them from
+  // a template literal rather than a literal href.
+  const DIRECT_CHILD = /^ses\/[^/]+\/page\.tsx$/;
+
+  it("has an href for every /ses/<child> route in src/app/ses/page.tsx", () => {
+    const hub = readFileSync(
+      resolve(repoRoot, "apps/website/src/app/ses/page.tsx"),
+      "utf8"
+    );
+    const children = globSync("ses/**/page.tsx", {
+      cwd: resolve(repoRoot, "apps/website/src/app"),
+    })
+      .filter((file) => DIRECT_CHILD.test(file))
+      .map((file) => `/${file.replace(/\/page\.tsx$/, "")}`);
+
+    // A hub that lost a child would still build, still pass the sitemap and
+    // search-intent tests, and simply be unreachable from its own index.
+    expect(children.length).toBeGreaterThanOrEqual(6);
+
+    const unlinked = children.filter(
+      (route) => !hub.includes(`href="${route}"`)
+    );
+    expect(
+      unlinked,
+      `These /ses pages exist but are not linked from the hub at src/app/ses/page.tsx:\n${unlinked.join("\n")}`
+    ).toEqual([]);
   });
 });

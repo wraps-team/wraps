@@ -857,6 +857,70 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     rationale:
       "Teaches the reader to read the principal, action and resource out of the message rather than pasting a wildcard policy, and points at the CLI command that already prints the actions a given operation needs.",
   },
+
+  // --- Amazon SES operations ---
+  // These target the symptom in the reader's own words. The /ses/errors/*
+  // pages above target the literal AWS exception, which is a different search.
+  {
+    route: "/ses/bounce-rate",
+    primaryQuery: "ses bounce rate too high",
+    secondaryQueries: [
+      "aws ses bounce rate limit",
+      "reduce bounce rate amazon ses",
+      "what bounce rate does aws suspend at",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Separates AWS's 2% best-practice level from the 5% review level and the 10% pause level, three numbers most results collapse into one, and states the rule that bounce rate counts only hard bounces to unverified domains.",
+  },
+  {
+    route: "/ses/complaint-rate",
+    primaryQuery: "what is a good ses complaint rate",
+    secondaryQueries: [
+      "aws ses complaint rate threshold",
+      "ses 0.1 percent complaint limit",
+      "reduce spam complaints amazon ses",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Carries the fact almost nothing else does: AWS excludes complaints from providers with no feedback loop, so the rate in the console is a floor rather than a measurement, which changes how much headroom a sender needs.",
+  },
+  {
+    route: "/ses/account-under-review",
+    primaryQuery: "amazon ses account under review what to do",
+    secondaryQueries: [
+      "ses sending paused how to fix",
+      "aws ses support case reply reputation",
+      "difference between ses review and pause",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Distinguishes two states that AWS's own notification emails read similarly for, and quotes what AWS asks for in the case reply, which is changes already implemented rather than a remediation plan.",
+  },
+  {
+    route: "/ses/limits",
+    primaryQuery: "amazon ses sending limits and quotas",
+    secondaryQueries: [
+      "increase ses sending quota",
+      "ses sandbox 200 emails per day",
+      "ses sending rate per second",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "States the sandbox numbers exactly, separates the per-second rate from the rolling 24-hour cap, and names the recipients-not-messages rule that makes quota arithmetic surprise people mid-broadcast.",
+  },
+  {
+    route: "/ses/spam-folder",
+    primaryQuery: "ses emails going to spam folder",
+    secondaryQueries: [
+      "aws ses email in spam gmail",
+      "why does ses mail get filtered",
+      "fix ses deliverability spam placement",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "This SERP is owned by inbox-warmup vendors whose product benefits from the problem, so a page that puts authentication first and says plainly that no one controls a provider's filtering decision wins on substance rather than volume.",
+  },
 ];
 
 /** Routes that exist for reasons other than search. */
