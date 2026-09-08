@@ -53,6 +53,20 @@ import { CodeBlock, CodeBlockBody, CodeBlockContent, CodeBlockCopyButton,
 
 For tabbed examples (multiple frameworks): use `CodeTabs` + `CodeTabItem`.
 
+### Registering a new page (tests enforce items 2 and 3)
+
+1. The route itself: `src/app/<path>/page.tsx`
+2. `public/llms.txt` — one bullet, or `src/__tests__/agent-surface.test.ts` fails
+3. `src/config/page-dates.ts` — run `pnpm --filter wraps-website sitemap:dates`
+   and commit; never hand-edit. `src/__tests__/sitemap.test.ts` fails otherwise,
+   on both missing AND orphaned entries.
+4. Blog posts only: an entry in the `posts` array in `src/app/blog/page-content.tsx`
+5. Docs pages only: a nav entry in `src/components/docs-nav.tsx`
+6. `src/config/search-intent.ts` — declare the page's target query
+
+Editing an existing page also trips (3): regenerate and commit `page-dates.ts`.
+A rebase or squash re-triggers it, because the check compares committer dates.
+
 ## Architecture
 
 ### Route Structure
