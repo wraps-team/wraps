@@ -307,6 +307,25 @@ Named, predictable URLs. Each one is a stable entry point.
 - [JSON Output](https://wraps.dev/docs/reference/json-output): Machine-readable output format
 - [Telemetry](https://wraps.dev/docs/telemetry): What telemetry is collected and how to opt out
 
+## Amazon SES errors
+
+These document AWS's own exceptions, not Wraps error codes. Remediation is adapted from the Wraps CLI's error catalog.
+
+- [Running Amazon SES in Production](https://wraps.dev/ses): Topic hub for SES exceptions and the operational limits AWS enforces
+- [Amazon SES Error Codes](https://wraps.dev/ses/errors): Every SES exception grouped by identity, throughput, account state, and credentials
+- [Email address is not verified](https://wraps.dev/ses/errors/email-address-not-verified): MessageRejected — SES sandbox, unverified sender identity, or the wrong region
+- [Maximum sending rate exceeded](https://wraps.dev/ses/errors/maximum-sending-rate-exceeded): Throttling — the per-second SES send rate, and how to back off
+- [Daily message quota exceeded](https://wraps.dev/ses/errors/daily-sending-quota-exceeded): LimitExceededException — the rolling 24-hour SES quota and how to raise it
+- [Account-level sending is paused](https://wraps.dev/ses/errors/account-sending-paused): AccountSendingPausedException — AWS switched off sending for the whole account
+- [Configuration set does not exist](https://wraps.dev/ses/errors/configuration-set-does-not-exist): ConfigurationSetDoesNotExistException — usually a region mismatch
+- [Configuration set sending is paused](https://wraps.dev/ses/errors/configuration-set-sending-paused): ConfigurationSetSendingPausedException — a pause scoped to one configuration set
+- [MAIL FROM domain is not verified](https://wraps.dev/ses/errors/mail-from-domain-not-verified): MailFromDomainNotVerifiedException — the MX and SPF records a custom MAIL FROM needs
+- [InvalidClientTokenId](https://wraps.dev/ses/errors/invalid-client-token-id): AWS cannot resolve the access key the request was signed with
+- [SignatureDoesNotMatch](https://wraps.dev/ses/errors/signature-does-not-match): SigV4 mismatch — secret key, clock skew, or a request modified after signing
+- [UnrecognizedClientException](https://wraps.dev/ses/errors/unrecognized-client-exception): The credential chain resolved to nothing usable
+- [ExpiredToken](https://wraps.dev/ses/errors/expired-token): Temporary credentials ran out mid-run, and how to refresh them
+- [AccessDenied](https://wraps.dev/ses/errors/access-denied): IAM denied the call — how to read the principal, action, and resource out of the message
+
 ## CLI Commands
 
 - [Email Commands](https://wraps.dev/docs/cli-reference/email): init, status, domains, upgrade, templates, workflows

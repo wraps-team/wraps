@@ -687,6 +687,176 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     rationale:
       "Targets the person accountable for the send rather than the marketer composing it — preflight checks, consent as a record, and end-to-end message tracing are operator concerns distinct from /for/marketing's campaign-authoring framing.",
   },
+
+  // --- Amazon SES ---
+  {
+    route: "/ses",
+    primaryQuery: "how to run amazon ses in production",
+    secondaryQueries: [
+      "amazon ses operations reference",
+      "ses limits and errors overview",
+      "operating aws ses at scale",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "The hub for the SES failure surface rather than another setup tutorial, and the only page on the site that indexes AWS's own exceptions next to the operational limits AWS enforces on every account.",
+  },
+  {
+    route: "/ses/errors",
+    primaryQuery: "amazon ses error codes list",
+    secondaryQueries: [
+      "ses exception reference",
+      "aws ses send email error codes",
+      "ses smtp response codes",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Groups every mapped SES exception by what actually went wrong instead of listing them alphabetically, and every row is traceable to a WrapsError code a shipped CLI raises, which no aggregator page can claim.",
+  },
+  {
+    route: "/ses/errors/email-address-not-verified",
+    primaryQuery: "ses email address is not verified error",
+    secondaryQueries: [
+      "messagerejected email address is not verified",
+      "ses identities failed the check in region",
+      "ses sandbox recipient not verified",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "This is the most-pasted SES string in existence and the page separates the three causes the CLI already distinguishes — sandbox, unverified sender, receive-only domain — where the incumbent results treat it as one problem.",
+  },
+  {
+    route: "/ses/errors/maximum-sending-rate-exceeded",
+    primaryQuery: "ses maximum sending rate exceeded",
+    secondaryQueries: [
+      "aws ses throttling error retry",
+      "ses 454 throttling failure",
+      "ses rate limit backoff",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Separates the per-second rate from the 24-hour quota, which is the distinction that decides whether backoff helps at all, and most results for this string conflate the two.",
+  },
+  {
+    route: "/ses/errors/daily-sending-quota-exceeded",
+    primaryQuery: "ses daily message quota exceeded",
+    secondaryQueries: [
+      "aws ses 24 hour sending quota",
+      "increase ses sending quota",
+      "ses limitexceededexception sending",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Names the rolling 24-hour window rather than a midnight reset, which is the single most common wrong assumption about this limit and the reason people wait for capacity that is already back.",
+  },
+  {
+    route: "/ses/errors/account-sending-paused",
+    primaryQuery: "aws paused sending for my ses account",
+    secondaryQueries: [
+      "accountsendingpausedexception ses",
+      "ses account under review sending disabled",
+      "resume ses sending after pause",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "The reader is in an incident, and the page leads with the Reputation Dashboard and the bounce and complaint thresholds AWS enforces rather than a retry, which is what the CLI does with this exception too.",
+  },
+  {
+    route: "/ses/errors/configuration-set-does-not-exist",
+    primaryQuery: "ses configuration set does not exist error",
+    secondaryQueries: [
+      "configurationsetdoesnotexistexception",
+      "ses configuration set wrong region",
+      "ses configuration set name not found",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Leads with the regional-resource explanation, which accounts for most occurrences, and Wraps deploys this resource itself so the failure mode is one we have to get right in code, not just describe.",
+  },
+  {
+    route: "/ses/errors/configuration-set-sending-paused",
+    primaryQuery: "ses configuration set sending is paused",
+    secondaryQueries: [
+      "configurationsetsendingpausedexception",
+      "resume configuration set ses",
+      "ses pause scoped to configuration set",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Almost nothing on the web distinguishes a configuration-set pause from an account pause, and the exception names are the only reliable way to tell which incident you are in.",
+  },
+  {
+    route: "/ses/errors/mail-from-domain-not-verified",
+    primaryQuery: "ses mail from domain is not verified",
+    secondaryQueries: [
+      "mailfromdomainnotverifiedexception",
+      "ses custom mail from mx record",
+      "ses mail from spf record pending",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Names both DNS records SES needs on the MAIL FROM subdomain and says plainly that removing the custom MAIL FROM is a valid fix, which vendor docs avoid because they want the SPF alignment.",
+  },
+  {
+    route: "/ses/errors/invalid-client-token-id",
+    primaryQuery: "aws invalidclienttokenid security token is invalid",
+    secondaryQueries: [
+      "invalidclienttokenid ses",
+      "aws access key deactivated error",
+      "aws credential precedence environment variable",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Distinguishes an unresolvable key from an expired session and from a denied permission, a three-way split the Wraps CLI had to get right because collapsing it into a credentials error is the exact bug we fixed in our own catalog.",
+  },
+  {
+    route: "/ses/errors/signature-does-not-match",
+    primaryQuery: "the request signature we calculated does not match",
+    secondaryQueries: [
+      "signaturedoesnotmatch aws ses",
+      "sigv4 signature mismatch clock skew",
+      "aws secret access key signature error",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Covers clock skew and post-signing request mutation alongside the obvious wrong-secret case, and those two account for the occurrences that look intermittent and therefore stay unfixed longest.",
+  },
+  {
+    route: "/ses/errors/unrecognized-client-exception",
+    primaryQuery: "unrecognizedclientexception aws ses security token invalid",
+    secondaryQueries: [
+      "unrecognizedclientexception credential chain",
+      "aws profile does not exist error",
+      "container task role not attached aws",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Frames this as an empty or unresolved credential chain rather than a wrong key, which is what it usually is in containers, and is why the CLI refuses to report it as credentials not found.",
+  },
+  {
+    route: "/ses/errors/expired-token",
+    primaryQuery: "aws expired token error when sending email",
+    secondaryQueries: [
+      "expiredtokenexception aws sdk",
+      "aws sso session expired mid job",
+      "refresh assumed role credentials",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Targets the batch-send case where the session outlives nothing and the job outlives the session, and names freezing credentials into environment variables as the cause, which is the part people reintroduce after every fix.",
+  },
+  {
+    route: "/ses/errors/access-denied",
+    primaryQuery: "aws ses access denied when sending email",
+    secondaryQueries: [
+      "is not authorized to perform ses:sendemail",
+      "ses iam permission denied",
+      "aws accessdenied principal action resource",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Teaches the reader to read the principal, action and resource out of the message rather than pasting a wildcard policy, and points at the CLI command that already prints the actions a given operation needs.",
+  },
 ];
 
 /** Routes that exist for reasons other than search. */
