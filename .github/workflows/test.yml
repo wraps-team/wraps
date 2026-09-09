@@ -252,6 +252,14 @@ jobs:
       - name: Build workspace deps
         run: pnpm --filter "@wraps.dev/cli^..." build
 
+      # verify-opennext-build.test.ts reads infra/.sst/platform/src/components/
+      # aws/nextjs.ts at module load. .sst is gitignored, so a fresh runner only
+      # has it after `sst install` materialises the platform. selfhost-smoke runs
+      # this step too, but that job does not run these unit tests.
+      - name: Materialise the SST platform (sst install)
+        working-directory: infra
+        run: ../node_modules/.bin/sst install --config selfhost.config.ts --stage production --print-logs
+
       - name: Run selfhost script tests
         run: pnpm test:scripts
 
