@@ -178,3 +178,26 @@ describe("the vendor guides state what the reader gives up", () => {
     expect(vendorSources.get(slug)).toMatch(/what you (lose|give up)/i);
   });
 });
+
+describe("the migrate cluster does not deny that SES has a subuser equivalent", () => {
+  // SES tenants shipped in August 2025 and are the subuser analogue: per-tenant
+  // bounce and complaint rates, their own suppression list and IP pool, and
+  // reputation policies that pause one tenant instead of the account. Telling a
+  // multi-tenant sender otherwise is the one error on these pages that talks a
+  // qualified reader out of a migration that would have worked for them.
+  //
+  // Narrow on purpose. It matches the denial, not the word — prose about what
+  // tenants do not do ("a paid add-on", "rates still sum into the account-wide
+  // one") has to stay writable.
+  const DENIAL =
+    /no subusers|subusers.{0,40}no SES|nothing (does|on top of SES can)/i;
+
+  const guarded: [string, string][] = [
+    ["hub", readFileSync(resolve(migrateDir, "page.tsx"), "utf8")],
+    ...VENDOR_SLUGS.map((slug): [string, string] => [slug, sourceOf(slug)]),
+  ];
+
+  it.each(guarded)("%s: claims no such thing", (_name, source) => {
+    expect(source).not.toMatch(DENIAL);
+  });
+});

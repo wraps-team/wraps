@@ -314,7 +314,8 @@ export default function MigrateFromMailgunPage() {
               Swapping the messages endpoint for SES is the shortest part. The
               three that take real time are Routes, the EU-or-US decision baked
               into every Mailgun domain, and moving from per-domain reputation
-              to a rate AWS measures across your whole account.
+              to a rate AWS measures across your whole account unless you split
+              the traffic into SES tenants.
             </p>
             <p className="max-w-2xl text-lg text-muted-foreground">
               Everything below is ordered so the things you wait on start first.
@@ -348,7 +349,7 @@ export default function MigrateFromMailgunPage() {
                   "Routes carry a product feature. Inbound reply handling on SES is a Region-limited receipt rule writing raw MIME to S3, and you write the parser.",
                   "You are grandfathered on a legacy pay-as-you-go rate. Anyone still on the old Flex pricing should price the alternative carefully before moving.",
                   "The validation API runs at signup. AWS has nothing comparable, so that vendor relationship survives the migration anyway.",
-                  "You send for many customers on one account. SES measures bounce and complaint rates account-wide, so one bad tenant can pause everybody.",
+                  "You send for many customers on one account and will not pay for SES tenants. Without them SES measures bounce and complaint rates account-wide, so one bad customer can pause everybody.",
                 ].map((item) => (
                   <li className="flex gap-2.5" key={item}>
                     <X

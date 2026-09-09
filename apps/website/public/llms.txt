@@ -422,11 +422,13 @@ stated catch on every entry including ours, and the incumbent kept on the list.
   reputation does not, export suppressions while you are still a customer, and
   SES measures bounce and complaint rates account-wide per Region.
 - [Migrate from SendGrid to Amazon SES](https://wraps.dev/migrate/sendgrid):
-  Subusers have no SES equivalent — reputation is per account, per Region, and
-  configuration sets do not isolate it. Also covers Inbound Parse against SES
-  receipt rules, unsubscribe groups against the bounce-and-complaint-only SES
-  suppression list, dynamic Handlebars templates, and who should stay on
-  SendGrid.
+  Subusers map onto SES tenants, which carry per-tenant bounce and complaint
+  rates, their own suppression list and IP pool, and reputation policies that
+  pause one tenant rather than the account — as a paid add-on, and with tenant
+  rates still summing into the account-wide number. Also covers Inbound Parse
+  against SES receipt rules, unsubscribe groups against the
+  bounce-and-complaint-only SES suppression list, dynamic Handlebars templates,
+  and who should stay on SendGrid.
 - [Migrate from Mailgun to Amazon SES](https://wraps.dev/migrate/mailgun): Pick
   the AWS Region first, because a Mailgun domain is pinned to the US or EU
   endpoint. Three suppression lists collapse into one that holds only bounces

@@ -574,7 +574,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     ],
     audience: "stranger-with-problem",
     rationale:
-      "Subusers are the most-asked question about this migration on AWS re:Post and have no SES answer; the current SERP is affiliate round-ups and AWS's own generic 'migrating from another solution' doc, neither of which names the four features that have no equivalent.",
+      "Subusers are the most-asked question about this migration on AWS re:Post and the answer is SES tenants; the current SERP is affiliate round-ups and AWS's own generic 'migrating from another solution' doc, neither of which maps subusers onto tenants or names the surfaces that still have no equivalent.",
   },
   {
     route: "/migrate/mailgun",

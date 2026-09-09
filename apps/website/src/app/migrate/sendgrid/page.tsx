@@ -11,7 +11,7 @@ import { VENDORS } from "@/config/alternatives";
 
 const TITLE = "Migrate from SendGrid to Amazon SES";
 const DESCRIPTION =
-  "A SendGrid-to-SES migration in the order it has to happen: subusers, Inbound Parse, dynamic templates, the unsubscribe groups SES has no slot for, and the production-access request that decides your timeline.";
+  "A SendGrid-to-SES migration in the order it has to happen: subusers onto SES tenants, Inbound Parse, dynamic templates, the unsubscribe groups SES has no slot for, and the production-access request that decides your timeline.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -69,20 +69,23 @@ const breadcrumbSchema = {
 // structured data cannot drift away from what the page actually tells you.
 const steps: { title: string; body: React.ReactNode; plain: string }[] = [
   {
-    title: "Decide the subuser question before anything else",
+    title: "Map your subusers onto SES tenants before anything else",
     plain:
-      "SES has no subusers. Decide whether your tenants become separate AWS accounts, separate configuration sets, or a single pool, because this decision shapes every later step.",
+      "SES tenants are the subuser equivalent. Create one tenant per subuser, associate the identity and configuration set it sends through, and pass the tenant name on every send, because this decision shapes every later step.",
     body: (
       <>
-        If you send on behalf of tenants through SendGrid subusers, this is the
-        step that decides whether the migration takes a week or a quarter.
-        Subusers give each tenant its own credentials, its own IP assignment,
-        and its own reputation. SES has none of that inside one account.
-        Configuration sets look like the answer and are not — they partition
-        event streams and sending options, not reputation. The three honest
-        options are one AWS account per tenant, one account with a configuration
-        set per tenant and shared reputation, or a hard look at whether you
-        needed per-tenant isolation at all.
+        If you send on behalf of customers through SendGrid subusers, this is
+        the step that decides whether the migration takes a week or a quarter.
+        The shape that matches is an SES tenant. Create one per subuser,
+        associate the identity and configuration set it sends through, then name
+        the tenant on the send — the <code>X-SES-TENANT</code> header over SMTP,{" "}
+        <code>TenantName</code> on SESv2. Each tenant reports its own bounce and
+        complaint rates, can carry its own suppression list and IP pool, and a
+        reputation policy can pause that tenant on its own rather than stopping
+        the account. Two things do not carry over. Tenants are a paid SES
+        add-on, not something the account has by default, and every tenant's
+        numbers still sum into the account-wide rate AWS enforces on. Isolation
+        here buys a smaller blast radius, not a separate reputation.
       </>
     ),
   },
@@ -191,7 +194,7 @@ const steps: { title: string; body: React.ReactNode; plain: string }[] = [
 const faqs = [
   {
     q: "What replaces SendGrid subusers in Amazon SES?",
-    a: "Nothing does, inside a single account. SES reputation is tracked per account per Region, so the isolation subusers give you is only reproducible by giving each tenant its own AWS account. Configuration sets separate event destinations and sending options, not reputation — a tenant that generates complaints affects everyone in the same account.",
+    a: "SES tenants. A tenant owns its identities, configuration sets, and templates, reports its own bounce and complaint rates, and can hold its own suppression list and IP pool. Reputation policies pause a single tenant on a threshold breach and leave the others sending. The default ceiling is 10,000 tenants per account per Region and AWS raises it on request. Two differences are worth planning around: tenants are a paid SES add-on, and each tenant's rates still roll up into the account-wide number AWS enforces on.",
   },
   {
     q: "Does SES have an equivalent of Inbound Parse?",
@@ -263,12 +266,12 @@ const surfaces: { surface: string; sendgrid: string; ses: string }[] = [
   {
     surface: "Tenant isolation",
     sendgrid: "Subusers with their own credentials, IPs, and reputation",
-    ses: "No equivalent — reputation is per account, per Region",
+    ses: "Tenants, with their own credentials, IP pool, and suppression list",
   },
   {
     surface: "Reputation signal",
     sendgrid: "Per-subuser stats, and the shared or dedicated IP pool",
-    ses: "Account-wide bounce and complaint rates, enforced by AWS",
+    ses: "Per-tenant rates that still sum into the account-wide one",
   },
   {
     surface: "Marketing side",
@@ -278,11 +281,11 @@ const surfaces: { surface: string; sendgrid: string; ses: string }[] = [
 ];
 
 const losses = [
-  "Subusers. Per-tenant reputation isolation does not exist inside one SES account.",
+  "Marketing Campaigns. The automations, segments, and sign-up forms are a separate SendGrid product with no export path into anything else.",
   "Unsubscribe groups. The SES suppression list holds bounces and complaints, and has no concept of a per-category opt-out.",
   "Inbound Parse. SES receipt rules deliver raw MIME, are Region-limited, and leave the parsing to you.",
   "The Design Editor. There is no drag-and-drop template builder anywhere in SES.",
-  "Account-wide safety margin. AWS watches your bounce and complaint rate across the whole account and can pause sending on it.",
+  "Account-wide safety margin. AWS watches your bounce and complaint rate across the whole account and can pause sending on it, and per-tenant rates still sum into that number.",
   "First-try approval. SES production access is an application AWS reviews, and refusals on a thin application are common.",
 ];
 
@@ -303,12 +306,12 @@ export default function MigrateFromSendGridPage() {
             </h1>
             <p className="mb-4 max-w-2xl text-lg text-muted-foreground">
               The sending swap is an afternoon. What makes this migration hard
-              is everything SendGrid does that is not sending: subusers,
-              unsubscribe groups, Inbound Parse, and the Marketing Campaigns
-              side. SES does none of it.
+              is everything SendGrid does that is not sending: unsubscribe
+              groups, Inbound Parse, and the Marketing Campaigns side. Subusers
+              map onto SES tenants. Those three map onto nothing.
             </p>
             <p className="max-w-2xl text-lg text-muted-foreground">
-              This page is the order of operations, the four things that have no
+              This page is the order of operations, the surfaces that have no
               SES equivalent, and an honest read on who should not do this at
               all.
             </p>
@@ -338,7 +341,7 @@ export default function MigrateFromSendGridPage() {
             <Card className="p-6">
               <ul className="grid gap-3.5 text-muted-foreground text-sm">
                 {[
-                  "You run multi-tenant sending on subusers and need per-tenant reputation isolation. One AWS account per tenant is the honest answer and it is a lot of AWS.",
+                  "Inbound Parse is a product feature and not a convenience. SES email receiving runs in a handful of Regions, hands you raw MIME in S3, and the parser becomes yours to write and keep running.",
                   "Marketing Campaigns is where your automations, segments, and sign-up forms live. None of that exports.",
                   "You are on a Twilio enterprise agreement and email is one line on it. Procurement will cost more than the sending does.",
                   "You have no one who wants to own an AWS account. SES production access, bounce-rate thresholds, and Region choices are now your job.",
@@ -525,7 +528,7 @@ export default function MigrateFromSendGridPage() {
                 </h3>
                 <ul className="grid gap-3 text-muted-foreground text-sm">
                   {[
-                    "It does not give you subusers. Nothing on top of SES can.",
+                    "It does not manage SES tenants. You configure those against SES directly.",
                     "It does not do inbound email parsing.",
                     "It does not get you production access — that approval is AWS's, usually answered within a day, and refusable.",
                     "Contacts, templates, and workflow state live in our database, not your AWS. Only sending data and delivery events land in your account.",

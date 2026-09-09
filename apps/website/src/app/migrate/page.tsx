@@ -46,9 +46,9 @@ const guides: {
   {
     href: "/migrate/sendgrid",
     from: "SendGrid",
-    hardestPart: "Subusers",
+    hardestPart: "Marketing Campaigns",
     summary:
-      "Per-tenant reputation isolation has no SES equivalent, and Inbound Parse, unsubscribe groups, and Marketing Campaigns all need somewhere else to live.",
+      "Subusers map onto SES tenants, but Inbound Parse, unsubscribe groups, and the Marketing Campaigns side all need somewhere else to live.",
   },
   {
     href: "/migrate/mailgun",
@@ -99,7 +99,7 @@ const shared = [
   },
   {
     title: "Reputation becomes account-wide",
-    body: "SES measures bounce and complaint rates across the whole account, per Region. Providers that isolated reputation per subuser, per domain, or per stream were protecting you from something you now carry yourself.",
+    body: "SES measures bounce and complaint rates across the whole account, per Region. SES tenants give each stream its own metrics, suppression list, and pause switch as a paid add-on, but every tenant's numbers still sum into the account rate AWS enforces on.",
   },
 ];
 
