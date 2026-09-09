@@ -16,8 +16,8 @@
  * in production.
  */
 
-import type React from "react";
 import { normalizePlainTextMustaches } from "@wraps/template-render/mustache-case";
+import type React from "react";
 
 export type RenderedTemplate = {
   html: string;
