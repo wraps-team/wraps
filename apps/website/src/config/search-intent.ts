@@ -554,6 +554,65 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
 
   // --- Migrate ---
   {
+    route: "/migrate",
+    primaryQuery: "migrate to amazon ses",
+    secondaryQueries: [
+      "move email sending to aws ses",
+      "switch email provider to amazon ses",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "The hub carries the five facts every provider migration shares — production access, parallel DNS, domain-not-IP reputation, suppression export, account-wide rates — so the per-vendor guides do not have to repeat them and stay distinct from each other.",
+  },
+  {
+    route: "/migrate/sendgrid",
+    primaryQuery: "migrate from sendgrid to amazon ses",
+    secondaryQueries: [
+      "sendgrid subuser equivalent in ses",
+      "sendgrid inbound parse alternative",
+      "sendgrid to ses suppression export",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Subusers are the most-asked question about this migration on AWS re:Post and have no SES answer; the current SERP is affiliate round-ups and AWS's own generic 'migrating from another solution' doc, neither of which names the four features that have no equivalent.",
+  },
+  {
+    route: "/migrate/mailgun",
+    primaryQuery: "migrate from mailgun to amazon ses",
+    secondaryQueries: [
+      "mailgun routes ses equivalent",
+      "mailgun eu region to ses",
+      "mailgun suppression list export",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Mailgun's EU endpoint pins a domain to a region and its suppressions are three separate lists against SES's one, which no existing guide addresses; both are decisions a reader has to make before writing any code.",
+  },
+  {
+    route: "/migrate/postmark",
+    primaryQuery: "migrate from postmark to amazon ses",
+    secondaryQueries: [
+      "postmark message streams alternative",
+      "postmark inbound parsing on ses",
+      "is postmark worth it at volume",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "People leave Postmark over unit price rather than over a failure, so the winnable page is the one that names the volume where that argument starts to hold and tells smaller senders to stay — an answer no vendor-funded guide will publish.",
+  },
+  {
+    route: "/migrate/resend",
+    primaryQuery: "migrate from resend to amazon ses",
+    secondaryQueries: [
+      "resend log retention 30 days",
+      "resend rate limit 2 requests per second",
+      "resend to own aws account",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Resend runs on SES, so the SPF include is usually already correct and React Email templates move unedited — two specific facts that make this migration shorter than every guide currently ranking, and the page also states the volume below which staying on Resend is cheaper.",
+  },
+  {
     route: "/migrate/amazon-pinpoint",
     primaryQuery: "amazon pinpoint end of support migration",
     secondaryQueries: [

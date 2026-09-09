@@ -415,6 +415,34 @@ stated catch on every entry including ours, and the incumbent kept on the list.
 
 ## Migration
 
+- [Migrate to Amazon SES](https://wraps.dev/migrate): Hub for the per-provider
+  migration guides. Carries the five facts every SES migration shares —
+  production access is an AWS application that can be refused, publish DNS for
+  both senders before removing either, domain reputation travels and IP
+  reputation does not, export suppressions while you are still a customer, and
+  SES measures bounce and complaint rates account-wide per Region.
+- [Migrate from SendGrid to Amazon SES](https://wraps.dev/migrate/sendgrid):
+  Subusers have no SES equivalent — reputation is per account, per Region, and
+  configuration sets do not isolate it. Also covers Inbound Parse against SES
+  receipt rules, unsubscribe groups against the bounce-and-complaint-only SES
+  suppression list, dynamic Handlebars templates, and who should stay on
+  SendGrid.
+- [Migrate from Mailgun to Amazon SES](https://wraps.dev/migrate/mailgun): Pick
+  the AWS Region first, because a Mailgun domain is pinned to the US or EU
+  endpoint. Three suppression lists collapse into one that holds only bounces
+  and complaints, expression-matched Routes become Region-limited receipt rules
+  delivering raw MIME, and per-domain reputation becomes an account-wide rate.
+- [Migrate from Postmark to Amazon SES](https://wraps.dev/migrate/postmark):
+  Price it before you move — below roughly 50,000 a month the saving does not
+  repay the work. Message Streams have no SES analogue, so the wall between
+  transactional and broadcast disappears; inbound parsing becomes raw MIME in
+  S3; server-side Handlebars templates have no bulk export.
+- [Migrate from Resend to Amazon SES](https://wraps.dev/migrate/resend): The
+  shortest of the four, because Resend already sends through SES — the SPF
+  include is usually already correct and React Email templates move unedited.
+  Under about 100,000 a month Resend is usually cheaper. The reasons that still
+  hold are 30-day log purging below Enterprise, a 2-request-per-second API cap,
+  and suspension risk during spikes.
 - [Migrate from Amazon Pinpoint](https://wraps.dev/migrate/amazon-pinpoint): AWS
   ends support for Amazon Pinpoint on 2026-10-30. After that date the console
   and all Pinpoint resources — endpoints, segments, campaigns, journeys,
