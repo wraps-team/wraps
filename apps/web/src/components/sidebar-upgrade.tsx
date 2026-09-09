@@ -59,6 +59,7 @@ export function SidebarUpgrade() {
         <Link
           className="flex items-start gap-3 rounded-lg border border-border/50 bg-gradient-to-br from-sidebar-accent/50 to-sidebar-accent/20 p-3 text-sm transition-colors hover:border-border hover:bg-sidebar-accent"
           href={`/${orgSlug}/settings/billing`}
+          prefetch={false}
         >
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
             <Sparkles className="h-4 w-4" />
