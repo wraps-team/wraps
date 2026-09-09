@@ -421,3 +421,14 @@ jobs:
             echo "::error::upgrade.ts failed with something other than its .env.selfhost guard — likely a broken import (missing root dep or dist artifact)"
             exit 1
           }
+      # The one step that actually builds the dashboard the way a customer's
+      # deploy does. sst.aws.Nextjs does not build Next itself — it shells out
+      # to OpenNext, which reimplements Next's server output for Lambda and
+      # tracks Next's internals minor by minor. Every step above stops at
+      # config evaluation, and no job in this workflow runs a Next production
+      # build of apps/web at all, so without this a Next bump OpenNext cannot
+      # adapt to merges green and first fails inside a customer's AWS account
+      # mid-deploy. The script derives the OpenNext version from the platform
+      # `sst install` just materialised, so it follows an sst bump on its own.
+      - name: OpenNext can build apps/web on this Next version
+        run: node scripts/selfhost/verify-opennext-build.mjs
