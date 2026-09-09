@@ -449,5 +449,55 @@ jobs:
       # adapt to merges green and first fails inside a customer's AWS account
       # mid-deploy. The script derives the OpenNext version from the platform
       # `sst install` just materialised, so it follows an sst bump on its own.
+      # The build below is ~2 min and CPU-bound, which puts selfhost-smoke on
+      # this workflow's critical path on every push. Only ~46% of recent
+      # commits can affect it, so scope it to the paths that can.
+      #
+      # `paths:` is workflow-level and this workflow has eleven other jobs, so
+      # the decision has to happen here. It uses the compare API rather than
+      # git so the checkout can stay shallow: `compare/BASE...HEAD` is
+      # merge-base semantics, which is what a PR wants and what a multi-commit
+      # push needs (github.event.before, not HEAD^).
+      #
+      # Fail open. Every path that cannot resolve a base — a new branch, a
+      # force push, an API blip — runs the build. A guard that quietly stops
+      # guarding is worse than one that costs two minutes.
+      - name: Does this change affect the OpenNext build?
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -uo pipefail
+
+          run_it() { echo "build=true" >> "$GITHUB_OUTPUT"; echo "$1"; exit 0; }
+
+          case "$BASE" in
+            ""|0000000000000000000000000000000000000000) run_it "no comparison base: building" ;;
+          esac
+
+          files=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE...$HEAD" \
+            --paginate --jq '.files[].filename' 2>/dev/null) \
+            || run_it "could not read the diff from the API: building"
+          [ -n "$files" ] || run_it "API returned no file list: building"
+
+          # apps/web plus its workspace dependency closure — keep in sync with
+          # `pnpm --filter "@wraps/web^..." list`, which the sibling test
+          # verify-opennext-build.test.ts asserts against this list. next is
+          # pinned in pnpm-workspace.yaml's `overrides:`, and the sst version
+          # in the root package.json decides which OpenNext runs, so a bump to
+          # either changes what this step is testing.
+          if echo "$files" | grep -qE \
+            '^(apps/web/|packages/(ai|auth|db|email|email-send|template-render|ui|unsubscribe-token)/|infra/selfhost\.config\.ts$|scripts/selfhost/verify-opennext-build\.mjs$|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.github/workflows/test\.yml$)'
+          then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "OpenNext-relevant paths changed: building"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "nothing OpenNext-relevant changed: skipping the build"
+          fi
+
       - name: OpenNext can build apps/web on this Next version
+        if: steps.scope.outputs.build == 'true'
         run: node scripts/selfhost/verify-opennext-build.mjs

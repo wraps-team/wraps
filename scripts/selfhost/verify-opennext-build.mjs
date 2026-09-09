@@ -100,8 +100,22 @@ function main() {
   });
   if (resolved.error) fail(resolved.error);
 
+  // What OpenNext will really compile against. It is not always the manifest
+  // specifier: next is pinned in pnpm-workspace.yaml's `overrides:`, so the two
+  // can drift apart, and then a log line quoting the specifier would name a
+  // version this job never tested.
+  let installedNext = "unknown";
+  try {
+    installedNext = JSON.parse(
+      readFileSync(join(WEB, "node_modules/next/package.json"), "utf-8")
+    ).version;
+  } catch {
+    // Resolution layout is pnpm's business; the build below is the real check.
+  }
+
   console.log(
-    `Building apps/web (next ${nextSpecifier}) with ${resolved.command}` +
+    `Building apps/web (next ${installedNext} installed, "${nextSpecifier}" declared) ` +
+      `with ${resolved.command}` +
       `${resolved.pinned ? " (pinned in selfhost.config.ts)" : " (SST platform default)"}`
   );
 
@@ -111,7 +125,7 @@ function main() {
   });
   if (build.status !== 0) {
     fail(
-      `OpenNext ${resolved.version} could not build apps/web on next ${nextSpecifier}. ` +
+      `OpenNext ${resolved.version} could not build apps/web on next ${installedNext}. ` +
         "The self-hosted dashboard would fail to deploy. Either hold apps/web at a Next version " +
         "this OpenNext supports, or set openNextVersion in infra/selfhost.config.ts to a release that does " +
         "(SST's Nextjs component still expects the 3.9.x output layout, so 4.x is not a drop-in)."
@@ -162,7 +176,7 @@ function main() {
   }
 
   console.log(
-    `OpenNext ${resolved.version} builds apps/web on next ${nextSpecifier}, and the output is shaped the way SST reads it.`
+    `OpenNext ${resolved.version} builds apps/web on next ${installedNext}, and the output is shaped the way SST reads it.`
   );
 }
 

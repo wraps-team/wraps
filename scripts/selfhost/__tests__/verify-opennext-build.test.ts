@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { resolveOpenNextCommand } from "../verify-opennext-build.mjs";
 
@@ -96,5 +96,85 @@ describe("resolveOpenNextCommand", () => {
 
     expect(resolved.command).toBe("@opennextjs/aws@3.10.4");
     expect(resolved.pinned).toBe(true);
+  });
+});
+
+// The path filter on the build step is a list of directories maintained by
+// hand. Add a workspace dependency to apps/web and forget this list and the
+// build simply stops running for changes to it — silently, with the job still
+// green, which is the same class of failure the build itself exists to catch.
+describe("the OpenNext build's path filter", () => {
+  const workflow = readFileSync(
+    new URL("../../../.github/workflows/test.yml", import.meta.url),
+    "utf-8"
+  );
+
+  const repoRoot = new URL("../../../", import.meta.url);
+  const readPkg = (relative: string) =>
+    JSON.parse(readFileSync(new URL(relative, repoRoot), "utf-8"));
+
+  // name -> directory, because the two do not always agree (@wraps.dev/cli
+  // lives in packages/cli).
+  const packageDirs = new Map<string, string>(
+    readdirSync(new URL("packages", repoRoot)).flatMap((dir) => {
+      try {
+        return [[readPkg(`packages/${dir}/package.json`).name, dir]] as [
+          string,
+          string,
+        ][];
+      } catch {
+        return [];
+      }
+    })
+  );
+
+  const workspaceDeps = (pkg: {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  }) =>
+    Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })
+      .filter(([, spec]) => spec.startsWith("workspace:"))
+      .map(([name]) => name);
+
+  // What `pnpm --filter "@wraps/web^..." list` resolves to, without shelling
+  // out to pnpm in a unit test.
+  const closure = (() => {
+    const seen = new Set<string>();
+    const queue = workspaceDeps(readPkg("apps/web/package.json"));
+    while (queue.length) {
+      const name = queue.shift() as string;
+      const dir = packageDirs.get(name);
+      if (!dir || seen.has(dir)) {
+        continue;
+      }
+      seen.add(dir);
+      queue.push(...workspaceDeps(readPkg(`packages/${dir}/package.json`)));
+    }
+    return [...seen].sort();
+  })();
+
+  const filtered = (
+    workflow.match(/\^\(apps\/web\/\|packages\/\(([a-z|-]+)\)\//)?.[1] ?? ""
+  )
+    .split("|")
+    .sort();
+
+  it("covers every workspace package apps/web builds against", () => {
+    expect(closure.length).toBeGreaterThan(0);
+    expect(filtered).toEqual(closure);
+  });
+
+  // Everything outside packages/ that changes what the build produces or which
+  // OpenNext produces it. next is pinned in pnpm-workspace.yaml's `overrides:`
+  // and the sst version in the root package.json picks the OpenNext default,
+  // so neither bump can be allowed to skip the build that checks it.
+  it.each([
+    "pnpm-workspace\\.yaml",
+    "package\\.json",
+    "pnpm-lock\\.yaml",
+    "infra/selfhost\\.config\\.ts",
+    "scripts/selfhost/verify-opennext-build\\.mjs",
+  ])("watches %s", (path) => {
+    expect(workflow).toContain(path);
   });
 });
