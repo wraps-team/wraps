@@ -1,9 +1,17 @@
 import {
+  CloudFormationClient,
+  DescribeStacksCommand,
+} from "@aws-sdk/client-cloudformation";
+import {
   GetIdentityVerificationAttributesCommand,
   ListIdentitiesCommand,
   SESClient,
 } from "@aws-sdk/client-ses";
-import { GetEmailIdentityCommand, SESv2Client } from "@aws-sdk/client-sesv2";
+import {
+  GetAccountCommand,
+  GetEmailIdentityCommand,
+  SESv2Client,
+} from "@aws-sdk/client-sesv2";
 import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
 import { mockClient } from "aws-sdk-client-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,6 +21,7 @@ import { emailStatus } from "../email/status.js";
 const stsMock = mockClient(STSClient);
 const sesMock = mockClient(SESClient);
 const sesv2Mock = mockClient(SESv2Client);
+const cfnMock = mockClient(CloudFormationClient);
 
 // Mock Pulumi
 vi.mock("@pulumi/pulumi/automation", () => ({
@@ -102,7 +111,25 @@ describe("email status command", () => {
     stsMock.reset();
     sesMock.reset();
     sesv2Mock.reset();
+    cfnMock.reset();
     vi.clearAllMocks();
+
+    // Explicit default so every pre-existing test asserts against a value
+    // someone chose, not the { ProductionAccessEnabled: undefined } an
+    // unstubbed GetAccountCommand resolves to under aws-sdk-client-mock
+    // (which getSESAccountStatus would otherwise read as sandbox: true).
+    sesv2Mock.on(GetAccountCommand).resolves({
+      ProductionAccessEnabled: true,
+      SendQuota: {
+        Max24HourSend: 50_000,
+        MaxSendRate: 14,
+        SentLast24Hours: 120,
+      },
+      EnforcementStatus: "HEALTHY",
+    });
+
+    // Default: no CloudFormation stacks, permission to check is present.
+    cfnMock.on(DescribeStacksCommand).resolves({ Stacks: [] });
 
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as any);
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -287,6 +314,182 @@ describe("email status command", () => {
         ]),
       })
     );
+  });
+
+  describe("SES sandbox reporting", () => {
+    async function stubStackAndDomains() {
+      stsMock.on(GetCallerIdentityCommand).resolves({
+        Account: "123456789012",
+        UserId: "AIDAI123456789",
+        Arn: "arn:aws:iam::123456789012:user/test",
+      });
+
+      const { LocalWorkspace } = await import("@pulumi/pulumi/automation");
+      vi.mocked(LocalWorkspace.selectStack).mockResolvedValue({
+        outputs: vi.fn().mockResolvedValue({
+          roleArn: {
+            value: "arn:aws:iam::123456789012:role/wraps-email-role",
+          },
+          region: { value: "us-east-1" },
+        }),
+      } as any);
+
+      sesMock.on(ListIdentitiesCommand).resolves({ Identities: [] });
+    }
+
+    it("reports sandbox: true, sandboxUncertain: false when SES is not in production", async () => {
+      await stubStackAndDomains();
+      sesv2Mock.on(GetAccountCommand).resolves({
+        ProductionAccessEnabled: false,
+      });
+
+      const { displayStatus } = await import("../../utils/shared/output.js");
+
+      await emailStatus({});
+
+      expect(displayStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sending: expect.objectContaining({
+            sandbox: true,
+            sandboxUncertain: false,
+          }),
+        })
+      );
+    });
+
+    it("sets sandboxUncertain: true when GetAccount fails, and never renders 'production'", async () => {
+      await stubStackAndDomains();
+      sesv2Mock.on(GetAccountCommand).rejects(new Error("AccessDenied"));
+
+      const outputModule = await vi.importActual<
+        typeof import("../../utils/shared/output.js")
+      >("../../utils/shared/output.js");
+      const displayStatusMock = vi.mocked(
+        (await import("../../utils/shared/output.js")).displayStatus
+      );
+
+      await emailStatus({});
+
+      expect(displayStatusMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sending: expect.objectContaining({
+            sandbox: true,
+            sandboxUncertain: true,
+          }),
+        })
+      );
+
+      // The regression that matters: render the payload we were actually
+      // handed and confirm "production" never appears.
+      const clack = await import("@clack/prompts");
+      vi.mocked(clack.note).mockClear();
+      const statusData = displayStatusMock.mock.calls.at(-1)?.[0];
+      outputModule.displayStatus(statusData as any);
+
+      const rendered = vi
+        .mocked(clack.note)
+        .mock.calls.map((call) => call[0])
+        .join("\n");
+      expect(rendered).not.toContain("production");
+      expect(rendered).toContain("could not determine");
+    });
+
+    it("includes quota fields in the payload when SES reports a send quota", async () => {
+      await stubStackAndDomains();
+      sesv2Mock.on(GetAccountCommand).resolves({
+        ProductionAccessEnabled: true,
+        SendQuota: {
+          Max24HourSend: 200_000,
+          MaxSendRate: 42,
+          SentLast24Hours: 999,
+        },
+      });
+
+      const { displayStatus } = await import("../../utils/shared/output.js");
+
+      await emailStatus({});
+
+      expect(displayStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sending: expect.objectContaining({
+            max24HourSend: 200_000,
+            maxSendRate: 42,
+            sentLast24Hours: 999,
+          }),
+        })
+      );
+    });
+  });
+
+  describe("CloudFormation-owned deployments (no Pulumi stack)", () => {
+    beforeEach(async () => {
+      stsMock.on(GetCallerIdentityCommand).resolves({
+        Account: "123456789012",
+        UserId: "AIDAI123456789",
+        Arn: "arn:aws:iam::123456789012:user/test",
+      });
+
+      const { LocalWorkspace } = await import("@pulumi/pulumi/automation");
+      vi.mocked(LocalWorkspace.selectStack).mockRejectedValue(
+        new Error("Stack not found")
+      );
+
+      sesMock.on(ListIdentitiesCommand).resolves({ Identities: [] });
+    });
+
+    it("does not exit 1 and reports the stack names when CloudFormation stacks are found", async () => {
+      cfnMock.on(DescribeStacksCommand).resolves({
+        Stacks: [
+          {
+            StackName: "wraps-email-prod",
+            StackStatus: "CREATE_COMPLETE",
+          },
+        ],
+      });
+
+      const { displayStatus } = await import("../../utils/shared/output.js");
+
+      await emailStatus({});
+
+      expect(exitSpy).not.toHaveBeenCalledWith(1);
+      expect(displayStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          integrationLevel: "dashboard-only",
+          cloudFormationStacks: ["wraps-email-prod"],
+        })
+      );
+    });
+
+    it("exits 1 and says the check could not be performed when CloudFormation access is denied", async () => {
+      cfnMock
+        .on(DescribeStacksCommand)
+        .rejects(new Error("AccessDenied: cloudformation:DescribeStacks"));
+
+      await emailStatus({});
+
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      const loggedLines = consoleLogSpy.mock.calls
+        .map((call) => String(call[0]))
+        .join("\n");
+      expect(loggedLines).toContain("Could not check for CloudFormation");
+    });
+
+    it("exits 1 with today's message when CloudFormation was checked and found nothing", async () => {
+      cfnMock.on(DescribeStacksCommand).resolves({ Stacks: [] });
+
+      const clack = await import("@clack/prompts");
+
+      await emailStatus({});
+
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(clack.log.error).toHaveBeenCalledWith(
+        "No email infrastructure found"
+      );
+      const loggedLines = consoleLogSpy.mock.calls
+        .map((call) => String(call[0]))
+        .join("\n");
+      expect(loggedLines).not.toContain("Could not check for CloudFormation");
+    });
   });
 
   describe("JSON output", () => {

@@ -7,9 +7,11 @@ import type { StatusOptions } from "../../types/index.js";
 import { resolveDashboardUrl } from "../../utils/selfhost/dashboard-url.js";
 import {
   getAWSRegion,
+  getSESAccountStatus,
   listSESDomains,
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
+import { findWrapsCloudFormationStacks } from "../../utils/shared/cloudformation.js";
 import { isAWSNotFoundError } from "../../utils/shared/errors.js";
 import {
   ensurePulumiWorkDir,
@@ -85,6 +87,7 @@ export async function emailStatus(options: StatusOptions): Promise<void> {
 
   // 3. Try to load Pulumi stack
   let stackOutputs: any = {};
+  let cloudFormationStacks: string[] | undefined;
   try {
     // Ensure Pulumi workspace is configured (sets backend URL)
     await ensurePulumiWorkDir({ accountId: identity.accountId, region });
@@ -97,19 +100,41 @@ export async function emailStatus(options: StatusOptions): Promise<void> {
     stackOutputs = await stack.outputs();
     // baseline:allow-next-line no-swallowed-errors — stack may not exist, Pulumi may not be installed
   } catch (_error) {
-    // Any failure (stack not found, Pulumi not installed, missing project file,
-    // S3 backend issues) means no infrastructure is accessible.
-    progress.stop();
-    clack.log.error("No email infrastructure found");
-    console.log(
-      `\nRun ${pc.cyan("wraps email init")} to deploy email infrastructure.\n`
-    );
-    process.exit(1);
-    return; // Return after process.exit for testing
+    // No Pulumi stack. That is not the same thing as "no infrastructure" —
+    // a customer who deployed through the dashboard's CloudFormation path
+    // has real, working infrastructure this CLI has never looked for.
+    const cfCheck = await findWrapsCloudFormationStacks(region);
+
+    if (cfCheck.checked && cfCheck.stacks.length > 0) {
+      // Dashboard-managed deployment: continue with empty stackOutputs.
+      // integrationLevel below naturally resolves to "dashboard-only".
+      cloudFormationStacks = cfCheck.stacks;
+    } else {
+      progress.stop();
+      clack.log.error("No email infrastructure found");
+      if (!cfCheck.checked) {
+        // "checked: false" means we could not look — never claim we looked
+        // and found nothing when we simply lacked the permission to check.
+        console.log(
+          pc.dim(
+            "\nCould not check for CloudFormation stacks (missing cloudformation:DescribeStacks).\n"
+          )
+        );
+      }
+      console.log(
+        `\nRun ${pc.cyan("wraps email init")} to deploy email infrastructure.\n`
+      );
+      process.exit(1);
+      return; // Return after process.exit for testing
+    }
   }
 
-  // 4. Get SES domains with DKIM tokens
-  const domains = await listSESDomains(region);
+  // 4. Get SES domains with DKIM tokens, and SES account sending state, in
+  // parallel — both depend only on `region`, not on the Pulumi/CFN outcome.
+  const [domains, sesAccountStatus] = await Promise.all([
+    listSESDomains(region),
+    getSESAccountStatus(region),
+  ]);
 
   // 4a. Fetch DKIM tokens for each domain
   const { SESv2Client, GetEmailIdentityCommand } = await import(
@@ -190,6 +215,15 @@ export async function emailStatus(options: StatusOptions): Promise<void> {
           cloudFrontDomain: stackOutputs.cloudFrontDomain?.value,
         }
       : undefined,
+    sending: {
+      sandbox: sesAccountStatus.isSandbox,
+      sandboxUncertain: sesAccountStatus.sandboxUncertain ?? false,
+      max24HourSend: sesAccountStatus.sendQuota?.max24HourSend,
+      maxSendRate: sesAccountStatus.sendQuota?.maxSendRate,
+      sentLast24Hours: sesAccountStatus.sendQuota?.sentLast24Hours,
+      enforcementStatus: sesAccountStatus.enforcementStatus,
+    },
+    cloudFormationStacks,
   };
 
   if (isJsonMode()) {

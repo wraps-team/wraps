@@ -381,6 +381,25 @@ export type StatusOutputs = {
   };
   /** This deployment's own dashboard — see resolveDashboardUrl. */
   dashboardUrl?: string;
+  /**
+   * SES account-level sending state. Optional because a status run that could
+   * not reach SES must report absence, never a fabricated "not sandboxed".
+   */
+  sending?: {
+    sandbox: boolean;
+    /** True when SES could not be read — do not present `sandbox` as fact. */
+    sandboxUncertain: boolean;
+    max24HourSend?: number;
+    maxSendRate?: number;
+    sentLast24Hours?: number;
+    enforcementStatus?: string;
+  };
+  /**
+   * Names of live CloudFormation stacks that look like Wraps stacks, found
+   * when no Pulumi stack exists. Only populated on the dashboard-only /
+   * CloudFormation-owned path — see email/status.ts.
+   */
+  cloudFormationStacks?: string[];
 };
 
 /**
@@ -393,6 +412,39 @@ export function displayStatus(status: StatusOutputs) {
     `${pc.bold("Integration:")} ${pc.cyan(status.integrationLevel)}`,
     `${pc.bold("Region:")} ${pc.cyan(status.region)}`,
   ];
+
+  if (status.sending) {
+    const { sandbox, sandboxUncertain } = status.sending;
+    // Never present "production" when SES could not be reached — an
+    // unreachable account is not the same thing as a verified one.
+    if (sandboxUncertain) {
+      infoLines.push(
+        `${pc.bold("Sending:")} ${pc.yellow("could not determine (SES unreachable)")}`
+      );
+    } else if (sandbox) {
+      infoLines.push(
+        `${pc.bold("Sending:")} ${pc.yellow("SANDBOX")} ${pc.dim("— you can only send to verified addresses")}`
+      );
+    } else {
+      infoLines.push(`${pc.bold("Sending:")} ${pc.green("production")}`);
+    }
+
+    if (
+      status.sending.sentLast24Hours !== undefined ||
+      status.sending.max24HourSend !== undefined ||
+      status.sending.maxSendRate !== undefined
+    ) {
+      infoLines.push(
+        `${pc.bold("Quota:")} ${pc.cyan(`${status.sending.sentLast24Hours ?? 0}/${status.sending.max24HourSend ?? 0}`)} sent (24h) ${pc.dim(`· max rate ${status.sending.maxSendRate ?? 0}/s`)}`
+      );
+    }
+  }
+
+  if (status.cloudFormationStacks && status.cloudFormationStacks.length > 0) {
+    infoLines.push(
+      `${pc.bold("CloudFormation stacks:")} ${pc.cyan(status.cloudFormationStacks.join(", "))}`
+    );
+  }
 
   if (status.domains.length > 0) {
     const PURPOSE_DISPLAY: Record<string, string> = {
