@@ -42,8 +42,13 @@ function jobBlock(source: string, name: string): string {
 // YAML key rather than to the prose in the comments above it.
 const USES_MIGRATE_WORKFLOW =
   /^\s+uses: \.\/\.github\/workflows\/migrate\.yml$/m;
-const USES_TEST_WORKFLOW = /^\s+uses: \.\/\.github\/workflows\/test\.yml$/m;
-const NEEDS_MIGRATE = /^\s+needs: \[test, migrate\]$/m;
+const CALLS_TEST_WORKFLOW = /^\s+uses: \.\/\.github\/workflows\/test\.yml$/m;
+const TRIGGERED_BY_TEST_RUN = /^\s+workflows: \[Test\]$/m;
+const REQUIRES_GREEN_SUITE =
+  /github\.event\.workflow_run\.conclusion == 'success'/;
+const NEEDS_MIGRATE = /^\s+needs: \[gate, migrate\]$/m;
+const CHECKS_OUT_TESTED_SHA =
+  /^\s+ref: \$\{\{ needs\.gate\.outputs\.sha \}\}$/m;
 const MIGRATE_CONCURRENCY_GROUP = /^\s+group: db-migrate-/m;
 const DEPLOY_CONCURRENCY_GROUP = /^\s+group: deploy-sst-/m;
 const NEVER_CANCEL_IN_PROGRESS = /^\s+cancel-in-progress: false$/m;
@@ -68,11 +73,32 @@ describe("the production migration gate", () => {
   it("gates the deploy on the full Test workflow", () => {
     // Three commits in five days shipped to production with a red Test run and
     // a green Deploy API run on the same SHA. The deploy job referenced only
-    // `migrate`, so a failing suite had no consequence. Calling test.yml as a
-    // reusable workflow makes `needs: [test, migrate]` wait on every job in
-    // that workflow, not just one matrix leg.
-    expect(jobBlock(apiWorkflow, "test")).toMatch(USES_TEST_WORKFLOW);
+    // `migrate`, so a failing suite had no consequence. The gate now reads the
+    // conclusion of the Test run for this commit, which covers every job in
+    // that workflow rather than one matrix leg.
+    expect(apiWorkflow).toMatch(TRIGGERED_BY_TEST_RUN);
+    expect(apiWorkflow).toMatch(REQUIRES_GREEN_SUITE);
     expect(jobBlock(apiWorkflow, "deploy")).toMatch(NEEDS_MIGRATE);
+  });
+
+  it("reads the suite's verdict instead of running a second copy of it", () => {
+    // Calling test.yml as a reusable workflow put the called copy and the
+    // standalone push-triggered run in test.yml's one `concurrency` group —
+    // the group that serialises access to the shared Neon database. Only one
+    // could hold the slot. On 92413fa3 the called copy lost, all twelve jobs
+    // were cancelled, and `deploy` was skipped: a production deploy that
+    // silently did not happen, on a run whose conclusion read `cancelled`
+    // rather than `failure`. Reading the verdict cannot contend with the run
+    // that produced it.
+    expect(apiWorkflow).not.toMatch(CALLS_TEST_WORKFLOW);
+  });
+
+  it("deploys the commit the suite went green on", () => {
+    // Under `workflow_run` the default checkout is the default branch's head
+    // at trigger time, not the commit that was tested. On a busy main those
+    // differ, and the difference is an untested commit reaching production
+    // while a green check sits next to it.
+    expect(jobBlock(apiWorkflow, "deploy")).toMatch(CHECKS_OUT_TESTED_SHA);
   });
 
   it("keeps one owner of production migrations", () => {

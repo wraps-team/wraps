@@ -1,22 +1,22 @@
 name: Deploy API
 
+# Gated on the Test workflow's verdict rather than on `push` directly.
+#
+# deploy-api used to call test.yml as a reusable workflow. test.yml carries a
+# workflow-level `concurrency` group for the one shared Neon database, so the
+# called copy and the standalone push-triggered run competed for that single
+# slot. On 92413fa3 the called copy lost: all twelve jobs were cancelled and
+# `deploy` was skipped — a production deploy that silently did not happen, and
+# a run whose conclusion reads `cancelled` rather than `failure`.
+#
+# `workflow_run` reads the verdict of the suite that already ran for this SHA
+# instead of starting a second one. The suite runs once per commit, the deploy
+# waits for its conclusion, and a red suite never reaches the jobs below.
 on:
-  push:
+  workflow_run:
+    workflows: [Test]
+    types: [completed]
     branches: [main]
-    paths:
-      # Keep in sync with `pnpm --filter "@wraps/api^..." list`
-      - 'apps/api/**'
-      - 'packages/auth/**'
-      - 'packages/core/**'
-      - 'packages/db/**'
-      - 'packages/email/**'
-      - 'packages/email-check/**'
-      - 'packages/email-send/**'
-      - 'packages/template-render/**'
-      - 'packages/unsubscribe-token/**'
-      - 'infra/**'
-      - 'sst.config.ts'
-      - '.github/workflows/deploy-api.yml'
   workflow_dispatch:
     inputs:
       stage:
@@ -31,11 +31,86 @@ on:
 permissions:
   contents: read
   id-token: write # Required for AWS OIDC
+  actions: read # `gate` reads the last successful run of this workflow
 
 env:
   AWS_REGION: us-east-1
 
 jobs:
+  # `workflow_run` has no `paths:` filter, so the path list that used to live in
+  # the `on: push` trigger is applied here instead — and against the last commit
+  # this workflow actually deployed, not against HEAD^.
+  #
+  # Comparing to the last deployed commit is what makes a skip self-healing. A
+  # HEAD^ comparison only sees the newest commit, so a multi-commit push, or a
+  # deploy that was cancelled or failed, leaves its changes behind permanently:
+  # the next push compares against a commit that never shipped and concludes
+  # there is nothing to do. Diffing from the last success means every file
+  # changed since the last thing that really reached production is considered,
+  # however many pushes ago that was.
+  gate:
+    if: >-
+      github.repository == 'wraps-team/wraps' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'))
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    outputs:
+      deploy: ${{ steps.decide.outputs.deploy }}
+      sha: ${{ steps.decide.outputs.sha }}
+
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # Full history: the last successful deploy may be many pushes back.
+          fetch-depth: 0
+
+      - name: Decide whether this commit needs a deploy
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          echo "sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
+          # The manual button exists to ship out of band — never second-guess it.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "manual dispatch: deploying"
+            exit 0
+          fi
+
+          # `|| echo ""` so a transient API failure falls through to deploying.
+          # This whole job exists to stop deploys going missing quietly; a blip
+          # reading run history is not a reason to add another way that happens.
+          last=$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-api.yml/runs?branch=main&status=success&per_page=1" \
+            --jq '.workflow_runs[0].head_sha // ""' 2>/dev/null || echo "")
+
+          # No previous success, or its commit is not in this history (a force
+          # push, a fresh workflow): deploy rather than guess.
+          if [ -z "$last" ] || ! git cat-file -e "${last}^{commit}" 2>/dev/null; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "no usable previous deploy: deploying"
+            exit 0
+          fi
+
+          echo "comparing $last..$HEAD_SHA"
+
+          # Keep in sync with `pnpm --filter "@wraps/api^..." list`.
+          if git diff --name-only "$last" "$HEAD_SHA" | grep -qE \
+            '^(apps/api/|packages/(auth|core|db|email|email-check|email-send|template-render|unsubscribe-token)/|infra/|sst\.config\.ts$|\.github/workflows/deploy-api\.yml$)'; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "api-relevant paths changed: deploying"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "nothing api-relevant changed: skipping"
+          fi
+
   # Migrate BEFORE deploying, not after. `sst deploy` publishes each Lambda's
   # new code the moment that function updates — well before the command returns
   # — so migrating afterwards leaves a window where new code runs against the
@@ -57,29 +132,17 @@ jobs:
   # apps/web ships on the same commit through Vercel whether this job runs or
   # not, so the migration must not be hostage to anything but itself. See
   # migrate.yml, which also carries the repo-wide serialisation.
-  # Run the whole Test workflow as one gate. `needs: test` below waits on this
-  # job's conclusion — success of every job in test.yml — so a red suite stops
-  # the deploy from starting. Calling the workflow (rather than naming one test
-  # job) means the gate covers all twelve suites, not just the CLI matrix leg.
-  test:
-    # Forks lack the Blacksmith runners and test secrets; the suite's own jobs
-    # guard themselves, but skip the calling job too so the gate is honest here.
-    if: github.repository == 'wraps-team/wraps'
-    uses: ./.github/workflows/test.yml
-    secrets: inherit
-
   migrate:
-    if: github.repository == 'wraps-team/wraps'
+    needs: gate
+    if: needs.gate.outputs.deploy == 'true'
     uses: ./.github/workflows/migrate.yml
     with:
       stage: ${{ github.event.inputs.stage || 'production' }}
     secrets: inherit
 
   deploy:
-    # Only runs upstream — forks lack the Blacksmith runners and AWS secrets,
-    # so this job would queue forever on a self-hosted customer's fork
-    if: github.repository == 'wraps-team/wraps'
-    needs: [test, migrate]
+    needs: [gate, migrate]
+    if: needs.gate.outputs.deploy == 'true'
     runs-on: blacksmith-2vcpu-ubuntu-2404
     environment: ${{ github.event.inputs.stage || 'production' }}
 
@@ -92,8 +155,13 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      - name: Checkout code
+      # The commit the suite went green on, not the branch tip. Under
+      # `workflow_run` the default checkout is the default branch's head at
+      # trigger time, which can already be a newer, untested commit.
+      - name: Checkout the tested commit
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -135,3 +203,4 @@ jobs:
         run: |
           echo "Deployment complete!"
           echo "Stage: ${{ github.event.inputs.stage || 'production' }}"
+          echo "Commit: ${{ needs.gate.outputs.sha }}"
