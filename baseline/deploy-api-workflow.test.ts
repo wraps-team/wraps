@@ -42,8 +42,7 @@ function jobBlock(source: string, name: string): string {
 // YAML key rather than to the prose in the comments above it.
 const USES_MIGRATE_WORKFLOW =
   /^\s+uses: \.\/\.github\/workflows\/migrate\.yml$/m;
-const USES_TEST_WORKFLOW =
-  /^\s+uses: \.\/\.github\/workflows\/test\.yml$/m;
+const USES_TEST_WORKFLOW = /^\s+uses: \.\/\.github\/workflows\/test\.yml$/m;
 const NEEDS_MIGRATE = /^\s+needs: \[test, migrate\]$/m;
 const MIGRATE_CONCURRENCY_GROUP = /^\s+group: db-migrate-/m;
 const DEPLOY_CONCURRENCY_GROUP = /^\s+group: deploy-sst-/m;
