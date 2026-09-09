@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { normalizePlainTextMustaches } from "../template-mustache-case";
+import { normalizePlainTextMustaches } from "../mustache-case";
 
 describe("normalizePlainTextMustaches", () => {
   it("lowercases an uppercased `{{#IF}}` block open", () => {

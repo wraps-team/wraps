@@ -14,6 +14,14 @@
  *
  * Tokens whose names are not in either the keyword set or the canonical
  * variable set are left untouched — we only rewrite what we know.
+ *
+ * Not yet replaceable by upstream. `@react-email/render` 2.1.0 added
+ * `unstableToPlainText`, which sidesteps html-to-text and does preserve the
+ * casing this function exists to restore. It is not usable yet: measured on
+ * 2.1.0, it prefixes the body with a literal `$htmlheadbody`, leaks raw
+ * `[if mso]><i style=...` conditional comments around every `<Button>`, and
+ * appends a trailing `/$`. Worse output than the problem it solves. Re-measure
+ * when it drops the `unstable` prefix — this whole module goes away when it does.
  */
 
 const HANDLEBARS_BLOCK_HELPERS = new Set(["if", "unless", "each", "with"]);

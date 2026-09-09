@@ -107,7 +107,7 @@ catalog:
   '@aws-sdk/s3-request-presigner': 3.1074.0
   '@aws-sdk/util-dynamodb': 3.996.5
   '@react-email/components': 1.0.12
-  '@react-email/render': 2.0.9
+  '@react-email/render': 2.1.0
   '@types/node': 24.10.0
   '@types/pg': ^8.20.0
   '@vitest/coverage-v8': 4.1.9

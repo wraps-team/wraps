@@ -17,7 +17,7 @@
  */
 
 import type React from "react";
-import { normalizePlainTextMustaches } from "./template-mustache-case.js";
+import { normalizePlainTextMustaches } from "@wraps/template-render/mustache-case";
 
 export type RenderedTemplate = {
   html: string;
