@@ -42,7 +42,9 @@ function jobBlock(source: string, name: string): string {
 // YAML key rather than to the prose in the comments above it.
 const USES_MIGRATE_WORKFLOW =
   /^\s+uses: \.\/\.github\/workflows\/migrate\.yml$/m;
-const NEEDS_MIGRATE = /^\s+needs: migrate$/m;
+const USES_TEST_WORKFLOW =
+  /^\s+uses: \.\/\.github\/workflows\/test\.yml$/m;
+const NEEDS_MIGRATE = /^\s+needs: \[test, migrate\]$/m;
 const MIGRATE_CONCURRENCY_GROUP = /^\s+group: db-migrate-/m;
 const DEPLOY_CONCURRENCY_GROUP = /^\s+group: deploy-sst-/m;
 const NEVER_CANCEL_IN_PROGRESS = /^\s+cancel-in-progress: false$/m;
@@ -61,6 +63,16 @@ describe("the production migration gate", () => {
     // the old code on the old schema, which works. The other order leaves new
     // code on the old schema, which does not.
     expect(jobBlock(apiWorkflow, "migrate")).toMatch(USES_MIGRATE_WORKFLOW);
+    expect(jobBlock(apiWorkflow, "deploy")).toMatch(NEEDS_MIGRATE);
+  });
+
+  it("gates the deploy on the full Test workflow", () => {
+    // Three commits in five days shipped to production with a red Test run and
+    // a green Deploy API run on the same SHA. The deploy job referenced only
+    // `migrate`, so a failing suite had no consequence. Calling test.yml as a
+    // reusable workflow makes `needs: [test, migrate]` wait on every job in
+    // that workflow, not just one matrix leg.
+    expect(jobBlock(apiWorkflow, "test")).toMatch(USES_TEST_WORKFLOW);
     expect(jobBlock(apiWorkflow, "deploy")).toMatch(NEEDS_MIGRATE);
   });
 

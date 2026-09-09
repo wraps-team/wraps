@@ -57,6 +57,17 @@ jobs:
   # apps/web ships on the same commit through Vercel whether this job runs or
   # not, so the migration must not be hostage to anything but itself. See
   # migrate.yml, which also carries the repo-wide serialisation.
+  # Run the whole Test workflow as one gate. `needs: test` below waits on this
+  # job's conclusion — success of every job in test.yml — so a red suite stops
+  # the deploy from starting. Calling the workflow (rather than naming one test
+  # job) means the gate covers all twelve suites, not just the CLI matrix leg.
+  test:
+    # Forks lack the Blacksmith runners and test secrets; the suite's own jobs
+    # guard themselves, but skip the calling job too so the gate is honest here.
+    if: github.repository == 'wraps-team/wraps'
+    uses: ./.github/workflows/test.yml
+    secrets: inherit
+
   migrate:
     if: github.repository == 'wraps-team/wraps'
     uses: ./.github/workflows/migrate.yml
@@ -68,7 +79,7 @@ jobs:
     # Only runs upstream — forks lack the Blacksmith runners and AWS secrets,
     # so this job would queue forever on a self-hosted customer's fork
     if: github.repository == 'wraps-team/wraps'
-    needs: migrate
+    needs: [test, migrate]
     runs-on: blacksmith-2vcpu-ubuntu-2404
     environment: ${{ github.event.inputs.stage || 'production' }}
 
