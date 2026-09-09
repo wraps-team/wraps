@@ -1,5 +1,5 @@
 
-<p align="center" style=`{"background: "#f1f1f1"}`>
+<p align="center">
   <kbd>
     <a href="https://wraps.dev">
       <img src="https://wraps.dev/wraps-light-logo.png" alt="Wraps" width="200" />
@@ -28,7 +28,7 @@
 
 ## Quick Start
 
-**Prerequisites:** Node.js 20+, AWS credentials configured
+**Prerequisites:** Node.js 22+, AWS credentials configured
 
 ```bash
 # Deploy email infrastructure to your AWS account
@@ -62,6 +62,7 @@ Using Claude Code, Cursor, or another AI assistant? Point it at:
 - **[wraps.dev/llms-full.txt](https://wraps.dev/llms-full.txt)** — the complete Wraps documentation in one file (quickstarts, SDK reference, CLI reference, guides)
 - **[wraps.dev/llms.txt](https://wraps.dev/llms.txt)** — agent-oriented index: when to use Wraps, quick command reference, links to everything
 - **Claude Code skills** — installable from [wraps.dev/.well-known/skills/](https://wraps.dev/.well-known/skills/)
+- **MCP server** — hosted at `https://wraps.dev/mcp`, or run locally with `npx -y @wraps.dev/mcp` for tools that send email, check setup status, and read event logs ([reference](https://wraps.dev/docs/mcp-reference))
 
 ## Why Wraps?
 
@@ -80,15 +81,19 @@ One command creates all of this in your AWS account:
 - **Lambda** — Event processing and webhook handling
 - **IAM** — Least-privilege roles with OIDC support (Vercel, AWS native)
 
-All resources are namespaced with `wraps-email-*` and tagged `ManagedBy: wraps-cli`.
+All resources are namespaced under `wraps-` (most as `wraps-email-*`) and tagged `ManagedBy: wraps-cli`.
 
 ## Also Available
 
 | Service | CLI | SDK |
 |---------|-----|-----|
-| **SMS** | `wraps sms init` | [`@wraps.dev/sms`](https://www.npmjs.com/package/@wraps.dev/sms) |
-| **CDK** | — | [`@wraps.dev/cdk`](https://www.npmjs.com/package/@wraps.dev/cdk) |
-| **Pulumi** | — | [`@wraps.dev/pulumi`](https://www.npmjs.com/package/@wraps.dev/pulumi) |
+| **SMS** (AWS End User Messaging) | `wraps sms init` | [`@wraps.dev/sms`](https://www.npmjs.com/package/@wraps.dev/sms) |
+| **CDN** (S3 + CloudFront) | `wraps cdn init` | — |
+| **Email (Python)** | — | [`wraps-email`](https://pypi.org/project/wraps-email/) |
+| **Platform API client** | — | [`@wraps.dev/client`](https://www.npmjs.com/package/@wraps.dev/client) |
+| **MCP server** | — | [`@wraps.dev/mcp`](https://www.npmjs.com/package/@wraps.dev/mcp) |
+| **CDK construct** | — | [`@wraps.dev/cdk`](https://www.npmjs.com/package/@wraps.dev/cdk) |
+| **Pulumi component** | — | [`@wraps.dev/pulumi`](https://www.npmjs.com/package/@wraps.dev/pulumi) |
 
 ## Documentation
 
@@ -97,6 +102,8 @@ All resources are namespaced with `wraps-email-*` and tagged `ManagedBy: wraps-c
 | Quickstart | [wraps.dev/docs/quickstart](https://wraps.dev/docs/quickstart) |
 | CLI Reference | [wraps.dev/docs/cli-reference](https://wraps.dev/docs/cli-reference) |
 | SDK Reference | [wraps.dev/docs/sdk-reference](https://wraps.dev/docs/sdk-reference) |
+| Python SDK Reference | [wraps.dev/docs/python-sdk-reference](https://wraps.dev/docs/python-sdk-reference) |
+| MCP Reference | [wraps.dev/docs/mcp-reference](https://wraps.dev/docs/mcp-reference) |
 | Guides | [wraps.dev/docs/guides](https://wraps.dev/docs/guides) |
 | Infrastructure | [wraps.dev/docs/infrastructure](https://wraps.dev/docs/infrastructure) |
 | Complete docs for LLMs | [wraps.dev/llms-full.txt](https://wraps.dev/llms-full.txt) |
