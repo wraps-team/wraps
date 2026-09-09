@@ -15,7 +15,7 @@ import {
   type UpdateOrganizationInput,
   updateOrganizationSchema,
 } from "@/lib/forms/update-organization";
-import { createActionLogger } from "@/lib/logger";
+import { createActionLogger, serializeError } from "@/lib/logger";
 import {
   generateSlug,
   getOrganizationWithMembership,
@@ -128,6 +128,36 @@ export async function createOrganizationAction(
       .set({ activeOrganizationId: newOrg.id })
       .where(eq(sessionTable.userId, session.user.id));
 
+    // 7.5. Attach an AWS Marketplace subscription, if this signup came from one.
+    let linkedMarketplaceSubscriptionId: string | null = null;
+    //
+    // Deliberately non-fatal: a buyer who cannot be linked still gets a working
+    // organization, and the subscription stays unlinked for a human to attach.
+    // Failing org creation over this would be strictly worse.
+    try {
+      const { cookies } = await import("next/headers");
+      const {
+        linkMarketplaceSubscription,
+        MARKETPLACE_LINK_COOKIE,
+        MARKETPLACE_SESSION_COOKIE,
+      } = await import("@/lib/marketplace/aws");
+      const cookieStore = await cookies();
+
+      const linkedId = await linkMarketplaceSubscription({
+        organizationId: newOrg.id,
+        cookieRef: cookieStore.get(MARKETPLACE_SESSION_COOKIE)?.value ?? null,
+        linkTokenSubscriptionId:
+          cookieStore.get(MARKETPLACE_LINK_COOKIE)?.value ?? null,
+      });
+
+      linkedMarketplaceSubscriptionId = linkedId;
+    } catch (linkError) {
+      createActionLogger("createOrganizationAction", {}).error(
+        { err: serializeError(linkError), organizationId: newOrg.id },
+        "Failed to link AWS Marketplace subscription to a new organization"
+      );
+    }
+
     // 8. Revalidate paths
     // Use "page" type to only revalidate the root page, not all routes.
     // revalidatePath("/") without a type is a special case that purges the
@@ -148,6 +178,21 @@ export async function createOrganizationAction(
         metadata: { name, slug },
       })
     );
+
+    // Written after org.created so the audit log reads in causal order.
+    if (linkedMarketplaceSubscriptionId) {
+      await db.insert(auditLog).values(
+        auditLogEntry(auditCtx, {
+          organizationId: newOrg.id,
+          actorId: session.user.id,
+          actorEmail: session.user.email,
+          action: "marketplace.linked",
+          resource: "organization",
+          resourceId: newOrg.id,
+          metadata: { subscriptionId: linkedMarketplaceSubscriptionId },
+        })
+      );
+    }
 
     // 9. Return success
     return {

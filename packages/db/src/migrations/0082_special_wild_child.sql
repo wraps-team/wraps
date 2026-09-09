@@ -1,0 +1,1 @@
+ALTER TABLE "aws_marketplace_subscription" ADD COLUMN "welcome_email_sent_at" timestamp;

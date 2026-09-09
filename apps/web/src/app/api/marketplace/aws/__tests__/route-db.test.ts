@@ -105,8 +105,8 @@ describe("AWS Marketplace registration (real DB)", () => {
   });
 
   it("never provisions on registration — status stays pending until EventBridge", async () => {
-    // AWS forbids creating resources before subscribe-success arrives, so the
-    // registration POST must not advance status on its own.
+    // AWS forbids activating a subscription before a `License Updated` event
+    // arrives, so the registration POST must not advance status on its own.
     const rows = await rowsForLicense();
     expect(rows[0]?.status).toBe("pending");
     expect(rows[0]?.organizationId).toBeNull();

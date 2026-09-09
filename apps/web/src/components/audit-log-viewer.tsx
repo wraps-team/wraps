@@ -61,6 +61,7 @@ const ACTION_LABELS: Record<AuditLogAction, string> = {
   "settings.updated": "Settings Updated",
   "audit_log.exported": "Audit Log Exported",
   "plan.changed": "Plan Changed",
+  "marketplace.linked": "AWS Marketplace Subscription Linked",
   "domain.verified": "Domain Verified",
   "auth.login": "Login",
   "auth.login_failed": "Login Failed",

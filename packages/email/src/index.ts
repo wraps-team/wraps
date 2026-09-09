@@ -18,6 +18,15 @@ export {
   buildEventFeedStaleEmail,
   sendEventFeedStaleEmail,
 } from "./emails/event-feed-stale";
+// AWS Marketplace subscription confirmation
+export type {
+  MarketplaceWelcomeContent,
+  SendMarketplaceWelcomeEmailParams,
+} from "./emails/marketplace-welcome";
+export {
+  buildMarketplaceWelcomeEmail,
+  sendMarketplaceWelcomeEmail,
+} from "./emails/marketplace-welcome";
 export { resolveAppUrl } from "./lib/app-url";
 export type { SendEmailParams } from "./lib/client";
 export { getWrapsClient, sendEmail } from "./lib/client";
@@ -29,6 +38,12 @@ export {
   verifyConfirmationToken,
 } from "./lib/confirmation-token";
 export { escapeHtml } from "./lib/escape-html";
+// AWS Marketplace signed link tokens
+export type { MarketplaceLinkTokenPayload } from "./lib/marketplace-link-token";
+export {
+  generateMarketplaceLinkToken,
+  verifyMarketplaceLinkToken,
+} from "./lib/marketplace-link-token";
 // SES templates
 export type {
   SESCredentials,

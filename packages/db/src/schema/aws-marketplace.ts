@@ -29,8 +29,29 @@ export const awsMarketplaceSubscription = pgTable(
     productCode: text("product_code").notNull(),
     customerIdentifier: text("customer_identifier"),
 
-    // Null between the Marketplace POST and the buyer finishing registration.
-    // A buyer can abandon the form, so this row has to stand on its own.
+    // Purchase Agreement lifecycle events (Created/Ended) carry NO licence ARN
+    // — only `agreement.id`. Without this column a cancellation cannot be tied
+    // back to a specific agreement, and under Concurrent Agreements one AWS
+    // account can hold several at once, so account+product is ambiguous.
+    // Populated from the first License event that names it.
+    agreementId: text("agreement_id"),
+
+    // EventBridge delivers at-least-once with no ordering guarantee. Events
+    // older than this are ignored, so a redelivered "License Updated" cannot
+    // resurrect a subscription that was already deprovisioned.
+    lastEventAt: timestamp("last_event_at"),
+
+    // DELIBERATE exception to the "every table has a NOT NULL organizationId
+    // with onDelete: cascade" rule in packages/db/CLAUDE.md. Do not "fix" it.
+    //
+    // This row is created at ResolveCustomer time — when a buyer subscribes on
+    // AWS Marketplace, which happens BEFORE they have a Wraps account. There is
+    // no organization to scope to yet, and a buyer can abandon the form, so the
+    // row has to stand on its own.
+    //
+    // `set null` rather than cascade for the same reason: deleting a Wraps org
+    // does not end the agreement on AWS's side, and keeping the row is what
+    // lets a later re-registration reconcile against it.
     organizationId: text("organization_id").references(() => organization.id, {
       onDelete: "set null",
     }),
@@ -39,11 +60,12 @@ export const awsMarketplaceSubscription = pgTable(
     // must collect the buyer's email address.
     contactEmail: text("contact_email"),
 
-    // pending | active | unsubscribe-pending | unsubscribed | failed
+    // pending | active | unsubscribed | failed
     //
     // Driven by EventBridge lifecycle events, NOT by the registration POST —
-    // AWS is explicit that resources must not be provisioned before
-    // subscribe-success arrives.
+    // AWS is explicit that a subscription must not be activated until a
+    // `License Updated` event arrives. (`subscribe-success` is the older SNS
+    // name; new listings receive EventBridge notifications instead.)
     status: text("status").notNull().default("pending"),
 
     // "free-trial" when AWS appends x-amzn-marketplace-offer-type.
@@ -51,6 +73,11 @@ export const awsMarketplaceSubscription = pgTable(
 
     resolvedAt: timestamp("resolved_at").defaultNow().notNull(),
     registeredAt: timestamp("registered_at"),
+
+    // Set the first time the confirmation email goes out. EventBridge delivers
+    // at-least-once, so without this a redelivered activation emails the buyer
+    // again every time.
+    welcomeEmailSentAt: timestamp("welcome_email_sent_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -58,7 +85,12 @@ export const awsMarketplaceSubscription = pgTable(
     index("aws_marketplace_subscription_organization_id_idx").on(
       table.organizationId
     ),
-    // Lifecycle events arrive keyed by account + product, not by licenseArn.
+    // Agreement events correlate by agreement id.
+    index("aws_marketplace_subscription_agreement_id_idx").on(
+      table.agreementId
+    ),
+    // Last-resort correlation when an event carries neither licence nor a
+    // known agreement id.
     index("aws_marketplace_subscription_account_product_idx").on(
       table.customerAwsAccountId,
       table.productCode

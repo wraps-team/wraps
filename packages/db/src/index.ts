@@ -55,7 +55,7 @@ export type DbOrTx =
     >;
 
 // Re-export commonly used drizzle-orm operators
-export { and, desc, eq, or, sql as sqlExpr } from "drizzle-orm";
+export { and, desc, eq, ilike, isNull, or, sql as sqlExpr } from "drizzle-orm";
 export { assertPostgresUrl, normalizeDatabaseUrl } from "./connection-url";
 
 /**

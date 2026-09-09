@@ -23,9 +23,9 @@ export type MarketplaceRegisterResult =
  * never from the form — otherwise anyone could attach their address to someone
  * else's agreement by guessing a row id.
  *
- * This deliberately does NOT provision anything. AWS is explicit that resources
- * must not be created before the `subscribe-success` lifecycle event arrives,
- * so the row stays `pending` until EventBridge says otherwise.
+ * This deliberately does NOT provision anything. AWS is explicit that a
+ * subscription must not be activated until a `License Updated` event arrives on
+ * EventBridge, so the row stays `pending` until then.
  */
 export async function registerMarketplaceContact(
   formData: FormData

@@ -13,6 +13,7 @@ export type AuditLogAction =
   | "settings.updated"
   | "audit_log.exported"
   | "plan.changed"
+  | "marketplace.linked"
   | "domain.verified"
   | "auth.login"
   | "auth.login_failed"

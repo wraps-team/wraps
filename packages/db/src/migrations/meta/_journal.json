@@ -568,6 +568,20 @@
       "when": 1788890648984,
       "tag": "0080_lush_luke_cage",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1788902987521,
+      "tag": "0081_red_may_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1788903452068,
+      "tag": "0082_special_wild_child",
+      "breakpoints": true
     }
   ]
 }

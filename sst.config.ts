@@ -37,6 +37,9 @@ export default $config({
       "./infra/queues"
     );
     const { schedulerGroup, schedulerRole } = await import("./infra/scheduler");
+    const { marketplaceQueue, marketplaceDlq } = await import(
+      "./infra/marketplace"
+    );
     const { api } = await import("./infra/api");
     const { alertsTopic } = await import("./infra/alarms");
     const {
@@ -56,6 +59,8 @@ export default $config({
       schedulerGroupName: schedulerGroup.name,
       schedulerRoleArn: schedulerRole.arn,
       alertsTopicArn: alertsTopic.arn,
+      marketplaceQueueUrl: marketplaceQueue.url,
+      marketplaceDlqUrl: marketplaceDlq.url,
     };
   },
 });
