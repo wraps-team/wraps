@@ -10,6 +10,18 @@ on:
 permissions:
   contents: read
 
+# Every DB-backed job below hits the same Neon branch (TEST_DATABASE_URL is a
+# single secret, and resolve-branch.mjs only isolates worktrees, never CI). Two
+# concurrent runs of this workflow — e.g. two pushes minutes apart — execute
+# their beforeAll/afterAll fixture windows on that one database at once, so one
+# run's cleanup deletes the deterministic fixture (test-onboarding-org-1,
+# contacts-analytics-db-c-active-1) another run's suite is still reading. That
+# surfaces as FK 23503. Repo-level serialisation per ref prevents the overlap;
+# this is the same mechanism migrate.yml and deploy-api.yml already use.
+concurrency:
+  group: test-db-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # Every job here is guarded to the upstream repo — forks (self-hosted
   # customers) lack the Blacksmith runners and test secrets, so unguarded
