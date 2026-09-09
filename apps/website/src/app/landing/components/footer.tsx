@@ -39,7 +39,7 @@ const footerLinks = {
   ],
   resources: [
     { name: "Alternatives", href: "/alternatives" },
-    { name: "Migrate from Pinpoint", href: "/migrate/amazon-pinpoint" },
+    { name: "Migration Guides", href: "/migrate" },
     { name: "Email Tools", href: "/tools" },
     { name: "SES Cost Calculator", href: "/tools/ses-calculator" },
     {

@@ -115,9 +115,9 @@ const resourceItems = [
     description: "Ranked lists of every real option, ours included",
   },
   {
-    name: "Migrate from Pinpoint",
-    href: "/migrate/amazon-pinpoint",
-    description: "AWS ends Pinpoint support October 30, 2026",
+    name: "Migration Guides",
+    href: "/migrate",
+    description: "Move to SES from SendGrid, Mailgun, Postmark, or Resend",
   },
   {
     name: "Security",
