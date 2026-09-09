@@ -22,13 +22,31 @@ concurrency:
   group: test-db-${{ github.ref }}
   cancel-in-progress: false
 
+# Runner allocation is by wall-clock position, not by job kind. This workflow
+# finishes when test-web finishes (~330s; 263s of that is `Run web tests`).
+# Every other job lands under ~200s, so each has 130s+ of slack — enough to
+# absorb a slower runner without moving the finish line. So the three jobs on
+# or near the critical path stay on Blacksmith and the other eight run on
+# GitHub-hosted runners, which are free on this public repo:
+#
+#   Blacksmith  test-web (329s, sets the wall clock), test-api (201s),
+#               selfhost-smoke (its OpenNext step runs a full Next production
+#               build, so it is CPU-bound and growing)
+#   ubuntu-latest  everything else (42-92s on Blacksmith)
+#
+# Before moving a job onto Blacksmith, check it against test-web's duration —
+# if it finishes well inside that, paying for it buys no PR feedback time.
+
 jobs:
-  # Every job here is guarded to the upstream repo — forks (self-hosted
-  # customers) lack the Blacksmith runners and test secrets, so unguarded
-  # jobs queue forever on their pushes and sync PRs.
+  # Every job here is guarded to the upstream repo — forks lack the test
+  # secrets, and the Blacksmith jobs also lack the runners, so unguarded jobs
+  # fail or queue forever on their pushes and sync PRs. The ubuntu-latest jobs
+  # that need no secrets (test, test-scripts, test-packages, baseline, lint)
+  # could now drop this guard and give fork PRs real CI for free — that is a
+  # deliberate choice about running contributor code, not an oversight.
   test:
     if: github.repository == 'wraps-team/wraps'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     strategy:
       matrix:
@@ -104,7 +122,7 @@ jobs:
 
   test-auth:
     if: github.repository == 'wraps-team/wraps'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -182,7 +200,7 @@ jobs:
 
   test-db:
     if: github.repository == 'wraps-team/wraps'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -213,7 +231,7 @@ jobs:
   # tests protect nothing in CI.
   test-scripts:
     if: github.repository == 'wraps-team/wraps'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -245,7 +263,7 @@ jobs:
   # architecture test that guards it.
   test-packages:
     if: github.repository == 'wraps-team/wraps'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -282,7 +300,7 @@ jobs:
 
   baseline:
     if: github.repository == 'wraps-team/wraps'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -317,7 +335,7 @@ jobs:
 
   lint:
     if: github.repository == 'wraps-team/wraps'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -421,6 +439,7 @@ jobs:
             echo "::error::upgrade.ts failed with something other than its .env.selfhost guard — likely a broken import (missing root dep or dist artifact)"
             exit 1
           }
+
       # The one step that actually builds the dashboard the way a customer's
       # deploy does. sst.aws.Nextjs does not build Next itself — it shells out
       # to OpenNext, which reimplements Next's server output for Lambda and
