@@ -3,8 +3,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@wraps/ui/components/ui/card";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, Loader2Icon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { SetupStatus } from "@/lib/setup-status";
 import { selectNextStep } from "./next-step";
@@ -34,7 +37,30 @@ export function NextStepCard({
   organizationId,
   setupStatus,
 }: NextStepCardProps) {
+  const router = useRouter();
+  const [isSendingTestEmail, startTestEmailSend] = useTransition();
   const step = selectNextStep(setupStatus);
+
+  const handleSendTestEmail = () => {
+    startTestEmailSend(async () => {
+      try {
+        const { sendSimulatorTestEmail } = await import(
+          "@/actions/ses-onboarding"
+        );
+        const result = await sendSimulatorTestEmail(organizationId);
+        if (result.success) {
+          toast.success(
+            "Test email sent through your infrastructure to the AWS mailbox simulator — no inbox receives it, but it proves the pipeline works."
+          );
+          router.refresh();
+        } else {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Failed to send the test email");
+      }
+    });
+  };
 
   const facts = {
     kind: step.kind,
@@ -93,12 +119,32 @@ export function NextStepCard({
           <p className="font-semibold text-lg">{title}</p>
           <p className="text-muted-foreground text-sm">{description}</p>
         </div>
-        <Button asChild className="shrink-0">
-          <Link href={step.href(orgSlug)}>
-            {step.ctaLabel}
-            <ArrowRightIcon className="ml-1 h-4 w-4" />
-          </Link>
-        </Button>
+        {step.action === "send_test_email" ? (
+          <Button
+            className="shrink-0"
+            disabled={isSendingTestEmail}
+            onClick={handleSendTestEmail}
+          >
+            {isSendingTestEmail ? (
+              <>
+                <Loader2Icon className="mr-1 h-4 w-4 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                {step.ctaLabel}
+                <ArrowRightIcon className="ml-1 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        ) : (
+          <Button asChild className="shrink-0">
+            <Link href={step.href(orgSlug)}>
+              {step.ctaLabel}
+              <ArrowRightIcon className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

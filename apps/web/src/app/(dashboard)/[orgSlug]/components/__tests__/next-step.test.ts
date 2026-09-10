@@ -162,6 +162,66 @@ describe("selectNextStep", () => {
     }
   });
 
+  it("marks first_send with a send_test_email action and a usable fallback href", () => {
+    const step = selectNextStep({
+      ...baseStatus,
+      hasSentEmail: false,
+      sandboxStatus: true,
+    });
+    expect(step.kind).toBe("first_send");
+    expect(step.action).toBe("send_test_email");
+    expect(step.href("acme")).toContain("acme");
+  });
+
+  it("leaves action undefined for every step other than first_send", () => {
+    // Guard against a future edit accidentally turning an unrelated CTA
+    // into a send by carrying the action discriminator along with it.
+    const statusByKind: Record<
+      Exclude<NextStepKind, "first_send">,
+      SetupStatus
+    > = {
+      connect_aws: {
+        ...baseStatus,
+        hasAwsAccount: false,
+        hasAnyAwsAccounts: false,
+        hasPlatformConnection: false,
+        hasVerifiedDomain: false,
+        hasSentEmail: false,
+        sandboxStatus: null,
+      },
+      connect_platform: {
+        ...baseStatus,
+        hasPlatformConnection: false,
+        hasVerifiedDomain: false,
+        hasSentEmail: false,
+        sandboxStatus: null,
+      },
+      verify_domain: {
+        ...baseStatus,
+        hasVerifiedDomain: false,
+        hasSentEmail: false,
+        sandboxStatus: null,
+      },
+      leave_sandbox: {
+        ...baseStatus,
+        sandboxStatus: true,
+      },
+      done: {
+        ...baseStatus,
+        sandboxStatus: false,
+      },
+    };
+
+    for (const kind of Object.keys(statusByKind) as Exclude<
+      NextStepKind,
+      "first_send"
+    >[]) {
+      const step = selectNextStep(statusByKind[kind]);
+      expect(step.kind).toBe(kind);
+      expect(step.action).toBeUndefined();
+    }
+  });
+
   it("returns non-empty copy for every possible kind", () => {
     const statusByKind: Record<NextStepKind, SetupStatus> = {
       connect_aws: {

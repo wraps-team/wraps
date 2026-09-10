@@ -15,6 +15,11 @@ export type NextStep = {
   description: string;
   ctaLabel: string;
   href: (orgSlug: string) => string;
+  /**
+   * When set, the CTA performs this action instead of navigating. `href`
+   * remains as the fallback destination for any surface that can only link.
+   */
+  action?: "send_test_email";
 };
 
 /**
@@ -71,6 +76,7 @@ export function selectNextStep(status: SetupStatus): NextStep {
         "Send a test email to prove the pipeline works — this succeeds even while your account is in the SES sandbox.",
       ctaLabel: "Send a test email",
       href: (orgSlug) => `/${orgSlug}/setup`,
+      action: "send_test_email",
     };
   }
 
