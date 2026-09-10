@@ -33,7 +33,7 @@ const LIVE_STATUSES = ["active", "trialing"];
 // cached: a subscription that just lapsed must take effect immediately, exactly
 // as the existing gate behaviour promises.
 const LAPSED_CACHE_TTL_MS = 60_000;
-const LAPSED_CACHE_MAX_ENTRIES = 1_000;
+const LAPSED_CACHE_MAX_ENTRIES = 1000;
 
 const lapsedOrgCache = new Map<string, { expiresAt: number }>();
 
