@@ -24,16 +24,30 @@ describe("StalePolicyBanner", () => {
     expect(container.innerHTML).toBe("");
   });
 
+  // These next three cases are positions *relative* to the current version,
+  // not absolute facts — write them as offsets from the imported constant,
+  // never as literals. Plan 283 hardcoded them (4 for "current", 3 for "one
+  // behind"); that passed until the ladder's next bump broke it in a way that
+  // looked like a bug in the bump rather than a stale test. Same principle as
+  // the marker-coverage guard: fix the class, not the instance.
   it("renders nothing when consolePolicyVersion equals the current version", () => {
     const { container } = render(
-      <StalePolicyBanner account={{ consolePolicyVersion: 4 }} />
+      <StalePolicyBanner
+        account={{ consolePolicyVersion: CURRENT_CONSOLE_POLICY_VERSION }}
+      />
     );
 
     expect(container.innerHTML).toBe("");
   });
 
   it("renders a warning with a link to #iam-role when one version behind", () => {
-    render(<StalePolicyBanner account={{ consolePolicyVersion: 3 }} />);
+    render(
+      <StalePolicyBanner
+        account={{
+          consolePolicyVersion: CURRENT_CONSOLE_POLICY_VERSION - 1,
+        }}
+      />
+    );
 
     expect(
       screen.getByText("Your AWS role is behind the current Wraps policy")
@@ -53,7 +67,13 @@ describe("StalePolicyBanner", () => {
   });
 
   it("renders a non-destructive (warning) alert, not the destructive variant", () => {
-    render(<StalePolicyBanner account={{ consolePolicyVersion: 3 }} />);
+    render(
+      <StalePolicyBanner
+        account={{
+          consolePolicyVersion: CURRENT_CONSOLE_POLICY_VERSION - 1,
+        }}
+      />
+    );
 
     const alert = screen.getByRole("alert");
     // The destructive variant's cva class list includes "text-destructive";

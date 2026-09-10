@@ -54,12 +54,29 @@ function stubClient(handlers: Partial<Record<string, () => unknown>>): {
 }
 
 describe("probeConsolePolicyVersion", () => {
-  it("returns version 4 when all four markers succeed", async () => {
+  it("returns version 5 when all five markers succeed", async () => {
     const client = stubClient({
       GetAccountCommand: () => ({}),
       ListEmailIdentitiesCommand: () => ({}),
       ListEmailTemplatesCommand: () => ({}),
       ListConfigurationSetsCommand: () => ({}),
+      ListSuppressedDestinationsCommand: () => ({}),
+    });
+
+    const result = await probeConsolePolicyVersion(
+      client as unknown as Parameters<typeof probeConsolePolicyVersion>[0]
+    );
+
+    expect(result).toEqual({ version: 5, unreachable: false });
+  });
+
+  it("returns version 4 when the v5 marker is denied (a role that predates the suppressions merge)", async () => {
+    const client = stubClient({
+      GetAccountCommand: () => ({}),
+      ListEmailIdentitiesCommand: () => ({}),
+      ListEmailTemplatesCommand: () => ({}),
+      ListConfigurationSetsCommand: () => ({}),
+      ListSuppressedDestinationsCommand: () => accessDeniedError(),
     });
 
     const result = await probeConsolePolicyVersion(
@@ -179,6 +196,7 @@ describe("probeConsolePolicyVersion", () => {
       ListEmailIdentitiesCommand: () => ({}),
       ListEmailTemplatesCommand: () => ({}),
       ListConfigurationSetsCommand: () => ({}),
+      ListSuppressedDestinationsCommand: () => ({}),
     });
 
     const result = await probeConsolePolicyVersion(
@@ -188,14 +206,14 @@ describe("probeConsolePolicyVersion", () => {
     // A guard against adding a rung without bumping the constant: if the
     // ladder grows, the all-succeed case above should climb with it.
     expect(result.version).toBe(CURRENT_CONSOLE_POLICY_VERSION);
-    expect(CURRENT_CONSOLE_POLICY_VERSION).toBe(4);
+    expect(CURRENT_CONSOLE_POLICY_VERSION).toBe(5);
   });
 
-  it("sends the ladder in chronological order — GetAccountCommand (rung 1) before ListEmailIdentitiesCommand (rung 2)", async () => {
+  it("sends the ladder in chronological order — GetAccountCommand (rung 1) before ListEmailIdentitiesCommand (rung 2), and ListSuppressedDestinationsCommand (rung 5) last", async () => {
     // Rungs 1 and 2 are NOT interchangeable: ses:ListEmailIdentities landed
     // five weeks after ses:GetAccount, so a CFN role created in that window
     // carries the first and not the second. Swapping them would still pass
-    // the "all four succeed" case above, so the order must be asserted
+    // the "all five succeed" case above, so the order must be asserted
     // directly against what gets sent.
     const sentOrder: string[] = [];
     const client = {
@@ -211,5 +229,6 @@ describe("probeConsolePolicyVersion", () => {
 
     expect(sentOrder[0]).toBe("GetAccountCommand");
     expect(sentOrder[1]).toBe("ListEmailIdentitiesCommand");
+    expect(sentOrder.at(-1)).toBe("ListSuppressedDestinationsCommand");
   });
 });

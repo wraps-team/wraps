@@ -12,7 +12,7 @@ import { AlertTriangle } from "lucide-react";
 // cannot import from apps/api, and a shared package for one integer is not
 // worth a new build edge — the two copies are pinned together by
 // __tests__/stale-policy-banner.test.tsx's source-parsing assertion.
-export const CURRENT_CONSOLE_POLICY_VERSION = 4;
+export const CURRENT_CONSOLE_POLICY_VERSION = 5;
 
 type StalePolicyBannerProps = {
   account: Pick<InferSelectModel<typeof awsAccount>, "consolePolicyVersion">;
