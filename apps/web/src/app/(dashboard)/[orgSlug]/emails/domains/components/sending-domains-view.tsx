@@ -30,7 +30,6 @@ import type {
   ListSendingDomainsResult,
   SendingDomain,
 } from "@/actions/domains";
-import { dnsRecordsFor } from "@/actions/domains";
 import {
   Empty,
   EmptyDescription,
@@ -38,6 +37,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { dnsRecordsFor } from "@/lib/dns-records";
 
 type SendingDomainsViewProps = {
   orgSlug: string;

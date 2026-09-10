@@ -9,11 +9,8 @@ import {
   it,
   vi,
 } from "vitest";
-import {
-  dnsRecordsFor,
-  listSendingDomains,
-  type SendingDomain,
-} from "../domains";
+import { dnsRecordsFor } from "@/lib/dns-records";
+import { listSendingDomains, type SendingDomain } from "../domains";
 import { UNAUTHORIZED } from "../shared/org-action";
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
