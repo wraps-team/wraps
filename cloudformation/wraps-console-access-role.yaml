@@ -133,6 +133,17 @@ Resources:
                   - "ses:SendBulkEmail" # SES v2 bulk sending
                 Resource: "*"
 
+              # SES - Suppression List (read + clear). Delete is deliberate:
+              # the dashboard's suppressions page unsuppresses an address.
+              # Put is intentionally absent.
+              - Sid: "SESSuppressionListAccess"
+                Effect: Allow
+                Action:
+                  - "ses:ListSuppressedDestinations"
+                  - "ses:GetSuppressedDestination"
+                  - "ses:DeleteSuppressedDestination"
+                Resource: "*"
+
               # DynamoDB - Read Email Events (if using Wraps email tracking)
               - Sid: "DynamoDBReadEmailEvents"
                 Effect: Allow

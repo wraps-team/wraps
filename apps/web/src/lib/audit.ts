@@ -86,7 +86,8 @@ export type AuditLogAction =
   | "agent.send_rejected"
   | "agent.send_blocked"
   | "contact.sms_consent_granted"
-  | "contact.sms_consent_withdrawn";
+  | "contact.sms_consent_withdrawn"
+  | "suppression.removed";
 
 export async function getAuditContext(): Promise<{
   ipAddress: string | null;

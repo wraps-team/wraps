@@ -66,6 +66,15 @@ export const CONSOLE_ACCESS_POLICY_JSON = JSON.stringify(
       {
         Effect: "Allow",
         Action: [
+          "ses:ListSuppressedDestinations",
+          "ses:GetSuppressedDestination",
+          "ses:DeleteSuppressedDestination",
+        ],
+        Resource: "*",
+      },
+      {
+        Effect: "Allow",
+        Action: [
           "dynamodb:DescribeTable",
           "dynamodb:Query",
           "dynamodb:Scan",

@@ -438,6 +438,26 @@ export function buildConsolePolicyDocument(
     });
   }
 
+  // Allow reading and clearing the account-level SES suppression list.
+  // Delete is a deliberate write: the dashboard's suppressions page lets an
+  // operator unsuppress an address that should not be on the list. Put is
+  // NOT granted — adding a suppression from the dashboard is a separate
+  // consent question.
+  const suppressionList = emailConfig?.suppressionList as
+    | Record<string, unknown>
+    | undefined;
+  if (suppressionList?.enabled !== false) {
+    statements.push({
+      Effect: "Allow",
+      Action: [
+        "ses:ListSuppressedDestinations",
+        "ses:GetSuppressedDestination",
+        "ses:DeleteSuppressedDestination",
+      ],
+      Resource: "*",
+    });
+  }
+
   // Always allow DynamoDB access for email history — the dashboard queries
   // wraps-email-history regardless of local metadata config, and the CloudFormation
   // template always includes these permissions

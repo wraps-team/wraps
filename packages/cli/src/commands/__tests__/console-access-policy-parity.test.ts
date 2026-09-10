@@ -39,11 +39,11 @@ describe("wraps-console-access-role policy: website matches the generator", () =
     expect(CONSOLE_ACCESS_POLICY_JSON).toBe(generatedJson);
   });
 
-  it("has exactly 7 statements for a default email deployment", () => {
+  it("has exactly 8 statements for a default email deployment", () => {
     const generated = buildConsolePolicyDocument(
       DEFAULT_EMAIL_CONFIG,
       undefined
     );
-    expect(generated.Statement).toHaveLength(7);
+    expect(generated.Statement).toHaveLength(8);
   });
 });
