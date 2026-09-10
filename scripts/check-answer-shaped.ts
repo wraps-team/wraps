@@ -273,6 +273,35 @@ export async function main(): Promise<number> {
   );
 
   const fetchErrors = results.filter((r) => r.kind === "fetch-error");
+
+  // A fetch failure is never a content finding — it means the page could not
+  // be retrieved (network error, timeout, non-200), not that it stopped
+  // stating its query. Reported and exit-coded separately from coverage, the
+  // same distinction scripts/check-cloudformation-published.sh draws for the
+  // same reason. Printed first, and the run produces NO coverage summary at
+  // all in this case — a partial "N/84" is exactly the number someone copies
+  // into the discoverability scoreboard, and a fraction computed from
+  // unusable data is worse than no number.
+  if (fetchErrors.length > 0) {
+    console.error(
+      `❌ FETCH FAILED for ${fetchErrors.length} route(s) — this is NOT a content finding.`
+    );
+    console.error(
+      "   The page(s) below could not be retrieved (network error, timeout,"
+    );
+    console.error(
+      "   or non-200 response). Do not read this as a drop in answer-shaped"
+    );
+    console.error("   coverage; investigate the fetch first.\n");
+    for (const failure of fetchErrors) {
+      console.error(`   ${failure.route}: ${failure.reason}`);
+    }
+    console.error(
+      "\nNo coverage measurement was produced — fix the fetch and re-run."
+    );
+    return 1;
+  }
+
   const scored = results.filter((r) => r.kind === "scored");
   const belowThreshold = scored.filter((r) => r.coverage < THRESHOLD);
   const passing = scored.length - belowThreshold.length;
@@ -292,28 +321,6 @@ export async function main(): Promise<number> {
   console.log(
     `\n${passing}/${total} routes state their declared query in the first 100 words`
   );
-
-  // A fetch failure is never a content finding — it means the page could not
-  // be retrieved (network error, timeout, non-200), not that it stopped
-  // stating its query. Reported and exit-coded separately from coverage, the
-  // same distinction scripts/check-cloudformation-published.sh draws for the
-  // same reason.
-  if (fetchErrors.length > 0) {
-    console.error(
-      `\n❌ FETCH FAILED for ${fetchErrors.length} route(s) — this is NOT a content finding.`
-    );
-    console.error(
-      "   The page(s) below could not be retrieved (network error, timeout,"
-    );
-    console.error(
-      "   or non-200 response). Do not read this as a drop in answer-shaped"
-    );
-    console.error("   coverage; investigate the fetch first.\n");
-    for (const failure of fetchErrors) {
-      console.error(`   ${failure.route}: ${failure.reason}`);
-    }
-    return 1;
-  }
 
   if (passing < FLOOR) {
     console.error(

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scoreAnswerShaped } from "../../../../scripts/check-answer-shaped.js";
+import { scoreAnswerShaped } from "../check-answer-shaped.js";
 
 /** Builds a derived-markdown fixture in the same shape deriveMarkdownFromHtml produces. */
 function doc(title: string, body: string): string {

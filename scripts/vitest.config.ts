@@ -10,6 +10,7 @@ export default defineConfig({
     include: [
       "../../scripts/selfhost/__tests__/**/*.test.ts",
       "../../scripts/test-db/__tests__/**/*.test.ts",
+      "../../scripts/__tests__/**/*.test.ts",
     ],
     exclude: ["**/node_modules/**"],
   },
