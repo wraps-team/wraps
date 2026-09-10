@@ -137,6 +137,21 @@ function buildPolicyStatements(config: ResolvedConfig): object[] {
     });
   }
 
+  // Allow SES suppression list access if enabled
+  if (config.suppressionList.enabled) {
+    statements.push({
+      Sid: "SESSuppressionList",
+      Effect: "Allow",
+      Action: [
+        "ses:ListSuppressedDestinations",
+        "ses:GetSuppressedDestination",
+        "ses:PutSuppressedDestination",
+        "ses:DeleteSuppressedDestination",
+      ],
+      Resource: "*",
+    });
+  }
+
   // Allow DynamoDB access if history storage enabled
   if (config.events?.storeHistory) {
     statements.push({

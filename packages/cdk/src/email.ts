@@ -681,6 +681,22 @@ export class WrapsEmail extends Construct {
       );
     }
 
+    // SES suppression list access (if enabled)
+    if (config.suppressionList.enabled) {
+      role.addToPolicy(
+        new iam.PolicyStatement({
+          sid: "SESSuppressionList",
+          actions: [
+            "ses:ListSuppressedDestinations",
+            "ses:GetSuppressedDestination",
+            "ses:PutSuppressedDestination",
+            "ses:DeleteSuppressedDestination",
+          ],
+          resources: ["*"],
+        })
+      );
+    }
+
     // DynamoDB access (if history storage enabled)
     if (config.events?.storeHistory) {
       role.addToPolicy(

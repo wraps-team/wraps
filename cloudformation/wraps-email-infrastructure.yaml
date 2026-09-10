@@ -309,6 +309,19 @@ Resources:
                   - "ses:GetConfigurationSetEventDestinations"
                 Resource: "*"
 
+              # SES - Suppression List. The SDK's email.suppression.* methods
+              # call these four; the configuration set above auto-suppresses
+              # bounces and complaints, so the list fills up whether or not the
+              # application ever reads it.
+              - Sid: "SESSuppressionList"
+                Effect: Allow
+                Action:
+                  - "ses:ListSuppressedDestinations"
+                  - "ses:GetSuppressedDestination"
+                  - "ses:PutSuppressedDestination"
+                  - "ses:DeleteSuppressedDestination"
+                Resource: "*"
+
               # CloudWatch Metrics
               - Sid: "CloudWatchMetrics"
                 Effect: Allow
@@ -428,6 +441,19 @@ Resources:
                   - "ses:ListConfigurationSets"
                   - "ses:GetConfigurationSet"
                   - "ses:GetConfigurationSetEventDestinations"
+                Resource: "*"
+
+              # SES - Suppression List. The SDK's email.suppression.* methods
+              # call these four; the configuration set above auto-suppresses
+              # bounces and complaints, so the list fills up whether or not the
+              # application ever reads it.
+              - Sid: "SESSuppressionList"
+                Effect: Allow
+                Action:
+                  - "ses:ListSuppressedDestinations"
+                  - "ses:GetSuppressedDestination"
+                  - "ses:PutSuppressedDestination"
+                  - "ses:DeleteSuppressedDestination"
                 Resource: "*"
 
               # CloudWatch Metrics
