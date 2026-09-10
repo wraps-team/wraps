@@ -32,6 +32,10 @@ export const DERIVE_MARKER_HEADER = "x-wraps-md-derive";
  *
  * Matched by name through a predicate rather than passed as a tag list because
  * Turndown types the list form as HTML tag names only, and `svg` is not one.
+ *
+ * `header` is deliberately not here. It is stripped conditionally instead — see
+ * `converter` and `contentHtml` — because it means two different things
+ * depending on where the content region comes from.
  */
 const NON_CONTENT_ELEMENTS = new Set([
   "script",
@@ -41,7 +45,6 @@ const NON_CONTENT_ELEMENTS = new Set([
   "svg",
   "iframe",
   "nav",
-  "header",
   "footer",
   "form",
 ]);
@@ -66,18 +69,28 @@ const MIN_USEFUL_CHARS = 200;
 const FETCH_TIMEOUT_MS = process.env.NODE_ENV === "development" ? 30_000 : 4000;
 
 const MAIN_ELEMENT = /<main\b[^>]*>([\s\S]*)<\/main>/i;
+const HEADER_CLOSE_BEFORE_MAIN = /<\/header>\s*$/i;
 const TITLE_ELEMENT = /<title\b[^>]*>([\s\S]*?)<\/title>/i;
 const TITLE_SUFFIX = /\s*[|·]\s*Wraps\s*$/;
 
-function converter(): TurndownService {
+/**
+ * `stripHeader` is false only when the content region already excludes the
+ * site navbar by construction (see `contentHtml`) — stripping `header` there
+ * would delete the page's own `<h1>` and opening paragraph along with it. When
+ * there is no `<main>` to scope to, the whole document is converted and the
+ * only `<header>` a rendered page has is the navbar, so it must be stripped or
+ * every derived page for those routes would open with site navigation.
+ */
+function converter(stripHeader: boolean): TurndownService {
   const service = new TurndownService({
     headingStyle: "atx",
     codeBlockStyle: "fenced",
     bulletListMarker: "-",
   });
-  service.remove((node) =>
-    NON_CONTENT_ELEMENTS.has(node.nodeName.toLowerCase())
-  );
+  const strip = stripHeader
+    ? new Set([...NON_CONTENT_ELEMENTS, "header"])
+    : NON_CONTENT_ELEMENTS;
+  service.remove((node) => strip.has(node.nodeName.toLowerCase()));
   // Tables are the whole point on the pricing and comparison pages; Turndown
   // core flattens them into unreadable runs of text without this.
   service.use(gfm);
@@ -85,12 +98,37 @@ function converter(): TurndownService {
 }
 
 /**
- * The page's content region. Roughly half the routes render a `<main>`; the
- * rest are converted whole and rely on the element removals above to drop the
- * surrounding chrome.
+ * The page's content region, plus whether the conversion below still needs to
+ * strip `<header>`.
+ *
+ * Roughly half the routes render a `<main>`; the rest are converted whole and
+ * rely on the element removals in `converter` to drop the surrounding chrome.
+ *
+ * On the two biggest content templates, the page's `<h1>` and its opening
+ * paragraph live in a `<header>` that sits immediately before `<main>` — a
+ * sibling, not a child, so the naive "just take `<main>`" extraction below used
+ * to throw them away. That header is content and belongs in the region. The
+ * site navbar also renders a bare `<header>`, but higher up the document,
+ * separated from `<main>` by everything in between — it is excluded simply by
+ * not being adjacent, so it never has to be recognised and named as "the
+ * navbar" here.
  */
-function contentHtml(html: string): string {
-  return MAIN_ELEMENT.exec(html)?.[1] ?? html;
+function contentHtml(html: string): { html: string; stripHeader: boolean } {
+  const main = MAIN_ELEMENT.exec(html);
+  if (!main || main.index === undefined) {
+    return { html, stripHeader: true };
+  }
+
+  const before = html.slice(0, main.index);
+  const headerClose = HEADER_CLOSE_BEFORE_MAIN.exec(before);
+  const headerStart = headerClose ? before.lastIndexOf("<header") : -1;
+  if (headerClose && headerStart !== -1) {
+    const headerEnd = headerClose.index + "</header>".length;
+    const header = before.slice(headerStart, headerEnd);
+    return { html: `${header}${main[1]}`, stripHeader: false };
+  }
+
+  return { html: main[1], stripHeader: false };
 }
 
 const ENTITIES: Record<string, string> = {
@@ -135,6 +173,88 @@ function absoluteLinks(markdown: string): string {
   return markdown.replace(RELATIVE_LINK, (_match, path) => `](${SITE}${path})`);
 }
 
+function normalizeHeadingText(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+const FIRST_HEADING = /^(#{1,6}) (.+)$/m;
+
+/**
+ * The deriver prepends `# {title}` from `<title>`, and turndown separately
+ * converts the page's own visible `<h1>` — which the header fix above now
+ * keeps. When both name the same page, that is a duplicate top-level heading,
+ * not two facts. `<title>` carries an SEO suffix the visible `<h1>` doesn't
+ * (e.g. "Resend vs Wraps" vs. "Resend vs Wraps - Compare Email Infrastructure
+ * Approaches"), so a prefix match counts as the same heading, and the fuller
+ * `<title>`-derived line is the one kept.
+ */
+function dropDuplicateH1(body: string, title: string | undefined): string {
+  if (title === undefined) {
+    return body;
+  }
+
+  const firstHeading = FIRST_HEADING.exec(body);
+  if (!firstHeading || firstHeading[1] !== "#") {
+    return body;
+  }
+
+  const heading = normalizeHeadingText(firstHeading[2]);
+  const normalizedTitle = normalizeHeadingText(title);
+  const isDuplicate =
+    heading === normalizedTitle ||
+    heading.startsWith(normalizedTitle) ||
+    normalizedTitle.startsWith(heading);
+  if (!isDuplicate) {
+    return body;
+  }
+
+  const start = firstHeading.index;
+  const end = start + firstHeading[0].length;
+  return `${body.slice(0, start)}${body.slice(end)}`
+    .replace(COLLAPSED_BLANK_LINES, "\n\n")
+    .trim();
+}
+
+const COLLAPSED_BLANK_LINES = /\n{3,}/g;
+const STRUCTURAL_LEADING_LINE = /^(#{1,6}\s|[-*+]\s|\d+\.\s|\|.*\||```)/;
+const WHITESPACE = /\s+/;
+const LEADING_BLANK_LINES = /^\n+/;
+
+/**
+ * Some templates open with a short eyebrow label above the real heading —
+ * "Alternatives", "What you're building", "23%" — that reads fine in the
+ * page's own visual hierarchy but carries no meaning once it is the first
+ * line of a markdown document with no title already stated above it. Dropped
+ * conservatively: at most one line, and only when real content follows it, so
+ * a page that genuinely opens with a short sentence is left alone.
+ */
+function dropLeadingChromeFragment(body: string): string {
+  const lines = body.split("\n");
+  const firstIndex = lines.findIndex((line) => line.trim().length > 0);
+  if (firstIndex === -1) {
+    return body;
+  }
+
+  const first = lines[firstIndex].trim();
+  const isStructural = STRUCTURAL_LEADING_LINE.test(first);
+  const isShort = first.split(WHITESPACE).length <= 3;
+  if (isStructural || !isShort) {
+    return body;
+  }
+
+  const hasFollowingContent = lines
+    .slice(firstIndex + 1)
+    .some((line) => line.trim().length > 0);
+  if (!hasFollowingContent) {
+    return body;
+  }
+
+  return lines
+    .filter((_line, index) => index !== firstIndex)
+    .join("\n")
+    .replace(LEADING_BLANK_LINES, "");
+}
+
 /**
  * Convert one page's HTML to markdown. Returns undefined when the result is too
  * thin to be worth serving — see MIN_USEFUL_CHARS.
@@ -146,12 +266,15 @@ export function deriveMarkdownFromHtml(
   html: string,
   pagePath: string
 ): string | undefined {
-  const body = absoluteLinks(converter().turndown(contentHtml(html))).trim();
+  const { html: region, stripHeader } = contentHtml(html);
+  let body = absoluteLinks(converter(stripHeader).turndown(region)).trim();
   if (body.length < MIN_USEFUL_CHARS) {
     return;
   }
 
   const title = pageTitle(html);
+  body = dropLeadingChromeFragment(dropDuplicateH1(body, title));
+
   const heading = title === undefined ? "" : `# ${title}\n\n`;
   return `${heading}Source: ${SITE}${pagePath}\n\n${body}\n`;
 }

@@ -11,6 +11,10 @@ const PROSE =
     4
   );
 
+/** A page header's lede — the sentence the header fix exists to stop discarding. */
+const LEDE =
+  "One complaint in a thousand puts an SES account under review, tighter than most senders expect.";
+
 function page(body: string, title = "Suppression Lists | Wraps"): string {
   return `<html><head><title>${title}</title></head><body>${body}</body></html>`;
 }
@@ -39,16 +43,133 @@ describe("deriveMarkdownFromHtml", () => {
     expect(markdown).toContain("Source: https://wraps.dev/byoc");
   });
 
-  it("converts only <main> when the page has one", () => {
+  it("keeps the page header with <main>, and nothing else around it", () => {
     const markdown = deriveMarkdownFromHtml(
       page(
-        `<div>Sidebar junk that is not the page</div><main><p>${PROSE}</p></main>`
+        `<div>Sidebar junk that is not the page</div><header><h1>Bring your own cloud</h1><p>${PROSE}</p></header><main><p>${PROSE}</p></main>`
       ),
       "/byoc"
     );
 
     expect(markdown).not.toContain("Sidebar junk");
+    expect(markdown).toContain("Bring your own cloud");
     expect(markdown).toContain("own AWS account");
+  });
+
+  it("keeps a <header> immediately before <main>, header content first", () => {
+    const markdown = deriveMarkdownFromHtml(
+      page(
+        `<header><h1>Complaint rate</h1><p>${LEDE}</p></header><main><p>${PROSE}</p></main>`
+      ),
+      "/ses/complaint-rate"
+    );
+
+    expect(markdown).toContain(LEDE);
+    expect(markdown).toContain("own AWS account");
+    const ledeIndex = markdown?.indexOf(LEDE) ?? -1;
+    const mainIndex = markdown?.indexOf("own AWS account") ?? -1;
+    expect(ledeIndex).toBeGreaterThan(-1);
+    expect(ledeIndex).toBeLessThan(mainIndex);
+  });
+
+  it("excludes an earlier, non-adjacent <header> — the site navbar", () => {
+    const markdown = deriveMarkdownFromHtml(
+      page(
+        `<header>NAVBAR</header><header><h1>X</h1><p>lede ${PROSE}</p></header><main><p>body ${PROSE}</p></main>`
+      ),
+      "/ses/complaint-rate"
+    );
+
+    expect(markdown).toContain("lede");
+    expect(markdown).toContain("body");
+    expect(markdown).not.toContain("NAVBAR");
+  });
+
+  it("still strips <header> when the page has no <main> — the fallback path is unchanged", () => {
+    const markdown = deriveMarkdownFromHtml(
+      page(
+        `<header>NAVBAR</header><h1>Bring your own cloud</h1><p>${PROSE}</p>`
+      ),
+      "/byoc"
+    );
+
+    expect(markdown).toContain("Bring your own cloud");
+    expect(markdown).not.toContain("NAVBAR");
+  });
+
+  it("still excludes <nav> even when it sits inside the page header", () => {
+    const markdown = deriveMarkdownFromHtml(
+      page(
+        `<header><nav>Pricing Docs Blog</nav><h1>X</h1><p>${PROSE}</p></header><main><p>${PROSE}</p></main>`
+      ),
+      "/ses/complaint-rate"
+    );
+
+    expect(markdown).not.toContain("Pricing Docs Blog");
+  });
+
+  it("still excludes <footer> even inside the extracted <main> region", () => {
+    const markdown = deriveMarkdownFromHtml(
+      page(
+        `<header><h1>X</h1><p>${PROSE}</p></header><main><p>${PROSE}</p><footer>All rights reserved</footer></main>`
+      ),
+      "/ses/complaint-rate"
+    );
+
+    expect(markdown).not.toContain("All rights reserved");
+  });
+
+  it("drops the duplicate H1 when the body heading matches the <title> heading", () => {
+    const markdown = deriveMarkdownFromHtml(
+      page(
+        `<header><h1>Resend vs Wraps</h1><p>${PROSE}</p></header><main><p>${PROSE}</p></main>`,
+        "Resend vs Wraps - Compare Email Infrastructure Approaches"
+      ),
+      "/compare/resend"
+    );
+
+    expect(markdown).toBeDefined();
+    const headingLines = (markdown ?? "")
+      .split("\n")
+      .filter((line) => line.startsWith("# "));
+    expect(headingLines.length).toBe(1);
+    expect(markdown).toContain(
+      "# Resend vs Wraps - Compare Email Infrastructure Approaches"
+    );
+  });
+
+  it("keeps both headings when the body's <h1> genuinely differs from the title", () => {
+    const markdown = deriveMarkdownFromHtml(
+      page(
+        `<header><h1>Which SES error is blocking you?</h1><p>${PROSE}</p></header><main><p>${PROSE}</p></main>`,
+        "SES Error Reference | Wraps"
+      ),
+      "/ses/errors"
+    );
+
+    const headingLines = (markdown ?? "")
+      .split("\n")
+      .filter((line) => line.startsWith("# "));
+    expect(headingLines.length).toBe(2);
+  });
+
+  it("drops a leading eyebrow fragment before real content", () => {
+    const markdown = deriveMarkdownFromHtml(
+      page(`<main><p>Alternatives</p><p>${PROSE}</p></main>`),
+      "/alternatives"
+    );
+
+    expect(markdown).not.toContain("Alternatives");
+    expect(markdown).toContain("own AWS account");
+  });
+
+  it("keeps a genuine short heading that opens the body", () => {
+    const markdown = deriveMarkdownFromHtml(
+      page(`<main><h2>Pricing</h2><p>${PROSE}</p></main>`),
+      "/pricing"
+    );
+
+    expect(markdown).toContain("## Pricing");
   });
 
   it("drops chrome on the pages that render no <main>", () => {
