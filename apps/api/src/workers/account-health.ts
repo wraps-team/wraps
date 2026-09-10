@@ -16,6 +16,10 @@
  *                             passed a check (roleLastReachableAt is set) —
  *                             a role that has never worked is an unfinished
  *                             setup, not a regression, and stays silent.
+ *   - aws.role_policy_stale   the role is reachable and works, but a fresh
+ *                             console-policy probe (plan 282) found it below
+ *                             CURRENT_CONSOLE_POLICY_VERSION — permissions
+ *                             added since the role was created are missing.
  *
  * Each alert is deduped per account per 24h via hasRecentNotification, so
  * an ongoing episode notifies once per day rather than once per hour.
@@ -58,7 +62,10 @@ import {
 } from "@wraps/db";
 import type { Handler } from "aws-lambda";
 import { and, eq, isNotNull } from "drizzle-orm";
-import { probeConsolePolicyVersion } from "../lib/console-policy-version";
+import {
+  CURRENT_CONSOLE_POLICY_VERSION,
+  probeConsolePolicyVersion,
+} from "../lib/console-policy-version";
 import { flushLogger, log } from "../lib/logger";
 import { isRoleAccessError } from "../lib/role-access-error";
 import { classifySesHealth, SES_THRESHOLDS } from "../lib/ses-health.js";
@@ -332,6 +339,21 @@ async function checkAccount(account: AccountRow): Promise<void> {
               eq(awsAccount.organizationId, account.organizationId)
             )
           );
+        // Notify only off this run's freshly observed version, never the
+        // pre-probe value read off `account` at the top of checkAccount —
+        // that one is one sweep out of date. A behind-but-working role is
+        // not an incident, so this carries no Sentry signal, unlike
+        // aws.role_unreachable.
+        if (result.version < CURRENT_CONSOLE_POLICY_VERSION) {
+          await notifyOnce({
+            account,
+            type: "aws.role_policy_stale",
+            title: "Your AWS role is behind the current Wraps policy",
+            body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) is missing permissions added since it was created. Wraps can still reach it, but features that depend on the newer permissions may appear switched off even though they are deployed. Open this account in Wraps and see "IAM Role Configuration" for the fastest fix.`,
+            href: accountHref,
+            data: { version: result.version },
+          });
+        }
       }
     }
   } catch (error) {

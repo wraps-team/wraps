@@ -10,6 +10,7 @@ import { AccountFeatures } from "./components/account-features";
 import { EventFeedStaleBanner } from "./components/event-feed-stale-banner";
 import { IAMConfiguration } from "./components/iam-configuration";
 import { QuotaReserve } from "./components/quota-reserve";
+import { StalePolicyBanner } from "./components/stale-policy-banner";
 import { WebhookConfiguration } from "./components/webhook-configuration";
 
 type AWSAccountPageProps = {
@@ -98,6 +99,11 @@ export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
 
       {/* Stale Event Feed Warning */}
       <EventFeedStaleBanner account={account} />
+
+      {/* Stale Console Policy Warning - manager-only, unlike the banner
+          above: its only call to action is a link to the IAM role card,
+          which only managers can see. */}
+      {permissions.canManage && <StalePolicyBanner account={account} />}
 
       {/* Deployed Features */}
       <AccountFeatures account={account} organizationId={organization.id} />

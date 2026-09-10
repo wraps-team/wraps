@@ -49,7 +49,7 @@ export function IAMConfiguration({
         <CardDescription>
           {selfHosted
             ? "Your External ID for secure role assumption. Keep this secret and use it when updating your CloudFormation stack."
-            : "If Wraps can no longer reach this account, its role needs its trust policy and permissions rewritten. Either route below does that."}
+            : "If Wraps can no longer reach this account, its role needs its trust policy and permissions rewritten. Any of the routes below does that."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -74,6 +74,41 @@ export function IAMConfiguration({
         {selfHosted ? null : (
           <div className="space-y-4 border-t pt-4">
             <div>
+              <h4 className="mb-1 font-medium text-sm">
+                The fastest fix, for any setup
+              </h4>
+              <p className="text-muted-foreground text-sm">
+                Open the IAM console, find the{" "}
+                <code className="font-mono">wraps-console-access-role</code>{" "}
+                role, edit its inline policy, and replace it with the current
+                policy document.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button asChild>
+                <a
+                  href="https://wraps.dev/byoc#what-syncs"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  View the current policy document
+                </a>
+              </Button>
+              <Button asChild variant="outline">
+                <a
+                  href="https://console.aws.amazon.com/iam/home#/roles/wraps-console-access-role"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Open the role in the IAM console
+                </a>
+              </Button>
+            </div>
+
+            <div className="border-t pt-4">
               <h4 className="mb-1 font-medium text-sm">
                 If you deployed with CloudFormation
               </h4>
