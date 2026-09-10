@@ -1183,6 +1183,9 @@ Resources:
                   - "ses:GetIdentityDkimAttributes"
                   - "ses:ListEmailIdentities"
                   - "ses:GetEmailIdentity"
+                  # Write. Required by the dashboard's "verify my own address"
+                  # sandbox flow; see plan 245.
+                  - "ses:CreateEmailIdentity"
                   - "ses:ListConfigurationSets"
                   - "ses:GetConfigurationSet"
                   - "ses:GetConfigurationSetEventDestinations"

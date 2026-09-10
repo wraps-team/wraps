@@ -19,6 +19,7 @@ export const CONSOLE_ACCESS_POLICY_JSON = JSON.stringify(
           "ses:GetIdentityVerificationAttributes",
           "ses:ListEmailIdentities",
           "ses:GetEmailIdentity",
+          "ses:CreateEmailIdentity",
           "ses:ListConfigurationSets",
           "ses:GetConfigurationSet",
           "ses:GetConfigurationSetEventDestinations",

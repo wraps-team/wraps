@@ -95,7 +95,7 @@ function mapCommonAwsError(
   permissionAction: string
 ): string | null {
   if (isAccessDeniedError(error)) {
-    return `Wraps doesn't have permission to ${permissionAction} on this account. Run \`wraps email update-role\` to refresh permissions.`;
+    return `Wraps doesn't have permission to ${permissionAction} on this account. Run \`wraps platform update-role\` to refresh permissions.`;
   }
   if (error instanceof AssumeRoleError) {
     return error.message;

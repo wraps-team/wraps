@@ -376,6 +376,11 @@ export function buildConsolePolicyDocument(
       // SES v2 API for listing/getting email identities (domains)
       "ses:ListEmailIdentities",
       "ses:GetEmailIdentity",
+      // Write, deliberately. verifyOwnEmailIdentity in
+      // apps/web/src/actions/ses-onboarding.ts creates the operator's own
+      // address as an SES identity so a sandboxed account can complete a
+      // real first send. This is the ONLY identity write the role grants.
+      "ses:CreateEmailIdentity",
       // SES v2 API for configuration set scanning (needed by dashboard).
       // List is what makes Get reachable — Get takes a name only List can find.
       "ses:ListConfigurationSets",
