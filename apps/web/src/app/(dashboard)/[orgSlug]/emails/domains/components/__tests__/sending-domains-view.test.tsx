@@ -24,9 +24,11 @@ vi.mock("../add-domain-form", () => ({
 }));
 
 const mockGetConfigurationSetDetail = vi.fn();
+const mockProbeTrackingDomain = vi.fn();
 vi.mock("@/actions/domains", () => ({
   getConfigurationSetDetail: (...args: unknown[]) =>
     mockGetConfigurationSetDetail(...args),
+  probeTrackingDomain: (...args: unknown[]) => mockProbeTrackingDomain(...args),
 }));
 
 import { SendingDomainsView } from "../sending-domains-view";
@@ -69,6 +71,12 @@ beforeEach(() => {
       suppressedReasons: [],
       eventDestinations: [],
     },
+  });
+  mockProbeTrackingDomain.mockReset();
+  mockProbeTrackingDomain.mockResolvedValue({
+    success: true,
+    trackingDomain: "track.example.com",
+    result: { status: "unknown", reason: "not probed" },
   });
 });
 
@@ -268,6 +276,167 @@ describe("clicking a row opens the sheet and loads the configuration set", () =>
     expect(
       await screen.findByText(/no matching certificate/i)
     ).toBeInTheDocument();
+  });
+});
+
+describe("tracking-domain TLS probe names which fix is right (plan 302)", () => {
+  function optionalDetail(
+    overrides: Partial<{
+      trackingRedirectDomain: string | null;
+      trackingHttpsPolicy: "REQUIRE" | "REQUIRE_OPEN_ONLY" | "OPTIONAL" | null;
+    }> = {}
+  ) {
+    return {
+      success: true as const,
+      detail: {
+        name: "wraps-email-example.com",
+        trackingRedirectDomain: "track.example.com",
+        trackingHttpsPolicy: "OPTIONAL" as const,
+        tlsPolicy: "REQUIRE",
+        sendingEnabled: true,
+        reputationMetricsEnabled: true,
+        suppressedReasons: [],
+        eventDestinations: [],
+        ...overrides,
+      },
+    };
+  }
+
+  it("recommends REQUIRE when the probe confirms something already serves the domain over valid TLS", async () => {
+    mockGetConfigurationSetDetail.mockResolvedValue(optionalDetail());
+    mockProbeTrackingDomain.mockResolvedValue({
+      success: true,
+      trackingDomain: "track.example.com",
+      result: { status: "serving" },
+    });
+
+    render(
+      <SendingDomainsView
+        organizationId="org-1"
+        orgSlug="acme"
+        result={successResult([makeDomain({ identity: "example.com" })])}
+      />
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "View details for example.com" })
+    );
+
+    // Match the recommendation sentence, not a bare /REQUIRE/ — the TLS
+    // policy field elsewhere in the sheet also renders the literal string
+    // "REQUIRE" for an unrelated setting, which would make a bare match
+    // ambiguous.
+    expect(await screen.findByText(/set it to REQUIRE/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/nothing is currently serving/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it("never recommends REQUIRE when the probe finds nothing serving the domain over TLS", async () => {
+    mockGetConfigurationSetDetail.mockResolvedValue(optionalDetail());
+    mockProbeTrackingDomain.mockResolvedValue({
+      success: true,
+      trackingDomain: "track.example.com",
+      result: { status: "not-serving", reason: "ECONNREFUSED" },
+    });
+
+    render(
+      <SendingDomainsView
+        organizationId="org-1"
+        orgSlug="acme"
+        result={successResult([makeDomain({ identity: "example.com" })])}
+      />
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "View details for example.com" })
+    );
+
+    // This is the regression plan 302 exists to prevent: OPTIONAL with
+    // nothing serving the domain must never be told to set REQUIRE — that
+    // would break every tracking link in production.
+    expect(
+      await screen.findByText(/nothing is currently serving/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/set it to REQUIRE/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the generic degraded warning, with no specific recommendation, when the probe result is unknown", async () => {
+    mockGetConfigurationSetDetail.mockResolvedValue(optionalDetail());
+    mockProbeTrackingDomain.mockResolvedValue({
+      success: true,
+      trackingDomain: "track.example.com",
+      result: { status: "unknown", reason: "TLS handshake timed out" },
+    });
+
+    render(
+      <SendingDomainsView
+        organizationId="org-1"
+        orgSlug="acme"
+        result={successResult([makeDomain({ identity: "example.com" })])}
+      />
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "View details for example.com" })
+    );
+
+    expect(
+      await screen.findByText(/no matching certificate/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/set it to REQUIRE/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/nothing is currently serving/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it("never calls the probe, and renders no warning, when trackingHttpsPolicy is REQUIRE", async () => {
+    mockGetConfigurationSetDetail.mockResolvedValue(
+      optionalDetail({ trackingHttpsPolicy: "REQUIRE" })
+    );
+
+    render(
+      <SendingDomainsView
+        organizationId="org-1"
+        orgSlug="acme"
+        result={successResult([makeDomain({ identity: "example.com" })])}
+      />
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "View details for example.com" })
+    );
+
+    // "HTTPS policy" is a static label that only renders once the
+    // configuration-set detail has loaded (past the loading skeleton) —
+    // a stable anchor that doesn't collide with the TLS-policy field, which
+    // also renders the literal string "REQUIRE" for an unrelated setting.
+    await screen.findByText("HTTPS policy");
+    expect(
+      screen.queryByText(/no matching certificate/i)
+    ).not.toBeInTheDocument();
+    expect(mockProbeTrackingDomain).not.toHaveBeenCalled();
+  });
+
+  it("never calls the probe when OPTIONAL has no tracking domain configured", async () => {
+    mockGetConfigurationSetDetail.mockResolvedValue(
+      optionalDetail({ trackingRedirectDomain: null })
+    );
+
+    render(
+      <SendingDomainsView
+        organizationId="org-1"
+        orgSlug="acme"
+        result={successResult([makeDomain({ identity: "example.com" })])}
+      />
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "View details for example.com" })
+    );
+
+    await screen.findByText("Not configured");
+    expect(mockProbeTrackingDomain).not.toHaveBeenCalled();
   });
 });
 

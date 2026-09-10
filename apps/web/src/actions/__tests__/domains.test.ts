@@ -14,6 +14,7 @@ import {
   addSendingDomain,
   getConfigurationSetDetail,
   listSendingDomains,
+  probeTrackingDomain,
   type SendingDomain,
 } from "../domains";
 import { UNAUTHORIZED } from "../shared/org-action";
@@ -56,6 +57,11 @@ vi.mock("@wraps/auth", () => ({
 const mockGetOrAssumeRole = vi.fn();
 vi.mock("@/lib/aws/credential-cache", () => ({
   getOrAssumeRole: (...args: unknown[]) => mockGetOrAssumeRole(...args),
+}));
+
+const mockProbeTrackingTls = vi.fn();
+vi.mock("@/lib/tracking-tls", () => ({
+  probeTrackingTls: (...args: unknown[]) => mockProbeTrackingTls(...args),
 }));
 
 // addSendingDomain revalidates the domains route on success; outside a real
@@ -279,6 +285,11 @@ beforeEach(() => {
     sessionToken: "session-token",
   });
   mockSend.mockReset();
+  mockProbeTrackingTls.mockReset();
+  mockProbeTrackingTls.mockResolvedValue({
+    status: "unknown",
+    reason: "not probed",
+  });
 });
 
 // ─── dnsRecordsFor (pure) ───────────────────────────────────────────────────
@@ -1102,5 +1113,111 @@ describe("getConfigurationSetDetail", () => {
       (call) => (call[0] as SesCommand)._type
     );
     expect(sentTypes).not.toContain("ListConfigurationSetsCommand");
+  });
+});
+
+describe("probeTrackingDomain", () => {
+  function mockGetConfigurationSetResponse(
+    csResponse: Record<string, unknown>
+  ) {
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "GetConfigurationSetCommand") {
+        return Promise.resolve(csResponse);
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+  }
+
+  it("calls the TLS probe with SES's CustomRedirectDomain and passes the result through", async () => {
+    mockGetConfigurationSetResponse({
+      TrackingOptions: { CustomRedirectDomain: "track.example.com" },
+    });
+    mockProbeTrackingTls.mockResolvedValue({ status: "serving" });
+
+    const result = await probeTrackingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "wraps-email-example.com"
+    );
+
+    expect(result).toEqual({
+      success: true,
+      trackingDomain: "track.example.com",
+      result: { status: "serving" },
+    });
+    expect(mockProbeTrackingTls).toHaveBeenCalledExactlyOnceWith(
+      "track.example.com"
+    );
+  });
+
+  it("takes no hostname argument — the probed host always comes from SES, never from the caller's configurationSetName", async () => {
+    // The test passes an attacker-chosen string as the config-set name; the
+    // stubbed SES response carries the real tracking domain. If the action
+    // ever started deriving a hostname from caller input instead of the SES
+    // response, this would catch it — the probe must receive the SES value.
+    mockGetConfigurationSetResponse({
+      TrackingOptions: { CustomRedirectDomain: "track.honest.com" },
+    });
+    mockProbeTrackingTls.mockResolvedValue({ status: "serving" });
+
+    await probeTrackingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "attacker-controlled-string-not-a-real-config-set"
+    );
+
+    expect(mockProbeTrackingTls).toHaveBeenCalledExactlyOnceWith(
+      "track.honest.com"
+    );
+  });
+
+  it("refuses an AWS account belonging to a different organization, calling neither SES nor the probe", async () => {
+    mockGetConfigurationSetResponse({
+      TrackingOptions: { CustomRedirectDomain: "track.example.com" },
+    });
+
+    const result = await probeTrackingDomain(
+      testOrganization.id,
+      testAwsAccountForeign.id,
+      "wraps-email-example.com"
+    );
+
+    expect(result.success).toBe(false);
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockProbeTrackingTls).not.toHaveBeenCalled();
+  });
+
+  it("returns a no-tracking-domain result and never calls the probe when TrackingOptions is absent", async () => {
+    mockGetConfigurationSetResponse({});
+
+    const result = await probeTrackingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "wraps-email-no-tracking.com"
+    );
+
+    expect(result).toEqual({ success: true, trackingDomain: null });
+    expect(mockProbeTrackingTls).not.toHaveBeenCalled();
+  });
+
+  it("maps AccessDeniedException to an unreachable failure without calling the probe", async () => {
+    mockSend.mockImplementation(() => {
+      const err = new Error("AccessDeniedException");
+      err.name = "AccessDeniedException";
+      return Promise.reject(err);
+    });
+
+    const result = await probeTrackingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "wraps-email-denied.com"
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: expect.any(String),
+      unreachable: true,
+    });
+    expect(mockProbeTrackingTls).not.toHaveBeenCalled();
   });
 });

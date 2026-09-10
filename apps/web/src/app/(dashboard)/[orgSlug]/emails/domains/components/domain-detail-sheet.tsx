@@ -16,7 +16,9 @@ import type { SendingDomain } from "@/actions/domains";
 import {
   type ConfigurationSetDetail,
   getConfigurationSetDetail,
+  probeTrackingDomain,
 } from "@/actions/domains";
+import type { TrackingTlsResult } from "@/lib/tracking-tls";
 import { DnsRecordsTable, VerificationBadge } from "./sending-domains-view";
 
 type DomainDetailSheetProps = {
@@ -33,6 +35,85 @@ type ConfigSetState =
   | { status: "loaded"; detail: ConfigurationSetDetail }
   | { status: "error"; error: string; unreachable: boolean };
 
+/**
+ * State for the second, independent load that probes whether the tracking
+ * domain is actually served over valid TLS. "idle"/"loading"/"error" (and a
+ * "loaded" whose `result.status` is "unknown") all degrade to the same
+ * uncertain copy in `renderHttpsPolicyWarning` below — see plan 302's
+ * maintenance notes for why collapsing that distinction would be wrong.
+ */
+type TrackingProbeState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "loaded"; trackingDomain: string; result: TrackingTlsResult }
+  | { status: "error" };
+
+/**
+ * Renders the OPTIONAL HTTPS-policy warning, naming the actual fix once the
+ * probe knows it. Never recommends REQUIRE unless the probe confirmed
+ * something already serves the domain over valid TLS — recommending REQUIRE
+ * when nothing serves it would break every tracking link in production.
+ */
+function renderHttpsPolicyWarning(
+  detail: ConfigurationSetDetail,
+  sendingDomain: string,
+  probeState: TrackingProbeState
+) {
+  if (detail.trackingHttpsPolicy !== "OPTIONAL") {
+    return null;
+  }
+
+  const probed = probeState.status === "loaded" ? probeState.result : undefined;
+
+  let body: React.ReactNode;
+  if (probed?.status === "serving" && probeState.status === "loaded") {
+    body = (
+      <span>
+        Something is already serving{" "}
+        <span className="font-mono">{probeState.trackingDomain}</span> over
+        valid TLS, so OPTIONAL is downgrading https:// click links to HTTP
+        unnecessarily. Set it to REQUIRE with{" "}
+        <code className="font-mono">
+          wraps email domains config --domain {sendingDomain} --tracking-https
+        </code>
+        .
+      </span>
+    );
+  } else if (
+    probed?.status === "not-serving" &&
+    probeState.status === "loaded"
+  ) {
+    body = (
+      <span>
+        Nothing is currently serving{" "}
+        <span className="font-mono">{probeState.trackingDomain}</span> over TLS,
+        so OPTIONAL is the only safe value here — setting it to REQUIRE would
+        break every tracking link. Provision HTTPS for the tracking domain
+        first, with{" "}
+        <code className="font-mono">
+          wraps email domains config --domain {sendingDomain} --tracking-https
+        </code>
+        .
+      </span>
+    );
+  } else {
+    body = (
+      <span>
+        SES wraps click links in the original link&apos;s protocol, so an
+        https:// link resolves against this tracking domain with no matching
+        certificate.
+      </span>
+    );
+  }
+
+  return (
+    <div className="mt-1 flex items-start gap-2 rounded-lg border border-amber-600/30 bg-amber-600/10 p-3 text-amber-700 text-xs dark:text-amber-400">
+      <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+      {body}
+    </div>
+  );
+}
+
 function ConfigurationSetPanel({
   domain,
   organizationId,
@@ -43,6 +124,9 @@ function ConfigurationSetPanel({
   orgSlug: string;
 }) {
   const [state, setState] = useState<ConfigSetState>({ status: "idle" });
+  const [probeState, setProbeState] = useState<TrackingProbeState>({
+    status: "idle",
+  });
   const configurationSet = domain.configurationSet;
 
   useEffect(() => {
@@ -77,6 +161,49 @@ function ConfigurationSetPanel({
       cancelled = true;
     };
   }, [configurationSet, organizationId, domain.awsAccountId]);
+
+  // Second, independent load: whether anything actually serves the tracking
+  // domain over valid TLS. Not chained behind the config-set load above and
+  // does not block it — the config-set read is a fast AWS call, this is a
+  // TLS handshake to a third-party host that can take up to five seconds.
+  // Fires only when it can change the advice given (OPTIONAL policy, a
+  // tracking domain to check); every other combination needs no probe.
+  useEffect(() => {
+    if (
+      state.status !== "loaded" ||
+      state.detail.trackingHttpsPolicy !== "OPTIONAL" ||
+      !state.detail.trackingRedirectDomain
+    ) {
+      setProbeState({ status: "idle" });
+      return;
+    }
+
+    let cancelled = false;
+    setProbeState({ status: "loading" });
+
+    probeTrackingDomain(
+      organizationId,
+      domain.awsAccountId,
+      state.detail.name
+    ).then((result) => {
+      if (cancelled) {
+        return;
+      }
+      if (result.success && result.trackingDomain) {
+        setProbeState({
+          status: "loaded",
+          trackingDomain: result.trackingDomain,
+          result: result.result,
+        });
+      } else {
+        setProbeState({ status: "error" });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state, organizationId, domain.awsAccountId]);
 
   if (!configurationSet) {
     return (
@@ -138,17 +265,7 @@ function ConfigurationSetPanel({
         <div>
           <dt className="text-muted-foreground text-xs">HTTPS policy</dt>
           <dd>{detail.trackingHttpsPolicy ?? "Unknown"}</dd>
-          {detail.trackingHttpsPolicy === "OPTIONAL" && (
-            <div className="mt-1 flex items-start gap-2 rounded-lg border border-amber-600/30 bg-amber-600/10 p-3 text-amber-700 text-xs dark:text-amber-400">
-              <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                SES wraps click links in the original link&apos;s protocol, so
-                an https:// link resolves against this tracking domain with no
-                matching certificate. Links can break in production until this
-                is set to REQUIRE or REQUIRE_OPEN_ONLY.
-              </span>
-            </div>
-          )}
+          {renderHttpsPolicyWarning(detail, domain.identity, probeState)}
         </div>
 
         <div>

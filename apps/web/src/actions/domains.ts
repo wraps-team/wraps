@@ -13,6 +13,7 @@ import {
 import { and, awsAccount, db, eq } from "@wraps/db";
 import { revalidatePath } from "next/cache";
 import { getOrAssumeRole } from "@/lib/aws/credential-cache";
+import { probeTrackingTls, type TrackingTlsResult } from "@/lib/tracking-tls";
 import { orgAction } from "./shared/org-action";
 
 /**
@@ -361,6 +362,109 @@ export const getConfigurationSetDetail = orgAction(
       };
 
       return { success: true, detail };
+    } catch (error) {
+      if (isRoleAccessError(error)) {
+        return {
+          success: false,
+          error:
+            "This AWS account could not be read. Check its connection under AWS Accounts settings.",
+          unreachable: true,
+        };
+      }
+      if (
+        error instanceof Error &&
+        (error.name === "NotFoundException" ||
+          error.message.includes("NotFoundException"))
+      ) {
+        return {
+          success: false,
+          error: `Configuration set "${configurationSetName}" no longer exists.`,
+          unreachable: false,
+        };
+      }
+      throw error;
+    }
+  }
+);
+
+export type ProbeTrackingDomainResult =
+  | { success: true; trackingDomain: string; result: TrackingTlsResult }
+  | { success: true; trackingDomain: null }
+  | { success: false; error: string; unreachable: boolean };
+
+/**
+ * Tells the caller whether anything actually serves this configuration
+ * set's tracking domain over valid TLS — see `probeTrackingTls` in
+ * `@/lib/tracking-tls` for the mechanism and plan 302 for why it exists.
+ *
+ * Deliberately takes no hostname argument. A server action that probes a
+ * client-supplied host turns the dashboard into an SSRF proxy for any
+ * authenticated user, so the tracking domain is re-derived here from SES
+ * itself — the same account/org-scoping this file already uses for every
+ * other action — rather than trusted from the caller. Returns the
+ * no-tracking-domain case without ever calling the probe.
+ */
+export const probeTrackingDomain = orgAction(
+  {
+    name: "probeTrackingDomain",
+    resource: "awsAccounts",
+    permission: ["read"],
+    orgId: (
+      organizationId: string,
+      _awsAccountId: string,
+      _configurationSetName: string
+    ) => organizationId,
+    onError: "Failed to check tracking domain",
+  },
+  async (
+    _ctx,
+    organizationId: string,
+    awsAccountId: string,
+    configurationSetName: string
+  ): Promise<ProbeTrackingDomainResult> => {
+    // Never look up an AWS account by id alone — scope to the caller's org.
+    const account = await db.query.awsAccount.findFirst({
+      where: and(
+        eq(awsAccount.id, awsAccountId),
+        eq(awsAccount.organizationId, organizationId)
+      ),
+    });
+    if (!account) {
+      return {
+        success: false,
+        error: "AWS account not found",
+        unreachable: false,
+      };
+    }
+
+    try {
+      const credentials = await getOrAssumeRole({
+        roleArn: account.roleArn,
+        externalId: account.externalId,
+      });
+
+      const client = new SESv2Client({
+        region: account.region,
+        credentials: {
+          accessKeyId: credentials.accessKeyId,
+          secretAccessKey: credentials.secretAccessKey,
+          sessionToken: credentials.sessionToken,
+        },
+      });
+
+      const csResponse = await client.send(
+        new GetConfigurationSetCommand({
+          ConfigurationSetName: configurationSetName,
+        })
+      );
+
+      const trackingDomain = csResponse.TrackingOptions?.CustomRedirectDomain;
+      if (!trackingDomain) {
+        return { success: true, trackingDomain: null };
+      }
+
+      const result = await probeTrackingTls(trackingDomain);
+      return { success: true, trackingDomain, result };
     } catch (error) {
       if (isRoleAccessError(error)) {
         return {
