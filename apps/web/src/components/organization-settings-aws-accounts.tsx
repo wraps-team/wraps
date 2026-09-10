@@ -135,18 +135,27 @@ export function OrganizationSettingsAwsAccounts({
     }
 
     setDeleting(true);
-    const result = await deleteAWSAccount(accountToDelete.id, organization.id);
+    try {
+      const result = await deleteAWSAccount(
+        accountToDelete.id,
+        organization.id
+      );
 
-    if (result.success) {
-      toast.success("AWS account deleted successfully");
-      setDeleteDialogOpen(false);
-      setAccountToDelete(null);
-      refreshData(); // Reload accounts list
-    } else {
-      toast.error(result.error);
+      if (result.success) {
+        toast.success("AWS account deleted successfully");
+        setDeleteDialogOpen(false);
+        setAccountToDelete(null);
+        refreshData(); // Reload accounts list
+      } else {
+        toast.error(result.error);
+      }
+    } catch (_err) {
+      toast.error(
+        "Couldn't delete the AWS account — the request failed. Please try again, and if it keeps happening contact support."
+      );
+    } finally {
+      setDeleting(false);
     }
-
-    setDeleting(false);
   }
 
   if (loading) {

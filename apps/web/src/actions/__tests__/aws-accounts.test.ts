@@ -1,4 +1,11 @@
-import { awsAccount, db, member, organization, user } from "@wraps/db";
+import {
+  awsAccount,
+  db,
+  member,
+  messageSend,
+  organization,
+  user,
+} from "@wraps/db";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import {
@@ -1105,6 +1112,62 @@ describe("deleteAWSAccount", () => {
       where: (a, { eq }) => eq(a.id, deletableAccount.id),
     });
     expect(deleted).toBeUndefined();
+  });
+
+  describe("with send history", () => {
+    const testMessageSendId = "test-aws-message-send-1";
+
+    beforeEach(async () => {
+      // Re-insert the deletable account (a prior test in this file may have
+      // deleted it) so the message_send row below has something to reference.
+      await db
+        .insert(awsAccount)
+        .values(deletableAccount)
+        .onConflictDoUpdate({
+          target: awsAccount.id,
+          set: { updatedAt: new Date() },
+        });
+
+      await db
+        .insert(messageSend)
+        .values({
+          id: testMessageSendId,
+          organizationId: testOrganization.id,
+          awsAccountId: deletableAccount.id,
+          sourceType: "transactional",
+          recipient: "recipient@example.com",
+        })
+        .onConflictDoUpdate({
+          target: messageSend.id,
+          set: { awsAccountId: deletableAccount.id },
+        });
+    });
+
+    afterAll(async () => {
+      await db.delete(messageSend).where(eq(messageSend.id, testMessageSendId));
+    });
+
+    it("deletes an account that has send history, preserving the send and nulling its aws_account_id", async () => {
+      const result = await deleteAWSAccount(
+        deletableAccount.id,
+        testOrganization.id
+      );
+
+      expect(result.success).toBe(true);
+
+      // The AWS account is gone.
+      const deletedAccount = await db.query.awsAccount.findFirst({
+        where: (a, { eq: eqOp }) => eqOp(a.id, deletableAccount.id),
+      });
+      expect(deletedAccount).toBeUndefined();
+
+      // The message_send row survives, with its aws_account_id nulled.
+      const send = await db.query.messageSend.findFirst({
+        where: (m, { eq: eqOp }) => eqOp(m.id, testMessageSendId),
+      });
+      expect(send).toBeDefined();
+      expect(send?.awsAccountId).toBeNull();
+    });
   });
 });
 

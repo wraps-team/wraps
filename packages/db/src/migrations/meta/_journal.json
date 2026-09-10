@@ -582,6 +582,13 @@
       "when": 1788903452068,
       "tag": "0082_special_wild_child",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1789059179789,
+      "tag": "0083_blue_liz_osborn",
+      "breakpoints": true
     }
   ]
 }

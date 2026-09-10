@@ -263,9 +263,9 @@ export const messageSend = pgTable(
       onDelete: "set null",
     }),
 
-    awsAccountId: text("aws_account_id")
-      .references(() => awsAccount.id, { onDelete: "set null" })
-      .notNull(),
+    awsAccountId: text("aws_account_id").references(() => awsAccount.id, {
+      onDelete: "set null",
+    }),
 
     // ═══════════════════════════════════════════════════════════════════════
     // CHANNEL

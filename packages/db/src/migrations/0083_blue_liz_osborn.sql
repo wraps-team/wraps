@@ -1,0 +1,1 @@
+ALTER TABLE "message_send" ALTER COLUMN "aws_account_id" DROP NOT NULL;
