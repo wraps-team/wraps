@@ -356,7 +356,9 @@ export default function MailgunVsWrapsPage() {
               the infrastructure -- and who can take it away. That ownership
               also decides HIPAA: Mailgun includes a BAA on Enterprise plans,
               while your sending through Wraps runs inside your own AWS account,
-              covered by your own AWS BAA on any plan.
+              covered by your own AWS BAA on any plan. The dashboard, contacts,
+              and templates are a different story -- those run on Wraps&apos;
+              own infrastructure, outside that AWS BAA.
             </p>
           </section>
 
