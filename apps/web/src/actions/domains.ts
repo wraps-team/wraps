@@ -2,6 +2,7 @@
 
 import {
   GetEmailIdentityCommand,
+  type IdentityInfo,
   ListEmailIdentitiesCommand,
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
@@ -38,6 +39,15 @@ function isRoleAccessError(error: unknown): boolean {
   );
 }
 
+/**
+ * Ceiling on identities listed per AWS account. The fan-out below issues one
+ * GetEmailIdentityCommand per identity, so an unbounded list is an unbounded
+ * number of AWS calls on a single page render. Not a placeholder — if a
+ * customer ever reports hitting it, the fix is to stop fanning out
+ * GetEmailIdentity per identity, not to raise this number.
+ */
+const MAX_IDENTITIES = 1000;
+
 export type SendingDomain = {
   identity: string;
   identityType: string | null;
@@ -51,7 +61,12 @@ export type SendingDomain = {
 };
 
 export type ListSendingDomainsResult =
-  | { success: true; domains: SendingDomain[]; unreachableAccountIds: string[] }
+  | {
+      success: true;
+      domains: SendingDomain[];
+      unreachableAccountIds: string[];
+      truncatedAccountIds: string[];
+    }
   | { success: false; error: string };
 
 export const listSendingDomains = orgAction(
@@ -75,6 +90,7 @@ export const listSendingDomains = orgAction(
 
     const domains: SendingDomain[] = [];
     const unreachableAccountIds: string[] = [];
+    const truncatedAccountIds: string[] = [];
 
     for (const account of accounts) {
       try {
@@ -92,10 +108,29 @@ export const listSendingDomains = orgAction(
           },
         });
 
-        const listResponse = await client.send(
-          new ListEmailIdentitiesCommand({ PageSize: 100 })
-        );
-        const identities = listResponse.EmailIdentities ?? [];
+        const identities: IdentityInfo[] = [];
+        let nextToken: string | undefined;
+        do {
+          const listResponse = await client.send(
+            new ListEmailIdentitiesCommand({
+              PageSize: 100,
+              NextToken: nextToken,
+            })
+          );
+          identities.push(...(listResponse.EmailIdentities ?? []));
+          const returned = listResponse.NextToken;
+          // SES returns a NextToken on the last non-empty page; a token that
+          // does not advance is how this becomes an infinite loop.
+          nextToken = returned && returned !== nextToken ? returned : undefined;
+        } while (nextToken && identities.length < MAX_IDENTITIES);
+
+        if (nextToken) {
+          truncatedAccountIds.push(account.id);
+          ctx.log.warn(
+            { awsAccountId: account.id, identityCount: identities.length },
+            "Stopped listing SES identities at MAX_IDENTITIES; some identities were not returned"
+          );
+        }
 
         const details = await Promise.all(
           identities.map(async (identity) => {
@@ -160,6 +195,11 @@ export const listSendingDomains = orgAction(
       }
     }
 
-    return { success: true, domains, unreachableAccountIds };
+    return {
+      success: true,
+      domains,
+      unreachableAccountIds,
+      truncatedAccountIds,
+    };
   }
 );

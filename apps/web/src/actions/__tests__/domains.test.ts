@@ -391,4 +391,233 @@ describe("listSendingDomains", () => {
       expect(result.error).toBe(UNAUTHORIZED);
     }
   });
+
+  it("pages through multiple pages of identities, following the NextToken from each response", async () => {
+    let listCalls = 0;
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "ListEmailIdentitiesCommand") {
+        listCalls += 1;
+        if (listCalls === 1) {
+          expect(command.input?.NextToken).toBeUndefined();
+          const page = Array.from({ length: 100 }, (_, i) => ({
+            IdentityName: `page1-${i}.com`,
+          }));
+          return Promise.resolve({
+            EmailIdentities: page,
+            NextToken: "page-2-token",
+          });
+        }
+        expect(command.input?.NextToken).toBe("page-2-token");
+        const page = Array.from({ length: 20 }, (_, i) => ({
+          IdentityName: `page2-${i}.com`,
+        }));
+        return Promise.resolve({ EmailIdentities: page });
+      }
+      if (command._type === "GetEmailIdentityCommand") {
+        return Promise.resolve({
+          IdentityType: "DOMAIN",
+          VerifiedForSendingStatus: true,
+          VerificationStatus: "SUCCESS",
+        });
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+
+    const result = await listSendingDomains(testOrganization.id);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.domains).toHaveLength(120);
+      expect(result.truncatedAccountIds).toHaveLength(0);
+    }
+    expect(listCalls).toBe(2);
+  });
+
+  it("makes exactly one list call when the first page has no NextToken", async () => {
+    let listCalls = 0;
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "ListEmailIdentitiesCommand") {
+        listCalls += 1;
+        return Promise.resolve({
+          EmailIdentities: [{ IdentityName: "solo.com" }],
+        });
+      }
+      if (command._type === "GetEmailIdentityCommand") {
+        return Promise.resolve({
+          IdentityType: "DOMAIN",
+          VerifiedForSendingStatus: true,
+          VerificationStatus: "SUCCESS",
+        });
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+
+    const result = await listSendingDomains(testOrganization.id);
+
+    expect(result.success).toBe(true);
+    expect(listCalls).toBe(1);
+  });
+
+  it("terminates when NextToken does not advance between pages, instead of looping forever", async () => {
+    let listCalls = 0;
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "ListEmailIdentitiesCommand") {
+        listCalls += 1;
+        return Promise.resolve({
+          EmailIdentities: [{ IdentityName: `stuck-${listCalls}.com` }],
+          NextToken: "stuck-token",
+        });
+      }
+      if (command._type === "GetEmailIdentityCommand") {
+        return Promise.resolve({
+          IdentityType: "DOMAIN",
+          VerifiedForSendingStatus: true,
+          VerificationStatus: "SUCCESS",
+        });
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+
+    const result = await listSendingDomains(testOrganization.id);
+
+    expect(result.success).toBe(true);
+    // Without the "returned !== nextToken" guard this hangs rather than
+    // fails, so an explicit short timeout (see the third arg below) bounds
+    // the failure mode instead of letting a regression stall the suite.
+    expect(listCalls).toBeLessThanOrEqual(2);
+  }, 5000);
+
+  it("stops at MAX_IDENTITIES and reports the account as truncated, without hanging on an endless supply of pages", async () => {
+    // MAX_IDENTITIES is 1000 in apps/web/src/actions/domains.ts — the
+    // constant is not exported (a non-async export from a "use server"
+    // file breaks next build), so this value must be kept in sync by hand.
+    const sharedGetResponse = {
+      IdentityType: "DOMAIN",
+      VerifiedForSendingStatus: true,
+      VerificationStatus: "SUCCESS",
+    };
+
+    let listCalls = 0;
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "ListEmailIdentitiesCommand") {
+        listCalls += 1;
+        const page = Array.from({ length: 100 }, (_, i) => ({
+          IdentityName: `overflow-${listCalls}-${i}.com`,
+        }));
+        // Always return a token — this account has far more than
+        // MAX_IDENTITIES identities, an endless supply of pages.
+        return Promise.resolve({
+          EmailIdentities: page,
+          NextToken: `token-${listCalls}`,
+        });
+      }
+      if (command._type === "GetEmailIdentityCommand") {
+        // A single shared response object — building 1000 distinct
+        // fixtures here is what makes this kind of test slow to run and
+        // read.
+        return Promise.resolve(sharedGetResponse);
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+
+    const result = await listSendingDomains(testOrganization.id);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.domains.length).toBeGreaterThan(0);
+      expect(result.domains.length).toBeLessThanOrEqual(1000);
+      expect(result.truncatedAccountIds).toContain(testAwsAccount.id);
+    }
+  }, 20_000);
+
+  it("marks the account unreachable when pagination itself fails partway through; other accounts' domains still return", async () => {
+    await db
+      .insert(awsAccount)
+      .values(testAwsAccount2)
+      .onConflictDoUpdate({
+        target: awsAccount.id,
+        set: { updatedAt: new Date() },
+      });
+
+    try {
+      // The DB does not guarantee which of the org's two accounts is
+      // processed first, so drive the failure off call order rather than a
+      // specific account id: whichever account is processed first fails
+      // partway through pagination, whichever is second succeeds normally.
+      let listCalls = 0;
+      mockSend.mockImplementation((command: SesCommand) => {
+        if (command._type === "ListEmailIdentitiesCommand") {
+          listCalls += 1;
+          if (listCalls === 1) {
+            // First account, first page: succeeds, hands back a token.
+            return Promise.resolve({
+              EmailIdentities: [{ IdentityName: "page1.com" }],
+              NextToken: "token-1",
+            });
+          }
+          if (listCalls === 2) {
+            // First account, second page: the role loses access mid-pagination.
+            return Promise.reject(new Error("AccessDeniedException"));
+          }
+          // Second account: a normal, single-page list.
+          return Promise.resolve({
+            EmailIdentities: [{ IdentityName: "surviving.com" }],
+          });
+        }
+        if (command._type === "GetEmailIdentityCommand") {
+          return Promise.resolve({
+            IdentityType: "DOMAIN",
+            VerifiedForSendingStatus: true,
+            VerificationStatus: "SUCCESS",
+          });
+        }
+        return Promise.reject(new Error(`Unexpected command ${command._type}`));
+      });
+
+      const result = await listSendingDomains(testOrganization.id);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // Exactly one of the two accounts landed in unreachableAccountIds …
+        expect(result.unreachableAccountIds).toHaveLength(1);
+        expect([testAwsAccount.id, testAwsAccount2.id]).toContain(
+          result.unreachableAccountIds[0]
+        );
+        // … and the other account's domain still came back, undisturbed by
+        // the first account's mid-pagination failure.
+        expect(result.domains).toHaveLength(1);
+        expect(result.domains[0].identity).toBe("surviving.com");
+        expect(result.domains[0].awsAccountId).not.toBe(
+          result.unreachableAccountIds[0]
+        );
+      }
+    } finally {
+      await db.delete(awsAccount).where(eq(awsAccount.id, testAwsAccount2.id));
+    }
+  });
+
+  it("does not mark the account truncated on the ordinary (exhausted-list) path", async () => {
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "ListEmailIdentitiesCommand") {
+        return Promise.resolve({
+          EmailIdentities: [{ IdentityName: "clean.com" }],
+        });
+      }
+      if (command._type === "GetEmailIdentityCommand") {
+        return Promise.resolve({
+          IdentityType: "DOMAIN",
+          VerifiedForSendingStatus: true,
+          VerificationStatus: "SUCCESS",
+        });
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+
+    const result = await listSendingDomains(testOrganization.id);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.truncatedAccountIds).toEqual([]);
+    }
+  });
 });
