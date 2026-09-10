@@ -406,6 +406,80 @@ describe("CliDeployConnectStep — three-path layout", () => {
     );
   });
 
+  it("omits param_Domain and param_MailFromSubdomain when no domain is entered", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the browser/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /deploy with cloudformation/i })
+    );
+
+    const params = new URL(mockOpen.mock.calls[0][0].replace("#/", ""))
+      .searchParams;
+    expect(params.has("param_Domain")).toBe(false);
+    expect(params.has("param_MailFromSubdomain")).toBe(false);
+    expect(params.get("param_WrapsOrganizationId")).toBe("org-123");
+    expect(params.get(WEBHOOK_SECRET_PARAM)).toBeTruthy();
+  });
+
+  it("omits param_Domain and param_MailFromSubdomain for a whitespace-only domain", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the browser/i }));
+    fireEvent.change(screen.getByLabelText(/sending domain/i), {
+      target: { value: "   " },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /deploy with cloudformation/i })
+    );
+
+    const params = new URL(mockOpen.mock.calls[0][0].replace("#/", ""))
+      .searchParams;
+    expect(params.has("param_Domain")).toBe(false);
+    expect(params.has("param_MailFromSubdomain")).toBe(false);
+  });
+
+  it("includes param_Domain and param_MailFromSubdomain when a domain is entered", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the browser/i }));
+    fireEvent.change(screen.getByLabelText(/sending domain/i), {
+      target: { value: "example.com" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /deploy with cloudformation/i })
+    );
+
+    const params = new URL(mockOpen.mock.calls[0][0].replace("#/", ""))
+      .searchParams;
+    expect(params.get("param_Domain")).toBe("example.com");
+    expect(params.get("param_MailFromSubdomain")).toBe("mail");
+  });
+
+  it("trims surrounding whitespace from the entered domain", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use the browser/i }));
+    fireEvent.change(screen.getByLabelText(/sending domain/i), {
+      target: { value: "  example.com  " },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /deploy with cloudformation/i })
+    );
+
+    const params = new URL(mockOpen.mock.calls[0][0].replace("#/", ""))
+      .searchParams;
+    expect(params.get("param_Domain")).toBe("example.com");
+  });
+
   it("validates the same webhook secret it deployed", async () => {
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
     renderWithQueryClient(

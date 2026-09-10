@@ -132,7 +132,8 @@ function generateSecureWebhookSecret(): string {
  */
 function generateQuickCreateUrl(
   organizationId: string,
-  webhookSecret: string
+  webhookSecret: string,
+  domain?: string
 ): string {
   const templateUrl =
     "https://wraps-assets.s3.amazonaws.com/cloudformation/wraps-email-infrastructure.yaml";
@@ -148,6 +149,12 @@ function generateQuickCreateUrl(
     param_WrapsOrganizationId: organizationId,
     param_WrapsWebhookSecret: webhookSecret,
   });
+
+  const trimmed = domain?.trim();
+  if (trimmed) {
+    params.set("param_Domain", trimmed);
+    params.set("param_MailFromSubdomain", "mail");
+  }
 
   return `https://console.aws.amazon.com/cloudformation/home#/stacks/create/review?${params.toString()}`;
 }
@@ -193,11 +200,14 @@ export function CliDeployConnectStep({
 
   // Generate a cryptographically secure webhook secret once on mount
   const [webhookSecret] = useState(() => generateSecureWebhookSecret());
+  const [sendingDomain, setSendingDomain] = useState("");
 
   const quickCreateUrl = useMemo(
     () =>
-      selfHosted ? null : generateQuickCreateUrl(organizationId, webhookSecret),
-    [organizationId, selfHosted, webhookSecret]
+      selfHosted
+        ? null
+        : generateQuickCreateUrl(organizationId, webhookSecret, sendingDomain),
+    [organizationId, selfHosted, webhookSecret, sendingDomain]
   );
 
   // Manual connection check
@@ -904,6 +914,25 @@ export function CliDeployConnectStep({
                 the stack can fail partway and leave resources behind. The CLI
                 path reports conflicts before it deploys.
               </p>
+
+              <div className="space-y-2">
+                <Label htmlFor="cfn-sending-domain">
+                  Sending domain
+                  <span className="ml-1.5 font-normal text-muted-foreground">
+                    — optional
+                  </span>
+                </Label>
+                <Input
+                  id="cfn-sending-domain"
+                  onChange={(e) => setSendingDomain(e.target.value)}
+                  placeholder="yourcompany.com"
+                  value={sendingDomain}
+                />
+                <p className="text-muted-foreground text-sm">
+                  Optional — the domain you'll send from. Leave blank to add it
+                  later from the CLI.
+                </p>
+              </div>
 
               <Button className="w-full" onClick={handleCloudFormationDeploy}>
                 <ExternalLinkIcon className="mr-2 h-4 w-4" />

@@ -891,9 +891,10 @@ const DEPLOY_PREREQUISITES = [
   },
 ];
 
-function generateQuickCreateUrl(
+export function generateQuickCreateUrl(
   organizationId: string,
-  webhookSecret: string
+  webhookSecret: string,
+  domain?: string
 ): string {
   const templateUrl =
     "https://wraps-assets.s3.amazonaws.com/cloudformation/wraps-email-infrastructure.yaml";
@@ -909,6 +910,12 @@ function generateQuickCreateUrl(
     param_WrapsOrganizationId: organizationId,
     param_WrapsWebhookSecret: webhookSecret,
   });
+
+  const trimmed = domain?.trim();
+  if (trimmed) {
+    params.set("param_Domain", trimmed);
+    params.set("param_MailFromSubdomain", "mail");
+  }
 
   return `https://console.aws.amazon.com/cloudformation/home#/stacks/create/review?${params.toString()}`;
 }
@@ -972,11 +979,12 @@ function DeployConnectGuide({ organizationId }: { organizationId: string }) {
   const [externalId, setExternalId] = useState("");
   const [isValidating, startValidation] = useTransition();
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [sendingDomain, setSendingDomain] = useState("");
 
   const [webhookSecret] = useState(() => generateSecureWebhookSecret());
   const quickCreateUrl = useMemo(
-    () => generateQuickCreateUrl(organizationId, webhookSecret),
-    [organizationId, webhookSecret]
+    () => generateQuickCreateUrl(organizationId, webhookSecret, sendingDomain),
+    [organizationId, webhookSecret, sendingDomain]
   );
 
   const handleCopy = async (command: string, index: number) => {
@@ -1232,14 +1240,34 @@ function DeployConnectGuide({ organizationId }: { organizationId: string }) {
               </div>
             </div>
           ) : (
-            <Button
-              className="w-full"
-              onClick={handleCloudFormationDeploy}
-              size="sm"
-            >
-              <ExternalLinkIcon className="mr-2 h-4 w-4" />
-              Deploy to AWS Console
-            </Button>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="cfn-sending-domain">
+                  Sending domain
+                  <span className="ml-1.5 font-normal text-muted-foreground">
+                    — optional
+                  </span>
+                </Label>
+                <Input
+                  id="cfn-sending-domain"
+                  onChange={(e) => setSendingDomain(e.target.value)}
+                  placeholder="yourcompany.com"
+                  value={sendingDomain}
+                />
+                <p className="text-muted-foreground text-[11px]">
+                  Optional — the domain you'll send from. Leave blank to add it
+                  later from the CLI.
+                </p>
+              </div>
+              <Button
+                className="w-full"
+                onClick={handleCloudFormationDeploy}
+                size="sm"
+              >
+                <ExternalLinkIcon className="mr-2 h-4 w-4" />
+                Deploy to AWS Console
+              </Button>
+            </div>
           )}
         </TabsContent>
       </Tabs>
