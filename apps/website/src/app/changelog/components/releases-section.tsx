@@ -66,6 +66,84 @@ const Code = ({ children }: { children: ReactNode }) => (
 
 const releases: Release[] = [
   {
+    version: "Platform v0.28.0",
+    date: "September 2026",
+    icon: LayoutDashboard,
+    title: "Sending Domains, Suppressions & Stale Roles",
+    items: [
+      <>
+        A sending-domains page lists every SES identity with its verification
+        state and the DKIM CNAMEs and MAIL FROM records still to publish, adds
+        a domain with SES-managed Easy DKIM, and opens a per-identity sheet for
+        the configuration set that governs it: tracking domain, TLS policy,
+        suppression reasons and event destinations. Onboarding had told
+        customers they could manage domains in the dashboard while the only
+        working paths were installing the CLI or rebuilding the CloudFormation
+        stack. The sheet flags an <Code>OPTIONAL</Code> tracking{" "}
+        <Code>HttpsPolicy</Code> and an empty event-destination list, which are
+        the usual reasons click links break and delivery events never arrive
+      </>,
+      <>
+        The SES suppression list is browsable from the dashboard, and an
+        address can be removed. A <Code>COMPLAINT</Code>-reason removal re-reads
+        the reason from SES rather than trusting the browser, and refuses
+        without an explicit acknowledgement.{" "}
+        <Code>email.suppression.*</Code> in <Code>@wraps.dev/email</Code> now
+        works on every deployment path as well: the CDK construct, the Pulumi
+        provider and the CloudFormation template each grant the four SES
+        actions their roles never had, so those calls returned AccessDenied
+        everywhere except a CLI deployment
+      </>,
+      <>
+        Existing infrastructure does not pick either grant up on its own. A
+        platform connection needs <Code>wraps platform update-role</Code> from
+        CLI v3.9.0 or later; a CDK or Pulumi stack needs{" "}
+        <Code>@wraps.dev/cdk</Code> 0.3.0 or <Code>@wraps.dev/pulumi</Code>{" "}
+        0.4.0 and a redeploy; a CloudFormation stack needs an update against
+        the republished template
+      </>,
+      <>
+        The account page warns when the console role&rsquo;s policy is behind
+        the version Wraps expects, and carries the IAM-console repair route the
+        card was missing &mdash; the one route that works regardless of how the
+        role was created. A customer on an old role saw features that looked
+        switched off, with nothing to explain why and no reason to visit the
+        page that fixes it
+      </>,
+      <>
+        The dashboard reports the SES production-access review verdict. AWS
+        returns <Code>Details.ReviewDetails</Code> on the{" "}
+        <Code>GetAccount</Code> call Wraps already makes hourly, and both
+        readers discarded it, so a request AWS had already failed still read as
+        &ldquo;Request production access&rdquo; to someone who believed they
+        had it
+      </>,
+      <>
+        <Code>wraps email status --json</Code> reports a <Code>sending</Code>{" "}
+        block with sandbox state and quota, and recognises a CloudFormation
+        deployment instead of exiting 1 with &ldquo;No email infrastructure
+        found&rdquo;. It is the command the onboarding wizard tells coding
+        agents to run to confirm setup
+      </>,
+      <>
+        Fix: a broadcast into an SES account AWS has paused is blocked at the
+        review step. <Code>assessQuotaHeadroom</Code> read{" "}
+        <Code>SendQuota</Code> off the <Code>GetAccount</Code> response while
+        discarding <Code>SendingEnabled</Code> and{" "}
+        <Code>EnforcementStatus</Code> on the same object, so the wizard ran
+        past the point-of-no-return dialog and every recipient failed. A
+        PROBATION account warns instead of blocking, and a check that cannot
+        read account state never refuses a legitimate send
+      </>,
+      <>
+        Fix: the sending-domains list pages through every SES identity rather
+        than showing the first 100, and the setup dashboard&rsquo;s &ldquo;Send
+        a test email&rdquo; step sends one instead of linking to the page the
+        reader was already on
+      </>,
+    ],
+  },
+  {
     version: "CLI v3.7.0",
     date: "September 2026",
     icon: Wrench,
