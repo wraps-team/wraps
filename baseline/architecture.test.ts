@@ -2445,3 +2445,73 @@ describe("apps/api plan allowances match apps/web", () => {
     ).toEqual(readWebPlanField("historyRetentionDays"));
   });
 });
+
+// ─────────────────────────────────────────────────────────
+// Test: Route53 auto-setup covers every DNS record SES needs
+//
+// The CloudFormation template takes an optional Route53HostedZoneId and, when
+// given one, creates the DNS records for the customer instead of making them
+// publish by hand. It set MailFromAttributes on the SES identity but only ever
+// created the three DKIM CNAMEs — the MAIL FROM MX and SPF TXT existed solely
+// as text in the stack Outputs. Every customer who handed over a hosted zone
+// got a domain that verified DKIM immediately and then sat in MAIL FROM
+// PENDING forever, with nothing in the UI saying why.
+//
+// Guard the pairing rather than the record count: if the identity declares a
+// MAIL FROM domain, the Route53 branch has to publish both records that domain
+// needs (MX for bounce handling, TXT for SPF alignment) alongside the CNAMEs.
+// ─────────────────────────────────────────────────────────
+
+describe("cloudformation route53 auto-setup", () => {
+  const TEMPLATE = "cloudformation/wraps-email-infrastructure.yaml";
+
+  // Resource blocks sit at two-space indent under `Resources:`. Slice on the
+  // next top-level key so Outputs — which carry the same MX/SPF strings as
+  // instructions — can never satisfy an assertion about resources.
+  function route53RecordTypes(): string[] {
+    const content = readFile(TEMPLATE);
+    const resources = content.slice(
+      content.indexOf("\nResources:"),
+      content.indexOf("\nOutputs:")
+    );
+
+    const types: string[] = [];
+    for (const block of resources.split(/\n {2}(?=\w+:\n)/)) {
+      if (!block.includes("Type: AWS::Route53::RecordSet")) continue;
+      if (!block.includes("Condition: HasRoute53")) continue;
+      const recordType = block.match(/^ {6}Type: (CNAME|MX|TXT)$/m);
+      if (recordType) types.push(recordType[1]);
+    }
+    return types;
+  }
+
+  test("declaring a MAIL FROM domain also creates its MX and SPF records", () => {
+    const content = readFile(TEMPLATE);
+    expect(
+      content.includes("MailFromAttributes"),
+      `${TEMPLATE} no longer sets MailFromAttributes — if MAIL FROM was ` +
+        "removed, delete this test; otherwise it moved and the guard is blind."
+    ).toBe(true);
+
+    const types = route53RecordTypes();
+    expect(
+      types.filter((t) => t === "MX"),
+      "SES identity sets a MAIL FROM domain but the Route53 branch creates no " +
+        "MX record for it, so MAIL FROM stays PENDING and bounce handling " +
+        "never routes through the customer's own subdomain."
+    ).toHaveLength(1);
+    expect(
+      types.filter((t) => t === "TXT"),
+      "SES identity sets a MAIL FROM domain but the Route53 branch creates no " +
+        "SPF TXT record for it, so MAIL FROM stays PENDING and SPF does not align."
+    ).toHaveLength(1);
+  });
+
+  test("all three DKIM CNAMEs are still created", () => {
+    expect(
+      route53RecordTypes().filter((t) => t === "CNAME"),
+      "SES DKIM signing needs all three CNAME tokens published; a partial set " +
+        "leaves the domain unverified."
+    ).toHaveLength(3);
+  });
+});

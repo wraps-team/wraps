@@ -195,7 +195,7 @@ Parameters:
   # Optional Route53 Integration
   Route53HostedZoneId:
     Type: String
-    Description: "(Optional) Route53 Hosted Zone ID - if provided, DKIM records will be created automatically"
+    Description: "(Optional) Route53 Hosted Zone ID - if provided, DKIM and MAIL FROM records will be created automatically"
     Default: ""
 
 Conditions:
@@ -573,6 +573,33 @@ Resources:
       TTL: "300"
       ResourceRecords:
         - !GetAtt WrapsEmailDomainIdentity.DkimDNSTokenValue3
+
+  # ===========================================
+  # Route53 MAIL FROM Records (Conditional - if Route53 Hosted Zone provided)
+  # ===========================================
+  MailFromMxRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasRoute53
+    DependsOn: WrapsEmailDomainIdentity
+    Properties:
+      HostedZoneId: !Ref Route53HostedZoneId
+      Name: !Sub "${MailFromSubdomain}.${Domain}"
+      Type: MX
+      TTL: "300"
+      ResourceRecords:
+        - !Sub "10 feedback-smtp.${AWS::Region}.amazonses.com"
+
+  MailFromSpfRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasRoute53
+    DependsOn: WrapsEmailDomainIdentity
+    Properties:
+      HostedZoneId: !Ref Route53HostedZoneId
+      Name: !Sub "${MailFromSubdomain}.${Domain}"
+      Type: TXT
+      TTL: "300"
+      ResourceRecords:
+        - '"v=spf1 include:amazonses.com ~all"'
 
   # ===========================================
   # EventBridge Event Destination (Conditional)
@@ -1387,6 +1414,11 @@ Outputs:
     Description: "Route53 DKIM records status"
     Value: "DKIM records were automatically created in your Route53 hosted zone"
 
+  Route53MailFromStatus:
+    Condition: HasRoute53
+    Description: "Route53 MAIL FROM records status"
+    Value: "MAIL FROM MX and SPF records were automatically created in your Route53 hosted zone"
+
   DKIMInstructions:
     Condition: HasDomain
     Description: "DKIM DNS record instructions (skip if using Route53 auto-setup)"
@@ -1394,13 +1426,13 @@ Outputs:
 
   SPFRecord:
     Condition: HasDomain
-    Description: "SPF TXT record for MAIL FROM domain"
-    Value: !Sub "Add TXT record at ${MailFromSubdomain}.${Domain} with value: v=spf1 include:amazonses.com ~all"
+    Description: "SPF TXT record for MAIL FROM domain (skip if using Route53 auto-setup)"
+    Value: !Sub "Add TXT record at ${MailFromSubdomain}.${Domain} with value: v=spf1 include:amazonses.com ~all. If you provided a Route53 Hosted Zone ID, this was created automatically."
 
   MXRecord:
     Condition: HasDomain
-    Description: "MX record for MAIL FROM domain"
-    Value: !Sub "Add MX record at ${MailFromSubdomain}.${Domain} with value: 10 feedback-smtp.${AWS::Region}.amazonses.com"
+    Description: "MX record for MAIL FROM domain (skip if using Route53 auto-setup)"
+    Value: !Sub "Add MX record at ${MailFromSubdomain}.${Domain} with value: 10 feedback-smtp.${AWS::Region}.amazonses.com. If you provided a Route53 Hosted Zone ID, this was created automatically."
 
   NextSteps:
     Description: "Next steps after deployment"
