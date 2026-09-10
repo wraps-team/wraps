@@ -6,6 +6,7 @@
 
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { SERVER_CARD } from "../src/lib/mcp-server-card";
 
 export const buildServerJson = () => ({
@@ -22,9 +23,19 @@ export const buildServerJson = () => ({
 
 const outputPath = resolve(import.meta.dirname, "..", "server.json");
 
-writeFileSync(
-  outputPath,
-  `${JSON.stringify(buildServerJson(), null, 2)}\n`,
-  "utf8"
-);
-process.stdout.write(`Wrote ${outputPath}\n`);
+// Guard the write so importing this module (as the drift test does, to reach
+// buildServerJson) never rewrites the checked-in artifact — only running the
+// file directly as the entrypoint does. Without this guard the drift test
+// would compare freshly-written output against itself and could never fail.
+const isEntrypoint =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isEntrypoint) {
+  writeFileSync(
+    outputPath,
+    `${JSON.stringify(buildServerJson(), null, 2)}\n`,
+    "utf8"
+  );
+  process.stdout.write(`Wrote ${outputPath}\n`);
+}
