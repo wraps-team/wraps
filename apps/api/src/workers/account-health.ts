@@ -58,40 +58,13 @@ import {
 } from "@wraps/db";
 import type { Handler } from "aws-lambda";
 import { and, eq, isNotNull } from "drizzle-orm";
+import { probeConsolePolicyVersion } from "../lib/console-policy-version";
 import { flushLogger, log } from "../lib/logger";
+import { isRoleAccessError } from "../lib/role-access-error";
 import { classifySesHealth, SES_THRESHOLDS } from "../lib/ses-health.js";
 import { type AwsCredentials, getCredentials } from "../services/credentials";
 
 const DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000; // once per day per account
-
-/**
- * STS/SES codes that all mean the same thing operationally: the customer's
- * console-access role is gone, its trust policy no longer admits this Lambda,
- * or it no longer carries the SES read permissions the sweep needs.
- */
-const ROLE_ACCESS_ERROR_CODES = [
-  "AccessDenied",
-  "AccessDeniedException",
-  "NoSuchEntity",
-  "NoSuchEntityException",
-  "InvalidClientTokenId",
-  "ExpiredToken",
-  "ExpiredTokenException",
-  "UnrecognizedClientException",
-] as const;
-
-/**
- * AWS SDK v3 error names are unreliable — some errors arrive as `name: "Error"`
- * with the real code only in the message — so both are checked.
- */
-function isRoleAccessError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  return ROLE_ACCESS_ERROR_CODES.some(
-    (code) => error.name === code || error.message.includes(code)
-  );
-}
 
 type AccountRow = {
   id: string;
@@ -101,6 +74,8 @@ type AccountRow = {
   region: string;
   features: typeof awsAccount.$inferSelect.features;
   roleLastReachableAt: Date | null;
+  consolePolicyVersion: number | null;
+  consolePolicyCheckedAt: Date | null;
 };
 
 async function getOrgSlug(organizationId: string): Promise<string | null> {
@@ -232,16 +207,18 @@ async function checkAccount(account: AccountRow): Promise<void> {
   // customer unaware their account stopped being health-checked.
   let credentials: AwsCredentials;
   let info: GetAccountCommandOutput;
+  let sesClient: SESv2Client;
   try {
     credentials = await getCredentials(account.id, account.organizationId);
-    info = await new SESv2Client({
+    sesClient = new SESv2Client({
       region: credentials.region,
       credentials: {
         accessKeyId: credentials.accessKeyId,
         secretAccessKey: credentials.secretAccessKey,
         sessionToken: credentials.sessionToken,
       },
-    }).send(new GetAccountCommand({}));
+    });
+    info = await sesClient.send(new GetAccountCommand({}));
   } catch (error) {
     if (!isRoleAccessError(error)) {
       throw error;
@@ -326,6 +303,44 @@ async function checkAccount(account: AccountRow): Promise<void> {
         eq(awsAccount.organizationId, account.organizationId)
       )
     );
+
+  // Console-policy version fingerprint. Reuses the SESv2Client already
+  // assumed above rather than building a second one. Probed at most once a
+  // day per account — a policy version changes when a customer runs a
+  // repair, not between two hourly sweeps, and this sweep touches every
+  // connected account. Its own try/catch keeps a probe failure from ever
+  // aborting the sweep or the checks below it.
+  try {
+    const checkedAt = account.consolePolicyCheckedAt;
+    const recentlyChecked =
+      checkedAt !== null && Date.now() - checkedAt.getTime() < DEDUPE_WINDOW_MS;
+    if (!recentlyChecked) {
+      const result = await probeConsolePolicyVersion(sesClient);
+      // A throttled/unreachable probe is not a policy-version fact — leave
+      // the previous reading in place rather than erasing a known-good
+      // version.
+      if (!result.unreachable) {
+        await db
+          .update(awsAccount)
+          .set({
+            consolePolicyVersion: result.version,
+            consolePolicyCheckedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(awsAccount.id, account.id),
+              eq(awsAccount.organizationId, account.organizationId)
+            )
+          );
+      }
+    }
+  } catch (error) {
+    log.warn("[account-health] Console-policy version probe failed", {
+      accountId: account.id,
+      organizationId: account.organizationId,
+      error,
+    });
+  }
 
   // 1. Sending paused / enforcement problems — the catastrophic one.
   const enforcement = info.EnforcementStatus;
@@ -489,6 +504,8 @@ export const handler: Handler = wrapHandler(async () => {
       region: awsAccount.region,
       features: awsAccount.features,
       roleLastReachableAt: awsAccount.roleLastReachableAt,
+      consolePolicyVersion: awsAccount.consolePolicyVersion,
+      consolePolicyCheckedAt: awsAccount.consolePolicyCheckedAt,
     })
     .from(awsAccount)
     .where(isNotNull(awsAccount.webhookSecret));

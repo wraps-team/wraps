@@ -100,6 +100,18 @@ export const awsAccount = pgTable(
     // hourly sweep and becomes alert-eligible from then on.
     roleLastReachableAt: timestamp("role_last_reachable_at"),
 
+    // Which version of the wraps-console-access-role policy this role was
+    // observed to carry, determined by the account-health sweep probing
+    // read-only marker actions in the order they were granted. The ladder
+    // lives in apps/api/src/lib/console-policy-version.ts.
+    //
+    // NULL means never probed — which covers both a brand-new connection and
+    // every account that existed before this column shipped. NULL must never
+    // render as "out of date": an unprobed role and a stale role are
+    // indistinguishable from here.
+    consolePolicyVersion: integer("console_policy_version"),
+    consolePolicyCheckedAt: timestamp("console_policy_checked_at"),
+
     // Liveness of the SES event feed: bumped (throttled) by the SES webhook
     // route every time an authenticated event arrives for this account.
     // NULL = no event ever received. Used for staleness detection/alerting.
