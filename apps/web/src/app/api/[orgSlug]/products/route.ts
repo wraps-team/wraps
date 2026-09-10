@@ -41,10 +41,15 @@ async function checkSMSInfrastructure(
         return { hasInfrastructure: true, needsRoleUpdate: false };
       }
     } catch (error) {
-      // If we get an access denied error, the role doesn't have SMS permissions
+      // AWS SDK v3 is not consistent about surfacing the exception type in
+      // `name` — it sometimes reports a bare "Error" with the real type only in
+      // the message — so check both. This only fires for accounts that opted
+      // into SMS, where a denied read really does mean a stale console role.
       const errorMessage =
         error instanceof Error ? error.message : String(error);
+      const errorName = error instanceof Error ? error.name : "";
       if (
+        errorName === "AccessDeniedException" ||
         errorMessage.includes("AccessDenied") ||
         errorMessage.includes("not authorized")
       ) {
@@ -156,10 +161,24 @@ export async function GET(_request: Request, context: RouteContext) {
 
     const accountIds = accounts.map((a) => a.id);
 
+    // Only probe SMS on accounts that opted into it. Both role-provisioning
+    // paths omit sms-voice permissions when the customer did not ask for SMS
+    // (`update-role.ts` gates on `if (smsConfig)`, the CloudFormation template
+    // on the `EnableSMS` condition), so on an email-only account AccessDenied
+    // is the designed steady state — not a role that needs updating. Probing
+    // anyway put a permanent, unclearable "Action required" banner on the
+    // overview of every email-only org. `smsEnabled` is written from the same
+    // `features.sms` presence that decides the role's SMS statements
+    // (`apps/api/src/routes/connections.ts:111`), which is what makes it the
+    // right gate here.
+    const smsAccountIds = accounts.filter((a) => a.smsEnabled).map((a) => a.id);
+
     // Check infrastructure for each product
     const [emailStatus, smsStatus] = await Promise.all([
       checkEmailInfrastructure(accountIds),
-      checkSMSInfrastructure(accountIds),
+      smsAccountIds.length > 0
+        ? checkSMSInfrastructure(smsAccountIds)
+        : Promise.resolve({ hasInfrastructure: false, needsRoleUpdate: false }),
     ]);
 
     const products: ProductStatus[] = [
