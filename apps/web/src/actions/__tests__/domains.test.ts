@@ -12,6 +12,7 @@ import {
 import { dnsRecordsFor } from "@/lib/dns-records";
 import {
   addSendingDomain,
+  getConfigurationSetDetail,
   listSendingDomains,
   type SendingDomain,
 } from "../domains";
@@ -95,6 +96,20 @@ vi.mock("@aws-sdk/client-sesv2", () => ({
   },
   CreateEmailIdentityCommand: class {
     _type = "CreateEmailIdentityCommand";
+    input: Record<string, unknown>;
+    constructor(input: Record<string, unknown>) {
+      this.input = input;
+    }
+  },
+  GetConfigurationSetCommand: class {
+    _type = "GetConfigurationSetCommand";
+    input: Record<string, unknown>;
+    constructor(input: Record<string, unknown>) {
+      this.input = input;
+    }
+  },
+  GetConfigurationSetEventDestinationsCommand: class {
+    _type = "GetConfigurationSetEventDestinationsCommand";
     input: Record<string, unknown>;
     constructor(input: Record<string, unknown>) {
       this.input = input;
@@ -847,5 +862,245 @@ describe("addSendingDomain", () => {
 
     const sentCommand = mockSend.mock.calls[0][0] as SesCommand;
     expect(sentCommand.input).not.toHaveProperty("DkimSigningAttributes");
+  });
+});
+
+describe("getConfigurationSetDetail", () => {
+  function mockConfigSetResponses(
+    csResponse: Record<string, unknown>,
+    eventDestResponse: Record<string, unknown> = { EventDestinations: [] }
+  ) {
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "GetConfigurationSetCommand") {
+        return Promise.resolve(csResponse);
+      }
+      if (command._type === "GetConfigurationSetEventDestinationsCommand") {
+        return Promise.resolve(eventDestResponse);
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+  }
+
+  it("sends both commands with the given ConfigurationSetName and maps the response", async () => {
+    mockConfigSetResponses(
+      {
+        TrackingOptions: {
+          CustomRedirectDomain: "track.example.com",
+          HttpsPolicy: "REQUIRE",
+        },
+        DeliveryOptions: { TlsPolicy: "REQUIRE" },
+        SendingOptions: { SendingEnabled: true },
+        ReputationOptions: { ReputationMetricsEnabled: true },
+        SuppressionOptions: { SuppressedReasons: ["BOUNCE"] },
+      },
+      {
+        EventDestinations: [
+          {
+            Name: "wraps-events",
+            Enabled: true,
+            MatchingEventTypes: ["SEND", "DELIVERY"],
+            EventBridgeDestination: { EventBusArn: "arn:aws:events:::bus" },
+          },
+        ],
+      }
+    );
+
+    const result = await getConfigurationSetDetail(
+      testOrganization.id,
+      testAwsAccount.id,
+      "wraps-email-example.com"
+    );
+
+    expect(result).toEqual({
+      success: true,
+      detail: {
+        name: "wraps-email-example.com",
+        trackingRedirectDomain: "track.example.com",
+        trackingHttpsPolicy: "REQUIRE",
+        tlsPolicy: "REQUIRE",
+        sendingEnabled: true,
+        reputationMetricsEnabled: true,
+        suppressedReasons: ["BOUNCE"],
+        eventDestinations: [
+          {
+            name: "wraps-events",
+            enabled: true,
+            matchingEventTypes: ["SEND", "DELIVERY"],
+            destinationType: "EventBridge",
+          },
+        ],
+      },
+    });
+
+    expect(mockSend).toHaveBeenCalledTimes(2);
+    const [csCommand, eventDestCommand] = mockSend.mock.calls.map(
+      (call) => call[0] as SesCommand
+    );
+    expect(csCommand._type).toBe("GetConfigurationSetCommand");
+    expect(csCommand.input).toEqual({
+      ConfigurationSetName: "wraps-email-example.com",
+    });
+    expect(eventDestCommand._type).toBe(
+      "GetConfigurationSetEventDestinationsCommand"
+    );
+    expect(eventDestCommand.input).toEqual({
+      ConfigurationSetName: "wraps-email-example.com",
+    });
+  });
+
+  it("maps a missing TrackingOptions to null rather than undefined or a crash", async () => {
+    mockConfigSetResponses({});
+
+    const result = await getConfigurationSetDetail(
+      testOrganization.id,
+      testAwsAccount.id,
+      "wraps-email-no-tracking.com"
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.detail.trackingRedirectDomain).toBeNull();
+      expect(result.detail.trackingHttpsPolicy).toBeNull();
+    }
+  });
+
+  it("surfaces an OPTIONAL HttpsPolicy verbatim", async () => {
+    mockConfigSetResponses({
+      TrackingOptions: {
+        CustomRedirectDomain: "track.example.com",
+        HttpsPolicy: "OPTIONAL",
+      },
+    });
+
+    const result = await getConfigurationSetDetail(
+      testOrganization.id,
+      testAwsAccount.id,
+      "wraps-email-optional-https.com"
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.detail.trackingHttpsPolicy).toBe("OPTIONAL");
+    }
+  });
+
+  it("refuses an AWS account belonging to a different organization, without calling AWS", async () => {
+    mockConfigSetResponses({});
+
+    const result = await getConfigurationSetDetail(
+      testOrganization.id,
+      testAwsAccountForeign.id,
+      "wraps-email-example.com"
+    );
+
+    expect(result.success).toBe(false);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("maps AccessDeniedException to an unreachable failure", async () => {
+    mockSend.mockImplementation(() => {
+      const err = new Error("AccessDeniedException");
+      err.name = "AccessDeniedException";
+      return Promise.reject(err);
+    });
+
+    const result = await getConfigurationSetDetail(
+      testOrganization.id,
+      testAwsAccount.id,
+      "wraps-email-denied.com"
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: expect.any(String),
+      unreachable: true,
+    });
+  });
+
+  it("maps NotFoundException to a failure that is not unreachable, mentioning the configuration set", async () => {
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "GetConfigurationSetCommand") {
+        const err = new Error("NotFoundException");
+        err.name = "NotFoundException";
+        return Promise.reject(err);
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+
+    const result = await getConfigurationSetDetail(
+      testOrganization.id,
+      testAwsAccount.id,
+      "wraps-email-deleted-set.com"
+    );
+
+    expect(result.success).toBe(false);
+    expect(result).toHaveProperty("unreachable", false);
+    if (!result.success) {
+      expect(result.error).toContain("wraps-email-deleted-set.com");
+    }
+  });
+
+  it("maps an EventBridgeDestination to destinationType EventBridge, and an unrecognised destination to Unknown", async () => {
+    mockConfigSetResponses(
+      {},
+      {
+        EventDestinations: [
+          {
+            Name: "eventbridge-dest",
+            Enabled: true,
+            MatchingEventTypes: ["SEND"],
+            EventBridgeDestination: { EventBusArn: "arn:aws:events:::bus" },
+          },
+          {
+            Name: "mystery-dest",
+            Enabled: false,
+            MatchingEventTypes: ["BOUNCE"],
+          },
+        ],
+      }
+    );
+
+    const result = await getConfigurationSetDetail(
+      testOrganization.id,
+      testAwsAccount.id,
+      "wraps-email-multi-dest.com"
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      const [eventBridgeDest, mysteryDest] = result.detail.eventDestinations;
+      expect(eventBridgeDest.destinationType).toBe("EventBridge");
+      expect(mysteryDest.destinationType).toBe("Unknown");
+    }
+  });
+
+  it("maps an empty EventDestinations list to an empty array without error", async () => {
+    mockConfigSetResponses({}, { EventDestinations: [] });
+
+    const result = await getConfigurationSetDetail(
+      testOrganization.id,
+      testAwsAccount.id,
+      "wraps-email-no-events.com"
+    );
+
+    expect(result).toEqual({
+      success: true,
+      detail: expect.objectContaining({ eventDestinations: [] }),
+    });
+  });
+
+  it("never sends ListConfigurationSetsCommand — this must work on roles predating that grant", async () => {
+    mockConfigSetResponses({});
+
+    await getConfigurationSetDetail(
+      testOrganization.id,
+      testAwsAccount.id,
+      "wraps-email-example.com"
+    );
+
+    const sentTypes = mockSend.mock.calls.map(
+      (call) => (call[0] as SesCommand)._type
+    );
+    expect(sentTypes).not.toContain("ListConfigurationSetsCommand");
   });
 });

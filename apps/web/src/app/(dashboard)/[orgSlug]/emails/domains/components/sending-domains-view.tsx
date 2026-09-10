@@ -2,13 +2,6 @@
 
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Table,
   TableBody,
   TableCell,
@@ -39,6 +32,7 @@ import {
 } from "@/components/ui/empty";
 import { dnsRecordsFor } from "@/lib/dns-records";
 import { AddDomainForm } from "./add-domain-form";
+import { DomainDetailSheet } from "./domain-detail-sheet";
 
 type SendingDomainsViewProps = {
   orgSlug: string;
@@ -46,7 +40,7 @@ type SendingDomainsViewProps = {
   result: ListSendingDomainsResult;
 };
 
-function VerificationBadge({ domain }: { domain: SendingDomain }) {
+export function VerificationBadge({ domain }: { domain: SendingDomain }) {
   if (domain.verifiedForSending) {
     return (
       <Badge className="gap-1 border-green-600/30 bg-green-600/10 text-green-600 dark:text-green-400">
@@ -101,7 +95,7 @@ function CopyButton({ value }: { value: string }) {
   );
 }
 
-function DnsRecordsTable({ domain }: { domain: SendingDomain }) {
+export function DnsRecordsTable({ domain }: { domain: SendingDomain }) {
   const records = dnsRecordsFor(domain);
 
   if (records.length === 0) {
@@ -147,49 +141,16 @@ function DnsRecordsTable({ domain }: { domain: SendingDomain }) {
   );
 }
 
-function DomainCard({ domain }: { domain: SendingDomain }) {
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="font-mono text-base">
-            {domain.identity}
-          </CardTitle>
-          <VerificationBadge domain={domain} />
-        </div>
-        <CardDescription>
-          {domain.identityType ?? "Unknown type"} · {domain.region}
-          {domain.configurationSet ? ` · ${domain.configurationSet}` : ""}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-muted-foreground">DKIM:</span>
-          <span>{domain.dkim?.status ?? "Not configured"}</span>
-        </div>
-        {domain.mailFromDomain && (
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-muted-foreground">MAIL FROM:</span>
-            <span className="font-mono">{domain.mailFromDomain.domain}</span>
-            <span className="text-muted-foreground">
-              ({domain.mailFromDomain.status ?? "Unknown"})
-            </span>
-          </div>
-        )}
-        <div>
-          <h4 className="mb-2 font-semibold text-xs">DNS records to publish</h4>
-          <DnsRecordsTable domain={domain} />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export function SendingDomainsView({
   orgSlug,
   organizationId,
   result,
 }: SendingDomainsViewProps) {
+  const [selectedDomain, setSelectedDomain] = useState<SendingDomain | null>(
+    null
+  );
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+
   if (!result.success) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive text-sm">
@@ -250,12 +211,86 @@ export function SendingDomainsView({
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="grid gap-4">
-          {domains.map((domain) => (
-            <DomainCard domain={domain} key={domain.identity} />
-          ))}
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Domain</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>DKIM</TableHead>
+                <TableHead>MAIL FROM</TableHead>
+                <TableHead>Config set</TableHead>
+                <TableHead>DNS</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {domains.map((domain) => {
+                const recordCount = dnsRecordsFor(domain).length;
+                const openDetails = () => {
+                  setSelectedDomain(domain);
+                  setDetailSheetOpen(true);
+                };
+                return (
+                  // audit-pattern (WCAG 2.1.1, Level A): copied from
+                  // segments-table.tsx — this row opens a details sheet, and
+                  // there is no URL for a sending domain to link to, so the
+                  // row itself is the operable control. The
+                  // e.target === e.currentTarget guard stops a keydown from
+                  // bubbling out of a control nested in the row.
+                  <TableRow
+                    aria-label={`View details for ${domain.identity}`}
+                    className="cursor-pointer outline-none hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    key={domain.identity}
+                    onClick={openDetails}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) {
+                        return;
+                      }
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openDetails();
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <TableCell className="font-mono text-sm">
+                      {domain.identity}
+                    </TableCell>
+                    <TableCell>{domain.identityType ?? "Unknown"}</TableCell>
+                    <TableCell>
+                      <VerificationBadge domain={domain} />
+                    </TableCell>
+                    <TableCell>
+                      {domain.dkim?.status ?? "Not configured"}
+                    </TableCell>
+                    <TableCell>
+                      {domain.mailFromDomain?.status ?? "—"}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {domain.configurationSet ?? "None"}
+                    </TableCell>
+                    <TableCell>
+                      {recordCount > 0
+                        ? `${recordCount} record${recordCount === 1 ? "" : "s"}`
+                        : "—"}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
+
+      <DomainDetailSheet
+        domain={selectedDomain}
+        onClose={() => setDetailSheetOpen(false)}
+        open={detailSheetOpen}
+        organizationId={organizationId}
+        orgSlug={orgSlug}
+      />
     </div>
   );
 }

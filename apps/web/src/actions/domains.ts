@@ -2,6 +2,9 @@
 
 import {
   CreateEmailIdentityCommand,
+  type EventDestination,
+  GetConfigurationSetCommand,
+  GetConfigurationSetEventDestinationsCommand,
   GetEmailIdentityCommand,
   type IdentityInfo,
   ListEmailIdentitiesCommand,
@@ -221,6 +224,165 @@ export const listSendingDomains = orgAction(
       unreachableAccountIds,
       truncatedAccountIds,
     };
+  }
+);
+
+export type ConfigurationSetDetail = {
+  name: string;
+  trackingRedirectDomain: string | null;
+  trackingHttpsPolicy: "REQUIRE" | "REQUIRE_OPEN_ONLY" | "OPTIONAL" | null;
+  tlsPolicy: string | null;
+  sendingEnabled: boolean | null;
+  reputationMetricsEnabled: boolean | null;
+  suppressedReasons: string[];
+  eventDestinations: Array<{
+    name: string;
+    enabled: boolean;
+    matchingEventTypes: string[];
+    /** Which AWS target it writes to — "EventBridge", "SNS", "CloudWatch", "Firehose", or "Unknown". */
+    destinationType: string;
+  }>;
+};
+
+export type GetConfigurationSetDetailResult =
+  | { success: true; detail: ConfigurationSetDetail }
+  | { success: false; error: string; unreachable: boolean };
+
+/**
+ * Maps an EventDestination's AWS target to a short, human label. Checked in
+ * this order because a destination carries exactly one of these fields.
+ */
+function destinationTypeFor(destination: EventDestination): string {
+  if (destination.EventBridgeDestination) {
+    return "EventBridge";
+  }
+  if (destination.SnsDestination) {
+    return "SNS";
+  }
+  if (destination.CloudWatchDestination) {
+    return "CloudWatch";
+  }
+  if (destination.KinesisFirehoseDestination) {
+    return "Firehose";
+  }
+  return "Unknown";
+}
+
+/**
+ * Lazily fetches a single configuration set's tracking, TLS, reputation,
+ * suppression and event-destination settings. Deliberately separate from
+ * `listSendingDomains` — that action already issues one GetEmailIdentity per
+ * identity on every page render, and adding two more SES calls per identity
+ * here would triple the request count for a page most customers open to
+ * check one domain. Called only when a domain's detail sheet opens.
+ */
+export const getConfigurationSetDetail = orgAction(
+  {
+    name: "getConfigurationSetDetail",
+    resource: "awsAccounts",
+    permission: ["read"],
+    orgId: (
+      organizationId: string,
+      _awsAccountId: string,
+      _configurationSetName: string
+    ) => organizationId,
+    onError: "Failed to load configuration set",
+  },
+  async (
+    _ctx,
+    organizationId: string,
+    awsAccountId: string,
+    configurationSetName: string
+  ): Promise<GetConfigurationSetDetailResult> => {
+    // Never look up an AWS account by id alone — scope to the caller's org.
+    const account = await db.query.awsAccount.findFirst({
+      where: and(
+        eq(awsAccount.id, awsAccountId),
+        eq(awsAccount.organizationId, organizationId)
+      ),
+    });
+    if (!account) {
+      return {
+        success: false,
+        error: "AWS account not found",
+        unreachable: false,
+      };
+    }
+
+    try {
+      const credentials = await getOrAssumeRole({
+        roleArn: account.roleArn,
+        externalId: account.externalId,
+      });
+
+      const client = new SESv2Client({
+        region: account.region,
+        credentials: {
+          accessKeyId: credentials.accessKeyId,
+          secretAccessKey: credentials.secretAccessKey,
+          sessionToken: credentials.sessionToken,
+        },
+      });
+
+      const csResponse = await client.send(
+        new GetConfigurationSetCommand({
+          ConfigurationSetName: configurationSetName,
+        })
+      );
+
+      const eventDestResponse = await client.send(
+        new GetConfigurationSetEventDestinationsCommand({
+          ConfigurationSetName: configurationSetName,
+        })
+      );
+
+      const detail: ConfigurationSetDetail = {
+        name: configurationSetName,
+        trackingRedirectDomain:
+          csResponse.TrackingOptions?.CustomRedirectDomain ?? null,
+        trackingHttpsPolicy: csResponse.TrackingOptions?.HttpsPolicy ?? null,
+        tlsPolicy: csResponse.DeliveryOptions?.TlsPolicy ?? null,
+        sendingEnabled: csResponse.SendingOptions?.SendingEnabled ?? null,
+        reputationMetricsEnabled:
+          csResponse.ReputationOptions?.ReputationMetricsEnabled ?? null,
+        suppressedReasons: csResponse.SuppressionOptions?.SuppressedReasons
+          ? [...csResponse.SuppressionOptions.SuppressedReasons]
+          : [],
+        eventDestinations: (eventDestResponse.EventDestinations ?? []).map(
+          (destination) => ({
+            name: destination.Name ?? "",
+            enabled: destination.Enabled ?? false,
+            matchingEventTypes: destination.MatchingEventTypes
+              ? [...destination.MatchingEventTypes]
+              : [],
+            destinationType: destinationTypeFor(destination),
+          })
+        ),
+      };
+
+      return { success: true, detail };
+    } catch (error) {
+      if (isRoleAccessError(error)) {
+        return {
+          success: false,
+          error:
+            "This AWS account could not be read. Check its connection under AWS Accounts settings.",
+          unreachable: true,
+        };
+      }
+      if (
+        error instanceof Error &&
+        (error.name === "NotFoundException" ||
+          error.message.includes("NotFoundException"))
+      ) {
+        return {
+          success: false,
+          error: `Configuration set "${configurationSetName}" no longer exists.`,
+          unreachable: false,
+        };
+      }
+      throw error;
+    }
   }
 );
 
