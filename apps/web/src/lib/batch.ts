@@ -460,6 +460,13 @@ export type CheckSendDurationResult =
        *  recipient that is not a verified address. Callers must name the
        *  sandbox rather than presenting the day count as the whole story. */
       productionAccessEnabled: boolean;
+      /** `false` = AWS has paused sending on this account; the server blocks
+       *  the send. `null` = AWS did not report it — never render null as
+       *  paused. */
+      sendingEnabled: boolean | null;
+      /** "HEALTHY" | "PROBATION" | "SHUTDOWN" (AWS may add more), or null when
+       *  AWS did not report it. */
+      enforcementStatus: string | null;
       /** Other queued/processing email broadcasts on this AWS account. */
       inFlightBatches: number;
       /** Their combined unsent remainder — the quota this send has to share. */

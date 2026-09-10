@@ -471,6 +471,16 @@ async function assessQuotaHeadroom(params: {
        */
       productionAccessEnabled: boolean;
       /**
+       * `false` means AWS has paused sending on this account. `null` means
+       * AWS did not report it — never treat silence as paused.
+       */
+      sendingEnabled: boolean | null;
+      /**
+       * "HEALTHY" | "PROBATION" | "SHUTDOWN" (AWS may add more), or `null`
+       * when AWS did not report it.
+       */
+      enforcementStatus: string | null;
+      /**
        * Non-null only when the audience, plus recipients still unsent on
        * other in-flight broadcasts on this AWS account, exceeds a full day's
        * capacity.
@@ -513,6 +523,13 @@ async function assessQuotaHeadroom(params: {
     // put a scary warning on accounts that are fine, so default to enabled.
     const productionAccessEnabled =
       accountInfo.ProductionAccessEnabled !== false;
+    // Both ride the same GetAccount response the quota already came from, so
+    // this costs no extra AWS call. `SendingEnabled === false` is AWS having
+    // paused this account; EnforcementStatus is the same fact from the
+    // enforcement side ("HEALTHY" | "PROBATION" | "SHUTDOWN", and AWS may add
+    // more). Absent means AWS did not say — never treat silence as paused.
+    const sendingEnabled = accountInfo.SendingEnabled ?? null;
+    const enforcementStatus = accountInfo.EnforcementStatus ?? null;
 
     if (
       !(
@@ -533,6 +550,8 @@ async function assessQuotaHeadroom(params: {
         reserve,
         dailyCapacity,
         productionAccessEnabled,
+        sendingEnabled,
+        enforcementStatus,
         estimatedDays: null,
         blockError: `Broadcast blocked: the transactional reserve (${reserve.toLocaleString()}) is at or above this account's daily SES quota (${max24HourSend.toLocaleString()}), so no broadcast can ever send. Lower the reserve in AWS account settings.`,
         quotaWarning: undefined,
@@ -627,6 +646,8 @@ async function assessQuotaHeadroom(params: {
       reserve,
       dailyCapacity,
       productionAccessEnabled,
+      sendingEnabled,
+      enforcementStatus,
       estimatedDays,
       blockError: null,
       quotaWarning,
@@ -784,6 +805,8 @@ export const checkBroadcastSendDuration = orgAction(
       estimatedDays: headroom.estimatedDays,
       dailyCapacity: headroom.dailyCapacity,
       productionAccessEnabled: headroom.productionAccessEnabled,
+      sendingEnabled: headroom.sendingEnabled,
+      enforcementStatus: headroom.enforcementStatus,
       inFlightBatches: headroom.inFlightBatches,
       inFlightRecipients: headroom.inFlightRecipients,
     };
@@ -821,6 +844,8 @@ type PrepareSendResult =
       quotaWarning?: string;
       /** Set when the account has no SES production access. Never blocks. */
       sandboxWarning?: string;
+      /** Set when the account is under AWS enforcement review. Never blocks. */
+      enforcementWarning?: string;
     }
   | { ok: false; error: string };
 
@@ -953,6 +978,7 @@ async function validateAndPrepareSend(
   // the protection.
   let quotaWarning: string | undefined;
   let sandboxWarning: string | undefined;
+  let enforcementWarning: string | undefined;
   if (data.channel !== "sms") {
     const headroom = await assessQuotaHeadroom({
       organizationId,
@@ -968,6 +994,28 @@ async function validateAndPrepareSend(
       scheduled: Boolean(data.scheduledFor),
     });
     if (headroom.available) {
+      // AWS has stopped this account from sending. Starting a broadcast now
+      // marches the entire audience into `failed` — the batch worker cannot
+      // fix an account-level pause, and the user finds out one chunk at a
+      // time. Only a POSITIVE read blocks: `sendingEnabled` is null when AWS
+      // did not say, and silence must never be treated as paused.
+      if (headroom.sendingEnabled === false) {
+        return {
+          ok: false,
+          error:
+            "AWS has paused sending on this SES account, so this broadcast would fail for every recipient. Open the SES console for this account, resolve the reputation or enforcement issue, and try again once sending is re-enabled.",
+        };
+      }
+      if (
+        headroom.enforcementStatus !== null &&
+        headroom.enforcementStatus !== "HEALTHY" &&
+        headroom.enforcementStatus !== "PROBATION"
+      ) {
+        return {
+          ok: false,
+          error: `AWS has this SES account under enforcement (${headroom.enforcementStatus}), so this broadcast would fail for every recipient. Resolve it in the SES console before sending.`,
+        };
+      }
       if (headroom.blockError) {
         return { ok: false, error: headroom.blockError };
       }
@@ -978,6 +1026,13 @@ async function validateAndPrepareSend(
       // rather than leaving the day count to speak for a cause it can't state.
       if (!headroom.productionAccessEnabled) {
         sandboxWarning = `This AWS account is still in the SES sandbox, so SES will reject every recipient that is not a verified address, and the daily quota is ${headroom.max24HourSend.toLocaleString()}. Request production access in the SES console to send to your full list.`;
+      }
+      // PROBATION is a live AWS review, not a stop. Blocking would take the
+      // product away from exactly the person who most needs to keep sending
+      // their good traffic — but they must know it before they confirm.
+      if (headroom.enforcementStatus === "PROBATION") {
+        enforcementWarning =
+          "AWS has this SES account under review (probation). Sending still works, but further bounces or complaints can get the account paused — consider holding non-essential sends until it clears.";
       }
     }
   }
@@ -1012,7 +1067,13 @@ async function validateAndPrepareSend(
     }
   }
 
-  return { ok: true, recipientCount, quotaWarning, sandboxWarning };
+  return {
+    ok: true,
+    recipientCount,
+    quotaWarning,
+    sandboxWarning,
+    enforcementWarning,
+  };
 }
 
 /** Both post-send warnings ride the single `warning` field. Joined rather than
@@ -1174,6 +1235,7 @@ export const createBatchSend = orgAction(
     const created = await getBatchSend(result.id, organizationId);
     const warning = joinSendWarnings(
       result.warning,
+      prep.enforcementWarning,
       prep.sandboxWarning,
       prep.quotaWarning
     );
@@ -1594,6 +1656,7 @@ export const promoteDraftToSend = orgAction(
     const promoted = await loadBatchWithMeta(batchId, organizationId);
     const promoteWarning = joinSendWarnings(
       promoteResponse.warning,
+      prep.enforcementWarning,
       prep.sandboxWarning,
       prep.quotaWarning
     );

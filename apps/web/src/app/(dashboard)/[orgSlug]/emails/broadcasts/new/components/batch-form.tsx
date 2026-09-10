@@ -1951,6 +1951,32 @@ function ReviewStep({
     durationResult.available &&
     !durationResult.productionAccessEnabled;
 
+  // The server blocks these exact cases. Offering Send and rejecting after the
+  // point-of-no-return dialog is the wrong order to find out. A null field is
+  // AWS not saying, which is not a block.
+  const accountBlockReason = (() => {
+    if (!(durationResult?.success && durationResult.available)) {
+      return null;
+    }
+    if (durationResult.sendingEnabled === false) {
+      return "AWS has paused sending on this SES account, so this broadcast would fail for every recipient. Resolve it in the SES console for this account, then reload this page.";
+    }
+    const enforcement = durationResult.enforcementStatus;
+    if (
+      enforcement !== null &&
+      enforcement !== "HEALTHY" &&
+      enforcement !== "PROBATION"
+    ) {
+      return `AWS has this SES account under enforcement (${enforcement}), so this broadcast would fail for every recipient. Resolve it in the SES console, then reload this page.`;
+    }
+    return null;
+  })();
+
+  const onProbation =
+    durationResult?.success &&
+    durationResult.available &&
+    durationResult.enforcementStatus === "PROBATION";
+
   // The server blocks this exact case, so offering Send and rejecting after the
   // point-of-no-return dialog is the wrong order to find out.
   const blockedByCoverage = Boolean(
@@ -2176,6 +2202,37 @@ function ReviewStep({
         </div>
       )}
 
+      {/* Blocked because AWS has paused/shut down sending on this account —
+          before the confirm dialog, not after (plan 206) */}
+      {accountBlockReason && (
+        <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+          <div className="space-y-1">
+            <p className="font-medium text-destructive text-sm">
+              AWS has paused sending on this account, so this send is blocked.
+            </p>
+            <p className="text-destructive/80 text-xs">{accountBlockReason}</p>
+          </div>
+        </div>
+      )}
+
+      {/* AWS enforcement probation — a live review, not a stop (plan 206) */}
+      {onProbation && (
+        <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+          <div className="space-y-1">
+            <p className="font-medium text-warning text-sm">
+              This AWS account is under review (probation)
+            </p>
+            <p className="text-warning/80 text-xs">
+              Sending still works, but further bounces or complaints can get the
+              account paused. Consider holding non-essential sends until it
+              clears.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Blocked by variable coverage — say so here, not after confirming (M8) */}
       {blockedByCoverage && (
         <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
@@ -2245,6 +2302,7 @@ function ReviewStep({
             recipientCount === null ||
             recipientCount === 0 ||
             blockedByCoverage ||
+            Boolean(accountBlockReason) ||
             (data.scheduleType === "later" && !data.scheduledDate)
           }
           onClick={() => setShowConfirmDialog(true)}

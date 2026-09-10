@@ -243,6 +243,10 @@ let sesGetAccountQuota: {
 } | null = null;
 /** undefined = AWS said nothing, which must NOT read as "in the sandbox". */
 let sesProductionAccessEnabled: boolean | undefined;
+/** undefined = AWS said nothing. Silence must NOT read as "paused". */
+let sesSendingEnabled: boolean | undefined;
+/** undefined = AWS said nothing. Silence must NOT read as "under enforcement". */
+let sesEnforcementStatus: string | undefined;
 
 vi.mock("@aws-sdk/client-sesv2", () => ({
   SESv2Client: class {
@@ -255,6 +259,12 @@ vi.mock("@aws-sdk/client-sesv2", () => ({
         ...(sesProductionAccessEnabled === undefined
           ? {}
           : { ProductionAccessEnabled: sesProductionAccessEnabled }),
+        ...(sesSendingEnabled === undefined
+          ? {}
+          : { SendingEnabled: sesSendingEnabled }),
+        ...(sesEnforcementStatus === undefined
+          ? {}
+          : { EnforcementStatus: sesEnforcementStatus }),
       });
     });
   },
@@ -336,6 +346,8 @@ beforeEach(() => {
   sesGetAccountShouldThrow = false;
   sesGetAccountQuota = null;
   sesProductionAccessEnabled = undefined;
+  sesSendingEnabled = undefined;
+  sesEnforcementStatus = undefined;
   getOrAssumeRoleMock.mockResolvedValue({
     accessKeyId: "AKIA-test",
     secretAccessKey: "secret-test",
@@ -1973,6 +1985,428 @@ describe("promoteDraftToSend — daily quota reserve preflight", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// promoteDraftToSend — account-state preflight (plan 206). GetAccount's
+// SendingEnabled/EnforcementStatus block a send into an account AWS has
+// paused or shut down, and warn (never block) on PROBATION. A healthy quota
+// is used throughout so these assertions can't be satisfied by the
+// pre-existing quota block instead.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("promoteDraftToSend — account-state preflight (plan 206)", () => {
+  it("blocks the send when AWS has paused sending on the account", async () => {
+    const awsId = `preflight-paused-aws-${RUN_ID}`;
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        externalId: `paused-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    sesGetAccountQuota = { Max24HourSend: 120_000, SentLast24Hours: 0 };
+    sesSendingEnabled = false;
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+    const fetchSpy = mockSendApiSuccess();
+
+    try {
+      const draft = await saveDraftBatchSend(testOrganization.id, {
+        awsAccountId: awsId,
+        templateId: templateNoCustomVars.id,
+        from: "sender@example.com",
+        subject: "Paused Account Test",
+      });
+      expect(draft.success).toBe(true);
+      if (!draft.success) return;
+
+      const result = await promoteDraftToSend(
+        draft.batch.id,
+        testOrganization.id,
+        {}
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toMatch(/paused/i);
+
+      // Draft row unchanged — the send never left the process.
+      const after = await db.query.batchSend.findFirst({
+        where: eq(batchSend.id, draft.batch.id),
+      });
+      expect(after?.status).toBe("draft");
+      expect(
+        fetchSpy.mock.calls.some(([url]) =>
+          String(url).includes(`/v1/batch/${draft.batch.id}/send`)
+        )
+      ).toBe(false);
+    } finally {
+      fetchSpy.mockRestore();
+      delete process.env.NEXT_PUBLIC_API_URL;
+      await db
+        .delete(batchSend)
+        .where(eq(batchSend.organizationId, testOrganization.id));
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+    }
+  });
+
+  it("blocks the send when AWS has the account under SHUTDOWN enforcement", async () => {
+    const awsId = `preflight-shutdown-aws-${RUN_ID}`;
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        externalId: `shutdown-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    sesGetAccountQuota = { Max24HourSend: 120_000, SentLast24Hours: 0 };
+    sesSendingEnabled = true;
+    sesEnforcementStatus = "SHUTDOWN";
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+    const fetchSpy = mockSendApiSuccess();
+
+    try {
+      const draft = await saveDraftBatchSend(testOrganization.id, {
+        awsAccountId: awsId,
+        templateId: templateNoCustomVars.id,
+        from: "sender@example.com",
+        subject: "Shutdown Account Test",
+      });
+      expect(draft.success).toBe(true);
+      if (!draft.success) return;
+
+      const result = await promoteDraftToSend(
+        draft.batch.id,
+        testOrganization.id,
+        {}
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toContain("SHUTDOWN");
+    } finally {
+      fetchSpy.mockRestore();
+      delete process.env.NEXT_PUBLIC_API_URL;
+      await db
+        .delete(batchSend)
+        .where(eq(batchSend.organizationId, testOrganization.id));
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+    }
+  });
+
+  it("does not block on PROBATION, and warns instead", async () => {
+    const awsId = `preflight-probation-aws-${RUN_ID}`;
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        externalId: `probation-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    sesGetAccountQuota = { Max24HourSend: 120_000, SentLast24Hours: 0 };
+    sesEnforcementStatus = "PROBATION";
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+    const fetchSpy = mockSendApiSuccess();
+
+    try {
+      const draft = await saveDraftBatchSend(testOrganization.id, {
+        awsAccountId: awsId,
+        templateId: templateNoCustomVars.id,
+        from: "sender@example.com",
+        subject: "Probation Account Test",
+      });
+      expect(draft.success).toBe(true);
+      if (!draft.success) return;
+
+      const result = await promoteDraftToSend(
+        draft.batch.id,
+        testOrganization.id,
+        {}
+      );
+
+      // This is the only test that fails if step 2's joinSendWarnings wiring
+      // drops enforcementWarning after computing it.
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.warning).toMatch(/under review/i);
+    } finally {
+      fetchSpy.mockRestore();
+      delete process.env.NEXT_PUBLIC_API_URL;
+      await db
+        .delete(batchSend)
+        .where(eq(batchSend.organizationId, testOrganization.id));
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+    }
+  });
+
+  it("does not warn about probation when the account is HEALTHY", async () => {
+    const awsId = `preflight-healthy-aws-${RUN_ID}`;
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        externalId: `healthy-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    sesGetAccountQuota = { Max24HourSend: 120_000, SentLast24Hours: 0 };
+    sesEnforcementStatus = "HEALTHY";
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+    const fetchSpy = mockSendApiSuccess();
+
+    try {
+      const draft = await saveDraftBatchSend(testOrganization.id, {
+        awsAccountId: awsId,
+        templateId: templateNoCustomVars.id,
+        from: "sender@example.com",
+        subject: "Healthy Account Test",
+      });
+      expect(draft.success).toBe(true);
+      if (!draft.success) return;
+
+      const result = await promoteDraftToSend(
+        draft.batch.id,
+        testOrganization.id,
+        {}
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.warning ?? "").not.toMatch(/under review/i);
+    } finally {
+      fetchSpy.mockRestore();
+      delete process.env.NEXT_PUBLIC_API_URL;
+      await db
+        .delete(batchSend)
+        .where(eq(batchSend.organizationId, testOrganization.id));
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+    }
+  });
+
+  it("fails open: does not block when AWS reports neither field (the regression that would break every legitimate send)", async () => {
+    const awsId = `preflight-silent-account-aws-${RUN_ID}`;
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        externalId: `silent-account-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    sesGetAccountQuota = { Max24HourSend: 120_000, SentLast24Hours: 0 };
+    // sesSendingEnabled and sesEnforcementStatus are left undefined by
+    // beforeEach — both fields are absent from the GetAccount response.
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+    const fetchSpy = mockSendApiSuccess();
+
+    try {
+      const draft = await saveDraftBatchSend(testOrganization.id, {
+        awsAccountId: awsId,
+        templateId: templateNoCustomVars.id,
+        from: "sender@example.com",
+        subject: "Silent Account Test",
+      });
+      expect(draft.success).toBe(true);
+      if (!draft.success) return;
+
+      const result = await promoteDraftToSend(
+        draft.batch.id,
+        testOrganization.id,
+        {}
+      );
+
+      expect(result.success).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      delete process.env.NEXT_PUBLIC_API_URL;
+      await db
+        .delete(batchSend)
+        .where(eq(batchSend.organizationId, testOrganization.id));
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+    }
+  });
+
+  it("reports the account-state error, not the coverage error, when both conditions hold", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+    const fetchSpy = mockSendApiSuccess();
+    const orderOrgId = `preflight-order-org-${RUN_ID}`;
+    const orderContactId = `preflight-order-contact-${RUN_ID}`;
+    const orderMemberId = `preflight-order-member-${RUN_ID}`;
+    const orderAwsId = `preflight-order-aws-${RUN_ID}`;
+    const orderSubId = `sub_preflight_order_${RUN_ID}`;
+
+    await db
+      .insert(organization)
+      .values({
+        id: orderOrgId,
+        name: "Order Test Org",
+        slug: `order-org-${RUN_ID}`,
+        createdAt: new Date(),
+      })
+      .onConflictDoNothing();
+
+    await db
+      .insert(organizationExtension)
+      .values({ organizationId: orderOrgId })
+      .onConflictDoNothing();
+
+    await db
+      .insert(subscription)
+      .values({
+        id: orderSubId,
+        plan: "growth",
+        referenceId: orderOrgId,
+        status: "active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoNothing();
+
+    await db
+      .insert(member)
+      .values({
+        id: orderMemberId,
+        organizationId: orderOrgId,
+        userId: testUser.id,
+        role: "owner" as const,
+        createdAt: new Date(),
+      })
+      .onConflictDoNothing();
+
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: orderAwsId,
+        organizationId: orderOrgId,
+        externalId: `order-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    await db
+      .insert(contact)
+      .values({
+        id: orderContactId,
+        organizationId: orderOrgId,
+        email: `order-contact-${RUN_ID}@example.com`,
+        emailHash: `hash-order-${RUN_ID}`,
+        emailStatus: "active" as const,
+        properties: {}, // missing dashboardUrl — every contact fails coverage
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoNothing();
+
+    const orderTemplate = {
+      id: `preflight-order-tmpl-${RUN_ID}`,
+      organizationId: orderOrgId,
+      name: "Order Template",
+      subject: "Your dashboard",
+      content: {},
+      sourceFormat: "react-email" as const,
+      variables: [{ name: "dashboardUrl", fallback: undefined }],
+      status: "PUBLISHED" as const,
+      type: "EMAIL" as const,
+      sesTemplateName: `wraps-order-tmpl-${RUN_ID}`,
+      publishedAt: new Date("2026-01-01"),
+      createdAt: new Date(),
+      updatedAt: new Date("2025-12-01"),
+      createdBy: testUser.id,
+    };
+
+    await db.insert(template).values(orderTemplate).onConflictDoNothing();
+
+    sesGetAccountQuota = { Max24HourSend: 120_000, SentLast24Hours: 0 };
+    sesSendingEnabled = false;
+
+    try {
+      const draft = await saveDraftBatchSend(orderOrgId, {
+        awsAccountId: orderAwsId,
+        templateId: orderTemplate.id,
+        from: "sender@example.com",
+        subject: "Test",
+      });
+      expect(draft.success).toBe(true);
+      if (!draft.success) return;
+
+      const result = await promoteDraftToSend(draft.batch.id, orderOrgId, {});
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toMatch(/paused/i);
+      expect(result.error).not.toMatch(/variable/i);
+    } finally {
+      fetchSpy.mockRestore();
+      delete process.env.NEXT_PUBLIC_API_URL;
+      await db
+        .delete(batchSend)
+        .where(eq(batchSend.organizationId, orderOrgId));
+      await db.delete(template).where(eq(template.id, orderTemplate.id));
+      await db.delete(contact).where(eq(contact.id, orderContactId));
+      await db.delete(awsAccount).where(eq(awsAccount.id, orderAwsId));
+      await db.delete(member).where(eq(member.id, orderMemberId));
+      await db.delete(subscription).where(eq(subscription.id, orderSubId));
+      await db
+        .delete(organizationExtension)
+        .where(eq(organizationExtension.organizationId, orderOrgId));
+      await db.delete(organization).where(eq(organization.id, orderOrgId));
+    }
+  });
+
+  it("blocks on a paused account even when the account is also in the sandbox", async () => {
+    const awsId = `preflight-paused-sandbox-aws-${RUN_ID}`;
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        externalId: `paused-sandbox-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    sesGetAccountQuota = { Max24HourSend: 120_000, SentLast24Hours: 0 };
+    sesSendingEnabled = false;
+    sesProductionAccessEnabled = false;
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+    const fetchSpy = mockSendApiSuccess();
+
+    try {
+      const draft = await saveDraftBatchSend(testOrganization.id, {
+        awsAccountId: awsId,
+        templateId: templateNoCustomVars.id,
+        from: "sender@example.com",
+        subject: "Paused Sandbox Account Test",
+      });
+      expect(draft.success).toBe(true);
+      if (!draft.success) return;
+
+      const result = await promoteDraftToSend(
+        draft.batch.id,
+        testOrganization.id,
+        {}
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toMatch(/paused/i);
+      expect(result.error).not.toMatch(/sandbox/i);
+    } finally {
+      fetchSpy.mockRestore();
+      delete process.env.NEXT_PUBLIC_API_URL;
+      await db
+        .delete(batchSend)
+        .where(eq(batchSend.organizationId, testOrganization.id));
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // checkBroadcastSendDuration — pre-confirmation multi-day send estimate.
 // Same quota math as the send preflight (via assessQuotaHeadroom), exposed
 // read-only so ReviewStep can show the estimate BEFORE the user confirms.
@@ -3044,6 +3478,108 @@ describe("SES sandbox awareness (H6)", () => {
       if (!result.available) return;
       // Guessing "sandbox" would put a scary, wrong warning on healthy accounts.
       expect(result.productionAccessEnabled).toBe(true);
+    } finally {
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+    }
+  });
+});
+
+describe("SES account-state awareness (plan 206)", () => {
+  it("returns sendingEnabled and enforcementStatus verbatim when SES reports them", async () => {
+    const awsId = `preflight-duration-paused-aws-${RUN_ID}`;
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        externalId: `duration-paused-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    sesGetAccountQuota = { Max24HourSend: 120_000, SentLast24Hours: 0 };
+    sesSendingEnabled = false;
+    sesEnforcementStatus = "SHUTDOWN";
+
+    try {
+      const result = await checkBroadcastSendDuration(
+        testOrganization.id,
+        awsId,
+        "email",
+        10,
+        false
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.available).toBe(true);
+      if (!result.available) return;
+      expect(result.sendingEnabled).toBe(false);
+      expect(result.enforcementStatus).toBe("SHUTDOWN");
+    } finally {
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+    }
+  });
+
+  it("returns sendingEnabled: null and enforcementStatus: null when the fields are absent", async () => {
+    const awsId = `preflight-duration-silent-account-aws-${RUN_ID}`;
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        externalId: `duration-silent-account-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    sesGetAccountQuota = { Max24HourSend: 120_000, SentLast24Hours: 0 };
+    // sesSendingEnabled and sesEnforcementStatus left undefined by beforeEach.
+
+    try {
+      const result = await checkBroadcastSendDuration(
+        testOrganization.id,
+        awsId,
+        "email",
+        10,
+        false
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.available).toBe(true);
+      if (!result.available) return;
+      // Silence must never render as "paused" or "under enforcement".
+      expect(result.sendingEnabled).toBeNull();
+      expect(result.enforcementStatus).toBeNull();
+    } finally {
+      await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
+    }
+  });
+
+  it("still returns available: false (not an error) when the AssumeRole/SES call throws", async () => {
+    const awsId = `preflight-duration-account-failopen-aws-${RUN_ID}`;
+    await db
+      .insert(awsAccount)
+      .values({
+        ...testAwsAccount,
+        id: awsId,
+        externalId: `duration-account-failopen-ext-${RUN_ID}`,
+      })
+      .onConflictDoNothing();
+
+    sesGetAccountShouldThrow = true;
+
+    try {
+      const result = await checkBroadcastSendDuration(
+        testOrganization.id,
+        awsId,
+        "email",
+        10,
+        false
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.available).toBe(false);
     } finally {
       await db.delete(awsAccount).where(eq(awsAccount.id, awsId));
     }
