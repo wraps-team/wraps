@@ -21,7 +21,11 @@ import {
   type TextFetcher,
   TOOLS,
 } from "@/lib/mcp-server";
-import { SERVER_CARD_NAME, SERVER_CARD_URL } from "@/lib/mcp-server-card";
+import {
+  SERVER_CARD,
+  SERVER_CARD_NAME,
+  SERVER_CARD_URL,
+} from "@/lib/mcp-server-card";
 import {
   NOT_FOUND_LINKS,
   renderNotFoundMarkdown,
@@ -790,6 +794,21 @@ describe("the MCP server card is discoverable and matches the live server", () =
 
     expect(link).toContain("/.well-known/ai-catalog.json");
     expect(link).toContain("/mcp/server-card");
+  });
+});
+
+describe("the registry server.json matches the card it was derived from", () => {
+  it("stays in sync with the checked-in file", async () => {
+    const { buildServerJson } = await import(
+      "../../scripts/generate-server-json"
+    );
+    const serverJson = JSON.parse(read("server.json"));
+
+    expect(serverJson).toEqual(buildServerJson());
+    expect(serverJson.name).toBe(SERVER_CARD_NAME);
+    expect(serverJson.version).toBe(SERVER_INFO.version);
+    expect(serverJson.remotes[0].url).toBe(SERVER_CARD.remotes[0].url);
+    expect(Object.keys(serverJson.remotes[0])).toEqual(["type", "url"]);
   });
 });
 

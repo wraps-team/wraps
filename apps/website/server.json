@@ -1,0 +1,19 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "dev.wraps/docs",
+  "title": "Wraps",
+  "description": "Search the Wraps docs and estimate AWS SES costs. Public, read-only, no authentication.",
+  "repository": {
+    "url": "https://github.com/wraps-team/wraps",
+    "source": "github",
+    "subfolder": "apps/website"
+  },
+  "version": "1.0.0",
+  "websiteUrl": "https://wraps.dev/mcp",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://wraps.dev/mcp"
+    }
+  ]
+}

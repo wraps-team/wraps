@@ -1,0 +1,51 @@
+name: MCP Registry
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/website/server.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-registry
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Check MCP_DNS_PRIVATE_KEY is set
+        env:
+          MCP_DNS_PRIVATE_KEY: ${{ secrets.MCP_DNS_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$MCP_DNS_PRIVATE_KEY" ]]; then
+            echo "::error::MCP_DNS_PRIVATE_KEY secret is not set. Copy the MCP_DNS_PRIVATE_KEY secret from wraps-team/wraps-js to this repo (wraps-team/wraps) before this workflow can publish."
+            exit 1
+          fi
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" \
+            | tar xz mcp-publisher
+          sudo mv mcp-publisher /usr/local/bin/
+
+      - name: Publish to MCP Registry
+        env:
+          MCP_DNS_PRIVATE_KEY: ${{ secrets.MCP_DNS_PRIVATE_KEY }}
+        run: |
+          cd apps/website
+          mcp-publisher login dns --domain wraps.dev --private-key "$MCP_DNS_PRIVATE_KEY"
+          mcp-publisher publish
+
+      - name: Summary
+        run: |
+          NAME=$(node -e 'console.log(require("./apps/website/server.json").name)')
+          VERSION=$(node -e 'console.log(require("./apps/website/server.json").version)')
+          echo "## Published $NAME@$VERSION to the MCP Registry" >> "$GITHUB_STEP_SUMMARY"
