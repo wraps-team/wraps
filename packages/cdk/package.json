@@ -1,6 +1,6 @@
 {
   "name": "@wraps.dev/cdk",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "AWS CDK L3 construct for email infrastructure. Deploys SES, event processing, email history, and OIDC auth as a single construct with grant methods.",
   "type": "module",
   "main": "./dist/index.cjs",
