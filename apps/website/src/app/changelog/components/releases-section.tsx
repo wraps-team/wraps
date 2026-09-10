@@ -79,8 +79,8 @@ const releases: Release[] = [
     items: [
       <>
         A sending-domains page lists every SES identity with its verification
-        state and the DKIM CNAMEs and MAIL FROM records still to publish, adds
-        a domain with SES-managed Easy DKIM, and opens a per-identity sheet for
+        state and the DKIM CNAMEs and MAIL FROM records still to publish, adds a
+        domain with SES-managed Easy DKIM, and opens a per-identity sheet for
         the configuration set that governs it: tracking domain, TLS policy,
         suppression reasons and event destinations. Onboarding had told
         customers they could manage domains in the dashboard while the only
@@ -90,23 +90,22 @@ const releases: Release[] = [
         the usual reasons click links break and delivery events never arrive
       </>,
       <>
-        The SES suppression list is browsable from the dashboard, and an
-        address can be removed. A <Code>COMPLAINT</Code>-reason removal re-reads
-        the reason from SES rather than trusting the browser, and refuses
-        without an explicit acknowledgement.{" "}
-        <Code>email.suppression.*</Code> in <Code>@wraps.dev/email</Code> now
-        works on every deployment path as well: the CDK construct, the Pulumi
-        provider and the CloudFormation template each grant the four SES
-        actions their roles never had, so those calls returned AccessDenied
-        everywhere except a CLI deployment
+        The SES suppression list is browsable from the dashboard, and an address
+        can be removed. A <Code>COMPLAINT</Code>-reason removal re-reads the
+        reason from SES rather than trusting the browser, and refuses without an
+        explicit acknowledgement. <Code>email.suppression.*</Code> in{" "}
+        <Code>@wraps.dev/email</Code> now works on every deployment path as
+        well: the CDK construct, the Pulumi provider and the CloudFormation
+        template each grant the four SES actions their roles never had, so those
+        calls returned AccessDenied everywhere except a CLI deployment
       </>,
       <>
         Existing infrastructure does not pick either grant up on its own. A
         platform connection needs <Code>wraps platform update-role</Code> from
         CLI v3.9.0 or later; a CDK or Pulumi stack needs{" "}
         <Code>@wraps.dev/cdk</Code> 0.3.0 or <Code>@wraps.dev/pulumi</Code>{" "}
-        0.4.0 and a redeploy; a CloudFormation stack needs an update against
-        the republished template
+        0.4.0 and a redeploy; a CloudFormation stack needs an update against the
+        republished template
       </>,
       <>
         The account page warns when the console role&rsquo;s policy is behind
@@ -121,8 +120,8 @@ const releases: Release[] = [
         returns <Code>Details.ReviewDetails</Code> on the{" "}
         <Code>GetAccount</Code> call Wraps already makes hourly, and both
         readers discarded it, so a request AWS had already failed still read as
-        &ldquo;Request production access&rdquo; to someone who believed they
-        had it
+        &ldquo;Request production access&rdquo; to someone who believed they had
+        it
       </>,
       <>
         <Code>wraps email status --json</Code> reports a <Code>sending</Code>{" "}
