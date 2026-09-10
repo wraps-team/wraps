@@ -70,6 +70,12 @@ const releases: Release[] = [
     date: "September 2026",
     icon: LayoutDashboard,
     title: "Sending Domains, Suppressions & Stale Roles",
+    media: {
+      src: "/email/2026-09-dashboard-domains.png",
+      alt: "A Wraps card reading: September 2026 — Add a domain in the dashboard. DKIM records, verification state, and the configuration set behind each identity.",
+      width: 1104,
+      height: 480,
+    },
     items: [
       <>
         A sending-domains page lists every SES identity with its verification
