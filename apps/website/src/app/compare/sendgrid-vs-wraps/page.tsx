@@ -372,6 +372,11 @@ export default function SendGridVsWrapsPage() {
               hard. Wraps was built for a world where it shouldn't be. Your AWS
               account. Your pricing. Your data. No surprise bans.
             </p>
+            <p className="max-w-2xl font-medium text-foreground text-lg">
+              Both platforms send reliably today. The real difference is vendor
+              lock-in: leave SendGrid and your IP reputation goes with it, while
+              Wraps' infrastructure keeps running in your own AWS account.
+            </p>
           </section>
 
           {/* 2. TL;DR Comparison Table */}

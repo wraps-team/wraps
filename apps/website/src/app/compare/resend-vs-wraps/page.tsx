@@ -362,7 +362,10 @@ export default function ResendVsWrapsPage() {
             </p>
             <p className="max-w-2xl font-medium text-foreground text-lg">
               Both platforms use AWS SES to send email. The difference is whose
-              account it runs in -- and who pays the bill.
+              account it runs in, who pays the bill -- and data retention:
+              Resend caps events at 30 days on non-Enterprise plans, while your
+              raw sending events sit in your own DynamoDB for as long as you
+              want them.
             </p>
           </section>
 

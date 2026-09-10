@@ -353,7 +353,10 @@ export default function MailgunVsWrapsPage() {
             </p>
             <p className="max-w-2xl font-medium text-foreground text-lg">
               Both platforms deliver email reliably. The difference is who owns
-              the infrastructure -- and who can take it away.
+              the infrastructure -- and who can take it away. That ownership
+              also decides HIPAA: Mailgun includes a BAA on Enterprise plans,
+              while your sending through Wraps runs inside your own AWS account,
+              covered by your own AWS BAA on any plan.
             </p>
           </section>
 
