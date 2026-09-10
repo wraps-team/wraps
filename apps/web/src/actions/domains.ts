@@ -1,12 +1,14 @@
 "use server";
 
 import {
+  CreateEmailIdentityCommand,
   GetEmailIdentityCommand,
   type IdentityInfo,
   ListEmailIdentitiesCommand,
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
-import { awsAccount, db, eq } from "@wraps/db";
+import { and, awsAccount, db, eq } from "@wraps/db";
+import { revalidatePath } from "next/cache";
 import { getOrAssumeRole } from "@/lib/aws/credential-cache";
 import { orgAction } from "./shared/org-action";
 
@@ -36,6 +38,24 @@ function isRoleAccessError(error: unknown): boolean {
   }
   return ROLE_ACCESS_ERROR_CODES.some(
     (code) => error.name === code || error.message.includes(code)
+  );
+}
+
+/**
+ * True when an AWS SDK v3 error is an access-denied response to a single
+ * command (as opposed to `isRoleAccessError` above, which classifies a whole
+ * account as unreachable for the read fan-out). Mirrors `isAccessDeniedError`
+ * in `apps/web/src/actions/ses-onboarding.ts:66-74` verbatim — not imported
+ * from there, since that file carries `"use server"` and a non-async export
+ * from it would break `next build`.
+ */
+function isAccessDeniedError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return (
+    error.name === "AccessDeniedException" ||
+    error.message.includes("AccessDeniedException")
   );
 }
 
@@ -201,5 +221,116 @@ export const listSendingDomains = orgAction(
       unreachableAccountIds,
       truncatedAccountIds,
     };
+  }
+);
+
+export type AddSendingDomainResult =
+  | { success: true; domain: string; alreadyExisted: boolean }
+  | { success: false; error: string };
+
+const WHITESPACE_RE = /\s/;
+
+/**
+ * Reject a value that is clearly not a domain (an email address, something
+ * with whitespace, a URL scheme, or a path) without a full domain regex — SES
+ * itself rejects a malformed identity with a clear error, and a too-strict
+ * regex that refuses a legitimate domain is the worse failure.
+ */
+function invalidDomainReason(domain: string): string | null {
+  if (domain.length === 0) {
+    return "Enter a domain.";
+  }
+  if (domain.includes("@")) {
+    return "Enter a domain, not an email address.";
+  }
+  if (WHITESPACE_RE.test(domain)) {
+    return "A domain cannot contain spaces.";
+  }
+  if (domain.includes("://")) {
+    return "Enter a domain, not a URL — leave off the https://.";
+  }
+  if (domain.includes("/")) {
+    return "Enter a domain, not a path.";
+  }
+  return null;
+}
+
+export const addSendingDomain = orgAction(
+  {
+    name: "addSendingDomain",
+    resource: "awsAccounts",
+    permission: ["write"],
+    orgId: (organizationId: string, _awsAccountId: string, _domain: string) =>
+      organizationId,
+    onError: "Failed to add sending domain",
+  },
+  async (
+    ctx,
+    organizationId: string,
+    awsAccountId: string,
+    rawDomain: string
+  ): Promise<AddSendingDomainResult> => {
+    // Never look up an AWS account by id alone — scope to the caller's org.
+    const account = await db.query.awsAccount.findFirst({
+      where: and(
+        eq(awsAccount.id, awsAccountId),
+        eq(awsAccount.organizationId, organizationId)
+      ),
+    });
+    if (!account) {
+      return { success: false, error: "AWS account not found" };
+    }
+
+    const domain = rawDomain.trim().toLowerCase();
+    const invalidReason = invalidDomainReason(domain);
+    if (invalidReason) {
+      return { success: false, error: invalidReason };
+    }
+
+    const credentials = await getOrAssumeRole({
+      roleArn: account.roleArn,
+      externalId: account.externalId,
+    });
+
+    const client = new SESv2Client({
+      region: account.region,
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+        sessionToken: credentials.sessionToken,
+      },
+    });
+
+    try {
+      // No DkimSigningAttributes: omitting it selects SES-managed Easy DKIM,
+      // the same default the CloudFormation path produces. This also means
+      // no MAIL FROM subdomain is configured — the console role has no
+      // permission to set MAIL FROM attributes on an identity, and granting
+      // a write action nothing else calls would widen the cross-account
+      // trust boundary for nothing. `wraps email domains add` is the path
+      // that sets one up.
+      await client.send(
+        new CreateEmailIdentityCommand({ EmailIdentity: domain })
+      );
+      revalidatePath(`/${ctx.access.orgSlug}/emails/domains`, "page");
+      return { success: true, domain, alreadyExisted: false };
+    } catch (error) {
+      if (error instanceof Error && error.name === "AlreadyExistsException") {
+        revalidatePath(`/${ctx.access.orgSlug}/emails/domains`, "page");
+        return { success: true, domain, alreadyExisted: true };
+      }
+      if (isAccessDeniedError(error)) {
+        // Verbatim copy of the string `mapCommonAwsError` returns for an
+        // access-denied error, from `ses-onboarding.ts:93-104` — see the
+        // comment on `isAccessDeniedError` above for why this is duplicated
+        // rather than imported.
+        return {
+          success: false,
+          error:
+            "Wraps doesn't have permission to create email identities on this account. Run `wraps platform update-role` to refresh permissions.",
+        };
+      }
+      throw error;
+    }
   }
 );

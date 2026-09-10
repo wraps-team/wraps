@@ -38,9 +38,11 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { dnsRecordsFor } from "@/lib/dns-records";
+import { AddDomainForm } from "./add-domain-form";
 
 type SendingDomainsViewProps = {
   orgSlug: string;
+  organizationId: string;
   result: ListSendingDomainsResult;
 };
 
@@ -185,6 +187,7 @@ function DomainCard({ domain }: { domain: SendingDomain }) {
 
 export function SendingDomainsView({
   orgSlug,
+  organizationId,
   result,
 }: SendingDomainsViewProps) {
   if (!result.success) {
@@ -200,6 +203,8 @@ export function SendingDomainsView({
 
   return (
     <div className="space-y-4">
+      <AddDomainForm organizationId={organizationId} />
+
       {unreachableAccountIds.length > 0 && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-600/30 bg-amber-600/10 p-3 text-amber-700 text-sm dark:text-amber-400">
           <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />

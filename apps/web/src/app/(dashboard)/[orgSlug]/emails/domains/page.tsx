@@ -100,7 +100,11 @@ export default async function DomainsPage({ params }: DomainsPageProps) {
         </p>
       </div>
 
-      <SendingDomainsView orgSlug={orgSlug} result={result} />
+      <SendingDomainsView
+        organizationId={orgWithMembership.id}
+        orgSlug={orgSlug}
+        result={result}
+      />
     </div>
   );
 }

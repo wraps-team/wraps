@@ -10,7 +10,11 @@ import {
   vi,
 } from "vitest";
 import { dnsRecordsFor } from "@/lib/dns-records";
-import { listSendingDomains, type SendingDomain } from "../domains";
+import {
+  addSendingDomain,
+  listSendingDomains,
+  type SendingDomain,
+} from "../domains";
 import { UNAUTHORIZED } from "../shared/org-action";
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
@@ -53,6 +57,14 @@ vi.mock("@/lib/aws/credential-cache", () => ({
   getOrAssumeRole: (...args: unknown[]) => mockGetOrAssumeRole(...args),
 }));
 
+// addSendingDomain revalidates the domains route on success; outside a real
+// Next.js request context revalidatePath throws "static generation store
+// missing", which orgAction's catch-all would otherwise turn into a false
+// "Failed to add sending domain".
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 type SesCommand = {
   _type: string;
   EmailIdentity?: string;
@@ -79,6 +91,13 @@ vi.mock("@aws-sdk/client-sesv2", () => ({
     EmailIdentity: string;
     constructor(input: { EmailIdentity: string }) {
       this.EmailIdentity = input.EmailIdentity;
+    }
+  },
+  CreateEmailIdentityCommand: class {
+    _type = "CreateEmailIdentityCommand";
+    input: Record<string, unknown>;
+    constructor(input: Record<string, unknown>) {
+      this.input = input;
     }
   },
 }));
@@ -146,6 +165,36 @@ const testAwsAccount2 = {
   webhookSecret: null,
 };
 
+// ─── Cross-org IDOR fixtures ────────────────────────────────────────────────
+// A second organization testUser is NOT a member of, and an AWS account that
+// belongs to it — exercises the "account belongs to a different org" path
+// for addSendingDomain (see describe("addSendingDomain") below).
+
+const testOrganization2 = {
+  id: "test-domains-org-2",
+  name: "Domains Test Org 2",
+  slug: "domains-test-org-2",
+  createdAt: new Date(),
+  logo: null,
+  metadata: null,
+};
+
+const testAwsAccountForeign = {
+  id: "test-domains-aws-account-foreign",
+  organizationId: testOrganization2.id,
+  name: "Foreign Org AWS Account",
+  accountId: "333333333333",
+  region: "us-east-1",
+  roleArn: "arn:aws:iam::333333333333:role/WrapsRole",
+  externalId: "test-domains-external-id-foreign",
+  isVerified: true,
+  lastVerifiedAt: new Date(),
+  createdBy: testUser.id,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  webhookSecret: null,
+};
+
 beforeAll(async () => {
   await db
     .insert(user)
@@ -172,11 +221,35 @@ beforeAll(async () => {
       target: awsAccount.id,
       set: { updatedAt: new Date() },
     });
+
+  // No `member` row for testUser in org 2 — deliberate, this is the IDOR
+  // fixture.
+  await db
+    .insert(organization)
+    .values(testOrganization2)
+    .onConflictDoUpdate({
+      target: organization.id,
+      set: { name: testOrganization2.name },
+    });
+
+  await db
+    .insert(awsAccount)
+    .values(testAwsAccountForeign)
+    .onConflictDoUpdate({
+      target: awsAccount.id,
+      set: { updatedAt: new Date() },
+    });
 });
 
 afterAll(async () => {
   await db.delete(awsAccount).where(eq(awsAccount.id, testAwsAccount.id));
   await db.delete(awsAccount).where(eq(awsAccount.id, testAwsAccount2.id));
+  await db
+    .delete(awsAccount)
+    .where(eq(awsAccount.id, testAwsAccountForeign.id));
+  await db
+    .delete(organization)
+    .where(eq(organization.id, testOrganization2.id));
   await db.delete(member).where(eq(member.id, testMember.id));
   await db.delete(organization).where(eq(organization.id, testOrganization.id));
   await db.delete(user).where(eq(user.id, testUser.id));
@@ -619,5 +692,160 @@ describe("listSendingDomains", () => {
     if (result.success) {
       expect(result.truncatedAccountIds).toEqual([]);
     }
+  });
+});
+
+// ─── addSendingDomain ───────────────────────────────────────────────────────
+
+describe("addSendingDomain", () => {
+  function mockCreateSuccess() {
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "CreateEmailIdentityCommand") {
+        return Promise.resolve({});
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+  }
+
+  it("sends CreateEmailIdentityCommand with the trimmed, lowercased domain and reports a fresh create", async () => {
+    mockCreateSuccess();
+
+    const result = await addSendingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "example.com"
+    );
+
+    expect(result).toEqual({
+      success: true,
+      domain: "example.com",
+      alreadyExisted: false,
+    });
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    const sentCommand = mockSend.mock.calls[0][0] as SesCommand;
+    expect(sentCommand._type).toBe("CreateEmailIdentityCommand");
+    expect(sentCommand.input).toEqual({ EmailIdentity: "example.com" });
+  });
+
+  it("normalises surrounding whitespace and mixed case before sending", async () => {
+    mockCreateSuccess();
+
+    const result = await addSendingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "  Example.COM  "
+    );
+
+    expect(result).toEqual({
+      success: true,
+      domain: "example.com",
+      alreadyExisted: false,
+    });
+    const sentCommand = mockSend.mock.calls[0][0] as SesCommand;
+    expect(sentCommand.input).toEqual({ EmailIdentity: "example.com" });
+  });
+
+  it("treats AlreadyExistsException as success, not a failure", async () => {
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "CreateEmailIdentityCommand") {
+        const err = new Error("AlreadyExistsException");
+        err.name = "AlreadyExistsException";
+        return Promise.reject(err);
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+
+    const result = await addSendingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "already-there.com"
+    );
+
+    expect(result).toEqual({
+      success: true,
+      domain: "already-there.com",
+      alreadyExisted: true,
+    });
+  });
+
+  it("maps an access-denied error to the wraps platform update-role remediation string", async () => {
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "CreateEmailIdentityCommand") {
+        const err = new Error("AccessDeniedException");
+        err.name = "AccessDeniedException";
+        return Promise.reject(err);
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+
+    const result = await addSendingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "denied.com"
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("wraps platform update-role");
+    }
+  });
+
+  it("refuses an AWS account belonging to a different organization, without calling AWS", async () => {
+    mockCreateSuccess();
+
+    const result = await addSendingDomain(
+      testOrganization.id,
+      testAwsAccountForeign.id,
+      "example.com"
+    );
+
+    expect(result.success).toBe(false);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("rejects empty and whitespace-only input without calling AWS", async () => {
+    mockCreateSuccess();
+
+    const emptyResult = await addSendingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      ""
+    );
+    expect(emptyResult.success).toBe(false);
+
+    const whitespaceResult = await addSendingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "   "
+    );
+    expect(whitespaceResult.success).toBe(false);
+
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("rejects input containing @ without calling AWS", async () => {
+    mockCreateSuccess();
+
+    const result = await addSendingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "user@example.com"
+    );
+
+    expect(result.success).toBe(false);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("never sends DkimSigningAttributes — pins the Easy DKIM default", async () => {
+    mockCreateSuccess();
+
+    await addSendingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "easy-dkim.com"
+    );
+
+    const sentCommand = mockSend.mock.calls[0][0] as SesCommand;
+    expect(sentCommand.input).not.toHaveProperty("DkimSigningAttributes");
   });
 });
