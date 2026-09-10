@@ -49,6 +49,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             ? []
             : [
                 { title: "Emails", url: `/${orgSlug}/emails` },
+                { title: "Domains", url: `/${orgSlug}/emails/domains` },
                 { title: "Inbound", url: `/${orgSlug}/emails/inbound` },
                 { title: "Broadcast", url: `/${orgSlug}/emails/broadcasts` },
                 { title: "Templates", url: `/${orgSlug}/emails/templates` },
