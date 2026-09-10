@@ -104,6 +104,8 @@ function detail(overrides: Partial<HealthDetailShape> = {}): HealthDetailShape {
     sendingEnabled: null,
     enforcementStatus: null,
     productionAccessEnabled: null,
+    reviewStatus: null,
+    reviewCaseId: null,
     max24HourSend: null,
     sentLast24Hours: null,
     maxSendRate: null,

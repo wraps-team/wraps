@@ -2079,3 +2079,139 @@ describe("scanAWSAccountFeatures — config set detection", () => {
     }
   });
 });
+
+describe("scanAWSAccountFeatures — SES production access review", () => {
+  beforeAll(async () => {
+    await db
+      .insert(awsAccount)
+      .values(scanTestAccount)
+      .onConflictDoUpdate({
+        target: awsAccount.id,
+        set: { updatedAt: new Date() },
+      });
+  });
+
+  afterAll(async () => {
+    await db.delete(awsAccount).where(eq(awsAccount.id, scanTestAccount.id));
+  });
+
+  beforeEach(() => {
+    setupQuietScanDefaults();
+    mockLogWarn.mockClear();
+  });
+
+  // Every case below reuses setupQuietScanDefaults() for every SES command
+  // except GetAccountCommand, which each test overrides individually.
+  function mockGetAccountResponse(
+    respond: () => Promise<unknown> | never
+  ): void {
+    mockSend.mockImplementation(
+      (command: { _type: string; ConfigurationSetName?: string }) => {
+        switch (command._type) {
+          case "GetAccountCommand":
+            return respond();
+          case "GetDedicatedIpsCommand":
+            return Promise.resolve({ DedicatedIps: [] });
+          case "ListEmailIdentitiesCommand":
+            return Promise.resolve({ EmailIdentities: [] });
+          case "GetConfigurationSetEventDestinationsCommand":
+            return Promise.resolve({ EventDestinations: [] });
+          case "ListConfigurationSetsCommand":
+            return Promise.resolve({ ConfigurationSets: [] });
+          default:
+            return Promise.reject(
+              new Error(`Unexpected SES command: ${command._type}`)
+            );
+        }
+      }
+    );
+  }
+
+  it("persists status and caseId when GetAccount returns ReviewDetails", async () => {
+    mockGetAccountResponse(() =>
+      Promise.resolve({
+        ProductionAccessEnabled: false,
+        Details: { ReviewDetails: { Status: "PENDING", CaseId: "1234" } },
+      })
+    );
+
+    const result = await scanAWSAccountFeatures(
+      scanTestAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.features.email!.productionAccessRequest).toEqual({
+        status: "PENDING",
+        caseId: "1234",
+      });
+    }
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq }) => eq(a.id, scanTestAccount.id),
+    });
+    expect(row?.features?.email?.productionAccessRequest).toEqual({
+      status: "PENDING",
+      caseId: "1234",
+    });
+  });
+
+  it("persists null, never a defaulted status, when GetAccount returns no Details", async () => {
+    mockGetAccountResponse(() =>
+      Promise.resolve({ ProductionAccessEnabled: false })
+    );
+
+    const result = await scanAWSAccountFeatures(
+      scanTestAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.features.email!.productionAccessRequest).toBeNull();
+    }
+  });
+
+  it("persists null when Details is present but has no ReviewDetails", async () => {
+    mockGetAccountResponse(() =>
+      Promise.resolve({ ProductionAccessEnabled: false, Details: {} })
+    );
+
+    const result = await scanAWSAccountFeatures(
+      scanTestAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.features.email!.productionAccessRequest).toBeNull();
+    }
+  });
+
+  it("defaults sandbox true and productionAccessRequest null when GetAccount throws", async () => {
+    mockGetAccountResponse(() =>
+      Promise.reject(
+        Object.assign(new Error("InternalFailure"), {
+          name: "InternalFailure",
+        })
+      )
+    );
+
+    const result = await scanAWSAccountFeatures(
+      scanTestAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.features.email!.productionAccessRequest).toBeNull();
+    }
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq }) => eq(a.id, scanTestAccount.id),
+    });
+    expect(row?.features?.email?.sandbox).toBe(true);
+    expect(row?.features?.email?.productionAccessRequest).toBeNull();
+  });
+});

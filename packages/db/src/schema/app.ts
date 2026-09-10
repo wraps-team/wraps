@@ -142,6 +142,10 @@ export const awsAccount = pgTable(
       enforcementStatus: string | null;
       /** SES production access — false means the account is in the sandbox. */
       productionAccessEnabled: boolean | null;
+      /** Latest SES account review, or null when AWS reported none. */
+      reviewStatus: "PENDING" | "GRANTED" | "DENIED" | "FAILED" | null;
+      /** Support case ID for that review, when AWS supplied one. */
+      reviewCaseId: string | null;
       /** Raw SendQuota figures, so a caller can compute its own headroom. */
       max24HourSend: number | null;
       sentLast24Hours: number | null;
@@ -200,6 +204,16 @@ export const awsAccount = pgTable(
           // that may not exist. Absent on rows scanned before this field.
           configSetName?: string;
         }>;
+        /**
+         * SES's verdict on the account's production-access appeal, straight
+         * from `GetAccount`'s `Details.ReviewDetails`. `null` means AWS
+         * reported no review — never a defaulted/fabricated status. Absent
+         * on rows scanned before this field.
+         */
+        productionAccessRequest?: {
+          status: "PENDING" | "GRANTED" | "DENIED" | "FAILED" | null;
+          caseId: string | null;
+        } | null;
       };
       sms?: {
         enabled?: boolean;

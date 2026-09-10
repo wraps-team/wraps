@@ -75,6 +75,50 @@ export function selectNextStep(status: SetupStatus): NextStep {
   }
 
   if (status.sandboxStatus === true) {
+    const review = status.productionAccessRequest;
+
+    // FAILED means AWS never received the appeal — the customer cannot
+    // discover this any other way, so it gets the strongest copy.
+    if (review?.status === "FAILED") {
+      return {
+        kind: "leave_sandbox",
+        title: "AWS did not receive your request",
+        description:
+          "An internal AWS error meant your production access request never arrived. You can submit it again.",
+        ctaLabel: "Request production access",
+        href: (orgSlug) => `/${orgSlug}/settings/aws-accounts`,
+      };
+    }
+
+    if (review?.status === "DENIED") {
+      return {
+        kind: "leave_sandbox",
+        title: "AWS denied your production access request",
+        // No case-specific link: SES's CaseId is not documented as the same
+        // identifier the AWS Support console URL takes, so the description
+        // must not promise a destination the CTA doesn't reach.
+        description: review.caseId
+          ? `AWS denied your production access request (case ${review.caseId}). You can request production access again once you've addressed the reason for the denial.`
+          : "AWS denied your production access request. You can request production access again once you've addressed the reason for the denial.",
+        ctaLabel: "Request production access",
+        href: (orgSlug) => `/${orgSlug}/settings/aws-accounts`,
+      };
+    }
+
+    if (review?.status === "PENDING") {
+      return {
+        kind: "leave_sandbox",
+        title: "Production access requested — AWS is reviewing it",
+        description: review.caseId
+          ? `AWS is reviewing your production access request (case ${review.caseId}). Your account can currently send only to verified recipients and the AWS mailbox simulator.`
+          : "AWS is reviewing your production access request. Your account can currently send only to verified recipients and the AWS mailbox simulator.",
+        // Not "check the case in AWS" — this links to Wraps' own AWS
+        // Accounts settings page, not the AWS Support case itself.
+        ctaLabel: "View AWS accounts",
+        href: (orgSlug) => `/${orgSlug}/settings/aws-accounts`,
+      };
+    }
+
     return {
       kind: "leave_sandbox",
       title: "Request SES production access",

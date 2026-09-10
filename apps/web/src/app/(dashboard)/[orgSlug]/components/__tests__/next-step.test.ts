@@ -16,6 +16,7 @@ const baseStatus: SetupStatus = {
   awsRegion: "us-east-1",
   emailCount: 10,
   sandboxStatus: false,
+  productionAccessRequest: null,
   awsAccountId: "aws-account-1",
   domainCount: 1,
 };
@@ -91,6 +92,74 @@ describe("selectNextStep", () => {
       sandboxStatus: null,
     });
     expect(step.kind).toBe("done");
+  });
+
+  it("tells the customer AWS never received their request when the review FAILED", () => {
+    const step = selectNextStep({
+      ...baseStatus,
+      sandboxStatus: true,
+      productionAccessRequest: { status: "FAILED", caseId: null },
+    });
+    expect(step.kind).toBe("leave_sandbox");
+    expect(step.title).toBe("AWS did not receive your request");
+    expect(step.description).toContain("submit it again");
+  });
+
+  it("still renders a working link when the review was DENIED", () => {
+    const step = selectNextStep({
+      ...baseStatus,
+      sandboxStatus: true,
+      productionAccessRequest: { status: "DENIED", caseId: "case-9876" },
+    });
+    expect(step.kind).toBe("leave_sandbox");
+    expect(step.title).toBe("AWS denied your production access request");
+    expect(step.description).toContain("case-9876");
+    // Label/destination coherence guard: href is Wraps' own AWS Accounts
+    // settings page, not the AWS Support case, so the copy must not
+    // instruct the customer to act inside "the support case".
+    expect(step.description).not.toContain("support case to appeal");
+    // The escape route must survive the copy change: href still resolves.
+    expect(step.href("acme")).toContain("acme");
+  });
+
+  it("does not promise an AWS-hosted case view when the review is PENDING", () => {
+    const step = selectNextStep({
+      ...baseStatus,
+      sandboxStatus: true,
+      productionAccessRequest: { status: "PENDING", caseId: "case-4321" },
+    });
+    expect(step.kind).toBe("leave_sandbox");
+    expect(step.description).toContain("case-4321");
+    // href is Wraps' own settings page, not AWS Support — the CTA label
+    // must not claim it goes "to AWS" or "to the case".
+    expect(step.ctaLabel.toLowerCase()).not.toContain("case in aws");
+    expect(step.href("acme")).toContain("acme");
+  });
+
+  it("copy is unchanged, character for character, when no review exists", () => {
+    // Regression pin: null must never fall through to a fabricated status.
+    const step = selectNextStep({
+      ...baseStatus,
+      sandboxStatus: true,
+      productionAccessRequest: null,
+    });
+    expect(step.title).toBe("Request SES production access");
+    expect(step.description).toBe(
+      "Your AWS account can currently send only to verified recipients and the AWS mailbox simulator. Request production access to email anyone."
+    );
+    expect(step.ctaLabel).toBe("Request production access");
+  });
+
+  it("stays done regardless of review status once out of the sandbox", () => {
+    // Coupling guard: sandboxStatus alone decides done-ness, never the review.
+    for (const status of ["PENDING", "GRANTED", "DENIED", "FAILED"] as const) {
+      const step = selectNextStep({
+        ...baseStatus,
+        sandboxStatus: false,
+        productionAccessRequest: { status, caseId: null },
+      });
+      expect(step.kind).toBe("done");
+    }
   });
 
   it("returns non-empty copy for every possible kind", () => {

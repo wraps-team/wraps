@@ -16,6 +16,7 @@ import {
   GetEmailIdentityCommand,
   ListConfigurationSetsCommand,
   ListEmailIdentitiesCommand,
+  type ReviewStatus,
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
 import { createServerValidate } from "@tanstack/react-form-nextjs";
@@ -65,6 +66,13 @@ export type ConnectAWSAccountResult =
       account: { id: string; name: string; region: string };
     }
   | { error: string; details?: string };
+
+// AWS's ReviewDetails.Status, carried through to the persisted features blob.
+// null means AWS reported no review at all — never a defaulted/fabricated status.
+export type SesProductionAccessRequest = {
+  status: ReviewStatus | null;
+  caseId: string | null;
+} | null;
 
 export type AWSAccountWithCreator = {
   id: string;
@@ -405,6 +413,7 @@ export type ScanFeaturesResult =
             identity: string;
             type: "DOMAIN" | "EMAIL_ADDRESS";
           }>;
+          productionAccessRequest?: SesProductionAccessRequest;
         };
         sms?: {
           enabled?: boolean;
@@ -649,6 +658,7 @@ export async function scanAWSAccountFeatures(
 
     // 9. Check SES sandbox status
     let sesSandbox = true; // Default to sandbox (safer assumption)
+    let sesProductionAccessRequest: SesProductionAccessRequest = null;
 
     try {
       const sesClient = new SESv2Client({
@@ -659,6 +669,11 @@ export async function scanAWSAccountFeatures(
       const accountResponse = await sesClient.send(new GetAccountCommand({}));
       // ProductionAccessEnabled is true when out of sandbox
       sesSandbox = !accountResponse.ProductionAccessEnabled;
+
+      const review = accountResponse.Details?.ReviewDetails;
+      sesProductionAccessRequest = review
+        ? { status: review.Status ?? null, caseId: review.CaseId ?? null }
+        : null;
     } catch (error: any) {
       if (error.name !== "AccessDeniedException") {
         log.warn({ err: error }, "Error checking SES sandbox status");
@@ -839,6 +854,7 @@ export async function scanAWSAccountFeatures(
       email: {
         configSetName,
         sandbox: sesSandbox,
+        productionAccessRequest: sesProductionAccessRequest,
         archivingEnabled,
         archiveArn,
         eventHistoryEnabled,

@@ -15,6 +15,54 @@ type GoLiveBannerProps = {
 
 type BannerStep = "connect" | "sandbox";
 
+type ProductionAccessRequest = {
+  status: "PENDING" | "GRANTED" | "DENIED" | "FAILED" | null;
+  caseId: string | null;
+} | null;
+
+type SandboxCopy = { message: string; ctaLabel: string };
+
+/**
+ * Sandbox-step copy, branched on AWS's production-access review verdict.
+ * `null`/`undefined` (never scanned, or AWS reported no review) keeps
+ * today's copy byte-for-byte — this step adds information, it never removes
+ * the escape route.
+ */
+function resolveSandboxCopy(review: ProductionAccessRequest): SandboxCopy {
+  if (review?.status === "FAILED") {
+    return {
+      message:
+        "AWS did not receive your production access request — you can submit it again.",
+      ctaLabel: "Request production access",
+    };
+  }
+  if (review?.status === "DENIED") {
+    return {
+      message: review.caseId
+        ? `AWS denied your production access request (case ${review.caseId}).`
+        : "AWS denied your production access request.",
+      ctaLabel: "Request production access",
+    };
+  }
+  if (review?.status === "PENDING") {
+    return {
+      message: review.caseId
+        ? `Production access requested — AWS is reviewing it (case ${review.caseId}).`
+        : "Production access requested — AWS is reviewing it.",
+      // Not "check the case in AWS": the CTA below always links to AWS's
+      // production-access docs, not the AWS Support case itself — SES's
+      // CaseId is not documented as the identifier the Support console URL
+      // takes, so the label must not promise a destination it doesn't reach.
+      ctaLabel: "View production access docs",
+    };
+  }
+  return {
+    message:
+      "Your AWS account is in the SES sandbox, so AWS only accepts mail to addresses you have verified.",
+    ctaLabel: "Request production access",
+  };
+}
+
 /**
  * Going live is two steps, not one (audit finding F6).
  *
@@ -42,7 +90,11 @@ function resolveStep(
 export function GoLiveBanner({ orgSlug }: GoLiveBannerProps) {
   const hasAwsAccounts = useProductsStore((s) => s.status?.hasAwsAccounts);
   const sandboxStatus = useProductsStore((s) => s.status?.sandboxStatus);
+  const productionAccessRequest = useProductsStore(
+    (s) => s.status?.productionAccessRequest
+  );
   const step = resolveStep(hasAwsAccounts, sandboxStatus);
+  const sandboxCopy = resolveSandboxCopy(productionAccessRequest ?? null);
 
   const [dismissed, setDismissed] = useState<Record<BannerStep, boolean>>(
     () => ({
@@ -84,7 +136,7 @@ export function GoLiveBanner({ orgSlug }: GoLiveBannerProps) {
         <p className="text-sm">
           {step === "connect"
             ? "Connect your AWS account to start sending emails."
-            : "Your AWS account is in the SES sandbox, so AWS only accepts mail to addresses you have verified."}
+            : sandboxCopy.message}
         </p>
       </div>
       <div className="flex items-center gap-2">
@@ -99,7 +151,7 @@ export function GoLiveBanner({ orgSlug }: GoLiveBannerProps) {
               rel="noopener noreferrer"
               target="_blank"
             >
-              Request production access
+              {sandboxCopy.ctaLabel}
             </a>
           </Button>
         )}

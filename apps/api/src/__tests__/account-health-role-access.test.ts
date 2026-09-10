@@ -278,6 +278,57 @@ describe("account-health with an unusable customer role", () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  it("persists SES's review verdict into healthDetail, independent of healthStatus", async () => {
+    mockStsSend.mockResolvedValue({
+      Credentials: {
+        AccessKeyId: "AKIA-test",
+        SecretAccessKey: "secret",
+        SessionToken: "token",
+        Expiration: new Date("2099-01-01"),
+      },
+    });
+    mockCloudWatchSend.mockResolvedValue({ MetricDataResults: [] });
+
+    // First sweep: AWS reports a pending review.
+    mockSesSend.mockResolvedValue({
+      SendingEnabled: true,
+      EnforcementStatus: "HEALTHY",
+      SendQuota: { Max24HourSend: 50_000, SentLast24Hours: 10 },
+      Details: { ReviewDetails: { Status: "PENDING", CaseId: "case-1234" } },
+    });
+    await invoke();
+    const withReview = mockDbSet.mock.calls.find(
+      (call) => call[0]?.healthStatus !== undefined
+    );
+    expect(withReview).toBeDefined();
+    expect(withReview?.[0].healthDetail).toMatchObject({
+      reviewStatus: "PENDING",
+      reviewCaseId: "case-1234",
+    });
+
+    mockDbSet.mockClear();
+
+    // Second sweep: AWS reports no review at all — must persist null, never
+    // a defaulted/fabricated status.
+    mockSesSend.mockResolvedValue({
+      SendingEnabled: true,
+      EnforcementStatus: "HEALTHY",
+      SendQuota: { Max24HourSend: 50_000, SentLast24Hours: 10 },
+    });
+    await invoke();
+    const withoutReview = mockDbSet.mock.calls.find(
+      (call) => call[0]?.healthStatus !== undefined
+    );
+    expect(withoutReview).toBeDefined();
+    expect(withoutReview?.[0].healthDetail).toMatchObject({
+      reviewStatus: null,
+      reviewCaseId: null,
+    });
+
+    // The review verdict must never influence the health classification.
+    expect(withoutReview?.[0].healthStatus).toBe(withReview?.[0].healthStatus);
+  });
+
   it("does not stamp reachability when the role is unusable", async () => {
     mockStsSend.mockRejectedValue(accessDeniedError());
 

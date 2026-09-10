@@ -41,6 +41,16 @@ export type AccountFeatures = {
       identity: string;
       type: "DOMAIN" | "EMAIL_ADDRESS";
     }>;
+    /**
+     * SES's verdict on the account's production-access appeal, straight from
+     * `GetAccount`'s `Details.ReviewDetails`. `null` means AWS reported no
+     * review — never a defaulted/fabricated status. Absent on rows scanned
+     * before this field.
+     */
+    productionAccessRequest?: {
+      status: "PENDING" | "GRANTED" | "DENIED" | "FAILED" | null;
+      caseId: string | null;
+    } | null;
   };
   sms?: {
     enabled?: boolean;
@@ -70,6 +80,14 @@ export type SetupStatus = {
   awsRegion: string | null;
   emailCount: number;
   sandboxStatus: boolean | null;
+  /**
+   * SES's production-access review state, independent of `sandboxStatus`.
+   * `null` when AWS reported no review (or the account hasn't been scanned).
+   */
+  productionAccessRequest: {
+    status: "PENDING" | "GRANTED" | "DENIED" | "FAILED" | null;
+    caseId: string | null;
+  } | null;
   awsAccountId: string | null;
   domainCount: number;
 };
@@ -154,6 +172,14 @@ export type EmailsListStatus = {
   hasEverSent: boolean;
   /** `true` in the SES sandbox, `false` in production, `null` never scanned. */
   sandboxStatus: boolean | null;
+  /**
+   * SES's production-access review state, independent of `sandboxStatus`.
+   * `null` when AWS reported no review (or the account hasn't been scanned).
+   */
+  productionAccessRequest: {
+    status: "PENDING" | "GRANTED" | "DENIED" | "FAILED" | null;
+    caseId: string | null;
+  } | null;
 };
 
 /**
@@ -197,15 +223,24 @@ export const getEmailsListStatus = cache(
       ...accounts.filter((a) => !a.isVerified),
     ];
     let sandboxStatus: boolean | null = null;
+    let productionAccessRequest: EmailsListStatus["productionAccessRequest"] =
+      null;
     for (const account of ordered) {
-      const value = (account.features as AccountFeatures)?.email?.sandbox;
+      const features = account.features as AccountFeatures;
+      const value = features?.email?.sandbox;
       if (typeof value === "boolean") {
         sandboxStatus = value;
+        productionAccessRequest =
+          features?.email?.productionAccessRequest ?? null;
         break;
       }
     }
 
-    return { hasEverSent: sends.length > 0, sandboxStatus };
+    return {
+      hasEverSent: sends.length > 0,
+      sandboxStatus,
+      productionAccessRequest,
+    };
   }
 );
 
@@ -298,6 +333,12 @@ export async function getSetupStatus(organizationId: string): Promise<{
       null)
     : null;
 
+  // Production-access review state — independent of sandboxStatus above.
+  const productionAccessRequest = firstVerifiedAccount
+    ? ((firstVerifiedAccount.features as AccountFeatures)?.email
+        ?.productionAccessRequest ?? null)
+    : null;
+
   return {
     setupStatus: {
       hasAwsAccount,
@@ -313,6 +354,7 @@ export async function getSetupStatus(organizationId: string): Promise<{
       awsRegion,
       emailCount: emailStatus.emailCount,
       sandboxStatus,
+      productionAccessRequest,
       awsAccountId: firstVerifiedAccount?.id ?? null,
       domainCount: verifiedDomains.length,
     },

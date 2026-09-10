@@ -16,6 +16,14 @@ export type ProductsStatus = {
   hasAwsAccounts: boolean;
   /** `true` in the SES sandbox, `false` in production, `null` never scanned. */
   sandboxStatus: boolean | null;
+  /**
+   * SES's production-access review state, independent of `sandboxStatus`.
+   * `null` when AWS reported no review (or the account hasn't been scanned).
+   */
+  productionAccessRequest: {
+    status: "PENDING" | "GRANTED" | "DENIED" | "FAILED" | null;
+    caseId: string | null;
+  } | null;
   planId: PlanId;
   planFeatures: PlanFeatures;
   memberCount: number;

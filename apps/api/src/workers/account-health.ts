@@ -445,6 +445,10 @@ async function checkAccount(account: AccountRow): Promise<void> {
     complaintRate,
     quotaUsedRatio,
   });
+  // AWS's review verdict, distinct from the health classifier's inputs —
+  // classifySesHealth must not see this. Absent ReviewDetails means AWS
+  // reported no review, never a defaulted status.
+  const review = info.Details?.ReviewDetails;
   await db
     .update(awsAccount)
     .set({
@@ -457,6 +461,8 @@ async function checkAccount(account: AccountRow): Promise<void> {
         sendingEnabled: info.SendingEnabled ?? null,
         enforcementStatus: info.EnforcementStatus ?? null,
         productionAccessEnabled: info.ProductionAccessEnabled ?? null,
+        reviewStatus: review?.Status ?? null,
+        reviewCaseId: review?.CaseId ?? null,
         max24HourSend: quotaMax24h,
         sentLast24Hours: quotaSent24h,
         maxSendRate: info.SendQuota?.MaxSendRate ?? null,

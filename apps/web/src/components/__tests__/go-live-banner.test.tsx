@@ -81,6 +81,78 @@ describe("GoLiveBanner", () => {
     );
   });
 
+  it("tells the customer AWS never received their request when the review FAILED", () => {
+    mockUseProductsStore.mockImplementation((selector: any) =>
+      selector({
+        status: {
+          hasAwsAccounts: true,
+          sandboxStatus: true,
+          productionAccessRequest: { status: "FAILED", caseId: null },
+        },
+      })
+    );
+
+    render(<GoLiveBanner orgSlug="test-org" />);
+
+    expect(screen.getByText(/did not receive/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /request production access/i })
+    ).toHaveAttribute(
+      "href",
+      "https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html"
+    );
+  });
+
+  it("names the case and keeps the AWS link when the review was DENIED", () => {
+    mockUseProductsStore.mockImplementation((selector: any) =>
+      selector({
+        status: {
+          hasAwsAccounts: true,
+          sandboxStatus: true,
+          productionAccessRequest: { status: "DENIED", caseId: "case-4242" },
+        },
+      })
+    );
+
+    render(<GoLiveBanner orgSlug="test-org" />);
+
+    expect(screen.getByText(/denied/i)).toBeInTheDocument();
+    expect(screen.getByText(/case-4242/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /request production access/i })
+    ).toHaveAttribute(
+      "href",
+      "https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html"
+    );
+  });
+
+  it("reframes the CTA copy, still pointing at the docs, when the review is PENDING", () => {
+    mockUseProductsStore.mockImplementation((selector: any) =>
+      selector({
+        status: {
+          hasAwsAccounts: true,
+          sandboxStatus: true,
+          productionAccessRequest: { status: "PENDING", caseId: "case-1111" },
+        },
+      })
+    );
+
+    render(<GoLiveBanner orgSlug="test-org" />);
+
+    expect(screen.getByText(/AWS is reviewing it/i)).toBeInTheDocument();
+    // The label must not claim a case-specific destination the link doesn't
+    // reach — it only ever points at AWS's production-access docs.
+    expect(
+      screen.queryByRole("link", { name: /check the case/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /view production access docs/i })
+    ).toHaveAttribute(
+      "href",
+      "https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html"
+    );
+  });
+
   it("goes quiet once the account is out of the sandbox", () => {
     mockUseProductsStore.mockImplementation((selector: any) =>
       selector({ status: { hasAwsAccounts: true, sandboxStatus: false } })

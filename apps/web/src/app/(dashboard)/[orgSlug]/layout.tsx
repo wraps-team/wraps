@@ -32,6 +32,34 @@ function resolveSandboxStatus(
   return null;
 }
 
+/**
+ * SES's production-access review state, resolved with the same
+ * verified-account-first preference as `resolveSandboxStatus`. Independent of
+ * sandbox status — a `null` here means AWS reported no review, never a
+ * guessed one.
+ */
+function resolveProductionAccessRequest(
+  accounts: Array<{ features: unknown; isVerified: boolean }>
+): {
+  status: "PENDING" | "GRANTED" | "DENIED" | "FAILED" | null;
+  caseId: string | null;
+} | null {
+  const ordered = [
+    ...accounts.filter((a) => a.isVerified),
+    ...accounts.filter((a) => !a.isVerified),
+  ];
+  for (const account of ordered) {
+    const value = (account.features as AccountFeatures)?.email?.sandbox;
+    if (typeof value === "boolean") {
+      return (
+        (account.features as AccountFeatures)?.email?.productionAccessRequest ??
+        null
+      );
+    }
+  }
+  return null;
+}
+
 type OrganizationLayoutProps = {
   children: ReactNode;
   params: Promise<{
@@ -86,6 +114,9 @@ export default async function OrganizationLayout({
     smsEnabled: orgData.awsAccounts.some((a) => a.smsEnabled),
     hasAwsAccounts: orgData.awsAccounts.length > 0,
     sandboxStatus: resolveSandboxStatus(orgData.awsAccounts),
+    productionAccessRequest: resolveProductionAccessRequest(
+      orgData.awsAccounts
+    ),
     planId,
     planFeatures: {
       batch: plan.features.batch,
