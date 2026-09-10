@@ -1,4 +1,3 @@
-import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   branchNameForWorktree,
@@ -90,11 +89,17 @@ function createNeonMock(
   return { fetchImpl, calls, getBranches: () => branches };
 }
 
-/** Fake execImpl: reports the main checkout (git-dir === git-common-dir). */
-function execNotWorktree() {
+/**
+ * Fake execImpl: reports the main checkout (git-dir === git-common-dir), and
+ * answers `--show-toplevel` with `toplevel` (as `checkoutRootName` now uses).
+ */
+function execNotWorktree(toplevel = "/repo") {
   return vi.fn((_cmd: string, args: readonly string[]) => {
     if (args.includes("--git-dir")) {
       return "/repo/.git\n/repo/.git";
+    }
+    if (args.includes("--show-toplevel")) {
+      return toplevel;
     }
     throw new Error(`unexpected exec for not-worktree: ${args.join(" ")}`);
   });
@@ -218,16 +223,17 @@ describe("resolveTestDatabaseUrl", () => {
     warnSpy.mockRestore();
   });
 
-  it("resolves a branch for the main checkout, named after its directory", async () => {
+  it("names the branch after the checkout root, not the process cwd", async () => {
     const { fetchImpl, calls } = createNeonMock([]);
-    const expectedBranchName = `wt-${path
-      .basename(process.cwd())
-      .toLowerCase()
-      .replace(/[^a-z0-9-]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60)}`;
+    const execImpl = vi.fn((_cmd: string, args: readonly string[]) => {
+      if (args.includes("--show-toplevel")) {
+        return "/Users/someone/Projects/wraps\n";
+      }
+      throw new Error(`unexpected exec: ${args.join(" ")}`);
+    });
+
     const result = await resolveTestDatabaseUrl(BASE_URL, NEON_ENV, {
-      execImpl: execNotWorktree(),
+      execImpl,
       fetchImpl,
     });
 
@@ -235,11 +241,51 @@ describe("resolveTestDatabaseUrl", () => {
     expect(postCall).toBeDefined();
     expect(postCall?.body.branch).toEqual({
       parent_id: "parent-123",
-      name: expectedBranchName,
+      name: "wt-wraps",
     });
     expect(result).toBe(
       "postgres://role:pw@ep-branch.us-east-2.aws.neon.tech/testdb"
     );
+  });
+
+  it("names the branch after the worktree root when inside a linked worktree", async () => {
+    const { fetchImpl, calls } = createNeonMock([]);
+    const execImpl = vi.fn((_cmd: string, args: readonly string[]) => {
+      if (args.includes("--show-toplevel")) {
+        return "/repo/.claude/worktrees/agent-abc123\n";
+      }
+      throw new Error(`unexpected exec: ${args.join(" ")}`);
+    });
+
+    const result = await resolveTestDatabaseUrl(BASE_URL, NEON_ENV, {
+      execImpl,
+      fetchImpl,
+    });
+
+    const postCall = calls.find((c) => c.method === "POST");
+    expect(postCall).toBeDefined();
+    expect(postCall?.body.branch).toEqual({
+      parent_id: "parent-123",
+      name: "wt-agent-abc123",
+    });
+    expect(result).toBe(
+      "postgres://role:pw@ep-branch.us-east-2.aws.neon.tech/testdb"
+    );
+  });
+
+  it("returns baseUrl when the checkout root cannot be determined", async () => {
+    const fetchImpl = vi.fn();
+    const execImpl = vi.fn(() => {
+      throw new Error("fatal: not a git repository");
+    });
+
+    const result = await resolveTestDatabaseUrl(BASE_URL, NEON_ENV, {
+      execImpl,
+      fetchImpl,
+    });
+
+    expect(result).toBe(BASE_URL);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("returns baseUrl and warns when in a worktree without Neon credentials", async () => {

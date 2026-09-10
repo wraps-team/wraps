@@ -78,6 +78,32 @@ export function detectWorktree(cwd, opts = {}) {
 }
 
 /**
+ * The basename of the checkout root containing `cwd` — the main checkout's
+ * directory, or a linked worktree's. Uses `git rev-parse --show-toplevel`, so
+ * it is independent of which subdirectory the process runs from: vitest runs
+ * with cwd set to the package directory, and naming a branch after that would
+ * cut one branch per package instead of one per checkout.
+ *
+ * @param {string} cwd
+ * @param {ResolverOpts} [opts]
+ * @returns {string|null}
+ */
+export function checkoutRootName(cwd, opts = {}) {
+  const execImpl = opts.execImpl ?? execFileSync;
+  try {
+    const toplevel = execImpl("git", ["rev-parse", "--show-toplevel"], {
+      cwd,
+      encoding: "utf8",
+    })
+      .toString()
+      .trim();
+    return toplevel ? path.basename(toplevel) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Sanitizes a worktree directory name into a Neon branch name.
  *
  * @param {string} name
@@ -271,13 +297,16 @@ export async function resolveTestDatabaseUrl(baseUrl, env, opts = {}) {
     return baseUrl;
   }
 
-  const { isWorktree, name } = detectWorktree(process.cwd(), opts);
   // Every checkout gets its own branch, main included: `check:all` runs every
   // package's suite in parallel against one URL, so the main checkout collides
   // with itself (and with any other vitest run on the box) exactly when its
   // verdict matters most. `liveWorktreeBranchNames` already lists the main
   // checkout, so the reaper treats this branch as live without any change.
-  const checkoutName = isWorktree ? name : path.basename(process.cwd());
+  // The name comes from the checkout root (`git rev-parse --show-toplevel`),
+  // not `process.cwd()`: vitest's cwd is the package directory under turbo,
+  // and naming after that would cut one branch per package instead of one
+  // per checkout.
+  const checkoutName = checkoutRootName(process.cwd(), opts);
   if (!checkoutName) {
     return baseUrl;
   }
