@@ -47,7 +47,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/blog/why-email-providers-cost-more-than-ses": "2026-09-03T13:19:49-06:00",
   "/blog/yc-w26-email-security-audit": "2026-04-14T13:00:57-06:00",
   "/blog/your-dmarc-policy-is-useless": "2026-07-09T10:21:06-06:00",
-  "/byoc": "2026-09-03T12:06:25-06:00",
+  "/byoc": "2026-09-09T20:04:58-06:00",
   "/changelog": "2026-09-08T08:51:55-06:00",
   "/cli": "2026-08-28T11:13:54-06:00",
   "/compare": "2026-09-03T12:34:36-06:00",
