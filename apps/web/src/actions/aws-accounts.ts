@@ -288,6 +288,7 @@ export async function connectAWSAccountAction(
         isVerified: true,
         lastVerifiedAt: new Date(),
         createdBy: session.user.id,
+        setupMethod: "cfn_console_role",
       })
       .returning();
 

@@ -19,6 +19,7 @@ import {
 } from "vitest";
 import { AssumeRoleError } from "@/lib/aws/assume-role";
 import {
+  connectAWSAccountAction,
   deleteAWSAccount,
   getSMSPhoneNumbers,
   getVerifiedDomains,
@@ -184,6 +185,19 @@ const mockGetOrAssumeRole = vi.fn();
 vi.mock("@/lib/aws/credential-cache", () => ({
   getOrAssumeRole: (...args: unknown[]) => mockGetOrAssumeRole(...args),
 }));
+
+// connectAWSAccountAction calls getCredentials (not getOrAssumeRole) to test
+// the connection before writing the row. Preserve the module's other exports
+// (AssumeRoleError, isCustomerRoleAccessError) via importOriginal — the route
+// under test imports them for real.
+const mockGetCredentials = vi.fn();
+vi.mock("@/lib/aws/assume-role", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/aws/assume-role")>();
+  return {
+    ...actual,
+    getCredentials: (...args: unknown[]) => mockGetCredentials(...args),
+  };
+});
 
 // Mock AWS SES SDK - must use function factory for hoisting
 const mockSend = vi.fn();
@@ -376,9 +390,15 @@ beforeEach(() => {
   mockS3Send.mockReset();
   mockSmsSend.mockReset();
   mockGetOrAssumeRole.mockReset();
+  mockGetCredentials.mockReset();
 
   // Default mock for credentials
   mockGetOrAssumeRole.mockResolvedValue({
+    accessKeyId: "AKIAIOSFODNN7EXAMPLE",
+    secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    sessionToken: "session-token",
+  });
+  mockGetCredentials.mockResolvedValue({
     accessKeyId: "AKIAIOSFODNN7EXAMPLE",
     secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
     sessionToken: "session-token",
@@ -2276,5 +2296,96 @@ describe("scanAWSAccountFeatures — SES production access review", () => {
     });
     expect(row?.features?.email?.sandbox).toBe(true);
     expect(row?.features?.email?.productionAccessRequest).toBeNull();
+  });
+});
+
+// ─── connectAWSAccountAction — setupMethod persistence ─────────────────────
+
+// connectAWSAccountSchema requires organizationId to be a UUID, unlike the
+// fixed-string ids used elsewhere in this file, so this case gets its own
+// org/member fixtures.
+const connectActionOrg = {
+  id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
+  name: "Connect Action Test Org",
+  slug: "connect-action-test-org",
+  createdAt: new Date(),
+  logo: null,
+  metadata: null,
+};
+
+const connectActionMember = {
+  id: "test-connect-action-member-1",
+  organizationId: connectActionOrg.id,
+  userId: testUser.id,
+  role: "owner" as const,
+  createdAt: new Date(),
+};
+
+const CONNECT_ACTION_ACCOUNT_ID = "555000111222";
+
+function buildConnectAWSAccountFormData(): FormData {
+  const formData = new FormData();
+  formData.append("organizationId", connectActionOrg.id);
+  formData.append("name", "Connect Action Test Account");
+  formData.append("accountId", CONNECT_ACTION_ACCOUNT_ID);
+  formData.append("region", "us-east-1");
+  formData.append(
+    "roleArn",
+    `arn:aws:iam::${CONNECT_ACTION_ACCOUNT_ID}:role/wraps-console-access-role`
+  );
+  formData.append("externalId", "wraps_1234567890abcdef1234567890abcdef");
+  return formData;
+}
+
+describe("connectAWSAccountAction — setupMethod persistence", () => {
+  beforeAll(async () => {
+    await db
+      .insert(organization)
+      .values(connectActionOrg)
+      .onConflictDoUpdate({
+        target: organization.id,
+        set: { name: connectActionOrg.name },
+      });
+
+    await db
+      .insert(member)
+      .values(connectActionMember)
+      .onConflictDoUpdate({
+        target: member.id,
+        set: { role: connectActionMember.role },
+      });
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(awsAccount)
+      .where(eq(awsAccount.organizationId, connectActionOrg.id));
+    await db.delete(member).where(eq(member.id, connectActionMember.id));
+    await db
+      .delete(organization)
+      .where(eq(organization.id, connectActionOrg.id));
+  });
+
+  beforeEach(async () => {
+    currentMockUserId = testUser.id;
+    await db
+      .delete(awsAccount)
+      .where(eq(awsAccount.organizationId, connectActionOrg.id));
+  });
+
+  it("persists setupMethod: cfn_console_role on a successful connect", async () => {
+    const result = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect((result as { success?: boolean }).success).toBe(true);
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq: eqOp }) => eqOp(a.organizationId, connectActionOrg.id),
+    });
+
+    expect(row).toBeDefined();
+    expect(row?.setupMethod).toBe("cfn_console_role");
   });
 });

@@ -169,6 +169,7 @@ export async function POST(request: Request, context: RouteContext) {
           isVerified: true,
           lastVerifiedAt: new Date(),
           createdBy: session.user.id,
+          setupMethod: "cfn_console_role",
         });
       }
 

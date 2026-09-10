@@ -174,6 +174,7 @@ export async function POST(request: Request, context: RouteContext) {
           isVerified: true,
           lastVerifiedAt: new Date(),
           createdBy: session.user.id,
+          setupMethod: "onboarding_wizard",
           ...(featuresUpdate && { features: featuresUpdate }),
         });
       }

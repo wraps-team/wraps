@@ -10,7 +10,14 @@
 
 import { randomBytes } from "node:crypto";
 import { CONSOLE_ACCESS_ROLE_NAME } from "@wraps/core";
-import { and, awsAccount, db, eq, sqlExpr } from "@wraps/db";
+import {
+  type AwsAccountSetupMethod,
+  and,
+  awsAccount,
+  db,
+  eq,
+  sqlExpr,
+} from "@wraps/db";
 import { count } from "drizzle-orm";
 import { t } from "elysia";
 import { log } from "../lib/logger";
@@ -132,6 +139,7 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
         } else {
           // Insert new
           const id = crypto.randomUUID();
+          const setupMethod: AwsAccountSetupMethod = "cli_connect";
           await tx.insert(awsAccount).values({
             id,
             organizationId: authContext.organizationId,
@@ -147,6 +155,7 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
             smsEnabled: hasSmsFeature,
             features: features ?? null,
             createdBy: authContext.userId,
+            setupMethod,
           });
           connectionId = id;
 

@@ -1,0 +1,1 @@
+ALTER TABLE "aws_account" ADD COLUMN "setup_method" text;

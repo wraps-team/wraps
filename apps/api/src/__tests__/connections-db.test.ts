@@ -302,6 +302,52 @@ describe("POST /v1/connections — upsert (real DB)", () => {
   });
 });
 
+describe("POST /v1/connections — setupMethod (real DB)", () => {
+  it("persists setupMethod as cli_connect for a new connection", async () => {
+    const app = createTestApp();
+    const res = await postConnection(app);
+    expect(res.status).toBe(201);
+    const body = await res.json();
+
+    const [row] = await db
+      .select({ setupMethod: awsAccount.setupMethod })
+      .from(awsAccount)
+      .where(eq(awsAccount.id, body.connectionId));
+
+    expect(row.setupMethod).toBe("cli_connect");
+  });
+
+  it("does not change setupMethod when re-connecting an existing account", async () => {
+    // Insert a row directly with a setupMethod other than what the connect
+    // flow would write, to prove the update branch never touches it.
+    const [existingRow] = await db
+      .insert(awsAccount)
+      .values({
+        organizationId: testOrg.id,
+        name: "Pre-existing Account",
+        accountId: "123456789012",
+        region: "us-east-1",
+        roleArn: "arn:aws:iam::123456789012:role/wraps-console-access-role",
+        externalId: "wraps_00000000000000000000000000000000",
+        isVerified: true,
+        createdBy: testUser.id,
+        setupMethod: "cfn_infrastructure",
+      })
+      .returning();
+
+    const app = createTestApp();
+    const res = await postConnection(app, { accountId: "123456789012" });
+    expect(res.status).toBe(200);
+
+    const [row] = await db
+      .select({ setupMethod: awsAccount.setupMethod })
+      .from(awsAccount)
+      .where(eq(awsAccount.id, existingRow.id));
+
+    expect(row.setupMethod).toBe("cfn_infrastructure");
+  });
+});
+
 describe("GET /v1/connections — real DB", () => {
   it("returns empty connections array when org has no connections", async () => {
     const app = createTestApp();

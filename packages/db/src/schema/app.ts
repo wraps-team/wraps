@@ -56,6 +56,31 @@ export const organizationExtension = pgTable("organization_extension", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+/**
+ * How an aws_account row came to exist. Written once, on insert, by whichever
+ * flow created it — never revised on re-validation, because the point is to
+ * know how the account was ORIGINALLY set up, which determines which repair
+ * route applies to it.
+ *
+ * The four paths are not interchangeable. Notably, the console role created by
+ * cloudformation/wraps-email-infrastructure.yaml carries
+ * cloudformation:DescribeStacks/ListStacks, and the one created by
+ * cloudformation/wraps-console-access-role.yaml does not — same role name,
+ * different capabilities.
+ */
+export const AWS_ACCOUNT_SETUP_METHODS = [
+  /** cloudformation/wraps-email-infrastructure.yaml — the full email stack. */
+  "cfn_infrastructure",
+  /** cloudformation/wraps-console-access-role.yaml, or a hand-made role. */
+  "cfn_console_role",
+  /** `wraps platform connect` — CreateRole via the CLI. There is no stack. */
+  "cli_connect",
+  /** The onboarding wizard's AWS step. */
+  "onboarding_wizard",
+] as const;
+
+export type AwsAccountSetupMethod = (typeof AWS_ACCOUNT_SETUP_METHODS)[number];
+
 // AWS Account Connections
 export const awsAccount = pgTable(
   "aws_account",
@@ -111,6 +136,12 @@ export const awsAccount = pgTable(
     // indistinguishable from here.
     consolePolicyVersion: integer("console_policy_version"),
     consolePolicyCheckedAt: timestamp("console_policy_checked_at"),
+
+    // See AWS_ACCOUNT_SETUP_METHODS above. NULL means the row predates this
+    // column — which is every account connected before it shipped. NULL is
+    // NOT "unknown method we could work out later": there is no signal that
+    // recovers it retroactively, so treat NULL as permanently unknown.
+    setupMethod: text("setup_method").$type<AwsAccountSetupMethod>(),
 
     // Liveness of the SES event feed: bumped (throttled) by the SES webhook
     // route every time an authenticated event arrives for this account.
