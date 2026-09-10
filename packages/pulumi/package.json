@@ -1,6 +1,6 @@
 {
   "name": "@wraps.dev/pulumi",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Pulumi component for email infrastructure. Deploys SES, event processing, email history, HTTPS tracking, and OIDC auth as a composable component.",
   "type": "module",
   "main": "./dist/index.cjs",
