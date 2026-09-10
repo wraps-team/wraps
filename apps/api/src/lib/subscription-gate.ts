@@ -23,9 +23,36 @@ import { log } from "./logger";
 /** Subscription statuses that entitle an org to platform service. */
 const LIVE_STATUSES = ["active", "trialing"];
 
+// A lapsed subscription is a slow-changing condition, but the SES webhook checks
+// it on every inbound event. During a lapsed org's sustained send burst that is
+// one subscription lookup per event that can only ever resolve to "drop" — the
+// same redundant DB round-trip that turns the flood into account-wide Lambda
+// concurrency and pool saturation for every other tenant on the shared API
+// function. Negative-cache only *definitive* "lapsed" verdicts for a short
+// window so repeated drops stop re-querying. Active/trialing verdicts are never
+// cached: a subscription that just lapsed must take effect immediately, exactly
+// as the existing gate behaviour promises.
+const LAPSED_CACHE_TTL_MS = 60_000;
+const LAPSED_CACHE_MAX_ENTRIES = 1_000;
+
+const lapsedOrgCache = new Map<string, { expiresAt: number }>();
+
+/** Test seam: drop the negative cache so cases share no lapsed state. */
+export function resetLapsedSubscriptionCache(): void {
+  lapsedOrgCache.clear();
+}
+
 export async function hasActiveSubscription(
   organizationId: string
 ): Promise<boolean> {
+  const cached = lapsedOrgCache.get(organizationId);
+  if (cached) {
+    if (cached.expiresAt > Date.now()) {
+      return false;
+    }
+    lapsedOrgCache.delete(organizationId);
+  }
+
   try {
     const [row] = await db
       .select({ id: subscription.id })
@@ -38,7 +65,17 @@ export async function hasActiveSubscription(
       )
       .limit(1);
 
-    return row !== undefined;
+    const lapsed = row === undefined;
+    if (lapsed) {
+      if (lapsedOrgCache.size >= LAPSED_CACHE_MAX_ENTRIES) {
+        lapsedOrgCache.clear();
+      }
+      lapsedOrgCache.set(organizationId, {
+        expiresAt: Date.now() + LAPSED_CACHE_TTL_MS,
+      });
+    }
+
+    return !lapsed;
   } catch (error) {
     log.error("Subscription gate check failed", error, { organizationId });
     // Fail OPEN, matching enforceEventLimit in middleware/event-limit.ts. The
@@ -46,7 +83,9 @@ export async function hasActiveSubscription(
     // here becomes a 500, and EventBridge retries 5xx with backoff before
     // DLQ-ing. Briefly ingesting for a lapsed org costs a few rows; DLQ-ing a
     // paying customer's delivery events on a transient DB blip loses data we
-    // cannot recover.
+    // cannot recover. The error path deliberately does NOT write the negative
+    // cache: a DB blip must not be remembered as a lapse and later used to
+    // drop a paying org's events.
     return true;
   }
 }
