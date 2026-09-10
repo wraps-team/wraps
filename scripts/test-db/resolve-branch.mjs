@@ -1,16 +1,18 @@
-// Gives each git worktree its own Neon test-database branch, so a Claude Code
-// agent worktree running tests can't collide with the main checkout (or with
-// another worktree) on the shared test database's fixed-ID fixtures
-// (`test-org-123` et al.). See plans/017-per-worktree-neon-test-branches.md.
+// Gives each git checkout its own Neon test-database branch, so a Claude Code
+// agent worktree — or the main checkout — running tests can't collide with
+// any other checkout on the shared test database's fixed-ID fixtures
+// (`test-org-123` et al.). See plans/017-per-worktree-neon-test-branches.md
+// and plans/297-check-all-own-test-database.md.
 //
 // Every vitest config that loads apps/web/.env.test calls
 // `resolveTestDatabaseUrl` before handing DATABASE_URL to test workers. The
 // resolver is intentionally paranoid: any failure (missing keys, network
 // error, unexpected API shape) falls back to the original `baseUrl` so tests
-// never fail to start because of this feature. The only way to opt in is a
-// worktree checkout PLUS NEON_API_KEY/NEON_PROJECT_ID in the env that loads
-// .env.test — the main checkout and CI (never linked worktrees) always take
-// the no-op path.
+// never fail to start because of this feature. Every checkout — main or a
+// linked worktree — gets its own branch, named after its directory; the only
+// way to fall back to the shared database is a missing NEON_API_KEY or
+// NEON_PROJECT_ID in the env that loads .env.test, which is why CI (no Neon
+// credentials) always takes the no-op path.
 //
 // Every exported function accepts a trailing `opts = { fetchImpl, execImpl }`
 // (defaulting to the real global `fetch` and `execFileSync`) so unit tests
@@ -270,20 +272,26 @@ export async function resolveTestDatabaseUrl(baseUrl, env, opts = {}) {
   }
 
   const { isWorktree, name } = detectWorktree(process.cwd(), opts);
-  if (!isWorktree) {
+  // Every checkout gets its own branch, main included: `check:all` runs every
+  // package's suite in parallel against one URL, so the main checkout collides
+  // with itself (and with any other vitest run on the box) exactly when its
+  // verdict matters most. `liveWorktreeBranchNames` already lists the main
+  // checkout, so the reaper treats this branch as live without any change.
+  const checkoutName = isWorktree ? name : path.basename(process.cwd());
+  if (!checkoutName) {
     return baseUrl;
   }
 
   if (!(env.NEON_API_KEY && env.NEON_PROJECT_ID)) {
     console.warn(
-      "[test-db] worktree detected but NEON_API_KEY/NEON_PROJECT_ID not set — falling back to the SHARED test database"
+      "[test-db] NEON_API_KEY/NEON_PROJECT_ID not set — falling back to the SHARED test database"
     );
     return baseUrl;
   }
 
   const apiKey = env.NEON_API_KEY;
   const projectId = env.NEON_PROJECT_ID;
-  const branchName = branchNameForWorktree(name ?? "");
+  const branchName = branchNameForWorktree(checkoutName);
 
   try {
     const parsedBase = new URL(baseUrl);

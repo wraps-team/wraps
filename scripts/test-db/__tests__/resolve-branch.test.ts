@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   branchNameForWorktree,
@@ -184,8 +185,23 @@ describe("detectWorktree", () => {
 });
 
 describe("resolveTestDatabaseUrl", () => {
-  it("returns baseUrl unchanged when not in a worktree, without calling fetch", async () => {
+  it("returns baseUrl when baseUrl is empty, without calling fetch", async () => {
     const fetchImpl = vi.fn();
+    const result = await resolveTestDatabaseUrl(
+      "",
+      {},
+      {
+        execImpl: execNotWorktree(),
+        fetchImpl,
+      }
+    );
+    expect(result).toBe("");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("returns baseUrl and warns when no Neon credentials are set, without calling fetch", async () => {
+    const fetchImpl = vi.fn();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const result = await resolveTestDatabaseUrl(
       BASE_URL,
       {},
@@ -196,6 +212,34 @@ describe("resolveTestDatabaseUrl", () => {
     );
     expect(result).toBe(BASE_URL);
     expect(fetchImpl).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("NEON_API_KEY/NEON_PROJECT_ID not set")
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("resolves a branch for the main checkout, named after its directory", async () => {
+    const { fetchImpl, calls } = createNeonMock([]);
+    const expectedBranchName = `wt-${path
+      .basename(process.cwd())
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60)}`;
+    const result = await resolveTestDatabaseUrl(BASE_URL, NEON_ENV, {
+      execImpl: execNotWorktree(),
+      fetchImpl,
+    });
+
+    const postCall = calls.find((c) => c.method === "POST");
+    expect(postCall).toBeDefined();
+    expect(postCall?.body.branch).toEqual({
+      parent_id: "parent-123",
+      name: expectedBranchName,
+    });
+    expect(result).toBe(
+      "postgres://role:pw@ep-branch.us-east-2.aws.neon.tech/testdb"
+    );
   });
 
   it("returns baseUrl and warns when in a worktree without Neon credentials", async () => {
