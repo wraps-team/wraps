@@ -1,0 +1,6 @@
+-- NOTE: "contact_event_org_created_idx" is declared in the Drizzle schema but is
+-- created out-of-band, CONCURRENTLY, via
+-- packages/db/scripts/create-contact-event-analytics-index.ts (or the whole set with
+-- `pnpm --filter @wraps/db db:migrate-indexes`). drizzle-kit cannot run CONCURRENTLY
+-- inside a txn block, and contact_event is large in production — a blocking index
+-- build is not acceptable. Run that script AFTER this migration applies.

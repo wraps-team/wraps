@@ -89,4 +89,10 @@ export const CONCURRENT_INDEXES: ConcurrentIndex[] = [
       "Workflow send deduplication (plan 034): UNIQUE on (workflowExecutionId, stepId), partial on both being non-null so historical rows (step_id added after the fact) and non-workflow rows (no workflowExecutionId) never collide. This is what the workflow claim-before-send INSERT relies on to close the send-then-record duplicate-send window. Losing it does not degrade performance, it duplicates mail.",
     ddl: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "message_send_workflow_step_dedup_idx" ON "message_send" ("workflow_execution_id", "step_id") WHERE workflow_execution_id IS NOT NULL AND step_id IS NOT NULL',
   },
+  {
+    name: "contact_event_org_created_idx",
+    purpose:
+      "Contacts-analytics period scans: countContactEventsInPeriod, countActiveContactsWithEvents, getDailyContactEventCounts and getTopContactEventNames all filter contact_event by (organization_id, created_at). Without it each dashboard load sequentially scans every event the org has retained — up to the 2-year TTL backstop — four times per load.",
+    ddl: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "contact_event_org_created_idx" ON "contact_event" ("organization_id", "created_at")',
+  },
 ];

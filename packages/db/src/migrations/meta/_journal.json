@@ -617,6 +617,13 @@
       "when": 1789136804217,
       "tag": "0087_aromatic_arclight",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1789164843299,
+      "tag": "0088_shiny_outlaw_kid",
+      "breakpoints": true
     }
   ]
 }

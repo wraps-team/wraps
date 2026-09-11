@@ -64,6 +64,12 @@ export const contactEvent = pgTable(
 
     // Index for TTL cleanup job
     expiresIdx: index("contact_event_expires_idx").on(table.expiresAt),
+
+    // Index for analytics period scans (countContactEventsInPeriod et al.)
+    orgCreatedIdx: index("contact_event_org_created_idx").on(
+      table.organizationId,
+      table.createdAt
+    ),
   })
 );
 

@@ -206,6 +206,7 @@ export async function countContactEventsInPeriod(
     .where(
       and(
         eq(contactEvent.organizationId, organizationId),
+        sql`${contactEvent.createdAt} >= ${startDateStr}::date - interval '1 day'`,
         sql`DATE(${createdAtLocal}) >= ${startDateStr}::date`
       )
     );
@@ -228,6 +229,7 @@ export async function countActiveContactsWithEvents(
     .where(
       and(
         eq(contactEvent.organizationId, organizationId),
+        sql`${contactEvent.createdAt} >= ${startDateStr}::date - interval '1 day'`,
         sql`DATE(${createdAtLocal}) >= ${startDateStr}::date`
       )
     );
@@ -251,6 +253,7 @@ export async function getDailyContactEventCounts(
     .where(
       and(
         eq(contactEvent.organizationId, organizationId),
+        sql`${contactEvent.createdAt} >= ${startDateStr}::date - interval '1 day'`,
         sql`DATE(${createdAtLocal}) >= ${startDateStr}::date`
       )
     )
@@ -280,6 +283,7 @@ export async function getTopContactEventNames(
     .where(
       and(
         eq(contactEvent.organizationId, organizationId),
+        sql`${contactEvent.createdAt} >= ${startDateStr}::date - interval '1 day'`,
         sql`DATE(${createdAtLocal}) >= ${startDateStr}::date`
       )
     )
