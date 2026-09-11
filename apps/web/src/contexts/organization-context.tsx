@@ -110,7 +110,7 @@ export function OrganizationProvider({
     });
 
     if (!error && data) {
-      router.push(`/${orgSlug}/emails`);
+      router.push(`/${orgSlug}`);
     }
   };
 
