@@ -129,17 +129,12 @@ export function PlanSelector({
 
             {/* Key features */}
             <ul className="space-y-2">
-              {plan.featureList.slice(0, 4).map((feature) => (
+              {plan.featureList.map((feature) => (
                 <li className="flex items-start gap-2 text-sm" key={feature}>
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
                   <span className="text-muted-foreground">{feature}</span>
                 </li>
               ))}
-              {plan.featureList.length > 4 && (
-                <li className="text-muted-foreground text-sm">
-                  + {plan.featureList.length - 4} more features
-                </li>
-              )}
             </ul>
           </button>
         );
