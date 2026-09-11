@@ -38,7 +38,10 @@ import {
   clearWorkflowState,
   seedBaseOrg,
 } from "../(ee)/__tests__/fixtures/real-db";
-import { hasActiveSubscription } from "../lib/subscription-gate";
+import {
+  hasActiveSubscription,
+  resetLapsedSubscriptionCache,
+} from "../lib/subscription-gate";
 import { buildDeliveryEvent } from "./fixtures/ses-events";
 
 vi.mock("../services/workflow-queue", () => ({
@@ -97,6 +100,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  resetLapsedSubscriptionCache();
   await clearWorkflowState(fixture.ids.org);
   await setSubscriptionStatus("active");
 });
@@ -178,5 +182,52 @@ describe("SES webhook — subscription gate", () => {
     await postDelivery(messageId);
 
     expect(await rowFor(messageId)).toBeDefined();
+  });
+
+  it("negative-caches a definitive lapse so repeated drops skip the subscription query", async () => {
+    await setSubscriptionStatus("canceled");
+    // First call performs the lookup and records the lapse.
+    await expect(hasActiveSubscription(fixture.ids.org)).resolves.toBe(false);
+
+    const spy = vi.spyOn(db, "select");
+    try {
+      // A second event for the same org is served from the cache: no query.
+      await expect(hasActiveSubscription(fixture.ids.org)).resolves.toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("does not cache an active verdict, so a lapse takes effect immediately", async () => {
+    // Active subscriptions are never cached...
+    await expect(hasActiveSubscription(fixture.ids.org)).resolves.toBe(true);
+
+    // ...so lapses mid-flight stop ingesting on the very next event.
+    await setSubscriptionStatus("canceled");
+    const messageId = `${TEST_PREFIX}-lapse-immediate-${Date.now()}`;
+    const res = await postDelivery(messageId);
+    const body = (await res.json()) as { status?: string; reason?: string };
+
+    expect(body.status).toBe("ignored");
+    expect(body.reason).toBe("no active subscription");
+    expect(await rowFor(messageId)).toBeUndefined();
+  });
+
+  it("does not cache the fail-open path, so a DB blip never suppresses a later lapse", async () => {
+    // Fail-open returns true (ingest) but must not be remembered as active.
+    const spy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+      throw new Error("connection terminated unexpectedly");
+    });
+    try {
+      await expect(hasActiveSubscription(fixture.ids.org)).resolves.toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+
+    // The org is actually canceled; the next real call must still see it.
+    await setSubscriptionStatus("canceled");
+    await expect(hasActiveSubscription(fixture.ids.org)).resolves.toBe(false);
   });
 });
