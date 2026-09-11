@@ -154,10 +154,12 @@ describe("workflow reaper — paused stuck threshold", () => {
     expect(mockFailExecution).toHaveBeenCalledWith(
       "exec-stuck-paused",
       expect.stringMatching(/stuck|paused|lifetime|exceeded/i),
-      expect.any(String)
+      expect.any(String),
+      "org-1"
     );
     expect(mockFailExecution).not.toHaveBeenCalledWith(
       "exec-recent-paused",
+      expect.any(String),
       expect.any(String),
       expect.any(String)
     );
@@ -209,10 +211,12 @@ describe("workflow reaper — waiting expired threshold", () => {
     expect(mockFailExecution).toHaveBeenCalledWith(
       "exec-expired-wait",
       expect.stringMatching(/stuck|waiting|timeout|expired/i),
-      expect.any(String)
+      expect.any(String),
+      "org-1"
     );
     expect(mockFailExecution).not.toHaveBeenCalledWith(
       "exec-pending-wait",
+      expect.any(String),
       expect.any(String),
       expect.any(String)
     );
@@ -250,12 +254,14 @@ describe("workflow reaper — combined run", () => {
     expect(mockFailExecution).toHaveBeenCalledWith(
       "exec-stuck",
       expect.any(String),
-      expect.any(String)
+      expect.any(String),
+      "org-1"
     );
     expect(mockFailExecution).toHaveBeenCalledWith(
       "exec-expired",
       expect.any(String),
-      expect.any(String)
+      expect.any(String),
+      "org-1"
     );
   });
 });

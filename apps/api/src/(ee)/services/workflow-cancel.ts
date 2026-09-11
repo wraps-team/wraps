@@ -84,6 +84,7 @@ export async function cancelWorkflowExecution(params: {
       .where(
         and(
           eq(workflowExecution.id, executionId),
+          eq(workflowExecution.organizationId, organizationId),
           sql`${workflowExecution.status} IN ('pending', 'active', 'paused', 'waiting')`
         )
       )
@@ -98,7 +99,12 @@ export async function cancelWorkflowExecution(params: {
       .set({
         activeExecutions: sql`GREATEST(0, ${workflow.activeExecutions} - 1)`,
       })
-      .where(eq(workflow.id, exec.workflowId));
+      .where(
+        and(
+          eq(workflow.id, exec.workflowId),
+          eq(workflow.organizationId, organizationId)
+        )
+      );
 
     return true;
   });

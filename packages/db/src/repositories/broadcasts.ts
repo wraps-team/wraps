@@ -270,11 +270,13 @@ export async function listBroadcastRecipients(
     conditions.push(eq(messageSend.status, options.status as never));
   }
 
+  // biome-ignore lint/plugin: the org predicate built above is always the second entry in `conditions` — the plugin can't trace `organizationId` through the `...conditions` spread.
   const [totalResult] = await dbClient
     .select({ count: sql<number>`count(*)::int` })
     .from(messageSend)
     .where(and(...conditions));
 
+  // biome-ignore lint/plugin: the org predicate built above is always the second entry in `conditions` — the plugin can't trace `organizationId` through the `...conditions` spread.
   const rows = await dbClient
     .select({
       id: messageSend.id,
@@ -328,6 +330,7 @@ export async function getBroadcastClickBreakdown(
 
   const isPreferenceLink = sql`${messageSend.clickedUrl} ~ ${PREFERENCE_LINK_PATTERN}`;
 
+  // biome-ignore lint/plugin: `scope` above already includes eq(messageSend.organizationId, organizationId) — the plugin can't trace `organizationId` through the `scope` variable.
   const [aggregate] = await dbClient
     .select({
       unsubscribeCount: sql<number>`count(*) filter (where ${isPreferenceLink})::int`,
@@ -336,6 +339,7 @@ export async function getBroadcastClickBreakdown(
     .from(messageSend)
     .where(scope);
 
+  // biome-ignore lint/plugin: `scope` above already includes eq(messageSend.organizationId, organizationId) — the plugin can't trace `organizationId` through the `scope` variable.
   const rows = await dbClient
     .select({
       url: messageSend.clickedUrl,
@@ -384,6 +388,7 @@ export async function listBroadcasts(
     }
   }
 
+  // biome-ignore lint/plugin: the org predicate built above is always the first entry in `conditions` — the plugin can't trace `organizationId` through the `...conditions` spread.
   const [totalResult] = await dbClient
     .select({ count: sql<number>`count(*)::int` })
     .from(batchSend)
@@ -654,6 +659,7 @@ export async function countBroadcastRecipients(
     dbClient
   );
 
+  // biome-ignore lint/plugin: buildRecipientConditions above always returns eq(contact.organizationId, organizationId) as its first entry — the plugin can't trace `organizationId` through the `...conditions` spread.
   const [result] = await dbClient
     .select({ count: sql<number>`count(*)::int` })
     .from(contact)
@@ -751,6 +757,7 @@ export async function previewConditionAudience(
     conditionSQL
   );
 
+  // biome-ignore lint/plugin: `matchWhere` above already includes eq(contact.organizationId, organizationId) — the plugin can't trace `organizationId` through the `matchWhere` variable.
   const [counts] = await dbClient
     .select({
       matched: sql<number>`count(*)::int`,
@@ -761,6 +768,7 @@ export async function previewConditionAudience(
 
   // Sampling the reachable rows, not the matching ones: a sample drawn from
   // contacts that cannot be mailed is not a sample of the send.
+  // biome-ignore lint/plugin: `matchWhere` above already includes eq(contact.organizationId, organizationId) — the plugin can't trace `organizationId` through the `matchWhere` variable.
   const samples = await dbClient
     .select({ email: contact.email })
     .from(contact)
@@ -841,10 +849,12 @@ export async function getSampleBroadcastRecipients(
   const whereClause = and(...conditions);
 
   const [[countResult], contacts] = await Promise.all([
+    // biome-ignore lint/plugin: `whereClause` above is built from buildRecipientConditions, which always returns eq(contact.organizationId, organizationId) as its first entry — the plugin can't trace it through the `whereClause` variable.
     dbClient
       .select({ count: sql<number>`count(*)::int` })
       .from(contact)
       .where(whereClause),
+    // biome-ignore lint/plugin: `whereClause` above is built from buildRecipientConditions, which always returns eq(contact.organizationId, organizationId) as its first entry — the plugin can't trace it through the `whereClause` variable.
     dbClient
       .select({
         id: contact.id,
@@ -884,10 +894,12 @@ export async function getSampleRecipientsWithProperties(
   const whereClause = and(...conditions);
 
   const [[countResult], contacts] = await Promise.all([
+    // biome-ignore lint/plugin: `whereClause` above is built from buildRecipientConditions, which always returns eq(contact.organizationId, organizationId) as its first entry — the plugin can't trace it through the `whereClause` variable.
     dbClient
       .select({ count: sql<number>`count(*)::int` })
       .from(contact)
       .where(whereClause),
+    // biome-ignore lint/plugin: `whereClause` above is built from buildRecipientConditions, which always returns eq(contact.organizationId, organizationId) as its first entry — the plugin can't trace it through the `whereClause` variable.
     dbClient
       .select({
         id: contact.id,

@@ -112,6 +112,7 @@ export const listAuditLogs = orgAction(
       if (cursorCondition) conditions.push(cursorCondition);
     }
 
+    // biome-ignore lint/plugin: the org predicate built above is always the first entry in `conditions` — the plugin can't trace `organizationId` through the `...conditions` spread.
     const rows = await db
       .select()
       .from(auditLog)

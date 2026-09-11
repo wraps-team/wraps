@@ -45,6 +45,7 @@ export async function contactMatchesCondition(
     conditionSQL as SQL
   );
 
+  // biome-ignore lint/plugin: `whereClause` above already includes eq(contact.organizationId, organizationId) — the plugin can't trace `organizationId` through the `whereClause` variable.
   const [row] = await database
     .select({ id: contact.id })
     .from(contact)
@@ -85,6 +86,7 @@ export async function contactIdsMatchingCondition(
     conditionSQL as SQL
   );
 
+  // biome-ignore lint/plugin: `whereClause` above already includes eq(contact.organizationId, organizationId) — the plugin can't trace `organizationId` through the `whereClause` variable.
   const rows = await database
     .select({ id: contact.id })
     .from(contact)

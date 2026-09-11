@@ -464,6 +464,7 @@ async function hasForeignSesTraffic(
 }
 
 async function clearStaleFlags(accountId: string): Promise<void> {
+  // biome-ignore lint/plugin: accountId is always account.id from the privileged all-org sweep in handler below — a row's own primary key, so this cannot cross an org boundary.
   await db
     .update(awsAccount)
     .set({ eventFeedStaleSince: null, eventFeedAlertedAt: null })
@@ -471,6 +472,7 @@ async function clearStaleFlags(accountId: string): Promise<void> {
 }
 
 async function markStaleSince(accountId: string, now: Date): Promise<void> {
+  // biome-ignore lint/plugin: accountId is always account.id from the privileged all-org sweep in handler below — a row's own primary key, so this cannot cross an org boundary.
   await db
     .update(awsAccount)
     .set({ eventFeedStaleSince: now })
@@ -478,6 +480,7 @@ async function markStaleSince(accountId: string, now: Date): Promise<void> {
 }
 
 async function markAlerted(accountId: string, now: Date): Promise<void> {
+  // biome-ignore lint/plugin: accountId is always account.id from the privileged all-org sweep in handler below — a row's own primary key, so this cannot cross an org boundary.
   await db
     .update(awsAccount)
     .set({ eventFeedAlertedAt: now })

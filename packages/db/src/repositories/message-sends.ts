@@ -91,16 +91,15 @@ export async function listEmailLogs(
 
   // Skip the count on cursor pages — it's already known from the first page
   // and avoids an extra full-table scan for large orgs.
-  const total = filters.cursor
-    ? null
-    : Number(
-        (
-          await dbClient
-            .select({ count: count() })
-            .from(messageSend)
-            .where(and(...conditions))
-        )[0]?.count ?? 0
-      );
+  let total: number | null = null;
+  if (!filters.cursor) {
+    // biome-ignore lint/plugin: buildConditions above always returns eq(messageSend.organizationId, organizationId) as its first entry — the plugin can't trace `organizationId` through the `...conditions` spread.
+    const [totalRow] = await dbClient
+      .select({ count: count() })
+      .from(messageSend)
+      .where(and(...conditions));
+    total = totalRow?.count ?? 0;
+  }
 
   const cursorConditions = [...conditions];
   const cursor = filters.cursor ? decodeCursor(filters.cursor) : null;
@@ -118,6 +117,7 @@ export async function listEmailLogs(
     }
   }
 
+  // biome-ignore lint/plugin: `cursorConditions` spreads `conditions` from buildConditions above, whose first entry is always eq(messageSend.organizationId, organizationId) — the plugin can't trace it through the spread.
   const rows = await dbClient
     .select(EMAIL_LOG_LIST_FIELDS)
     .from(messageSend)

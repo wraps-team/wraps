@@ -113,6 +113,7 @@ export const contactsTopicsRoutes = createAuthenticatedRoutes("/v1/contacts")
         const now = new Date();
 
         // Get contact email for confirmation emails
+        // biome-ignore lint/plugin: params.id was already verified to belong to authContext.organizationId by the "Check contact exists" lookup above.
         const [contactData] = await db
           .select({ email: contact.email })
           .from(contact)

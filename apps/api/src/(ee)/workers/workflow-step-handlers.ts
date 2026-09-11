@@ -232,7 +232,8 @@ export async function handleSendEmail(
       .where(
         and(
           eq(messageSend.workflowExecutionId, execution.id),
-          eq(messageSend.stepId, stepId)
+          eq(messageSend.stepId, stepId),
+          eq(messageSend.organizationId, organizationId)
         )
       )
       .limit(1);
@@ -299,6 +300,7 @@ export async function handleSendEmail(
         and(
           eq(messageSend.workflowExecutionId, execution.id),
           eq(messageSend.stepId, stepId),
+          eq(messageSend.organizationId, organizationId),
           eq(messageSend.status, "queued"),
           isNull(messageSend.messageId),
           sql`${messageSend.claimedAt} < now() - interval '${sql.raw(String(WORKFLOW_SEND_CLAIM_STALE_MINUTES))} minutes'`
@@ -729,7 +731,8 @@ export async function handleSendEmail(
         .where(
           and(
             eq(messageSend.workflowExecutionId, execution.id),
-            eq(messageSend.stepId, stepId)
+            eq(messageSend.stepId, stepId),
+            eq(messageSend.organizationId, organizationId)
           )
         );
       break;
@@ -767,7 +770,12 @@ export async function handleSendEmail(
       lastEmailSentAt: new Date(),
       emailsSent: sql`COALESCE(${contact.emailsSent}, 0) + 1`,
     })
-    .where(eq(contact.id, contactRecord.id));
+    .where(
+      and(
+        eq(contact.id, contactRecord.id),
+        eq(contact.organizationId, organizationId)
+      )
+    );
 
   return {
     action: "next",
@@ -826,6 +834,7 @@ async function autoPublishTemplate(
     });
 
     // 3. Update template in DB with SES template name
+    // biome-ignore lint/plugin: tmpl.id is org-verified by the caller's own eq(template.organizationId, organizationId) select (workflow-step-handlers.ts:~362) immediately before this is invoked; autoPublishTemplate has no other caller and takes no organizationId param to thread.
     await db
       .update(template)
       .set({
@@ -920,7 +929,12 @@ export async function handleSendSms(
   const [account] = await db
     .select({ region: awsAccount.region })
     .from(awsAccount)
-    .where(eq(awsAccount.id, wf.awsAccountId))
+    .where(
+      and(
+        eq(awsAccount.id, wf.awsAccountId),
+        eq(awsAccount.organizationId, organizationId)
+      )
+    )
     .limit(1);
 
   if (!account) {
@@ -1066,7 +1080,12 @@ export async function handleSendSms(
       lastSmsSentAt: new Date(),
       smsSent: sql`COALESCE(${contact.smsSent}, 0) + 1`,
     })
-    .where(eq(contact.id, contactRecord.id));
+    .where(
+      and(
+        eq(contact.id, contactRecord.id),
+        eq(contact.organizationId, organizationId)
+      )
+    );
 
   return {
     action: "next",
@@ -1153,7 +1172,12 @@ export async function handleDelay(
       delaySchedulerName: schedulerName,
       updatedAt: new Date(),
     })
-    .where(eq(workflowExecution.id, execution.id));
+    .where(
+      and(
+        eq(workflowExecution.id, execution.id),
+        eq(workflowExecution.organizationId, organizationId)
+      )
+    );
 
   return { action: "wait" };
 }
@@ -1512,7 +1536,12 @@ export async function handleWaitForEvent(
       waitTimeoutSchedulerName: schedulerName,
       updatedAt: new Date(),
     })
-    .where(eq(workflowExecution.id, execution.id));
+    .where(
+      and(
+        eq(workflowExecution.id, execution.id),
+        eq(workflowExecution.organizationId, organizationId)
+      )
+    );
 
   return { action: "wait" };
 }
@@ -1575,7 +1604,12 @@ export async function handleWaitForEmailEngagement(
       waitTimeoutSchedulerName: schedulerName,
       updatedAt: new Date(),
     })
-    .where(eq(workflowExecution.id, execution.id));
+    .where(
+      and(
+        eq(workflowExecution.id, execution.id),
+        eq(workflowExecution.organizationId, organizationId)
+      )
+    );
 
   return { action: "wait" };
 }

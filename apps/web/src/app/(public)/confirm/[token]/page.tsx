@@ -32,6 +32,7 @@ export async function generateMetadata({
     return { title: "Confirm Subscription" };
   }
 
+  // biome-ignore lint/plugin: payload.tid comes from a cryptographically verified confirmation token (verifyConfirmationToken) — this public, token-authenticated route has no org session; the token itself is the authorization, and only the topic's display name is read here.
   const [topicRecord] = await db
     .select({ name: topic.name })
     .from(topic)

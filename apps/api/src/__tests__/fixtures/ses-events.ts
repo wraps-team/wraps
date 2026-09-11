@@ -208,3 +208,22 @@ export function buildSuppressionEvent(
     },
   };
 }
+
+export function buildRenderingFailureEvent(
+  overrides: BaseOverrides & {
+    errorMessage?: string;
+    templateName?: string;
+  } = {}
+) {
+  return {
+    ...baseEnvelope(overrides),
+    detail: {
+      eventType: "Rendering Failure" as const,
+      mail: makeMail(overrides.mail),
+      failure: {
+        errorMessage: overrides.errorMessage ?? "Missing template variable",
+        templateName: overrides.templateName ?? "welcome-email",
+      },
+    },
+  };
+}

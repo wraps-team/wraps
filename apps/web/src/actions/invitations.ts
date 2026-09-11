@@ -217,6 +217,7 @@ export async function acceptInvitation(
     const auditCtx = await getAuditContext();
     // Atomically claim the invitation, create membership, and write audit log
     const claimResult = await db.transaction(async (tx) => {
+      // biome-ignore lint/plugin: invitationId is the accept flow's own credential (verified above: pending, unexpired, session email matches inv.email) — it uniquely determines the target org, so there is no separate authenticated org context to compare it against. eq(status, "pending") is the atomic double-accept guard.
       const result = await tx
         .update(invitation)
         .set({ status: "accepted" })
@@ -377,6 +378,7 @@ export async function declineInvitation(
     }
 
     // Update invitation status
+    // biome-ignore lint/plugin: invitationId is the primary key of the row already fetched and email-verified above. The invitee is not yet an org member, so organizationId scoping doesn't apply here — email ownership is the authorization.
     await db
       .update(invitation)
       .set({ status: "declined" })

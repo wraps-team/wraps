@@ -16,6 +16,7 @@ import { and, eq, like } from "drizzle-orm";
 
 type CreateStatementParams = {
   userId: string;
+  organizationId: string;
   effect: "allow" | "deny";
   action: string;
   resource: string;
@@ -24,12 +25,14 @@ type CreateStatementParams = {
 
 type CheckStatementParams = {
   userId: string;
+  organizationId: string;
   action: string;
   resource: string;
 };
 
 type RevokeStatementParams = {
   userId: string;
+  organizationId: string;
   action: string;
   resource: string;
 };
@@ -41,7 +44,8 @@ type RevokeStatementParams = {
 export async function createAccessStatement(
   params: CreateStatementParams
 ): Promise<void> {
-  const { userId, effect, action, resource, expiresAt } = params;
+  const { userId, organizationId, effect, action, resource, expiresAt } =
+    params;
 
   // Direct database insert through @wraps/db
   // The statement table comes from better-auth but we manage it ourselves
@@ -50,6 +54,7 @@ export async function createAccessStatement(
   await db.insert(statement).values({
     id: crypto.randomUUID(),
     userId,
+    organizationId,
     effect,
     action,
     resource,
@@ -66,13 +71,14 @@ export async function createAccessStatement(
 export async function checkAccessStatement(
   params: CheckStatementParams
 ): Promise<boolean> {
-  const { userId, action, resource } = params;
+  const { userId, organizationId, action, resource } = params;
 
   // Query the statement table through drizzle's query builder
   const result = await db.query.statement.findFirst({
     where: (s, { and, eq, or, gt, isNull }) =>
       and(
         eq(s.userId, userId),
+        eq(s.organizationId, organizationId),
         eq(s.effect, "allow"),
         // Match exact action or wildcard (e.g., "aws-account:*")
         or(eq(s.action, action), eq(s.action, `${action.split(":")[0]}:*`)),
@@ -92,7 +98,7 @@ export async function checkAccessStatement(
 export async function revokeAccessStatement(
   params: RevokeStatementParams
 ): Promise<void> {
-  const { userId, action, resource } = params;
+  const { userId, organizationId, action, resource } = params;
 
   const { statement } = await import("@wraps/db");
 
@@ -105,6 +111,7 @@ export async function revokeAccessStatement(
       .where(
         and(
           eq(statement.userId, userId),
+          eq(statement.organizationId, organizationId),
           eq(statement.resource, resource),
           like(statement.action, `${prefix}%`)
         )
@@ -116,6 +123,7 @@ export async function revokeAccessStatement(
       .where(
         and(
           eq(statement.userId, userId),
+          eq(statement.organizationId, organizationId),
           eq(statement.action, action),
           eq(statement.resource, resource)
         )

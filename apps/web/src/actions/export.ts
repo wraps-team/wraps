@@ -95,6 +95,7 @@ export const exportAllContacts = orgAction(
     // so `total` below can be honest instead of reporting the truncated
     // fetch's own length as if it were the whole match (audit F23 — this was
     // the same "count that lies" class the broadcast wave removed downstream).
+    // biome-ignore lint/plugin: `whereClause` above always spreads `conditions`, whose first entry is eq(contact.organizationId, organizationId) — the plugin can't trace it through the `whereClause` variable.
     const [{ value: matchingCount }] = await db
       .select({ value: sql<number>`count(*)::int` })
       .from(contact)
@@ -355,11 +356,13 @@ export const exportAuditLogs = orgAction(
         // reporting the truncated fetch's own length as if it were the whole
         // match (audit F23 — see exportAllContacts above for the original
         // finding).
+        // biome-ignore lint/plugin: `whereClause` above always spreads `conditions`, whose first entry is eq(auditLog.organizationId, organizationId) — the plugin can't trace it through the `whereClause` variable.
         const [{ value: matchingCount }] = await tx
           .select({ value: sql<number>`count(*)::int` })
           .from(auditLog)
           .where(whereClause);
 
+        // biome-ignore lint/plugin: `whereClause` above always spreads `conditions`, whose first entry is eq(auditLog.organizationId, organizationId) — the plugin can't trace it through the `whereClause` variable.
         const rows = await tx
           .select()
           .from(auditLog)

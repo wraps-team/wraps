@@ -54,6 +54,7 @@ export const agentsWebhookRoutes = new Elysia({ prefix: "/v1/agents" }).post(
     // Match the presented key against every account's webhookSecret in constant
     // time. account_id is not in the callback, so we cannot pre-narrow; secrets
     // are 32 random bytes so exactly one account matches.
+    // biome-ignore lint/plugin: organizationId is not yet known — this query IS the identity resolution step; the timing-safe secret match below picks the org.
     const candidates = await db
       .select({
         webhookSecret: awsAccount.webhookSecret,

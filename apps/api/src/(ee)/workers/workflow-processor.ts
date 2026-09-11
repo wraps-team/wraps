@@ -272,7 +272,12 @@ async function triggerWorkflow(
         activeExecutions: sql`${workflow.activeExecutions} + 1`,
         lastTriggeredAt: new Date(),
       })
-      .where(eq(workflow.id, workflowId));
+      .where(
+        and(
+          eq(workflow.id, workflowId),
+          eq(workflow.organizationId, organizationId)
+        )
+      );
 
     return row;
   });
@@ -396,6 +401,7 @@ async function processScheduleTrigger(
   );
 
   // Update last triggered timestamp
+  // biome-ignore lint/plugin: workflowId already verified to belong to organizationId by the org-scoped fetch at the top of this function.
   await db
     .update(workflow)
     .set({ lastTriggeredAt: now })
@@ -446,6 +452,7 @@ async function getSegmentContacts(
   organizationId: string
 ): Promise<{ id: string }[]> {
   // 1. Fetch segment condition
+  // biome-ignore lint/plugin: segmentId comes from wf.triggerConfig on an already org-verified workflow; even so, step 2 below re-scopes every returned contact by organizationId, so a wrong segmentId could at most leak a filter shape, never cross-org contact data.
   const [seg] = await db
     .select({ condition: segment.condition })
     .from(segment)
@@ -560,7 +567,12 @@ async function processStep(executionId: string, stepId: string): Promise<void> {
     log.error("Contact not found", undefined, {
       contactId: execution.contactId,
     });
-    await failExecution(executionId, "Contact not found", stepId);
+    await failExecution(
+      executionId,
+      "Contact not found",
+      stepId,
+      execution.organizationId
+    );
     return;
   }
 
@@ -573,7 +585,12 @@ async function processStep(executionId: string, stepId: string): Promise<void> {
 
   if (!step) {
     log.error("Step not found in workflow", undefined, { stepId });
-    await failExecution(executionId, `Step ${stepId} not found`, stepId);
+    await failExecution(
+      executionId,
+      `Step ${stepId} not found`,
+      stepId,
+      execution.organizationId
+    );
     return;
   }
 
@@ -634,6 +651,7 @@ async function processStep(executionId: string, stepId: string): Promise<void> {
   // Atomic claim: update execution status only if it is NOT in a terminal state.
   // This prevents cancelled/completed/failed executions from being resurrected
   // by delayed or duplicate SQS messages.
+  // biome-ignore lint/plugin: executionId comes from an internally-enqueued WorkflowJob SQS message — trusted internal plumbing, never external input; wf/contactRecord above independently re-verify organizationId.
   const [claimedExecution] = await db
     .update(workflowExecution)
     .set({ currentStepId: stepId, status: "active", updatedAt: new Date() })
@@ -663,7 +681,12 @@ async function processStep(executionId: string, stepId: string): Promise<void> {
       executionId,
       stepId,
     });
-    await failExecution(executionId, "execution lifetime exceeded", stepId);
+    await failExecution(
+      executionId,
+      "execution lifetime exceeded",
+      stepId,
+      claimedExecution.organizationId
+    );
     return;
   }
 
@@ -697,7 +720,7 @@ async function processStep(executionId: string, stepId: string): Promise<void> {
       // Step is waiting (e.g., delay scheduled, waiting for event)
       // Execution status already updated by the step handler
     } else if (result.action === "exit") {
-      await completeExecution(executionId);
+      await completeExecution(executionId, wf.organizationId);
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -712,7 +735,7 @@ async function processStep(executionId: string, stepId: string): Promise<void> {
       })
       .where(eq(workflowStepExecution.id, stepExec.id));
 
-    await failExecution(executionId, errorMessage, stepId);
+    await failExecution(executionId, errorMessage, stepId, wf.organizationId);
   }
 }
 
@@ -759,7 +782,7 @@ async function executeStep(
         execution,
         step.id,
         organizationId,
-        completeExecution
+        (execId) => completeExecution(execId, organizationId)
       );
 
     case "condition":
@@ -840,7 +863,7 @@ async function processNextStep(
 
   if (!nextTransition) {
     // No next step - complete execution
-    await completeExecution(execution.id);
+    await completeExecution(execution.id, execution.organizationId);
     return;
   }
 
@@ -866,6 +889,7 @@ async function resumeExecution(
   branch: WorkflowBranch
 ): Promise<void> {
   // Atomic claim: only one caller can transition waiting → active
+  // biome-ignore lint/plugin: executionId comes from an internally-enqueued WorkflowJob SQS "resume" message (see workflow-queue.ts) — populated from executions already resolved org-scoped by their originating webhook/timeout handler, never external input.
   const [claimed] = await db
     .update(workflowExecution)
     .set({
@@ -930,7 +954,8 @@ async function resumeExecution(
     await failExecution(
       executionId,
       "Workflow not found",
-      claimed.currentStepId ?? "unknown"
+      claimed.currentStepId ?? "unknown",
+      claimed.organizationId
     );
     return;
   }
@@ -948,7 +973,8 @@ async function resumeExecution(
     await failExecution(
       executionId,
       `Step ${claimed.currentStepId} not found`,
-      claimed.currentStepId ?? "unknown"
+      claimed.currentStepId ?? "unknown",
+      claimed.organizationId
     );
     return;
   }
@@ -981,7 +1007,10 @@ async function resumeExecution(
 /**
  * Mark execution as completed
  */
-async function completeExecution(executionId: string): Promise<void> {
+async function completeExecution(
+  executionId: string,
+  organizationId: string
+): Promise<void> {
   await db.transaction(async (tx) => {
     const [execution] = await tx
       .update(workflowExecution)
@@ -993,6 +1022,7 @@ async function completeExecution(executionId: string): Promise<void> {
       .where(
         and(
           eq(workflowExecution.id, executionId),
+          eq(workflowExecution.organizationId, organizationId),
           notInArray(workflowExecution.status, [...TERMINAL_STATUSES])
         )
       )
@@ -1005,7 +1035,12 @@ async function completeExecution(executionId: string): Promise<void> {
           activeExecutions: sql`GREATEST(0, ${workflow.activeExecutions} - 1)`,
           completedExecutions: sql`${workflow.completedExecutions} + 1`,
         })
-        .where(eq(workflow.id, execution.workflowId));
+        .where(
+          and(
+            eq(workflow.id, execution.workflowId),
+            eq(workflow.organizationId, organizationId)
+          )
+        );
     } else {
       log.warn(
         "completeExecution: execution already in terminal state, skipping",
@@ -1021,6 +1056,7 @@ async function completeExecution(executionId: string): Promise<void> {
  * Increment the dropped executions counter on a workflow
  */
 async function incrementDroppedExecutions(workflowId: string): Promise<void> {
+  // biome-ignore lint/plugin: every call site passes a workflowId already verified org-scoped by the `wf` fetch in triggerWorkflow above.
   await db
     .update(workflow)
     .set({
@@ -1036,7 +1072,8 @@ async function incrementDroppedExecutions(workflowId: string): Promise<void> {
 export async function failExecution(
   executionId: string,
   error: string,
-  stepId: string
+  stepId: string,
+  organizationId: string
 ): Promise<void> {
   await db.transaction(async (tx) => {
     const [execution] = await tx
@@ -1051,6 +1088,7 @@ export async function failExecution(
       .where(
         and(
           eq(workflowExecution.id, executionId),
+          eq(workflowExecution.organizationId, organizationId),
           notInArray(workflowExecution.status, [...TERMINAL_STATUSES])
         )
       )
@@ -1063,7 +1101,12 @@ export async function failExecution(
           activeExecutions: sql`GREATEST(0, ${workflow.activeExecutions} - 1)`,
           failedExecutions: sql`${workflow.failedExecutions} + 1`,
         })
-        .where(eq(workflow.id, execution.workflowId));
+        .where(
+          and(
+            eq(workflow.id, execution.workflowId),
+            eq(workflow.organizationId, organizationId)
+          )
+        );
     } else {
       log.warn("failExecution: execution already in terminal state, skipping", {
         executionId,

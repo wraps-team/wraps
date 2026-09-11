@@ -108,6 +108,7 @@ async function validateApiKey(key: string): Promise<AuthContext | null> {
   }
 
   // Update last used timestamp
+  // biome-ignore lint/plugin: result.id is the row just resolved by its unique keyHash above — that lookup IS how the org gets identified for this API key.
   await db
     .update(apiKey)
     .set({ lastUsedAt: new Date() })

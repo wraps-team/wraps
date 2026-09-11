@@ -104,6 +104,7 @@ async function getOrgAwsAccounts(
   if (awsAccountId) {
     conditions.push(eq(awsAccount.id, awsAccountId));
   }
+  // biome-ignore lint/plugin: the org predicate built above is always the first entry in `conditions` — the plugin can't trace `organizationId` through the `...conditions` spread.
   return await db
     .select({
       id: awsAccount.id,
@@ -111,7 +112,6 @@ async function getOrgAwsAccounts(
       region: awsAccount.region,
     })
     .from(awsAccount)
-    // biome-ignore lint/plugin: the org predicate built above is always the first entry in `conditions` — the org-scope plugin can't trace it through the spread.
     .where(and(...conditions));
 }
 

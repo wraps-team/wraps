@@ -6,10 +6,10 @@ language js
 // Cross-org IDOR defense: the mutation itself must carry the scope so the
 // protection survives refactors, even if a caller validated ownership earlier.
 //
-// Escape hatch: use `// biome-ignore lint/plugin: <reason>` on the .where(
-// line when scope is guaranteed by context (id came from an org-scoped
-// lookup in the same function).
-`db.update($table).set($set).where($where)` as $source where {
+// Escape hatch: use `// biome-ignore lint/plugin: <reason>` on the line
+// above the statement when scope is guaranteed by context (id came from an
+// org-scoped lookup in the same function).
+`$prefix.update($table).set($set).where($where)` as $source where {
   $table <: or {
     `contact`,
     `topic`,
@@ -41,5 +41,5 @@ language js
     `eventUsageMonthly`
   },
   ! $where <: contains `$table.organizationId`,
-  register_diagnostic(span=$source, severity="warn", message="db.update(<orgScopedTable>) WHERE clause missing <table>.organizationId scope. Add eq(<table>.organizationId, ...) to the predicate, or add `// biome-ignore lint/plugin: <reason>` on the .where( line if the id is guaranteed org-scoped in this context.")
+  register_diagnostic(span=$source, severity="error", message="db.update(<orgScopedTable>) WHERE clause missing <table>.organizationId scope. Add eq(<table>.organizationId, ...) to the predicate, or add `// biome-ignore lint/plugin: <reason>` on the line above the statement if the id is guaranteed org-scoped in this context.")
 }

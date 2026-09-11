@@ -302,7 +302,14 @@ async function adoptOrphanRow(
     const orphanRank = ORPHAN_STATUS_RANK[orphan.status] ?? 0;
     const orphanIsMoreAdvanced = orphanRank > (ORPHAN_STATUS_RANK.sent ?? 0);
 
-    await tx.delete(messageSend).where(eq(messageSend.id, orphan.id));
+    await tx
+      .delete(messageSend)
+      .where(
+        and(
+          eq(messageSend.id, orphan.id),
+          eq(messageSend.organizationId, ctx.organizationId)
+        )
+      );
 
     await tx
       .update(messageSend)
@@ -892,6 +899,7 @@ async function setBatchStatus(
   // insert type rejects as SQL-not-assignable-to-number.
   values: PgUpdateSetSource<typeof batchSend>
 ): Promise<void> {
+  // biome-ignore lint/plugin: every call site passes a batchId already verified org-scoped by the "Scoped by (id, organizationId)" fetch in processJob above.
   await db
     .update(batchSend)
     .set(values)
@@ -1171,6 +1179,7 @@ async function processJob(
       // staleness as its "no progress" signal, so the pause path must leave it
       // alone. pausedAt is the separate liveness heartbeat that lets
       // broadcast-reaper tell an alive pause loop from a dead one.
+      // biome-ignore lint/plugin: batchId is verified org-scoped by the "Scoped by (id, organizationId)" fetch in processJob above.
       await db
         .update(batchSend)
         .set({ pausedReason: "quota_reserve", pausedAt: new Date() })
@@ -1577,6 +1586,7 @@ async function processJob(
           // rather than lastChunkAt. This branch matters most in practice: a
           // send larger than the account's daily quota spends the majority of
           // its wall-clock right here, cycling every 900s for days.
+          // biome-ignore lint/plugin: batchId is verified org-scoped by the "Scoped by (id, organizationId)" fetch in processJob above.
           await db
             .update(batchSend)
             .set({ pausedReason: "daily_quota", pausedAt: new Date() })
@@ -1847,6 +1857,7 @@ async function processJob(
 
   // Update contact email counters for successful sends
   if (sentContactIds.length > 0) {
+    // biome-ignore lint/plugin: sentContactIds are ids of contacts fetched org-scoped by getContactsChunk earlier in this job (eq(contact.organizationId, organizationId)).
     await db
       .update(contact)
       .set({
@@ -1862,6 +1873,7 @@ async function processJob(
   const lastContact = contacts.at(-1);
   const nextCursor = lastContact ? { id: lastContact.id } : null;
 
+  // biome-ignore lint/plugin: batchId is verified org-scoped by the "Scoped by (id, organizationId)" fetch in processJob above.
   await db
     .update(batchSend)
     .set({
@@ -2039,6 +2051,7 @@ export async function getContactsChunk(
     conditions.push(lte(contact.createdAt, filter.createdBefore));
   }
 
+  // biome-ignore lint/plugin: the org predicate built above is always the first entry in `conditions` — the plugin can't trace `organizationId` through the `...conditions` spread.
   return db
     .select({
       id: contact.id,

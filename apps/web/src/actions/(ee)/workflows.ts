@@ -296,6 +296,7 @@ export const listWorkflows = orgAction(
     }
 
     // Get total count
+    // biome-ignore lint/plugin: the org predicate built above is always the first entry in `conditions` — the plugin can't trace `organizationId` through the `...conditions` spread.
     const [totalResult] = await db
       .select({ count: count() })
       .from(workflow)
@@ -780,6 +781,7 @@ export const deleteWorkflow = orgAction(
     }
 
     // Check for active executions
+    // biome-ignore lint/plugin: workflowId already verified org-scoped by the "Verify workflow exists" fetch above.
     const [activeCount] = await db
       .select({ count: count() })
       .from(workflowExecution)
@@ -1370,6 +1372,7 @@ export const listWorkflowExecutions = orgAction(
       conditions.push(eq(workflowExecution.status, status));
     }
 
+    // biome-ignore lint/plugin: the org predicate built above is always the second entry in `conditions` — the plugin can't trace `organizationId` through the `...conditions` spread.
     const [totalResult] = await db
       .select({ count: count() })
       .from(workflowExecution)

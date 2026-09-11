@@ -610,6 +610,13 @@
       "when": 1789105481456,
       "tag": "0086_curvy_peter_quill",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1789136804217,
+      "tag": "0087_aromatic_arclight",
+      "breakpoints": true
     }
   ]
 }

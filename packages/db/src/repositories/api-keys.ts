@@ -62,6 +62,7 @@ export async function touchApiKeyLastUsed(
   apiKeyId: string,
   dbClient: DbClient = db
 ): Promise<void> {
+  // biome-ignore lint/plugin: auth-bootstrap path (verifyApiKey in apps/web/src/actions/api-keys.ts) — apiKeyId comes from findApiKeyByHash above, which is how organizationId gets discovered in the first place, so it cannot be pre-scoped here. apiKeyId is a UUID PK identifying exactly one row regardless of org.
   await dbClient
     .update(apiKey)
     .set({ lastUsedAt: new Date() })

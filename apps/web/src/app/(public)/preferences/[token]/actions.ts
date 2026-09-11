@@ -432,6 +432,7 @@ export async function resendConfirmation(
 
   try {
     // Get contact email
+    // biome-ignore lint/plugin: contactId is verified against the signed unsubscribe token's cid/oid claims above (payload.cid === contactId && payload.oid === organizationId) — token authenticity establishes both contact and org ownership.
     const [contactRecord] = await db
       .select({ email: contact.email })
       .from(contact)

@@ -6,8 +6,8 @@ language js
 // Cross-org IDOR defense on reads — prevents returning another org's rows
 // even when a caller passes a valid-looking id.
 //
-// Escape hatch: use `// biome-ignore lint/plugin: <reason>` on the .where(
-// line when scope is guaranteed by context.
+// Escape hatch: use `// biome-ignore lint/plugin: <reason>` on the line
+// above the statement when scope is guaranteed by context.
 `$prefix.from($table).where($where)` as $source where {
   $table <: or {
     `contact`,
@@ -40,5 +40,5 @@ language js
     `eventUsageMonthly`
   },
   ! $where <: contains `organizationId`,
-  register_diagnostic(span=$source, severity="warn", message="db.select().from(<orgScopedTable>) WHERE clause missing organizationId scope. Add eq(<table>.organizationId, ...) to the predicate, or add `// biome-ignore lint/plugin: <reason>` on the .where( line if the scope is guaranteed via a JOINed org-scoped table.")
+  register_diagnostic(span=$source, severity="error", message="db.select().from(<orgScopedTable>) WHERE clause missing organizationId scope. Add eq(<table>.organizationId, ...) to the predicate, or add `// biome-ignore lint/plugin: <reason>` on the line above the statement if the scope is guaranteed via a JOINed org-scoped table.")
 }

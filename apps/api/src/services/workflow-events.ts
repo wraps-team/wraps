@@ -658,6 +658,7 @@ export async function cancelExecutionsForTopicUnsubscribe(params: {
 
   // Batch cancel all executions
   const executionIds = activeExecutions.map((e) => e.id);
+  // biome-ignore lint/plugin: executionIds all come from the activeExecutions query above, which is already scoped by eq(workflowExecution.organizationId, organizationId).
   await db
     .update(workflowExecution)
     .set({
@@ -677,6 +678,7 @@ export async function cancelExecutionsForTopicUnsubscribe(params: {
   }
   await Promise.all(
     [...countsByWorkflow.entries()].map(([wfId, count]) =>
+      // biome-ignore lint/plugin: wfId values come from countsByWorkflow, built from activeExecutions.workflowId, which is itself drawn from matchingWorkflows above — already scoped by eq(workflow.organizationId, organizationId).
       db
         .update(workflow)
         .set({

@@ -257,7 +257,12 @@ export async function DELETE(_request: Request, context: RouteContext) {
           await tx
             .update(brandKit)
             .set({ isDefault: true })
-            .where(eq(brandKit.id, remainingKit.id));
+            .where(
+              and(
+                eq(brandKit.id, remainingKit.id),
+                eq(brandKit.organizationId, orgWithMembership.id)
+              )
+            );
         }
       }
 

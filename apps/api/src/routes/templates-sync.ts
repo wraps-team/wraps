@@ -465,7 +465,12 @@ export async function upsertTemplateFromCli(
         lastEditedFrom: "cli",
         updatedAt: now,
       })
-      .where(eq(template.id, existing.id));
+      .where(
+        and(
+          eq(template.id, existing.id),
+          eq(template.organizationId, authContext.organizationId)
+        )
+      );
 
     return {
       id: existing.id,

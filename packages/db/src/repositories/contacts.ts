@@ -161,6 +161,7 @@ export async function listContacts(
     );
   }
 
+  // biome-ignore lint/plugin: the org predicate built above is always the first entry in `conditions` — the plugin can't trace `organizationId` through the `...conditions` spread.
   const [countResult] = await dbClient
     .select({ count: sql<number>`count(*)::int` })
     .from(contact)
@@ -168,6 +169,7 @@ export async function listContacts(
 
   const total = countResult?.count ?? 0;
 
+  // biome-ignore lint/plugin: the org predicate built above is always the first entry in `conditions` — the plugin can't trace `organizationId` through the `...conditions` spread.
   const contacts = await dbClient
     .select()
     .from(contact)
@@ -587,6 +589,7 @@ export async function listContactsWithRelations(
     where = and(...conditions);
   }
 
+  // biome-ignore lint/plugin: `where` above is built from `conditions`, whose first entry is always eq(contact.organizationId, organizationId) — the plugin can't trace it through the `where` variable.
   const [countResult] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(contact)

@@ -44,10 +44,12 @@ export async function runReaper(db: DrizzleDB): Promise<void> {
   // ── a) Paused executions stuck for more than 30 minutes ──────────────────
   // A paused execution has an EventBridge schedule that should have fired by now.
   // If nextStepScheduledAt is > 30 min ago, the delivery was lost.
-  // guardrail:allow-unscoped — privileged system Lambda; processes all orgs by design
+  // baseline:allow-unscoped — privileged system Lambda; processes all orgs by design
+  // biome-ignore lint/plugin: privileged system Lambda; processes all orgs by design (see baseline:allow-unscoped above)
   const pausedCandidates = await db
     .select({
       id: workflowExecution.id,
+      organizationId: workflowExecution.organizationId,
       nextStepScheduledAt: workflowExecution.nextStepScheduledAt,
     })
     .from(workflowExecution)
@@ -82,12 +84,13 @@ export async function runReaper(db: DrizzleDB): Promise<void> {
     log.info("[workflow-reaper] Failing paused stuck executions", {
       count: pausedStuck.length,
     });
-    for (const { id } of pausedStuck) {
+    for (const { id, organizationId } of pausedStuck) {
       try {
         await failExecution(
           id,
           "execution stuck: paused step not delivered",
-          "unknown"
+          "unknown",
+          organizationId
         );
         log.info("[workflow-reaper] Failed paused stuck execution", {
           executionId: id,
@@ -114,10 +117,12 @@ export async function runReaper(db: DrizzleDB): Promise<void> {
   // ── b) Waiting executions past their waitTimeoutAt by more than 5 minutes ─
   // A waiting execution should have been resumed by a timeout schedule. If
   // waitTimeoutAt is > 5 min ago, the scheduler missed it.
-  // guardrail:allow-unscoped — privileged system Lambda; processes all orgs by design
+  // baseline:allow-unscoped — privileged system Lambda; processes all orgs by design
+  // biome-ignore lint/plugin: privileged system Lambda; processes all orgs by design (see baseline:allow-unscoped above)
   const waitingCandidates = await db
     .select({
       id: workflowExecution.id,
+      organizationId: workflowExecution.organizationId,
       waitTimeoutAt: workflowExecution.waitTimeoutAt,
     })
     .from(workflowExecution)
@@ -148,12 +153,13 @@ export async function runReaper(db: DrizzleDB): Promise<void> {
     log.info("[workflow-reaper] Failing waiting expired executions", {
       count: waitingExpired.length,
     });
-    for (const { id } of waitingExpired) {
+    for (const { id, organizationId } of waitingExpired) {
       try {
         await failExecution(
           id,
           "execution stuck: waiting timeout expired",
-          "unknown"
+          "unknown",
+          organizationId
         );
         log.info("[workflow-reaper] Failed waiting expired execution", {
           executionId: id,

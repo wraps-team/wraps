@@ -6,9 +6,9 @@ language js
 // Cross-org IDOR defense on mass-delete operations — arguably the most
 // important scope check since an unbounded DELETE can wipe other orgs' data.
 //
-// Escape hatch: use `// biome-ignore lint/plugin: <reason>` on the .where(
-// line when scope is guaranteed by context.
-`db.delete($table).where($where)` as $source where {
+// Escape hatch: use `// biome-ignore lint/plugin: <reason>` on the line
+// above the statement when scope is guaranteed by context.
+`$prefix.delete($table).where($where)` as $source where {
   $table <: or {
     `contact`,
     `topic`,
@@ -40,5 +40,5 @@ language js
     `eventUsageMonthly`
   },
   ! $where <: contains `$table.organizationId`,
-  register_diagnostic(span=$source, severity="warn", message="db.delete(<orgScopedTable>) WHERE clause missing <table>.organizationId scope. Add eq(<table>.organizationId, ...) to the predicate, or add `// biome-ignore lint/plugin: <reason>` on the .where( line.")
+  register_diagnostic(span=$source, severity="error", message="db.delete(<orgScopedTable>) WHERE clause missing <table>.organizationId scope. Add eq(<table>.organizationId, ...) to the predicate, or add `// biome-ignore lint/plugin: <reason>` on the line above the statement.")
 }

@@ -323,6 +323,7 @@ async function queryTotals(
   // A real aggregate query with the same WHERE and no GROUP BY — not a
   // client-side sum of the bucketed rows, which would be wrong for any
   // distinct-count metric added later.
+  // biome-ignore lint/plugin: buildWhereConditions above always returns eq(messageSend.organizationId, query.organizationId) as its first entry — the plugin can't trace `organizationId` through the `...conditions` spread.
   const [row] = await dbClient
     .select({ ...AGGREGATE_FIELDS })
     .from(messageSend)

@@ -209,6 +209,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
     // malicious org can register a victim's account number), so we must resolve the
     // correct row by matching the inbound secret rather than picking an arbitrary
     // row. webhook_secret is 32 random bytes — collisions are impossible.
+    // biome-ignore lint/plugin: organizationId is not yet known — this query IS the identity resolution step; the timing-safe secret match below picks the org.
     const candidates = await db
       .select({
         id: awsAccount.id,
@@ -287,6 +288,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
     // past the staleness worker's never-connected gate, straight into a false
     // "feed stalled" alert (SHC, 2026-08-25).
     try {
+      // biome-ignore lint/plugin: account.id came from the webhook-secret-matched account resolved above, which is already the correct org's row.
       await db
         .update(awsAccount)
         .set({ lastEventReceivedAt: new Date() })
@@ -476,6 +478,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
         case "Rendering Failure":
           await processRenderingFailure(
             message,
+            account.organizationId,
             event.detail.failure?.errorMessage,
             event.detail.failure?.templateName,
             mail.tags
@@ -575,6 +578,7 @@ async function processDelivery(
   // with an atomic status='failed' flip below, so exactly one of N
   // concurrent duplicate events wins and the counter decrement can never
   // double-apply.
+  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
   const updated = await db
     .update(messageSend)
     .set({ status: "delivered", deliveredAt })
@@ -588,6 +592,7 @@ async function processDelivery(
 
   let wasWronglyFailed = false;
   if (updated.length === 0) {
+    // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
     const healed = await db
       .update(messageSend)
       .set({ status: "delivered", deliveredAt, error: null })
@@ -611,6 +616,7 @@ async function processDelivery(
 
   // Increment batchSend counter if applicable
   if (message.batchSendId) {
+    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(batchSend)
       .set({
@@ -646,6 +652,7 @@ async function processOpen(
   }
 
   // Atomic update: WHERE openedAt IS NULL prevents TOCTOU race
+  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
   const result = await db
     .update(messageSend)
     .set({
@@ -665,6 +672,7 @@ async function processOpen(
 
   // Increment batchSend counter if applicable
   if (message.batchSendId) {
+    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(batchSend)
       .set({
@@ -675,6 +683,7 @@ async function processOpen(
 
   // Update contact engagement
   if (message.contactId) {
+    // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(contact)
       .set({
@@ -712,6 +721,7 @@ async function processClick(
   }
 
   // Atomic update: WHERE clickedAt IS NULL prevents TOCTOU race
+  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
   const result = await db
     .update(messageSend)
     .set({
@@ -732,6 +742,7 @@ async function processClick(
 
   // Increment batchSend counter if applicable
   if (message.batchSendId) {
+    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(batchSend)
       .set({
@@ -742,6 +753,7 @@ async function processClick(
 
   // Update contact engagement
   if (message.contactId) {
+    // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(contact)
       .set({
@@ -787,6 +799,7 @@ async function processBounce(
 
   // Update messageSend status — guarded on a genuine transition (WHERE status
   // <> 'bounced') so a duplicate Bounce event does not re-count.
+  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
   const transitioned = await db
     .update(messageSend)
     .set({
@@ -809,6 +822,7 @@ async function processBounce(
 
   // Increment batchSend counter if applicable
   if (message.batchSendId) {
+    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(batchSend)
       .set({
@@ -819,6 +833,7 @@ async function processBounce(
 
   // Update contact status for permanent bounces
   if (message.contactId && bounceType === "Permanent") {
+    // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(contact)
       .set({
@@ -855,6 +870,7 @@ async function processComplaint(
 
   // Update messageSend status — guarded on a genuine transition (WHERE status
   // <> 'complained') so a duplicate Complaint event does not re-count.
+  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
   const transitioned = await db
     .update(messageSend)
     .set({
@@ -875,6 +891,7 @@ async function processComplaint(
 
   // Increment batchSend counter if applicable
   if (message.batchSendId) {
+    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(batchSend)
       .set({
@@ -885,6 +902,7 @@ async function processComplaint(
 
   // Update contact status
   if (message.contactId) {
+    // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(contact)
       .set({
@@ -975,6 +993,7 @@ async function processReject(
   // SES rejected the message before attempting delivery (e.g., bad content, account reputation).
   // The status enum has no `rejected`, so the reason has to be carried in `error` -
   // otherwise the dashboard shows a bare "Failed" with nothing to act on.
+  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
   await db
     .update(messageSend)
     .set({
@@ -1010,6 +1029,7 @@ async function processSuppression(
 
   // Update messageSend status — guarded on a genuine transition (WHERE status
   // <> 'suppressed') so a duplicate Suppressed event does not re-count.
+  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
   const transitioned = await db
     .update(messageSend)
     .set({
@@ -1030,6 +1050,7 @@ async function processSuppression(
 
   // Increment batchSend counter if applicable
   if (message.batchSendId) {
+    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(batchSend)
       .set({
@@ -1040,6 +1061,7 @@ async function processSuppression(
 
   // Update contact status - all suppressions mark contact as suppressed
   if (message.contactId) {
+    // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(contact)
       .set({
@@ -1057,6 +1079,7 @@ async function processSuppression(
 
 async function processRenderingFailure(
   message: MessageRecord,
+  organizationId: string,
   errorMessage?: string,
   templateName?: string,
   tags?: Record<string, string[]>
@@ -1066,6 +1089,7 @@ async function processRenderingFailure(
     : "Template rendering failure";
 
   // Update messageSend status to failed with the rendering error
+  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
   await db
     .update(messageSend)
     .set({
@@ -1076,6 +1100,7 @@ async function processRenderingFailure(
 
   // Increment batchSend failure counter if applicable
   if (message.batchSendId) {
+    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(batchSend)
       .set({
@@ -1084,7 +1109,11 @@ async function processRenderingFailure(
       .where(eq(batchSend.id, message.batchSendId));
   }
 
-  // Fail the workflow execution if this was a workflow-sent email
+  // Fail the workflow execution if this was a workflow-sent email.
+  // executionId comes from SES message tags — attacker-influenced for any
+  // customer sending directly through their own SES account into their own
+  // Wraps-deployed event stream — so both updates below must carry the org
+  // predicate explicitly, not rely on executionId alone (cross-org IDOR).
   const executionId = tags?.executionId?.[0];
   if (executionId) {
     await db.transaction(async (tx) => {
@@ -1099,6 +1128,7 @@ async function processRenderingFailure(
         .where(
           and(
             eq(workflowExecution.id, executionId),
+            eq(workflowExecution.organizationId, organizationId),
             inArray(workflowExecution.status, ["active", "paused", "waiting"])
           )
         )
@@ -1111,7 +1141,12 @@ async function processRenderingFailure(
             activeExecutions: sql`GREATEST(0, ${workflow.activeExecutions} - 1)`,
             failedExecutions: sql`${workflow.failedExecutions} + 1`,
           })
-          .where(eq(workflow.id, execution.workflowId));
+          .where(
+            and(
+              eq(workflow.id, execution.workflowId),
+              eq(workflow.organizationId, organizationId)
+            )
+          );
       }
     });
   }

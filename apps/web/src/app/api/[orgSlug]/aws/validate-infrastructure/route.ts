@@ -167,6 +167,7 @@ export async function POST(request: Request, context: RouteContext) {
 
       if (existingAccount) {
         // Update existing account with detected features
+        // biome-ignore lint/plugin: existingAccount.id comes from the org-scoped findFirst above (eq(table.organizationId, orgWithMembership.id)).
         await db
           .update(awsAccount)
           .set({

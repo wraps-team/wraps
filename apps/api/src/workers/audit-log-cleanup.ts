@@ -91,6 +91,7 @@ async function deleteOldLogsForOrg(
     }
 
     const ids = batch.map((r) => r.id);
+    // biome-ignore lint/plugin: ids come from the batch select above, already scoped by eq(auditLog.organizationId, organizationId).
     await db.delete(auditLog).where(inArray(auditLog.id, ids));
 
     totalDeleted += ids.length;

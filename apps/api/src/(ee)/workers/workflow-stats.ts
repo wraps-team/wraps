@@ -1,5 +1,5 @@
 import { db, eq, workflow, workflowExecution } from "@wraps/db";
-import { sql } from "drizzle-orm";
+import { and, sql } from "drizzle-orm";
 
 export type ReconcileResult = {
   workflowId: string;
@@ -22,6 +22,7 @@ const ACTIVE_STATUSES = new Set(["active", "pending", "paused", "waiting"]);
 
 export async function reconcileWorkflowStats(
   workflowId: string,
+  organizationId: string,
   options?: { fix?: boolean }
 ): Promise<ReconcileResult> {
   // Load current denormalized stats
@@ -34,7 +35,12 @@ export async function reconcileWorkflowStats(
       failedExecutions: workflow.failedExecutions,
     })
     .from(workflow)
-    .where(eq(workflow.id, workflowId));
+    .where(
+      and(
+        eq(workflow.id, workflowId),
+        eq(workflow.organizationId, organizationId)
+      )
+    );
 
   // Count actual executions grouped by status
   const counts = await db
@@ -43,7 +49,12 @@ export async function reconcileWorkflowStats(
       count: sql<number>`count(*)::int`,
     })
     .from(workflowExecution)
-    .where(eq(workflowExecution.workflowId, workflowId))
+    .where(
+      and(
+        eq(workflowExecution.workflowId, workflowId),
+        eq(workflowExecution.organizationId, organizationId)
+      )
+    )
     .groupBy(workflowExecution.status);
 
   // Compute actual totals
@@ -93,7 +104,12 @@ export async function reconcileWorkflowStats(
         completedExecutions: actual.completedExecutions,
         failedExecutions: actual.failedExecutions,
       })
-      .where(eq(workflow.id, workflowId));
+      .where(
+        and(
+          eq(workflow.id, workflowId),
+          eq(workflow.organizationId, organizationId)
+        )
+      );
   }
 
   return { workflowId, before, actual, drifted };

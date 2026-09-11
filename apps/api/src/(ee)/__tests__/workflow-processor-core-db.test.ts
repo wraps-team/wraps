@@ -152,7 +152,7 @@ describe("Workflow processor core (real DB)", () => {
         })
       );
 
-      await failExecution(EXEC_ID, "boom", "step-1");
+      await failExecution(EXEC_ID, "boom", "step-1", ids.org);
 
       const exec = await getExecution();
       expect(exec.status).toBe("failed");
@@ -177,9 +177,9 @@ describe("Workflow processor core (real DB)", () => {
         })
       );
 
-      await failExecution(EXEC_ID, "boom", "step-1");
+      await failExecution(EXEC_ID, "boom", "step-1", ids.org);
       // Second delivery (SQS at-least-once): execution is already failed.
-      await failExecution(EXEC_ID, "boom again", "step-9");
+      await failExecution(EXEC_ID, "boom again", "step-9", ids.org);
 
       const wf = await getWorkflow();
       // Counters must NOT double — the notInArray(TERMINAL_STATUSES) guard

@@ -266,6 +266,7 @@ export async function reconcileScheduleChains(): Promise<{
     );
   }
 
+  // biome-ignore lint/plugin: privileged system Lambda; reconciles EventBridge schedules for all orgs' scheduled workflows by design.
   const workflows = await db
     .select({
       id: workflow.id,

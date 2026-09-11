@@ -79,7 +79,7 @@ describe("reconcileWorkflowStats", () => {
       };
     });
 
-    const result = await reconcileWorkflowStats("wf-1");
+    const result = await reconcileWorkflowStats("wf-1", "org-1");
 
     expect(result).toEqual({
       workflowId: "wf-1",
@@ -141,7 +141,7 @@ describe("reconcileWorkflowStats", () => {
       }),
     });
 
-    const result = await reconcileWorkflowStats("wf-1", { fix: true });
+    const result = await reconcileWorkflowStats("wf-1", "org-1", { fix: true });
 
     expect(result.drifted).toBe(true);
     // Should have called db.update to fix the counters
@@ -183,7 +183,7 @@ describe("reconcileWorkflowStats", () => {
       };
     });
 
-    const result = await reconcileWorkflowStats("wf-1", { fix: true });
+    const result = await reconcileWorkflowStats("wf-1", "org-1", { fix: true });
 
     expect(result.drifted).toBe(false);
     expect(result.before).toEqual(result.actual);

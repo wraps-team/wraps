@@ -117,7 +117,8 @@ export async function runBroadcastReaper(
   // double-enqueueing one is worse than waiting for its next cycle to stamp
   // the heartbeat.
   //
-  // guardrail:allow-unscoped — privileged system Lambda; sweeps all orgs by design
+  // baseline:allow-unscoped — privileged system Lambda; sweeps all orgs by design
+  // biome-ignore lint/plugin: privileged system Lambda; sweeps all orgs by design (see baseline:allow-unscoped above)
   const candidates = await dbClient
     .select({
       id: batchSend.id,

@@ -166,9 +166,9 @@ export const invitation = pgTable("invitation", {
 export const statement = pgTable("statement", {
   id: text("id").primaryKey(),
   userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
-  organizationId: text("organization_id").references(() => organization.id, {
-    onDelete: "cascade",
-  }),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
   roleId: text("role_id"),
   effect: text("effect").notNull(), // 'allow' | 'deny'
   action: text("action").notNull(),

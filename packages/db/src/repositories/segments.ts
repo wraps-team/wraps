@@ -44,6 +44,7 @@ export async function listSegmentsForOrg(
     conditions.push(sql`${segment.name} ILIKE ${search}`);
   }
 
+  // biome-ignore lint/plugin: the org predicate built above is always the first entry in `conditions` — the plugin can't trace `organizationId` through the `...conditions` spread.
   const [countResult] = await dbClient
     .select({ count: sql<number>`count(*)::int` })
     .from(segment)
@@ -51,6 +52,7 @@ export async function listSegmentsForOrg(
 
   const total = countResult?.count ?? 0;
 
+  // biome-ignore lint/plugin: the org predicate built above is always the first entry in `conditions` — the plugin can't trace `organizationId` through the `...conditions` spread.
   const baseQuery = dbClient
     .select()
     .from(segment)

@@ -462,6 +462,7 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
           .where(
             and(
               eq(workflowExecution.id, executionId),
+              eq(workflowExecution.organizationId, auth.organizationId),
               eq(workflowExecution.status, "failed")
             )
           )
@@ -477,7 +478,12 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
             activeExecutions: sql`${workflow.activeExecutions} + 1`,
             failedExecutions: sql`GREATEST(0, ${workflow.failedExecutions} - 1)`,
           })
-          .where(eq(workflow.id, exec.workflowId));
+          .where(
+            and(
+              eq(workflow.id, exec.workflowId),
+              eq(workflow.organizationId, auth.organizationId)
+            )
+          );
 
         return true;
       });
@@ -530,7 +536,12 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
               activeExecutions: sql`GREATEST(0, ${workflow.activeExecutions} - 1)`,
               failedExecutions: sql`${workflow.failedExecutions} + 1`,
             })
-            .where(eq(workflow.id, exec.workflowId));
+            .where(
+              and(
+                eq(workflow.id, exec.workflowId),
+                eq(workflow.organizationId, auth.organizationId)
+              )
+            );
         });
 
         log.error("Workflow execution retry enqueue failed", error, {

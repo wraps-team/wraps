@@ -134,7 +134,12 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
               features: (features ?? null) as any,
               updatedAt: new Date(),
             })
-            .where(eq(awsAccount.id, existing.id));
+            .where(
+              and(
+                eq(awsAccount.id, existing.id),
+                eq(awsAccount.organizationId, authContext.organizationId)
+              )
+            );
           connectionId = existing.id;
         } else {
           // Insert new
@@ -295,7 +300,12 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
           webhookSecret: null,
           updatedAt: new Date(),
         })
-        .where(eq(awsAccount.id, id));
+        .where(
+          and(
+            eq(awsAccount.id, id),
+            eq(awsAccount.organizationId, authContext.organizationId)
+          )
+        );
 
       return { success: true };
     },

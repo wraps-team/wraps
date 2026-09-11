@@ -528,7 +528,12 @@ export async function upsertWorkflowFromCli(
         lastEditedFrom: "cli",
         updatedAt: now,
       })
-      .where(eq(workflow.id, existing.id));
+      .where(
+        and(
+          eq(workflow.id, existing.id),
+          eq(workflow.organizationId, authContext.organizationId)
+        )
+      );
 
     return {
       id: existing.id,

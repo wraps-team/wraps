@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { existsSync, globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
@@ -1597,6 +1598,49 @@ describe("pnpm config is not stranded in package.json", () => {
         "CVE floors for transitive deps; dropping them re-admits the advisory " +
         "versions without any install-time signal."
     ).toBeGreaterThan(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// File-presence guardrails baseline.toml cannot enforce
+// ─────────────────────────────────────────────────────────
+//
+// code-baseline 1.6.0 does not load user-declared `file-presence` rules at
+// all (proven by a scratch-directory probe: a banned-pattern rule alongside
+// one loads as "1 rules loaded", and a missing required file produces no
+// diagnostic). The `required-project-files` and `no-env-committed` rules in
+// baseline.toml are left in place as documentation of intent, but they do
+// not run — these tests are the real check. Root-level env files are also
+// covered by the built-in `no-env-files` rule from `extends = ["security"]`;
+// `apps/web/.env` and `apps/api/.env` are not, which is why they're checked
+// here too.
+describe("file-presence guardrails (baseline.toml's file-presence rules don't load)", () => {
+  test("required project files exist", () => {
+    const required = [
+      "CLAUDE.md",
+      "baseline.toml",
+      "turbo.json",
+      "biome.jsonc",
+    ];
+    const missing = required.filter((file) => !existsSync(resolve(ROOT, file)));
+
+    expect(
+      missing,
+      `Missing critical project files: ${missing.join(", ")}.`
+    ).toEqual([]);
+  });
+
+  test("no env file is committed to the repository", () => {
+    const forbidden = [".env", ".env.local", "apps/web/.env", "apps/api/.env"];
+    const tracked = execSync("git ls-files", { cwd: ROOT, encoding: "utf-8" })
+      .split("\n")
+      .map((line) => line.trim());
+    const committed = forbidden.filter((file) => tracked.includes(file));
+
+    expect(
+      committed,
+      `Environment files must not be committed to the repository: ${committed.join(", ")}.`
+    ).toEqual([]);
   });
 });
 

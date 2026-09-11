@@ -532,6 +532,7 @@ async function checkAccount(account: AccountRow): Promise<void> {
 export const handler: Handler = wrapHandler(async () => {
   log.info("[account-health] Starting sweep");
 
+  // biome-ignore lint/plugin: privileged system Lambda; sweeps every org's AWS accounts by design (SES health check).
   const accounts = await db
     .select({
       id: awsAccount.id,

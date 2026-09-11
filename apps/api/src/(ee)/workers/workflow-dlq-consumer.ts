@@ -75,12 +75,14 @@ async function handleExecute(job: Extract<WorkflowJob, { type: "execute" }>) {
   await failExecution(
     job.executionId,
     `Step ${job.stepId} failed after SQS retries exhausted`,
-    job.stepId
+    job.stepId,
+    job.organizationId
   );
 }
 
 async function handleResume(job: Extract<WorkflowJob, { type: "resume" }>) {
   // Load execution to get currentStepId
+  // biome-ignore lint/plugin: job.executionId comes from an internally-enqueued WorkflowJob SQS message — populated exclusively by our own trusted server code from already org-resolved executions, never external input.
   const execution = await db
     .select({
       id: workflowExecution.id,
@@ -109,12 +111,14 @@ async function handleResume(job: Extract<WorkflowJob, { type: "resume" }>) {
   await failExecution(
     job.executionId,
     `Resume (${job.branch}) failed after SQS retries exhausted`,
-    execution[0].currentStepId ?? "unknown"
+    execution[0].currentStepId ?? "unknown",
+    job.organizationId
   );
 }
 
 async function handleTrigger(job: Extract<WorkflowJob, { type: "trigger" }>) {
   // Check if an execution was created before the failure
+  // biome-ignore lint/plugin: job.workflowId/contactId come from an internally-enqueued WorkflowJob SQS message — populated exclusively by our own trusted server code from already org-resolved state, never external input.
   const executions = await db
     .select({
       id: workflowExecution.id,
@@ -135,7 +139,8 @@ async function handleTrigger(job: Extract<WorkflowJob, { type: "trigger" }>) {
     await failExecution(
       executions[0].id,
       "Trigger failed after SQS retries exhausted",
-      "trigger"
+      "trigger",
+      job.organizationId
     );
     return;
   }
@@ -149,6 +154,7 @@ async function handleTrigger(job: Extract<WorkflowJob, { type: "trigger" }>) {
 async function handleScheduleTrigger(
   job: Extract<WorkflowJob, { type: "schedule-trigger" }>
 ) {
+  // biome-ignore lint/plugin: job.workflowId comes from an internally-enqueued WorkflowJob SQS message — populated exclusively by our own trusted server code, never external input.
   const [wf] = await db
     .select({
       id: workflow.id,
@@ -213,7 +219,8 @@ async function handleScheduleTrigger(
 async function failExecution(
   executionId: string,
   error: string,
-  stepId: string
+  stepId: string,
+  organizationId: string
 ): Promise<void> {
   await db.transaction(async (tx) => {
     const [execution] = await tx
@@ -228,6 +235,7 @@ async function failExecution(
       .where(
         and(
           eq(workflowExecution.id, executionId),
+          eq(workflowExecution.organizationId, organizationId),
           notInArray(workflowExecution.status, [
             "completed",
             "failed",
@@ -244,7 +252,12 @@ async function failExecution(
           activeExecutions: sql`GREATEST(0, ${workflow.activeExecutions} - 1)`,
           failedExecutions: sql`${workflow.failedExecutions} + 1`,
         })
-        .where(eq(workflow.id, execution.workflowId));
+        .where(
+          and(
+            eq(workflow.id, execution.workflowId),
+            eq(workflow.organizationId, organizationId)
+          )
+        );
 
       log.warn("DLQ: execution marked as failed", {
         executionId,
