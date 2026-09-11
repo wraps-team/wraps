@@ -1242,7 +1242,17 @@ Resources:
                   - "ses:ListConfigurationSets"
                   - "ses:GetConfigurationSet"
                   - "ses:GetConfigurationSetEventDestinations"
+                  - "ses:GetDedicatedIps"
                 Resource: "*"
+
+              # S3 - Inbound Bucket Feature Detection. The dashboard sends
+              # HeadBucket, which is authorized by s3:ListBucket — there is no
+              # s3:HeadBucket IAM action.
+              - Sid: "S3InboundBucketDetection"
+                Effect: Allow
+                Action:
+                  - "s3:ListBucket"
+                Resource: "arn:aws:s3:::wraps-inbound-*"
 
               # SES - Template Management
               - Sid: "SESTemplateManagement"
@@ -1254,6 +1264,12 @@ Resources:
                   - "ses:UpdateTemplate"
                   - "ses:DeleteTemplate"
                   - "ses:TestRenderTemplate"
+                  - "ses:GetEmailTemplate"
+                  - "ses:ListEmailTemplates"
+                  - "ses:CreateEmailTemplate"
+                  - "ses:UpdateEmailTemplate"
+                  - "ses:DeleteEmailTemplate"
+                  - "ses:TestRenderEmailTemplate"
                 Resource: "*"
 
               # SES - Send Access (for batch sending and test sends via dashboard)
@@ -1265,6 +1281,17 @@ Resources:
                   - "ses:SendTemplatedEmail"
                   - "ses:SendBulkTemplatedEmail"
                   - "ses:SendBulkEmail"
+                Resource: "*"
+
+              # SES - Suppression List (read + clear). Delete is deliberate:
+              # the dashboard's suppressions page unsuppresses an address.
+              # Put is intentionally absent.
+              - Sid: "SESSuppressionListAccess"
+                Effect: Allow
+                Action:
+                  - "ses:ListSuppressedDestinations"
+                  - "ses:GetSuppressedDestination"
+                  - "ses:DeleteSuppressedDestination"
                 Resource: "*"
 
               # DynamoDB - Read Email Events
@@ -1287,6 +1314,25 @@ Resources:
                   - "cloudformation:DescribeStacks"
                   - "cloudformation:ListStacks"
                 Resource: "*"
+
+              # Mail Manager - Archive Access. Gated on the same condition that
+              # creates the archive, so a stack without archiving grants
+              # nothing.
+              - !If
+                - HasEmailArchiving
+                - Sid: "MailManagerArchiveAccess"
+                  Effect: Allow
+                  Action:
+                    - "ses:StartArchiveSearch"
+                    - "ses:GetArchiveSearchResults"
+                    - "ses:GetArchiveMessage"
+                    - "ses:GetArchiveMessageContent"
+                    - "ses:GetArchive"
+                    - "ses:ListArchives"
+                    - "ses:StartArchiveExport"
+                    - "ses:GetArchiveExport"
+                  Resource: !Sub "arn:aws:ses:*:${AWS::AccountId}:mailmanager-archive/*"
+                - !Ref "AWS::NoValue"
       Tags:
         - Key: ManagedBy
           Value: wraps-cloudformation

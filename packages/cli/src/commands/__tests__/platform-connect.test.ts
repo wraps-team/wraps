@@ -407,7 +407,10 @@ describe("platform connect - import collision fix", () => {
       expect(actions).toContain("ses:GetConfigurationSet");
       expect(actions).toContain("ses:GetConfigurationSetEventDestinations");
       expect(actions).toContain("ses:GetDedicatedIps");
-      expect(actions).toContain("s3:HeadBucket");
+      // Inbound-bucket detection sends HeadBucket, which IAM authorizes with
+      // s3:ListBucket; there is no s3:HeadBucket action.
+      expect(actions).toContain("s3:ListBucket");
+      expect(actions).not.toContain("s3:HeadBucket");
       expect(actions).not.toContain("dynamodb:PutItem");
     });
 
@@ -428,7 +431,10 @@ describe("platform connect - import collision fix", () => {
       expect(actions).toContain("ses:GetConfigurationSet");
       expect(actions).toContain("ses:GetConfigurationSetEventDestinations");
       expect(actions).toContain("ses:GetDedicatedIps");
-      expect(actions).toContain("s3:HeadBucket");
+      // Inbound-bucket detection sends HeadBucket, which IAM authorizes with
+      // s3:ListBucket; there is no s3:HeadBucket action.
+      expect(actions).toContain("s3:ListBucket");
+      expect(actions).not.toContain("s3:HeadBucket");
       expect(actions).not.toContain("dynamodb:PutItem");
     });
 

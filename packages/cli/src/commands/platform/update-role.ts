@@ -163,9 +163,6 @@ export async function updateRole(options: UpdateRoleOptions): Promise<void> {
   const sendingEnabled =
     !emailConfig ||
     (emailConfig.sendingEnabled as boolean | undefined) !== false;
-  const eventTracking = emailConfig?.eventTracking as
-    | Record<string, unknown>
-    | undefined;
   const emailArchiving = emailConfig?.emailArchiving as
     | Record<string, unknown>
     | undefined;
@@ -302,10 +299,6 @@ export async function updateRole(options: UpdateRoleOptions): Promise<void> {
     `  ${pc.green("✓")} DynamoDB read access (including DescribeTable)`
   );
 
-  if (eventTracking?.enabled) {
-    console.log(`  ${pc.green("✓")} EventBridge and SQS access`);
-  }
-
   if (emailArchiving?.enabled) {
     console.log(`  ${pc.green("✓")} Mail Manager Archive access`);
   }
@@ -394,11 +387,15 @@ export function buildConsolePolicyDocument(
     Resource: "*",
   });
 
-  // Always allow S3 HeadBucket for feature detection (inbound bucket scanning)
-  // This allows the dashboard to discover if inbound email is deployed
+  // Feature detection: the dashboard sends HeadBucket to discover whether
+  // inbound email is deployed (apps/web/src/actions/aws-accounts.ts). There is
+  // no `s3:HeadBucket` IAM action — HeadBucket is authorized by
+  // `s3:ListBucket` — so the grant this replaced authorized nothing, and
+  // detection only ever worked on roles that got ListBucket from the separate
+  // inbound block below.
   statements.push({
     Effect: "Allow",
-    Action: ["s3:HeadBucket"],
+    Action: ["s3:ListBucket"],
     Resource: "arn:aws:s3:::wraps-inbound-*",
   });
 
@@ -476,31 +473,12 @@ export function buildConsolePolicyDocument(
     ],
   });
 
-  // Allow EventBridge access if event tracking enabled
-  const eventTracking = emailConfig?.eventTracking as
-    | Record<string, unknown>
-    | undefined;
-  if (eventTracking?.enabled) {
-    statements.push({
-      Effect: "Allow",
-      Action: ["events:PutEvents", "events:DescribeEventBus"],
-      Resource: "arn:aws:events:*:*:event-bus/wraps-email-*",
-    });
-  }
-
-  // Allow SQS access if event tracking enabled
-  if (eventTracking?.enabled) {
-    statements.push({
-      Effect: "Allow",
-      Action: [
-        "sqs:SendMessage",
-        "sqs:ReceiveMessage",
-        "sqs:DeleteMessage",
-        "sqs:GetQueueAttributes",
-      ],
-      Resource: "arn:aws:sqs:*:*:wraps-email-*",
-    });
-  }
+  // No EventBridge or SQS grant. Nothing that assumes this role touches
+  // either: every SQSClient and EventBridgeClient in apps/api is built from
+  // `awsDefaults` — Wraps' own account — and apps/web constructs neither. The
+  // grant this replaced gave the platform `events:PutEvents` on the customer's
+  // bus and `sqs:ReceiveMessage`/`DeleteMessage` on their event queue, which
+  // is the ability to inject events and drain their pipeline, for no feature.
 
   // Allow Mail Manager Archive access if email archiving enabled
   const emailArchiving = emailConfig?.emailArchiving as
@@ -528,12 +506,7 @@ export function buildConsolePolicyDocument(
   if (inbound?.enabled) {
     statements.push({
       Effect: "Allow",
-      Action: [
-        "s3:HeadBucket",
-        "s3:ListBucket",
-        "s3:GetObject",
-        "s3:GetObjectTagging",
-      ],
+      Action: ["s3:ListBucket", "s3:GetObject", "s3:GetObjectTagging"],
       Resource: [
         "arn:aws:s3:::wraps-inbound-*",
         "arn:aws:s3:::wraps-inbound-*/*",

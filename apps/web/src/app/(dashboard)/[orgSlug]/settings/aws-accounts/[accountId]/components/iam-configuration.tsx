@@ -12,11 +12,7 @@ import type { InferSelectModel } from "drizzle-orm";
 import { Copy, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  buildStacksConsoleUrl,
-  CONSOLE_ACCESS_STACK_NAME,
-  CONSOLE_ACCESS_TEMPLATE_URL,
-} from "@/lib/aws/cloudformation-url";
+import { resolveCloudFormationRepairRoute } from "@/lib/aws/cloudformation-url";
 
 type IAMConfigurationProps = {
   account: InferSelectModel<typeof awsAccount>;
@@ -35,6 +31,13 @@ export function IAMConfiguration({
   selfHosted,
 }: IAMConfigurationProps) {
   const [copied, setCopied] = useState<CopyField | null>(null);
+  // The External ID is the only record of how this role was created: the
+  // infrastructure template sets it to the stack's own ARN. Without this the
+  // card named a `wraps-console-access` stack these accounts never had.
+  const repair = resolveCloudFormationRepairRoute(
+    account.externalId,
+    account.region
+  );
 
   const copyToClipboard = async (text: string, field: CopyField) => {
     await navigator.clipboard.writeText(text);
@@ -110,28 +113,43 @@ export function IAMConfiguration({
 
             <div className="border-t pt-4">
               <h4 className="mb-1 font-medium text-sm">
-                If you deployed with CloudFormation
+                {repair.identified
+                  ? "Your CloudFormation stack"
+                  : "If you deployed with CloudFormation"}
               </h4>
               <p className="text-muted-foreground text-sm">
-                Open the{" "}
-                <code className="font-mono">{CONSOLE_ACCESS_STACK_NAME}</code>{" "}
-                stack, choose <strong>Update</strong> →{" "}
+                {repair.identified
+                  ? "This role was created by the "
+                  : "Open the "}
+                <code className="font-mono">{repair.stackName}</code> stack
+                {repair.identified ? ". Open it" : ""}, choose{" "}
+                <strong>Update</strong> →{" "}
                 <strong>Replace existing template</strong> →{" "}
                 <strong>Amazon S3 URL</strong>, paste the template URL below,
-                and keep the External ID as-is.
+                and{" "}
+                {repair.identified
+                  ? "leave every parameter at its current value."
+                  : "keep the External ID as-is."}
               </p>
+              {repair.identified ? (
+                <p className="mt-2 text-muted-foreground text-sm">
+                  The URL below is the full email infrastructure template — the
+                  one this stack already deploys. Updating it with any other
+                  template would delete the rest of your email infrastructure.
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <h4 className="mb-2 font-medium text-sm">Template URL</h4>
                 <code className="block break-all rounded-md border bg-muted px-3 py-2 font-mono text-sm">
-                  {CONSOLE_ACCESS_TEMPLATE_URL}
+                  {repair.templateUrl}
                 </code>
               </div>
               <Button
                 onClick={() =>
-                  copyToClipboard(CONSOLE_ACCESS_TEMPLATE_URL, "templateUrl")
+                  copyToClipboard(repair.templateUrl, "templateUrl")
                 }
                 size="sm"
                 type="button"
@@ -144,27 +162,32 @@ export function IAMConfiguration({
 
             <Button asChild>
               <a
-                href={buildStacksConsoleUrl(account.region)}
+                href={repair.stacksConsoleUrl}
                 rel="noopener noreferrer"
                 target="_blank"
               >
                 <ExternalLink className="mr-2 h-4 w-4" />
-                Open CloudFormation stacks
+                {repair.identified
+                  ? `Open the ${repair.stackName} stack`
+                  : "Open CloudFormation stacks"}
               </a>
             </Button>
 
-            <div className="border-t pt-4">
-              <h4 className="mb-1 font-medium text-sm">
-                If you connected with the CLI
-              </h4>
-              <p className="text-muted-foreground text-sm">
-                There is no stack to update — the role was created directly. Run{" "}
-                <code className="font-mono">wraps platform update-role</code> to
-                rewrite it, or{" "}
-                <code className="font-mono">wraps platform connect</code> if it
-                was deleted.
-              </p>
-            </div>
+            {repair.identified ? null : (
+              <div className="border-t pt-4">
+                <h4 className="mb-1 font-medium text-sm">
+                  If you connected with the CLI
+                </h4>
+                <p className="text-muted-foreground text-sm">
+                  There is no stack to update — the role was created directly.
+                  Run{" "}
+                  <code className="font-mono">wraps platform update-role</code>{" "}
+                  to rewrite it, or{" "}
+                  <code className="font-mono">wraps platform connect</code> if
+                  it was deleted.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

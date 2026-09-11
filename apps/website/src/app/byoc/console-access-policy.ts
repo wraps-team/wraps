@@ -31,7 +31,7 @@ export const CONSOLE_ACCESS_POLICY_JSON = JSON.stringify(
       },
       {
         Effect: "Allow",
-        Action: ["s3:HeadBucket"],
+        Action: ["s3:ListBucket"],
         Resource: "arn:aws:s3:::wraps-inbound-*",
       },
       {
@@ -85,21 +85,6 @@ export const CONSOLE_ACCESS_POLICY_JSON = JSON.stringify(
           "arn:aws:dynamodb:*:*:table/wraps-email-*",
           "arn:aws:dynamodb:*:*:table/wraps-email-*/index/*",
         ],
-      },
-      {
-        Effect: "Allow",
-        Action: ["events:PutEvents", "events:DescribeEventBus"],
-        Resource: "arn:aws:events:*:*:event-bus/wraps-email-*",
-      },
-      {
-        Effect: "Allow",
-        Action: [
-          "sqs:SendMessage",
-          "sqs:ReceiveMessage",
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes",
-        ],
-        Resource: "arn:aws:sqs:*:*:wraps-email-*",
       },
     ],
   },

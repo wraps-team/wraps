@@ -43,18 +43,63 @@ describe("SES suppression IAM parity across all four deployment paths", () => {
     });
   }
 
-  it("grants all four suppression actions in the CloudFormation template, once per role", () => {
+  it("grants all four suppression actions in the CloudFormation template, once per sending role", () => {
     // WrapsEmailRoleVercel and WrapsEmailRoleStandard each carry their own
     // copy of the inline policy. A future edit that touches only one role
     // reproduces the bug for half of all CloudFormation deployments, so each
-    // action must appear exactly twice — not "at least once".
-    const template = read("cloudformation/wraps-email-infrastructure.yaml");
+    // action must appear exactly twice — not "at least once". The console
+    // role is excluded here and asserted separately below: it is a different
+    // policy with a different rule about Put.
+    const { sendingRoles } = splitInfrastructureTemplate();
     for (const action of SUPPRESSION_ACTIONS) {
-      const occurrences = template.split(action).length - 1;
+      const occurrences = sendingRoles.split(action).length - 1;
       expect(
         occurrences,
-        `cloudformation/wraps-email-infrastructure.yaml should grant ${action} to both roles (found ${occurrences} occurrence(s))`
+        `cloudformation/wraps-email-infrastructure.yaml should grant ${action} to both sending roles (found ${occurrences} occurrence(s))`
       ).toBe(2);
     }
   });
+
+  // The console role reads and clears the suppression list for the dashboard's
+  // suppressions page; it never writes to it. It is also a fifth policy source
+  // that drifted behind the other four — an account deployed from the
+  // infrastructure template had a console role with no suppression access at
+  // all, which probes as a stale console-policy version and puts the account
+  // permanently in the "your AWS role is behind the current Wraps policy"
+  // alert with no repair that clears it.
+  it("grants the console role read and clear, but never Put", () => {
+    const { consoleRole } = splitInfrastructureTemplate();
+    for (const action of [
+      "ses:ListSuppressedDestinations",
+      "ses:GetSuppressedDestination",
+      "ses:DeleteSuppressedDestination",
+    ]) {
+      expect(
+        consoleRole,
+        `WrapsConsoleAccessRole is missing ${action}`
+      ).toContain(action);
+    }
+    expect(consoleRole).not.toContain("ses:PutSuppressedDestination");
+  });
 });
+
+/**
+ * Splits the infrastructure template into the console-access role and
+ * everything else, so counts of an action in the two sending roles are not
+ * thrown off by the console role carrying the same action for its own reasons.
+ */
+function splitInfrastructureTemplate() {
+  const template = read("cloudformation/wraps-email-infrastructure.yaml");
+  const start = template.indexOf("  WrapsConsoleAccessRole:");
+  const end = template.indexOf("\nOutputs:");
+  if (start === -1 || end <= start) {
+    throw new Error(
+      "cloudformation/wraps-email-infrastructure.yaml no longer has a WrapsConsoleAccessRole followed by an Outputs section"
+    );
+  }
+
+  return {
+    consoleRole: template.slice(start, end),
+    sendingRoles: template.slice(0, start) + template.slice(end),
+  };
+}
