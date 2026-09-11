@@ -94,8 +94,8 @@ export function InviteMembersStep({
       <CardHeader className="space-y-2 text-center">
         <CardTitle className="text-3xl">Invite your team</CardTitle>
         <CardDescription className="text-base">
-          Add teammates so they're ready when you finish setup. You can always
-          invite more later from Settings.
+          Optional — invite teammates now or skip and add them anytime from
+          Settings. They'll get access as soon as your setup is done.
         </CardDescription>
       </CardHeader>
 
@@ -149,15 +149,23 @@ export function InviteMembersStep({
           </div>
         )}
 
-        <div className="flex justify-center gap-3 pt-2">
-          <Button onClick={handleSkip} size="lg" variant="ghost">
-            Skip for now
-          </Button>
-          {sentInvites.length > 0 && (
-            <Button onClick={handleContinue} size="lg">
-              Continue
+        <div className="flex flex-col items-center gap-2 pt-2">
+          <div className="flex justify-center gap-3">
+            {sentInvites.length > 0 && (
+              <Button onClick={handleContinue} size="lg">
+                Continue
+              </Button>
+            )}
+            <Button
+              onClick={handleSkip}
+              size="lg"
+              variant={sentInvites.length > 0 ? "ghost" : "default"}
+            >
+              {sentInvites.length > 0
+                ? "Skip for now"
+                : "Skip — I'll do this later"}
             </Button>
-          )}
+          </div>
         </div>
       </CardContent>
     </Card>
