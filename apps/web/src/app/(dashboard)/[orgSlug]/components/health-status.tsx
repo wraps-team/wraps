@@ -232,6 +232,21 @@ export function HealthStatus({
   const config = overallConfig[overallLevel];
   const OverallIcon = OVERALL_ICON[overallLevel];
 
+  // Healthy is the one level with nothing to act on: every channel passed, so
+  // the rows below all filter out and the tinted panel is left shouting a
+  // single non-actionable sentence. It still has to render something, though —
+  // `getBannerLevel` keeps "not checked" and "still loading" as `unknown`
+  // precisely so that green means measured-and-fine, and rendering nothing
+  // would make that indistinguishable from a banner that never ran.
+  if (overallLevel === "healthy") {
+    return (
+      <div className="flex items-center gap-2">
+        <OverallIcon className={cn("h-4 w-4 shrink-0", config.color)} />
+        <p className="text-muted-foreground text-xs">{config.label}</p>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("rounded-lg border", config.bg, config.border)}>
       {/* Overall status header */}
