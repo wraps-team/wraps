@@ -13,9 +13,11 @@
  *   30-day grace month, and contact_event rows past their expires_at. Warns
  *   org owners/admins once when rows enter the grace window, before they are
  *   actually deleted. See apps/api/src/workers/message-send-cleanup.ts.
- * - Ships with RETENTION_DRY_RUN=true — logs what it would delete and
- *   deletes nothing. Flip to "false" only after a human reviews a real
- *   dry-run report. See plans/210.
+ * - Deletion is LIVE (RETENTION_DRY_RUN=false) since 2026-09-11, after a
+ *   human reviewed the production dry-run report for that night: 8,611
+ *   message_send rows across three orgs (atolljobs 9, rinya 6,
+ *   fsi-language-courses 8,596), zero contact_event rows. Set it back to
+ *   "true" to return the sweep to reporting-only. See plans/210 step 8.
  *
  * WorkflowReaper:
  * - Runs hourly in production
@@ -134,9 +136,10 @@ export const messageSendCleanupCron = new sst.aws.CronV2("MessageSendCleanup", {
       AXIOM_TOKEN: axiomToken.value,
       AXIOM_DATASET: "wraps",
       SENTRY_DSN: sentryDsn.value,
-      // Ships in dry-run. Flip to "false" only after a human has reviewed a
-      // dry-run report — see plans/210 step 8.
-      RETENTION_DRY_RUN: "true",
+      // Live since 2026-09-11 — the step-8 sign-off ran against that night's
+      // production dry-run report (8,611 rows, three orgs, no surprises).
+      // "true" puts the sweep back in reporting-only mode.
+      RETENTION_DRY_RUN: "false",
     },
     nodejs: { install: ["pg", "@sentry/profiling-node"] },
   },

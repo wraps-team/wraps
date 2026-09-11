@@ -10,8 +10,11 @@
  * GRACE_DAYS grace month. Owners/admins are warned once a org has rows in
  * that grace window, before those rows are actually deleted.
  *
- * Ships with RETENTION_DRY_RUN defaulting to true — see plans/210 step 8.
- * Do not flip it without a human reviewing a real dry-run report first.
+ * RETENTION_DRY_RUN still DEFAULTS to true here, so any stage that does not
+ * set it explicitly reports instead of deleting. Production sets it to
+ * "false" (infra/cron.ts) as of 2026-09-11, after the plans/210 step-8
+ * sign-off against that night's real dry-run report. Self-hosted does not
+ * wire this cron at all.
  */
 
 // Initialize Sentry before all other imports
