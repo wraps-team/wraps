@@ -144,8 +144,7 @@ export function OrganizationSwitcher() {
                     </p>
                     <p className="text-muted-foreground text-xs">
                       {userRole &&
-                        `${userRole.charAt(0).toUpperCase() + userRole.slice(1)}`}{" "}
-                      · 1 Member
+                        `${userRole.charAt(0).toUpperCase() + userRole.slice(1)}`}
                     </p>
                   </div>
                 </div>

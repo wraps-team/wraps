@@ -35,6 +35,7 @@ const WINDOW_END = new Date(NOW + MINUTE_MS);
 
 const SUBJECT_MIXED = `${TEST_PREFIX} mixed outcomes`;
 const SUBJECT_ALL_FAILED = `${TEST_PREFIX} never left SES`;
+const SUBJECT_BLANK_UA = `${TEST_PREFIX} opened by a blank agent`;
 
 type RowSpec = {
   key: string;
@@ -43,6 +44,7 @@ type RowSpec = {
   minutesAgo: number | null;
   deliveredAt?: number;
   openedAt?: number;
+  openUserAgent?: string;
 };
 
 /**
@@ -83,6 +85,18 @@ const ROWS: RowSpec[] = [
     subject: SUBJECT_ALL_FAILED,
     status: "failed",
     minutesAgo: 14,
+  },
+  // Opened, but the UA is whitespace only. `isBotOpen` calls that a bot
+  // (email-bot-detection.test.ts asserts it), so the SQL must agree — a bare
+  // `!= ''` lets this through and counts it as a real human open.
+  {
+    key: "blank-ua-open",
+    subject: SUBJECT_BLANK_UA,
+    status: "delivered",
+    minutesAgo: 15,
+    deliveredAt: 14,
+    openedAt: 13,
+    openUserAgent: "   ",
   },
   // Created but never sent. Belongs to no window, and has no honest timestamp.
   {
@@ -149,11 +163,13 @@ beforeAll(async () => {
           row.openedAt === undefined
             ? null
             : new Date(NOW - row.openedAt * MINUTE_MS),
-        // A real UA, so the bot filter keeps the open.
+        // A real UA by default, so the bot filter keeps the open; rows that
+        // test the filter itself override it.
         openUserAgent:
           row.openedAt === undefined
             ? null
-            : "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            : (row.openUserAgent ??
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"),
       }))
     )
     .onConflictDoNothing();
@@ -192,6 +208,22 @@ describe("getTopPerformersFromPostgres", () => {
     // 1 open over 3 sends. Over deliveries it would have read 50%.
     expect(mixed?.opens).toBe(1);
     expect(mixed?.openRate).toBeCloseTo(33.3, 1);
+  });
+
+  it("does not count a whitespace-only user agent as a human open", async () => {
+    const performers = await getTopPerformersFromPostgres(
+      ORG_ID,
+      WINDOW_START,
+      WINDOW_END,
+      10
+    );
+    const blank = performers.find((p) => p.subject === SUBJECT_BLANK_UA);
+
+    // The row is sent and has an opened_at, so it reaches the open filter and
+    // must be rejected there. Under the old `!= ''` predicate this read 1/100%.
+    expect(blank?.sent).toBe(1);
+    expect(blank?.opens).toBe(0);
+    expect(blank?.openRate).toBe(0);
   });
 
   it("returns the earliest send as epoch millis, not an unparsed string", async () => {
