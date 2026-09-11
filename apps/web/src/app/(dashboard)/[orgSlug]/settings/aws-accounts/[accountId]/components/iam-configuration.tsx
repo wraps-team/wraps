@@ -57,22 +57,22 @@ export function IAMConfiguration({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h4 className="mb-2 font-medium text-sm">External ID</h4>
-            <code className="block break-all rounded-md border bg-muted px-3 py-2 font-mono text-sm">
+        <div>
+          <h4 className="mb-2 font-medium text-sm">External ID</h4>
+          <div className="flex items-center gap-2">
+            <code className="min-w-0 flex-1 break-all rounded-md border bg-muted px-3 py-2 font-mono text-sm">
               {account.externalId}
             </code>
+            <Button
+              onClick={() => copyToClipboard(account.externalId, "externalId")}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <Copy className="h-4 w-4" />
+              {copied === "externalId" ? "Copied!" : "Copy"}
+            </Button>
           </div>
-          <Button
-            onClick={() => copyToClipboard(account.externalId, "externalId")}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            <Copy className="h-4 w-4" />
-            {copied === "externalId" ? "Copied!" : "Copy"}
-          </Button>
         </div>
 
         {selfHosted ? null : (
@@ -146,24 +146,24 @@ export function IAMConfiguration({
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <h4 className="mb-2 font-medium text-sm">Template URL</h4>
-                <code className="block break-all rounded-md border bg-muted px-3 py-2 font-mono text-sm">
+            <div>
+              <h4 className="mb-2 font-medium text-sm">Template URL</h4>
+              <div className="flex items-center gap-2">
+                <code className="min-w-0 flex-1 break-all rounded-md border bg-muted px-3 py-2 font-mono text-sm">
                   {repair.templateUrl}
                 </code>
+                <Button
+                  onClick={() =>
+                    copyToClipboard(repair.templateUrl, "templateUrl")
+                  }
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <Copy className="h-4 w-4" />
+                  {copied === "templateUrl" ? "Copied!" : "Copy"}
+                </Button>
               </div>
-              <Button
-                onClick={() =>
-                  copyToClipboard(repair.templateUrl, "templateUrl")
-                }
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                <Copy className="h-4 w-4" />
-                {copied === "templateUrl" ? "Copied!" : "Copy"}
-              </Button>
             </div>
 
             <Button asChild>
