@@ -17,6 +17,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { trackAwsConnected } from "@/lib/activation-tracking";
 import { AssumeRoleError } from "@/lib/aws/assume-role";
 import {
   connectAWSAccountAction,
@@ -429,7 +430,7 @@ describe("getVerifiedDomains", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe("Unauthorized");
+        expect(result.error).toBe("You don't have access to this organization");
       }
     });
 
@@ -940,7 +941,7 @@ describe("listAWSAccounts", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toBe("You must be logged in");
+      expect(result.error).toBe("You don't have access to this organization");
     }
   });
 
@@ -1076,7 +1077,7 @@ describe("deleteAWSAccount", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toBe("Not authenticated");
+      expect(result.error).toBe("You don't have access to this organization");
     }
   });
 
@@ -1115,7 +1116,7 @@ describe("deleteAWSAccount", () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       // User is not a member of different org
-      expect(result.error).toContain("Only owners and admins");
+      expect(result.error).toContain("don't have access");
     }
   });
 
@@ -1322,7 +1323,7 @@ describe("saveWebhookSecretAction", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toContain("must be logged in");
+      expect(result.error).toContain("don't have access");
     }
   });
 
@@ -1434,7 +1435,7 @@ describe("removeWebhookSecretAction", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toContain("must be logged in");
+      expect(result.error).toContain("don't have access");
     }
   });
 
@@ -2321,6 +2322,50 @@ const connectActionMember = {
   createdAt: new Date(),
 };
 
+// Non-owner members for the permission-denial and default-access-grant cases.
+// "read-only" matches the `roles` record key in packages/auth/src/access.ts
+// (checkPermission does `roles[role]`); this role holds awsAccounts: ["read"]
+// only, so it doubles as the write-permission-denied fixture and, on the
+// happy path, as the "non-admin member gets READ_ONLY" fixture.
+const connectActionReadOnlyMember = {
+  id: "test-connect-action-readonly-member-1",
+  organizationId: connectActionOrg.id,
+  userId: testMemberUser.id,
+  role: "read-only" as const,
+  createdAt: new Date(),
+};
+
+const connectActionAdminUser = {
+  id: "test-connect-action-admin-1",
+  email: "aws-connect-admin@example.com",
+  name: "Connect Action Admin User",
+  emailVerified: true,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  image: null,
+  twoFactorEnabled: false,
+  stripeCustomerId: null,
+};
+
+const connectActionAdminMember = {
+  id: "test-connect-action-admin-member-1",
+  organizationId: connectActionOrg.id,
+  userId: connectActionAdminUser.id,
+  role: "admin" as const,
+  createdAt: new Date(),
+};
+
+// Victim org for the duplicate-organizationId cross-org write regression
+// below. The session user (testUser) is deliberately NOT a member of it.
+const connectActionVictimOrg = {
+  id: "e290f1ee-6c54-4b01-90e6-d701748f0852",
+  name: "Connect Action Victim Org",
+  slug: "connect-action-victim-org",
+  createdAt: new Date(),
+  logo: null,
+  metadata: null,
+};
+
 const CONNECT_ACTION_ACCOUNT_ID = "555000111222";
 
 function buildConnectAWSAccountFormData(): FormData {
@@ -2354,16 +2399,59 @@ describe("connectAWSAccountAction — setupMethod persistence", () => {
         target: member.id,
         set: { role: connectActionMember.role },
       });
+
+    await db
+      .insert(member)
+      .values(connectActionReadOnlyMember)
+      .onConflictDoUpdate({
+        target: member.id,
+        set: { role: connectActionReadOnlyMember.role },
+      });
+
+    await db
+      .insert(user)
+      .values(connectActionAdminUser)
+      .onConflictDoUpdate({
+        target: user.id,
+        set: { updatedAt: new Date() },
+      });
+
+    await db
+      .insert(member)
+      .values(connectActionAdminMember)
+      .onConflictDoUpdate({
+        target: member.id,
+        set: { role: connectActionAdminMember.role },
+      });
+
+    await db
+      .insert(organization)
+      .values(connectActionVictimOrg)
+      .onConflictDoUpdate({
+        target: organization.id,
+        set: { name: connectActionVictimOrg.name },
+      });
   });
 
   afterAll(async () => {
     await db
       .delete(awsAccount)
       .where(eq(awsAccount.organizationId, connectActionOrg.id));
+    await db
+      .delete(awsAccount)
+      .where(eq(awsAccount.organizationId, connectActionVictimOrg.id));
     await db.delete(member).where(eq(member.id, connectActionMember.id));
+    await db
+      .delete(member)
+      .where(eq(member.id, connectActionReadOnlyMember.id));
+    await db.delete(member).where(eq(member.id, connectActionAdminMember.id));
+    await db.delete(user).where(eq(user.id, connectActionAdminUser.id));
     await db
       .delete(organization)
       .where(eq(organization.id, connectActionOrg.id));
+    await db
+      .delete(organization)
+      .where(eq(organization.id, connectActionVictimOrg.id));
   });
 
   beforeEach(async () => {
@@ -2371,6 +2459,9 @@ describe("connectAWSAccountAction — setupMethod persistence", () => {
     await db
       .delete(awsAccount)
       .where(eq(awsAccount.organizationId, connectActionOrg.id));
+    await db
+      .delete(awsAccount)
+      .where(eq(awsAccount.organizationId, connectActionVictimOrg.id));
   });
 
   it("persists setupMethod: cfn_console_role on a successful connect", async () => {
@@ -2387,5 +2478,211 @@ describe("connectAWSAccountAction — setupMethod persistence", () => {
 
     expect(row).toBeDefined();
     expect(row?.setupMethod).toBe("cfn_console_role");
+  });
+
+  it("returns Unauthorized and writes no row when there is no session", async () => {
+    currentMockUserId = null;
+
+    const result = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "You don't have access to this organization",
+    });
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq: eqOp }) => eqOp(a.organizationId, connectActionOrg.id),
+    });
+    expect(row).toBeUndefined();
+  });
+
+  it("returns Insufficient permissions and writes no row for a non-member", async () => {
+    currentMockUserId = testNonMemberUser.id;
+
+    const result = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "You don't have access to this organization",
+    });
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq: eqOp }) => eqOp(a.organizationId, connectActionOrg.id),
+    });
+    expect(row).toBeUndefined();
+  });
+
+  it("denies a member without awsAccounts write access and writes no row", async () => {
+    // connectActionReadOnlyMember holds the "read-only" role in this org,
+    // which grants awsAccounts: ["read"] only (packages/auth/src/access.ts).
+    currentMockUserId = testMemberUser.id;
+
+    const result = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "You don't have permission to perform this action",
+    });
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq: eqOp }) => eqOp(a.organizationId, connectActionOrg.id),
+    });
+    expect(row).toBeUndefined();
+  });
+
+  it("returns the TanStack formState (not an {error} shape) for an invalid field", async () => {
+    const formData = buildConnectAWSAccountFormData();
+    formData.set("accountId", "123"); // schema requires exactly 12 digits
+
+    const result = await connectAWSAccountAction(undefined, formData);
+
+    expect(result).not.toHaveProperty("error");
+    expect(result).not.toHaveProperty("success");
+    expect(
+      (result as { errorMap?: { onServer?: string } }).errorMap?.onServer
+    ).toContain("12 digits");
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq: eqOp }) => eqOp(a.organizationId, connectActionOrg.id),
+    });
+    expect(row).toBeUndefined();
+  });
+
+  it("does not write a row when the AWS connection test fails", async () => {
+    mockGetCredentials.mockRejectedValue(new Error("AccessDenied"));
+
+    const result = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect(result).toEqual({
+      error: "Unable to connect to AWS account",
+      details: "AccessDenied",
+    });
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq: eqOp }) => eqOp(a.organizationId, connectActionOrg.id),
+    });
+    expect(row).toBeUndefined();
+  });
+
+  it("leaves the inserted row committed when a post-insert step throws", async () => {
+    // CHARACTERIZATION: the insert is not transactional, so a post-insert throw
+    // leaves a committed row behind while the caller sees a failure. Current
+    // behavior — see plan 043.
+    vi.mocked(trackAwsConnected).mockRejectedValueOnce(
+      new Error("activation tracking down")
+    );
+
+    const result = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect(result).toEqual({
+      error: "Internal error",
+      details: "activation tracking down",
+    });
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq: eqOp }) => eqOp(a.organizationId, connectActionOrg.id),
+    });
+    expect(row).toBeDefined();
+    expect(row?.accountId).toBe(CONNECT_ACTION_ACCOUNT_ID);
+  });
+
+  it("audits the connect with the session user as actor and tracks activation", async () => {
+    const result = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect((result as { success?: boolean }).success).toBe(true);
+    const accountId = (result as { account: { id: string } }).account.id;
+
+    // Best-effort: next/server's after() is mocked to invoke its callback
+    // synchronously, but the action does not await that callback's promise,
+    // so give the async audit write a moment to settle (same pattern as
+    // sso-audit.test.ts).
+    await new Promise((r) => setTimeout(r, 50));
+
+    const auditRow = await db.query.auditLog.findFirst({
+      where: (a, { eq: eqOp }) => eqOp(a.resourceId, accountId),
+    });
+
+    expect(auditRow).toBeDefined();
+    expect(auditRow?.action).toBe("resource.deployed");
+    expect(auditRow?.resource).toBe("aws_account");
+    expect(auditRow?.resourceId).toBe(accountId);
+    expect(auditRow?.userId).toBe(testUser.id);
+    expect(auditRow?.actorEmail).toBe(testUser.email);
+
+    expect(trackAwsConnected).toHaveBeenCalledWith(
+      testUser.email,
+      connectActionOrg.id,
+      expect.objectContaining({ region: "us-east-1" })
+    );
+  });
+
+  it("grants READ_ONLY to non-admin members and FULL_ACCESS to admins, skipping owners", async () => {
+    const result = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect((result as { success?: boolean }).success).toBe(true);
+    const accountId = (result as { account: { id: string } }).account.id;
+
+    const ownerPermission = await db.query.awsAccountPermission.findFirst({
+      where: (p, { and: andOp, eq: eqOp }) =>
+        andOp(eqOp(p.awsAccountId, accountId), eqOp(p.userId, testUser.id)),
+    });
+    expect(ownerPermission).toBeUndefined();
+
+    const readOnlyPermission = await db.query.awsAccountPermission.findFirst({
+      where: (p, { and: andOp, eq: eqOp }) =>
+        andOp(
+          eqOp(p.awsAccountId, accountId),
+          eqOp(p.userId, testMemberUser.id)
+        ),
+    });
+    expect(readOnlyPermission?.permissions).toEqual(["view"]);
+
+    const adminPermission = await db.query.awsAccountPermission.findFirst({
+      where: (p, { and: andOp, eq: eqOp }) =>
+        andOp(
+          eqOp(p.awsAccountId, accountId),
+          eqOp(p.userId, connectActionAdminUser.id)
+        ),
+    });
+    expect(adminPermission?.permissions).toEqual(["view", "send"]);
+  });
+
+  it("does not write the AWS account into another org when organizationId is duplicated", async () => {
+    const formData = buildConnectAWSAccountFormData();
+    // REGRESSION: orgAction authorizes formData.get("organizationId") (first value)
+    // while serverValidate decodes the last. Duplicated keys must not let an
+    // authorized org's caller write a row into another org.
+    formData.append("organizationId", connectActionVictimOrg.id);
+
+    const result = await connectAWSAccountAction(undefined, formData);
+
+    expect(result).toEqual({ error: "Invalid organization" });
+
+    const victimRow = await db.query.awsAccount.findFirst({
+      where: (a, { eq: eqOp }) =>
+        eqOp(a.organizationId, connectActionVictimOrg.id),
+    });
+    expect(victimRow).toBeUndefined();
   });
 });

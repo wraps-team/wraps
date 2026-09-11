@@ -658,6 +658,67 @@ describe("no duplicate verifyOrgAccess", () => {
 });
 
 // ─────────────────────────────────────────────────────────
+// Test 14b: Ratchet — raw verifyOrgAccess call sites outside shared/
+// ─────────────────────────────────────────────────────────
+
+describe("no raw verifyOrgAccess calls outside shared", () => {
+  test("verifyOrgAccess call sites outside shared/ must not exceed the ratchet ceiling", () => {
+    const files = findFiles("apps/web/src/actions/**/*.ts").filter(
+      (f) =>
+        !(
+          f.includes("__tests__") ||
+          f.includes(".test.") ||
+          f.includes("/shared/")
+        )
+    );
+
+    // Plans 026 + 037-043 moved server actions behind `orgAction`, which
+    // calls `verifyOrgAccess` internally. A file that calls `verifyOrgAccess`
+    // directly is hand-rolling the auth/permission skeleton `orgAction`
+    // already provides — exactly the regression that landed in agents.ts on
+    // 2026-07-10 (commit 4a90013e, agent mailboxes), after the 037-043
+    // series was planned, while this ratchet sat unbuilt.
+    //
+    // Allowed today (ceiling = 8). Lower this when each is migrated to orgAction:
+    //   agents.ts (5)          — NO follow-up plan yet; landed 2026-07-10 in 4a90013e,
+    //                            after the 037-043 series, by copy-paste.
+    //   api-keys.ts (1)        — NO follow-up plan; plan 033 (MERGED) did not migrate it.
+    //   import-contacts.ts (1) — plan 025 (TODO) owns it.
+    //   sso.ts (1)             — getExistingVerificationToken; plan 040 missed it.
+    const RAW_VERIFY_ORG_ACCESS_CEILING = 8;
+
+    const callRegex = /verifyOrgAccess\s*\(/g;
+    const counts: Record<string, number> = {};
+    let total = 0;
+
+    for (const file of files) {
+      const content = readFile(file);
+      callRegex.lastIndex = 0;
+      const matches = content.match(callRegex);
+      if (matches && matches.length > 0) {
+        counts[file] = matches.length;
+        total += matches.length;
+      }
+    }
+
+    const breakdown = Object.entries(counts)
+      .map(([file, count]) => `  ${file}: ${count}`)
+      .join("\n");
+
+    expect(
+      total,
+      `Found ${total} raw verifyOrgAccess() call site(s) outside shared/ ` +
+        `(ceiling is ${RAW_VERIFY_ORG_ACCESS_CEILING}):\n${breakdown}\n\n` +
+        "New or grown call sites must use `orgAction` (apps/web/src/actions/shared/org-action.ts) " +
+        "instead of hand-rolling verifyOrgAccess + checkPermission + audit boilerplate. " +
+        "Never raise this ceiling to absorb a new site — migrate it, or add it to the " +
+        "allowed-exceptions comment above with an owning plan if it is a pre-existing one. " +
+        "Lower the ceiling (never raise it) when an exception above is migrated."
+    ).toBeLessThanOrEqual(RAW_VERIFY_ORG_ACCESS_CEILING);
+  });
+});
+
+// ─────────────────────────────────────────────────────────
 // Test 15: No duplicate hash helpers
 // ─────────────────────────────────────────────────────────
 
