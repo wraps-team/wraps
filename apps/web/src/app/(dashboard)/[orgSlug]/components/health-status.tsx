@@ -33,6 +33,13 @@ type ChannelHealth = {
   level: HealthLevel;
   metrics: string[];
   href: string;
+  /**
+   * Counts toward the headline but prints no detail row: something else on
+   * the page already explains this channel in full. The SES survival strip
+   * sits directly below this banner showing these same reasons as rates
+   * against AWS's lines.
+   */
+  detailedElsewhere?: boolean;
 };
 
 function getHealthIcon(level: HealthLevel) {
@@ -129,6 +136,7 @@ export function HealthStatus({
       level: sesLevel,
       metrics: reasons.length > 0 ? [...new Set(reasons)] : ["Not checked yet"],
       href: `/${orgSlug}/emails/analytics`,
+      detailedElsewhere: true,
     });
   }
 
@@ -235,10 +243,12 @@ export function HealthStatus({
       </div>
 
       {/* Per-channel rows — only show unhealthy channels */}
-      {channels.some((ch) => ch.level !== "healthy") && (
+      {channels.some(
+        (ch) => ch.level !== "healthy" && !ch.detailedElsewhere
+      ) && (
         <div className="border-t border-inherit">
           {channels
-            .filter((ch) => ch.level !== "healthy")
+            .filter((ch) => ch.level !== "healthy" && !ch.detailedElsewhere)
             .map((ch) => (
               <div
                 className="flex items-center gap-3 px-4 py-2.5 border-b border-inherit last:border-b-0"

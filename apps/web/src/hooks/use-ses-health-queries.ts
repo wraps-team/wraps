@@ -2,6 +2,28 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+/**
+ * The numbers behind a verdict, as the hourly sweep read them from SES and
+ * CloudWatch. Rates are DECIMALS (0–1), not percentages. Every field is
+ * nullable: a brand-new account has published no metrics yet, and an
+ * unmeasured account is not a healthy one.
+ */
+export type SesHealthDetail = {
+  bounceRate: number | null;
+  complaintRate: number | null;
+  quotaUsedRatio: number | null;
+  sendingEnabled: boolean | null;
+  enforcementStatus: string | null;
+  /** false means the account is in the SES sandbox. */
+  productionAccessEnabled: boolean | null;
+  reviewStatus: "PENDING" | "GRANTED" | "DENIED" | "FAILED" | null;
+  reviewCaseId: string | null;
+  max24HourSend: number | null;
+  sentLast24Hours: number | null;
+  maxSendRate: number | null;
+  reasons: string[];
+};
+
 export type SesHealthAccount = {
   id: string;
   name: string;
@@ -10,6 +32,7 @@ export type SesHealthAccount = {
   status: "healthy" | "at_risk" | "in_danger" | "unknown";
   checkedAt: number | null;
   reasons: string[];
+  detail: SesHealthDetail | null;
 };
 
 export type SesHealthResponse = {

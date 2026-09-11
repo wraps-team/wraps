@@ -82,6 +82,11 @@ export async function GET(_request: Request, context: RouteContext) {
       status: (account.healthStatus ?? "unknown") as SesHealthRollupStatus,
       checkedAt: account.healthCheckedAt?.getTime() ?? null,
       reasons: account.healthDetail?.reasons ?? [],
+      // The whole snapshot the sweep already paid AWS for: rates, quota,
+      // sandbox and review state. It is the customer's own account data, and
+      // shipping it whole means the survival strip never needs a second
+      // endpoint — or a second AWS read — to explain a verdict.
+      detail: account.healthDetail ?? null,
     }));
 
     const status =

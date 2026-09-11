@@ -23,6 +23,7 @@ import { HealthStatus } from "./health-status";
 import { InfrastructureStatusCard } from "./infrastructure-status-card";
 import { InsightsSection } from "./insights-section";
 import { SendVolumeSpark } from "./send-volume-spark";
+import { SesSurvivalStrip } from "./ses-survival-strip";
 
 const TIME_OPTIONS = [
   { value: "7d", label: "7 days", days: 7 },
@@ -121,6 +122,7 @@ export function OverviewDashboard({
           <RefreshButton className="sm:hidden" onRefresh={handleRefresh} />
         </div>
         <HealthStatus days={days} orgSlug={orgSlug} />
+        <SesSurvivalStrip orgSlug={orgSlug} />
         <InsightsSection
           days={days}
           orgSlug={orgSlug}
