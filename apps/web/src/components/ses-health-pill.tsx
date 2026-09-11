@@ -9,28 +9,13 @@ import {
 import Link from "next/link";
 import type { SesHealthAccount } from "@/hooks/use-ses-health-queries";
 import { useSesHealth } from "@/hooks/use-ses-health-queries";
+import { humanizeSesHealthReason } from "@/lib/ses-health-reasons";
 import { formatRelativeTime } from "@/lib/utils";
-
-/** Humanizes the classifier's machine-readable reason codes for the tooltip. */
-const REASON_LABELS: Record<string, string> = {
-  sending_disabled: "SES has disabled sending",
-  bounce_pause: "bounce rate above AWS's pause line",
-  bounce_review: "bounce rate above AWS's review line",
-  complaint_pause: "complaint rate above AWS's pause line",
-  complaint_review: "complaint rate above AWS's review line",
-  quota_high: "daily send quota nearly used up",
-  enforcement_probation: "AWS enforcement status: PROBATION",
-  enforcement_shutdown: "AWS enforcement status: SHUTDOWN",
-};
-
-function humanizeReason(reason: string): string {
-  return REASON_LABELS[reason] ?? reason;
-}
 
 function accountTooltipLine(account: SesHealthAccount): string {
   const reasons =
     account.reasons.length > 0
-      ? account.reasons.map(humanizeReason).join(", ")
+      ? account.reasons.map(humanizeSesHealthReason).join(", ")
       : "unchecked";
   return `${account.name} (${account.region}) — ${reasons}`;
 }

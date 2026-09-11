@@ -4,21 +4,28 @@ import {
   AlertTriangleIcon,
   ArrowRightIcon,
   CheckCircleIcon,
+  CircleDashedIcon,
   KeyRoundIcon,
   MailIcon,
   MessageSquareIcon,
+  ShieldIcon,
   XCircleIcon,
   ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useEventUsage } from "@/hooks/use-event-usage";
 import { useProductsStatus } from "@/hooks/use-products-status";
+import { useSesHealth } from "@/hooks/use-ses-health-queries";
+import { humanizeSesHealthReason } from "@/lib/ses-health-reasons";
 import { cn } from "@/lib/utils";
 import { useProductsStore } from "@/stores/products-store";
 import { useAnalyticsOverview } from "../emails/analytics/hooks/use-analytics";
 import { useSMSAnalyticsOverview } from "../sms/analytics/hooks/use-sms-analytics";
-
-type HealthLevel = "healthy" | "warning" | "critical";
+import {
+  getBannerLevel,
+  type HealthLevel,
+  SES_STATUS_LEVEL,
+} from "./health-level";
 
 type ChannelHealth = {
   channel: string;
@@ -42,18 +49,17 @@ function getHealthIcon(level: HealthLevel) {
       return (
         <XCircleIcon className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
       );
+    case "unknown":
+      return <CircleDashedIcon className="h-3.5 w-3.5 text-muted-foreground" />;
   }
 }
 
-function getOverallLevel(channels: ChannelHealth[]): HealthLevel {
-  if (channels.some((c) => c.level === "critical")) {
-    return "critical";
-  }
-  if (channels.some((c) => c.level === "warning")) {
-    return "warning";
-  }
-  return "healthy";
-}
+const OVERALL_ICON = {
+  healthy: CheckCircleIcon,
+  warning: AlertTriangleIcon,
+  critical: XCircleIcon,
+  unknown: CircleDashedIcon,
+} as const;
 
 const overallConfig = {
   healthy: {
@@ -74,6 +80,12 @@ const overallConfig = {
     bg: "bg-red-500/10",
     border: "border-red-500/20",
   },
+  unknown: {
+    label: "Health not yet checked",
+    color: "text-muted-foreground",
+    bg: "bg-muted/50",
+    border: "border-border",
+  },
 };
 
 export function HealthStatus({
@@ -90,40 +102,48 @@ export function HealthStatus({
   const { data: smsData } = useSMSAnalyticsOverview(orgSlug, days);
   const { data: eventUsage } = useEventUsage(orgSlug);
   const { data: productsApiStatus } = useProductsStatus(orgSlug);
+  const { data: sesHealth, isLoading: isSesHealthLoading } =
+    useSesHealth(orgSlug);
 
   const channels: ChannelHealth[] = [];
 
-  // Email channel — show real health whenever there are sends, even if the
-  // stored emailEnabled flag is stale/false (it can lag actual usage).
+  // SES account survival, first because it is the only row here that can mean
+  // "AWS is about to stop your mail". The verdict comes from the hourly
+  // account-health sweep via `classifySesHealth`, which reads the signals no
+  // window of send analytics can see — SendingEnabled, EnforcementStatus and
+  // quota usage — and compares rates against AWS's own review and pause lines.
+  // This banner must never compute a second opinion on reputation: two
+  // thresholds for one question is how a page ends up saying "all systems
+  // healthy" while SES has sending switched off.
+  if (sesHealth && sesHealth.accounts.length > 0) {
+    const sesLevel: HealthLevel =
+      SES_STATUS_LEVEL[sesHealth.status] ?? "unknown";
+    const reasons = sesHealth.accounts
+      .filter((account) => account.status !== "healthy")
+      .flatMap((account) => account.reasons)
+      .map(humanizeSesHealthReason);
+
+    channels.push({
+      channel: "SES",
+      icon: <ShieldIcon className="h-3.5 w-3.5" />,
+      level: sesLevel,
+      metrics: reasons.length > 0 ? [...new Set(reasons)] : ["Not checked yet"],
+      href: `/${orgSlug}/emails/analytics`,
+    });
+  }
+
+  // Delivery rate is window arithmetic over this org's own sends, so it is a
+  // genuinely separate signal from the account-level reputation above rather
+  // than a second reading of it.
   if (emailData && (isEmailEnabled || emailData.totalSent > 0)) {
     let level: HealthLevel = "healthy";
     const issues: string[] = [];
-
-    if (emailData.bounceRate > 5) {
-      level = "critical";
-      issues.push(`Bounce rate ${emailData.bounceRate.toFixed(1)}%`);
-    } else if (emailData.bounceRate > 2) {
-      level = "warning";
-      issues.push(`Bounce rate ${emailData.bounceRate.toFixed(1)}%`);
-    }
-
-    if (emailData.complaintRate > 0.3) {
-      level = "critical";
-      issues.push(`Complaint rate ${emailData.complaintRate.toFixed(2)}%`);
-    } else if (emailData.complaintRate > 0.1) {
-      if (level !== "critical") {
-        level = "warning";
-      }
-      issues.push(`Complaint rate ${emailData.complaintRate.toFixed(2)}%`);
-    }
 
     if (emailData.totalSent > 0 && emailData.deliveryRate < 90) {
       level = "critical";
       issues.push(`Delivery rate ${emailData.deliveryRate.toFixed(1)}%`);
     } else if (emailData.totalSent > 0 && emailData.deliveryRate < 95) {
-      if (level !== "critical") {
-        level = "warning";
-      }
+      level = "warning";
       issues.push(`Delivery rate ${emailData.deliveryRate.toFixed(1)}%`);
     }
 
@@ -197,15 +217,12 @@ export function HealthStatus({
     }
   }
 
-  const overallLevel =
-    channels.length > 0 ? getOverallLevel(channels) : "healthy";
+  const overallLevel = getBannerLevel(
+    channels.map((c) => c.level),
+    isSesHealthLoading
+  );
   const config = overallConfig[overallLevel];
-  const OverallIcon =
-    overallLevel === "critical"
-      ? XCircleIcon
-      : overallLevel === "warning"
-        ? AlertTriangleIcon
-        : CheckCircleIcon;
+  const OverallIcon = OVERALL_ICON[overallLevel];
 
   return (
     <div className={cn("rounded-lg border", config.bg, config.border)}>
