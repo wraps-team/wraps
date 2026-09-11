@@ -13,6 +13,7 @@ import { Copy, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { resolveCloudFormationRepairRoute } from "@/lib/aws/cloudformation-url";
+import { ConsolePolicyRecheck } from "./console-policy-recheck";
 
 type IAMConfigurationProps = {
   account: InferSelectModel<typeof awsAccount>;
@@ -76,7 +77,12 @@ export function IAMConfiguration({
 
         {selfHosted ? null : (
           <div className="space-y-4 border-t pt-4">
-            <div>
+            <ConsolePolicyRecheck
+              awsAccountId={account.id}
+              organizationId={account.organizationId}
+            />
+
+            <div className="border-t pt-4">
               <h4 className="mb-1 font-medium text-sm">
                 The fastest fix, for any setup
               </h4>

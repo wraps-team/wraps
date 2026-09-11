@@ -12,14 +12,21 @@
  * the customer owns their own infrastructure.
  */
 
+import { SESv2Client } from "@aws-sdk/client-sesv2";
 import { and, awsAccount, db, eq } from "@wraps/db";
 import { t } from "elysia";
+import {
+  CURRENT_CONSOLE_POLICY_VERSION,
+  probeConsolePolicyVersion,
+} from "../lib/console-policy-version";
 import { rollUpSesHealth, SES_THRESHOLDS } from "../lib/ses-health";
 import {
   type AuthContext,
   createAuthenticatedRoutes,
   getAuth,
 } from "../middleware/auth";
+import { rateLimitMiddleware } from "../middleware/rate-limit";
+import { getCredentials } from "../services/credentials";
 
 type HealthDetail = NonNullable<typeof awsAccount.$inferSelect.healthDetail>;
 
@@ -167,7 +174,130 @@ const ACCOUNT_HEALTH_VIEW = t.Object({
   reasons: t.Array(t.String()),
 });
 
+/**
+ * Per-account cooldown on the re-probe below. The button this serves exists
+ * because the hourly sweep will not re-probe a freshly repaired role for up
+ * to a day; it does not need to answer faster than once a minute, and each
+ * call costs an STS AssumeRole plus up to five SES calls in the customer's
+ * account.
+ */
+const RECHECK_COOLDOWN_MS = 60_000;
+
+const CONSOLE_POLICY_VIEW = t.Object({
+  version: NULLABLE_NUMBER,
+  currentVersion: t.Number(),
+  upToDate: t.Boolean(),
+  checkedAt: NULLABLE_STRING,
+  /** False when the cooldown or an unreachable probe left the stored reading in place. */
+  rechecked: t.Boolean(),
+});
+
 export const accountRoutes = createAuthenticatedRoutes("/v1/account")
+  .use(rateLimitMiddleware)
+  .post(
+    "/console-policy/:awsAccountId/recheck",
+    async (ctx) => {
+      const { params, set } = ctx;
+      const authContext = getAuth(ctx);
+
+      // Org-scoped by both predicates: an account id alone is a cross-org
+      // read, and this one hands back a credential-derived fact.
+      const account = await db.query.awsAccount.findFirst({
+        where: and(
+          eq(awsAccount.id, params.awsAccountId),
+          eq(awsAccount.organizationId, authContext.organizationId)
+        ),
+        columns: {
+          id: true,
+          organizationId: true,
+          consolePolicyVersion: true,
+          consolePolicyCheckedAt: true,
+        },
+      });
+
+      if (!account) {
+        set.status = 404;
+        throw new Error("AWS account not found");
+      }
+
+      const storedView = (rechecked: boolean) => ({
+        version: account.consolePolicyVersion,
+        currentVersion: CURRENT_CONSOLE_POLICY_VERSION,
+        upToDate:
+          account.consolePolicyVersion !== null &&
+          account.consolePolicyVersion >= CURRENT_CONSOLE_POLICY_VERSION,
+        checkedAt: account.consolePolicyCheckedAt?.toISOString() ?? null,
+        rechecked,
+      });
+
+      const checkedAt = account.consolePolicyCheckedAt;
+      if (
+        checkedAt !== null &&
+        Date.now() - checkedAt.getTime() < RECHECK_COOLDOWN_MS
+      ) {
+        return storedView(false);
+      }
+
+      const credentials = await getCredentials(
+        account.id,
+        account.organizationId
+      );
+      const sesClient = new SESv2Client({
+        region: credentials.region,
+        credentials: {
+          accessKeyId: credentials.accessKeyId,
+          secretAccessKey: credentials.secretAccessKey,
+          sessionToken: credentials.sessionToken,
+        },
+      });
+
+      const result = await probeConsolePolicyVersion(sesClient);
+
+      // Throttled or transport-failed is not a policy-version fact. Returning
+      // the stored reading is right: erasing a known-good version because SES
+      // rate-limited one probe would put a healthy account into the stale
+      // banner it just escaped.
+      if (result.unreachable) {
+        return storedView(false);
+      }
+
+      const now = new Date();
+      await db
+        .update(awsAccount)
+        .set({
+          consolePolicyVersion: result.version,
+          consolePolicyCheckedAt: now,
+        })
+        .where(
+          and(
+            eq(awsAccount.id, account.id),
+            eq(awsAccount.organizationId, account.organizationId)
+          )
+        );
+
+      return {
+        version: result.version,
+        currentVersion: CURRENT_CONSOLE_POLICY_VERSION,
+        upToDate: result.version >= CURRENT_CONSOLE_POLICY_VERSION,
+        checkedAt: now.toISOString(),
+        rechecked: true,
+      };
+    },
+    {
+      params: t.Object({
+        awsAccountId: t.String({ maxLength: 36 }),
+      }),
+      response: {
+        200: CONSOLE_POLICY_VIEW,
+      },
+      detail: {
+        tags: ["account"],
+        summary: "Re-probe one account's console-access policy version",
+        description:
+          "Assumes the account's wraps-console-access-role and probes which version of the Wraps console policy it carries, then persists the reading. Exists so a customer who has just repaired their role sees it reflected immediately rather than waiting for the hourly sweep, which does not re-probe an account it checked within the last day. Rate limited to one probe per account per minute; inside that window, or when SES throttles the probe, the stored reading is returned with `rechecked: false`.",
+      },
+    }
+  )
   .get(
     "/health",
     async (ctx) => {

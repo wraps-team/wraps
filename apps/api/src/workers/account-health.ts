@@ -71,7 +71,10 @@ import { isRoleAccessError } from "../lib/role-access-error";
 import { classifySesHealth, SES_THRESHOLDS } from "../lib/ses-health.js";
 import { type AwsCredentials, getCredentials } from "../services/credentials";
 
-const DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000; // once per day per account
+// Once per day per account — but only for an account whose role is already
+// current. See the probe block in checkAccount for why a behind account is
+// re-probed every sweep instead.
+const DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 type AccountRow = {
   id: string;
@@ -312,15 +315,27 @@ async function checkAccount(account: AccountRow): Promise<void> {
     );
 
   // Console-policy version fingerprint. Reuses the SESv2Client already
-  // assumed above rather than building a second one. Probed at most once a
-  // day per account — a policy version changes when a customer runs a
-  // repair, not between two hourly sweeps, and this sweep touches every
-  // connected account. Its own try/catch keeps a probe failure from ever
-  // aborting the sweep or the checks below it.
+  // assumed above rather than building a second one. Its own try/catch keeps
+  // a probe failure from ever aborting the sweep or the checks below it.
+  //
+  // An account already known to be behind is re-probed every sweep; only an
+  // up-to-date one is deduped for a day. The daily window used to apply to
+  // both, on the reasoning that a version "changes when a customer runs a
+  // repair, not between two hourly sweeps" — which is backwards. A repair is
+  // exactly when it changes, and it is the one moment a customer is watching:
+  // they fix the role, the banner keeps telling them it is broken for up to
+  // 24 hours, and they reasonably conclude the repair failed. Deduping only
+  // healthy accounts keeps the sweep's cost flat across the fleet, since the
+  // set that is actually behind is small and shrinks as they repair.
   try {
     const checkedAt = account.consolePolicyCheckedAt;
+    const knownBehind =
+      account.consolePolicyVersion !== null &&
+      account.consolePolicyVersion < CURRENT_CONSOLE_POLICY_VERSION;
     const recentlyChecked =
-      checkedAt !== null && Date.now() - checkedAt.getTime() < DEDUPE_WINDOW_MS;
+      !knownBehind &&
+      checkedAt !== null &&
+      Date.now() - checkedAt.getTime() < DEDUPE_WINDOW_MS;
     if (!recentlyChecked) {
       const result = await probeConsolePolicyVersion(sesClient);
       // A throttled/unreachable probe is not a policy-version fact — leave

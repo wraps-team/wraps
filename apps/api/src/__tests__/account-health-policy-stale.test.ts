@@ -282,16 +282,57 @@ describe("account-health console-policy-stale notification", () => {
     expect(policyWrite).toBeUndefined();
   });
 
-  it("does not notify when the probe is skipped inside the 24h throttle window, even with a stale stored version", async () => {
-    // The easiest case to get wrong: notifying off the STORED column instead
-    // of a fresh probe result would fire on every hourly sweep during the
-    // window, not just once.
-    ACCOUNT_ROW.consolePolicyVersion = CURRENT_CONSOLE_POLICY_VERSION - 1;
+  it("still skips the probe for an up-to-date role inside the 24h window", async () => {
+    ACCOUNT_ROW.consolePolicyVersion = CURRENT_CONSOLE_POLICY_VERSION;
     ACCOUNT_ROW.consolePolicyCheckedAt = new Date(Date.now() - 60_000);
 
     await invoke();
 
     expect(mockProbeConsolePolicyVersion).not.toHaveBeenCalled();
+    expect(mockNotifyOrg).not.toHaveBeenCalled();
+  });
+
+  it("re-probes a role already known to be behind, even inside the 24h window", async () => {
+    // The window used to apply here too, so a customer who repaired their
+    // role went on being told it was broken for up to a day — the one moment
+    // they are actually watching the banner. An account known to be behind is
+    // the case where a change is expected, so it is re-probed every sweep.
+    ACCOUNT_ROW.consolePolicyVersion = CURRENT_CONSOLE_POLICY_VERSION - 1;
+    ACCOUNT_ROW.consolePolicyCheckedAt = new Date(Date.now() - 60_000);
+    mockProbeConsolePolicyVersion.mockResolvedValue({
+      version: CURRENT_CONSOLE_POLICY_VERSION,
+      unreachable: false,
+    });
+
+    await invoke();
+
+    expect(mockProbeConsolePolicyVersion).toHaveBeenCalledTimes(1);
+    // The repair is observed and persisted, which is what clears the banner.
+    const policyWrite = mockDbSet.mock.calls.find(
+      (call) => call[0]?.consolePolicyVersion !== undefined
+    );
+    expect(policyWrite?.[0].consolePolicyVersion).toBe(
+      CURRENT_CONSOLE_POLICY_VERSION
+    );
+    expect(mockNotifyOrg).not.toHaveBeenCalled();
+  });
+
+  it("does not re-notify a still-behind account on every sweep", async () => {
+    // Probing hourly must not mean notifying hourly. The guard is
+    // notifyOnce's own 24h dedupe against the notification table, which is
+    // independent of the probe throttle — if the two are ever collapsed back
+    // into one window, this fails.
+    ACCOUNT_ROW.consolePolicyVersion = CURRENT_CONSOLE_POLICY_VERSION - 1;
+    ACCOUNT_ROW.consolePolicyCheckedAt = new Date(Date.now() - 60_000);
+    mockProbeConsolePolicyVersion.mockResolvedValue({
+      version: CURRENT_CONSOLE_POLICY_VERSION - 1,
+      unreachable: false,
+    });
+    mockHasRecentNotification.mockResolvedValue(true);
+
+    await invoke();
+
+    expect(mockProbeConsolePolicyVersion).toHaveBeenCalledTimes(1);
     expect(mockNotifyOrg).not.toHaveBeenCalled();
   });
 });

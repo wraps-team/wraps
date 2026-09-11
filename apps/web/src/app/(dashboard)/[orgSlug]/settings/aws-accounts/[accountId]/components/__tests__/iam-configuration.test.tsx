@@ -94,6 +94,25 @@ describe("IAMConfiguration for a server-minted External ID", () => {
   });
 });
 
+describe("IAMConfiguration re-check control", () => {
+  it("offers a re-check, because the banner reads a stored column", () => {
+    // The stale-policy banner renders off aws_account.consolePolicyVersion,
+    // which only the hourly sweep writes. Without this the only feedback on a
+    // successful repair is the banner eventually vanishing.
+    render(<IAMConfiguration account={infraAccount} selfHosted={false} />);
+
+    expect(screen.getByRole("button", { name: /check again/i })).toBeEnabled();
+  });
+
+  it("withholds it when self-hosted, like every other platform route", () => {
+    render(<IAMConfiguration account={infraAccount} selfHosted={true} />);
+
+    expect(
+      screen.queryByRole("button", { name: /check again/i })
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("IAMConfiguration when self-hosted", () => {
   it("shows the External ID and no CloudFormation route at all", () => {
     render(<IAMConfiguration account={infraAccount} selfHosted={true} />);
