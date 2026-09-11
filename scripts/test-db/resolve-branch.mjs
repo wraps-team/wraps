@@ -453,7 +453,13 @@ export async function reapOrphanBranches(env, opts = {}) {
       continue;
     }
 
-    const shouldDelete = opts.all === true || !liveNames.has(branch.name);
+    // `only` is authoritative when given: delete exactly those branches and
+    // keep every other, live or not. That is what lets one checkout refresh
+    // its own branch after a migration lands without deleting a branch another
+    // agent's worktree is mid-run against (which `--all` does by design).
+    const shouldDelete = opts.only
+      ? opts.only.includes(branch.name)
+      : opts.all === true || !liveNames.has(branch.name);
     if (!shouldDelete) {
       kept.push(branch.name);
       continue;

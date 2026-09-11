@@ -148,6 +148,29 @@ node scripts/test-db/reap-branches.mjs --all  # also delete LIVE wt-* branches �
 the absence of the checkout, so reaping first finds nothing and leaves the branch live
 indefinitely.
 
+### After a migration lands, refresh the test branches — two steps, not one
+
+An **existing** `wt-*` branch is reused verbatim forever: `resolve-branch.mjs` cuts a
+branch from the shared test DB only when one does not already exist, and never re-cuts
+or migrates it afterwards. So a schema change reaches your tests only if you both
+update the parent *and* drop the stale child:
+
+```bash
+pnpm test-db:refresh   # = db:push:test (updates the shared parent)
+                       #   + reap-branches.mjs --self (drops THIS checkout's
+                       #     branch so it re-cuts from that parent next run)
+```
+
+`--self` is the concurrency-safe form of `--all`: it deletes only the current
+checkout's branch, so it cannot pull the database out from under another agent's
+worktree mid-run. Use `--all` only when you deliberately want every checkout refreshed.
+
+**`db:push` and `db:push:test` alone do not do this.** `db:push` targets the dev DB in
+`.env.local`; `db:push:test` targets the raw `DATABASE_URL` in `.env.test` — the shared
+*parent*. Neither is the database your tests read, because every vitest config rewrites
+`DATABASE_URL` through `resolveTestDatabaseUrl` to the per-checkout branch. Running
+either and seeing tests still fail `42703` is this gap, not a broken push.
+
 `pnpm dev` serves every app through `portless` (a global CLI) on HTTPS hostnames, not
 ports. Use these when checking local work in a browser — `localhost:3000` will not be listening:
 

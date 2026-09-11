@@ -429,6 +429,81 @@ describe("reapOrphanBranches", () => {
     ]);
   });
 
+  it("with opts.only, deletes exactly those branches and keeps every other — including dead ones", async () => {
+    // The --self case: one checkout refreshing its own branch after a
+    // migration must not touch a branch another agent's worktree is mid-run
+    // against, which is precisely what --all would do.
+    const branches = [
+      { id: "b-self", name: "wt-wraps", current_state: "ready" },
+      { id: "b-other", name: "wt-agent-live1", current_state: "ready" },
+      { id: "b-dead", name: "wt-agent-dead1", current_state: "ready" },
+    ];
+    const { fetchImpl, calls } = createNeonMock(branches);
+    const execImpl = execWorktreeList([
+      "/Users/x/Projects/wraps",
+      "/Users/x/Projects/wraps/.claude/worktrees/agent-live1",
+    ]);
+
+    const result = await reapOrphanBranches(NEON_ENV, {
+      fetchImpl,
+      execImpl,
+      only: ["wt-wraps"],
+    });
+
+    expect(result.deleted).toEqual(["wt-wraps"]);
+    // wt-agent-dead1 is orphaned and would be swept by a default run; `only`
+    // is authoritative, so it survives.
+    expect(result.kept).toEqual(["wt-agent-live1", "wt-agent-dead1"]);
+
+    const deleteUrls = calls
+      .filter((c) => c.method === "DELETE")
+      .map((c) => c.url);
+    expect(deleteUrls).toEqual([
+      "https://console.neon.tech/api/v2/projects/proj-1/branches/b-self",
+    ]);
+  });
+
+  it("with opts.only naming a branch that does not exist, deletes nothing and fails nothing", async () => {
+    const branches = [
+      { id: "b-other", name: "wt-agent-live1", current_state: "ready" },
+    ];
+    const { fetchImpl, calls } = createNeonMock(branches);
+    const execImpl = execWorktreeList(["/Users/x/Projects/wraps"]);
+
+    const result = await reapOrphanBranches(NEON_ENV, {
+      fetchImpl,
+      execImpl,
+      only: ["wt-never-created"],
+    });
+
+    expect(result.deleted).toEqual([]);
+    expect(result.failed).toEqual([]);
+    expect(result.kept).toEqual(["wt-agent-live1"]);
+    expect(calls.filter((c) => c.method === "DELETE")).toEqual([]);
+  });
+
+  it("opts.only takes precedence over opts.all", async () => {
+    const branches = [
+      { id: "b-self", name: "wt-wraps", current_state: "ready" },
+      { id: "b-other", name: "wt-agent-live1", current_state: "ready" },
+    ];
+    const { fetchImpl } = createNeonMock(branches);
+    const execImpl = execWorktreeList([
+      "/Users/x/Projects/wraps",
+      "/Users/x/Projects/wraps/.claude/worktrees/agent-live1",
+    ]);
+
+    const result = await reapOrphanBranches(NEON_ENV, {
+      fetchImpl,
+      execImpl,
+      all: true,
+      only: ["wt-wraps"],
+    });
+
+    expect(result.deleted).toEqual(["wt-wraps"]);
+    expect(result.kept).toEqual(["wt-agent-live1"]);
+  });
+
   it("deletes live wt-* branches too when opts.all is true", async () => {
     const branches = [
       { id: "b-live", name: "wt-agent-live1", current_state: "ready" },

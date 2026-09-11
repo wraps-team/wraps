@@ -37,6 +37,7 @@
     "sst:remove": "sst remove",
     "sync:skills": "./scripts/sync-skills.sh",
     "setup-worktree": "./scripts/setup-worktree.sh",
+    "test-db:refresh": "pnpm --filter @wraps/db db:push:test && node scripts/test-db/reap-branches.mjs --self",
     "selfhost:build-deps": "turbo run build --filter=\"@wraps/api^...\" --filter=\"@wraps/web^...\"",
     "selfhost:deploy": "pnpm selfhost:build-deps && tsx scripts/selfhost/deploy.ts",
     "selfhost:upgrade": "pnpm selfhost:build-deps && tsx scripts/selfhost/upgrade.ts",
