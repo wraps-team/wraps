@@ -87,6 +87,8 @@ describe("monitoring noise from route-level client errors", () => {
 
     expect(res.status).toBe(404);
     expect(sinks.captureException).not.toHaveBeenCalled();
+    expect(sinks.log.error).not.toHaveBeenCalled();
+    expect(sinks.log.warn.mock.calls[0][0]).toBe("api.not_found");
   });
 
   it("does not report schema validation failures", async () => {

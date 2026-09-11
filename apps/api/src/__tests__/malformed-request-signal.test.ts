@@ -158,7 +158,8 @@ describe("api.malformed_request signal", () => {
     await app.handle(new Request("http://localhost/nope"));
     await app.handle(new Request("http://localhost/boom"));
 
-    expect(sinks.log.warn).not.toHaveBeenCalled();
+    const warned = sinks.log.warn.mock.calls.map((call) => call[0]);
+    expect(warned).not.toContain("api.malformed_request");
   });
 });
 

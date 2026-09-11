@@ -249,6 +249,19 @@ export function handleApiError(
         .get("user-agent")
         ?.slice(0, MAX_HEADER_LOG_LENGTH),
     });
+  } else if (code === "NOT_FOUND") {
+    // Unmatched routes are client errors: the 404 is the correct response, not
+    // a failure. Log the path at warn so wrong-path traffic (scanners, typos)
+    // stays observable without tripping error-level detection.
+    sinks.log.warn("api.not_found", {
+      requestId,
+      method: request.method,
+      path: url.pathname,
+      status,
+      organizationId: auth?.organizationId,
+      apiKeyId: auth?.apiKeyId,
+      userId: auth?.userId,
+    });
   } else {
     sinks.log.error("api.error", asError(error), {
       requestId,
