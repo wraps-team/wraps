@@ -202,22 +202,40 @@ pnpm --filter @wraps/db db:studio     # Open Drizzle Studio GUI
 
 drizzle-kit wraps every migration in a transaction, which rejects
 `CREATE INDEX CONCURRENTLY`. For large tables where a blocking index build
-is unacceptable, the pattern is:
+is unacceptable, the DDL lives in a manifest and runs out-of-band.
 
-1. **Declare the index in `schema/*.ts` as the source of truth.** Drizzle's
-   snapshot will then list it as existing.
-2. **Strip the `CREATE INDEX` statements** from the generated migration SQL
-   file (leave a `-- NOTE:` pointer to the script instead).
-3. **Create the index out-of-band** via a one-off TypeScript script under
-   `packages/db/scripts/` that uses `@neondatabase/serverless` directly
-   (no drizzle-kit involvement), with `CREATE INDEX CONCURRENTLY IF NOT
-   EXISTS`. Run manually after the drizzle migration:
-   `pnpm --filter @wraps/db exec tsx scripts/<name>.ts`.
-4. **Document the deploy order** in the PR description — e.g., "Run
-   `db:migrate` first, then the script, then ship the code that relies
-   on the index."
+**`scripts/index-manifest.ts` is the source of truth. Adding an index means
+adding one entry there — not writing a script.** `migrate-indexes.ts` runs the
+whole list; the per-area `create-*.ts` scripts are three-line wrappers around
+`runIndexSubset` that exist only because migration `-- NOTE:` comments name
+them. Do not hand-roll a connection, and do not put DDL in a script.
 
-Reference: `packages/db/scripts/create-broadcast-resume-indexes.ts`.
+1. **Declare the index in `schema/*.ts`.** Drizzle's snapshot will then list it
+   as existing. Leave the generated `meta/*_snapshot.json` and `_journal.json`
+   exactly as produced — schema and snapshot keep declaring the index while the
+   SQL no longer creates it. That asymmetry IS the pattern, not drift;
+   `drizzle-kit check` still passes.
+2. **Strip the `CREATE INDEX` statements** from the generated migration SQL,
+   leaving a `-- NOTE:` pointer. `0070_supreme_nick_fury.sql` is the precedent
+   for a NOTE-only migration; `0055` and `0086` show one alongside real DDL.
+3. **Add one entry to `CONCURRENT_INDEXES`** in `scripts/index-manifest.ts`
+   with `name`, `purpose` (what degrades without it), and `ddl`. The `ddl` must
+   be `CONCURRENTLY` + `IF NOT EXISTS` so re-runs are free.
+4. **Optionally add a wrapper** under `scripts/` if a migration NOTE names one:
+   `runIndexSubset(["<index_name>"])`, nothing else. Mirror
+   `create-contact-event-analytics-index.ts`.
+5. **Document the deploy order**: `db:migrate` first, then
+   `pnpm --filter @wraps/db db:migrate-indexes` (or the named wrapper), then
+   ship the code that relies on the index.
+
+**Use `pg`, never `@neondatabase/serverless`.** The Neon serverless driver
+speaks only to Neon's WebSocket proxy, so on RDS, Supabase, Docker — any
+self-hosted Postgres — every statement dies in the handshake, which surfaced
+as a useless `[object ErrorEvent]`. It is also a devDependency, absent from a
+production self-hosted install. `baseline/architecture.test.ts` enforces this
+on `migrate-indexes.ts` and `run-index-subset.ts`.
+
+Reference: `scripts/index-manifest.ts`, `scripts/run-index-subset.ts`.
 
 #### These scripts need a DIRECT connection
 
