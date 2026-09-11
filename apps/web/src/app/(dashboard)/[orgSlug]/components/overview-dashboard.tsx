@@ -134,15 +134,10 @@ export function OverviewDashboard({
             <ActivityFeed orgSlug={orgSlug} recentItems={recentItems} />
           </div>
           <div className="space-y-6">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground">
-                  Plan
-                </span>
-                <Badge variant="secondary">{plan?.name ?? "Free"}</Badge>
-              </div>
-              <EventUsageCard orgSlug={orgSlug} />
-            </div>
+            <EventUsageCard
+              action={<Badge variant="secondary">{plan?.name ?? "Free"}</Badge>}
+              orgSlug={orgSlug}
+            />
             <InfrastructureStatusCard
               orgSlug={orgSlug}
               setupStatus={setupStatus}

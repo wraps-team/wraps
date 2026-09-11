@@ -2,6 +2,7 @@
 
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -29,6 +30,12 @@ type UsageCardProps = {
   isLoading: boolean;
   upgradeHref: string;
   className?: string;
+  /**
+   * Optional right-hand slot in the header. The overview passes the org's plan
+   * badge here; the billing page deliberately does not, because the plan is
+   * already the subject of that whole page.
+   */
+  action?: React.ReactNode;
 };
 
 const progressColors = {
@@ -46,6 +53,7 @@ export function UsageCard({
   isLoading,
   upgradeHref,
   className,
+  action,
 }: UsageCardProps) {
   if (isLoading) {
     return (
@@ -56,6 +64,7 @@ export function UsageCard({
             <CardTitle className="text-base">{title}</CardTitle>
           </div>
           <CardDescription>Loading...</CardDescription>
+          {action && <CardAction className="self-center">{action}</CardAction>}
         </CardHeader>
       </Card>
     );
@@ -71,24 +80,25 @@ export function UsageCard({
   return (
     <Card className={className}>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Icon className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">{title}</CardTitle>
-          </div>
-          {!isUnlimited && (
-            <span className="text-sm text-muted-foreground">
-              {usage.current.toLocaleString()} / {usage.limit.toLocaleString()}
-            </span>
-          )}
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-base">{title}</CardTitle>
         </div>
         <CardDescription>{description}</CardDescription>
+        {action && <CardAction className="self-center">{action}</CardAction>}
       </CardHeader>
       <CardContent className="space-y-3">
         {isUnlimited ? (
           <p className="text-sm text-muted-foreground">Unlimited</p>
         ) : (
           <>
+            <p className="font-semibold text-lg tabular-nums">
+              {usage.current.toLocaleString()}
+              <span className="font-normal text-muted-foreground text-sm">
+                {" / "}
+                {usage.limit.toLocaleString()}
+              </span>
+            </p>
             <Progress
               className={cn("h-2", progressColors[usage.threshold])}
               value={displayPercent}

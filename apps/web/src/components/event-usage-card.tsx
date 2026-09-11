@@ -7,13 +7,19 @@ import { useEventUsage } from "@/hooks/use-event-usage";
 type EventUsageCardProps = {
   orgSlug: string;
   className?: string;
+  action?: React.ReactNode;
 };
 
-export function EventUsageCard({ orgSlug, className }: EventUsageCardProps) {
+export function EventUsageCard({
+  orgSlug,
+  className,
+  action,
+}: EventUsageCardProps) {
   const { data: usage, isLoading } = useEventUsage(orgSlug);
 
   return (
     <UsageCard
+      action={action}
       className={className}
       description="Tracked events this month"
       icon={Activity}
