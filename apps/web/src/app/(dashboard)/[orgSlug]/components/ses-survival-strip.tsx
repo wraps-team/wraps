@@ -1,7 +1,13 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@wraps/ui/components/ui/card";
 import Link from "next/link";
 import type {
   SesHealthAccount,
@@ -300,11 +306,13 @@ export function SesSurvivalStrip({ orgSlug }: { orgSlug: string }) {
 
   return (
     <Card>
-      <CardContent className="space-y-4 pt-6">
-        <div className="flex items-center justify-between gap-3">
-          <p className="font-medium text-sm">Account survival</p>
-          <span className="text-muted-foreground text-xs">{checkedLine}</span>
-        </div>
+      <CardHeader>
+        <CardTitle className="text-lg">Account survival</CardTitle>
+        <CardAction className="self-center text-muted-foreground text-xs">
+          {checkedLine}
+        </CardAction>
+      </CardHeader>
+      <CardContent>
         <div className="space-y-6">
           {data.accounts.map((account) => (
             <AccountBlock
