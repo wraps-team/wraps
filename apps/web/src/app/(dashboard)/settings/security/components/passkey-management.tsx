@@ -340,8 +340,8 @@ export function PasskeyManagement() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={handleDeletePasskey}
+              variant="destructive"
             >
               {isLoading ? "Removing..." : "Remove Passkey"}
             </AlertDialogAction>

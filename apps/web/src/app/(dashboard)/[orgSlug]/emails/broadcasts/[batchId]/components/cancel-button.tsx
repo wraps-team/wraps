@@ -63,9 +63,9 @@ export function CancelBatchButton({
         <AlertDialogFooter>
           <AlertDialogCancel>Keep Sending</AlertDialogCancel>
           <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             disabled={isPending}
             onClick={handleCancel}
+            variant="destructive"
           >
             {isPending ? "Cancelling..." : "Cancel Broadcast"}
           </AlertDialogAction>

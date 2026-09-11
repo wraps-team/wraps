@@ -210,9 +210,9 @@ export function OrganizationSettingsAwsAccounts({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deleting}
               onClick={handleDeleteConfirm}
+              variant="destructive"
             >
               {deleting ? (
                 <>

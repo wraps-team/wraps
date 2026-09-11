@@ -97,9 +97,9 @@ export function RemoveSuppressionButton({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             disabled={isPending || (isComplaint && !acknowledged)}
             onClick={handleRemove}
+            variant="destructive"
           >
             {isPending ? "Removing..." : "Remove from suppression list"}
           </AlertDialogAction>

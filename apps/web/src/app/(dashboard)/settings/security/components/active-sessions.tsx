@@ -225,8 +225,8 @@ export function ActiveSessions() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={handleRevokeAllSessions}
+              variant="destructive"
             >
               Revoke All Sessions
             </AlertDialogAction>

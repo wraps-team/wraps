@@ -462,9 +462,9 @@ export function TwoFactorAuth() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isLoading}
               onClick={() => promptForPassword("disable")}
+              variant="destructive"
             >
               {isLoading ? "Loading..." : "Continue"}
             </AlertDialogAction>
