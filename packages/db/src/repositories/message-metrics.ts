@@ -104,12 +104,12 @@ export function assertValidTimezone(timezone: string): string {
 /**
  * SQL fragment that returns TRUE when the open_user_agent is NOT a bot.
  * Derives from the same BOT_UA_KEYWORDS list as the TypeScript `isBotOpen()`.
- * null/empty UAs are considered bots.
+ * null, empty, and whitespace-only UAs are considered bots.
  */
 const botPattern = BOT_UA_KEYWORDS.join("|");
 const isNotBotOpen = sql`(
   ${messageSend.openUserAgent} IS NOT NULL
-  AND ${messageSend.openUserAgent} != ''
+  AND btrim(${messageSend.openUserAgent}) != ''
   AND ${messageSend.openUserAgent} !~* ${botPattern}
 )`;
 

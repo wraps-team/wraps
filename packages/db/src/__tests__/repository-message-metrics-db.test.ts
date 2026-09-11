@@ -294,6 +294,26 @@ function seedPendingShape(organizationId: string, awsAccountId: string) {
   });
 }
 
+// ─── Case 12: whitespace-only open_user_agent is bot-filtered ──────────────
+const DAY30_START = new Date("2026-08-30T00:00:00Z");
+const DAY30_END = new Date("2026-08-30T23:59:59Z");
+
+function seedWhitespaceUaShape(organizationId: string, awsAccountId: string) {
+  const base = {
+    organizationId,
+    awsAccountId,
+    sourceType: "transactional" as const,
+  };
+  seed({
+    ...base,
+    status: "opened",
+    sentAt: new Date("2026-08-30T01:00:00Z"),
+    deliveredAt: new Date("2026-08-30T01:01:00Z"),
+    openedAt: new Date("2026-08-30T01:05:00Z"),
+    openUserAgent: "   ",
+  });
+}
+
 beforeAll(async () => {
   await db
     .insert(organization)
@@ -359,6 +379,7 @@ beforeAll(async () => {
   seedDomainShape(ORG_A, ACCOUNT_A);
   seedBroadcastShape(ORG_A, ACCOUNT_A);
   seedPendingShape(ORG_A, ACCOUNT_A);
+  seedWhitespaceUaShape(ORG_A, ACCOUNT_A);
 
   await db
     .insert(messageSend)
@@ -616,5 +637,21 @@ describe("Repository: message metrics", () => {
       maxRows: 3,
     });
     expect(rows).toHaveLength(3);
+  });
+
+  it("whitespace-only open_user_agent is bot-filtered out of `opened` but still counted in `openedRaw`", async () => {
+    const result = await getMessageMetrics({
+      organizationId: ORG_A,
+      startTime: DAY30_START,
+      endTime: DAY30_END,
+    });
+
+    // The row reached the openedAt-is-not-null filter (openedRaw: 1) but was
+    // excluded from the bot-filtered count because its open_user_agent is
+    // whitespace-only, not a real UA (opened: 0). Asserting both proves the
+    // row was seeded and reached the filter, rather than being excluded
+    // earlier for an unrelated reason.
+    expect(result.totals.openedRaw).toBe(1);
+    expect(result.totals.opened).toBe(0);
   });
 });
