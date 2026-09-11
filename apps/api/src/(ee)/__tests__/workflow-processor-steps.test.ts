@@ -583,6 +583,12 @@ describe("handleSendEmail", () => {
       }
     });
 
+    // insert call 1: step execution claim (workflow-processor.ts, unchanged).
+    // insert call 2+: the messageSend claim-before-send insert
+    // (handleSendEmail, plan 034) — succeeds by default so the existing
+    // "normal single send" tests below still exercise a real send. Tests
+    // that specifically exercise the lost-claim/replay/reclaim branches
+    // override this per-test (see "handleSendEmail — messageSend claim").
     let insertCallCount = 0;
     mockDbInsert.mockImplementation(() => {
       insertCallCount++;
@@ -601,7 +607,13 @@ describe("handleSendEmail", () => {
           }),
         };
       }
-      return { values: vi.fn().mockResolvedValue(undefined) };
+      return {
+        values: vi.fn().mockReturnValue({
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ id: "ms-claim-1" }]),
+          }),
+        }),
+      };
     });
 
     mockDbUpdate.mockReturnValue({
@@ -2254,7 +2266,16 @@ describe("Topic handlers", () => {
 // Suite: messageSend INSERT retry logic
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe("handleSendEmail — messageSend INSERT retry", () => {
+// Plan 034 rewrote handleSendEmail to claim-before-send: the messageSend row
+// is now INSERTed (status 'queued') BEFORE the SES call, and the retry loop
+// that used to guard a post-send INSERT now guards the post-send UPDATE that
+// marks the claimed row 'sent'. These two tests used to drive INSERT
+// failures; they now drive UPDATE failures against that same retry loop, and
+// the retry-exhaustion test's expectation flips: the update loop no longer
+// rethrows (see workflow-step-handlers.ts's comment on that loop, and plan
+// 034 R4) — SES already accepted the message by the time this UPDATE runs,
+// so a persistent DB error here must log and give up, not fail the step.
+describe("handleSendEmail — messageSend mark-sent UPDATE retry", () => {
   const emailStep = {
     id: "step-email",
     type: "send_email",
@@ -2274,36 +2295,11 @@ describe("handleSendEmail — messageSend INSERT retry", () => {
     organizationId: "org-1",
   };
 
-  it("retries messageSend INSERT up to 3 times when DB throws on first attempt", async () => {
-    const exec = makeExecution({ currentStepId: "step-email" });
-    const ct = makeContact({});
-    const wf = makeWorkflow({
-      defaultFrom: "noreply@test.com",
-      defaultFromName: "Test",
-      steps: [
-        { id: "trigger-1", type: "trigger", config: { type: "trigger" } },
-        emailStep,
-      ],
-      transitions: [
-        {
-          id: "t1",
-          fromStepId: "trigger-1",
-          toStepId: "step-email",
-          condition: null,
-        },
-      ],
-    });
-    const defaultTemplate = {
-      id: "tmpl-1",
-      name: "Welcome",
-      subject: "Hello {{firstName}}",
-      compiledHtml: "<h1>Hi {{firstName}}</h1>",
-      emailType: "marketing",
-      sesTemplateName: "ses-tmpl-1",
-    };
-
-    mockDbQueryWorkflowExecution.findFirst.mockResolvedValue(exec);
-
+  function setupSelects(
+    wf: Record<string, unknown>,
+    ct: Record<string, unknown>,
+    defaultTemplate: Record<string, unknown>
+  ) {
     let selectCallCount = 0;
     mockDbSelect.mockImplementation(() => {
       selectCallCount++;
@@ -2338,61 +2334,19 @@ describe("handleSendEmail — messageSend INSERT retry", () => {
           return chain([]);
       }
     });
+  }
 
-    // insert call 1: step execution claim (succeeds)
-    // insert call 2+: messageSend — fail first attempt, succeed on second
-    let insertCallCount = 0;
-    let messageSendAttempts = 0;
-    mockDbInsert.mockImplementation(() => {
-      insertCallCount++;
-      if (insertCallCount === 1) {
-        return {
-          values: vi.fn().mockReturnValue({
-            onConflictDoUpdate: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([
-                {
-                  id: "se-1",
-                  status: "executing",
-                  idempotencyKey: "exec-1-step-email",
-                },
-              ]),
-            }),
-          }),
-        };
-      }
-      // messageSend insert: fail on first attempt, succeed on retry
-      messageSendAttempts++;
-      if (messageSendAttempts === 1) {
-        return {
-          values: vi
-            .fn()
-            .mockRejectedValue(
-              Object.assign(new Error("connection failure"), { code: "08006" })
-            ),
-        };
-      }
-      return { values: vi.fn().mockResolvedValue(undefined) };
-    });
+  /** Chain shape awaitable directly (no .returning()) AND chainable to .returning() —
+   * matches how different db.update(...) call sites in this codebase are used. */
+  function awaitableWhere(resolvedValue: unknown[]) {
+    const p = Promise.resolve(undefined) as Promise<undefined> & {
+      returning: () => Promise<unknown[]>;
+    };
+    p.returning = vi.fn().mockResolvedValue(resolvedValue);
+    return p;
+  }
 
-    mockDbUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([exec]),
-        }),
-      }),
-    });
-
-    await handler(makeSQSEvent(emailJob));
-
-    // messageSend should have been attempted at least twice (1 failure + 1 success)
-    // and no more than 3 times (the max retry count)
-    expect(messageSendAttempts).toBeGreaterThanOrEqual(2);
-    expect(messageSendAttempts).toBeLessThanOrEqual(3);
-    // The step should ultimately complete (mockDbUpdate called for metrics update)
-    expect(sesSendCalls).toHaveLength(1);
-  });
-
-  it("calls log.error and rethrows after 3 failed messageSend INSERT attempts (retry exhaustion)", async () => {
+  it("retries the mark-sent UPDATE up to 3 times when DB throws on first attempt, succeeds on retry", async () => {
     const exec = makeExecution({ currentStepId: "step-email" });
     const ct = makeContact({});
     const wf = makeWorkflow({
@@ -2421,44 +2375,12 @@ describe("handleSendEmail — messageSend INSERT retry", () => {
     };
 
     mockDbQueryWorkflowExecution.findFirst.mockResolvedValue(exec);
+    setupSelects(wf, ct, defaultTemplate);
 
-    let selectCallCount = 0;
-    mockDbSelect.mockImplementation(() => {
-      selectCallCount++;
-      const chain = (rows: unknown[]) => ({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue(rows),
-          }),
-        }),
-      });
-      switch (selectCallCount) {
-        case 1:
-          return chain([wf]);
-        case 2:
-          return chain([ct]);
-        case 3:
-          return chain([
-            {
-              awsAccountId: wf.awsAccountId,
-              defaultFrom: wf.defaultFrom,
-              defaultFromName: wf.defaultFromName,
-              defaultReplyTo: wf.defaultReplyTo,
-            },
-          ]);
-        case 4:
-          return chain([{ region: "us-east-1" }]);
-        case 5:
-          return chain([defaultTemplate]);
-        case 6:
-          return chain([{ name: "Test Org" }]);
-        default:
-          return chain([]);
-      }
-    });
-
+    // insert call 1: step execution claim. insert call 2: messageSend
+    // claim-before-send — both succeed; this suite is about the UPDATE that
+    // marks the claim 'sent', not the claim itself.
     let insertCallCount = 0;
-    let messageSendAttempts = 0;
     mockDbInsert.mockImplementation(() => {
       insertCallCount++;
       if (insertCallCount === 1) {
@@ -2476,36 +2398,152 @@ describe("handleSendEmail — messageSend INSERT retry", () => {
           }),
         };
       }
-      // All messageSend INSERT attempts fail with a transient Postgres error
-      messageSendAttempts++;
       return {
-        values: vi
-          .fn()
-          .mockRejectedValue(
-            Object.assign(new Error("connection failure"), { code: "08006" })
-          ),
+        values: vi.fn().mockReturnValue({
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ id: "ms-claim-1" }]),
+          }),
+        }),
       };
     });
 
-    mockDbUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([exec]),
-        }),
-      }),
+    // The mark-sent UPDATE (set({status: "sent", ...})) fails once with a
+    // transient error, then succeeds. Every other db.update(...) call site
+    // (stepExec completion, contact metrics, workflowExecution claim) always
+    // succeeds immediately.
+    let sentUpdateAttempts = 0;
+    mockDbUpdate.mockImplementation(() => ({
+      set: (setArgs: Record<string, unknown>) => {
+        if (setArgs?.status === "sent") {
+          sentUpdateAttempts++;
+          if (sentUpdateAttempts === 1) {
+            return {
+              where: () =>
+                Promise.reject(
+                  Object.assign(new Error("connection failure"), {
+                    code: "08006",
+                  })
+                ),
+            };
+          }
+        }
+        return { where: () => awaitableWhere([exec]) };
+      },
+    }));
+
+    await handler(makeSQSEvent(emailJob));
+
+    // Exactly one SES send regardless of how many times the DB write retries
+    // — the retry is purely a bookkeeping concern, SES was already called.
+    expect(sesSendCalls).toHaveLength(1);
+    expect(sentUpdateAttempts).toBeGreaterThanOrEqual(2);
+    expect(sentUpdateAttempts).toBeLessThanOrEqual(3);
+  });
+
+  it("logs (does not throw) after 3 failed mark-sent UPDATE attempts — an SES-accepted send must not be reported as a failed step", async () => {
+    const exec = makeExecution({ currentStepId: "step-email" });
+    const ct = makeContact({});
+    const wf = makeWorkflow({
+      defaultFrom: "noreply@test.com",
+      defaultFromName: "Test",
+      steps: [
+        { id: "trigger-1", type: "trigger", config: { type: "trigger" } },
+        emailStep,
+      ],
+      transitions: [
+        {
+          id: "t1",
+          fromStepId: "trigger-1",
+          toStepId: "step-email",
+          condition: null,
+        },
+      ],
     });
+    const defaultTemplate = {
+      id: "tmpl-1",
+      name: "Welcome",
+      subject: "Hello {{firstName}}",
+      compiledHtml: "<h1>Hi {{firstName}}</h1>",
+      emailType: "marketing",
+      sesTemplateName: "ses-tmpl-1",
+    };
+
+    mockDbQueryWorkflowExecution.findFirst.mockResolvedValue(exec);
+    setupSelects(wf, ct, defaultTemplate);
+
+    let insertCallCount = 0;
+    mockDbInsert.mockImplementation(() => {
+      insertCallCount++;
+      if (insertCallCount === 1) {
+        return {
+          values: vi.fn().mockReturnValue({
+            onConflictDoUpdate: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([
+                {
+                  id: "se-1",
+                  status: "executing",
+                  idempotencyKey: "exec-1-step-email",
+                },
+              ]),
+            }),
+          }),
+        };
+      }
+      return {
+        values: vi.fn().mockReturnValue({
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ id: "ms-claim-1" }]),
+          }),
+        }),
+      };
+    });
+
+    // All mark-sent UPDATE attempts fail with a transient Postgres error.
+    // Every other db.update(...) call site succeeds immediately, so the step
+    // itself can still be observed completing (not failing) around this.
+    let sentUpdateAttempts = 0;
+    const otherUpdateSetCalls: Record<string, unknown>[] = [];
+    mockDbUpdate.mockImplementation(() => ({
+      set: (setArgs: Record<string, unknown>) => {
+        if (setArgs?.status === "sent") {
+          sentUpdateAttempts++;
+          return {
+            where: () =>
+              Promise.reject(
+                Object.assign(new Error("connection failure"), {
+                  code: "08006",
+                })
+              ),
+          };
+        }
+        otherUpdateSetCalls.push(setArgs);
+        return { where: () => awaitableWhere([exec]) };
+      },
+    }));
 
     const { log: mockLog } = await import("../../lib/logger");
     await handler(makeSQSEvent(emailJob));
 
-    // All 3 attempts must have been made
-    expect(messageSendAttempts).toBe(3);
-    // log.error must be called to record the permanent failure
+    // All 3 attempts must have been made.
+    expect(sentUpdateAttempts).toBe(3);
+    // log.error must record the permanent bookkeeping failure.
     expect(mockLog.error).toHaveBeenCalledWith(
-      expect.stringMatching(/messageSend.*3|3.*attempt|retry.*exhaust/i),
+      expect.stringMatching(/messageSend.*sent|retry.*exhaust/i),
       expect.anything(),
       expect.objectContaining({ executionId: exec.id, channel: "email" })
     );
+    // The isolation rule under test: SES already accepted the message, so
+    // exhausting the bookkeeping retries must NOT mark the step (or the
+    // stepExec row) 'failed' — that would report a failed send to the
+    // customer despite mail being in flight, and duplicate it on any
+    // eventual reclaim. Every OTHER update in this run (stepExec completion
+    // included) must reflect success, never 'failed'.
+    expect(otherUpdateSetCalls.some((call) => call.status === "failed")).toBe(
+      false
+    );
+    expect(
+      otherUpdateSetCalls.some((call) => call.status === "completed")
+    ).toBe(true);
   });
 });
 

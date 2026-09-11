@@ -286,6 +286,12 @@ export const messageSend = pgTable(
       () => workflowExecution.id,
       { onDelete: "set null" }
     ),
+    // Workflow step id (from WorkflowStep.id), NULL for non-workflow sends and
+    // for every historical workflow row. Paired with workflowExecutionId as
+    // the dedup key for workflow claim-before-send (plan 034) — a single
+    // execution can run multiple send_email steps, so workflowExecutionId
+    // alone is not a valid dedup key.
+    stepId: text("step_id"),
 
     // ═══════════════════════════════════════════════════════════════════════
     // RECIPIENT (denormalized for history)
@@ -386,6 +392,16 @@ export const messageSend = pgTable(
     uniqueIndex("message_send_dedup_idx")
       .on(table.batchSendId, table.contactId)
       .where(sql`contact_id IS NOT NULL`),
+    // Workflow-send dedup guard (plan 034), mirroring message_send_dedup_idx
+    // above. Partial on both columns because historical workflow rows have
+    // step_id IS NULL (added after the fact) and non-workflow rows have
+    // workflow_execution_id IS NULL — neither should collide under this index.
+    // Created in production via
+    // packages/db/scripts/create-workflow-step-dedup-index.ts (CONCURRENTLY)
+    // — schema declared here as source of truth.
+    uniqueIndex("message_send_workflow_step_dedup_idx")
+      .on(table.workflowExecutionId, table.stepId)
+      .where(sql`workflow_execution_id IS NOT NULL AND step_id IS NOT NULL`),
     // Covers the /emails dashboard query: org + channel (email/sms) + time window + status filter.
     // message_send_org_created_idx uses created_at but the query filters on sent_at — wrong column.
     // Created in production via packages/db/scripts/create-email-sent-at-idx.ts

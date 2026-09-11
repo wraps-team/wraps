@@ -741,7 +741,8 @@ async function executeStep(
         config,
         execution,
         contactRecord,
-        organizationId
+        organizationId,
+        step.id
       );
 
     case "send_sms":

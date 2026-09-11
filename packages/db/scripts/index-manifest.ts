@@ -83,4 +83,10 @@ export const CONCURRENT_INDEXES: ConcurrentIndex[] = [
     purpose: "Email search: fuzzy sender match. Requires pg_trgm.",
     ddl: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "message_send_search_from_trgm_idx" ON "message_send" USING gin ("from" gin_trgm_ops) WHERE "from" IS NOT NULL',
   },
+  {
+    name: "message_send_workflow_step_dedup_idx",
+    purpose:
+      "Workflow send deduplication (plan 034): UNIQUE on (workflowExecutionId, stepId), partial on both being non-null so historical rows (step_id added after the fact) and non-workflow rows (no workflowExecutionId) never collide. This is what the workflow claim-before-send INSERT relies on to close the send-then-record duplicate-send window. Losing it does not degrade performance, it duplicates mail.",
+    ddl: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "message_send_workflow_step_dedup_idx" ON "message_send" ("workflow_execution_id", "step_id") WHERE workflow_execution_id IS NOT NULL AND step_id IS NOT NULL',
+  },
 ];

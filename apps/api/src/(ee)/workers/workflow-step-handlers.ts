@@ -45,7 +45,7 @@ import {
   normalizePlainTextForSes,
 } from "@wraps/template-render";
 import { resolveApiBaseUrl } from "@wraps/unsubscribe-token";
-import { and, sql } from "drizzle-orm";
+import { and, isNull, sql } from "drizzle-orm";
 import { trackFirstEmailSent } from "../../lib/activation-tracking";
 import { awsDefaults } from "../../lib/aws-defaults";
 import { log } from "../../lib/logger";
@@ -105,11 +105,18 @@ function isTransientDbError(error: unknown): boolean {
 // SEND EMAIL
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Staleness threshold for the send-claim reclaim below. Aligned with
+// STEP_EXECUTION_TIMEOUT_MINUTES (workflow-processor.ts) — that is the
+// reclaim horizon for the step itself, and this claim exists to survive the
+// same crash window. If one changes, change both.
+export const WORKFLOW_SEND_CLAIM_STALE_MINUTES = 15;
+
 export async function handleSendEmail(
   config: Extract<WorkflowStepConfig, { type: "send_email" }>,
   execution: typeof workflowExecution.$inferSelect,
   contactRecord: typeof contact.$inferSelect,
-  organizationId: string
+  organizationId: string,
+  stepId: string
 ): Promise<{ action: "next"; data: Record<string, unknown> }> {
   // Check contact has email
   if (!contactRecord.email) {
@@ -178,11 +185,159 @@ export async function handleSendEmail(
     };
   }
 
-  // Get AWS account region and features (for config set name)
+  // ═══════════════════════════════════════════════════════════════════════
+  // CLAIM BEFORE SEND (plan 034)
+  //
+  // Claim the messageSend row BEFORE any SES call, mirroring
+  // apps/api/src/workers/batch-sender.ts's race-safe claim (~:1256-1337).
+  // message_send_workflow_step_dedup_idx — UNIQUE on (workflowExecutionId,
+  // stepId) — makes this insert race-safe: concurrent/redelivered attempts
+  // for the same step each try to INSERT, only one wins. Claiming here,
+  // before the AWS account/template/credential lookups below, also means a
+  // replay skips all of that (including an STS AssumeRole call), not just
+  // the SES send itself.
+  //
+  // NOTE: bare onConflictDoNothing() — Drizzle cannot target a partial
+  // unique index.
+  // ═══════════════════════════════════════════════════════════════════════
+  const [claimedRow] = await db
+    .insert(messageSend)
+    .values({
+      organizationId,
+      contactId: contactRecord.id,
+      awsAccountId: wf.awsAccountId,
+      channel: "email",
+      sourceType: "workflow",
+      workflowExecutionId: execution.id,
+      stepId,
+      recipient: contactRecord.email,
+      emailTemplateId: config.templateId,
+      status: "queued",
+      claimedAt: new Date(),
+    })
+    .onConflictDoNothing()
+    .returning({ id: messageSend.id });
+
+  if (!claimedRow) {
+    // Another attempt already claimed (workflowExecutionId, stepId) —
+    // figure out whether it already sent, is still in flight, or crashed.
+    const [existing] = await db
+      .select({
+        messageId: messageSend.messageId,
+        subject: messageSend.subject,
+        status: messageSend.status,
+        claimedAt: messageSend.claimedAt,
+      })
+      .from(messageSend)
+      .where(
+        and(
+          eq(messageSend.workflowExecutionId, execution.id),
+          eq(messageSend.stepId, stepId)
+        )
+      )
+      .limit(1);
+
+    if (existing?.messageId) {
+      // A row carrying a messageId was accepted by SES — regardless of its
+      // current status (sent/delivered/opened/…), re-sending it would
+      // duplicate mail, and SES has no idempotency token to stop it (mirrors
+      // batch-sender.ts's identical messageId-based guard). This is an
+      // idempotent replay: reuse the recorded result, do not send again.
+      log.info("Workflow: send already recorded, skipping duplicate send", {
+        executionId: execution.id,
+        stepId,
+        messageId: existing.messageId,
+      });
+      return {
+        action: "next",
+        data: {
+          messageId: existing.messageId,
+          templateId: config.templateId,
+          recipient: contactRecord.email,
+          subject: existing.subject ?? undefined,
+          timestamp: new Date().toISOString(),
+          replay: true,
+        },
+      };
+    }
+
+    const isStaleQueuedClaim =
+      existing?.status === "queued" &&
+      existing.claimedAt !== null &&
+      Date.now() - new Date(existing.claimedAt).getTime() >
+        WORKFLOW_SEND_CLAIM_STALE_MINUTES * 60 * 1000;
+
+    if (!isStaleQueuedClaim) {
+      // A fresh 'queued' claim — another active attempt owns this send right
+      // now. The processor's own step-execution claim (workflow-processor.ts)
+      // makes concurrent handleSendEmail calls for the same
+      // (executionId, stepId) rare, but this is the guard that actually
+      // prevents the duplicate SES send if it happens anyway.
+      log.warn(
+        "Workflow: send claim held by another active attempt, skipping",
+        { executionId: execution.id, stepId, status: existing?.status }
+      );
+      return {
+        action: "next",
+        data: {
+          skipped: true,
+          reason: "send_claim_in_progress",
+          timestamp: new Date().toISOString(),
+        },
+      };
+    }
+
+    // Stale 'queued' claim with no messageId — the previous attempt crashed
+    // before reaching SES. Reclaim it. WHERE also requires messageId IS NULL
+    // (mirrors batch-sender.ts's re-claim guard): a row that gained a
+    // messageId between the SELECT above and this UPDATE was SES-accepted,
+    // and re-sending it would duplicate mail.
+    const [reclaimed] = await db
+      .update(messageSend)
+      .set({ claimedAt: new Date() })
+      .where(
+        and(
+          eq(messageSend.workflowExecutionId, execution.id),
+          eq(messageSend.stepId, stepId),
+          eq(messageSend.status, "queued"),
+          isNull(messageSend.messageId),
+          sql`${messageSend.claimedAt} < now() - interval '${sql.raw(String(WORKFLOW_SEND_CLAIM_STALE_MINUTES))} minutes'`
+        )
+      )
+      .returning({ id: messageSend.id });
+
+    if (!reclaimed) {
+      // Lost the reclaim race to another concurrent attempt — same
+      // "someone else owns it" outcome as above.
+      log.warn("Workflow: lost stale-claim reclaim race, skipping send", {
+        executionId: execution.id,
+        stepId,
+      });
+      return {
+        action: "next",
+        data: {
+          skipped: true,
+          reason: "send_claim_in_progress",
+          timestamp: new Date().toISOString(),
+        },
+      };
+    }
+    // Reclaimed the stale claim — fall through and send.
+  }
+
+  // Get AWS account region and features (for config set name). Scoped by org
+  // (Cross-Org IDOR Prevention, root CLAUDE.md): wf.awsAccountId comes from
+  // this org's own workflow row, but every lookup must still verify org
+  // ownership rather than trust an id alone.
   const [account] = await db
     .select({ region: awsAccount.region, features: awsAccount.features })
     .from(awsAccount)
-    .where(eq(awsAccount.id, wf.awsAccountId))
+    .where(
+      and(
+        eq(awsAccount.id, wf.awsAccountId),
+        eq(awsAccount.organizationId, organizationId)
+      )
+    )
     .limit(1);
 
   if (!account) {
@@ -541,41 +696,60 @@ export async function handleSendEmail(
     throw error;
   }
 
-  // Record the send in messageSend table — retry only on transient DB errors
+  // Mark the claimed row 'sent' — retry only on transient DB errors.
+  //
+  // Deliberately runs OUTSIDE the SES try/catch above and deliberately does
+  // NOT rethrow after exhausting retries. SES has already accepted the
+  // message: this mirrors the isolation rule
+  // apps/api/src/workers/batch-sender.ts's recordAcceptedSend establishes
+  // (see its comment there) — a transient Postgres error here must never
+  // surface as a send failure, because the processor's catch block would
+  // then mark this step (and the execution) 'failed' despite mail being in
+  // flight. On persistent failure the row is left 'queued' with no
+  // messageId, which the stale-reclaim block above will pick up on a later
+  // retry of this step. That reclaim is also the residual risk this
+  // decision accepts: if the reclaim fires before this UPDATE ever lands,
+  // the email sends a second time. Same shape as batch, which accepts the
+  // identical window — SES is not transactional with Postgres. See plan 034
+  // R4 for the alternative (rethrow) and why it was rejected: it would mark
+  // an SES-accepted send 'failed', which is a worse lie than the rare
+  // reclaim duplicate.
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      await db.insert(messageSend).values({
-        organizationId,
-        contactId: contactRecord.id,
-        awsAccountId: wf.awsAccountId,
-        channel: "email",
-        sourceType: "workflow",
-        workflowExecutionId: execution.id,
-        recipient: contactRecord.email,
-        subject,
-        from: fromAddress,
-        fromName: fromName || null,
-        emailTemplateId: config.templateId,
-        messageId,
-        status: "sent",
-        sentAt: new Date(),
-      });
+      await db
+        .update(messageSend)
+        .set({
+          status: "sent",
+          messageId,
+          subject,
+          from: fromAddress,
+          fromName: fromName || null,
+          sentAt: new Date(),
+        })
+        .where(
+          and(
+            eq(messageSend.workflowExecutionId, execution.id),
+            eq(messageSend.stepId, stepId)
+          )
+        );
       break;
     } catch (dbError) {
       if (attempt < 2 && isTransientDbError(dbError)) {
         await sleep(100 * 2 ** attempt);
-      } else {
-        log.error(
-          "Workflow: failed to record messageSend after 3 attempts",
-          dbError,
-          {
-            executionId: execution.id,
-            messageId,
-            channel: "email",
-          }
-        );
-        throw dbError;
+        continue;
       }
+      log.error(
+        "Workflow: failed to mark messageSend sent after retries exhausted",
+        dbError,
+        {
+          executionId: execution.id,
+          stepId,
+          messageId,
+          channel: "email",
+          attempt: attempt + 1,
+        }
+      );
+      break;
     }
   }
 
