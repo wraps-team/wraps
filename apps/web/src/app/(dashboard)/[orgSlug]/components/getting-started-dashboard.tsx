@@ -35,7 +35,6 @@ import {
   CopyIcon,
   ExternalLinkIcon,
   GlobeIcon,
-  InfoIcon,
   LinkIcon,
   Loader2Icon,
   MailIcon,
@@ -62,7 +61,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { AccountFeatures, AwsAccountData, SetupStatus } from "../page";
 import { CAL_BOOKING_URL, HelpCard } from "./help-card";
-import { NextStepCard } from "./next-step-card";
+import { type NextStepKind, selectNextStep } from "./next-step";
+import { useNextStepCopy } from "./use-next-step-copy";
 
 type GettingStartedDashboardProps = {
   orgSlug: string;
@@ -118,6 +118,8 @@ type ChecklistItemContentProps = {
   description: string;
   isComplete: boolean;
   icon: React.ReactNode;
+  /** The one step `selectNextStep` picked: opens by default and is marked. */
+  isNext?: boolean;
   isOptional?: boolean;
 };
 
@@ -144,13 +146,20 @@ function ChecklistItemIcon({
 
 function ChecklistItemBadges({
   isComplete,
+  isNext,
   isOptional,
 }: {
   isComplete: boolean;
+  isNext?: boolean;
   isOptional?: boolean;
 }) {
   return (
     <>
+      {isNext && (
+        <Badge className="text-xs" variant="default">
+          Next step
+        </Badge>
+      )}
       {isOptional && (
         <Badge className="text-xs" variant="secondary">
           Optional
@@ -173,6 +182,7 @@ function ChecklistItemContent({
   description,
   isComplete,
   icon,
+  isNext,
   isOptional,
 }: ChecklistItemContentProps) {
   return (
@@ -187,6 +197,7 @@ function ChecklistItemContent({
           </h4>
           <ChecklistItemBadges
             isComplete={isComplete}
+            isNext={isNext}
             isOptional={isOptional}
           />
         </div>
@@ -215,6 +226,7 @@ function ExpandableChecklistItem({
   isComplete,
   href,
   icon,
+  isNext,
   isOptional,
   children,
   defaultOpen = false,
@@ -235,6 +247,7 @@ function ExpandableChecklistItem({
           description={description}
           icon={icon}
           isComplete={isComplete}
+          isNext={isNext}
           isOptional={isOptional}
           title={title}
         />
@@ -253,7 +266,8 @@ function ExpandableChecklistItem({
       <div
         className={cn(
           "rounded-lg border transition-colors",
-          isComplete && "bg-muted/30"
+          isComplete && "bg-muted/30",
+          isNext && "border-primary/40 ring-1 ring-primary/20"
         )}
       >
         <CollapsibleTrigger asChild>
@@ -265,6 +279,7 @@ function ExpandableChecklistItem({
               description={description}
               icon={icon}
               isComplete={isComplete}
+              isNext={isNext}
               isOptional={isOptional}
               title={title}
             />
@@ -549,17 +564,29 @@ function WebhookSecretForm({
 }
 
 type DomainVerificationProps = {
+  orgSlug: string;
   verifiedDomains: string[];
 };
 
-function DomainVerification({ verifiedDomains }: DomainVerificationProps) {
+function DomainVerification({
+  orgSlug,
+  verifiedDomains,
+}: DomainVerificationProps) {
   if (verifiedDomains.length === 0) {
     return (
-      <CliCommandGuide
-        command="wraps email domains add -d yourdomain.com"
-        description="No verified domains found. Add and verify a domain using the CLI:"
-        hint="Follow the DNS instructions shown after running this command. Verification can take up to 48 hours."
-      />
+      <div className="space-y-3">
+        <Button asChild>
+          <Link href={`/${orgSlug}/emails/domains`}>
+            Add a sending domain
+            <ArrowRightIcon className="ml-1 h-4 w-4" />
+          </Link>
+        </Button>
+        <CliCommandGuide
+          command="wraps email domains add -d yourdomain.com"
+          description="Or from your terminal:"
+          hint="Either way you'll get DNS records to add. Verification can take up to 48 hours."
+        />
+      </div>
     );
   }
 
@@ -580,7 +607,13 @@ function DomainVerification({ verifiedDomains }: DomainVerificationProps) {
         ))}
       </div>
       <p className="text-muted-foreground text-xs">
-        To add more domains, run{" "}
+        <Link
+          className="underline underline-offset-4"
+          href={`/${orgSlug}/emails/domains`}
+        >
+          Add another domain
+        </Link>{" "}
+        or run{" "}
         <code className="rounded bg-muted px-1 py-0.5">
           wraps email domains add -d yourdomain.com
         </code>
@@ -1314,6 +1347,22 @@ export function GettingStartedDashboard({
     awsRegion,
   } = setupStatus;
 
+  const requiredSteps = [
+    hasAwsAccount,
+    hasPlatformConnection,
+    hasVerifiedDomain,
+    hasSentEmail,
+  ];
+  const completedSteps = requiredSteps.filter(Boolean).length;
+
+  // The checklist is the only driver of action on this page: the step chosen
+  // here is the one that opens, and its guide carries the button. Generated
+  // copy replaces that step's description instead of adding a row under it.
+  const nextStep = selectNextStep(setupStatus);
+  const generatedDescription = useNextStepCopy(organizationId, setupStatus);
+  const describeStep = (kind: NextStepKind, fallback: string) =>
+    nextStep.kind === kind ? (generatedDescription ?? fallback) : fallback;
+
   return (
     <>
       {/* Page Header */}
@@ -1328,68 +1377,46 @@ export function GettingStartedDashboard({
         </div>
       </div>
 
-      {/* Next Step */}
-      <div className="px-4 lg:px-6">
-        <NextStepCard
-          organizationId={organizationId}
-          orgSlug={orgSlug}
-          setupStatus={setupStatus}
-        />
-      </div>
-
       {/* Main Content */}
       <div className="@container/main px-4 lg:px-6">
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column - Setup Checklist */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Progress Card */}
             <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+              <CardHeader className="gap-3">
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <CardTitle className="text-lg">Setup Progress</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg">Setup Checklist</CardTitle>
+                      {setupStatus.sandboxStatus === true && (
+                        <Badge variant="outline">SES sandbox</Badge>
+                      )}
+                    </div>
                     <CardDescription>
-                      {completionPercent === 100
-                        ? "All set! You're ready to send emails."
-                        : `${completionPercent}% complete`}
+                      {completedSteps} of {requiredSteps.length} steps complete
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      onClick={() => router.refresh()}
-                      size="icon"
-                      variant="ghost"
-                    >
-                      <RefreshCwIcon className="h-4 w-4" />
-                      <span className="sr-only">Refresh status</span>
-                    </Button>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                      <span className="font-bold text-primary text-lg">
-                        {completionPercent}%
-                      </span>
-                    </div>
-                  </div>
+                  <Button
+                    onClick={() => router.refresh()}
+                    size="icon"
+                    variant="ghost"
+                  >
+                    <RefreshCwIcon className="h-4 w-4" />
+                    <span className="sr-only">Refresh status</span>
+                  </Button>
                 </div>
-              </CardHeader>
-              <CardContent>
                 <Progress className="h-2" value={completionPercent} />
-              </CardContent>
-            </Card>
-
-            {/* Checklist */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Setup Checklist</CardTitle>
-                <CardDescription>
-                  Deploy infrastructure and connect your AWS account
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <ExpandableChecklistItem
-                  defaultOpen={!hasAwsAccount}
-                  description="Set up AWS SES, DynamoDB, and event tracking in your account"
+                  defaultOpen={nextStep.kind === "connect_aws"}
+                  description={describeStep(
+                    "connect_aws",
+                    "Set up AWS SES, DynamoDB, and event tracking in your account"
+                  )}
                   icon={<CloudIcon className="h-5 w-5" />}
                   isComplete={hasAwsAccount}
+                  isNext={nextStep.kind === "connect_aws"}
                   title="Deploy email infrastructure"
                 >
                   {awsAccount ? (
@@ -1399,15 +1426,31 @@ export function GettingStartedDashboard({
                       organizationId={organizationId}
                     />
                   ) : (
-                    <DeployConnectGuide organizationId={organizationId} />
+                    <>
+                      <DeployConnectGuide organizationId={organizationId} />
+                      <p className="mt-3 text-muted-foreground text-xs">
+                        Already ran the deploy elsewhere?{" "}
+                        <Link
+                          className="underline underline-offset-4"
+                          href={`/${orgSlug}/settings/aws-accounts`}
+                        >
+                          Connect the account by role ARN
+                        </Link>
+                      </p>
+                    </>
                   )}
                 </ExpandableChecklistItem>
 
                 {/* Connect to platform */}
                 <ExpandableChecklistItem
-                  description="Stream events and grant dashboard access"
+                  defaultOpen={nextStep.kind === "connect_platform"}
+                  description={describeStep(
+                    "connect_platform",
+                    "Stream events and grant dashboard access"
+                  )}
                   icon={<LinkIcon className="h-5 w-5" />}
                   isComplete={hasPlatformConnection}
+                  isNext={nextStep.kind === "connect_platform"}
                   title="Connect to platform"
                 >
                   {awsAccount ? (
@@ -1427,31 +1470,32 @@ export function GettingStartedDashboard({
 
                 {/* Verify domain */}
                 <ExpandableChecklistItem
-                  description="Configure DNS records to send emails from your domain"
+                  defaultOpen={nextStep.kind === "verify_domain"}
+                  description={describeStep(
+                    "verify_domain",
+                    "Configure DNS records to send emails from your domain"
+                  )}
                   icon={<GlobeIcon className="h-5 w-5" />}
                   isComplete={hasVerifiedDomain}
+                  isNext={nextStep.kind === "verify_domain"}
                   title="Verify your domain"
                 >
-                  <div className="space-y-3">
-                    {!hasVerifiedDomain && hasAwsAccount && (
-                      <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
-                        <InfoIcon className="mt-0.5 h-4 w-4 shrink-0" />
-                        <p className="text-sm">
-                          DNS changes can take up to 48 hours to propagate.
-                          Expand &quot;Deploy email infrastructure&quot; above
-                          and click &quot;Scan Features&quot; to check again.
-                        </p>
-                      </div>
-                    )}
-                    <DomainVerification verifiedDomains={verifiedDomains} />
-                  </div>
+                  <DomainVerification
+                    orgSlug={orgSlug}
+                    verifiedDomains={verifiedDomains}
+                  />
                 </ExpandableChecklistItem>
 
                 {/* Send first email */}
                 <ExpandableChecklistItem
-                  description="Configure sender defaults and use the SDK to send a test email"
+                  defaultOpen={nextStep.kind === "first_send"}
+                  description={describeStep(
+                    "first_send",
+                    "Configure sender defaults and use the SDK to send a test email"
+                  )}
                   icon={<MailIcon className="h-5 w-5" />}
                   isComplete={hasSentEmail}
+                  isNext={nextStep.kind === "first_send"}
                   title="Send your first email"
                 >
                   <div className="space-y-3">
