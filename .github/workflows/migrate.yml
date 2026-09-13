@@ -96,6 +96,31 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      # Every schema-declared index that ships as a `-- NOTE:` pointer in a
+      # migration (CONCURRENTLY, out of band) is built here. Without this step
+      # the indexes 0086 and 0088 point at are never created: drizzle-kit cannot
+      # run CREATE INDEX CONCURRENTLY inside its transaction, so the DDL lives
+      # in packages/db/scripts/index-manifest.ts and db:migrate-indexes runs it
+      # after the migrations that reference it. Safe on every run —
+      # CONCURRENTLY + IF NOT EXISTS, no blocking locks, and the script verifies
+      # pg_index.indisvalid so a partial build fails the deploy rather than
+      # being skipped forever by IF NOT EXISTS.
+      #
+      # DATABASE_DIRECT_URL is preferred by resolveDirectDatabaseUrl and must
+      # point at the direct (non-pooled) endpoint; a transaction-mode pooler
+      # rejects CONCURRENTLY with "cannot run inside a transaction block".
+      # Fall back to DATABASE_URL when the direct secret is not provisioned —
+      # if that URL is pooled the step fails loudly with the reason, which is
+      # the correct outcome: a silently missing index is what this step exists
+      # to prevent. Add DATABASE_DIRECT_URL to the Production environment once
+      # the direct endpoint is available.
+      - name: Create out-of-band indexes
+        if: ${{ inputs.stage == 'production' }}
+        run: pnpm --filter @wraps/db db:migrate-indexes
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_DIRECT_URL: ${{ secrets.DATABASE_DIRECT_URL }}
+
 # What this workflow does NOT cover, stated plainly so the next person does not
 # assume it is closed:
 #
