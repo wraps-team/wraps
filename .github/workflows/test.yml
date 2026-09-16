@@ -256,9 +256,22 @@ jobs:
       # aws/nextjs.ts at module load. .sst is gitignored, so a fresh runner only
       # has it after `sst install` materialises the platform. selfhost-smoke runs
       # this step too, but that job does not run these unit tests.
+      #
+      # sst install downloads a version-pinned pulumi binary from GitHub
+      # releases at CI runtime, which can fail transiently. The materialisation
+      # is idempotent, so retry it with backoff.
       - name: Materialise the SST platform (sst install)
         working-directory: infra
-        run: ../node_modules/.bin/sst install --config selfhost.config.ts --stage production --print-logs
+        run: |
+          for attempt in 1 2 3; do
+            if ../node_modules/.bin/sst install --config selfhost.config.ts --stage production --print-logs; then
+              exit 0
+            fi
+            echo "sst install failed (attempt $attempt/3), retrying"
+            sleep "$((attempt * 15))"
+          done
+          echo "::error::sst install failed after 3 attempts"
+          exit 1
 
       - name: Run selfhost script tests
         run: pnpm test:scripts
@@ -421,9 +434,20 @@ jobs:
             exit 1
           fi
 
+      # Same bounded retry as test-scripts: the pinned pulumi download can
+      # fail transiently.
       - name: SST config builds from zero (sst install)
         working-directory: infra
-        run: ../node_modules/.bin/sst install --config selfhost.config.ts --stage production --print-logs
+        run: |
+          for attempt in 1 2 3; do
+            if ../node_modules/.bin/sst install --config selfhost.config.ts --stage production --print-logs; then
+              exit 0
+            fi
+            echo "sst install failed (attempt $attempt/3), retrying"
+            sleep "$((attempt * 15))"
+          done
+          echo "::error::sst install failed after 3 attempts"
+          exit 1
 
       # Full run() evaluation — the phase sst install never reaches (it only
       # evaluates app()). Real config + real SST platform components + real
