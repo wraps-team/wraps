@@ -2,9 +2,10 @@
  * Platform Alerting Infrastructure
  *
  * SNS topic + CloudWatch alarms for DLQ monitoring.
- * Alerts when any message lands in the workflow or batch DLQs.
+ * Alerts when any message lands in the workflow, batch, or marketplace DLQs.
  */
 
+import { marketplaceDlq } from "./marketplace";
 import { batchDlq, batchQueue, workflowDlq } from "./queues";
 
 // SNS topic for alarm notifications
@@ -56,6 +57,30 @@ new aws.cloudwatch.MetricAlarm("BatchDlqAlarm", {
   metricName: "ApproximateNumberOfMessagesVisible",
   dimensions: {
     QueueName: batchDlq.nodes.queue.name,
+  },
+  statistic: "Maximum",
+  period: 60,
+  evaluationPeriods: 1,
+  threshold: 1,
+  comparisonOperator: "GreaterThanOrEqualToThreshold",
+  treatMissingData: "notBreaching",
+  alarmActions: [alertsTopic.arn],
+  okActions: [alertsTopic.arn],
+  tags: {
+    ManagedBy: "sst",
+    Service: "wraps-api",
+  },
+});
+
+// Alarm: messages visible in the Marketplace DLQ
+new aws.cloudwatch.MetricAlarm("MarketplaceDlqAlarm", {
+  name: $interpolate`wraps-marketplace-dlq-${$app.stage}`,
+  alarmDescription:
+    "One or more marketplace events landed in the dead-letter queue",
+  namespace: "AWS/SQS",
+  metricName: "ApproximateNumberOfMessagesVisible",
+  dimensions: {
+    QueueName: marketplaceDlq.nodes.queue.name,
   },
   statistic: "Maximum",
   period: 60,
