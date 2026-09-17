@@ -155,8 +155,12 @@ describe("the production migration gate", () => {
 // this path may be pinned back onto a `blacksmith-*` label.
 describe("the release path is not hostage to the shared runner pool", () => {
   it("keeps the Deploy API jobs on a runner that cannot be queued behind a pool shortage", () => {
-    expect(jobBlock(apiWorkflow, "gate")).not.toMatch(PINNED_TO_SELF_HOSTED_POOL);
-    expect(jobBlock(apiWorkflow, "deploy")).not.toMatch(PINNED_TO_SELF_HOSTED_POOL);
+    expect(jobBlock(apiWorkflow, "gate")).not.toMatch(
+      PINNED_TO_SELF_HOSTED_POOL
+    );
+    expect(jobBlock(apiWorkflow, "deploy")).not.toMatch(
+      PINNED_TO_SELF_HOSTED_POOL
+    );
   });
 
   it("keeps the migration on a runner that cannot be queued behind a pool shortage", () => {
