@@ -54,6 +54,7 @@ const DEPLOY_CONCURRENCY_GROUP = /^\s+group: deploy-sst-/m;
 const NEVER_CANCEL_IN_PROGRESS = /^\s+cancel-in-progress: false$/m;
 const DATABASE_URL_FROM_SECRETS = /^\s+DATABASE_URL: \$\{\{ secrets\./m;
 const DECLARES_ENVIRONMENT = /^\s+environment: /m;
+const PINNED_TO_SELF_HOSTED_POOL = /^ +runs-on: blacksmith-/m;
 
 describe("the production migration gate", () => {
   it("runs migrations before the API deploy, as a dependency it cannot skip", () => {
@@ -140,5 +141,27 @@ describe("the production migration gate", () => {
     // DATABASE_URL is an environment secret on `Production`, not a repository
     // secret, so the job only receives it if it declares the environment.
     expect(migrateJob).toMatch(DECLARES_ENVIRONMENT);
+  });
+});
+
+// The production release path must not wait on the shared self-hosted pool.
+//
+// On 2026-09-14 the Deploy API `gate` job sat queued for 22h45m waiting for a
+// blacksmith-2vcpu runner to register (run 34877429952) while the job itself
+// took 14s to run. A run whose jobs never start does not fail — it still
+// concludes `success` — so a starved pool parks gate -> migrate -> deploy
+// behind it, while Vercel ships apps/web on the same commit: the front/back
+// skew that 404'd /v1/agents*. GitHub-hosted capacity is elastic, so no job on
+// this path may be pinned back onto a `blacksmith-*` label.
+describe("the release path is not hostage to the shared runner pool", () => {
+  it("keeps the Deploy API jobs on a runner that cannot be queued behind a pool shortage", () => {
+    expect(jobBlock(apiWorkflow, "gate")).not.toMatch(PINNED_TO_SELF_HOSTED_POOL);
+    expect(jobBlock(apiWorkflow, "deploy")).not.toMatch(PINNED_TO_SELF_HOSTED_POOL);
+  });
+
+  it("keeps the migration on a runner that cannot be queued behind a pool shortage", () => {
+    expect(jobBlock(migrateWorkflow, "migrate")).not.toMatch(
+      PINNED_TO_SELF_HOSTED_POOL
+    );
   });
 });

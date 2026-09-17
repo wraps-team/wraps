@@ -48,13 +48,28 @@ jobs:
   # there is nothing to do. Diffing from the last success means every file
   # changed since the last thing that really reached production is considered,
   # however many pushes ago that was.
+  #
+  # GitHub-hosted, not the shared Blacksmith pool.
+  #
+  # On 2026-09-14 this job queued for 22h45m waiting for a blacksmith-2vcpu
+  # runner to register (run 34877429952); the job then took 14s to execute, and
+  # the whole release finished in under seven minutes once a runner appeared.
+  # A run whose jobs never start does not fail — it still concludes `success` —
+  # so a starved pool parks gate -> migrate -> deploy behind it while Vercel
+  # ships apps/web on the same commit, which is the front/back skew that 404'd
+  # /v1/agents*. GitHub-hosted capacity is elastic, so this job cannot wait on a
+  # runner shortage; it is a cheap diff step that needs nothing from Blacksmith.
+  #
+  # timeout-minutes bounds a hung *run*. GitHub's 24h self-hosted queue cap is a
+  # separate, fixed limit that no workflow setting can lower.
   gate:
     if: >-
       github.repository == 'wraps-team/wraps' &&
       (github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push'))
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       deploy: ${{ steps.decide.outputs.deploy }}
       sha: ${{ steps.decide.outputs.sha }}
@@ -143,7 +158,15 @@ jobs:
   deploy:
     needs: [gate, migrate]
     if: needs.gate.outputs.deploy == 'true'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # GitHub-hosted for the same reason as `gate`: this job was also pinned to
+    # blacksmith-2vcpu-ubuntu-2404, so a runner shortage there stalled the
+    # release even when `gate` had already decided to ship. Nothing in this job
+    # runs until a runner is assigned, and GitHub-hosted capacity does not queue
+    # behind a self-hosted pool's shortage.
+    runs-on: ubuntu-latest
+    # Bound a hung `sst deploy`; a normal run is ~5-14 minutes. This does not
+    # cover queue time — GitHub caps self-hosted queue time at 24h instead.
+    timeout-minutes: 120
     environment: ${{ github.event.inputs.stage || 'production' }}
 
     # Two `sst deploy` runs against one Pulumi stack fight over the state lock.
