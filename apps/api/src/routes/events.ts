@@ -36,6 +36,7 @@ function hashEmail(email: string): string {
   return createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
 }
 
+import { log } from "../lib/logger";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import {
   enforceEventLimit,
@@ -60,6 +61,28 @@ const propertiesSchema = t.Optional(
   t.Object({}, { additionalProperties: true, description: "Event properties" })
 );
 
+/**
+ * Per-phase stopwatch for the single-event ingest route.
+ *
+ * `POST /v1/events/` is the slowest route on the API and its tail is a fixed
+ * ~6 s on roughly one request in ten, which the request's total duration alone
+ * cannot attribute to a call. Lapping each awaited upstream call and logging
+ * the split once (`api.event.timing`, correlated to the `api.request` total by
+ * requestId) names the phase that owns the extra seconds.
+ */
+function createPhaseClock() {
+  const phases: Record<string, number> = {};
+  let last = performance.now();
+  return {
+    phases,
+    lap(phase: string) {
+      const now = performance.now();
+      phases[phase] = Math.round(now - last);
+      last = now;
+    },
+  };
+}
+
 export const eventsRoutes = createAuthenticatedRoutes("/v1/events")
   .use(planGateMiddleware("events"))
   .onBeforeHandle(enforceEventLimit)
@@ -77,6 +100,8 @@ export const eventsRoutes = createAuthenticatedRoutes("/v1/events")
     async (ctx) => {
       const { body } = ctx;
       const auth = getAuth(ctx);
+      const clock = createPhaseClock();
+      const requestId = ctx.request.headers.get("x-request-id") ?? undefined;
       const {
         name,
         contactId,
@@ -105,6 +130,8 @@ export const eventsRoutes = createAuthenticatedRoutes("/v1/events")
           (await findContactByEmailInOrg(contactEmail, auth.organizationId)) ??
           undefined;
       }
+
+      clock.lap("contactLookup");
 
       // Auto-create contact if missing and flag is set
       if (!contactRecord && createIfMissing && contactEmail) {
@@ -138,6 +165,8 @@ export const eventsRoutes = createAuthenticatedRoutes("/v1/events")
         }
       }
 
+      clock.lap("contactCreateIfMissing");
+
       if (!contactRecord) {
         ctx.set.status = 400;
         return {
@@ -160,14 +189,20 @@ export const eventsRoutes = createAuthenticatedRoutes("/v1/events")
         expiresAt: getEventTTLExpiration(),
       });
 
+      clock.lap("insertContactEvent");
+
       // 2. Increment event usage counter
       await incrementEventUsage(auth.organizationId);
+
+      clock.lap("incrementEventUsage");
 
       // 3. Find and trigger matching workflows
       const matchingWorkflows = await findEventWorkflows(
         auth.organizationId,
         name
       );
+
+      clock.lap("findEventWorkflows");
 
       for (const wf of matchingWorkflows) {
         await enqueueWorkflowStep({
@@ -180,12 +215,16 @@ export const eventsRoutes = createAuthenticatedRoutes("/v1/events")
         results.workflowsTriggered++;
       }
 
+      clock.lap("enqueueWorkflowStep");
+
       // 4. Resume executions waiting for this event
       const waitingExecutions = await findWaitingExecutions(
         auth.organizationId,
         contactRecord.id,
         name
       );
+
+      clock.lap("findWaitingExecutions");
 
       for (const execution of waitingExecutions) {
         // Cancel timeout scheduler
@@ -203,8 +242,22 @@ export const eventsRoutes = createAuthenticatedRoutes("/v1/events")
         results.executionsResumed++;
       }
 
+      clock.lap("resumeWaitingExecutions");
+
       // Update contact last activity
       await touchContactLastActivity(contactRecord.id, auth.organizationId);
+
+      clock.lap("touchContactLastActivity");
+
+      log.info("api.event.timing", {
+        requestId,
+        organizationId: auth.organizationId,
+        eventName: name,
+        contactCreated,
+        workflowsTriggered: results.workflowsTriggered,
+        executionsResumed: results.executionsResumed,
+        phases: clock.phases,
+      });
 
       return {
         success: true,

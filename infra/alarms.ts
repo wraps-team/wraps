@@ -5,6 +5,7 @@
  * Alerts when any message lands in the workflow, batch, or marketplace DLQs.
  */
 
+import { apiHandler } from "./api";
 import { marketplaceDlq } from "./marketplace";
 import { batchDlq, batchQueue, workflowDlq } from "./queues";
 
@@ -114,6 +115,46 @@ new aws.cloudwatch.MetricAlarm("BatchQueueAgeAlarm", {
   period: 60,
   evaluationPeriods: 3,
   threshold: 900, // 15 minutes
+  comparisonOperator: "GreaterThanOrEqualToThreshold",
+  treatMissingData: "notBreaching",
+  alarmActions: [alertsTopic.arn],
+  okActions: [alertsTopic.arn],
+  tags: {
+    ManagedBy: "sst",
+    Service: "wraps-api",
+  },
+});
+
+// Alarm: POST /v1/events/ requests taking >= 3 s.
+//
+// The single-event ingest route is the slowest route on the API — p50 near 1 s
+// with a recurring 6-7 s tail — and had no monitoring of any kind, so it drove
+// the API Gateway latency p99 while staying invisible. An API-wide p99 alarm
+// cannot see it once the SES webhook volume dominates request counts, so the
+// signal comes from the route's own structured log line (`path` + `durationMs`)
+// instead of the gateway metric.
+new aws.cloudwatch.LogMetricFilter("EventsRouteSlowRequestsFilter", {
+  name: $interpolate`wraps-events-route-slow-${$app.stage}`,
+  logGroupName: apiHandler.nodes.logGroup.apply((logGroup) => logGroup!.name),
+  pattern: '{ $.path = "/v1/events/" && $.durationMs >= 3000 }',
+  metricTransformation: {
+    name: "EventsRouteSlowRequests",
+    namespace: "Wraps/Api",
+    value: "1",
+    unit: "Count",
+  },
+});
+
+new aws.cloudwatch.MetricAlarm("EventsRouteLatencyAlarm", {
+  name: $interpolate`wraps-events-route-latency-${$app.stage}`,
+  alarmDescription:
+    "One or more POST /v1/events/ requests took >= 3 s in the last 5 minutes",
+  namespace: "Wraps/Api",
+  metricName: "EventsRouteSlowRequests",
+  statistic: "Sum",
+  period: 300,
+  evaluationPeriods: 1,
+  threshold: 1,
   comparisonOperator: "GreaterThanOrEqualToThreshold",
   treatMissingData: "notBreaching",
   alarmActions: [alertsTopic.arn],
