@@ -5,6 +5,7 @@
  * Alerts when any message lands in the workflow or batch DLQs.
  */
 
+import { accountHealthCron } from "./cron";
 import { batchDlq, batchQueue, workflowDlq } from "./queues";
 
 // SNS topic for alarm notifications
@@ -89,6 +90,70 @@ new aws.cloudwatch.MetricAlarm("BatchQueueAgeAlarm", {
   period: 60,
   evaluationPeriods: 3,
   threshold: 900, // 15 minutes
+  comparisonOperator: "GreaterThanOrEqualToThreshold",
+  treatMissingData: "notBreaching",
+  alarmActions: [alertsTopic.arn],
+  okActions: [alertsTopic.arn],
+  tags: {
+    ManagedBy: "sst",
+    Service: "wraps-api",
+  },
+});
+
+// The account-health sweep assumes each connected account's console-access role
+// to read its SES state. When that role can no longer be assumed for an account
+// that passed a check before, the sweep logs
+//   "[account-health] Customer role unusable, skipping account"
+// once per hour and moves on, deliberately: a deleted or drifted role is the
+// customer's configuration to repair, and the customer is told in-app. But the
+// sweep's own Sentry signal is gated on an active paid subscription, so when the
+// account reads as free nothing internal is told. One customer's account
+// (550430683003) was skipped this way for 36 days with no alarm and no issue.
+//
+// The literal is emitted only for an account whose role worked before
+// (roleLastReachableAt is set); an account that never passed a check logs a
+// different, info-level line and stays silent here, so this cannot fire for an
+// abandoned free signup.
+const ACCOUNT_HEALTH_ROLE_UNUSABLE_METRIC = {
+  namespace: "Wraps/AccountHealth",
+  name: "CustomerRoleUnusable",
+};
+
+new aws.cloudwatch.LogMetricFilter("AccountHealthRoleUnusableFilter", {
+  name: $interpolate`wraps-account-health-role-unusable-${$app.stage}`,
+  logGroupName: accountHealthCron.nodes.function.apply((fn) =>
+    fn.nodes.logGroup.apply((logGroup) => {
+      if (!logGroup) {
+        throw new Error(
+          "account-health function has no log group to filter on"
+        );
+      }
+      return logGroup.name;
+    })
+  ),
+  pattern: '"Customer role unusable, skipping account"',
+  metricTransformation: {
+    name: ACCOUNT_HEALTH_ROLE_UNUSABLE_METRIC.name,
+    namespace: ACCOUNT_HEALTH_ROLE_UNUSABLE_METRIC.namespace,
+    value: "1",
+  },
+});
+
+// Alarm: a connected AWS account's console-access role stopped being assumable,
+// so that account's SES health checks are being skipped. The sweep logs the
+// filtered line once per hour while the account stays unreachable, so a 1-hour
+// Sum >= 1 keeps the alarm in ALARM for as long as the account is unmonitored
+// and clears it once the role is repaired.
+new aws.cloudwatch.MetricAlarm("AccountHealthRoleUnusableAlarm", {
+  name: $interpolate`wraps-account-health-role-unusable-${$app.stage}`,
+  alarmDescription:
+    "A connected AWS account's console-access role can no longer be assumed; its SES health checks are being skipped",
+  namespace: ACCOUNT_HEALTH_ROLE_UNUSABLE_METRIC.namespace,
+  metricName: ACCOUNT_HEALTH_ROLE_UNUSABLE_METRIC.name,
+  statistic: "Sum",
+  period: 3600,
+  evaluationPeriods: 1,
+  threshold: 1,
   comparisonOperator: "GreaterThanOrEqualToThreshold",
   treatMissingData: "notBreaching",
   alarmActions: [alertsTopic.arn],
