@@ -1,0 +1,19 @@
+# Dependabot version updates.
+#
+# Every `uses:` in .github/workflows is pinned to a full commit SHA. A pin is
+# only safe while it is maintained: `actions/checkout@<sha>` keeps working but
+# stops receiving security fixes the moment nobody bumps it, which is the same
+# exposure the tag pin had. The `github-actions` ecosystem is what opens those
+# bump PRs; without this entry the pins silently rot behind the moving majors.
+#
+# Only github-actions is declared here. The npm ecosystem for this repository is
+# a separate decision (its dependency backlog needs its own reviewed config),
+# and this file exists so pinning does not decay.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    # Workflows are discovered from the repository root; a narrower directory
+    # finds no manifest and Dependabot silently reports nothing to update.
+    directory: "/"
+    schedule:
+      interval: "weekly"
