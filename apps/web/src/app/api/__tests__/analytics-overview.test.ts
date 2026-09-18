@@ -5,6 +5,11 @@ vi.mock("next/headers", () => ({
   headers: () => new Headers(),
 }));
 
+// Mock unstable_cache to just call the function directly (no caching)
+vi.mock("next/cache", () => ({
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => () => fn(),
+}));
+
 vi.mock("@wraps/auth", () => ({
   auth: {
     api: {
