@@ -89,7 +89,7 @@ export default async function SMSAnalyticsPage({
               Monitor your SMS messaging performance and delivery metrics
             </p>
           </div>
-          <SMSAnalyticsRefreshButton />
+          <SMSAnalyticsRefreshButton orgSlug={orgSlug} />
         </div>
       </div>
 
