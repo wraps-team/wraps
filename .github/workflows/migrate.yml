@@ -48,11 +48,14 @@ permissions:
 
 jobs:
   migrate:
-    # Only runs upstream — forks (self-hosted customers) have neither the
-    # Blacksmith runners nor a production DATABASE_URL, and self-host migrates
-    # through scripts/selfhost/upgrade.ts instead.
+    # Only runs upstream — forks (self-hosted customers) have no production
+    # DATABASE_URL, and self-host migrates through scripts/selfhost/upgrade.ts
+    # instead.
     if: github.repository == 'wraps-team/wraps'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # GitHub-hosted, like the deploy-api jobs: on the shared blacksmith-2vcpu
+    # pool this job queued behind a runner shortage and held every deploy
+    # behind it. It needs only Node and a database connection.
+    runs-on: ubuntu-latest
     # Supplies DATABASE_URL, which is an environment secret on `Production`,
     # not a repository secret. A job without this line gets an empty URL.
     environment: ${{ inputs.stage || 'production' }}
