@@ -136,7 +136,18 @@ new aws.cloudwatch.MetricAlarm("BatchQueueAgeAlarm", {
 new aws.cloudwatch.LogMetricFilter("EventsRouteSlowRequestsFilter", {
   name: $interpolate`wraps-events-route-slow-${$app.stage}`,
   logGroupName: apiHandler.nodes.logGroup.apply((logGroup) => logGroup!.name),
-  pattern: '{ $.path = "/v1/events/" && $.durationMs >= 3000 }',
+  // `path` is the requested pathname, not the matched route, and the route
+  // answers both spellings — so keying on the trailing-slash form alone would
+  // let a client hitting /v1/events produce no metric at all, leaving the alarm
+  // silently dead rather than quiet.
+  //
+  // 10 s, not 3 s: the route's existing tail is a recurring 6-7 s on roughly one
+  // request in ten. An alarm at 3 s would therefore be in ALARM from the moment
+  // it deploys and would stay there, which teaches everyone to ignore it. 10 s
+  // is unambiguously worse than the known baseline, so firing means something
+  // changed. Lower it once the tail itself is fixed.
+  pattern:
+    '{ ($.path = "/v1/events/" || $.path = "/v1/events") && $.durationMs >= 10000 }',
   metricTransformation: {
     name: "EventsRouteSlowRequests",
     namespace: "Wraps/Api",
@@ -148,7 +159,7 @@ new aws.cloudwatch.LogMetricFilter("EventsRouteSlowRequestsFilter", {
 new aws.cloudwatch.MetricAlarm("EventsRouteLatencyAlarm", {
   name: $interpolate`wraps-events-route-latency-${$app.stage}`,
   alarmDescription:
-    "One or more POST /v1/events/ requests took >= 3 s in the last 5 minutes",
+    "One or more POST /v1/events requests took >= 10 s in the last 5 minutes",
   namespace: "Wraps/Api",
   metricName: "EventsRouteSlowRequests",
   statistic: "Sum",
