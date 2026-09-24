@@ -113,6 +113,51 @@ export const Code = ({ children }: { children: ReactNode }) => (
 
 export const releases: Release[] = [
   {
+    slug: "editable-agent-send-policy",
+    versions: ["CLI v3.12.0"],
+    date: "2026-09-24",
+    icon: Bot,
+    title: "Editable agent send policy",
+    tags: ["cli", "api", "agents"],
+    summary:
+      "Change an agent mailbox's send caps and recipient allowlist after it is created, without recreating the agent.",
+    items: [
+      <>
+        Run <Code>wraps email agent policy &lt;name&gt;</Code> to change a live
+        agent&rsquo;s policy. <Code>--max-per-hour</Code> and{" "}
+        <Code>--max-per-day</Code> set the caps, <Code>--allow-recipient</Code>{" "}
+        and <Code>--allow-domain</Code> add to the allowlist and can be
+        repeated, and <Code>--clear-allowlist</Code> empties it. Fields you
+        leave out keep their current values. The API equivalent is{" "}
+        <Code>PATCH /v1/agents/:id/policy</Code>. A killed agent&rsquo;s policy
+        cannot be changed
+      </>,
+      <>
+        <Code>wraps email agent create</Code> checks the domain for an MX record
+        and warns when replies to the new address will bounce. Set{" "}
+        <Code>replyTo</Code> on every send to a mailbox that can receive, or run{" "}
+        <Code>wraps email inbound</Code> so the domain accepts mail
+      </>,
+      <>
+        Pass <Code>--org &lt;slug&gt;</Code> to{" "}
+        <Code>wraps platform connect</Code> to pick the organization without a
+        prompt, so the command runs in CI. With more than one organization and
+        no <Code>--org</Code>, a <Code>--yes</Code> or <Code>--json</Code> run
+        exits with an error rather than choosing one.{" "}
+        <Code>wraps platform update-role</Code> now honors <Code>--yes</Code>
+      </>,
+      <>
+        Fix: if a deploy failed with advice to check your AWS permissions after
+        an earlier run was interrupted, the error now names the pending Pulumi
+        operations and tells you to run <Code>pulumi refresh</Code>
+      </>,
+    ],
+    alsoFixed: [
+      "wraps platform update-role says when it left the trust policy untouched because no external ID is stored, and tells you to re-run wraps platform connect.",
+      "wraps --version reports the new version after wraps update, and update no longer re-offers a release you already installed.",
+    ],
+  },
+  {
     slug: "teardown-that-leaves-your-dns-alone",
     versions: ["CLI v3.11.1"],
     date: "2026-09-01",
