@@ -4,6 +4,7 @@ import {
   createWriteStream,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   rmSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -51,6 +52,28 @@ async function fetchLatestVersion(): Promise<{
     }
   }
   return null;
+}
+
+/**
+ * Replaces every top-level entry the release ships, not a fixed list. The
+ * tarball carries a root `package.json` beside `bin/`, `runtime/` and `lib/`,
+ * and `lib/cli.js` reads its version from `../package.json` -- that root file.
+ * Copying only the three directories installed the new code under the old
+ * version number, so `--version` lied and `update` re-offered the same release
+ * forever. Entries the tarball does not ship (connections, config, Pulumi
+ * state) are never touched.
+ */
+export function installRelease(source: string, installDir: string): void {
+  for (const entry of readdirSync(source)) {
+    const target = join(installDir, entry);
+    rmSync(target, { recursive: true, force: true });
+    // cp -R, not cpSync: lib/node_modules is pnpm symlinks, and cpSync
+    // rewrites relative links to absolute paths into the temp dir.
+    execFileSync("cp", ["-R", join(source, entry), target]);
+  }
+
+  chmodSync(join(installDir, "bin", "wraps"), 0o755);
+  chmodSync(join(installDir, "runtime", "node"), 0o755);
 }
 
 function detectPlatformArch(): { platform: string; arch: string } {
@@ -174,15 +197,7 @@ export async function update(currentVersion: string): Promise<void> {
       mkdirSync(extractDir, { recursive: true });
       execFileSync("tar", ["xzf", tarballPath, "-C", extractDir]);
 
-      const source = join(extractDir, "wraps");
-
-      for (const dir of ["bin", "runtime", "lib"]) {
-        rmSync(join(INSTALL_DIR, dir), { recursive: true, force: true });
-        execFileSync("cp", ["-R", join(source, dir), join(INSTALL_DIR, dir)]);
-      }
-
-      chmodSync(join(INSTALL_DIR, "bin", "wraps"), 0o755);
-      chmodSync(join(INSTALL_DIR, "runtime", "node"), 0o755);
+      installRelease(join(extractDir, "wraps"), INSTALL_DIR);
     });
 
     console.log();
