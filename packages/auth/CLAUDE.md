@@ -74,6 +74,26 @@ function getPostHogHost(): string {
 }
 ```
 
+### 5. Bumping better-auth (or any @better-auth/* plugin)
+
+The 1.7.1 bump (2026-09-14) added a required `account.issuer` field our Drizzle
+schema lacked. Every signup and OAuth sign-in threw inside the adapter for nine
+days: typecheck, tests and CI were green, and better-auth swallowed the error.
+
+- `auth-schema-parity.test.ts` fails if the installed version expects any model
+  or field the Drizzle schema lacks. Add the columns in `packages/db` and run
+  `db:generate` — CI fails a schema change with no migration, because
+  self-hosters only get columns through migrations.
+- `account-schema-db`, `scim-provisioning-db` and `org-invitation-db` drive
+  signup, SCIM and invites through the real adapter. Keep them green.
+- Bump every `@better-auth/*` package and the `better-auth` catalog entry to the
+  same version, then check `pnpm-workspace.yaml` `overrides:` for pins below
+  what the new core requires (zod, `@better-fetch/fetch`, `better-call`).
+- Run `pnpm --filter @wraps/web build` before pushing. A dependency ceiling
+  shows up only there, never in typecheck or vitest.
+- `logger.log` routes better-auth's internally caught errors to Sentry
+  (`logAuthEvent`). Do not remove it.
+
 ## Architecture
 
 ### Plugins

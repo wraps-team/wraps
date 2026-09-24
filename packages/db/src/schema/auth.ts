@@ -160,6 +160,7 @@ export const invitation = pgTable("invitation", {
   inviterId: text("inviter_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Access Control plugin table (DAC)
@@ -198,6 +199,11 @@ export const subscription = pgTable(
     trialStart: timestamp("trial_start"),
     trialEnd: timestamp("trial_end"),
     annual: boolean("annual").default(false), // true for annual billing, false for monthly
+    cancelAt: timestamp("cancel_at"),
+    canceledAt: timestamp("canceled_at"),
+    endedAt: timestamp("ended_at"),
+    billingInterval: text("billing_interval"),
+    stripeScheduleId: text("stripe_schedule_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
