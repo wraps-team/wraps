@@ -10,11 +10,7 @@ import * as ssoSchema from "@wraps/db/schema/sso-provider";
 import { getWrapsClient } from "@wraps/email";
 import { wraps as wrapsContactSync } from "@wraps.dev/better-auth";
 import { createPlatformClient } from "@wraps.dev/client";
-import {
-  type BetterAuthOptions,
-  type BetterAuthPlugin,
-  betterAuth,
-} from "better-auth";
+import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
@@ -776,11 +772,6 @@ export const auth = betterAuth<BetterAuthOptions>({
     //
     // Its database hooks are additive — better-auth collects plugin hooks and
     // this file's own `databaseHooks` into one list and runs both.
-    //
-    // Cast: @wraps.dev/better-auth 0.2.0 ships typings that inline a pre-1.7.3
-    // BetterAuthOptions (experimental.joins), so its init() no longer matches
-    // better-auth 1.7.5. Runtime shape is unchanged; drop once the plugin
-    // republishes with BetterAuthPlugin as its declared return type.
     wrapsContactSync({
       apiKey: process.env.WRAPS_API_KEY,
       eventName: "user.signup",
@@ -793,7 +784,7 @@ export const auth = betterAuth<BetterAuthOptions>({
       }),
       onError: (error, { stage }) =>
         console.error(`Wraps contact sync failed (${stage}):`, error),
-    }) as BetterAuthPlugin,
+    }),
     lastLoginMethod({
       storeInDatabase: true,
     }),
