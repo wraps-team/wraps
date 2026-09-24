@@ -17,7 +17,7 @@
 import { execSync } from "node:child_process";
 import { batchQueue, workflowQueue } from "./queues";
 import { schedulerGroup, schedulerRole } from "./scheduler";
-import { axiomToken, sentryDsn } from "./secrets";
+import { axiomToken, sentryEnv } from "./secrets";
 import { rateLimitTable } from "./tables";
 
 // API Gateway with Elysia Lambda handler
@@ -97,7 +97,7 @@ export const apiHandler = new sst.aws.Function("ApiHandler", {
     // No AI provider config here on purpose: all inference lives in the three
     // apps/web routes, so the keys belong on the web function. This lambda
     // carried ANTHROPIC_API_KEY for a workflow generator that never existed.
-    SENTRY_DSN: sentryDsn.value,
+    ...sentryEnv,
   },
   link: [rateLimitTable, batchQueue, workflowQueue],
   nodejs: {

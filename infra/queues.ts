@@ -8,7 +8,7 @@
  */
 
 import { schedulerGroup, schedulerRole } from "./scheduler-resources";
-import { axiomToken, sentryDsn } from "./secrets";
+import { axiomToken, sentryEnv } from "./secrets";
 
 // Dead Letter Queue for failed batch jobs.
 // A consumer (apps/api/src/workers/batch-dlq-consumer.ts) drains it and
@@ -68,7 +68,7 @@ batchDlq.subscribe(
         process.env.BROADCAST_DLQ_CONSUMER_ENABLED ?? "true",
       // There is no DLQ-of-DLQ: a record this consumer cannot process is
       // dropped, so Sentry is the only place that failure surfaces.
-      SENTRY_DSN: sentryDsn.value,
+      ...sentryEnv,
     },
     nodejs: {
       // @sentry/profiling-node ships native .node binaries that esbuild
@@ -137,7 +137,7 @@ const batchSenderSubscription = batchQueue.subscribe(
         })(),
       // Post-send bookkeeping failures are swallowed so one bad row cannot
       // abort a broadcast — they only reach Sentry.
-      SENTRY_DSN: sentryDsn.value,
+      ...sentryEnv,
       // The stuck-broadcast alert emails the org from wraps.dev, which is
       // verified in the dogfood account (010836206701), not this platform
       // account. getWrapsClient() assumes this role from the function's
@@ -238,7 +238,7 @@ workflowDlq.subscribe(
       AXIOM_DATASET: "wraps",
       // Last handler in the chain: a record it cannot process leaves the
       // execution stuck with nothing left to retry it.
-      SENTRY_DSN: sentryDsn.value,
+      ...sentryEnv,
     },
     nodejs: {
       install: ["pg", "@sentry/profiling-node"],
@@ -318,7 +318,7 @@ workflowQueue.subscribe(
         })(),
       // A broken cron chain is never retried by SQS — the workflow just stops
       // firing. That capture is the only warning.
-      SENTRY_DSN: sentryDsn.value,
+      ...sentryEnv,
     },
     nodejs: {
       // PostgreSQL driver for Drizzle; @sentry/profiling-node ships native

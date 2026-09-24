@@ -273,6 +273,10 @@ export function handleApiError(
       apiKeyId: auth?.apiKeyId,
       userId: auth?.userId,
       authMethod: authMethodOf(auth),
+      // 4xx here is contract (deliberate route throws), not an incident; 5xx
+      // is captured below with request context. Reporting this log line too
+      // would double the noise for every 4xx and duplicate the 5xx capture.
+      reportToSentry: false,
     });
   }
 

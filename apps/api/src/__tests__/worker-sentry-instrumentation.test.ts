@@ -60,8 +60,23 @@ describe("worker Sentry instrumentation", () => {
       return { ref, block: source.slice(start, next) };
     });
 
-    it.each(blocks)("passes SENTRY_DSN to $ref", ({ block }) => {
-      expect(block).toContain("SENTRY_DSN");
-    });
+    it.each(blocks)(
+      "passes SENTRY_DSN (directly or via sentryEnv) to $ref",
+      ({ block }) => {
+        expect(block).toMatch(/SENTRY_DSN|\.\.\.sentryEnv\b/);
+      }
+    );
+  });
+
+  it("sentryEnv itself carries SENTRY_DSN", () => {
+    const source = readFileSync(
+      new URL("infra/secrets.ts", REPO_ROOT),
+      "utf-8"
+    );
+    const start = source.indexOf("export const sentryEnv");
+    const end = source.indexOf("};", start) + 2;
+    const sentryEnvLiteral = source.slice(start, end);
+
+    expect(sentryEnvLiteral).toContain("SENTRY_DSN: sentryDsn.value");
   });
 });

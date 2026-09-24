@@ -110,8 +110,12 @@ export async function trackFirstEmailSent(
     if (contactEmail) {
       await emit(contactEmail, "activation.first_email_sent", props);
     }
-  } catch {
+  } catch (error) {
     // never throw from tracking
+    log.warn("activation tracking failed", {
+      error: String(error),
+      step: "trackFirstEmailSent",
+    });
   }
 }
 
@@ -165,8 +169,12 @@ export async function trackFirstEmailDelivered(
       organizationId,
       source,
     });
-  } catch {
+  } catch (error) {
     // never throw from tracking
+    log.warn("activation tracking failed", {
+      error: String(error),
+      step: "trackFirstEmailDelivered",
+    });
   }
 }
 
@@ -244,8 +252,12 @@ async function setContactProperties(
         },
       });
     }
-  } catch {
+  } catch (error) {
     // best-effort
+    log.warn("activation tracking failed", {
+      error: String(error),
+      step: "setContactProperties",
+    });
   }
 }
 
@@ -333,7 +345,11 @@ export async function trackFirstResourceCreated(
       resource,
       source,
     });
-  } catch {
+  } catch (error) {
     // never throw from tracking
+    log.warn("activation tracking failed", {
+      error: String(error),
+      step: "trackFirstResourceCreated",
+    });
   }
 }

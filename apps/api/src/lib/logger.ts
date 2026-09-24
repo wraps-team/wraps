@@ -1,4 +1,5 @@
 import { Writable } from "node:stream";
+import * as Sentry from "@sentry/aws-serverless";
 import pino from "pino";
 
 type LogData = Record<string, unknown>;
@@ -35,14 +36,28 @@ async function flushAxiom() {
   if (events.length === 0) {
     return;
   }
-  await fetch(`https://api.axiom.co/v1/datasets/${axiomDataset}/ingest`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${axiomToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(events),
-  }).catch(() => {});
+  try {
+    const res = await fetch(
+      `https://api.axiom.co/v1/datasets/${axiomDataset}/ingest`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${axiomToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(events),
+      }
+    );
+    if (!res.ok) {
+      process.stderr.write(
+        `axiom ingest failed: HTTP ${res.status}, dropped ${events.length} events\n`
+      );
+    }
+  } catch (error) {
+    process.stderr.write(
+      `axiom ingest failed: ${String(error)}, dropped ${events.length} events\n`
+    );
+  }
 }
 
 const pinoLogger = pino(
@@ -78,10 +93,30 @@ export const log = {
   warn(msg: string, data?: LogData) {
     pinoLogger.warn(data ?? {}, msg);
   },
+  /**
+   * Error-level logs are incidents: they go to Sentry as well as the log sink.
+   * Pass `reportToSentry: false` in `data` when the caller reports the failure
+   * itself or it is an expected, customer-caused condition (prefer log.warn).
+   */
   error(msg: string, error?: unknown, data?: LogData) {
+    const { reportToSentry, ...fields } = data ?? {};
     const err =
       error instanceof Error ? serializeError(error) : { error: String(error) };
-    pinoLogger.error({ err, ...data }, msg);
+    pinoLogger.error({ err, ...fields }, msg);
+    if (reportToSentry === false) {
+      return;
+    }
+    if (error instanceof Error) {
+      Sentry.captureException(error, { extra: { message: msg, ...fields } });
+    } else {
+      Sentry.captureMessage(msg, {
+        level: "error",
+        extra: {
+          error: error === undefined ? undefined : String(error),
+          ...fields,
+        },
+      });
+    }
   },
 };
 

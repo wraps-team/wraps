@@ -16,7 +16,7 @@
  * which ours was — expects EventBridge.
  */
 
-import { axiomToken, sentryDsn } from "./secrets";
+import { axiomToken, sentryEnv } from "./secrets";
 
 // Dead letter queue. Without this a record the consumer cannot process is
 // retried forever and then dropped, leaving a buyer stuck at `pending`.
@@ -92,7 +92,7 @@ marketplaceQueue.subscribe(
       AXIOM_DATASET: "wraps",
       // Advisories (buyer fraud, abuse, account closure) and unprocessable
       // records surface nowhere else.
-      SENTRY_DSN: sentryDsn.value,
+      ...sentryEnv,
       // The confirmation email is sent from wraps.dev, which is verified in
       // the dogfood account (010836206701), not this platform account.
       // getWrapsClient() assumes this role from the function's execution role.

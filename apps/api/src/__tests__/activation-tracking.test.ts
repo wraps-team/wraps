@@ -86,6 +86,7 @@ vi.mock("../lib/posthog", () => ({
 vi.mock("../lib/logger", () => ({
   log: {
     info: vi.fn(),
+    warn: vi.fn(),
     error: vi.fn(),
   },
 }));

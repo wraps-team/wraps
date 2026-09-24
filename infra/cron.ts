@@ -60,7 +60,7 @@
  */
 
 import { batchQueue } from "./queues";
-import { axiomToken, sentryDsn } from "./secrets";
+import { axiomToken, sentryEnv } from "./secrets";
 
 export const broadcastReaperCron = new sst.aws.CronV2("BroadcastReaper", {
   // 15-minute sweep against a 30-minute staleness threshold, so a dead chain
@@ -85,7 +85,7 @@ export const broadcastReaperCron = new sst.aws.CronV2("BroadcastReaper", {
       // batch it tries to revive, which is the one failure it cannot back off
       // from — it IS the backstop.
       BATCH_QUEUE_URL: batchQueue.url,
-      SENTRY_DSN: sentryDsn.value,
+      ...sentryEnv,
     },
     permissions: [
       {
@@ -113,7 +113,7 @@ export const auditLogCleanupCron = new sst.aws.CronV2("AuditLogCleanup", {
         })(),
       AXIOM_TOKEN: axiomToken.value,
       AXIOM_DATASET: "wraps",
-      SENTRY_DSN: sentryDsn.value,
+      ...sentryEnv,
     },
     nodejs: { install: ["pg", "@sentry/profiling-node"] },
   },
@@ -135,7 +135,7 @@ export const messageSendCleanupCron = new sst.aws.CronV2("MessageSendCleanup", {
         })(),
       AXIOM_TOKEN: axiomToken.value,
       AXIOM_DATASET: "wraps",
-      SENTRY_DSN: sentryDsn.value,
+      ...sentryEnv,
       // Live since 2026-09-11 — the step-8 sign-off ran against that night's
       // production dry-run report (8,611 rows, three orgs, no surprises).
       // "true" puts the sweep back in reporting-only mode.
@@ -163,7 +163,7 @@ export const workflowReaperCron = new sst.aws.CronV2("WorkflowReaper", {
       AXIOM_DATASET: "wraps",
       // The reaper is itself the backstop — when it cannot fail a stuck
       // execution it just logs and moves on, once an hour, forever.
-      SENTRY_DSN: sentryDsn.value,
+      ...sentryEnv,
     },
     nodejs: { install: ["pg", "@sentry/profiling-node"] },
   },
@@ -190,7 +190,7 @@ export const eventFeedStalenessCron = new sst.aws.CronV2("EventFeedStaleness", {
       AXIOM_DATASET: "wraps",
       // alertOwner() swallows send failures so one org cannot abort the sweep,
       // which means a permanently failing alert is invisible without this.
-      SENTRY_DSN: sentryDsn.value,
+      ...sentryEnv,
       // The alert email links to the account's settings page, and resolveAppUrl
       // throws rather than defaulting to app.wraps.dev. Without this the send
       // fails, markAlerted never runs, and the alert retries hourly forever.
@@ -256,7 +256,7 @@ export const accountHealthCron = new sst.aws.CronV2("AccountHealth", {
       AXIOM_DATASET: "wraps",
       // Per-account failures are skipped so one broken role cannot abort the
       // sweep; without this that account silently stops being checked.
-      SENTRY_DSN: sentryDsn.value,
+      ...sentryEnv,
     },
     nodejs: { install: ["pg", "@sentry/profiling-node"] },
     permissions: [
