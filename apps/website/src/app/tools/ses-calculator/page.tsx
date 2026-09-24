@@ -16,16 +16,16 @@ import { JsonLd } from "@/components/json-ld";
 import SESCalculatorPageContent from "./page-content";
 
 export const metadata: Metadata = {
-  title: "Amazon SES Pricing Calculator",
+  title: "Amazon SES Pricing 2026: All 4 Plans + Calculator",
   description:
     "Calculate your true AWS SES email costs including infrastructure (Lambda, DynamoDB, SQS, EventBridge). The only SES pricing calculator that shows full production costs, not just the $0.10/1K à la carte sending fee — or the $0.16/1K AWS defaults new accounts to.",
   openGraph: {
-    title: "Amazon SES Pricing Calculator | Wraps",
+    title: "Amazon SES Pricing 2026: All 4 Plans + Calculator | Wraps",
     description:
       "Calculate your true AWS SES costs including infrastructure. See full production email costs beyond the $0.10/1K à la carte headline — AWS now defaults new accounts to $0.16/1K instead.",
   },
   twitter: {
-    title: "Amazon SES Pricing Calculator | Wraps",
+    title: "Amazon SES Pricing 2026: All 4 Plans + Calculator | Wraps",
     description:
       "Calculate your true AWS SES costs including infrastructure. See full production email costs beyond the $0.10/1K à la carte headline — AWS now defaults new accounts to $0.16/1K instead.",
   },
