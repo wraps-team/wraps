@@ -184,7 +184,7 @@ export function LandingNavbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-border border-b bg-background">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <div className="flex items-center">
           <a className="flex cursor-pointer items-center" href="/">
