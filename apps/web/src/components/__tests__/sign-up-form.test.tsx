@@ -260,6 +260,43 @@ describe("SignUpForm - analytics on successful signup", () => {
     vi.unstubAllEnvs();
   });
 
+  it("signs up, signs in with the same credentials, then routes to onboarding", async () => {
+    render(<DynamicSignUpForm onSwitchToSignIn={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/name/i), {
+      target: { value: "Ada Lovelace" },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/m@example\.com/i), {
+      target: { value: "ada@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "abcdef12" },
+    });
+    const submitButton = screen.getByRole("button", {
+      name: /create account/i,
+    });
+    await waitFor(() => {
+      expect(submitButton).not.toBeDisabled();
+    });
+    fireEvent.click(submitButton);
+
+    // The payload signup-route-db.test.ts drives through the real route.
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith("/onboarding?interval=monthly");
+    });
+    expect(dynamicAuthClient.signUp.email).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "ada@example.com",
+        password: "abcdef12",
+        name: "Ada Lovelace",
+      })
+    );
+    expect(dynamicAuthClient.signIn.email).toHaveBeenCalledWith({
+      email: "ada@example.com",
+      password: "abcdef12",
+    });
+  });
+
   it("fires sign_up_form_completed, never the server-side user_signed_up name", async () => {
     render(<DynamicSignUpForm onSwitchToSignIn={vi.fn()} />);
 
