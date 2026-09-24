@@ -221,6 +221,21 @@ jobs:
       - name: Check migration snapshot integrity
         run: pnpm --filter @wraps/db exec drizzle-kit check
 
+      # Self-hosted installs get schema changes only through migrations
+      # (scripts/selfhost/upgrade.ts). A schema edit with no generated
+      # migration passes every test here, since the test DB is db:push-managed,
+      # and ships a column self-hosters never receive. Offline: generate reads
+      # the schema and the snapshots, not a database.
+      - name: Every schema change has a migration
+        run: |
+          pnpm --filter @wraps/db exec drizzle-kit generate --name ci-drift-probe
+          drift=$(git status --porcelain packages/db/src/migrations)
+          if [ -n "$drift" ]; then
+            echo "::error::packages/db schema changed with no migration. Run 'pnpm --filter @wraps/db db:generate' and commit the result."
+            echo "$drift"
+            exit 1
+          fi
+
       - name: Run db tests
         run: pnpm --filter @wraps/db test
         env:
