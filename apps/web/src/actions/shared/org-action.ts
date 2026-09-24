@@ -5,7 +5,7 @@ import {
   auditLogEntry,
   getAuditContext,
 } from "@/lib/audit";
-import { createActionLogger, type Logger, serializeError } from "@/lib/logger";
+import { createActionLogger, type Logger } from "@/lib/logger";
 import { checkFeatureAccess } from "@/lib/plan-limits";
 import type { PlanFeature } from "@/lib/plans";
 import { checkPermission } from "./permissions";
@@ -110,7 +110,7 @@ export function orgAction<TArgs extends unknown[], TResult>(
       if (e && typeof e === "object" && "formState" in e) {
         return (e as { formState: TResult }).formState;
       }
-      log.error({ err: serializeError(e) }, `${opts.name} failed`);
+      log.error({ err: e }, `${opts.name} failed`);
       return { success: false, error: opts.onError };
     }
   };
