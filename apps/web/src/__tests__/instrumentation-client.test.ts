@@ -26,6 +26,7 @@ vi.mock("posthog-js", () => ({
 
 const originalNextPublicSentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 const originalNextPublicPosthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+const originalNextPublicVercelEnv = process.env.NEXT_PUBLIC_VERCEL_ENV;
 
 async function importSrcInstrumentationClient() {
   vi.resetModules();
@@ -50,6 +51,12 @@ describe("client instrumentation", () => {
       delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
     } else {
       process.env.NEXT_PUBLIC_POSTHOG_KEY = originalNextPublicPosthogKey;
+    }
+
+    if (originalNextPublicVercelEnv === undefined) {
+      delete process.env.NEXT_PUBLIC_VERCEL_ENV;
+    } else {
+      process.env.NEXT_PUBLIC_VERCEL_ENV = originalNextPublicVercelEnv;
     }
   });
 
@@ -78,6 +85,16 @@ describe("client instrumentation", () => {
       expect.objectContaining({
         dsn: undefined,
       })
+    );
+  });
+
+  it("tags the environment from NEXT_PUBLIC_VERCEL_ENV", async () => {
+    process.env.NEXT_PUBLIC_VERCEL_ENV = "production";
+
+    await importSrcInstrumentationClient();
+
+    expect(mockSentryInit).toHaveBeenCalledWith(
+      expect.objectContaining({ environment: "production" })
     );
   });
 });

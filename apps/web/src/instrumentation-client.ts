@@ -1,9 +1,15 @@
 import * as Sentry from "@sentry/nextjs";
 import posthog from "posthog-js";
+import { sentryEnvironment } from "@/lib/sentry-environment";
 
 // Sentry client-side initialization
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+
+  environment: sentryEnvironment(
+    process.env.NEXT_PUBLIC_VERCEL_ENV,
+    process.env.NODE_ENV
+  ),
 
   sendDefaultPii: true,
 

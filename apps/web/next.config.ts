@@ -100,7 +100,6 @@ export default withSentryConfig(postHogWrapped, {
   silent: !process.env.CI,
 
   webpack: {
-    automaticVercelMonitors: true,
     treeshake: {
       removeDebugLogging: true,
     },
