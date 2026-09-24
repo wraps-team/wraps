@@ -180,10 +180,10 @@ export const releases: Release[] = [
     summary:
       "Sending domains, suppressions and role health move from CLI-only into the dashboard.",
     media: {
-      src: "/email/2026-09-dashboard-domains.png",
-      alt: "A Wraps card reading: September 2026 — Add a domain in the dashboard. DKIM records, verification state, and the configuration set behind each identity.",
-      width: 1104,
-      height: 480,
+      src: "/email/2026-09-dashboard-domains-clip.gif",
+      alt: "Adding notify.acme.dev on the Sending Domains page: it lands as pending verification, and its detail sheet lists the three DKIM CNAME records to publish",
+      width: 552,
+      height: 310,
     },
     items: [
       <>
