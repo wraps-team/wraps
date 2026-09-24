@@ -6,7 +6,7 @@
 // <lastmod>, which cannot be derived at build time: see the script header.
 
 export const PAGE_DATES: Record<string, string> = {
-  "/": "2026-09-18T09:16:12-06:00",
+  "/": "2026-09-24T08:19:14-06:00",
   "/about": "2026-09-15T08:41:41-06:00",
   "/agents": "2026-09-15T08:41:41-06:00",
   "/alternatives": "2026-09-15T08:41:41-06:00",
@@ -169,7 +169,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/subprocessors": "2026-08-28T11:13:44-06:00",
   "/terms": "2026-08-28T11:14:02-06:00",
   "/tools": "2026-09-18T16:14:52-06:00",
-  "/tools/ses-calculator": "2026-09-18T16:14:44-06:00",
+  "/tools/ses-calculator": "2026-09-24T09:11:17-06:00",
   "/tools/ses-production-access": "2026-09-18T16:14:52-06:00",
   "/tools/spf-builder": "2026-09-18T16:14:44-06:00",
   "/versus": "2026-09-16T13:30:58-06:00",
