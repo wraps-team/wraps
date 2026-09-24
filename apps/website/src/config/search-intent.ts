@@ -549,14 +549,16 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
   },
   {
     route: "/tools/ses-calculator",
-    primaryQuery: "aws ses pricing cost calculator",
+    primaryQuery: "amazon ses pricing",
     secondaryQueries: [
+      "aws ses pricing",
+      "ses pricing",
+      "aws ses pricing calculator",
       "ses true cost lambda dynamodb",
-      "ses cost beyond per email price",
     ],
     audience: "stranger-with-problem",
     rationale:
-      "Its own description makes a specific, checkable claim of differentiation — it includes infrastructure costs (Lambda, DynamoDB, SQS, EventBridge) that other SES calculators omit, plus both the $0.10 and $0.16 per-1K rates AWS now runs in parallel.",
+      "Re-aimed 2026-09-24 from Search Console: it already ranks ~7.5 for amazon/aws ses pricing (~7.9K impressions in 90 days), and is the only page-1 result showing all four 2026 SES plans rather than the old $0.10/1K.",
   },
   {
     route: "/tools/spf-builder",
