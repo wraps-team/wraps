@@ -42,6 +42,7 @@ import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import {
   captureException,
   captureMessage,
+  withMonitor,
   wrapHandler,
 } from "@sentry/aws-serverless";
 import { batchSend, db } from "@wraps/db";
@@ -50,6 +51,7 @@ import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { awsDefaults } from "../lib/aws-defaults";
 import { flushLogger, log } from "../lib/logger";
 import type { BatchJob } from "../services/queue";
+import { CRON_MONITOR_DEFAULTS, CRON_MONITORS } from "./cron-monitors";
 
 type DrizzleDB = typeof db;
 
@@ -315,10 +317,16 @@ async function enqueueChunk(job: BatchJob): Promise<void> {
   );
 }
 
-export const handler: Handler = wrapHandler(async () => {
-  try {
-    await runBroadcastReaper(db, { enqueue: enqueueChunk });
-  } finally {
-    await flushLogger();
-  }
-});
+export const handler: Handler = wrapHandler(async () =>
+  withMonitor(
+    "broadcast-reaper",
+    async () => {
+      try {
+        await runBroadcastReaper(db, { enqueue: enqueueChunk });
+      } finally {
+        await flushLogger();
+      }
+    },
+    { ...CRON_MONITOR_DEFAULTS, ...CRON_MONITORS["broadcast-reaper"] }
+  )
+);

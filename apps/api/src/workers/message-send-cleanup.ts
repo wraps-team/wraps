@@ -20,7 +20,7 @@
 // Initialize Sentry before all other imports
 import "../lib/sentry";
 
-import { wrapHandler } from "@sentry/aws-serverless";
+import { withMonitor, wrapHandler } from "@sentry/aws-serverless";
 import {
   contactEvent,
   db,
@@ -32,6 +32,7 @@ import {
 import type { Handler } from "aws-lambda";
 import { and, count, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { flushLogger, log } from "../lib/logger";
+import { CRON_MONITOR_DEFAULTS, CRON_MONITORS } from "./cron-monitors";
 
 // When true, the worker logs exactly what it would delete and deletes nothing.
 // Ships as true. Flipped to false only after a human reviews a dry-run report.
@@ -373,53 +374,68 @@ async function cleanupExpiredContactEvents(): Promise<number> {
   return rowsDeleted;
 }
 
-export const handler: Handler = wrapHandler(async () => {
-  log.info("[message-send-cleanup] Starting cleanup run", { dryRun: DRY_RUN });
-
-  const orgs = await db
-    .selectDistinct({ organizationId: messageSend.organizationId })
-    .from(messageSend);
-
-  log.info("[message-send-cleanup] Processing orgs", { count: orgs.length });
-
-  let totalDeleted = 0;
-
-  for (const { organizationId } of orgs) {
-    const { plan, visibleDays, deleteAfterDays } =
-      await getOrgRetention(organizationId);
-
-    await warnOrgIfNeeded(organizationId, plan, visibleDays, deleteAfterDays);
-
-    const { rowsDeleted, oldestRemaining } = await cleanupMessageSendForOrg(
-      organizationId,
-      deleteAfterDays
-    );
-
-    if (rowsDeleted > 0) {
-      log.info("[message-send-cleanup] Processed org", {
-        organizationId,
-        plan,
-        deleteAfterDays,
+export const handler: Handler = wrapHandler(async () =>
+  withMonitor(
+    "message-send-cleanup",
+    async () => {
+      log.info("[message-send-cleanup] Starting cleanup run", {
         dryRun: DRY_RUN,
-        ...(DRY_RUN ? { rowsWouldDelete: rowsDeleted } : { rowsDeleted }),
-        oldestRemaining,
       });
-    }
 
-    totalDeleted += rowsDeleted;
-  }
+      const orgs = await db
+        .selectDistinct({ organizationId: messageSend.organizationId })
+        .from(messageSend);
 
-  const contactEventsDeleted = await cleanupExpiredContactEvents();
+      log.info("[message-send-cleanup] Processing orgs", {
+        count: orgs.length,
+      });
 
-  log.info("[message-send-cleanup] Cleanup complete", {
-    dryRun: DRY_RUN,
-    ...(DRY_RUN
-      ? { messageSendRowsWouldDelete: totalDeleted }
-      : { messageSendRowsDeleted: totalDeleted }),
-    ...(DRY_RUN
-      ? { contactEventRowsWouldDelete: contactEventsDeleted }
-      : { contactEventRowsDeleted: contactEventsDeleted }),
-  });
+      let totalDeleted = 0;
 
-  await flushLogger();
-});
+      for (const { organizationId } of orgs) {
+        const { plan, visibleDays, deleteAfterDays } =
+          await getOrgRetention(organizationId);
+
+        await warnOrgIfNeeded(
+          organizationId,
+          plan,
+          visibleDays,
+          deleteAfterDays
+        );
+
+        const { rowsDeleted, oldestRemaining } = await cleanupMessageSendForOrg(
+          organizationId,
+          deleteAfterDays
+        );
+
+        if (rowsDeleted > 0) {
+          log.info("[message-send-cleanup] Processed org", {
+            organizationId,
+            plan,
+            deleteAfterDays,
+            dryRun: DRY_RUN,
+            ...(DRY_RUN ? { rowsWouldDelete: rowsDeleted } : { rowsDeleted }),
+            oldestRemaining,
+          });
+        }
+
+        totalDeleted += rowsDeleted;
+      }
+
+      const contactEventsDeleted = await cleanupExpiredContactEvents();
+
+      log.info("[message-send-cleanup] Cleanup complete", {
+        dryRun: DRY_RUN,
+        ...(DRY_RUN
+          ? { messageSendRowsWouldDelete: totalDeleted }
+          : { messageSendRowsDeleted: totalDeleted }),
+        ...(DRY_RUN
+          ? { contactEventRowsWouldDelete: contactEventsDeleted }
+          : { contactEventRowsDeleted: contactEventsDeleted }),
+      });
+
+      await flushLogger();
+    },
+    { ...CRON_MONITOR_DEFAULTS, ...CRON_MONITORS["message-send-cleanup"] }
+  )
+);

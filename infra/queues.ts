@@ -93,7 +93,7 @@ batchDlq.subscribe(
 
 // Subscribe batch worker to the queue
 // The worker is defined in apps/api/src/workers/batch-sender.ts
-const batchSenderSubscription = batchQueue.subscribe(
+export const batchSenderSubscription = batchQueue.subscribe(
   {
     handler: "apps/api/src/workers/batch-sender.handler",
     runtime: "nodejs24.x",

@@ -18,12 +18,13 @@
 // Initialize Sentry before all other imports
 import "../lib/sentry";
 
-import { wrapHandler } from "@sentry/aws-serverless";
+import { withMonitor, wrapHandler } from "@sentry/aws-serverless";
 import { auditLog, db, subscription } from "@wraps/db";
 import type { Handler } from "aws-lambda";
 import { and, eq, inArray, lt } from "drizzle-orm";
 import { flushLogger, log } from "../lib/logger";
 import { isPlanId, type PlanId } from "../lib/plan-ids";
+import { CRON_MONITOR_DEFAULTS, CRON_MONITORS } from "./cron-monitors";
 
 const RETENTION_DAYS: Record<PlanId, number> = {
   free: 30,
@@ -107,39 +108,47 @@ async function deleteOldLogsForOrg(
   return totalDeleted;
 }
 
-export const handler: Handler = wrapHandler(async () => {
-  log.info("[audit-log-cleanup] Starting cleanup run");
+export const handler: Handler = wrapHandler(async () =>
+  withMonitor(
+    "audit-log-cleanup",
+    async () => {
+      log.info("[audit-log-cleanup] Starting cleanup run");
 
-  // 1. Fetch all distinct organizationIds that have audit logs
-  const orgs = await db
-    .selectDistinct({ organizationId: auditLog.organizationId })
-    .from(auditLog);
+      // 1. Fetch all distinct organizationIds that have audit logs
+      const orgs = await db
+        .selectDistinct({ organizationId: auditLog.organizationId })
+        .from(auditLog);
 
-  if (orgs.length === 0) {
-    log.info("[audit-log-cleanup] No audit logs found, nothing to clean up");
-    await flushLogger();
-    return;
-  }
+      if (orgs.length === 0) {
+        log.info(
+          "[audit-log-cleanup] No audit logs found, nothing to clean up"
+        );
+        await flushLogger();
+        return;
+      }
 
-  log.info("[audit-log-cleanup] Processing orgs", { count: orgs.length });
+      log.info("[audit-log-cleanup] Processing orgs", { count: orgs.length });
 
-  let totalDeleted = 0;
+      let totalDeleted = 0;
 
-  for (const { organizationId } of orgs) {
-    const plan = await getOrgPlan(organizationId);
-    const deleted = await deleteOldLogsForOrg(organizationId, plan);
+      for (const { organizationId } of orgs) {
+        const plan = await getOrgPlan(organizationId);
+        const deleted = await deleteOldLogsForOrg(organizationId, plan);
 
-    if (deleted > 0) {
-      log.info("[audit-log-cleanup] Deleted rows for org", {
-        organizationId,
-        plan,
-        deleted,
-      });
-    }
+        if (deleted > 0) {
+          log.info("[audit-log-cleanup] Deleted rows for org", {
+            organizationId,
+            plan,
+            deleted,
+          });
+        }
 
-    totalDeleted += deleted;
-  }
+        totalDeleted += deleted;
+      }
 
-  log.info("[audit-log-cleanup] Cleanup complete", { totalDeleted });
-  await flushLogger();
-});
+      log.info("[audit-log-cleanup] Cleanup complete", { totalDeleted });
+      await flushLogger();
+    },
+    { ...CRON_MONITOR_DEFAULTS, ...CRON_MONITORS["audit-log-cleanup"] }
+  )
+);

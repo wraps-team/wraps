@@ -99,6 +99,7 @@ import {
 import {
   captureException,
   captureMessage,
+  withMonitor,
   wrapHandler,
 } from "@sentry/aws-serverless";
 import {
@@ -117,6 +118,7 @@ import type { Handler } from "aws-lambda";
 import { and, eq, exists, gt, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { flushLogger, log } from "../lib/logger";
 import { getCredentials } from "../services/credentials";
+import { CRON_MONITOR_DEFAULTS, CRON_MONITORS } from "./cron-monitors";
 
 const RECENT_SEND_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h
 const EVENT_GRACE_MS = 15 * 60 * 1000; // 15m
@@ -623,219 +625,238 @@ async function alertOwner(account: {
   }
 }
 
-export const handler: Handler = wrapHandler(async () => {
-  log.info("[event-feed-staleness] Starting sweep");
+export const handler: Handler = wrapHandler(async () =>
+  withMonitor(
+    "event-feed-staleness",
+    async () => {
+      log.info("[event-feed-staleness] Starting sweep");
 
-  const now = new Date();
-  const debounceCutoff = new Date(now.getTime() - ALERT_DEBOUNCE_MS);
-  const graceCutoff = new Date(now.getTime() - EVENT_GRACE_MS);
+      const now = new Date();
+      const debounceCutoff = new Date(now.getTime() - ALERT_DEBOUNCE_MS);
+      const graceCutoff = new Date(now.getTime() - EVENT_GRACE_MS);
 
-  const connectedAccounts = await db
-    .select({
-      id: awsAccount.id,
-      organizationId: awsAccount.organizationId,
-      name: awsAccount.name,
-      accountId: awsAccount.accountId,
-      region: awsAccount.region,
-      lastEventReceivedAt: awsAccount.lastEventReceivedAt,
-      eventFeedStaleSince: awsAccount.eventFeedStaleSince,
-      eventFeedAlertedAt: awsAccount.eventFeedAlertedAt,
-    })
-    .from(awsAccount)
-    .where(
-      and(
-        isNotNull(awsAccount.webhookSecret),
-        // Skip orgs whose events the SES webhook is deliberately dropping
-        // (routes/webhooks.ts step 3 — no active subscription). Their
-        // lastEventReceivedAt freezes by design while SES keeps reporting
-        // sends, which is exactly the shape this worker treats as a stalled
-        // feed. Without this, disconnecting an org is immediately followed by
-        // telling them their integration is broken.
-        exists(
-          db
-            .select({ live: sql`1` })
-            .from(subscription)
-            .where(
-              and(
-                eq(subscription.referenceId, awsAccount.organizationId),
-                inArray(subscription.status, ["active", "trialing"])
-              )
+      const connectedAccounts = await db
+        .select({
+          id: awsAccount.id,
+          organizationId: awsAccount.organizationId,
+          name: awsAccount.name,
+          accountId: awsAccount.accountId,
+          region: awsAccount.region,
+          lastEventReceivedAt: awsAccount.lastEventReceivedAt,
+          eventFeedStaleSince: awsAccount.eventFeedStaleSince,
+          eventFeedAlertedAt: awsAccount.eventFeedAlertedAt,
+        })
+        .from(awsAccount)
+        .where(
+          and(
+            isNotNull(awsAccount.webhookSecret),
+            // Skip orgs whose events the SES webhook is deliberately dropping
+            // (routes/webhooks.ts step 3 — no active subscription). Their
+            // lastEventReceivedAt freezes by design while SES keeps reporting
+            // sends, which is exactly the shape this worker treats as a stalled
+            // feed. Without this, disconnecting an org is immediately followed by
+            // telling them their integration is broken.
+            exists(
+              db
+                .select({ live: sql`1` })
+                .from(subscription)
+                .where(
+                  and(
+                    eq(subscription.referenceId, awsAccount.organizationId),
+                    inArray(subscription.status, ["active", "trialing"])
+                  )
+                )
             )
-        )
-      )
-    );
-
-  let flaggedCount = 0;
-  let alertedCount = 0;
-  let recoveredCount = 0;
-  let unflaggedNeverConnectedCount = 0;
-  let totalAcceptedSends = 0;
-  let totalUnacknowledgedSends = 0;
-  let sesProbeCount = 0;
-  let sesFlaggedCount = 0;
-  let sesForeignSkipCount = 0;
-
-  for (const account of connectedAccounts) {
-    // "Stalled" is only a meaningful word for a feed that once worked. An
-    // account whose lastEventReceivedAt has never been set has no regression
-    // to report — there is nothing to compare a stall against, the
-    // dashboard's "no events have ever arrived" banner already tells this
-    // customer the truth, and this state never self-heals on its own (no
-    // event is coming to prove recovery). Alerting it forever would bury the
-    // accounts that genuinely broke. Silence here is deliberate, in the
-    // spirit of account-health.ts's aws.role_unreachable gate.
-    if (account.lastEventReceivedAt === null) {
-      if (account.eventFeedStaleSince !== null) {
-        // A row the pre-plan-194 sweep mis-flagged before this gate existed.
-        // This is a one-time correction, not a "recovery" — it must not be
-        // counted as one — and it restores the accurate never-received
-        // banner (event-feed-banners.tsx's `silent` filter is suppressed by
-        // a non-null eventFeedStaleSince).
-        await clearStaleFlags(account.id);
-        unflaggedNeverConnectedCount++;
-      }
-      log.info("[event-feed-staleness] Never-connected account, skipping", {
-        accountId: account.id,
-        organizationId: account.organizationId,
-      });
-      continue;
-    }
-    const lastEventAt = account.lastEventReceivedAt;
-
-    const {
-      stale: feedStale,
-      total,
-      unacknowledged,
-    } = await hasUnacknowledgedSend(account.organizationId, account.id, now);
-    totalAcceptedSends += total;
-    totalUnacknowledgedSends += unacknowledged;
-
-    // Fallback for SDK/direct-SES senders (plan 195): message_send has no
-    // evidence either way for them until an event materializes its row, so
-    // an account whose feed just broke looks identical here to one with
-    // nothing to send. The gate is `total === 0` — *no evidence* — not
-    // "not stale": an account with accepted sends that all carry a
-    // post-'sent' status has already proved its feed works, and the
-    // account-and-region-wide metric is far too coarse to overturn that. It
-    // used to read `!feedStale`, which let the fallback override a clean
-    // per-message verdict and produced two false alerts on 2026-08-25.
-    // Accounts whose last event is still inside the grace period are
-    // trivially alive and skipped too, so most accounts on most sweeps never
-    // make this call.
-    let sesSendCount: number | null = null;
-    // Logged on the flag below. The 2026-08-25 false alerts were invisible
-    // for want of exactly this: a count with no window beside it cannot be
-    // checked against the send it claims to have missed.
-    let sesWindowStart: Date | null = null;
-    let stale = feedStale;
-    if (total === 0 && lastEventAt < graceCutoff) {
-      const windowStart = ceilToMinute(
-        new Date(
-          Math.max(lastEventAt.getTime(), now.getTime() - SES_METRIC_WINDOW_MS)
-        )
-      );
-      // Rounding up can push the window start past its end when the last
-      // event landed within a minute of the grace cutoff. There is nothing
-      // to observe in a window that has closed, and CloudWatch rejects
-      // StartTime >= EndTime outright.
-      if (windowStart < graceCutoff) {
-        sesWindowStart = windowStart;
-        sesProbeCount++;
-        sesSendCount = await getSesSendCountSince(
-          account,
-          windowStart,
-          graceCutoff
+          )
         );
-        // null means "couldn't check" (no role, no permission) — never treat
-        // it as "sent nothing". Only a count of at least SES_FALLBACK_MIN_SENDS
-        // is evidence of a stall.
-        if (sesSendCount !== null && sesSendCount >= SES_FALLBACK_MIN_SENDS) {
-          // ...and only if those sends were plausibly Wraps' own. The metric
-          // is account-and-region-wide, so on an account that shares SES with
-          // its owner's application it reports that application's traffic and
-          // never stops. Checked here rather than before the probe so the
-          // extra CloudWatch call only happens on the handful of accounts
-          // actually about to be flagged.
-          const attribution = await hasForeignSesTraffic(account, lastEventAt);
-          if (attribution.foreign) {
-            sesForeignSkipCount++;
-            log.info(
-              "[event-feed-staleness] Account-wide SES sends not attributable to Wraps, not flagging",
-              {
-                accountId: account.id,
-                organizationId: account.organizationId,
-                sesSendCount,
-                baselineStart: attribution.baselineStart.toISOString(),
-                baselineEnd: lastEventAt.toISOString(),
-                baselineAccountSends: attribution.baselineAccountSends,
-                baselineWrapsSends: attribution.baselineWrapsSends,
-              }
-            );
-          } else {
-            stale = true;
-            sesFlaggedCount++;
-          }
-        }
-      }
-    }
 
-    if (stale) {
-      if (account.eventFeedStaleSince === null) {
-        await markStaleSince(account.id, now);
-        flaggedCount++;
-        log.info("[event-feed-staleness] Flagged feed as stale", {
-          accountId: account.id,
-          organizationId: account.organizationId,
+      let flaggedCount = 0;
+      let alertedCount = 0;
+      let recoveredCount = 0;
+      let unflaggedNeverConnectedCount = 0;
+      let totalAcceptedSends = 0;
+      let totalUnacknowledgedSends = 0;
+      let sesProbeCount = 0;
+      let sesFlaggedCount = 0;
+      let sesForeignSkipCount = 0;
+
+      for (const account of connectedAccounts) {
+        // "Stalled" is only a meaningful word for a feed that once worked. An
+        // account whose lastEventReceivedAt has never been set has no regression
+        // to report — there is nothing to compare a stall against, the
+        // dashboard's "no events have ever arrived" banner already tells this
+        // customer the truth, and this state never self-heals on its own (no
+        // event is coming to prove recovery). Alerting it forever would bury the
+        // accounts that genuinely broke. Silence here is deliberate, in the
+        // spirit of account-health.ts's aws.role_unreachable gate.
+        if (account.lastEventReceivedAt === null) {
+          if (account.eventFeedStaleSince !== null) {
+            // A row the pre-plan-194 sweep mis-flagged before this gate existed.
+            // This is a one-time correction, not a "recovery" — it must not be
+            // counted as one — and it restores the accurate never-received
+            // banner (event-feed-banners.tsx's `silent` filter is suppressed by
+            // a non-null eventFeedStaleSince).
+            await clearStaleFlags(account.id);
+            unflaggedNeverConnectedCount++;
+          }
+          log.info("[event-feed-staleness] Never-connected account, skipping", {
+            accountId: account.id,
+            organizationId: account.organizationId,
+          });
+          continue;
+        }
+        const lastEventAt = account.lastEventReceivedAt;
+
+        const {
+          stale: feedStale,
           total,
           unacknowledged,
-          sesSendCount,
-          sesWindowStart: sesWindowStart?.toISOString() ?? null,
-          sesWindowEnd: graceCutoff.toISOString(),
-          lastEventAt: lastEventAt.toISOString(),
-        });
-        continue;
+        } = await hasUnacknowledgedSend(
+          account.organizationId,
+          account.id,
+          now
+        );
+        totalAcceptedSends += total;
+        totalUnacknowledgedSends += unacknowledged;
+
+        // Fallback for SDK/direct-SES senders (plan 195): message_send has no
+        // evidence either way for them until an event materializes its row, so
+        // an account whose feed just broke looks identical here to one with
+        // nothing to send. The gate is `total === 0` — *no evidence* — not
+        // "not stale": an account with accepted sends that all carry a
+        // post-'sent' status has already proved its feed works, and the
+        // account-and-region-wide metric is far too coarse to overturn that. It
+        // used to read `!feedStale`, which let the fallback override a clean
+        // per-message verdict and produced two false alerts on 2026-08-25.
+        // Accounts whose last event is still inside the grace period are
+        // trivially alive and skipped too, so most accounts on most sweeps never
+        // make this call.
+        let sesSendCount: number | null = null;
+        // Logged on the flag below. The 2026-08-25 false alerts were invisible
+        // for want of exactly this: a count with no window beside it cannot be
+        // checked against the send it claims to have missed.
+        let sesWindowStart: Date | null = null;
+        let stale = feedStale;
+        if (total === 0 && lastEventAt < graceCutoff) {
+          const windowStart = ceilToMinute(
+            new Date(
+              Math.max(
+                lastEventAt.getTime(),
+                now.getTime() - SES_METRIC_WINDOW_MS
+              )
+            )
+          );
+          // Rounding up can push the window start past its end when the last
+          // event landed within a minute of the grace cutoff. There is nothing
+          // to observe in a window that has closed, and CloudWatch rejects
+          // StartTime >= EndTime outright.
+          if (windowStart < graceCutoff) {
+            sesWindowStart = windowStart;
+            sesProbeCount++;
+            sesSendCount = await getSesSendCountSince(
+              account,
+              windowStart,
+              graceCutoff
+            );
+            // null means "couldn't check" (no role, no permission) — never treat
+            // it as "sent nothing". Only a count of at least SES_FALLBACK_MIN_SENDS
+            // is evidence of a stall.
+            if (
+              sesSendCount !== null &&
+              sesSendCount >= SES_FALLBACK_MIN_SENDS
+            ) {
+              // ...and only if those sends were plausibly Wraps' own. The metric
+              // is account-and-region-wide, so on an account that shares SES with
+              // its owner's application it reports that application's traffic and
+              // never stops. Checked here rather than before the probe so the
+              // extra CloudWatch call only happens on the handful of accounts
+              // actually about to be flagged.
+              const attribution = await hasForeignSesTraffic(
+                account,
+                lastEventAt
+              );
+              if (attribution.foreign) {
+                sesForeignSkipCount++;
+                log.info(
+                  "[event-feed-staleness] Account-wide SES sends not attributable to Wraps, not flagging",
+                  {
+                    accountId: account.id,
+                    organizationId: account.organizationId,
+                    sesSendCount,
+                    baselineStart: attribution.baselineStart.toISOString(),
+                    baselineEnd: lastEventAt.toISOString(),
+                    baselineAccountSends: attribution.baselineAccountSends,
+                    baselineWrapsSends: attribution.baselineWrapsSends,
+                  }
+                );
+              } else {
+                stale = true;
+                sesFlaggedCount++;
+              }
+            }
+          }
+        }
+
+        if (stale) {
+          if (account.eventFeedStaleSince === null) {
+            await markStaleSince(account.id, now);
+            flaggedCount++;
+            log.info("[event-feed-staleness] Flagged feed as stale", {
+              accountId: account.id,
+              organizationId: account.organizationId,
+              total,
+              unacknowledged,
+              sesSendCount,
+              sesWindowStart: sesWindowStart?.toISOString() ?? null,
+              sesWindowEnd: graceCutoff.toISOString(),
+              lastEventAt: lastEventAt.toISOString(),
+            });
+            continue;
+          }
+
+          const debounced = account.eventFeedStaleSince < debounceCutoff;
+          if (debounced && account.eventFeedAlertedAt === null) {
+            await alertOwner({
+              id: account.id,
+              organizationId: account.organizationId,
+              name: account.name,
+              accountId: account.accountId,
+              region: account.region,
+              lastEventAt,
+              observedSendCount: sesSendCount ?? undefined,
+            });
+            alertedCount++;
+          }
+        } else if (
+          account.eventFeedStaleSince !== null &&
+          lastEventAt > account.eventFeedStaleSince
+        ) {
+          // An event landed after the flag was raised — the feed is genuinely
+          // back. Without this check an account that simply stopped sending
+          // would also stop looking stale and clear its own alert.
+          await clearStaleFlags(account.id);
+          recoveredCount++;
+          log.info("[event-feed-staleness] Event feed recovered", {
+            accountId: account.id,
+            organizationId: account.organizationId,
+          });
+        }
       }
 
-      const debounced = account.eventFeedStaleSince < debounceCutoff;
-      if (debounced && account.eventFeedAlertedAt === null) {
-        await alertOwner({
-          id: account.id,
-          organizationId: account.organizationId,
-          name: account.name,
-          accountId: account.accountId,
-          region: account.region,
-          lastEventAt,
-          observedSendCount: sesSendCount ?? undefined,
-        });
-        alertedCount++;
-      }
-    } else if (
-      account.eventFeedStaleSince !== null &&
-      lastEventAt > account.eventFeedStaleSince
-    ) {
-      // An event landed after the flag was raised — the feed is genuinely
-      // back. Without this check an account that simply stopped sending
-      // would also stop looking stale and clear its own alert.
-      await clearStaleFlags(account.id);
-      recoveredCount++;
-      log.info("[event-feed-staleness] Event feed recovered", {
-        accountId: account.id,
-        organizationId: account.organizationId,
+      log.info("[event-feed-staleness] Sweep complete", {
+        accountsChecked: connectedAccounts.length,
+        flaggedCount,
+        alertedCount,
+        recoveredCount,
+        unflaggedNeverConnectedCount,
+        totalAcceptedSends,
+        totalUnacknowledgedSends,
+        sesProbeCount,
+        sesFlaggedCount,
+        sesForeignSkipCount,
       });
-    }
-  }
-
-  log.info("[event-feed-staleness] Sweep complete", {
-    accountsChecked: connectedAccounts.length,
-    flaggedCount,
-    alertedCount,
-    recoveredCount,
-    unflaggedNeverConnectedCount,
-    totalAcceptedSends,
-    totalUnacknowledgedSends,
-    sesProbeCount,
-    sesFlaggedCount,
-    sesForeignSkipCount,
-  });
-  await flushLogger();
-});
+      await flushLogger();
+    },
+    { ...CRON_MONITOR_DEFAULTS, ...CRON_MONITORS["event-feed-staleness"] }
+  )
+);

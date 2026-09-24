@@ -67,6 +67,7 @@ vi.mock("@sentry/aws-serverless", () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
   captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
   wrapHandler: (handler: unknown) => handler,
+  withMonitor: (_slug: string, fn: () => unknown) => fn(),
 }));
 
 vi.mock("../lib/sentry", () => ({}));

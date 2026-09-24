@@ -19,11 +19,19 @@
 // Initialize Sentry before all other imports
 import "../../lib/sentry";
 
-import { captureException, wrapHandler } from "@sentry/aws-serverless";
+import {
+  captureException,
+  withMonitor,
+  wrapHandler,
+} from "@sentry/aws-serverless";
 import { db, workflowExecution } from "@wraps/db";
 import type { Handler } from "aws-lambda";
 import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
 import { flushLogger, log } from "../../lib/logger";
+import {
+  CRON_MONITOR_DEFAULTS,
+  CRON_MONITORS,
+} from "../../workers/cron-monitors";
 import { failExecution } from "./workflow-processor";
 
 // Type alias for the DB instance accepted by runReaper (testable without Lambda env)
@@ -191,6 +199,12 @@ export async function runReaper(db: DrizzleDB): Promise<void> {
 /**
  * Lambda entry point — calls runReaper with the real DB instance.
  */
-export const handler: Handler = wrapHandler(async () => {
-  await runReaper(db);
-});
+export const handler: Handler = wrapHandler(async () =>
+  withMonitor(
+    "workflow-reaper",
+    async () => {
+      await runReaper(db);
+    },
+    { ...CRON_MONITOR_DEFAULTS, ...CRON_MONITORS["workflow-reaper"] }
+  )
+);

@@ -7,7 +7,13 @@
 
 import { apiHandler } from "./api";
 import { marketplaceDlq } from "./marketplace";
-import { batchDlq, batchQueue, workflowDlq } from "./queues";
+import {
+  batchDlq,
+  batchQueue,
+  batchSenderSubscription,
+  workflowDlq,
+  workflowQueue,
+} from "./queues";
 
 // SNS topic for alarm notifications
 export const alertsTopic = new aws.sns.Topic("AlertsTopic", {
@@ -115,6 +121,62 @@ new aws.cloudwatch.MetricAlarm("BatchQueueAgeAlarm", {
   period: 60,
   evaluationPeriods: 3,
   threshold: 900, // 15 minutes
+  comparisonOperator: "GreaterThanOrEqualToThreshold",
+  treatMissingData: "notBreaching",
+  alarmActions: [alertsTopic.arn],
+  okActions: [alertsTopic.arn],
+  tags: {
+    ManagedBy: "sst",
+    Service: "wraps-api",
+  },
+});
+
+// Alarm: workflow messages sitting too long on the main queue. Only the batch
+// queue had an age alarm — a stalled workflow processor (the SQS-triggered
+// consumer of workflowQueue) went undetected until executions backed up badly
+// enough to surface elsewhere.
+new aws.cloudwatch.MetricAlarm("WorkflowQueueAgeAlarm", {
+  name: $interpolate`wraps-workflow-queue-age-${$app.stage}`,
+  alarmDescription:
+    "Oldest workflow message ≥ 15 minutes — processor likely stalled",
+  namespace: "AWS/SQS",
+  metricName: "ApproximateAgeOfOldestMessage",
+  dimensions: {
+    QueueName: workflowQueue.nodes.queue.name,
+  },
+  statistic: "Maximum",
+  period: 60,
+  evaluationPeriods: 3,
+  threshold: 900, // 15 minutes
+  comparisonOperator: "GreaterThanOrEqualToThreshold",
+  treatMissingData: "notBreaching",
+  alarmActions: [alertsTopic.arn],
+  okActions: [alertsTopic.arn],
+  tags: {
+    ManagedBy: "sst",
+    Service: "wraps-api",
+  },
+});
+
+// Alarm: Lambda's recursive-loop detection stopped the batch sender's
+// self-invocation chain and dropped an invocation. infra/queues.ts's
+// FunctionRecursionConfig explains why this matters: before it existed, AWS
+// silently cut every broadcast at 800 recipients this way, and destroying the
+// recursion config would bring that back. This metric is the only evidence a
+// drop ever produces.
+new aws.cloudwatch.MetricAlarm("BatchSenderRecursionDroppedAlarm", {
+  name: $interpolate`wraps-batch-recursion-dropped-${$app.stage}`,
+  alarmDescription:
+    "The batch sender's recursive self-invocation was dropped — a broadcast may have been cut short",
+  namespace: "AWS/Lambda",
+  metricName: "RecursiveInvocationsDropped",
+  dimensions: {
+    FunctionName: batchSenderSubscription.nodes.function.name,
+  },
+  statistic: "Sum",
+  period: 300,
+  evaluationPeriods: 1,
+  threshold: 1,
   comparisonOperator: "GreaterThanOrEqualToThreshold",
   treatMissingData: "notBreaching",
   alarmActions: [alertsTopic.arn],

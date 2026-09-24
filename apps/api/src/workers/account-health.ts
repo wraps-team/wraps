@@ -50,6 +50,7 @@ import {
 import {
   captureException,
   captureMessage,
+  withMonitor,
   wrapHandler,
 } from "@sentry/aws-serverless";
 import {
@@ -70,6 +71,7 @@ import { flushLogger, log } from "../lib/logger";
 import { isRoleAccessError } from "../lib/role-access-error";
 import { classifySesHealth, SES_THRESHOLDS } from "../lib/ses-health.js";
 import { type AwsCredentials, getCredentials } from "../services/credentials";
+import { CRON_MONITOR_DEFAULTS, CRON_MONITORS } from "./cron-monitors";
 
 // Once per day per account — but only for an account whose role is already
 // current. See the probe block in checkAccount for why a behind account is
@@ -529,55 +531,61 @@ async function checkAccount(account: AccountRow): Promise<void> {
     );
 }
 
-export const handler: Handler = wrapHandler(async () => {
-  log.info("[account-health] Starting sweep");
+export const handler: Handler = wrapHandler(async () =>
+  withMonitor(
+    "account-health",
+    async () => {
+      log.info("[account-health] Starting sweep");
 
-  // biome-ignore lint/plugin: privileged system Lambda; sweeps every org's AWS accounts by design (SES health check).
-  const accounts = await db
-    .select({
-      id: awsAccount.id,
-      organizationId: awsAccount.organizationId,
-      name: awsAccount.name,
-      accountId: awsAccount.accountId,
-      region: awsAccount.region,
-      features: awsAccount.features,
-      roleLastReachableAt: awsAccount.roleLastReachableAt,
-      consolePolicyVersion: awsAccount.consolePolicyVersion,
-      consolePolicyCheckedAt: awsAccount.consolePolicyCheckedAt,
-    })
-    .from(awsAccount)
-    .where(isNotNull(awsAccount.webhookSecret));
+      // biome-ignore lint/plugin: privileged system Lambda; sweeps every org's AWS accounts by design (SES health check).
+      const accounts = await db
+        .select({
+          id: awsAccount.id,
+          organizationId: awsAccount.organizationId,
+          name: awsAccount.name,
+          accountId: awsAccount.accountId,
+          region: awsAccount.region,
+          features: awsAccount.features,
+          roleLastReachableAt: awsAccount.roleLastReachableAt,
+          consolePolicyVersion: awsAccount.consolePolicyVersion,
+          consolePolicyCheckedAt: awsAccount.consolePolicyCheckedAt,
+        })
+        .from(awsAccount)
+        .where(isNotNull(awsAccount.webhookSecret));
 
-  let checkedCount = 0;
-  let errorCount = 0;
+      let checkedCount = 0;
+      let errorCount = 0;
 
-  for (const account of accounts) {
-    try {
-      await checkAccount(account);
-      checkedCount++;
-    } catch (error) {
-      errorCount++;
-      // Skipped by design so one broken role cannot abort the sweep — which
-      // also means an account whose role has drifted stops being health-checked
-      // indefinitely without anything surfacing it.
-      captureException(error, {
-        tags: { worker: "account-health", stage: "check-account" },
-        extra: {
-          accountId: account.id,
-          organizationId: account.organizationId,
-        },
+      for (const account of accounts) {
+        try {
+          await checkAccount(account);
+          checkedCount++;
+        } catch (error) {
+          errorCount++;
+          // Skipped by design so one broken role cannot abort the sweep — which
+          // also means an account whose role has drifted stops being health-checked
+          // indefinitely without anything surfacing it.
+          captureException(error, {
+            tags: { worker: "account-health", stage: "check-account" },
+            extra: {
+              accountId: account.id,
+              organizationId: account.organizationId,
+            },
+          });
+          log.error("[account-health] Account check failed", error, {
+            accountId: account.id,
+            organizationId: account.organizationId,
+          });
+        }
+      }
+
+      log.info("[account-health] Sweep complete", {
+        accountsTotal: accounts.length,
+        checkedCount,
+        errorCount,
       });
-      log.error("[account-health] Account check failed", error, {
-        accountId: account.id,
-        organizationId: account.organizationId,
-      });
-    }
-  }
-
-  log.info("[account-health] Sweep complete", {
-    accountsTotal: accounts.length,
-    checkedCount,
-    errorCount,
-  });
-  await flushLogger();
-});
+      await flushLogger();
+    },
+    { ...CRON_MONITOR_DEFAULTS, ...CRON_MONITORS["account-health"] }
+  )
+);
