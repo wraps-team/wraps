@@ -16,6 +16,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { querySMSEvents } from "@/lib/aws/sms-voice";
+import { logger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkHasAwsAccounts } from "@/lib/setup-status";
 import { SMSTable } from "./components/sms-table";
@@ -97,14 +98,15 @@ async function fetchSMSMessages(
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          console.error(
-            `[fetchSMSMessages] Failed to fetch SMS for account ${account.id} (${account.accountId}):`,
+          logger.warn(
             {
+              accountId: account.id,
+              awsAccountId: account.accountId,
               error: errorMessage,
-              roleArn: account.roleArn,
               region: account.region,
               hasExternalId: !!account.externalId,
-            }
+            },
+            "fetchSMSMessages: failed to fetch SMS for account"
           );
           return [];
         }
@@ -162,7 +164,7 @@ async function fetchSMSMessages(
 
     return messages;
   } catch (error) {
-    console.error("[fetchSMSMessages] Error fetching SMS:", error);
+    logger.error({ err: error }, "fetchSMSMessages failed");
     return [];
   }
 }

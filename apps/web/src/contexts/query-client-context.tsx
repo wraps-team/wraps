@@ -2,6 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import {
+  MutationCache,
   QueryCache,
   QueryClient,
   QueryClientProvider,
@@ -22,6 +23,16 @@ export function QueryProvider({ children }: { children: ReactNode }) {
             Sentry.captureException(error, {
               tags: { source: "react-query" },
               extra: { queryHash: query.queryHash },
+            });
+          },
+        }),
+        // Mutations have their own cache; without this a failed useMutation is
+        // only ever a toast.
+        mutationCache: new MutationCache({
+          onError: (error, _variables, _onMutateResult, mutation) => {
+            Sentry.captureException(error, {
+              tags: { source: "react-query-mutation" },
+              extra: { mutationKey: mutation.options.mutationKey },
             });
           },
         }),

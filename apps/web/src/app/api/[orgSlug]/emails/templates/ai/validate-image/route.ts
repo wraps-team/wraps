@@ -2,6 +2,7 @@ import { auth } from "@wraps/auth";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireRoutePermission } from "@/app/api/shared/route-permission";
+import { logger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { validatePublicUrl } from "@/lib/ssrf-guard";
 
@@ -130,7 +131,8 @@ export async function POST(request: Request, context: RouteContext) {
         error: "Failed to reach the image URL",
       });
     }
-  } catch {
+  } catch (error) {
+    logger.error({ err: error }, "validate-image failed");
     return NextResponse.json(
       { valid: false, error: "Failed to validate image" },
       { status: 500 }

@@ -16,6 +16,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { listInboundEmails } from "@/lib/aws/s3-inbound";
+import { logger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { InboundAnalytics } from "./components/inbound-analytics";
 import { InboundEmailsTable } from "./components/inbound-emails-table";
@@ -72,9 +73,13 @@ async function fetchInboundEmails(
             accountId: account.id,
           }));
         } catch (error) {
-          console.error(
-            `[fetchInboundEmails] Failed for account ${account.id}:`,
-            error instanceof Error ? error.message : error
+          logger.warn(
+            {
+              accountId: account.id,
+              awsAccountId: account.accountId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "fetchInboundEmails: failed for account"
           );
           return [];
         }
@@ -91,7 +96,7 @@ async function fetchInboundEmails(
       hasInbound: true,
     };
   } catch (error) {
-    console.error("[fetchInboundEmails] Error:", error);
+    logger.error({ err: error }, "fetchInboundEmails failed");
     return { emails: [], hasInbound: false };
   }
 }

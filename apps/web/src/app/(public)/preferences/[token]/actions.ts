@@ -13,6 +13,7 @@ import { determineSubscriptionStatus } from "@wraps/email";
 import { and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auditLogEntry, getAuditContext } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 import { maskPhone, SMS_CONSENT_TEXT } from "@/lib/sms-consent";
 import { orgCanSendSms } from "@/lib/sms-consent.server";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe-token";
@@ -49,7 +50,10 @@ async function emitPreferenceEvents(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, contactId, organizationId, changes }),
   }).catch((err) => {
-    console.error("[PREFERENCES] Failed to emit workflow events:", err);
+    logger.error(
+      { err, flow: "preferences", op: "emit-workflow-events" },
+      "Failed to emit workflow events"
+    );
   });
 }
 
@@ -339,7 +343,16 @@ export async function updatePreferences(
       pendingTopics: pendingTopics.length > 0 ? pendingTopics : undefined,
     };
   } catch (error) {
-    console.error("[PREFERENCES] Error updating preferences:", error);
+    logger.error(
+      {
+        err: error,
+        flow: "preferences",
+        op: "update",
+        contactId,
+        organizationId,
+      },
+      "Error updating preferences"
+    );
     return { success: false, error: "Failed to update preferences" };
   }
 }
@@ -410,7 +423,16 @@ export async function unsubscribeGlobally(
     revalidatePath(`/preferences/${token}`);
     return { success: true };
   } catch (error) {
-    console.error("[PREFERENCES] Error unsubscribing globally:", error);
+    logger.error(
+      {
+        err: error,
+        flow: "preferences",
+        op: "unsubscribe-global",
+        contactId,
+        organizationId,
+      },
+      "Error unsubscribing globally"
+    );
     return { success: false, error: "Failed to unsubscribe" };
   }
 }
@@ -502,7 +524,16 @@ export async function resendConfirmation(
 
     return { success: true };
   } catch (error) {
-    console.error("[PREFERENCES] Error resending confirmation:", error);
+    logger.error(
+      {
+        err: error,
+        flow: "preferences",
+        op: "resend-confirmation",
+        contactId,
+        organizationId,
+      },
+      "Error resending confirmation"
+    );
     return { success: false, error: "Failed to resend confirmation" };
   }
 }

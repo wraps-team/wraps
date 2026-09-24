@@ -5,6 +5,7 @@ import type {
   WorkflowStepType,
   WorkflowTransition,
 } from "@wraps/db";
+import { logger } from "@/lib/logger";
 
 /**
  * Valid step types that the AI can generate
@@ -94,7 +95,10 @@ export function extractWorkflowFromMessage(
 
     return { steps, transitions };
   } catch (error) {
-    console.error("[workflow-parser] Failed to parse AI response:", error);
+    logger.warn(
+      { error: String(error) },
+      "workflow parser could not parse AI response"
+    );
     return null;
   }
 }

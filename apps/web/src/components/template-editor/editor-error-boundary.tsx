@@ -1,5 +1,6 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { AlertTriangle, RefreshCw, RotateCcw } from "lucide-react";
 import { Component, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,10 @@ export class EditorErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    console.error("Template editor error:", error, errorInfo);
+    Sentry.captureException(error, {
+      tags: { source: "template-editor" },
+      extra: { componentStack: errorInfo.componentStack },
+    });
     this.setState({ errorInfo });
   }
 
