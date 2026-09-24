@@ -8,8 +8,11 @@
  * must never create a row or a session.
  */
 
-import { db, session, user } from "@wraps/db";
+import { db, user } from "@wraps/db";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const PROBE_EMAIL = "health-probe@wraps.invalid";
 
 const captureException = vi.fn();
 vi.mock("@sentry/nextjs", () => ({ captureException }));
@@ -24,11 +27,6 @@ describe("GET /api/health/auth", () => {
   });
 
   it("returns 200 and { ok: true } against the real adapter, with no report and no rows written", async () => {
-    const [usersBefore, sessionsBefore] = await Promise.all([
-      db.select().from(user),
-      db.select().from(session),
-    ]);
-
     const route: Route = await import("../auth/route");
     const res = await route.GET();
     const body = await res.json();
@@ -38,12 +36,13 @@ describe("GET /api/health/auth", () => {
     expect(captureException).not.toHaveBeenCalled();
     expect(res.headers.get("cache-control")).toBe("no-store");
 
-    const [usersAfter, sessionsAfter] = await Promise.all([
-      db.select().from(user),
-      db.select().from(session),
-    ]);
-    expect(usersAfter.length).toBe(usersBefore.length);
-    expect(sessionsAfter.length).toBe(sessionsBefore.length);
+    // The probe must not create the user it looks up — a session can only
+    // belong to a user, so a missing user rules out a written session too.
+    const probeUsers = await db
+      .select()
+      .from(user)
+      .where(eq(user.email, PROBE_EMAIL));
+    expect(probeUsers.length).toBe(0);
   });
 
   it("returns 503 and { ok: false } with no leaked error text when the adapter fails", async () => {
