@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/nextjs";
 import { db, eq, notifyOrg } from "@wraps/db";
 import * as schema from "@wraps/db/schema/auth";
 import { getWrapsClient } from "@wraps/email";
@@ -12,7 +13,13 @@ const structuredError = (
   msg: string,
   error?: unknown,
   data?: Record<string, unknown>
-) => console.error(JSON.stringify({ msg, error: String(error), ...data }));
+) => {
+  console.error(JSON.stringify({ msg, error: String(error), ...data }));
+  captureException(error instanceof Error ? error : new Error(msg), {
+    tags: { feature: "stripe-webhook" },
+    extra: { msg, ...data },
+  });
+};
 
 // PostHog client for subscription tracking (lazy singleton)
 let posthogClient: PostHog | null = null;
@@ -93,7 +100,9 @@ export async function emitSubscriptionEvent(
     });
 
     if (error) {
-      console.error(`Failed to emit ${eventName} event:`, error);
+      structuredError(`Failed to emit ${eventName} event`, error, {
+        eventName,
+      });
       return false;
     }
 
@@ -107,7 +116,7 @@ export async function emitSubscriptionEvent(
     });
     return true;
   } catch (err) {
-    console.error(`Error emitting ${eventName} event:`, err);
+    structuredError(`Error emitting ${eventName} event`, err, { eventName });
     return false;
   }
 }
@@ -268,9 +277,10 @@ export async function handlePaymentFailed(
       });
       notifiedCount++;
     } catch (emailError) {
-      console.error(
-        `Failed to send payment failed email to ${admin.user.email}:`,
-        emailError
+      structuredError(
+        "Failed to send payment failed email to org admin",
+        emailError,
+        { organizationId: org.id }
       );
       const posthog = getPostHogClient();
       posthog?.captureException(
@@ -323,15 +333,19 @@ export async function handleCheckoutCompleted(
   } = await getSubscriptionOrgAdmins({ stripeCustomerId: customerId });
 
   if (!sub) {
-    console.error(
-      `Checkout completed webhook: No subscription found for customer ${customerId}`
+    structuredError(
+      "Checkout completed webhook: No subscription found for customer",
+      undefined,
+      { customerId }
     );
     return { success: false, eventsEmitted: 0 };
   }
 
   if (!org) {
-    console.error(
-      `Checkout completed webhook: No organization found for ${sub.referenceId}`
+    structuredError(
+      "Checkout completed webhook: No organization found",
+      undefined,
+      { referenceId: sub.referenceId }
     );
     return { success: false, eventsEmitted: 0 };
   }
@@ -353,7 +367,9 @@ export async function handleCheckoutCompleted(
         stripeSubscription.items.data[0]?.price.recurring?.interval;
       isAnnual = interval === "year";
     } catch (err) {
-      console.error("Failed to fetch subscription from Stripe:", err);
+      structuredError("Failed to fetch subscription from Stripe", err, {
+        stripeSubscriptionId,
+      });
       const posthog = getPostHogClient();
       posthog?.captureException(
         err instanceof Error ? err : new Error(String(err)),
@@ -449,15 +465,19 @@ export async function handleSubscriptionDeleted(
   });
 
   if (!sub) {
-    console.error(
-      `Subscription deleted webhook: No subscription found for ${subscription.id}`
+    structuredError(
+      "Subscription deleted webhook: No subscription found",
+      undefined,
+      { stripeSubscriptionId: subscription.id }
     );
     return { success: false, eventsEmitted: 0 };
   }
 
   if (!org) {
-    console.error(
-      `Subscription deleted webhook: No organization found for ${sub.referenceId}`
+    structuredError(
+      "Subscription deleted webhook: No organization found",
+      undefined,
+      { referenceId: sub.referenceId }
     );
     return { success: false, eventsEmitted: 0 };
   }
@@ -540,15 +560,19 @@ export async function handleSubscriptionUpdated(
   });
 
   if (!sub) {
-    console.error(
-      `Subscription updated webhook: No subscription found for ${subscription.id}`
+    structuredError(
+      "Subscription updated webhook: No subscription found",
+      undefined,
+      { stripeSubscriptionId: subscription.id }
     );
     return { success: false, eventsEmitted: 0, changeType: null };
   }
 
   if (!org) {
-    console.error(
-      `Subscription updated webhook: No organization found for ${sub.referenceId}`
+    structuredError(
+      "Subscription updated webhook: No organization found",
+      undefined,
+      { referenceId: sub.referenceId }
     );
     return { success: false, eventsEmitted: 0, changeType: null };
   }
@@ -702,7 +726,9 @@ export async function onStripeEvent(event: Stripe.Event): Promise<void> {
   try {
     await handleStripeWebhook(event);
   } catch (error) {
-    console.error("Stripe webhook handler error:", error);
+    structuredError("Stripe webhook handler error", error, {
+      eventType: event.type,
+    });
     throw error;
   }
 }

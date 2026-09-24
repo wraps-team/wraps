@@ -386,10 +386,16 @@ export default function SignUpForm({
                 onClick={async () => {
                   setIsGoogleLoading(true);
                   try {
-                    await authClient.signIn.social({
+                    const { error } = await authClient.signIn.social({
                       provider: "google",
                       callbackURL: callbackUrl,
                     });
+                    if (error) {
+                      toast.error(
+                        error.message || "Failed to sign up with Google"
+                      );
+                      setIsGoogleLoading(false);
+                    }
                   } catch (error: any) {
                     console.error("Google sign-up error:", error);
                     toast.error(
@@ -429,10 +435,16 @@ export default function SignUpForm({
                 onClick={async () => {
                   setIsGitHubLoading(true);
                   try {
-                    await authClient.signIn.social({
+                    const { error } = await authClient.signIn.social({
                       provider: "github",
                       callbackURL: callbackUrl,
                     });
+                    if (error) {
+                      toast.error(
+                        error.message || "Failed to sign up with GitHub"
+                      );
+                      setIsGitHubLoading(false);
+                    }
                   } catch (error: any) {
                     console.error("GitHub sign-up error:", error);
                     toast.error(

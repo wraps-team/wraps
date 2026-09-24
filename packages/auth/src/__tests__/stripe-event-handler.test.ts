@@ -71,8 +71,7 @@ describe("onStripeEvent", () => {
 
     await expect(onStripeEvent(event)).rejects.toThrow();
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Stripe webhook"),
-      expect.any(Error)
+      expect.stringContaining("Stripe webhook")
     );
 
     consoleSpy.mockRestore();

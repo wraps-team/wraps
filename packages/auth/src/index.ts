@@ -12,7 +12,7 @@ import { wraps as wrapsContactSync } from "@wraps.dev/better-auth";
 import { createPlatformClient } from "@wraps.dev/client";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError } from "better-auth/api";
+import { APIError, isAPIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import {
   admin,
@@ -147,7 +147,7 @@ async function trackUserDeleted(user: { email: string; name: string | null }) {
       await posthog.flush();
     }
   } catch (err) {
-    console.error("Error tracking user.deleted event:", err);
+    reportAuthSideEffectFailure("user-deleted-tracking", err);
   }
 }
 
@@ -205,7 +205,7 @@ async function trackPostHogSignup(
 
     await posthog.flush();
   } catch (err) {
-    console.error("Error tracking PostHog signup:", err);
+    reportAuthSideEffectFailure("posthog-signup-tracking", err);
   }
 }
 
@@ -244,7 +244,7 @@ async function isNewDeviceOrIp(
 
     return Boolean(isNewIp || isNewAgent);
   } catch (error) {
-    console.error("Error checking for new device/IP:", error);
+    reportAuthSideEffectFailure("new-device-check", error);
     return false;
   }
 }
@@ -626,6 +626,17 @@ export function logAuthEvent(
   });
 }
 
+/** A failed auth side effect (email, tracking, alert) — logged and reported. */
+export function reportAuthSideEffectFailure(
+  operation: string,
+  error: unknown
+): void {
+  console.error(`[auth] ${operation} failed:`, error);
+  captureException(error instanceof Error ? error : new Error(String(error)), {
+    tags: { feature: "better-auth", operation },
+  });
+}
+
 export const auth = betterAuth<BetterAuthOptions>({
   baseURL: process.env.BETTER_AUTH_URL,
   logger: { log: logAuthEvent },
@@ -685,6 +696,20 @@ export const auth = betterAuth<BetterAuthOptions>({
   // codes raw.
   onAPIError: {
     errorURL: "/auth",
+    // Setting onError replaces better-auth's own logging (router onError in
+    // better-auth/dist/api/index.mjs), so this must log as well as report.
+    // Its value over logAuthEvent: the schema-mismatch branch there logs only
+    // e.message, so the stack of the exact bug class that caused the
+    // 2026-09 signup outage was lost.
+    onError: (error) => {
+      if (isAPIError(error) && error.status !== "INTERNAL_SERVER_ERROR") {
+        return;
+      }
+      console.error("[better-auth] API error", error);
+      captureException(error, {
+        tags: { feature: "better-auth", source: "onAPIError" },
+      });
+    },
   },
   session: {
     cookieCache: {
@@ -726,7 +751,7 @@ export const auth = betterAuth<BetterAuthOptions>({
           },
         });
       } catch (error) {
-        console.error("Error sending password reset email:", error);
+        reportAuthSideEffectFailure("password-reset-email", error);
       }
     },
     onPasswordReset: async ({ user }) => {
@@ -743,7 +768,7 @@ export const auth = betterAuth<BetterAuthOptions>({
           },
         });
       } catch (error) {
-        console.error("Error sending password changed email:", error);
+        reportAuthSideEffectFailure("password-changed-email", error);
       }
     },
   },
@@ -783,7 +808,7 @@ export const auth = betterAuth<BetterAuthOptions>({
         source: "web",
       }),
       onError: (error, { stage }) =>
-        console.error(`Wraps contact sync failed (${stage}):`, error),
+        reportAuthSideEffectFailure(`contact-sync:${stage}`, error),
     }),
     lastLoginMethod({
       storeInDatabase: true,
@@ -930,7 +955,7 @@ export const auth = betterAuth<BetterAuthOptions>({
               attribution
             );
           } catch (error) {
-            console.error("Error in user create tracking hook:", error);
+            reportAuthSideEffectFailure("user-create-hook", error);
           }
         },
       },
@@ -1009,7 +1034,7 @@ export const auth = betterAuth<BetterAuthOptions>({
               await writeLoginAuditLogs(session.userId, session.id, user.email);
             }
           } catch (error) {
-            console.error("Error in login alert hook:", error);
+            reportAuthSideEffectFailure("login-alert-hook", error);
           }
         },
       },

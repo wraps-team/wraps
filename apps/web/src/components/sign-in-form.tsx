@@ -411,10 +411,16 @@ export default function SignInForm({
                       method: "google",
                     });
 
-                    await authClient.signIn.social({
+                    const { error } = await authClient.signIn.social({
                       provider: "google",
                       callbackURL: redirectTo,
                     });
+                    if (error) {
+                      toast.error(
+                        error.message || "Failed to sign in with Google"
+                      );
+                      setIsGoogleLoading(false);
+                    }
                   } catch (error: any) {
                     console.error("Google sign-in error:", error);
                     toast.error(
@@ -466,10 +472,16 @@ export default function SignInForm({
                       method: "github",
                     });
 
-                    await authClient.signIn.social({
+                    const { error } = await authClient.signIn.social({
                       provider: "github",
                       callbackURL: redirectTo,
                     });
+                    if (error) {
+                      toast.error(
+                        error.message || "Failed to sign in with GitHub"
+                      );
+                      setIsGitHubLoading(false);
+                    }
                   } catch (error: any) {
                     console.error("GitHub sign-in error:", error);
                     toast.error(
