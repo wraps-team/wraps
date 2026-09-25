@@ -120,6 +120,25 @@ disambiguation is which repo you are standing in, not the tag text.
 11. **Verify it actually landed** — do not trust a green workflow alone:
     - npm: `npm view <pkg> version dist-tags --json`
     - PyPI: `uv pip index versions wraps-email` or check the project page
+    - `mcp` only: the official MCP Registry, which `publish.yml` updates after npm.
+      Check that `https://registry.modelcontextprotocol.io/v0/servers?search=dev.wraps/email`
+      lists the new version with `isLatest: true`.
+12. **`mcp` only: cut the Glama release by hand.** Glama's Auto-Release is **off on
+    purpose**. It fires on *every* GitHub release in wraps-js, so an `email-v*`,
+    `sms-v*` or `client-v*` release would publish a mislabeled MCP release. Glama has
+    no tag filter and no write API, so the release is cut by hand, in a browser
+    signed in to Glama as `stewartjarod`:
+    1. `glama.ai/mcp/servers/wraps-team/wraps-js/admin/repository`: click **Sync
+       Server** and wait until "Last known commit" shows the release commit. Glama
+       rejects a pinned SHA it has not synced ("Commit not found").
+    2. `.../admin/dockerfile`: click **Build**, not Build & Release, and wait for
+       status `success`. Leave the build spec alone. It is Glama's own template,
+       not the repo `Dockerfile`: build steps `pnpm install --frozen-lockfile
+       --filter '@wraps.dev/mcp...'` and `pnpm --filter '@wraps.dev/mcp...' build`,
+       CMD `node packages/mcp/dist/index.js`.
+    3. On that build test's page, click **Create Release** and enter the **npm
+       version** (it defaults to `0.1.0`). The GitHub release notes are fine as
+       the changelog.
 
 ## Pre-flight checks
 
@@ -175,3 +194,4 @@ Append the suffix to both version and tag: `cli-v2.10.0-beta.1`.
 - NEVER release with failing checks
 - NEVER guess when the user says `email` — ask which repo
 - ALWAYS confirm before pushing a local main that is ahead of origin
+- NEVER turn Glama Auto-Release back on for wraps-js (it cannot tell `mcp-v*` from the other packages' releases)
