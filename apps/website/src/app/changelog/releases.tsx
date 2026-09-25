@@ -113,6 +113,43 @@ export const Code = ({ children }: { children: ReactNode }) => (
 
 export const releases: Release[] = [
   {
+    slug: "custom-headers-on-send",
+    versions: ["Email SDK v0.14.0"],
+    date: "2026-09-25",
+    icon: Send,
+    title: "Custom headers on send",
+    tags: ["sdk"],
+    summary:
+      "Set message headers on send(), including the one-click unsubscribe Gmail and Yahoo require of bulk senders.",
+    items: [
+      <>
+        Pass a <Code>headers</Code> map to <Code>send()</Code> in{" "}
+        <Code>@wraps.dev/email</Code> or <Code>@wraps.dev/email/workers</Code>.
+        Set <Code>List-Unsubscribe</Code> to your unsubscribe URL and{" "}
+        <Code>List-Unsubscribe-Post</Code> to{" "}
+        <Code>List-Unsubscribe=One-Click</Code> to get the unsubscribe button in
+        Gmail and Yahoo
+      </>,
+      <>
+        Your unsubscribe URL must accept an HTTPS POST and unsubscribe without a
+        confirmation page. Mail clients POST to it and link scanners only GET
+        it, so a GET should not unsubscribe anyone
+      </>,
+      <>
+        Headers are checked before anything is sent. Reserved names such as{" "}
+        <Code>From</Code>, <Code>To</Code>, <Code>Subject</Code> and{" "}
+        <Code>Reply-To</Code> throw a <Code>ValidationError</Code>, and so do
+        values with line breaks or over SES&rsquo;s length limits
+      </>,
+      <>
+        On Node, a send with headers goes out through <Code>SendRawEmail</Code>.
+        Roles deployed by Wraps already allow it. If you send with your own IAM
+        policy, add <Code>ses:SendRawEmail</Code>
+      </>,
+    ],
+    docs: "/docs/sdk-reference",
+  },
+  {
     slug: "editable-agent-send-policy",
     versions: ["CLI v3.12.0"],
     date: "2026-09-24",
