@@ -90,6 +90,7 @@ export const getOrganizationWithDashboardData = cache(
             // AWS account is not going live, getting out of the SES sandbox is.
             features: true,
             isVerified: true,
+            region: true,
           },
         },
       },

@@ -60,6 +60,27 @@ function resolveProductionAccessRequest(
   return null;
 }
 
+/**
+ * Region of the account `resolveSandboxStatus` read from, with the same
+ * verified-account-first ordering and stop condition. `null` when no
+ * account qualifies.
+ */
+function resolveSandboxRegion(
+  accounts: Array<{ features: unknown; isVerified: boolean; region: string }>
+): string | null {
+  const ordered = [
+    ...accounts.filter((a) => a.isVerified),
+    ...accounts.filter((a) => !a.isVerified),
+  ];
+  for (const account of ordered) {
+    const value = (account.features as AccountFeatures)?.email?.sandbox;
+    if (typeof value === "boolean") {
+      return account.region;
+    }
+  }
+  return null;
+}
+
 type OrganizationLayoutProps = {
   children: ReactNode;
   params: Promise<{
@@ -117,6 +138,7 @@ export default async function OrganizationLayout({
     productionAccessRequest: resolveProductionAccessRequest(
       orgData.awsAccounts
     ),
+    sandboxRegion: resolveSandboxRegion(orgData.awsAccounts),
     planId,
     planFeatures: {
       batch: plan.features.batch,

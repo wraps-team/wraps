@@ -3,6 +3,7 @@
 import { CloudUpload, Lock, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { ProductionAccessDialog } from "@/components/production-access-dialog";
 import { Button } from "@/components/ui/button";
 import { useProductsStore } from "@/stores/products-store";
 
@@ -93,6 +94,7 @@ export function GoLiveBanner({ orgSlug }: GoLiveBannerProps) {
   const productionAccessRequest = useProductsStore(
     (s) => s.status?.productionAccessRequest
   );
+  const sandboxRegion = useProductsStore((s) => s.status?.sandboxRegion);
   const step = resolveStep(hasAwsAccounts, sandboxStatus);
   const sandboxCopy = resolveSandboxCopy(productionAccessRequest ?? null);
 
@@ -144,7 +146,7 @@ export function GoLiveBanner({ orgSlug }: GoLiveBannerProps) {
           <Button asChild size="sm" variant="outline">
             <Link href={`/${orgSlug}/setup`}>Get Started</Link>
           </Button>
-        ) : (
+        ) : productionAccessRequest?.status === "PENDING" ? (
           <Button asChild size="sm" variant="outline">
             <a
               href={PRODUCTION_ACCESS_DOCS}
@@ -154,6 +156,16 @@ export function GoLiveBanner({ orgSlug }: GoLiveBannerProps) {
               {sandboxCopy.ctaLabel}
             </a>
           </Button>
+        ) : (
+          <ProductionAccessDialog
+            region={sandboxRegion ?? null}
+            review={productionAccessRequest ?? null}
+            trigger={
+              <Button size="sm" variant="outline">
+                {sandboxCopy.ctaLabel}
+              </Button>
+            }
+          />
         )}
         <Button
           aria-label="Dismiss banner"

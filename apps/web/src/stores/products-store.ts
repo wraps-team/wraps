@@ -24,6 +24,8 @@ export type ProductsStatus = {
     status: "PENDING" | "GRANTED" | "DENIED" | "FAILED" | null;
     caseId: string | null;
   } | null;
+  /** Region of the account `sandboxStatus` was read from; `null` if none was scanned. */
+  sandboxRegion: string | null;
   planId: PlanId;
   planFeatures: PlanFeatures;
   memberCount: number;

@@ -5,7 +5,7 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GoLiveBanner } from "../go-live-banner";
@@ -74,14 +74,67 @@ describe("GoLiveBanner", () => {
 
     expect(screen.getByText(/in the SES sandbox/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /request production access/i })
+      screen.getByRole("button", { name: /request production access/i })
+    ).toBeInTheDocument();
+  });
+
+  it("opens a dialog with a region-scoped SES console link when the account has a region", async () => {
+    const user = userEvent.setup();
+    mockUseProductsStore.mockImplementation((selector: any) =>
+      selector({
+        status: {
+          hasAwsAccounts: true,
+          sandboxStatus: true,
+          productionAccessRequest: null,
+          sandboxRegion: "eu-west-1",
+        },
+      })
+    );
+
+    render(<GoLiveBanner orgSlug="test-org" />);
+    await user.click(
+      screen.getByRole("button", { name: /request production access/i })
+    );
+
+    expect(
+      screen.getByRole("link", { name: /open ses in eu-west-1/i })
+    ).toHaveAttribute(
+      "href",
+      "https://eu-west-1.console.aws.amazon.com/ses/home?region=eu-west-1#/account"
+    );
+    expect(
+      screen.getByRole("link", { name: /open ses in eu-west-1/i })
+    ).toHaveAttribute("target", "_blank");
+  });
+
+  it("falls back to AWS's docs link in the dialog when no region was scanned", async () => {
+    const user = userEvent.setup();
+    mockUseProductsStore.mockImplementation((selector: any) =>
+      selector({
+        status: {
+          hasAwsAccounts: true,
+          sandboxStatus: true,
+          productionAccessRequest: null,
+          sandboxRegion: null,
+        },
+      })
+    );
+
+    render(<GoLiveBanner orgSlug="test-org" />);
+    await user.click(
+      screen.getByRole("button", { name: /request production access/i })
+    );
+
+    expect(
+      screen.getByRole("link", { name: /open aws's guide/i })
     ).toHaveAttribute(
       "href",
       "https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html"
     );
   });
 
-  it("tells the customer AWS never received their request when the review FAILED", () => {
+  it("tells the customer AWS never received their request when the review FAILED", async () => {
+    const user = userEvent.setup();
     mockUseProductsStore.mockImplementation((selector: any) =>
       selector({
         status: {
@@ -95,15 +148,17 @@ describe("GoLiveBanner", () => {
     render(<GoLiveBanner orgSlug="test-org" />);
 
     expect(screen.getByText(/did not receive/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /request production access/i })
-    ).toHaveAttribute(
-      "href",
-      "https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html"
+
+    await user.click(
+      screen.getByRole("button", { name: /request production access/i })
     );
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/never received/i)).toBeInTheDocument();
   });
 
-  it("names the case and keeps the AWS link when the review was DENIED", () => {
+  it("names the case and shows resubmission guidance when the review was DENIED", async () => {
+    const user = userEvent.setup();
     mockUseProductsStore.mockImplementation((selector: any) =>
       selector({
         status: {
@@ -118,12 +173,39 @@ describe("GoLiveBanner", () => {
 
     expect(screen.getByText(/denied/i)).toBeInTheDocument();
     expect(screen.getByText(/case-4242/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /request production access/i })
-    ).toHaveAttribute(
-      "href",
-      "https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html"
+
+    await user.click(
+      screen.getByRole("button", { name: /request production access/i })
     );
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/case-4242/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/denial isn't final/i)).toBeInTheDocument();
+  });
+
+  it("never claims Wraps submits or approves the request", async () => {
+    const user = userEvent.setup();
+    mockUseProductsStore.mockImplementation((selector: any) =>
+      selector({
+        status: {
+          hasAwsAccounts: true,
+          sandboxStatus: true,
+          productionAccessRequest: null,
+          sandboxRegion: "us-east-1",
+        },
+      })
+    );
+
+    render(<GoLiveBanner orgSlug="test-org" />);
+    await user.click(
+      screen.getByRole("button", { name: /request production access/i })
+    );
+
+    const dialog = screen.getByRole("dialog");
+    const text = dialog.textContent ?? "";
+    expect(text).not.toMatch(/we('ll| will) (submit|file|send) /i);
+    expect(text).not.toMatch(/approv(ed|al) (in|within)/i);
+    expect(text).not.toMatch(/wraps (submits|files|approves)/i);
   });
 
   it("reframes the CTA copy, still pointing at the docs, when the review is PENDING", () => {
@@ -151,6 +233,10 @@ describe("GoLiveBanner", () => {
       "href",
       "https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html"
     );
+    // PENDING never gets the dialog CTA — only the docs link.
+    expect(
+      screen.queryByRole("button", { name: /view production access docs/i })
+    ).not.toBeInTheDocument();
   });
 
   it("goes quiet once the account is out of the sandbox", () => {
