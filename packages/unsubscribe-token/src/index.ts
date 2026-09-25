@@ -89,7 +89,9 @@ export async function verifyUnsubscribeToken(
   log?: TokenLogger
 ): Promise<UnsubscribeTokenPayload | null> {
   try {
-    const { payload } = await jose.jwtVerify(token, getSecret());
+    const { payload } = await jose.jwtVerify(token, getSecret(), {
+      algorithms: ["HS256"],
+    });
 
     // Validate payload structure
     if (
@@ -110,7 +112,16 @@ export async function verifyUnsubscribeToken(
   } catch (error) {
     if (error instanceof jose.errors.JWTExpired) {
       log?.info("Unsubscribe: token expired");
-    } else if (error instanceof jose.errors.JWTInvalid) {
+    } else if (
+      // A mangled, tampered, or foreign-alg link is recipient input, not a
+      // server fault. The algorithm pin above turns alg:none into
+      // JOSEAlgNotAllowed instead of an indistinguishable TypeError.
+      error instanceof jose.errors.JWTInvalid ||
+      error instanceof jose.errors.JWSInvalid ||
+      error instanceof jose.errors.JWSSignatureVerificationFailed ||
+      error instanceof jose.errors.JWTClaimValidationFailed ||
+      error instanceof jose.errors.JOSEAlgNotAllowed
+    ) {
       log?.warn("Unsubscribe: invalid token");
     } else {
       log?.error("Unsubscribe: token verification failed", error);
