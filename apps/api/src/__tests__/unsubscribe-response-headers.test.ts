@@ -10,12 +10,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Dynamic mock for jose so each test can choose verify success/failure.
 const jwtVerifyMock = vi.fn();
-vi.mock("jose", () => ({
+vi.mock("jose", async (importOriginal) => ({
   jwtVerify: (...args: unknown[]) => jwtVerifyMock(...args),
-  errors: {
-    JWTExpired: class JWTExpired extends Error {},
-    JWTInvalid: class JWTInvalid extends Error {},
-  },
+  errors: (await importOriginal<typeof import("jose")>()).errors,
 }));
 
 // Dynamic mock for the contact lookup — tests flip this between found/empty.

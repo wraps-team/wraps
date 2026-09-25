@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("jose", () => ({
+vi.mock("jose", async (importOriginal) => ({
   jwtVerify: vi.fn(),
-  errors: {
-    JWTExpired: class JWTExpired extends Error {},
-    JWTInvalid: class JWTInvalid extends Error {},
-  },
+  errors: (await importOriginal<typeof import("jose")>()).errors,
 }));
 
 type SelectResult = Record<string, unknown>[];
