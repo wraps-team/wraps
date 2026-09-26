@@ -18,6 +18,9 @@ vi.mock("@wraps/email", () => ({
   getWrapsClient: vi.fn(),
 }));
 
+const { PostHogCtor } = vi.hoisted(() => ({ PostHogCtor: vi.fn() }));
+vi.mock("posthog-node", () => ({ PostHog: PostHogCtor }));
+
 const PREFIX = "account-schema-test";
 const email = `${PREFIX}-${Date.now()}@example.com`;
 const password = "a-long-unbreached-test-passphrase-9f2c";
@@ -26,11 +29,13 @@ describe("account table vs better-auth", () => {
   let auth: typeof import("../index").auth;
 
   beforeAll(async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key");
     ({ auth } = await import("../index"));
     await db.delete(user).where(like(user.email, `${PREFIX}-%`));
   }, 60_000);
 
   afterAll(async () => {
+    vi.unstubAllEnvs();
     await db.delete(user).where(like(user.email, `${PREFIX}-%`));
   });
 
@@ -42,6 +47,10 @@ describe("account table vs better-auth", () => {
 
     const signIn = await auth.api.signInEmail({ body: { email, password } });
     expect(signIn.user.id).toBe(signUp.user.id);
+  });
+
+  it("does not send the signup to PostHog outside production", () => {
+    expect(PostHogCtor).not.toHaveBeenCalled();
   });
 
   it("links and finds an OAuth account the way the callback does", async () => {

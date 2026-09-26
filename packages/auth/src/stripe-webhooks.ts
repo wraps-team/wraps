@@ -37,7 +37,12 @@ function getPostHogHost(): string {
 }
 
 function getPostHogClient(): PostHog | null {
-  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+  // Local dev and test runs load apps/web/.env.local, which carries the
+  // production key; without this every test signup lands in prod analytics.
+  if (
+    process.env.NODE_ENV !== "production" ||
+    !process.env.NEXT_PUBLIC_POSTHOG_KEY
+  ) {
     return null;
   }
   if (!posthogClient) {
