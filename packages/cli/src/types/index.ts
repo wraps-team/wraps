@@ -129,6 +129,27 @@ export type EmailPlanOptions = {
 };
 
 /**
+ * Command options for `wraps email production-access` — show the account's
+ * SES production-access / review state and (with `--request`) file the
+ * request. Shape follows `EmailPlanOptions` above.
+ */
+export type EmailProductionAccessOptions = {
+  account?: string;
+  region?: string;
+  /** File the request (mutating). Read-only without it. */
+  request?: boolean;
+  /** Required by AWS when requesting: the sender's website URL. */
+  website?: string;
+  /** Required by AWS when requesting: `transactional` or `marketing`. */
+  mailType?: string;
+  /** Up to 4 additional contact emails, comma-separated. */
+  contact?: string;
+  /** Skip the confirmation prompt when mutating with `--request`. */
+  yes?: boolean;
+  json?: boolean;
+};
+
+/**
  * Command options for `wraps email agent policy` — change an agent's send
  * caps or allowlist after creation. Declared directly here rather than in
  * `email.ts`, matching `EmailPlanOptions` above.

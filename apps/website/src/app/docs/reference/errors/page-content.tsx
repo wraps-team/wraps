@@ -370,6 +370,43 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         message: "SES rejected the pricing plan change: <detail>",
         solution: "Check the current plan: wraps email plan",
       },
+      {
+        code: "PRODUCTION_ACCESS_PENDING",
+        message:
+          "A production access request is already under review for this account",
+        solution:
+          "Wait for AWS to finish the current review before submitting another. Run wraps email production-access to see its status.",
+      },
+      {
+        code: "PRODUCTION_ACCESS_REJECTED",
+        message: "AWS rejected the request: <detail>",
+        solution:
+          "Check the website URL (must be a full https:// URL) and contact addresses, then retry.",
+      },
+      {
+        code: "PRODUCTION_ACCESS_ALREADY_ENABLED",
+        message:
+          "Production access is already enabled for this account in <region>",
+        solution:
+          "Nothing to do — run wraps email production-access to confirm",
+      },
+      {
+        code: "INVALID_WEBSITE_URL",
+        message: "Invalid --website: <value>",
+        solution:
+          "Pass a full URL starting with http:// or https://, up to 1000 characters",
+      },
+      {
+        code: "INVALID_MAIL_TYPE",
+        message: "Invalid --mail-type: <value>",
+        solution: "Valid values: transactional, marketing",
+      },
+      {
+        code: "INVALID_CONTACT_EMAIL",
+        message: "Invalid contact email: <value>",
+        solution:
+          "Pass valid email addresses, comma-separated, via --contact (max 4)",
+      },
     ],
   },
   {

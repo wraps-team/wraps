@@ -18,6 +18,29 @@ describe("parseCliArgs — --tracking-domain", () => {
   });
 });
 
+describe("parseCliArgs — email production-access", () => {
+  it("parses the request flags", () => {
+    const { flags, sub } = parseCliArgs([
+      "node",
+      "wraps",
+      "email",
+      "production-access",
+      "--request",
+      "--website",
+      "https://x.dev",
+      "--mail-type",
+      "transactional",
+      "--contact",
+      "a@x.dev,b@x.dev",
+    ]);
+    expect(flags.request).toBe(true);
+    expect(flags.website).toBe("https://x.dev");
+    expect(flags.mailType).toBe("transactional");
+    expect(flags.contact).toBe("a@x.dev,b@x.dev");
+    expect(sub).toEqual(["email", "production-access"]);
+  });
+});
+
 describe("resolveNegatableFlag", () => {
   it("returns an explicit true or false from the parsed options untouched", () => {
     expect(resolveNegatableFlag(true, "--no-tracking-https", [])).toBe(true);

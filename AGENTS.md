@@ -86,6 +86,14 @@ wraps email plan          Show or change the SES plan for an account
   --volume                Monthly email volume for the estimate
   -y, --yes               Skip confirmation
 
+wraps email production-access   Show SES production-access / review status, or file the request
+  --account               AWS account ID
+  -r, --region            AWS region
+  --request               Submit the request (asks for confirmation; --yes to skip)
+  --website               Your website URL (required with --request)
+  --mail-type             transactional | marketing (required with --request)
+  --contact               Up to 4 extra contact emails, comma-separated
+
 wraps email logs list     List recent sends
   --status                Filter by delivery status
   --limit                 Page size

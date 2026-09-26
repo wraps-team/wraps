@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-ses";
 import {
   GetAccountCommand,
+  PutAccountDetailsCommand,
   PutAccountPricingAttributesCommand,
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
@@ -441,6 +442,177 @@ export async function setSESPricingPlan(
         "SES_PRICING_PLAN_CHANGE_REJECTED",
         "This can happen if a plan change is already pending, or the requested plan isn't valid for this account right now.\n\nCheck the current plan:\n  wraps email plan",
         "https://docs.aws.amazon.com/ses/latest/dg/sending-email-pricing.html"
+      );
+    }
+
+    // Anything else — surface the real AWS error instead of swallowing it.
+    throw error;
+  }
+}
+
+export type SESProductionAccessReview = {
+  /** `null` when GetAccount did not report the field. */
+  productionAccessEnabled: boolean | null;
+  /** AWS's latest review of the account, or `null` when AWS reported none. */
+  review: {
+    status: "PENDING" | "GRANTED" | "DENIED" | "FAILED";
+    caseId: string | null;
+  } | null;
+  enforcementStatus: string | null;
+  sendQuota: {
+    max24HourSend: number;
+    maxSendRate: number;
+    sentLast24Hours: number;
+  } | null;
+};
+
+/**
+ * Production-access view of GetAccount. Unlike `getSESAccountStatus`, this
+ * does NOT swallow errors: the caller is about to decide whether to file a
+ * request on the strength of this read, so an unreadable account must surface
+ * as an error, never as "sandbox".
+ */
+export async function getSESProductionAccessReview(
+  region: string
+): Promise<SESProductionAccessReview> {
+  const sesv2 = new SESv2Client({ region });
+
+  try {
+    const response = await sesv2.send(new GetAccountCommand({}));
+    const reviewDetails = response.Details?.ReviewDetails;
+
+    return {
+      productionAccessEnabled: response.ProductionAccessEnabled ?? null,
+      review: reviewDetails?.Status
+        ? {
+            status: reviewDetails.Status,
+            caseId: reviewDetails.CaseId ?? null,
+          }
+        : null,
+      enforcementStatus: response.EnforcementStatus ?? null,
+      sendQuota: response.SendQuota
+        ? {
+            max24HourSend: response.SendQuota.Max24HourSend ?? 0,
+            maxSendRate: response.SendQuota.MaxSendRate ?? 0,
+            sentLast24Hours: response.SendQuota.SentLast24Hours ?? 0,
+          }
+        : null,
+    };
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error;
+    }
+
+    const name = error.name;
+    const message = error.message || "";
+    const mentions = (needle: string): boolean =>
+      name === needle || message.includes(needle);
+
+    if (
+      mentions("AccessDenied") ||
+      mentions("AccessDeniedException") ||
+      mentions("UnauthorizedAccess")
+    ) {
+      throw errors.iamPermissionDenied(
+        "ses:GetAccount",
+        "SES account details",
+        "Ensure your IAM user/role has the ses:GetAccount permission."
+      );
+    }
+
+    if (
+      mentions("Throttling") ||
+      mentions("ThrottlingException") ||
+      mentions("TooManyRequestsException")
+    ) {
+      throw errors.awsThrottled("GetAccount");
+    }
+
+    throw error;
+  }
+}
+
+export type SESProductionAccessRequestInput = {
+  mailType: "MARKETING" | "TRANSACTIONAL";
+  websiteUrl: string;
+  additionalContactEmails: string[];
+};
+
+/**
+ * File the SES production-access request for this account, in this Region.
+ *
+ * Mutating — the caller (`wraps email production-access --request`) is
+ * responsible for confirming with the user before invoking this. Never
+ * swallow errors: a silent failure would let a customer believe AWS is
+ * reviewing a request it never received.
+ */
+export async function requestSESProductionAccess(
+  region: string,
+  input: SESProductionAccessRequestInput
+): Promise<void> {
+  const sesv2 = new SESv2Client({ region });
+
+  try {
+    await sesv2.send(
+      new PutAccountDetailsCommand({
+        MailType: input.mailType,
+        WebsiteURL: input.websiteUrl,
+        ContactLanguage: "EN",
+        AdditionalContactEmailAddresses: input.additionalContactEmails.length
+          ? input.additionalContactEmails
+          : undefined,
+        ProductionAccessEnabled: true,
+      })
+    );
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error;
+    }
+
+    const name = error.name;
+    const message = error.message || "";
+    const mentions = (needle: string): boolean =>
+      name === needle || message.includes(needle);
+
+    // Request never reached the API, or was denied once it did.
+    if (
+      mentions("AccessDenied") ||
+      mentions("AccessDeniedException") ||
+      mentions("UnauthorizedAccess")
+    ) {
+      throw errors.iamPermissionDenied(
+        "ses:PutAccountDetails",
+        "SES account details",
+        "Ensure your IAM user/role has the ses:PutAccountDetails permission."
+      );
+    }
+
+    // Throttled — safe to retry.
+    if (
+      mentions("Throttling") ||
+      mentions("ThrottlingException") ||
+      mentions("TooManyRequestsException")
+    ) {
+      throw errors.awsThrottled("PutAccountDetails");
+    }
+
+    // Another request is already under review for this account.
+    if (mentions("ConflictException")) {
+      throw new WrapsError(
+        "A production access request is already under review for this account.",
+        "PRODUCTION_ACCESS_PENDING",
+        "Wait for AWS to finish the current review before submitting another. Run wraps email production-access to see its status.",
+        "https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html"
+      );
+    }
+
+    // Request reached SES but was rejected for a validation reason.
+    if (mentions("BadRequestException")) {
+      throw new WrapsError(
+        `AWS rejected the request: ${message}`,
+        "PRODUCTION_ACCESS_REJECTED",
+        "Check the website URL (must be a full https:// URL) and contact addresses, then retry.",
+        "https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html"
       );
     }
 

@@ -88,6 +88,12 @@ export type CliFlags = {
   volume?: string;
   countries?: string;
 
+  // Email production-access
+  request?: boolean;
+  website?: string;
+  mailType?: string;
+  contact?: string;
+
   // License
   tier?: string;
   expires?: string;
@@ -163,6 +169,9 @@ const STRING_FLAGS = [
   "set",
   "volume",
   "countries",
+  "website",
+  "mail-type",
+  "contact",
   "since",
   "filter",
   "source",
@@ -208,6 +217,7 @@ const BOOLEAN_FLAGS = [
   "errors",
   "live",
   "platform",
+  "request",
 ] as const;
 
 /**

@@ -51,6 +51,7 @@ import {
 import { init } from "./commands/email/init.js";
 import { emailLogsGet, emailLogsList } from "./commands/email/logs.js";
 import { emailPlan } from "./commands/email/plan.js";
+import { emailProductionAccess } from "./commands/email/production-access.js";
 import {
   replyDecode,
   replyDestroy,
@@ -186,6 +187,9 @@ function showHelp() {
   );
   console.log(
     `  ${pc.cyan("email plan")}              Show SES pricing plan and cheaper options`
+  );
+  console.log(
+    `  ${pc.cyan("email production-access")} Show SES production-access status or file the request`
   );
   console.log(`  ${pc.cyan("email test")}              Send a test email`);
   console.log(
@@ -754,6 +758,19 @@ async function run() {
             region: flags.region,
             set: flags.set,
             volume: flags.volume,
+            yes: flags.yes,
+            json: flags.json,
+          });
+          break;
+
+        case "production-access":
+          await emailProductionAccess({
+            account: flags.account,
+            region: flags.region,
+            request: flags.request,
+            website: flags.website,
+            mailType: flags.mailType,
+            contact: flags.contact,
             yes: flags.yes,
             json: flags.json,
           });
