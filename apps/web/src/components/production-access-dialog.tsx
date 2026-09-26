@@ -86,8 +86,11 @@ export function ProductionAccessDialog({
         {review?.status === "DENIED" && (
           <div className="rounded-md border bg-muted p-3 text-sm">
             <p>
-              A denial isn't final. Before resubmitting, make clear where your
-              recipients came from and how people unsubscribe.
+              A denied status isn't always final. AWS also shows it while
+              waiting on your reply to a request for more information, so if
+              that case is still open, reply there instead of resubmitting.
+              Before resubmitting, make clear where your recipients came from
+              and how people unsubscribe.
             </p>
             {review.caseId && (
               <p className="mt-1 text-muted-foreground">

@@ -39,9 +39,11 @@ function resolveSandboxCopy(review: ProductionAccessRequest): SandboxCopy {
   }
   if (review?.status === "DENIED") {
     return {
+      // SES also reports DENIED while it waits on the customer's reply to a
+      // request for more information, so this can't read as a final verdict.
       message: review.caseId
-        ? `AWS denied your production access request (case ${review.caseId}).`
-        : "AWS denied your production access request.",
+        ? `AWS hasn't granted production access yet (case ${review.caseId}). If AWS asked you for more information, reply on that case before resubmitting.`
+        : "AWS hasn't granted production access yet. If AWS asked you for more information, reply on that case before resubmitting.",
       ctaLabel: "Request production access",
     };
   }

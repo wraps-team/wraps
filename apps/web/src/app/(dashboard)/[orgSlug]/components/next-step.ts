@@ -99,13 +99,16 @@ export function selectNextStep(status: SetupStatus): NextStep {
     if (review?.status === "DENIED") {
       return {
         kind: "leave_sandbox",
-        title: "AWS denied your production access request",
+        title: "AWS hasn't granted production access yet",
         // No case-specific link: SES's CaseId is not documented as the same
         // identifier the AWS Support console URL takes, so the description
         // must not promise a destination the CTA doesn't reach.
+        // SES also reports DENIED while it waits on the customer's reply to a
+        // request for more information, and keeps reporting it after they
+        // reply, so the copy must not present the case as closed.
         description: review.caseId
-          ? `AWS denied your production access request (case ${review.caseId}). You can request production access again once you've addressed the reason for the denial.`
-          : "AWS denied your production access request. You can request production access again once you've addressed the reason for the denial.",
+          ? `AWS reports this review (case ${review.caseId}) as denied, the same status it shows while waiting on your reply to a request for more information. If you've replied, wait for AWS. If the case is closed, address the reason and request production access again.`
+          : "AWS reports this review as denied, the same status it shows while waiting on your reply to a request for more information. If you've replied, wait for AWS. If the case is closed, address the reason and request production access again.",
         ctaLabel: "Request production access",
         href: (orgSlug) => `/${orgSlug}/settings/aws-accounts`,
       };

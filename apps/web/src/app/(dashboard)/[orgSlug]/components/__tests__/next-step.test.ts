@@ -112,8 +112,10 @@ describe("selectNextStep", () => {
       productionAccessRequest: { status: "DENIED", caseId: "case-9876" },
     });
     expect(step.kind).toBe("leave_sandbox");
-    expect(step.title).toBe("AWS denied your production access request");
+    expect(step.title).toBe("AWS hasn't granted production access yet");
     expect(step.description).toContain("case-9876");
+    // SES keeps reporting DENIED while a request-for-more-info case is open.
+    expect(step.description).toContain("If you've replied, wait for AWS");
     // Label/destination coherence guard: href is Wraps' own AWS Accounts
     // settings page, not the AWS Support case, so the copy must not
     // instruct the customer to act inside "the support case".

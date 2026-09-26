@@ -198,7 +198,12 @@ describe("GoLiveBanner", () => {
 
     render(<GoLiveBanner orgSlug="test-org" />);
 
-    expect(screen.getByText(/denied/i)).toBeInTheDocument();
+    // DENIED is also AWS's status while it waits on a reply, so the banner
+    // must not present it as a final denial.
+    expect(
+      screen.getByText(/hasn't granted production access yet/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/AWS denied/i)).not.toBeInTheDocument();
     expect(screen.getByText(/case-4242/i)).toBeInTheDocument();
 
     await user.click(
@@ -207,7 +212,9 @@ describe("GoLiveBanner", () => {
 
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText(/case-4242/i)).toBeInTheDocument();
-    expect(within(dialog).getByText(/denial isn't final/i)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/reply there instead of resubmitting/i)
+    ).toBeInTheDocument();
   });
 
   it("never claims Wraps submits or approves the request", async () => {
