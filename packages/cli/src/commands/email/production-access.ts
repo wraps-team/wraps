@@ -99,8 +99,15 @@ function nextActionFor(
     case "PENDING":
       return "AWS is reviewing; typically ~24h. Nothing to do.";
     case "DENIED": {
+      // SES reports DENIED both for a final denial and while AWS waits on a
+      // reply to its request for more information, and keeps reporting it
+      // after the customer replies. The Support case is the only place that
+      // tells the two apart, and reading it needs a paid Support plan.
       const caseId = review.review?.caseId;
-      return `Strengthen the application (recipient provenance, unsubscribe handling, bounce/complaint monitoring) and resubmit with --request${caseId ? `, or open a Support case referencing case ${caseId} to ask why` : ""}.`;
+      const where = caseId
+        ? `case ${caseId} in the AWS Support Center`
+        : "your cases in the AWS Support Center";
+      return `AWS shows DENIED for a final denial and also while it waits on your reply to a request for more information. Check ${where}: if you've replied, wait for AWS. If the case is closed, strengthen the application (recipient provenance, unsubscribe handling, bounce/complaint monitoring) and resubmit with --request.`;
     }
     case "FAILED":
       return "AWS could not process the request; resubmit with --request.";
@@ -348,6 +355,15 @@ async function runRequestPath(
   const mailType = await resolveMailType(options);
   const additionalContactEmails = resolveContactEmails(options);
 
+  const openCaseId =
+    before.review?.status === "DENIED" ? before.review.caseId : null;
+
+  if (openCaseId && !isJsonMode()) {
+    clack.log.warn(
+      `AWS already has case ${openCaseId} on file for this account. AWS reports DENIED while it waits on your reply to a request for more information, so the case may still be open. If you've replied on it, wait for AWS instead of submitting a new request.`
+    );
+  }
+
   if (!isJsonMode()) {
     clack.note(
       `AWS reviews this request by hand, typically within 24 hours. The API sends less than the console form does: the console also asks you to confirm that every recipient opted in and that you handle bounces and complaints. There is no API field for that acknowledgment, so make sure both are true before you submit. If you would rather file the fuller application yourself: ${consoleUrl(region)}.`,
@@ -377,7 +393,10 @@ async function runRequestPath(
     }
 
     const confirmed = await clack.confirm({
-      message: `Submit the SES production-access request for account ${accountId} in ${region}?`,
+      message: openCaseId
+        ? `Case ${openCaseId} may still be open. Submit a new SES production-access request for account ${accountId} in ${region} anyway?`
+        : `Submit the SES production-access request for account ${accountId} in ${region}?`,
+      initialValue: !openCaseId,
     });
 
     if (clack.isCancel(confirmed) || !confirmed) {

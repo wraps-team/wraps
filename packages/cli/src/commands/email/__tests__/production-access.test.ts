@@ -193,6 +193,64 @@ describe("email production-access command", () => {
     expect(envelope.data.nextAction).toContain("24h");
   });
 
+  it("read path, DENIED does not present the case as closed", async () => {
+    sesv2Mock.on(GetAccountCommand).resolves({
+      ProductionAccessEnabled: false,
+      Details: {
+        ReviewDetails: { Status: "DENIED", CaseId: "179034689300364" },
+      },
+    });
+
+    setJsonMode(true);
+    await emailProductionAccess({ json: true });
+
+    const envelope = readJsonEnvelope(consoleLogSpy);
+    expect(envelope.data.review.status).toBe("DENIED");
+    // SES keeps reporting DENIED while a request-for-more-info case is open,
+    // so the guidance must send the customer to the case before resubmitting.
+    expect(envelope.data.nextAction).toContain("case 179034689300364");
+    expect(envelope.data.nextAction).toContain("if you've replied, wait");
+    expect(envelope.data.nextAction).toContain(
+      "If the case is closed, strengthen"
+    );
+  });
+
+  it("--request when DENIED with a case warns and defaults the confirm to no", async () => {
+    vi.mocked(prompts.isInteractive).mockReturnValue(true);
+    vi.mocked(clack.confirm).mockResolvedValue(false as never);
+
+    sesv2Mock.on(GetAccountCommand).resolves({
+      ProductionAccessEnabled: false,
+      Details: {
+        ReviewDetails: { Status: "DENIED", CaseId: "9999" },
+      },
+    });
+
+    exitSpy.mockImplementation((() => {
+      throw new Error("process.exit");
+    }) as never);
+
+    await expect(
+      emailProductionAccess({
+        request: true,
+        website: "https://x.dev",
+        mailType: "transactional",
+      })
+    ).rejects.toThrow("process.exit");
+
+    expect(exitSpy).toHaveBeenCalledWith(0);
+    expect(clack.log.warn).toHaveBeenCalledWith(
+      expect.stringContaining("case 9999")
+    );
+    expect(clack.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("Case 9999 may still be open"),
+        initialValue: false,
+      })
+    );
+    expect(sesv2Mock.commandCalls(PutAccountDetailsCommand)).toHaveLength(0);
+  });
+
   it("--request when already enabled rejects without prompting or mutating", async () => {
     sesv2Mock.on(GetAccountCommand).resolves({
       ProductionAccessEnabled: true,
