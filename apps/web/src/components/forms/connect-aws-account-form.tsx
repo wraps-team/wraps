@@ -28,7 +28,7 @@ import {
 } from "@wraps/ui/components/ui/select";
 import { AlertCircle, CheckCircle, Copy, ExternalLink } from "lucide-react";
 import posthog from "posthog-js";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { uuidv7 } from "uuidv7";
 import { connectAWSAccountAction } from "@/actions/aws-accounts";
@@ -156,8 +156,16 @@ export function ConnectAWSAccountForm({
     "success" in state &&
     state.success === true;
 
-  // Handle success callback
-  if (isSuccess) {
+  // Handle success once per action result, outside render: onSuccess updates
+  // parent state, and running it during render re-renders this form with the
+  // same success state, looping until React aborts (Sentry #7755732895).
+  const handledState = useRef(state);
+  useEffect(() => {
+    if (!isSuccess || handledState.current === state) {
+      return;
+    }
+    handledState.current = state;
+
     // Capture AWS account connected event in PostHog
     posthog.capture("aws_account_connected", {
       organization_id: organizationId,
@@ -165,15 +173,10 @@ export function ConnectAWSAccountForm({
     });
 
     // Clear the saved External ID from localStorage on success
-    const storageKey = `wraps-external-id-${organizationId}`;
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(storageKey);
-    }
+    localStorage.removeItem(`wraps-external-id-${organizationId}`);
 
-    if (onSuccess) {
-      onSuccess();
-    }
-  }
+    onSuccess?.();
+  }, [isSuccess, state, organizationId, form, onSuccess]);
 
   // Only the hosted platform can use this link — the template it points at
   // creates a role trusting the Wraps platform account.
