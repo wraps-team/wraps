@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   type AWSAccountWithCreator,
@@ -82,30 +82,32 @@ export function OrganizationSettingsAwsAccounts({
   const [accountToDelete, setAccountToDelete] =
     useState<AWSAccountWithCreator | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [_refreshKey, setRefreshKey] = useState(0);
 
   const canEdit = userRole === "owner" || userRole === "admin";
   const accountLimit = unlimited ? -1 : getAwsAccountLimit(planId);
   const canAddMore = unlimited || canAddAwsAccount(planId, accounts.length);
   const isAtLimit = !canAddMore && accountLimit !== -1;
 
-  // Trigger a refresh
-  const refreshData = () => setRefreshKey((prev) => prev + 1);
-
-  // Load AWS accounts
-  useEffect(() => {
-    async function loadData(organizationId: string) {
-      setLoading(true);
-      const result = await listAWSAccounts(organizationId);
+  // Load AWS accounts. Called on mount and again after connect/delete, so the
+  // list reflects the change without a page reload.
+  const loadAccounts = useCallback(async () => {
+    try {
+      const result = await listAWSAccounts(organization.id);
       if (result.success) {
         setAccounts(result.accounts);
       } else {
         toast.error(result.error);
       }
-      setLoading(false);
+    } catch (_err) {
+      toast.error(
+        "Couldn't load your AWS accounts — the request failed. Refresh the page to try again."
+      );
     }
-    loadData(organization.id);
   }, [organization.id]);
+
+  useEffect(() => {
+    loadAccounts().finally(() => setLoading(false));
+  }, [loadAccounts]);
 
   const formatDate = (date: Date | null) => {
     if (!date) {
@@ -120,7 +122,7 @@ export function OrganizationSettingsAwsAccounts({
 
   function handleConnectSuccess() {
     setConnectDialogOpen(false);
-    refreshData(); // Reload accounts list
+    loadAccounts();
     toast.success("AWS account connected successfully");
   }
 
@@ -145,7 +147,7 @@ export function OrganizationSettingsAwsAccounts({
         toast.success("AWS account deleted successfully");
         setDeleteDialogOpen(false);
         setAccountToDelete(null);
-        refreshData(); // Reload accounts list
+        await loadAccounts();
       } else {
         toast.error(result.error);
       }
@@ -336,6 +338,7 @@ export function OrganizationSettingsAwsAccounts({
                     )}
                     {canEdit && (
                       <Button
+                        aria-label={`Delete ${account.name}`}
                         onClick={() => handleDeleteClick(account)}
                         variant="ghost-destructive"
                       >
