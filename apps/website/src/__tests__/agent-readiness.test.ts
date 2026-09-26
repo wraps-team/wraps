@@ -115,12 +115,15 @@ describe("a 404 tells an agent where to go next", () => {
     expect(body).toContain("https://wraps.dev/sitemap.xml");
   });
 
-  it("keeps the HTML 404 page pointing at the same list, and answers markdown requests in markdown", () => {
+  it("keeps the HTML 404 page pointing at the same recovery list — markdown 404s are middleware's job, not this page's", () => {
     const source = read("src/app/not-found.tsx");
 
     expect(source).toContain("NOT_FOUND_LINKS");
-    expect(source).toContain("renderNotFoundMarkdown");
-    expect(source).toContain('accept.includes("text/markdown")');
+    // The markdown branch deliberately lives in middleware + /api/md, which the
+    // tests above cover. A dynamic API here (headers/cookies) opts the ENTIRE
+    // app out of static rendering, because the root not-found participates in
+    // every route's render tree.
+    expect(source).not.toContain("next/headers");
   });
 });
 

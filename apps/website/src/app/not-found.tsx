@@ -1,22 +1,8 @@
 import { Button } from "@wraps/ui/components/ui/button";
-import { headers } from "next/headers";
 import Link from "next/link";
-import {
-  NOT_FOUND_LINKS,
-  renderNotFoundMarkdown,
-} from "@/lib/not-found-content";
+import { NOT_FOUND_LINKS } from "@/lib/not-found-content";
 
-export default async function NotFound() {
-  // Agents that ask for markdown get markdown. Everyone else gets the page.
-  const accept = (await headers()).get("accept") ?? "";
-  if (accept.includes("text/markdown")) {
-    return (
-      <pre className="whitespace-pre-wrap p-6 font-mono text-sm">
-        {renderNotFoundMarkdown()}
-      </pre>
-    );
-  }
-
+export default function NotFound() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-16">
       <div className="w-full max-w-xl text-center">

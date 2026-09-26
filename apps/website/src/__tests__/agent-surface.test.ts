@@ -147,6 +147,17 @@ describe("middleware negotiates markdown for every page, hand-authored or derive
     );
   });
 
+  it("rewrites a markdown request for a path that does not exist at all — /api/md answers with the markdown 404", async () => {
+    const request = new NextRequest("https://wraps.dev/docs/does-not-exist", {
+      headers: { accept: "text/markdown" },
+    });
+    const response = await middleware(request);
+
+    expect(response.headers.get("x-middleware-rewrite")).toBe(
+      "https://wraps.dev/api/md/docs/does-not-exist"
+    );
+  });
+
   it("rewrites the root path to the /api/md/root sentinel, not /api/md/", async () => {
     const request = new NextRequest("https://wraps.dev/", {
       headers: { accept: "text/markdown" },
