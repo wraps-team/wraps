@@ -115,3 +115,29 @@ describe("runtime pool size", () => {
     expect(await poolMaxFor("2.5")).toBe(2);
   });
 });
+
+/**
+ * `connectionTimeoutMillis` is unset by default, which node-postgres reads as
+ * "wait forever". On Lambda that is paid as handler latency: a stalled pooler
+ * (or a full pool whose in-flight queries have stalled) blocks the query until
+ * the function's own timeout, holding an account-wide concurrency slot. The
+ * bound is deliberate, so an unset value must not slip back in.
+ */
+describe("runtime pool connection timeout", () => {
+  async function connectionTimeout(): Promise<number | undefined> {
+    vi.stubEnv("DATABASE_URL", "postgres://u:pw@h/db");
+    vi.resetModules();
+    await import("../index");
+    const config = mockPoolCtor.mock.calls[0]?.[0] as {
+      connectionTimeoutMillis?: number;
+    };
+    return config.connectionTimeoutMillis;
+  }
+
+  it("bounds the connection-acquire wait instead of waiting forever", async () => {
+    const timeout = await connectionTimeout();
+    expect(typeof timeout).toBe("number");
+    expect(Number.isFinite(timeout)).toBe(true);
+    expect(timeout).toBeGreaterThan(0);
+  });
+});

@@ -40,6 +40,16 @@ const pool = new Pool({
   // recycle aggressively so we rarely pick up a dead connection.
   idleTimeoutMillis: 30_000,
   maxLifetimeSeconds: 300,
+  // Bound the wait for a connection. node-postgres defaults this to 0, which
+  // means "wait forever": a pooler that stalls while accepting a new socket —
+  // or a full pool whose two in-flight queries have stalled — is then paid as
+  // handler latency until the Lambda's own timeout (30s for the API, 5min for
+  // the queue consumers), holding one of the account's ten concurrency slots
+  // the whole time. Every warm container carries its own pool, and the busiest
+  // route issues its queries serially (p50 ~1s across ~7 round trips), so 10s
+  // is far above a healthy exchange and below the API timeout: a genuine stall
+  // fails loudly and bounded instead of silently consuming seconds.
+  connectionTimeoutMillis: 10_000,
 });
 // Errors on idle clients (e.g., pooler closing a frozen Lambda's socket)
 // crash the process if unhandled; the pool discards the client either way.
