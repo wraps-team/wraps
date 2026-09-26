@@ -113,6 +113,42 @@ export const Code = ({ children }: { children: ReactNode }) => (
 
 export const releases: Release[] = [
   {
+    slug: "ses-production-access-from-the-cli",
+    versions: ["CLI v3.13.0"],
+    date: "2026-09-26",
+    icon: Terminal,
+    title: "SES production access from the CLI",
+    tags: ["cli"],
+    summary:
+      "Check where your SES production-access request stands, and file it from your terminal, with wraps email production-access.",
+    items: [
+      <>
+        Run <Code>wraps email production-access</Code> to see whether the
+        account is still in the sandbox, AWS&rsquo;s review status and case ID,
+        and your daily quota. It changes nothing
+      </>,
+      <>
+        Add <Code>--request</Code> with <Code>--website</Code> and{" "}
+        <Code>--mail-type</Code> to file the request with your own AWS
+        credentials. The command asks for confirmation first, or takes{" "}
+        <Code>--yes</Code> in scripts, and refuses if access is already enabled
+        or a review is pending
+      </>,
+      <>
+        The API sends less than the console form. It has no field for the
+        acknowledgment that your recipients opted in and that you handle bounces
+        and complaints, so make sure both are true before you submit, or use the
+        console link the command prints
+      </>,
+      <>
+        Your credentials need <Code>ses:GetAccount</Code> and{" "}
+        <Code>ses:PutAccountDetails</Code>. AWS still reviews every request by
+        hand, usually within 24 hours
+      </>,
+    ],
+    docs: "/docs/guides/production-access",
+  },
+  {
     slug: "custom-headers-on-send",
     versions: ["Email SDK v0.14.0"],
     date: "2026-09-25",
