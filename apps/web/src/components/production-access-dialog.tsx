@@ -126,6 +126,16 @@ export function ProductionAccessDialog({
           suppression on by default.
         </p>
 
+        <p className="text-muted-foreground text-sm">
+          You can also file it from a terminal with{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+            wraps email production-access --request
+          </code>{" "}
+          (CLI 3.13+), using your own AWS credentials. AWS&apos;s API has no
+          field for the acknowledgment, so confirm both parts of it are true
+          before you submit.
+        </p>
+
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline">Close</Button>

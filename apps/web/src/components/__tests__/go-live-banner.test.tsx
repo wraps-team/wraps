@@ -107,6 +107,33 @@ describe("GoLiveBanner", () => {
     ).toHaveAttribute("target", "_blank");
   });
 
+  it("offers the CLI command as a second way to file, without claiming it sends the acknowledgment", async () => {
+    const user = userEvent.setup();
+    mockUseProductsStore.mockImplementation((selector: any) =>
+      selector({
+        status: {
+          hasAwsAccounts: true,
+          sandboxStatus: true,
+          productionAccessRequest: null,
+          sandboxRegion: "eu-west-1",
+        },
+      })
+    );
+
+    render(<GoLiveBanner orgSlug="test-org" />);
+    await user.click(
+      screen.getByRole("button", { name: /request production access/i })
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(
+      within(dialog).getByText("wraps email production-access --request")
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/API has no field for the acknowledgment/i)
+    ).toBeInTheDocument();
+  });
+
   it("falls back to AWS's docs link in the dialog when no region was scanned", async () => {
     const user = userEvent.setup();
     mockUseProductsStore.mockImplementation((selector: any) =>
