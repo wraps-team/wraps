@@ -163,6 +163,7 @@ vi.mock("@wraps/db", () => {
     subscription: subscriptionTable,
     notifyOrg: mockNotifyOrg,
     hasRecentNotification: mockHasRecentNotification,
+    closeDbConnection: vi.fn(),
     eq: vi.fn(),
     and: vi.fn(),
     isNotNull: vi.fn(),

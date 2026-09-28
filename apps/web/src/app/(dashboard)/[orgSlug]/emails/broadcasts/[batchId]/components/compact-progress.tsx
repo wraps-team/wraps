@@ -9,6 +9,7 @@ import {
   type ComponentProps,
   useCallback,
   useEffect,
+  useState,
   useTransition,
 } from "react";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,11 @@ function formatDuration(
 const isActive = (status: string) =>
   status === "processing" || status === "queued";
 
+// No one watches this page for longer than this in one sitting — cap
+// auto-refresh so a forgotten tab can't poll the DB indefinitely. The manual
+// refresh button below stays available afterward.
+const MAX_AUTO_REFRESH_MS = 5 * 60 * 1000;
+
 const isTerminal = (status: string) =>
   status === "completed" || status === "failed" || status === "cancelled";
 
@@ -86,10 +92,19 @@ export function CompactProgress({
 }: CompactProgressProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [capped, setCapped] = useState(false);
   // Derived from the current status rather than latched at mount. It used to
   // initialise once and only ever turn off, so a `scheduled` broadcast that
   // started sending while the page was open never began polling.
-  const autoRefresh = isActive(status);
+  const autoRefresh = isActive(status) && !capped;
+
+  // A newly active status gets its own fresh 5-minute polling window — e.g. a
+  // `queued` broadcast that starts `processing` while the page is open.
+  useEffect(() => {
+    if (isActive(status)) {
+      setCapped(false);
+    }
+  }, [status]);
   const paused = getPausedPresentation(status, pausedReason ?? null);
   const zeroSend = getZeroSendPresentation(status, sent);
 
@@ -109,7 +124,11 @@ export function CompactProgress({
       return;
     }
     const interval = setInterval(refresh, 5000);
-    return () => clearInterval(interval);
+    const cap = setTimeout(() => setCapped(true), MAX_AUTO_REFRESH_MS);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(cap);
+    };
   }, [autoRefresh, refresh]);
 
   const statusIcon = {

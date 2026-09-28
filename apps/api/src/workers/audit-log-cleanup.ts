@@ -19,7 +19,7 @@
 import "../lib/sentry";
 
 import { withMonitor, wrapHandler } from "@sentry/aws-serverless";
-import { auditLog, db, subscription } from "@wraps/db";
+import { auditLog, closeDbConnection, db, subscription } from "@wraps/db";
 import type { Handler } from "aws-lambda";
 import { and, eq, inArray, lt } from "drizzle-orm";
 import { flushLogger, log } from "../lib/logger";
@@ -112,42 +112,50 @@ export const handler: Handler = wrapHandler(async () =>
   withMonitor(
     "audit-log-cleanup",
     async () => {
-      log.info("[audit-log-cleanup] Starting cleanup run");
+      try {
+        log.info("[audit-log-cleanup] Starting cleanup run");
 
-      // 1. Fetch all distinct organizationIds that have audit logs
-      const orgs = await db
-        .selectDistinct({ organizationId: auditLog.organizationId })
-        .from(auditLog);
+        // 1. Fetch all distinct organizationIds that have audit logs
+        const orgs = await db
+          .selectDistinct({ organizationId: auditLog.organizationId })
+          .from(auditLog);
 
-      if (orgs.length === 0) {
-        log.info(
-          "[audit-log-cleanup] No audit logs found, nothing to clean up"
-        );
-        await flushLogger();
-        return;
-      }
-
-      log.info("[audit-log-cleanup] Processing orgs", { count: orgs.length });
-
-      let totalDeleted = 0;
-
-      for (const { organizationId } of orgs) {
-        const plan = await getOrgPlan(organizationId);
-        const deleted = await deleteOldLogsForOrg(organizationId, plan);
-
-        if (deleted > 0) {
-          log.info("[audit-log-cleanup] Deleted rows for org", {
-            organizationId,
-            plan,
-            deleted,
-          });
+        if (orgs.length === 0) {
+          log.info(
+            "[audit-log-cleanup] No audit logs found, nothing to clean up"
+          );
+          return;
         }
 
-        totalDeleted += deleted;
-      }
+        log.info("[audit-log-cleanup] Processing orgs", {
+          count: orgs.length,
+        });
 
-      log.info("[audit-log-cleanup] Cleanup complete", { totalDeleted });
-      await flushLogger();
+        let totalDeleted = 0;
+
+        for (const { organizationId } of orgs) {
+          const plan = await getOrgPlan(organizationId);
+          const deleted = await deleteOldLogsForOrg(organizationId, plan);
+
+          if (deleted > 0) {
+            log.info("[audit-log-cleanup] Deleted rows for org", {
+              organizationId,
+              plan,
+              deleted,
+            });
+          }
+
+          totalDeleted += deleted;
+        }
+
+        log.info("[audit-log-cleanup] Cleanup complete", { totalDeleted });
+      } finally {
+        await flushLogger();
+        // See closeDbConnection's doc comment — this runs nightly, but a
+        // frozen container can still sit warm for hours between runs, which
+        // was enough to keep the Neon compute permanently active.
+        await closeDbConnection();
+      }
     },
     { ...CRON_MONITOR_DEFAULTS, ...CRON_MONITORS["audit-log-cleanup"] }
   )

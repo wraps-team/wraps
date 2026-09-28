@@ -12,6 +12,10 @@ type LiveRefreshToggleProps = {
 };
 
 const REFRESH_INTERVAL_MS = 15_000;
+// No one watches a live-updating table for longer than this in one sitting —
+// cap it so a forgotten tab can't poll the DB indefinitely. Re-enabling the
+// switch (or the tab regaining focus) starts a fresh window.
+const MAX_LIVE_DURATION_MS = 5 * 60 * 1000;
 
 export function LiveRefreshToggle({ params }: LiveRefreshToggleProps) {
   const router = useRouter();
@@ -49,7 +53,11 @@ export function LiveRefreshToggle({ params }: LiveRefreshToggleProps) {
       return;
     }
     const interval = setInterval(refresh, REFRESH_INTERVAL_MS);
-    return () => clearInterval(interval);
+    const cap = setTimeout(() => setEnabled(false), MAX_LIVE_DURATION_MS);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(cap);
+    };
   }, [live, refresh]);
 
   return (

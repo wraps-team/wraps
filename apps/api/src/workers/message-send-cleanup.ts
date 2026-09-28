@@ -22,6 +22,7 @@ import "../lib/sentry";
 
 import { withMonitor, wrapHandler } from "@sentry/aws-serverless";
 import {
+  closeDbConnection,
   contactEvent,
   db,
   messageSend,
@@ -378,63 +379,67 @@ export const handler: Handler = wrapHandler(async () =>
   withMonitor(
     "message-send-cleanup",
     async () => {
-      log.info("[message-send-cleanup] Starting cleanup run", {
-        dryRun: DRY_RUN,
-      });
+      try {
+        log.info("[message-send-cleanup] Starting cleanup run", {
+          dryRun: DRY_RUN,
+        });
 
-      const orgs = await db
-        .selectDistinct({ organizationId: messageSend.organizationId })
-        .from(messageSend);
+        const orgs = await db
+          .selectDistinct({ organizationId: messageSend.organizationId })
+          .from(messageSend);
 
-      log.info("[message-send-cleanup] Processing orgs", {
-        count: orgs.length,
-      });
+        log.info("[message-send-cleanup] Processing orgs", {
+          count: orgs.length,
+        });
 
-      let totalDeleted = 0;
+        let totalDeleted = 0;
 
-      for (const { organizationId } of orgs) {
-        const { plan, visibleDays, deleteAfterDays } =
-          await getOrgRetention(organizationId);
+        for (const { organizationId } of orgs) {
+          const { plan, visibleDays, deleteAfterDays } =
+            await getOrgRetention(organizationId);
 
-        await warnOrgIfNeeded(
-          organizationId,
-          plan,
-          visibleDays,
-          deleteAfterDays
-        );
-
-        const { rowsDeleted, oldestRemaining } = await cleanupMessageSendForOrg(
-          organizationId,
-          deleteAfterDays
-        );
-
-        if (rowsDeleted > 0) {
-          log.info("[message-send-cleanup] Processed org", {
+          await warnOrgIfNeeded(
             organizationId,
             plan,
-            deleteAfterDays,
-            dryRun: DRY_RUN,
-            ...(DRY_RUN ? { rowsWouldDelete: rowsDeleted } : { rowsDeleted }),
-            oldestRemaining,
-          });
+            visibleDays,
+            deleteAfterDays
+          );
+
+          const { rowsDeleted, oldestRemaining } =
+            await cleanupMessageSendForOrg(organizationId, deleteAfterDays);
+
+          if (rowsDeleted > 0) {
+            log.info("[message-send-cleanup] Processed org", {
+              organizationId,
+              plan,
+              deleteAfterDays,
+              dryRun: DRY_RUN,
+              ...(DRY_RUN ? { rowsWouldDelete: rowsDeleted } : { rowsDeleted }),
+              oldestRemaining,
+            });
+          }
+
+          totalDeleted += rowsDeleted;
         }
 
-        totalDeleted += rowsDeleted;
+        const contactEventsDeleted = await cleanupExpiredContactEvents();
+
+        log.info("[message-send-cleanup] Cleanup complete", {
+          dryRun: DRY_RUN,
+          ...(DRY_RUN
+            ? { messageSendRowsWouldDelete: totalDeleted }
+            : { messageSendRowsDeleted: totalDeleted }),
+          ...(DRY_RUN
+            ? { contactEventRowsWouldDelete: contactEventsDeleted }
+            : { contactEventRowsDeleted: contactEventsDeleted }),
+        });
+      } finally {
+        await flushLogger();
+        // See closeDbConnection's doc comment — this runs nightly, but a
+        // frozen container can still sit warm for hours between runs, which
+        // was enough to keep the Neon compute permanently active.
+        await closeDbConnection();
       }
-
-      const contactEventsDeleted = await cleanupExpiredContactEvents();
-
-      log.info("[message-send-cleanup] Cleanup complete", {
-        dryRun: DRY_RUN,
-        ...(DRY_RUN
-          ? { messageSendRowsWouldDelete: totalDeleted }
-          : { messageSendRowsDeleted: totalDeleted }),
-        ...(DRY_RUN
-          ? { contactEventRowsWouldDelete: contactEventsDeleted }
-          : { contactEventRowsDeleted: contactEventsDeleted }),
-      });
-
-      await flushLogger();
     },
     { ...CRON_MONITOR_DEFAULTS, ...CRON_MONITORS["message-send-cleanup"] }
   )

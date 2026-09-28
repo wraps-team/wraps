@@ -33,18 +33,54 @@ function resolvePoolMax(raw: string | undefined): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_POOL_MAX;
 }
 
-const pool = new Pool({
-  connectionString: normalizeDatabaseUrl(process.env.DATABASE_URL || "").url,
-  max: resolvePoolMax(process.env.DATABASE_POOL_MAX),
-  // Lambda freeze/thaw leaves sockets the pooler has already closed;
-  // recycle aggressively so we rarely pick up a dead connection.
-  idleTimeoutMillis: 30_000,
-  maxLifetimeSeconds: 300,
-});
-// Errors on idle clients (e.g., pooler closing a frozen Lambda's socket)
-// crash the process if unhandled; the pool discards the client either way.
-pool.on("error", () => {});
-export const db = drizzle(pool, { schema });
+function createPool(): Pool {
+  const newPool = new Pool({
+    connectionString: normalizeDatabaseUrl(process.env.DATABASE_URL || "").url,
+    max: resolvePoolMax(process.env.DATABASE_POOL_MAX),
+    // Lambda freeze/thaw leaves sockets the pooler has already closed;
+    // recycle aggressively so we rarely pick up a dead connection.
+    idleTimeoutMillis: 30_000,
+    maxLifetimeSeconds: 300,
+  });
+  // Errors on idle clients (e.g., pooler closing a frozen Lambda's socket)
+  // crash the process if unhandled; the pool discards the client either way.
+  newPool.on("error", () => {});
+  return newPool;
+}
+
+let pool = createPool();
+// `let`, not `const`: closeDbConnection() below reassigns this. Every
+// `import { db } from "@wraps/db"` is a live ES module binding, so a
+// reassignment here is visible to every existing importer on their next
+// query — no caller needs to re-import anything.
+// biome-ignore lint/plugin: reassigned by closeDbConnection() below.
+export let db = drizzle(pool, { schema });
+
+/**
+ * Closes the pool this process holds and opens a fresh one in its place.
+ *
+ * The pool's own `idleTimeoutMillis`/`maxLifetimeSeconds` are JS timers, which
+ * only run while the event loop is active. AWS Lambda freezes a container
+ * between invocations instead of tearing it down, so those timers never fire
+ * on a frozen container — the connection just sits open, idle, for as long as
+ * AWS keeps that container warm. For an infrequently-invoked function (a
+ * cron running every 15 minutes to nightly), that container can stay warm
+ * indefinitely, which was enough on its own to keep the Neon compute behind
+ * it from ever seeing a clean idle gap and autosuspending.
+ *
+ * Call this at the end of an infrequent cron/worker handler's invocation, in
+ * a `finally` so it runs on both success and failure. Do NOT call it from a
+ * high-traffic handler (the API Lambda, queue subscribers) — those benefit
+ * from reusing the pool across warm invocations, and ending it every time
+ * would trade a real performance win for no benefit (they're invoked often
+ * enough that the connection would stay warm anyway).
+ */
+export async function closeDbConnection(): Promise<void> {
+  const ended = pool.end();
+  pool = createPool();
+  db = drizzle(pool, { schema });
+  await ended;
+}
 
 export type DbOrTx =
   | typeof db

@@ -55,6 +55,7 @@ import {
 } from "@sentry/aws-serverless";
 import {
   awsAccount,
+  closeDbConnection,
   db,
   hasRecentNotification,
   notifyOrg,
@@ -535,56 +536,63 @@ export const handler: Handler = wrapHandler(async () =>
   withMonitor(
     "account-health",
     async () => {
-      log.info("[account-health] Starting sweep");
+      try {
+        log.info("[account-health] Starting sweep");
 
-      // biome-ignore lint/plugin: privileged system Lambda; sweeps every org's AWS accounts by design (SES health check).
-      const accounts = await db
-        .select({
-          id: awsAccount.id,
-          organizationId: awsAccount.organizationId,
-          name: awsAccount.name,
-          accountId: awsAccount.accountId,
-          region: awsAccount.region,
-          features: awsAccount.features,
-          roleLastReachableAt: awsAccount.roleLastReachableAt,
-          consolePolicyVersion: awsAccount.consolePolicyVersion,
-          consolePolicyCheckedAt: awsAccount.consolePolicyCheckedAt,
-        })
-        .from(awsAccount)
-        .where(isNotNull(awsAccount.webhookSecret));
+        // biome-ignore lint/plugin: privileged system Lambda; sweeps every org's AWS accounts by design (SES health check).
+        const accounts = await db
+          .select({
+            id: awsAccount.id,
+            organizationId: awsAccount.organizationId,
+            name: awsAccount.name,
+            accountId: awsAccount.accountId,
+            region: awsAccount.region,
+            features: awsAccount.features,
+            roleLastReachableAt: awsAccount.roleLastReachableAt,
+            consolePolicyVersion: awsAccount.consolePolicyVersion,
+            consolePolicyCheckedAt: awsAccount.consolePolicyCheckedAt,
+          })
+          .from(awsAccount)
+          .where(isNotNull(awsAccount.webhookSecret));
 
-      let checkedCount = 0;
-      let errorCount = 0;
+        let checkedCount = 0;
+        let errorCount = 0;
 
-      for (const account of accounts) {
-        try {
-          await checkAccount(account);
-          checkedCount++;
-        } catch (error) {
-          errorCount++;
-          // Skipped by design so one broken role cannot abort the sweep — which
-          // also means an account whose role has drifted stops being health-checked
-          // indefinitely without anything surfacing it.
-          captureException(error, {
-            tags: { worker: "account-health", stage: "check-account" },
-            extra: {
+        for (const account of accounts) {
+          try {
+            await checkAccount(account);
+            checkedCount++;
+          } catch (error) {
+            errorCount++;
+            // Skipped by design so one broken role cannot abort the sweep — which
+            // also means an account whose role has drifted stops being health-checked
+            // indefinitely without anything surfacing it.
+            captureException(error, {
+              tags: { worker: "account-health", stage: "check-account" },
+              extra: {
+                accountId: account.id,
+                organizationId: account.organizationId,
+              },
+            });
+            log.error("[account-health] Account check failed", error, {
               accountId: account.id,
               organizationId: account.organizationId,
-            },
-          });
-          log.error("[account-health] Account check failed", error, {
-            accountId: account.id,
-            organizationId: account.organizationId,
-          });
+            });
+          }
         }
-      }
 
-      log.info("[account-health] Sweep complete", {
-        accountsTotal: accounts.length,
-        checkedCount,
-        errorCount,
-      });
-      await flushLogger();
+        log.info("[account-health] Sweep complete", {
+          accountsTotal: accounts.length,
+          checkedCount,
+          errorCount,
+        });
+      } finally {
+        await flushLogger();
+        // See closeDbConnection's doc comment — this runs hourly, but a
+        // frozen container can still sit warm between runs, which was enough
+        // to keep the Neon compute permanently active.
+        await closeDbConnection();
+      }
     },
     { ...CRON_MONITOR_DEFAULTS, ...CRON_MONITORS["account-health"] }
   )

@@ -45,7 +45,7 @@ import {
   withMonitor,
   wrapHandler,
 } from "@sentry/aws-serverless";
-import { batchSend, db } from "@wraps/db";
+import { batchSend, closeDbConnection, db } from "@wraps/db";
 import type { Handler } from "aws-lambda";
 import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { awsDefaults } from "../lib/aws-defaults";
@@ -325,6 +325,10 @@ export const handler: Handler = wrapHandler(async () =>
         await runBroadcastReaper(db, { enqueue: enqueueChunk });
       } finally {
         await flushLogger();
+        // See closeDbConnection's doc comment — this runs every 15 minutes,
+        // frequently enough that a frozen container holding the connection
+        // open between runs was keeping the Neon compute permanently active.
+        await closeDbConnection();
       }
     },
     { ...CRON_MONITOR_DEFAULTS, ...CRON_MONITORS["broadcast-reaper"] }

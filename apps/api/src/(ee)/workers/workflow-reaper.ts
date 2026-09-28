@@ -24,7 +24,7 @@ import {
   withMonitor,
   wrapHandler,
 } from "@sentry/aws-serverless";
-import { db, workflowExecution } from "@wraps/db";
+import { closeDbConnection, db, workflowExecution } from "@wraps/db";
 import type { Handler } from "aws-lambda";
 import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
 import { flushLogger, log } from "../../lib/logger";
@@ -203,7 +203,14 @@ export const handler: Handler = wrapHandler(async () =>
   withMonitor(
     "workflow-reaper",
     async () => {
-      await runReaper(db);
+      try {
+        await runReaper(db);
+      } finally {
+        // See closeDbConnection's doc comment — this runs hourly, frequently
+        // enough that a frozen container holding the connection open between
+        // runs was keeping the Neon compute permanently active.
+        await closeDbConnection();
+      }
     },
     { ...CRON_MONITOR_DEFAULTS, ...CRON_MONITORS["workflow-reaper"] }
   )
