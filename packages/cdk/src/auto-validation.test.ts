@@ -10,6 +10,7 @@ import { WrapsEmail } from "./email.js";
  * stack here so no Lambda asset needs bundling for synth.
  */
 describe("WrapsEmail — SES Auto Validation", () => {
+  // Cold aws-cdk-lib import + synth is slow under the parallel suite, so allow 30s.
   it("adds ValidationOptions to the configuration set's SuppressionOptions when autoValidation is set", () => {
     const app = new cdk.App();
     const stack = new cdk.Stack(app, "TestStack");
@@ -34,7 +35,7 @@ describe("WrapsEmail — SES Auto Validation", () => {
         }),
       })
     );
-  });
+  }, 30_000);
 
   it("has no ValidationOptions when autoValidation is not set", () => {
     const app = new cdk.App();
