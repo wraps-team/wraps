@@ -1834,6 +1834,281 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
       "These two appear on the same shortlist whenever a growing company asks what comes after basic campaigns, and the honest deciding factors — a monthly floor that excludes small companies, and an event pipeline somebody has to build — are absent from both vendors' own comparisons.",
   },
   // END GENERATED VERSUS INTENT
+
+  // BEGIN GENERATED GLOSSARY INTENT
+  {
+    route: "/glossary",
+    primaryQuery: "email terminology glossary",
+    secondaryQueries: [
+      "email jargon explained",
+      "email deliverability glossary",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Every term a reader hits across the SES error pages, the versus comparisons, and the blog posts, defined once and linked from everywhere else it's used instead of re-explained per page.",
+  },
+  {
+    route: "/glossary/spf",
+    primaryQuery: "what is spf (sender policy framework)",
+    secondaryQueries: ["sender policy framework", "spf record", "v=spf1"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/dkim",
+    primaryQuery: "what is dkim (domainkeys identified mail)",
+    secondaryQueries: [
+      "domainkeys identified mail",
+      "dkim signature",
+      "dkim record",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/dmarc",
+    primaryQuery:
+      "what is dmarc (domain-based message authentication, reporting & conformance)",
+    secondaryQueries: ["dmarc record", "dmarc policy", "p=reject"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/bimi",
+    primaryQuery: "what is bimi (brand indicators for message identification)",
+    secondaryQueries: [
+      "brand indicators for message identification",
+      "bimi record",
+      "email logo",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/mta-sts",
+    primaryQuery: "what is mta-sts (smtp mta strict transport security)",
+    secondaryQueries: ["smtp mta strict transport security", "mta-sts policy"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/tls-rpt",
+    primaryQuery: "what is tls-rpt (smtp tls reporting)",
+    secondaryQueries: ["smtp tls reporting", "tls reporting record"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/dkim-selector",
+    primaryQuery: "what is dkim selector",
+    secondaryQueries: ["selector._domainkey", "dkim key selector"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/dmarc-alignment",
+    primaryQuery: "what is dmarc alignment",
+    secondaryQueries: ["spf alignment", "dkim alignment", "aspf"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/return-path",
+    primaryQuery: "what is return-path",
+    secondaryQueries: [
+      "envelope sender",
+      "mail from address",
+      "bounce address",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/soft-bounce",
+    primaryQuery: "what is soft bounce",
+    secondaryQueries: ["temporary bounce", "smtp 4xx", "transient failure"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/hard-bounce",
+    primaryQuery: "what is hard bounce",
+    secondaryQueries: ["permanent bounce", "smtp 5xx"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/complaint-rate",
+    primaryQuery: "what is complaint rate",
+    secondaryQueries: [
+      "spam complaint rate",
+      "abuse complaint rate",
+      "fbl complaint rate",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/spam-trap",
+    primaryQuery: "what is spam trap",
+    secondaryQueries: ["honeypot address", "trap address"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/blocklist",
+    primaryQuery: "what is blocklist (dnsbl)",
+    secondaryQueries: ["blacklist", "dnsbl", "dns-based blocklist"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/ip-warming",
+    primaryQuery: "what is ip warming",
+    secondaryQueries: ["ip ramp-up", "warming a sending ip"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/dedicated-ip",
+    primaryQuery: "what is dedicated ip",
+    secondaryQueries: ["dedicated sending ip", "private sending ip"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/shared-ip",
+    primaryQuery: "what is shared ip",
+    secondaryQueries: ["shared sending pool", "shared ip pool"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/inbox-placement",
+    primaryQuery: "what is inbox placement",
+    secondaryQueries: ["inbox placement rate", "spam folder placement"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/feedback-loop",
+    primaryQuery: "what is feedback loop (fbl)",
+    secondaryQueries: ["fbl", "isp feedback loop", "complaint feedback loop"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/list-unsubscribe",
+    primaryQuery: "what is list-unsubscribe",
+    secondaryQueries: [
+      "list-unsubscribe header",
+      "one-click unsubscribe",
+      "rfc 8058",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/smtp-relay",
+    primaryQuery: "what is smtp relay",
+    secondaryQueries: ["smtp gateway", "ses smtp interface"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/mx-record",
+    primaryQuery: "what is mx record",
+    secondaryQueries: ["mail exchange record", "mx"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/configuration-set",
+    primaryQuery: "what is configuration set",
+    secondaryQueries: ["ses configuration set"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/suppression-list",
+    primaryQuery: "what is suppression list",
+    secondaryQueries: ["ses suppression list", "account-level suppression"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/sending-quota",
+    primaryQuery: "what is sending quota",
+    secondaryQueries: ["ses send quota", "sending limits"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/message-id",
+    primaryQuery: "what is message-id",
+    secondaryQueries: ["ses messageid", "email message-id header"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/double-opt-in",
+    primaryQuery: "what is double opt-in",
+    secondaryQueries: ["confirmed opt-in", "coi"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/can-spam",
+    primaryQuery: "what is can-spam act",
+    secondaryQueries: ["can-spam", "us anti-spam law"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/gdpr-consent",
+    primaryQuery: "what is gdpr consent",
+    secondaryQueries: ["gdpr marketing consent", "lawful basis for email"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  {
+    route: "/glossary/open-rate",
+    primaryQuery: "what is open rate",
+    secondaryQueries: ["email open rate", "open tracking"],
+    audience: "stranger-with-problem",
+    rationale:
+      "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
+  },
+  // END GENERATED GLOSSARY INTENT
 ];
 
 /** Routes that exist for reasons other than search. */

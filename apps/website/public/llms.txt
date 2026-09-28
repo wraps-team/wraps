@@ -336,6 +336,44 @@ Failures SES throws no exception for. Every percentage is quoted from AWS docume
 - [SES Sending Limits](https://wraps.dev/ses/limits): Sandbox quotas, per-second rate vs rolling 24-hour cap, recipients not messages, and how increases happen
 - [SES Emails Going to Spam](https://wraps.dev/ses/spam-folder): Diagnose authentication, then reputation, then content — and what nobody can promise about inbox placement
 
+## Glossary: email terminology
+
+Definitions written from the code that actually checks each mechanism (SPF, DKIM, DMARC, BIMI lookups and validation live in packages/email-check), not from general knowledge. Links back to the /ses/errors and /ses pages that document a specific failure mode in depth.
+
+<!-- BEGIN GENERATED GLOSSARY -->
+- [All email terminology](https://wraps.dev/glossary): Every term grouped by authentication, deliverability, infrastructure, compliance, and metrics
+- [SPF (Sender Policy Framework)](https://wraps.dev/glossary/spf): An SPF record is a DNS TXT record that lists which servers are allowed to send mail for a domain, checked against the envelope return-path rather than the visible From address.
+- [DKIM (DomainKeys Identified Mail)](https://wraps.dev/glossary/dkim): DKIM signs outgoing mail with a private key and publishes the matching public key in DNS, so a receiver can verify the message was not altered in transit and genuinely came from the signing domain.
+- [DMARC (Domain-based Message Authentication, Reporting & Conformance)](https://wraps.dev/glossary/dmarc): DMARC is a DNS TXT record that tells receivers what to do with mail claiming your domain that fails SPF and DKIM alignment, and where to send reports about it — the enforcement layer on top of both.
+- [BIMI (Brand Indicators for Message Identification)](https://wraps.dev/glossary/bimi): BIMI is a DNS record that points a supporting mailbox provider at a domain's SVG logo, displayed next to authenticated mail — but only once DMARC is already enforcing.
+- [MTA-STS (SMTP MTA Strict Transport Security)](https://wraps.dev/glossary/mta-sts): MTA-STS (RFC 8461) lets a domain require that inbound mail delivered to it use encrypted, authenticated SMTP, closing the downgrade and interception attacks plain SMTP TLS leaves open.
+- [TLS-RPT (SMTP TLS Reporting)](https://wraps.dev/glossary/tls-rpt): TLS-RPT (RFC 8460) is a DNS record naming an address that receives daily aggregate reports of SMTP transport-security failures against your domain, the reporting half of MTA-STS.
+- [DKIM selector](https://wraps.dev/glossary/dkim-selector): The DKIM selector is the label a sender chooses to name a specific public key at <selector>._domainkey.<domain>, letting one domain publish and rotate several DKIM keys at once.
+- [DMARC alignment](https://wraps.dev/glossary/dmarc-alignment): DMARC alignment is the check that ties a passing SPF or DKIM result back to the domain in the visible From header, using either a strict exact-match mode or a relaxed organizational-domain match.
+- [Return-path](https://wraps.dev/glossary/return-path): The return-path is the envelope-level sender address SPF actually checks and where non-delivery bounces are sent — distinct from, and invisible next to, the visible From address a recipient reads.
+- [Soft bounce](https://wraps.dev/glossary/soft-bounce): A soft bounce is a temporary delivery failure — a full mailbox, an unreachable server, an oversized message — reported with an SMTP 4xx code, meant to be retried rather than treated as permanent.
+- [Hard bounce](https://wraps.dev/glossary/hard-bounce): A hard bounce is a permanent delivery failure — the address or domain doesn't exist — reported with an SMTP 5xx code, and the address should never be sent to again without a fresh, confirmed reason to believe it's valid.
+- [Complaint rate](https://wraps.dev/glossary/complaint-rate): Complaint rate is the share of delivered messages a recipient actively marked as spam, and AWS reviews an SES account at 0.1% and may pause sending at 0.5% — thresholds far tighter than the bounce-rate ones.
+- [Spam trap](https://wraps.dev/glossary/spam-trap): A spam trap is an email address mailbox providers or anti-spam organizations control specifically to catch senders with poor list hygiene — a hit confirms the practice, not a one-off mistake.
+- [Blocklist (DNSBL)](https://wraps.dev/glossary/blocklist): A blocklist (DNSBL) is a DNS-queryable list of IPs or domains associated with unwanted mail — checked by reversing the IP into a lookup subdomain and testing for a listing response.
+- [IP warming](https://wraps.dev/glossary/ip-warming): IP warming is the gradual, staged increase of sending volume on a new IP so mailbox providers can build a reputation baseline for it before it carries full-scale traffic.
+- [Dedicated IP](https://wraps.dev/glossary/dedicated-ip): A dedicated IP is a sending IP address assigned to a single sender rather than shared across many, meaning its reputation is entirely and exclusively yours to build and protect.
+- [Shared IP](https://wraps.dev/glossary/shared-ip): A shared IP is a sending address used by many senders at once, whose reputation reflects the collective behavior of everyone in the pool rather than any single sender's own history.
+- [Inbox placement](https://wraps.dev/glossary/inbox-placement): Inbox placement is whether a message that was successfully delivered actually lands in the primary inbox, a secondary tab, or the spam folder — a decision no sender, including AWS, can see or guarantee from the outside.
+- [Feedback loop (FBL)](https://wraps.dev/glossary/feedback-loop): A feedback loop is a mailbox provider's mechanism for forwarding a recipient's spam complaint back to the sending infrastructure, so the address can be suppressed and the underlying cause investigated.
+- [List-Unsubscribe](https://wraps.dev/glossary/list-unsubscribe): List-Unsubscribe is an email header that lets a mailbox client render a working unsubscribe action directly in its interface, and it's mandatory for bulk senders on Gmail and Yahoo as of February 2024.
+- [SMTP relay](https://wraps.dev/glossary/smtp-relay): An SMTP relay accepts mail over the standard SMTP protocol and forwards it on, letting any system that only knows how to speak SMTP — not call an API — send through a provider like SES.
+- [MX record](https://wraps.dev/glossary/mx-record): An MX record is a DNS record naming which mail server accepts email for a domain, with a priority value that determines the order receiving servers should be tried in.
+- [Configuration set](https://wraps.dev/glossary/configuration-set): A configuration set is an SES resource attached to a send that controls where its events publish, which reputation options apply, and which IP pool it uses — a routing and policy layer on top of the send itself.
+- [Suppression list](https://wraps.dev/glossary/suppression-list): The suppression list is SES's account-level record of addresses it will refuse to send to, populated automatically on a hard bounce or a complaint, unless a send explicitly overrides it.
+- [Sending quota](https://wraps.dev/glossary/sending-quota): SES enforces two independent sending caps — a rolling 24-hour maximum message count and a per-second maximum rate — and hitting either returns a different exception with a different fix.
+- [Message-ID](https://wraps.dev/glossary/message-id): Message-ID is the RFC 5322 header uniquely identifying an individual email message; SES's own MessageId, returned from a successful send, is the handle used to correlate that send with its later delivery, bounce, and complaint events.
+- [Double opt-in](https://wraps.dev/glossary/double-opt-in): Double opt-in requires a subscriber to confirm their email address — usually by clicking a link in a confirmation message — before they're added to a sending list, rather than trusting the signup form alone.
+- [CAN-SPAM Act](https://wraps.dev/glossary/can-spam): CAN-SPAM is the 2003 US federal law, enforced by the FTC, that requires accurate sender information, a working opt-out mechanism honored within 10 business days, and a valid physical postal address in commercial email.
+- [GDPR consent](https://wraps.dev/glossary/gdpr-consent): GDPR requires a lawful basis for processing personal data, and for marketing email that basis is generally consent — freely given, specific, informed, and an affirmative opt-in, not a pre-checked box or a default-in setting.
+- [Open rate](https://wraps.dev/glossary/open-rate): Open rate is the share of delivered messages whose tracking pixel fired — historically the headline engagement metric, but heavily inflated since 2021 by Apple's Mail Privacy Protection pre-fetching images regardless of whether a message was actually opened.
+<!-- END GENERATED GLOSSARY -->
+
 ## CLI Commands
 
 - [Email Commands](https://wraps.dev/docs/cli-reference/email): init, status, domains, upgrade, templates, workflows

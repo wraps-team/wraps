@@ -13,6 +13,7 @@
     "mcp:server-json": "tsx scripts/generate-server-json.ts",
     "sitemap:dates": "tsx scripts/generate-page-dates.ts",
     "versus:generate": "tsx scripts/generate-versus-pages.ts",
+    "glossary:generate": "tsx scripts/generate-glossary-pages.ts",
     "deploy:vercel": "vercel --prod",
     "deploy:vercel:preview": "vercel"
   },
