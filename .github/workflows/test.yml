@@ -540,7 +540,7 @@ jobs:
           # in the root package.json decides which OpenNext runs, so a bump to
           # either changes what this step is testing.
           if echo "$files" | grep -qE \
-            '^(apps/web/|packages/(ai|auth|db|email|email-send|template-render|ui|unsubscribe-token)/|infra/selfhost\.config\.ts$|scripts/selfhost/verify-opennext-build\.mjs$|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.github/workflows/test\.yml$)'
+            '^(apps/web/|packages/(ai|auth|core|db|email|email-send|template-render|ui|unsubscribe-token)/|infra/selfhost\.config\.ts$|scripts/selfhost/verify-opennext-build\.mjs$|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.github/workflows/test\.yml$)'
           then
             echo "build=true" >> "$GITHUB_OUTPUT"
             echo "OpenNext-relevant paths changed: building"
