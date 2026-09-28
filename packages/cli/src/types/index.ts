@@ -129,6 +129,27 @@ export type EmailPlanOptions = {
 };
 
 /**
+ * Command options for `wraps email vdm` — show, and (with `--enable`/
+ * `--disable`) switch, Virtual Deliverability Manager for the account.
+ * Shape follows `EmailPlanOptions` above.
+ */
+export type EmailVdmOptions = {
+  account?: string;
+  region?: string;
+  /** Turn VDM on. Mutually exclusive with `disable`. */
+  enable?: boolean;
+  /** Turn VDM off. Mutually exclusive with `enable`. */
+  disable?: boolean;
+  /** Tri-state: read through `resolveNegatableFlag` to distinguish "off" from "not mentioned". */
+  engagement?: boolean;
+  /** Tri-state: read through `resolveNegatableFlag` to distinguish "off" from "not mentioned". */
+  optimizedDelivery?: boolean;
+  /** Skip the confirmation prompt when mutating. */
+  yes?: boolean;
+  json?: boolean;
+};
+
+/**
  * Command options for `wraps email production-access` — show the account's
  * SES production-access / review state and (with `--request`) file the
  * request. Shape follows `EmailPlanOptions` above.

@@ -67,6 +67,7 @@ import { templatesPreview } from "./commands/email/templates/preview.js";
 import { templatesPush } from "./commands/email/templates/push.js";
 import { emailTest } from "./commands/email/test.js";
 import { upgrade } from "./commands/email/upgrade.js";
+import { emailVdm } from "./commands/email/vdm.js";
 import { workflowsInit } from "./commands/email/workflows/init.js";
 import { workflowsPush } from "./commands/email/workflows/push.js";
 import { workflowsValidate } from "./commands/email/workflows/validate.js";
@@ -187,6 +188,9 @@ function showHelp() {
   );
   console.log(
     `  ${pc.cyan("email plan")}              Show SES pricing plan and cheaper options`
+  );
+  console.log(
+    `  ${pc.cyan("email vdm")}               Turn Virtual Deliverability Manager on or off for this account`
   );
   console.log(
     `  ${pc.cyan("email production-access")} Show SES production-access status or file the request`
@@ -763,6 +767,19 @@ async function run() {
           });
           break;
 
+        case "vdm":
+          await emailVdm({
+            account: flags.account,
+            region: flags.region,
+            enable: flags.enable,
+            disable: flags.disable,
+            engagement: flags.engagement,
+            optimizedDelivery: flags.optimizedDelivery,
+            yes: flags.yes,
+            json: flags.json,
+          });
+          break;
+
         case "production-access":
           await emailProductionAccess({
             account: flags.account,
@@ -1055,6 +1072,8 @@ async function run() {
                 sendingEnabled: flags.sendingEnabled,
                 vdmEngagement: flags.vdmEngagement,
                 vdmInbox: flags.vdmInbox,
+                autoValidation: flags.autoValidation,
+                validationThreshold: flags.validationThreshold,
                 region: flags.region,
                 json: flags.json,
               });

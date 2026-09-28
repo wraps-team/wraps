@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildSuppressionOptions } from "@wraps/core";
 import * as cdk from "aws-cdk-lib";
 import { Annotations } from "aws-cdk-lib";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
@@ -189,6 +190,24 @@ export class WrapsEmail extends Construct {
         : undefined,
     });
     resources.configSet = configSet;
+
+    // SES Auto Validation (plan 373). CDK's L2 ConfigurationSet construct has
+    // no `validationOptions` prop, so this is a CloudFormation property
+    // override on the L1 escape hatch. Always paired with the reasons the
+    // construct is applying above, via the same builder every other writer
+    // (CLI, Pulumi) shares — see @wraps/core/ses-suppression for why a
+    // suppression-options write can never carry one field without the other.
+    if (config.autoValidation) {
+      const cfnConfigSet = configSet.node
+        .defaultChild as ses.CfnConfigurationSet;
+      cfnConfigSet.addPropertyOverride(
+        "SuppressionOptions.ValidationOptions",
+        buildSuppressionOptions(
+          config.suppressionList.reasons,
+          config.autoValidation
+        ).ValidationOptions
+      );
+    }
 
     // The construct does not yet write TrackingOptions onto the configuration
     // set — plan 226 owns that work. Until it lands, accepting the option

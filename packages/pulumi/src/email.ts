@@ -3,6 +3,7 @@ import * as pulumi from "@pulumi/pulumi";
 import { DEFAULT_CONFIG_SET_NAME, retentionToDays } from "@wraps/core";
 import { applyDefaults } from "./defaults.js";
 import {
+  createConfigSetAutoValidation,
   createCustomOIDCProvider,
   createDNSRecords,
   createEventProcessor,
@@ -222,6 +223,19 @@ export class WrapsEmail extends pulumi.ComponentResource {
     nodes.configSet = sesResult.configSet;
     nodes.domainIdentity = sesResult.domainIdentity;
     nodes.domainDkim = sesResult.domainDkim;
+
+    // SES Auto Validation (if configured) — opt-in, stored inside the
+    // configuration set's suppression options, so it depends on the config
+    // set existing first.
+    if (config.autoValidation) {
+      createConfigSetAutoValidation(
+        name,
+        config,
+        sesResult.configSet.name ?? DEFAULT_CONFIG_SET_NAME,
+        region.name,
+        { parent: this, dependsOn: [sesResult.configSet] }
+      );
+    }
 
     // ============================================
     // 3.5. CREATE DNS RECORDS (if DNS provider configured)

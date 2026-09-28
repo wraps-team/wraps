@@ -415,6 +415,11 @@ export function buildConsolePolicyDocument(
       "cloudwatch:GetMetricStatistics",
       // SES dedicated IP scanning
       "ses:GetDedicatedIps",
+      // VDM advisor recommendations (read by the account-health sweep, plan 373).
+      "ses:ListRecommendations",
+      // Email address validation for contact import (plan 373 Phase C) —
+      // billed per call, never probed by the console-policy ladder.
+      "ses:GetEmailAddressInsights",
     ],
     Resource: "*",
   });

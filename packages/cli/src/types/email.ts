@@ -44,6 +44,10 @@ export type AdditionalDomain = {
   archiveArn?: string;
   vdmEngagement?: boolean;
   vdmInbox?: boolean;
+  autoValidation?: {
+    enabled: boolean;
+    threshold: "MEDIUM" | "HIGH" | "MANAGED";
+  };
   addedAt: string;
 };
 
@@ -63,6 +67,8 @@ export type EmailDomainsConfigOptions = {
   sendingEnabled?: boolean;
   vdmEngagement?: boolean;
   vdmInbox?: boolean;
+  autoValidation?: boolean;
+  validationThreshold?: string;
   region?: string;
   json?: boolean;
 };
@@ -222,6 +228,10 @@ export type WrapsEmailConfig = {
   vdmOptions?: {
     engagementTrackingEnabled?: boolean;
     optimizedSharedDeliveryEnabled?: boolean;
+  };
+  autoValidation?: {
+    enabled: boolean;
+    threshold: "MEDIUM" | "HIGH" | "MANAGED";
   };
 };
 

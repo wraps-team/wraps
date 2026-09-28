@@ -45,6 +45,7 @@ import {
 import {
   GetAccountCommand,
   type GetAccountCommandOutput,
+  ListRecommendationsCommand,
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
 import {
@@ -204,6 +205,95 @@ async function getReputationRates(
     return result?.Values?.[0] ?? null;
   };
   return { bounceRate: latest("bounce"), complaintRate: latest("complaint") };
+}
+
+/** The `vdm` shape persisted into `healthDetail` — see packages/db/src/schema/app.ts. */
+type VdmHealthDetail = NonNullable<
+  NonNullable<typeof awsAccount.$inferSelect.healthDetail>["vdm"]
+>;
+
+const MAX_STORED_RECOMMENDATIONS = 20;
+const IMPACT_ORDER: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+
+/**
+ * Read VDM's on/off state (already on `info`, free) plus its open advisor
+ * recommendations (one extra call, only when VDM is enabled). Never throws —
+ * a customer's VDM state, or Wraps' inability to read it, is context for the
+ * dashboard, not a reason to abort the rest of the sweep.
+ */
+async function readVdmState(
+  sesClient: SESv2Client,
+  info: GetAccountCommandOutput,
+  account: AccountRow
+): Promise<VdmHealthDetail> {
+  const enabled = info.VdmAttributes?.VdmEnabled === "ENABLED";
+  const engagementMetrics =
+    info.VdmAttributes?.DashboardAttributes?.EngagementMetrics === "ENABLED";
+  const optimizedSharedDelivery =
+    info.VdmAttributes?.GuardianAttributes?.OptimizedSharedDelivery ===
+    "ENABLED";
+
+  if (!enabled) {
+    return {
+      enabled,
+      engagementMetrics,
+      optimizedSharedDelivery,
+      recommendations: { status: "vdm_disabled" },
+    };
+  }
+
+  try {
+    const response = await sesClient.send(
+      new ListRecommendationsCommand({
+        Filter: { STATUS: "OPEN" },
+        PageSize: 100,
+      })
+    );
+    const all = response.Recommendations ?? [];
+    const sorted = [...all].sort(
+      (a, b) =>
+        (IMPACT_ORDER[a.Impact ?? ""] ?? 99) -
+        (IMPACT_ORDER[b.Impact ?? ""] ?? 99)
+    );
+    const truncated =
+      sorted.length > MAX_STORED_RECOMMENDATIONS || Boolean(response.NextToken);
+    const open = sorted.slice(0, MAX_STORED_RECOMMENDATIONS).map((r) => ({
+      type: r.Type ?? "UNKNOWN",
+      impact: r.Impact ?? null,
+      description: (r.Description ?? "").slice(0, 300),
+      resourceArn: r.ResourceArn ?? null,
+      lastUpdatedAt: r.LastUpdatedTimestamp
+        ? r.LastUpdatedTimestamp.toISOString()
+        : null,
+    }));
+
+    return {
+      enabled,
+      engagementMetrics,
+      optimizedSharedDelivery,
+      recommendations: { status: "ok", open, truncated },
+    };
+  } catch (error) {
+    if (isRoleAccessError(error)) {
+      return {
+        enabled,
+        engagementMetrics,
+        optimizedSharedDelivery,
+        recommendations: { status: "permission_missing" },
+      };
+    }
+    log.warn("[account-health] VDM recommendations read failed", {
+      accountId: account.id,
+      organizationId: account.organizationId,
+      error,
+    });
+    return {
+      enabled,
+      engagementMetrics,
+      optimizedSharedDelivery,
+      recommendations: { status: "unavailable" },
+    };
+  }
 }
 
 async function checkAccount(account: AccountRow): Promise<void> {
@@ -504,6 +594,7 @@ async function checkAccount(account: AccountRow): Promise<void> {
   // classifySesHealth must not see this. Absent ReviewDetails means AWS
   // reported no review, never a defaulted status.
   const review = info.Details?.ReviewDetails;
+  const vdm = await readVdmState(sesClient, info, account);
   await db
     .update(awsAccount)
     .set({
@@ -525,6 +616,7 @@ async function checkAccount(account: AccountRow): Promise<void> {
           current: info.PricingAttributes?.CurrentPlan ?? null,
           next: info.PricingAttributes?.NextPlan ?? null,
         },
+        vdm,
         reasons: verdict.reasons,
       },
     })

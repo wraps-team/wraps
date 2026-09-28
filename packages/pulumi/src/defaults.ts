@@ -1,5 +1,7 @@
 import {
   type ArchiveRetention,
+  type AutoValidationConfig,
+  DEFAULT_AUTO_VALIDATION_THRESHOLD,
   DEFAULT_EVENT_TYPES,
   DEFAULT_SUPPRESSION_REASONS,
   DEFAULT_TAGS,
@@ -42,9 +44,34 @@ export function applyDefaults(args: WrapsEmailArgs): ResolvedConfig {
   const suppressionList = args.suppressionList as
     | { enabled?: boolean; reasons?: SuppressionReason[] }
     | undefined;
+  const autoValidationArg = args.autoValidation as
+    | AutoValidationConfig
+    | undefined;
   const tags = args.tags as Record<string, string> | undefined;
 
   const dns = args.dns as DNSConfig | undefined;
+
+  const resolvedSuppressionList = {
+    enabled: suppressionList?.enabled ?? true,
+    reasons: suppressionList?.reasons ?? DEFAULT_SUPPRESSION_REASONS,
+  };
+  const autoValidation = autoValidationArg
+    ? {
+        enabled: autoValidationArg.enabled ?? true,
+        threshold:
+          autoValidationArg.threshold ?? DEFAULT_AUTO_VALIDATION_THRESHOLD,
+      }
+    : undefined;
+
+  // SES stores Auto Validation inside the configuration set's suppression
+  // options, so writing it without suppression reasons would cancel
+  // suppression for this configuration set — fail fast rather than deploy
+  // that silently.
+  if (autoValidation?.enabled && !resolvedSuppressionList.enabled) {
+    throw new Error(
+      "autoValidation requires suppressionList.enabled: true — SES stores Auto Validation inside the configuration set's suppression options, and writing it without suppression reasons would cancel suppression for this configuration set."
+    );
+  }
 
   return {
     vercel,
@@ -71,10 +98,8 @@ export function applyDefaults(args: WrapsEmailArgs): ResolvedConfig {
       | { enabled?: boolean; retention?: ArchiveRetention }
       | undefined,
     smtp: args.smtp as { enabled?: boolean } | undefined,
-    suppressionList: {
-      enabled: suppressionList?.enabled ?? true,
-      reasons: suppressionList?.reasons ?? DEFAULT_SUPPRESSION_REASONS,
-    },
+    suppressionList: resolvedSuppressionList,
+    autoValidation,
     reputationMetrics: (args.reputationMetrics as boolean) ?? true,
     tlsRequired: (args.tlsRequired as boolean) ?? false,
     dedicatedIp: (args.dedicatedIp as boolean) ?? false,

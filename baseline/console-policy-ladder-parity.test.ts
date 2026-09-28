@@ -22,6 +22,7 @@ const LADDER_ACTIONS = [
   "ses:ListEmailTemplates",
   "ses:ListConfigurationSets",
   "ses:ListSuppressedDestinations",
+  "ses:ListRecommendations",
 ] as const;
 
 const TEMPLATES = [

@@ -219,6 +219,43 @@ describe("applyDefaults", () => {
     });
   });
 
+  describe("autoValidation configuration", () => {
+    it("is undefined by default", () => {
+      const result = applyDefaults({});
+
+      expect(result.autoValidation).toBeUndefined();
+    });
+
+    it("resolves an empty object to enabled: true, threshold: MANAGED", () => {
+      const result = applyDefaults({ autoValidation: {} });
+
+      expect(result.autoValidation).toEqual({
+        enabled: true,
+        threshold: "MANAGED",
+      });
+    });
+
+    it("keeps an explicit threshold", () => {
+      const result = applyDefaults({
+        autoValidation: { enabled: true, threshold: "HIGH" },
+      });
+
+      expect(result.autoValidation).toEqual({
+        enabled: true,
+        threshold: "HIGH",
+      });
+    });
+
+    it("throws when autoValidation.enabled is true and suppressionList.enabled is false", () => {
+      expect(() =>
+        applyDefaults({
+          autoValidation: { enabled: true },
+          suppressionList: { enabled: false },
+        })
+      ).toThrow(/requires suppressionList\.enabled/);
+    });
+  });
+
   describe("removal policy", () => {
     it("should use RETAIN by default", () => {
       const result = applyDefaults({});

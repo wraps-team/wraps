@@ -1,7 +1,10 @@
 "use server";
 
+import { SESv2Client } from "@aws-sdk/client-sesv2";
+import { isSesPricingPlan } from "@wraps/core/ses-plans";
 import {
   auditLog,
+  awsAccount,
   contact,
   contactTopic,
   db,
@@ -11,10 +14,15 @@ import {
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { trackContactsImported } from "@/lib/activation-tracking";
 import { auditLogEntry, getAuditContext } from "@/lib/audit";
+import { getOrAssumeRole } from "@/lib/aws/credential-cache";
 import type { ImportContactsResult, ImportDuplicateRow } from "@/lib/contacts";
 import { SMS_STATUSES } from "@/lib/contacts";
 import { createActionLogger } from "@/lib/logger";
 import { checkContactLimit } from "@/lib/plan-limits";
+import {
+  SesValidationAccessDeniedError,
+  validateEmailAddressesWithSes,
+} from "@/lib/ses-email-validation";
 import { revalidateContacts } from "./contacts";
 import { hashEmail, hashPhone } from "./shared/hash";
 import { checkPermission } from "./shared/permissions";
@@ -144,6 +152,14 @@ export type ImportContactsData = {
     skipped: number;
     errorCount: number;
   };
+  /**
+   * Opt-in email validation via SES's Email Address Insights API (plan 373
+   * Phase C). Off by default. `awsAccountId` must be an org-owned AWS
+   * account whose last-measured SES pricing plan is PRO or ENTERPRISE —
+   * re-checked here rather than trusted from the client, since the plan can
+   * change between when the import dialog loaded and when this runs.
+   */
+  sesValidation?: { awsAccountId: string };
 };
 
 const BATCH_SIZE = 100;
@@ -208,6 +224,64 @@ export async function importContacts(
         ? Number.POSITIVE_INFINITY
         : limitCheck.limit - limitCheck.current;
 
+    // Opt-in SES email validation (plan 373 Phase C). Re-verified here rather
+    // than trusted from the client: the account's plan can change between
+    // when the import dialog loaded and when this runs, and the account must
+    // belong to this org either way (cross-org IDOR guard).
+    let validationSesClient: SESv2Client | undefined;
+    if (data.sesValidation) {
+      const validationAccount = await db.query.awsAccount.findFirst({
+        where: and(
+          eq(awsAccount.id, data.sesValidation.awsAccountId),
+          eq(awsAccount.organizationId, organizationId)
+        ),
+      });
+      if (!validationAccount) {
+        return {
+          success: false,
+          error: "AWS account for SES validation was not found.",
+        };
+      }
+      const plan = validationAccount.healthDetail?.sesPricingPlan?.current;
+      if (
+        !(
+          plan &&
+          isSesPricingPlan(plan) &&
+          (plan === "PRO" || plan === "ENTERPRISE")
+        )
+      ) {
+        return {
+          success: false,
+          error:
+            "This AWS account's SES plan no longer includes email validation. Refresh the import dialog and try again.",
+        };
+      }
+
+      let validationCredentials: Awaited<ReturnType<typeof getOrAssumeRole>>;
+      try {
+        validationCredentials = await getOrAssumeRole({
+          roleArn: validationAccount.roleArn,
+          externalId: validationAccount.externalId,
+          region: validationAccount.region,
+        });
+      } catch {
+        return {
+          success: false,
+          error:
+            "Wraps couldn't connect to this AWS account to validate addresses. Check the account's IAM role.",
+        };
+      }
+
+      validationSesClient = new SESv2Client({
+        region: validationAccount.region,
+        credentials: {
+          accessKeyId: validationCredentials.accessKeyId,
+          secretAccessKey: validationCredentials.secretAccessKey,
+          sessionToken: validationCredentials.sessionToken,
+        },
+      });
+    }
+
     const auditCtx = await getAuditContext();
 
     let created = 0;
@@ -249,7 +323,7 @@ export async function importContacts(
         properties: Record<string, string>;
       };
 
-      const validRows: ValidatedRow[] = [];
+      let validRows: ValidatedRow[] = [];
 
       for (let j = 0; j < batch.length; j++) {
         const row = batch[j];
@@ -367,6 +441,65 @@ export async function importContacts(
           smsConsentedAt,
           properties: row.properties ?? {},
         });
+      }
+
+      // Opt-in SES validation (plan 373 Phase C) — only rows that already
+      // passed the syntax check above are candidates. A LOW-confidence
+      // verdict removes the row from this batch's import and reports it the
+      // same way any other row failure is reported; MEDIUM/HIGH import as
+      // today. Nothing new is stored on the contact — the verdict is used
+      // once, here.
+      if (validationSesClient && validRows.length > 0) {
+        const emailsToCheck = validRows
+          .map((row) => row.email)
+          .filter((email): email is string => email !== null);
+
+        if (emailsToCheck.length > 0) {
+          let validation: Awaited<
+            ReturnType<typeof validateEmailAddressesWithSes>
+          >;
+          try {
+            validation = await validateEmailAddressesWithSes(
+              validationSesClient,
+              emailsToCheck
+            );
+          } catch (validationError) {
+            if (validationError instanceof SesValidationAccessDeniedError) {
+              return {
+                success: false,
+                error:
+                  "Wraps can't validate addresses: this account's wraps-console-access-role is missing ses:GetEmailAddressInsights. Run wraps platform update-role, then try again.",
+              };
+            }
+            throw validationError;
+          }
+
+          const lowConfidenceEmails = new Set(
+            Object.entries(validation.verdicts)
+              .filter(([, verdict]) => verdict === "LOW")
+              .map(([email]) => email)
+          );
+
+          if (lowConfidenceEmails.size > 0) {
+            validRows = validRows.filter((row) => {
+              if (row.email && lowConfidenceEmails.has(row.email)) {
+                errors.push({ row: row.index, error: "Failed SES validation" });
+                return false;
+              }
+              return true;
+            });
+          }
+
+          // AWS publishes no rate for this API — stop the whole import
+          // cleanly on the first throttling error rather than silently
+          // importing addresses the rest of the file never got checked.
+          if (validation.stoppedEarly) {
+            return {
+              success: false,
+              error: `SES validation was throttled after checking ${validation.validatedCount.toLocaleString()} address${validation.validatedCount === 1 ? "" : "es"}. ${created.toLocaleString()} contact${created === 1 ? "" : "s"} from this file were imported before this happened — re-run the import to pick up the rest.`,
+            };
+          }
+        }
       }
 
       if (validRows.length === 0) {

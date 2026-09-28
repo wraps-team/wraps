@@ -1,5 +1,6 @@
 import {
   type ArchiveRetention,
+  DEFAULT_AUTO_VALIDATION_THRESHOLD,
   DEFAULT_EVENT_TYPES,
   DEFAULT_SUPPRESSION_REASONS,
 } from "@wraps/core";
@@ -13,6 +14,28 @@ export { retentionToDays } from "@wraps/core";
  * Apply default values to WrapsEmailProps
  */
 export function applyDefaults(props: WrapsEmailProps): ResolvedConfig {
+  const suppressionList = {
+    enabled: props.suppressionList?.enabled ?? true,
+    reasons: props.suppressionList?.reasons ?? DEFAULT_SUPPRESSION_REASONS,
+  };
+  const autoValidation = props.autoValidation
+    ? {
+        enabled: props.autoValidation.enabled ?? true,
+        threshold:
+          props.autoValidation.threshold ?? DEFAULT_AUTO_VALIDATION_THRESHOLD,
+      }
+    : undefined;
+
+  // SES stores Auto Validation inside the configuration set's suppression
+  // options, so writing it without suppression reasons would cancel
+  // suppression for this configuration set — fail fast rather than deploy
+  // that silently.
+  if (autoValidation?.enabled && !suppressionList.enabled) {
+    throw new Error(
+      "autoValidation requires suppressionList.enabled: true — SES stores Auto Validation inside the configuration set's suppression options, and writing it without suppression reasons would cancel suppression for this configuration set."
+    );
+  }
+
   return {
     vercel: props.vercel,
     oidc: props.oidc,
@@ -36,10 +59,8 @@ export function applyDefaults(props: WrapsEmailProps): ResolvedConfig {
       : undefined,
     archiving: props.archiving,
     smtp: props.smtp,
-    suppressionList: {
-      enabled: props.suppressionList?.enabled ?? true,
-      reasons: props.suppressionList?.reasons ?? DEFAULT_SUPPRESSION_REASONS,
-    },
+    suppressionList,
+    autoValidation,
     reputationMetrics: props.reputationMetrics ?? true,
     tlsRequired: props.tlsRequired ?? false,
     dedicatedIp: props.dedicatedIp ?? false,

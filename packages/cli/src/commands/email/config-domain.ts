@@ -19,6 +19,16 @@ import {
   UpdateConfigurationSetEventDestinationCommand,
 } from "@aws-sdk/client-sesv2";
 import * as clack from "@clack/prompts";
+import {
+  AUTO_VALIDATION_THRESHOLDS,
+  type AutoValidationThreshold,
+  buildSuppressionOptions,
+  DEFAULT_AUTO_VALIDATION_THRESHOLD,
+} from "@wraps/core";
+import {
+  getSesFeatureEntitlement,
+  SES_PLAN_RATES,
+} from "@wraps/core/ses-plans";
 import pc from "picocolors";
 import { trackCommand } from "../../telemetry/events.js";
 import type { EmailDomainsConfigOptions } from "../../types/index.js";
@@ -46,6 +56,7 @@ import {
 import { resolveNegatableFlag } from "../../utils/shared/arg-parser.js";
 import {
   getAWSRegion,
+  getSESAccountStatus,
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
 import { WrapsError } from "../../utils/shared/errors.js";
@@ -72,6 +83,7 @@ type DomainCandidate = {
   archiveArn?: string;
   vdmEngagement?: boolean;
   vdmInbox?: boolean;
+  autoValidation?: { enabled: boolean; threshold: AutoValidationThreshold };
 };
 
 async function findOrCreateEmailArchive(region: string): Promise<string> {
@@ -202,6 +214,7 @@ export async function configDomain(
               vdmInbox:
                 metadata.services.email.config.vdmOptions
                   ?.optimizedSharedDeliveryEnabled,
+              autoValidation: metadata.services.email.config.autoValidation,
               trackingDomain:
                 metadata.services.email.config.tracking?.customRedirectDomain,
             },
@@ -225,6 +238,7 @@ export async function configDomain(
           archiveArn: d.archiveArn,
           vdmEngagement: d.vdmEngagement,
           vdmInbox: d.vdmInbox,
+          autoValidation: d.autoValidation,
         })),
     ];
 
@@ -316,6 +330,25 @@ export async function configDomain(
       "--no-vdm-engagement"
     );
     const vdmInboxFlag = flag(options.vdmInbox, "--no-vdm-inbox");
+    const autoValidationFlag = flag(
+      options.autoValidation,
+      "--no-auto-validation"
+    );
+    let validationThresholdFlag: AutoValidationThreshold | undefined;
+    if (options.validationThreshold) {
+      const normalized = options.validationThreshold.toUpperCase();
+      if (
+        !(AUTO_VALIDATION_THRESHOLDS as readonly string[]).includes(normalized)
+      ) {
+        throw new WrapsError(
+          `Invalid validation threshold: ${options.validationThreshold}`,
+          "INVALID_VALIDATION_THRESHOLD",
+          `Valid values: ${AUTO_VALIDATION_THRESHOLDS.join(", ").toLowerCase()}`,
+          "https://wraps.dev/docs/cli-reference/email"
+        );
+      }
+      validationThresholdFlag = normalized as AutoValidationThreshold;
+    }
     const trackingDomainFlag = options.trackingDomain;
     const trackingHttpsFlag = flag(
       options.trackingHttps,
@@ -334,6 +367,7 @@ export async function configDomain(
         sendingEnabledFlag,
         vdmEngagementFlag,
         vdmInboxFlag,
+        autoValidationFlag,
         trackingHttpsFlag,
       ].some((f) => f !== undefined) || trackingDomainFlag !== undefined;
 
@@ -356,6 +390,8 @@ export async function configDomain(
         sendingEnabledFlag,
         vdmEngagementFlag,
         vdmInboxFlag,
+        autoValidationFlag,
+        validationThresholdFlag,
         trackingDomainFlag,
         trackingHttpsFlag,
         progress,
@@ -456,6 +492,12 @@ function persistCandidateField<K extends keyof DomainCandidate>(
         if (!emailConfig.vdmOptions) emailConfig.vdmOptions = {};
         emailConfig.vdmOptions.optimizedSharedDeliveryEnabled =
           value as boolean;
+        break;
+      case "autoValidation":
+        emailConfig.autoValidation = value as {
+          enabled: boolean;
+          threshold: AutoValidationThreshold;
+        };
         break;
       case "trackingDomain":
         // Primary is Pulumi-managed; never reached — applyTrackingDomain
@@ -572,13 +614,55 @@ async function applySuppression(
   ctx: ApplyContext,
   reasons: ("BOUNCE" | "COMPLAINT")[]
 ): Promise<void> {
+  // PutConfigurationSetSuppressionOptions is a PUT: sending SuppressedReasons
+  // alone risks dropping an existing ValidationOptions (Auto Validation), so
+  // read the live options first and forward ValidationOptions unchanged
+  // (plan 373 — see packages/core/src/ses-suppression.ts).
+  const current = await ctx.sesClient.send(
+    new GetConfigurationSetCommand({
+      ConfigurationSetName: ctx.candidate.configSetName,
+    })
+  );
   await ctx.sesClient.send(
     new PutConfigurationSetSuppressionOptionsCommand({
       ConfigurationSetName: ctx.candidate.configSetName,
       SuppressedReasons: reasons,
+      ...(current.SuppressionOptions?.ValidationOptions
+        ? { ValidationOptions: current.SuppressionOptions.ValidationOptions }
+        : {}),
     })
   );
   persistCandidateField(ctx, "suppressionReasons", reasons);
+  await saveMetadata(ctx);
+}
+
+async function applyAutoValidation(
+  ctx: ApplyContext,
+  config: { enabled: boolean; threshold: AutoValidationThreshold }
+): Promise<void> {
+  const current = await ctx.sesClient.send(
+    new GetConfigurationSetCommand({
+      ConfigurationSetName: ctx.candidate.configSetName,
+    })
+  );
+
+  if (!current.SuppressionOptions) {
+    throw new WrapsError(
+      `Configuration set ${ctx.candidate.configSetName} has no suppression options, so Auto Validation cannot be added without changing its suppression behaviour.`,
+      "SUPPRESSION_OPTIONS_MISSING",
+      "Set suppression explicitly first:\n  wraps email domains config --suppress-bounce --suppress-complaint",
+      "https://wraps.dev/docs/cli-reference/email"
+    );
+  }
+
+  const liveReasons = current.SuppressionOptions.SuppressedReasons ?? [];
+  await ctx.sesClient.send(
+    new PutConfigurationSetSuppressionOptionsCommand({
+      ConfigurationSetName: ctx.candidate.configSetName,
+      ...buildSuppressionOptions(liveReasons, config),
+    })
+  );
+  persistCandidateField(ctx, "autoValidation", config);
   await saveMetadata(ctx);
 }
 
@@ -883,6 +967,8 @@ async function applyFlagMode(
     sendingEnabledFlag: boolean | undefined;
     vdmEngagementFlag: boolean | undefined;
     vdmInboxFlag: boolean | undefined;
+    autoValidationFlag: boolean | undefined;
+    validationThresholdFlag: AutoValidationThreshold | undefined;
     trackingDomainFlag: string | undefined;
     trackingHttpsFlag: boolean | undefined;
     targetDomain?: string;
@@ -899,6 +985,8 @@ async function applyFlagMode(
     sendingEnabledFlag,
     vdmEngagementFlag,
     vdmInboxFlag,
+    autoValidationFlag,
+    validationThresholdFlag,
     trackingDomainFlag,
     trackingHttpsFlag,
     candidate,
@@ -1000,7 +1088,55 @@ async function applyFlagMode(
       applyVdm(ctx, engagement, inbox)
     );
     clack.log.success(
-      `VDM: engagement ${engagement ? "on" : "off"}, inbox placement ${inbox ? "on" : "off"}`
+      `VDM: engagement ${engagement ? "on" : "off"}, optimized delivery ${inbox ? "on" : "off"}`
+    );
+  }
+
+  if (autoValidationFlag !== undefined) {
+    const status = await getSESAccountStatus(region);
+    if (status.currentPlan) {
+      const entitlement = getSesFeatureEntitlement(
+        status.currentPlan,
+        "autoValidation"
+      );
+      const planLabel = SES_PLAN_RATES[status.currentPlan].label;
+      clack.log.info(
+        pc.dim(
+          entitlement.status === "included"
+            ? `Auto Validation is included in your ${planLabel} plan.`
+            : entitlement.status === "addon"
+              ? `Auto Validation is billed as an add-on on your plan (${entitlement.price}).`
+              : `Auto Validation is not available on your plan: ${entitlement.reason}`
+        )
+      );
+    } else {
+      clack.log.info(
+        pc.dim(
+          "Auto Validation is included on SES Pro and Enterprise and billed per email on other plans."
+        )
+      );
+    }
+
+    const threshold =
+      validationThresholdFlag ?? DEFAULT_AUTO_VALIDATION_THRESHOLD;
+    try {
+      await args.progress.execute("Updating Auto Validation", async () =>
+        applyAutoValidation(ctx, {
+          enabled: autoValidationFlag,
+          threshold,
+        })
+      );
+    } catch (error) {
+      args.progress.stop();
+      if (error instanceof WrapsError) {
+        clack.log.error(error.message);
+        process.exit(1);
+        return;
+      }
+      throw error;
+    }
+    clack.log.success(
+      `Auto Validation ${autoValidationFlag ? `enabled (${threshold.toLowerCase()})` : "disabled"}`
     );
   }
 
@@ -1173,6 +1309,12 @@ async function applyInteractiveMode(
       configSet.VdmOptions?.DashboardOptions?.EngagementMetrics;
     const vdmInbox =
       configSet.VdmOptions?.GuardianOptions?.OptimizedSharedDelivery;
+    const autoValidationEnabled =
+      configSet.SuppressionOptions?.ValidationOptions?.ConditionThreshold
+        ?.ConditionThresholdEnabled === "ENABLED";
+    const autoValidationThreshold =
+      configSet.SuppressionOptions?.ValidationOptions?.ConditionThreshold
+        ?.OverallConfidenceThreshold?.ConfidenceVerdictThreshold;
     const trackingCfg = candidate.trackingConfig;
 
     const menuOptions: Array<{ value: string; label: string; hint?: string }> =
@@ -1216,6 +1358,13 @@ async function applyInteractiveMode(
           value: "archive",
           label: "Email archiving",
           hint: archiveArn ? "enabled" : "disabled",
+        },
+        {
+          value: "autoValidation",
+          label: "Email validation: Auto Validation",
+          hint: autoValidationEnabled
+            ? `enabled (${(autoValidationThreshold ?? "MANAGED").toLowerCase()})`
+            : "disabled",
         },
         ...(vdmEnabled
           ? [
@@ -1529,6 +1678,61 @@ async function applyInteractiveMode(
         break;
       }
 
+      case "autoValidation": {
+        const wantsAutoValidation = await clack.confirm({
+          message:
+            "Enable Auto Validation (suppress sends that fail SES's address validation)?",
+          initialValue: autoValidationEnabled,
+        });
+        if (clack.isCancel(wantsAutoValidation)) break;
+        let threshold: AutoValidationThreshold =
+          DEFAULT_AUTO_VALIDATION_THRESHOLD;
+        if (wantsAutoValidation) {
+          const thresholdChoice = await clack.select({
+            message: "Confidence threshold",
+            options: AUTO_VALIDATION_THRESHOLDS.map((t) => ({
+              value: t,
+              label: t,
+            })),
+            initialValue:
+              autoValidationThreshold ?? DEFAULT_AUTO_VALIDATION_THRESHOLD,
+          });
+          if (clack.isCancel(thresholdChoice)) break;
+          threshold = thresholdChoice as AutoValidationThreshold;
+        }
+        const avProgress = new DeploymentProgress();
+        await avProgress.execute("Updating Auto Validation", async () =>
+          applyAutoValidation(ctx, {
+            enabled: wantsAutoValidation,
+            threshold,
+          })
+        );
+        avProgress.stop();
+        configSet.SuppressionOptions = {
+          ...configSet.SuppressionOptions,
+          ValidationOptions: {
+            ConditionThreshold: {
+              ConditionThresholdEnabled: wantsAutoValidation
+                ? "ENABLED"
+                : "DISABLED",
+              ...(wantsAutoValidation
+                ? {
+                    OverallConfidenceThreshold: {
+                      ConfidenceVerdictThreshold: threshold,
+                    },
+                  }
+                : {}),
+            },
+          },
+        };
+        clack.log.success(
+          `Auto Validation ${wantsAutoValidation ? `enabled (${threshold.toLowerCase()})` : "disabled"}`
+        );
+        if (candidate.additionalIndex === undefined)
+          primaryDomainChanged = true;
+        break;
+      }
+
       case "vdm": {
         const wantsEngagement = await clack.confirm({
           message: "Enable VDM engagement tracking?",
@@ -1536,7 +1740,7 @@ async function applyInteractiveMode(
         });
         if (clack.isCancel(wantsEngagement)) break;
         const wantsInbox = await clack.confirm({
-          message: "Enable VDM optimized shared delivery (inbox placement)?",
+          message: "Enable VDM optimized shared delivery?",
           initialValue: vdmInbox === "ENABLED",
         });
         if (clack.isCancel(wantsInbox)) break;

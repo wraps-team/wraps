@@ -77,6 +77,14 @@ export type CliFlags = {
   sendingEnabled?: boolean;
   vdmEngagement?: boolean;
   vdmInbox?: boolean;
+  autoValidation?: boolean;
+  validationThreshold?: string;
+
+  // Email vdm
+  enable?: boolean;
+  disable?: boolean;
+  engagement?: boolean;
+  optimizedDelivery?: boolean;
 
   // Email logs
   status?: string;
@@ -175,6 +183,7 @@ const STRING_FLAGS = [
   "since",
   "filter",
   "source",
+  "validation-threshold",
 ] as const;
 
 /**
@@ -211,6 +220,11 @@ const BOOLEAN_FLAGS = [
   "sending-enabled",
   "vdm-engagement",
   "vdm-inbox",
+  "auto-validation",
+  "enable",
+  "disable",
+  "engagement",
+  "optimized-delivery",
   "help",
   "version",
   "follow",

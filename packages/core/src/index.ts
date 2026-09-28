@@ -70,6 +70,14 @@ export {
   retentionToAWSPeriod,
   retentionToDays,
 } from "./retention.js";
+// SES configuration-set suppression options (Auto Validation, plan 373) —
+// the single builder every writer (CLI, CDK, Pulumi) shares.
+export {
+  AUTO_VALIDATION_THRESHOLDS,
+  buildSuppressionOptions,
+  DEFAULT_AUTO_VALIDATION_THRESHOLD,
+  type SesSuppressionOptions,
+} from "./ses-suppression.js";
 // SMTP utilities
 export {
   convertToSMTPPassword,
@@ -81,6 +89,8 @@ export {
 export type {
   ArchiveRetention,
   ArchivingConfig,
+  AutoValidationConfig,
+  AutoValidationThreshold,
   // DNS provider types
   CloudflareDNSConfig,
   DNSConfig,

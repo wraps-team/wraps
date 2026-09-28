@@ -12,6 +12,7 @@ import { IAMConfiguration } from "./components/iam-configuration";
 import { QuotaReserve } from "./components/quota-reserve";
 import { SesPlanCard } from "./components/ses-plan-card";
 import { StalePolicyBanner } from "./components/stale-policy-banner";
+import { VdmStatusCard } from "./components/vdm-status-card";
 import { WebhookConfiguration } from "./components/webhook-configuration";
 
 type AWSAccountPageProps = {
@@ -111,6 +112,9 @@ export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
 
       {/* AWS SES pricing plan - read-only, visible to every viewer */}
       <SesPlanCard account={account} />
+
+      {/* Virtual Deliverability Manager - read-only, visible to every viewer */}
+      <VdmStatusCard account={account} />
 
       {/* Account Details */}
       <AccountDetails account={account} />

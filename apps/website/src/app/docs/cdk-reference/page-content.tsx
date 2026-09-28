@@ -241,6 +241,7 @@ ${fullConfigCode}
 | \`archiving\` | ArchivingConfig | Email archiving via Mail Manager |
 | \`smtp\` | SMTPConfig | SMTP credentials for legacy systems |
 | \`suppressionList\` | SuppressionListConfig | Bounce/complaint suppression |
+| \`autoValidation\` | AutoValidationConfig | SES Auto Validation on the configuration set (requires suppressionList.enabled) |
 | \`reputationMetrics\` | boolean | Enable SES reputation metrics (default: true) |
 | \`tlsRequired\` | boolean | Require TLS for outbound emails (default: false) |
 | \`dedicatedIp\` | boolean | Enable dedicated IP (~$25/mo) |

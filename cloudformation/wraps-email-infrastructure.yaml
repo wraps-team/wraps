@@ -1243,6 +1243,8 @@ Resources:
                   - "ses:GetConfigurationSet"
                   - "ses:GetConfigurationSetEventDestinations"
                   - "ses:GetDedicatedIps"
+                  - "ses:ListRecommendations"
+                  - "ses:GetEmailAddressInsights"
                 Resource: "*"
 
               # S3 - Inbound Bucket Feature Detection. The dashboard sends

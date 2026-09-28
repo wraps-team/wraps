@@ -4,6 +4,8 @@
 export { convertToSMTPPassword, getSMTPEndpoint } from "@wraps/core";
 // ACM certificate resources
 export { type ACMResult, createACMCertificate } from "./acm.js";
+// SES Auto Validation resources
+export { createConfigSetAutoValidation } from "./auto-validation.js";
 // CloudFront resources
 export {
   type CloudFrontResult,

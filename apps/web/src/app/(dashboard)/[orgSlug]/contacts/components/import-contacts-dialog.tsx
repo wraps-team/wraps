@@ -1,5 +1,15 @@
 "use client";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@wraps/ui/components/ui/alert-dialog";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Checkbox } from "@wraps/ui/components/ui/checkbox";
 import {
@@ -45,6 +55,10 @@ import {
   type ImportContactInput,
   importContacts,
 } from "@/actions/import-contacts";
+import {
+  getSesValidationAccounts,
+  type SesValidationAccount,
+} from "@/actions/validate-emails";
 import { Button } from "@/components/ui/button";
 import type { ImportContactsResult, ImportDuplicateRow } from "@/lib/contacts";
 import {
@@ -306,6 +320,69 @@ function DuplicateRows({ duplicates }: { duplicates: ImportDuplicateRow[] }) {
   );
 }
 
+/**
+ * Confirms the metered cost of SES validation before any call is made
+ * (plan 373 Phase C, requirement 3). Wraps has no way to read how much of
+ * the account's allowance other tools have already used this month, so the
+ * copy says so rather than implying a precise remaining balance.
+ */
+function SesValidationConfirmDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+  account,
+  rowCount,
+  loading,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+  account: SesValidationAccount;
+  rowCount: number;
+  loading: boolean;
+}) {
+  const entitlement = account.entitlement;
+  const allowanceText =
+    entitlement.status === "included" && entitlement.allowance
+      ? `Included allowance: ${entitlement.allowance}.`
+      : "";
+  const overageText =
+    entitlement.status === "included" && entitlement.overage
+      ? ` Overage: ${entitlement.overage}.`
+      : "";
+
+  return (
+    <AlertDialog onOpenChange={onOpenChange} open={open}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirm SES validation</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will validate up to {rowCount.toLocaleString()} email address
+            {rowCount === 1 ? "" : "es"} using {account.name} ({account.region})
+            on the {account.plan === "PRO" ? "Pro" : "Enterprise"} SES plan.{" "}
+            {allowanceText}
+            {overageText} Wraps can't see how much of this allowance other tools
+            have already used this month, so a large import could push this
+            account into overage.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={loading}
+            onClick={(e) => {
+              e.preventDefault();
+              onConfirm();
+            }}
+          >
+            {loading ? "Validating..." : "Validate and import"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export function ImportContactsDialog({
   organizationId,
   topics,
@@ -335,6 +412,40 @@ export function ImportContactsDialog({
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const announcedStepRef = useRef<Step | null>(null);
 
+  // SES email validation (plan 373 Phase C) — opt-in, off by default, and
+  // hidden entirely when no AWS account on this org is eligible (PRO or
+  // ENTERPRISE SES plan).
+  const [sesValidationAccounts, setSesValidationAccounts] = useState<
+    SesValidationAccount[]
+  >([]);
+  const [wantsSesValidation, setWantsSesValidation] = useState(false);
+  const [selectedValidationAccountId, setSelectedValidationAccountId] =
+    useState<string | null>(null);
+  const [showValidationConfirm, setShowValidationConfirm] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    // A failed fetch here just means the opt-in option doesn't show — not
+    // worth surfacing as an import error, but it must not become an
+    // unhandled rejection either.
+    getSesValidationAccounts(organizationId)
+      .then((res) => {
+        if (res.success) {
+          setSesValidationAccounts(res.accounts);
+          setSelectedValidationAccountId(res.accounts[0]?.id ?? null);
+        }
+      })
+      .catch(() => {
+        // Leave sesValidationAccounts empty — the checkbox simply won't show.
+      });
+  }, [open, organizationId]);
+
+  const selectedValidationAccount = sesValidationAccounts.find(
+    (a) => a.id === selectedValidationAccountId
+  );
+
   // Move focus into the step that just replaced the one the user was in
   // (audit M7). Skipped on the first render of a session so the dialog's own
   // opening focus is left alone; when the dialog is closed its content is
@@ -360,6 +471,8 @@ export function ImportContactsDialog({
     setUploadError(null);
     setIsDraggingFile(false);
     setProgress(null);
+    setWantsSesValidation(false);
+    setShowValidationConfirm(false);
   }, []);
 
   const handleOpenChange = useCallback(
@@ -608,6 +721,10 @@ export function ImportContactsDialog({
           duplicateStrategy,
           deferSummary: !isLast,
           priorTotals: i === 0 ? undefined : { ...totals },
+          sesValidation:
+            wantsSesValidation && selectedValidationAccountId
+              ? { awsAccountId: selectedValidationAccountId }
+              : undefined,
         });
 
         // A failed chunk stops the run. Earlier chunks are already committed,
@@ -669,7 +786,28 @@ export function ImportContactsDialog({
     duplicateStrategy,
     csvData,
     onImportComplete,
+    wantsSesValidation,
+    selectedValidationAccountId,
   ]);
+
+  /**
+   * The "Import" button's click target. When SES validation is opted in, it
+   * confirms the metered cost first (requirement 3) rather than calling
+   * anything immediately — `handleImport` itself is what actually triggers
+   * the validation calls, inside `importContacts`.
+   */
+  const handleImportClick = useCallback(() => {
+    if (wantsSesValidation && selectedValidationAccount) {
+      setShowValidationConfirm(true);
+      return;
+    }
+    handleImport();
+  }, [wantsSesValidation, selectedValidationAccount, handleImport]);
+
+  const handleConfirmValidation = useCallback(() => {
+    setShowValidationConfirm(false);
+    handleImport();
+  }, [handleImport]);
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
@@ -968,6 +1106,55 @@ export function ImportContactsDialog({
               </div>
             )}
 
+            {/* SES email validation (plan 373 Phase C) — hidden entirely when
+                no AWS account on this org is on a plan that includes it. */}
+            {sesValidationAccounts.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    checked={wantsSesValidation}
+                    id="import-ses-validation"
+                    onCheckedChange={(checked) =>
+                      setWantsSesValidation(checked === true)
+                    }
+                  />
+                  <Label
+                    className="cursor-pointer font-normal"
+                    htmlFor="import-ses-validation"
+                  >
+                    Validate addresses with SES before importing
+                  </Label>
+                </div>
+                {wantsSesValidation && sesValidationAccounts.length > 1 && (
+                  <Select
+                    onValueChange={setSelectedValidationAccountId}
+                    value={selectedValidationAccountId ?? undefined}
+                  >
+                    <SelectTrigger
+                      aria-label="AWS account for SES validation"
+                      className="h-8 w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sesValidationAccounts.map((acct) => (
+                        <SelectItem key={acct.id} value={acct.id}>
+                          {acct.name} ({acct.region})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {wantsSesValidation && (
+                  <p className="text-muted-foreground text-xs">
+                    Addresses SES has low confidence in are rejected instead of
+                    imported. This is a metered SES API call — you'll confirm
+                    the cost before anything runs.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-2 rounded-md bg-muted/50 p-3">
               <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">
@@ -983,7 +1170,7 @@ export function ImportContactsDialog({
               <Button onClick={() => setStep("map")} variant="outline">
                 Back
               </Button>
-              <Button disabled={isPending} onClick={handleImport}>
+              <Button disabled={isPending} onClick={handleImportClick}>
                 {isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1019,6 +1206,17 @@ export function ImportContactsDialog({
           </div>
         )}
       </DialogContent>
+
+      {selectedValidationAccount && (
+        <SesValidationConfirmDialog
+          account={selectedValidationAccount}
+          loading={isPending}
+          onConfirm={handleConfirmValidation}
+          onOpenChange={setShowValidationConfirm}
+          open={showValidationConfirm}
+          rowCount={mappedContacts.filter((c) => !!c.email).length}
+        />
+      )}
     </Dialog>
   );
 }

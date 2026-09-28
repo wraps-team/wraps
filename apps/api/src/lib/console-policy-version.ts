@@ -22,13 +22,14 @@ import {
   ListConfigurationSetsCommand,
   ListEmailIdentitiesCommand,
   ListEmailTemplatesCommand,
+  ListRecommendationsCommand,
   ListSuppressedDestinationsCommand,
   type SESv2Client,
 } from "@aws-sdk/client-sesv2";
 import { isRoleAccessError } from "./role-access-error";
 
 /** The newest policy version this build knows how to probe for. */
-export const CURRENT_CONSOLE_POLICY_VERSION = 5;
+export const CURRENT_CONSOLE_POLICY_VERSION = 6;
 
 export type PolicyProbeResult = {
   /** Highest version whose marker action succeeded; 0 if even the baseline failed. */
@@ -68,6 +69,9 @@ function isThrottlingError(error: unknown): boolean {
  * merge, `ed18a45b`, 2026-09-10 — see plan 299. It shipped before plan 282
  * itself landed, but the ladder didn't pick it up until 299, so a role
  * created any time up to and including that merge probes as version 4.
+ *
+ * Rung 6 (`ses:ListRecommendations`) was granted by plan 373 (VDM advisor
+ * recommendations, read by the account-health sweep).
  */
 const RUNGS: Array<{
   version: number;
@@ -96,6 +100,11 @@ const RUNGS: Array<{
     version: 5,
     probe: (client) =>
       client.send(new ListSuppressedDestinationsCommand({ PageSize: 1 })),
+  },
+  {
+    version: 6,
+    probe: (client) =>
+      client.send(new ListRecommendationsCommand({ PageSize: 1 })),
   },
 ];
 

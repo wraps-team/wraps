@@ -1,5 +1,5 @@
 import * as aws from "@pulumi/aws";
-import { retentionToDays } from "@wraps/core";
+import { DEFAULT_SUPPRESSION_REASONS, retentionToDays } from "@wraps/core";
 import type { EmailStackConfig, StackOutputs } from "../types/index.js";
 import { domainToConfigSetName } from "../utils/email/config-set-slug.js";
 import { createAlertingResources } from "./resources/alerting.js";
@@ -245,6 +245,23 @@ export async function deployEmailStack(
       retention: emailConfig.emailArchiving.retention,
       configSetName: sesResources.configSet.configurationSetName,
       region: config.region,
+    });
+  }
+
+  // 10.5. SES Auto Validation (if configured). Imperative, like the archive
+  // link above, so it re-applies on every deploy — which is what heals the
+  // suppression-options PUT hazard if a later deploy changes suppressionList
+  // without knowing about Auto Validation.
+  if (emailConfig.autoValidation && sesResources) {
+    const { applyConfigSetAutoValidation } = await import(
+      "./resources/auto-validation.js"
+    );
+    await applyConfigSetAutoValidation({
+      configSetName: sesResources.configSet.configurationSetName,
+      region: config.region,
+      suppressedReasons:
+        emailConfig.suppressionList?.reasons ?? DEFAULT_SUPPRESSION_REASONS,
+      autoValidation: emailConfig.autoValidation,
     });
   }
 

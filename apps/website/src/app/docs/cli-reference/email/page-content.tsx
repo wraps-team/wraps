@@ -293,6 +293,92 @@ export default function CLIReferenceEmailPageContent() {
         </Card>
       </section>
 
+      {/* wraps email vdm */}
+      <section className="mb-12">
+        <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
+          <Terminal className="h-6 w-6 text-primary" />
+          wraps email vdm
+        </h2>
+        <p className="mb-4 text-muted-foreground">
+          Show, and optionally switch, Virtual Deliverability Manager (VDM) for
+          the account in a Region — the dashboard and advisor recommendations
+          bundled with the Essentials, Pro and Enterprise SES pricing plans.
+        </p>
+
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle className="text-lg">Usage</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CLICommand command="npx @wraps.dev/cli email vdm" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Options</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <code className="rounded bg-muted px-2 py-1">
+                  --region &lt;region&gt;
+                </code>{" "}
+                <span className="text-muted-foreground">
+                  Region to read or change. Required when you've deployed to
+                  more than one Region and the terminal isn't interactive.
+                </span>
+              </li>
+              <li>
+                <code className="rounded bg-muted px-2 py-1">--enable</code>{" "}
+                <span className="text-muted-foreground">
+                  Turn VDM on for the account. With no other flags, also turns
+                  on engagement metrics and optimized shared delivery.
+                </span>
+              </li>
+              <li>
+                <code className="rounded bg-muted px-2 py-1">--disable</code>{" "}
+                <span className="text-muted-foreground">
+                  Turn VDM off for the account. Mutually exclusive with{" "}
+                  <code className="rounded bg-muted px-1">--enable</code>.
+                </span>
+              </li>
+              <li>
+                <code className="rounded bg-muted px-2 py-1">
+                  --engagement / --no-engagement
+                </code>{" "}
+                <span className="text-muted-foreground">
+                  Override the engagement-metrics sub-setting when enabling.
+                </span>
+              </li>
+              <li>
+                <code className="rounded bg-muted px-2 py-1">
+                  --optimized-delivery / --no-optimized-delivery
+                </code>{" "}
+                <span className="text-muted-foreground">
+                  Override the optimized-shared-delivery sub-setting when
+                  enabling.
+                </span>
+              </li>
+              <li>
+                <code className="rounded bg-muted px-2 py-1">--yes</code>{" "}
+                <span className="text-muted-foreground">
+                  Skip the confirmation for{" "}
+                  <code className="rounded bg-muted px-1">--enable</code>/
+                  <code className="rounded bg-muted px-1">--disable</code>.
+                </span>
+              </li>
+              <li>
+                <code className="rounded bg-muted px-2 py-1">--json</code>{" "}
+                <span className="text-muted-foreground">
+                  Machine-readable output.
+                </span>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+      </section>
+
       {/* wraps email domains */}
       <section className="mb-12">
         <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
@@ -644,7 +730,30 @@ export default function CLIReferenceEmailPageContent() {
                     --vdm-inbox / --no-vdm-inbox
                   </code>{" "}
                   <span className="text-muted-foreground">
-                    Enable or disable VDM inbox placement optimization
+                    Enable or disable VDM optimized shared delivery (AWS picks
+                    the best shared IPs per mailbox provider)
+                  </span>
+                </li>
+                <li className="pt-1 font-medium text-foreground">
+                  Email validation
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --auto-validation / --no-auto-validation
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Enable or disable SES Auto Validation (suppress sends that
+                    fail address validation before they're attempted)
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --validation-threshold &lt;medium|high|managed&gt;
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Confidence threshold for Auto Validation. Defaults to{" "}
+                    <code className="rounded bg-muted px-1">managed</code> (AWS
+                    picks).
                   </span>
                 </li>
               </ul>

@@ -8,6 +8,7 @@ import {
   GetAccountCommand,
   PutAccountDetailsCommand,
   PutAccountPricingAttributesCommand,
+  PutAccountVdmAttributesCommand,
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
 import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
@@ -446,6 +447,157 @@ export async function setSESPricingPlan(
     }
 
     // Anything else — surface the real AWS error instead of swallowing it.
+    throw error;
+  }
+}
+
+export type SESVdmState = {
+  vdmEnabled: boolean;
+  engagementMetrics: boolean;
+  optimizedSharedDelivery: boolean;
+  /** SES pricing plan currently in effect, when GetAccount reported one we recognize. */
+  currentPlan?: SESPricingPlan;
+};
+
+/**
+ * Read the account's Virtual Deliverability Manager state, in this Region.
+ *
+ * Unlike `getSESAccountStatus`, this does NOT swallow errors: a VDM
+ * enable/disable decision must not be made on a defaulted answer.
+ */
+export async function getSESVdmAttributes(
+  region: string
+): Promise<SESVdmState> {
+  const sesv2 = new SESv2Client({ region });
+
+  try {
+    const response = await sesv2.send(new GetAccountCommand({}));
+    const currentPlanRaw = response.PricingAttributes?.CurrentPlan;
+    return {
+      vdmEnabled: response.VdmAttributes?.VdmEnabled === "ENABLED",
+      engagementMetrics:
+        response.VdmAttributes?.DashboardAttributes?.EngagementMetrics ===
+        "ENABLED",
+      optimizedSharedDelivery:
+        response.VdmAttributes?.GuardianAttributes?.OptimizedSharedDelivery ===
+        "ENABLED",
+      currentPlan:
+        currentPlanRaw && isSESPricingPlan(currentPlanRaw)
+          ? currentPlanRaw
+          : undefined,
+    };
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error;
+    }
+
+    const name = error.name;
+    const message = error.message || "";
+    const mentions = (needle: string): boolean =>
+      name === needle || message.includes(needle);
+
+    if (
+      mentions("AccessDenied") ||
+      mentions("AccessDeniedException") ||
+      mentions("UnauthorizedAccess")
+    ) {
+      throw errors.iamPermissionDenied(
+        "ses:GetAccount",
+        "SES account VDM settings",
+        "Ensure your IAM user/role has the ses:GetAccount permission."
+      );
+    }
+
+    if (
+      mentions("Throttling") ||
+      mentions("ThrottlingException") ||
+      mentions("TooManyRequestsException")
+    ) {
+      throw errors.awsThrottled("GetAccount");
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Set the account's Virtual Deliverability Manager attributes, in this
+ * Region. Always sends all three sub-settings — a caller must resolve
+ * "unspecified" against the current state before calling this, so a PUT
+ * never resets a sub-setting the customer chose outside Wraps.
+ *
+ * Mutating — the caller (`wraps email vdm`) is responsible for confirming
+ * with the user before invoking this. Never swallows errors.
+ */
+export async function setSESVdmAttributes(
+  region: string,
+  attrs: {
+    vdmEnabled: boolean;
+    engagementMetrics: boolean;
+    optimizedSharedDelivery: boolean;
+  }
+): Promise<void> {
+  const sesv2 = new SESv2Client({ region });
+
+  try {
+    await sesv2.send(
+      new PutAccountVdmAttributesCommand({
+        VdmAttributes: {
+          VdmEnabled: attrs.vdmEnabled ? "ENABLED" : "DISABLED",
+          DashboardAttributes: {
+            EngagementMetrics: attrs.engagementMetrics ? "ENABLED" : "DISABLED",
+          },
+          GuardianAttributes: {
+            OptimizedSharedDelivery: attrs.optimizedSharedDelivery
+              ? "ENABLED"
+              : "DISABLED",
+          },
+        },
+      })
+    );
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error;
+    }
+
+    const name = error.name;
+    const message = error.message || "";
+    const mentions = (needle: string): boolean =>
+      name === needle || message.includes(needle);
+
+    if (
+      mentions("AccessDenied") ||
+      mentions("AccessDeniedException") ||
+      mentions("UnauthorizedAccess")
+    ) {
+      throw errors.iamPermissionDenied(
+        "ses:PutAccountVdmAttributes",
+        "SES account VDM settings",
+        "Ensure your IAM user/role has the ses:PutAccountVdmAttributes permission."
+      );
+    }
+
+    if (
+      mentions("Throttling") ||
+      mentions("ThrottlingException") ||
+      mentions("TooManyRequestsException")
+    ) {
+      throw errors.awsThrottled("PutAccountVdmAttributes");
+    }
+
+    if (
+      mentions("ConflictException") ||
+      mentions("BadRequestException") ||
+      mentions("ValidationException")
+    ) {
+      throw new WrapsError(
+        `SES rejected the VDM change: ${sanitizeErrorMessage(error)}`,
+        "SES_VDM_CHANGE_REJECTED",
+        "Check the current state:\n  wraps email vdm",
+        "https://docs.aws.amazon.com/ses/latest/dg/vdm.html"
+      );
+    }
+
     throw error;
   }
 }

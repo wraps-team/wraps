@@ -45,6 +45,7 @@ const MARKER_ACTIONS = [
   "ses:ListEmailTemplates", // rung 3
   "ses:ListConfigurationSets", // rung 4
   "ses:ListSuppressedDestinations", // rung 5
+  "ses:ListRecommendations", // rung 6
 ];
 
 /**
@@ -75,6 +76,7 @@ const NOT_A_MARKER: Record<string, string> = {
     "granted alongside ses:ListConfigurationSets (rung 4); same version, redundant marker",
   "ses:GetSuppressedDestination":
     "Get counterpart to ses:ListSuppressedDestinations (rung 5); same version, redundant marker",
+  "ses:GetEmailAddressInsights": "billed per call ($0.01) — never probe",
 };
 
 const READ_ONLY_PREFIXES = ["Get", "List", "Describe"];

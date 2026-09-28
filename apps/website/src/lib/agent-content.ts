@@ -1210,6 +1210,23 @@ npx @wraps.dev/cli email status
 
 Shows: deployment status, AWS region, SES configuration, DynamoDB table, Lambda function, EventBridge rules.
 
+## wraps email vdm
+
+Show, and optionally switch, Virtual Deliverability Manager (VDM) for the account in a Region.
+
+\`\`\`bash
+npx @wraps.dev/cli email vdm                      # read the current state
+npx @wraps.dev/cli email vdm --enable --yes       # turn VDM on
+npx @wraps.dev/cli email vdm --disable --yes      # turn VDM off
+\`\`\`
+
+Options:
+- \`--region <region>\` — Region to read or change
+- \`--enable\` / \`--disable\` — mutually exclusive; \`--enable\` also turns on engagement metrics and optimized shared delivery unless overridden
+- \`--engagement / --no-engagement\` — override the engagement-metrics sub-setting
+- \`--optimized-delivery / --no-optimized-delivery\` — override the optimized-shared-delivery sub-setting
+- \`--yes\` — Skip the confirmation prompt
+
 ## wraps email destroy
 
 Remove all Wraps email infrastructure from your AWS account.
@@ -1286,7 +1303,7 @@ Options:
 - \`--suppress-complaint / --no-suppress-complaint\` — Complaint suppression
 - \`--archive / --no-archive\` — Email archiving via Mail Manager
 - \`--vdm-engagement / --no-vdm-engagement\` — VDM engagement tracking
-- \`--vdm-inbox / --no-vdm-inbox\` — VDM inbox placement optimization
+- \`--vdm-inbox / --no-vdm-inbox\` — VDM optimized shared delivery
 
 ## wraps email inbound init
 

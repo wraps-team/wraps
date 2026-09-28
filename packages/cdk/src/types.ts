@@ -12,6 +12,7 @@ import type * as sqs from "aws-cdk-lib/aws-sqs";
 export type {
   ArchiveRetention,
   ArchivingConfig,
+  AutoValidationConfig,
   EventsConfig,
   OIDCConfig,
   ResolvedTrackingConfig,
@@ -27,6 +28,7 @@ export type {
 // Import for local use
 import type {
   ArchivingConfig,
+  AutoValidationConfig,
   EventsConfig,
   OIDCConfig,
   ResolvedTrackingConfig,
@@ -114,6 +116,14 @@ export type WrapsEmailProps = {
   suppressionList?: SuppressionListConfig;
 
   /**
+   * SES Auto Validation for the configuration set. Included on SES
+   * Pro/Enterprise; an add-on otherwise. Stored inside the configuration
+   * set's suppression options, so it requires `suppressionList.enabled`
+   * (the default).
+   */
+  autoValidation?: AutoValidationConfig;
+
+  /**
    * Enable SES reputation metrics dashboard.
    * @default true
    */
@@ -166,6 +176,7 @@ export type ResolvedConfig = {
   archiving?: ArchivingConfig;
   smtp?: SMTPConfig;
   suppressionList: Required<SuppressionListConfig>;
+  autoValidation?: Required<AutoValidationConfig>;
   reputationMetrics: boolean;
   tlsRequired: boolean;
   dedicatedIp: boolean;

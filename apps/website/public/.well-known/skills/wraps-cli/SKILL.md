@@ -99,6 +99,20 @@ wraps email plan --region us-east-1 --set NONE  # switch a Region to à la carte
 `--set` accepts `NONE` (à la carte), `ESSENTIALS`, `PRO`, `ENTERPRISE`, asks
 for confirmation (skip with `--yes`), and never guesses the Region.
 
+### `wraps email vdm`
+
+Show, and optionally switch, Virtual Deliverability Manager (VDM) for the account in a Region — bundled with the Essentials, Pro and Enterprise SES pricing plans.
+
+```bash
+wraps email vdm                          # read the current state
+wraps email vdm --enable --yes           # turn VDM on (both sub-settings on)
+wraps email vdm --disable --yes          # turn VDM off
+```
+
+`--enable` and `--disable` are mutually exclusive. `--engagement`/`--no-engagement`
+and `--optimized-delivery`/`--no-optimized-delivery` override the sub-settings
+when enabling; asks for confirmation unless `--yes` is passed.
+
 ### `wraps email verify`
 
 Check and guide domain DNS verification.
@@ -161,11 +175,15 @@ wraps email domains config --domain myapp.com --no-sending-enabled
 | Suppress complaints | `--suppress-complaint` | `--no-suppress-complaint` |
 | Email archive | `--archive` | `--no-archive` |
 | VDM engagement | `--vdm-engagement` | `--no-vdm-engagement` |
-| VDM inbox | `--vdm-inbox` | `--no-vdm-inbox` |
+| VDM optimized shared delivery | `--vdm-inbox` | `--no-vdm-inbox` |
+| Auto Validation | `--auto-validation` | `--no-auto-validation` |
+
+`--validation-threshold <medium|high|managed>` sets Auto Validation's confidence threshold (default `managed`).
 
 **Notes:**
 - Archive uses a shared `wraps-email-archive` Mail Manager archive, created automatically on first use
-- VDM options only appear when the AWS account has Virtual Deliverability Manager enabled
+- VDM options only appear when VDM is enabled for the account — turn it on with `wraps email vdm --enable`
+- Auto Validation is stored inside the configuration set's suppression options — it requires suppression to already be configured (`--suppress-bounce`/`--suppress-complaint`), or `wraps email domains config` refuses with `SUPPRESSION_OPTIONS_MISSING`
 - Primary domain: after changes, run `wraps email upgrade` to sync Pulumi state
 - Additional domains: changes are saved to local metadata immediately
 

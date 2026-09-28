@@ -26,6 +26,8 @@ export const CONSOLE_ACCESS_POLICY_JSON = JSON.stringify(
           "cloudwatch:GetMetricData",
           "cloudwatch:GetMetricStatistics",
           "ses:GetDedicatedIps",
+          "ses:ListRecommendations",
+          "ses:GetEmailAddressInsights",
         ],
         Resource: "*",
       },

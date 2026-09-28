@@ -347,9 +347,14 @@ async function runReadPath(
 /**
  * Resolve exactly one Region for `--set`. Never guesses at a Region for a
  * mutation that changes billing — see the table in plan 129 step 5.
+ *
+ * Exported so `wraps email vdm` (plan 373) can reuse the same Region
+ * resolution for its own account-wide mutation. It only reads
+ * `options.region`, so the parameter is narrowed to that rather than the
+ * full `EmailPlanOptions`.
  */
-async function resolveSetRegion(
-  options: EmailPlanOptions,
+export async function resolveSetRegion(
+  options: { region?: string },
   accountId: string
 ): Promise<string> {
   if (options.region) {

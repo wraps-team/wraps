@@ -782,8 +782,16 @@ async function processBounce(
   bounceSubType?: string,
   timestamp?: string
 ): Promise<void> {
-  if (bounceSubType === "Suppressed") {
-    await processSuppression(message, "Suppressed", timestamp);
+  // Auto Validation (SES Pro/Enterprise, or an add-on elsewhere) drops the
+  // send before any delivery attempt is made, on the strength of a validation
+  // verdict rather than a real bounce. AWS excludes it from
+  // Reputation.BounceRate for that reason, so it is a suppression, not a
+  // bounce, even though it arrives as one (plan 373).
+  if (
+    bounceSubType === "Suppressed" ||
+    bounceSubType === "EmailValidationSuppressed"
+  ) {
+    await processSuppression(message, bounceSubType, timestamp);
     if (message.contactId) {
       await resumeWaitingExecutions(
         messageId,

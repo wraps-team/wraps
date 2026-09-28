@@ -137,6 +137,23 @@ export type SuppressionListConfig = {
   reasons?: SuppressionReason[];
 };
 
+/** AWS's confidence threshold for SES email Auto Validation. */
+export type AutoValidationThreshold = "MEDIUM" | "HIGH" | "MANAGED";
+
+/**
+ * SES Auto Validation for the Wraps configuration set. Included on SES
+ * Pro/Enterprise; an add-on otherwise. Stored inside the configuration set's
+ * suppression options (`SuppressionOptions.ValidationOptions`), so it
+ * requires `suppressionList.enabled: true` — see
+ * `@wraps/core/ses-suppression`'s `buildSuppressionOptions`.
+ */
+export type AutoValidationConfig = {
+  /** @default true when the object is present */
+  enabled?: boolean;
+  /** @default "MANAGED" (AWS picks the threshold) */
+  threshold?: AutoValidationThreshold;
+};
+
 /**
  * Webhook configuration for Wraps platform integration
  */

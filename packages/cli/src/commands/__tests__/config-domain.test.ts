@@ -44,6 +44,10 @@ vi.mock("../../utils/shared/aws", () => ({
     arn: "arn:aws:iam::123456789012:user/test",
     userId: "AIDATEST",
   }),
+  // Unrecognized plan by default — the auto-validation flag path prints a
+  // static entitlement line in that case and does not call
+  // getSesFeatureEntitlement.
+  getSESAccountStatus: vi.fn().mockResolvedValue({ isSandbox: false }),
 }));
 
 vi.mock("../../utils/shared/metadata", () => ({
@@ -1000,5 +1004,99 @@ describe("configDomain — extended config set options", () => {
         }),
       })
     );
+  });
+
+  it("Unit 25: flag mode: --auto-validation reads live suppression options and PUTs both SuppressedReasons and ValidationOptions", async () => {
+    sesClientMock.on(GetConfigurationSetCommand).resolves({
+      SuppressionOptions: { SuppressedReasons: ["BOUNCE", "COMPLAINT"] },
+    });
+    sesClientMock.on(PutConfigurationSetSuppressionOptionsCommand).resolves({});
+
+    await configDomain({ domain: "test.com", autoValidation: true });
+
+    const getCalls = sesClientMock.commandCalls(GetConfigurationSetCommand);
+    expect(getCalls.length).toBeGreaterThanOrEqual(1);
+
+    const putCalls = sesClientMock.commandCalls(
+      PutConfigurationSetSuppressionOptionsCommand
+    );
+    expect(putCalls.length).toBe(1);
+    expect(putCalls[0].args[0].input).toEqual({
+      ConfigurationSetName: additionalConfigSetName,
+      SuppressedReasons: ["BOUNCE", "COMPLAINT"],
+      ValidationOptions: {
+        ConditionThreshold: {
+          ConditionThresholdEnabled: "ENABLED",
+          OverallConfidenceThreshold: { ConfidenceVerdictThreshold: "MANAGED" },
+        },
+      },
+    });
+  });
+
+  it("Unit 26: flag mode: --suppress-bounce preserves a live ValidationOptions in the PUT", async () => {
+    sesClientMock.on(GetConfigurationSetCommand).resolves({
+      SuppressionOptions: {
+        SuppressedReasons: ["BOUNCE", "COMPLAINT"],
+        ValidationOptions: {
+          ConditionThreshold: {
+            ConditionThresholdEnabled: "ENABLED",
+            OverallConfidenceThreshold: { ConfidenceVerdictThreshold: "HIGH" },
+          },
+        },
+      },
+    });
+    sesClientMock.on(PutConfigurationSetSuppressionOptionsCommand).resolves({});
+
+    await configDomain({ domain: "test.com", suppressBounce: false });
+
+    const putCalls = sesClientMock.commandCalls(
+      PutConfigurationSetSuppressionOptionsCommand
+    );
+    expect(putCalls.length).toBe(1);
+    expect(putCalls[0].args[0].input).toMatchObject({
+      SuppressedReasons: ["COMPLAINT"],
+      ValidationOptions: {
+        ConditionThreshold: {
+          ConditionThresholdEnabled: "ENABLED",
+          OverallConfidenceThreshold: { ConfidenceVerdictThreshold: "HIGH" },
+        },
+      },
+    });
+  });
+
+  it("Unit 27: flag mode: --auto-validation on a set with no SuppressionOptions is refused (SUPPRESSION_OPTIONS_MISSING) with zero Puts", async () => {
+    sesClientMock.on(GetConfigurationSetCommand).resolves({});
+    const clack = await import("@clack/prompts");
+
+    await configDomain({ domain: "test.com", autoValidation: true });
+
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(clack.log.error).toHaveBeenCalledWith(
+      expect.stringContaining("no suppression options")
+    );
+    expect(
+      sesClientMock.commandCalls(PutConfigurationSetSuppressionOptionsCommand)
+    ).toHaveLength(0);
+  });
+
+  it("Unit 28: flag mode: --validation-threshold bogus throws INVALID_VALIDATION_THRESHOLD before any AWS call", async () => {
+    let caught: unknown;
+    try {
+      await configDomain({
+        domain: "test.com",
+        autoValidation: true,
+        validationThreshold: "bogus",
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error & { code?: string }).code).toBe(
+      "INVALID_VALIDATION_THRESHOLD"
+    );
+    expect(
+      sesClientMock.commandCalls(PutConfigurationSetSuppressionOptionsCommand)
+    ).toHaveLength(0);
   });
 });

@@ -5,6 +5,7 @@ import type * as pulumi from "@pulumi/pulumi";
 export type {
   ArchiveRetention,
   ArchivingConfig,
+  AutoValidationConfig,
   CloudflareDNSConfig,
   DNSConfig,
   DNSProvider,
@@ -26,6 +27,7 @@ export type {
 // Import for local use
 import type {
   ArchivingConfig,
+  AutoValidationConfig,
   DNSConfig,
   EventsConfig,
   OIDCConfig,
@@ -168,6 +170,14 @@ export type WrapsEmailArgs = {
   suppressionList?: pulumi.Input<SuppressionListConfig>;
 
   /**
+   * SES Auto Validation for the configuration set. Included on SES
+   * Pro/Enterprise; an add-on otherwise. Stored inside the configuration
+   * set's suppression options, so it requires `suppressionList.enabled`
+   * (the default).
+   */
+  autoValidation?: pulumi.Input<AutoValidationConfig>;
+
+  /**
    * Enable SES reputation metrics dashboard.
    * @default true
    */
@@ -225,6 +235,7 @@ export type ResolvedConfig = {
   archiving?: ArchivingConfig;
   smtp?: SMTPConfig;
   suppressionList: Required<SuppressionListConfig>;
+  autoValidation?: Required<AutoValidationConfig>;
   reputationMetrics: boolean;
   tlsRequired: boolean;
   dedicatedIp: boolean;

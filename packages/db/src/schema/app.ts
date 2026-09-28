@@ -204,6 +204,27 @@ export const awsAccount = pgTable(
        * GetAccount does not say whether Essentials was chosen or defaulted.
        */
       sesPricingPlan?: { current: string | null; next: string | null };
+      /** VDM state from GetAccount, plus open advisor recommendations. Absent on rows written before plan 373. */
+      vdm?: {
+        enabled: boolean;
+        engagementMetrics: boolean;
+        optimizedSharedDelivery: boolean;
+        recommendations:
+          | {
+              status: "ok";
+              open: Array<{
+                type: string;
+                impact: string | null;
+                description: string;
+                resourceArn: string | null;
+                lastUpdatedAt: string | null;
+              }>;
+              truncated: boolean;
+            }
+          | { status: "vdm_disabled" }
+          | { status: "permission_missing" }
+          | { status: "unavailable" };
+      };
       /** Machine-readable reasons, worst first. Empty when healthy. */
       reasons: string[];
     }>(),

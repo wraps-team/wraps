@@ -371,6 +371,28 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         solution: "Check the current plan: wraps email plan",
       },
       {
+        code: "SES_VDM_CHANGE_REJECTED",
+        message: "SES rejected the VDM change: <detail>",
+        solution: "Check the current state: wraps email vdm",
+      },
+      {
+        code: "INVALID_VALIDATION_THRESHOLD",
+        message: "Invalid validation threshold: <detail>",
+        solution: "Valid values: medium, high, managed",
+      },
+      {
+        code: "SUPPRESSION_OPTIONS_MISSING",
+        message:
+          "Configuration set <name> has no suppression options, so Auto Validation cannot be added without changing its suppression behaviour",
+        solution:
+          "Set suppression explicitly first: wraps email domains config --suppress-bounce --suppress-complaint",
+      },
+      {
+        code: "CONFLICTING_VDM_FLAGS",
+        message: "Pass either --enable or --disable, not both",
+        solution: "Use one of the two flags",
+      },
+      {
         code: "PRODUCTION_ACCESS_PENDING",
         message:
           "A production access request is already under review for this account",
