@@ -1369,12 +1369,16 @@ export default function CLIReferenceEmailPageContent() {
                 history
               </li>
               <li>
-                Production → Enterprise: Adds dedicated IP and 1-year history
-                retention
+                Production → Enterprise: Adds 1-year history retention and
+                stricter alert thresholds
               </li>
               <li>
                 Add individual features: Enable specific event types or extend
                 storage
+              </li>
+              <li>
+                <code>--action managed-dedicated-ips</code>: Toggle an SES
+                managed dedicated IP pool and show the cost for your SES plan
               </li>
             </ul>
           </CardContent>

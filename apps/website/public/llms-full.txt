@@ -116,7 +116,7 @@ wraps email status            Show infrastructure details
 wraps email check [domain]    Deliverability audit (DKIM, SPF, DMARC, blacklists, TLS)
 wraps email verify            Verify domain DNS records
 wraps email config            Apply CLI updates to infrastructure
-wraps email upgrade           Add features (tracking, history, dedicated IP)
+wraps email upgrade           Add features (tracking, history, archiving)
 wraps email restore           Restore from saved metadata
 wraps email destroy           Remove all email infrastructure
 ```
@@ -706,7 +706,7 @@ npx @wraps.dev/cli email upgrade
 |--------|-------------|----------|
 | starter | ~$0.05 | Open/click tracking, bounce/complaint suppression |
 | production | ~$2-5 | + Real-time event tracking, 90-day history, reputation metrics |
-| enterprise | ~$50-100 | + Dedicated IP, 1-year history, all 10 SES event types |
+| enterprise | ~$50-100 | + 1-year history, all 10 SES event types |
 
 ### SMS
 
@@ -792,7 +792,7 @@ Full table, generated from the same source as the website: https://wraps.dev/pri
 
 **Production preset adds:** EventBridge rule, SQS queue + DLQ, Lambda processor (Node.js 20, 128MB), DynamoDB table (90-day TTL)
 
-**Enterprise preset adds:** Dedicated IP address, 365-day history, all 10 SES event types
+**Enterprise preset adds:** 365-day history, all 10 SES event types
 
 Architecture: SES → EventBridge → SQS + DLQ → Lambda → DynamoDB
 

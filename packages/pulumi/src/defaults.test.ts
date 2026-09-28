@@ -301,6 +301,21 @@ describe("applyDefaults", () => {
       expect(result.dedicatedIp).toBe(true);
     });
 
+    it("should default managedDedicatedIps to false", () => {
+      const result = applyDefaults({});
+
+      expect(result.managedDedicatedIps).toBe(false);
+    });
+
+    it("should configure managedDedicatedIps", () => {
+      const args: WrapsEmailArgs = {
+        managedDedicatedIps: true,
+      };
+      const result = applyDefaults(args);
+
+      expect(result.managedDedicatedIps).toBe(true);
+    });
+
     it("should configure reputation metrics", () => {
       const args: WrapsEmailArgs = {
         reputationMetrics: false,

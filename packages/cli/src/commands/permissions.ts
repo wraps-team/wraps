@@ -298,6 +298,28 @@ function getSMTPStatements(): IAMStatement[] {
 }
 
 /**
+ * Get SES managed dedicated IP pool statements (plan 374). Pool
+ * creation/deletion happens under the operator's own deploy credentials —
+ * never through the console role, so this needs no policy-version rung.
+ */
+function getDedicatedIpPoolStatements(): IAMStatement[] {
+  return [
+    {
+      Sid: "SESManagedDedicatedIps",
+      Effect: "Allow",
+      Action: [
+        "ses:CreateDedicatedIpPool",
+        "ses:DeleteDedicatedIpPool",
+        "ses:GetDedicatedIpPool",
+        "ses:GetDedicatedIps",
+        "ses:PutConfigurationSetDeliveryOptions",
+      ],
+      Resource: "*",
+    },
+  ];
+}
+
+/**
  * Get S3 statements for CDN/email archiving
  */
 function getS3Statements(): IAMStatement[] {
@@ -469,6 +491,7 @@ function buildPolicy(
     // SMTP credentials and advanced features
     if (!preset || preset === "enterprise") {
       statements.push(...getSMTPStatements());
+      statements.push(...getDedicatedIpPoolStatements());
     }
 
     // Route53 for auto DNS (optional for all presets)

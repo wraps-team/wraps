@@ -126,8 +126,10 @@ export async function config(options: EmailConfigOptions): Promise<void> {
     console.log(`  ${pc.green("✓")} Event Tracking (EventBridge)`);
   }
 
-  if (config.dedicatedIp) {
-    console.log(`  ${pc.green("✓")} Dedicated IP Address`);
+  if (config.managedDedicatedIps) {
+    console.log(
+      `  ${pc.green("✓")} Managed Dedicated IPs (wraps-email-managed)`
+    );
   }
 
   console.log("");

@@ -30,8 +30,10 @@ const AWS_PRICING = {
   // EventBridge pricing
   EVENTBRIDGE_EVENTS_PER_MILLION: 1.0, // $1.00 per million custom events published
 
-  // Dedicated IP
-  DEDICATED_IP_PER_MONTH: 24.95, // $24.95 per dedicated IP per month
+  // SES managed dedicated IPs — à la carte fixed fee (verified 2026-09-27
+  // against aws.amazon.com/ses/pricing; the per-email fee is extra and
+  // included on the SES Pro/Enterprise plans)
+  MANAGED_DEDICATED_IP_PER_MONTH: 15,
 
   // CloudWatch pricing
   CLOUDWATCH_LOGS_PER_GB: 0.5, // $0.50 per GB ingested
@@ -328,22 +330,6 @@ function calculateReputationMetricsCost(
 }
 
 /**
- * Calculate cost for dedicated IP
- */
-function calculateDedicatedIpCost(
-  config: WrapsEmailConfig
-): FeatureCost | undefined {
-  if (!config.dedicatedIp) {
-    return;
-  }
-
-  return {
-    monthly: AWS_PRICING.DEDICATED_IP_PER_MONTH,
-    description: "Dedicated IP address (requires 100k+ emails/day for warmup)",
-  };
-}
-
-/**
  * Calculate cost for email archiving (full email content storage)
  * Architecture: SES → Mail Manager Archive (S3-backed)
  */
@@ -369,6 +355,25 @@ function calculateEmailArchivingCost(
   return {
     monthly: ingestionCost + storageCost,
     description: `Email archiving (${retention}, ~${storageGB.toFixed(2)} GB at steady-state)`,
+  };
+}
+
+/**
+ * Calculate cost for managed dedicated IPs (plan 374). À la carte fixed fee
+ * only — this estimate does not include the per-email fee (included on the
+ * SES Pro/Enterprise plans; AWS does not publish an Essentials add-on rate).
+ */
+function calculateManagedDedicatedIpsCost(
+  config: WrapsEmailConfig
+): FeatureCost | undefined {
+  if (!config.managedDedicatedIps) {
+    return;
+  }
+
+  return {
+    monthly: AWS_PRICING.MANAGED_DEDICATED_IP_PER_MONTH,
+    description:
+      "Managed dedicated IPs (à la carte fixed fee; per-email fee extra; included on SES Pro/Enterprise)",
   };
 }
 
@@ -462,7 +467,7 @@ export function calculateCosts(
   const eventTracking = calculateEventTrackingCost(config, emailsPerMonth);
   const dynamoDBHistory = calculateDynamoDBCost(config, emailsPerMonth);
   const emailArchiving = calculateEmailArchivingCost(config, emailsPerMonth);
-  const dedicatedIp = calculateDedicatedIpCost(config);
+  const dedicatedIp = calculateManagedDedicatedIpsCost(config);
   const waf = calculateWafCost(config, emailsPerMonth);
   const smtpCredentials = calculateSMTPCredentialsCost(config);
   const alerts = calculateAlertingCost(config);

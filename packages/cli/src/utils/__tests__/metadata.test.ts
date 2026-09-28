@@ -926,7 +926,7 @@ describe("applyConfigUpdates", () => {
       const result = applyConfigUpdates(existingConfig, enterprisePreset);
 
       expect(result.domain).toBe("myapp.com");
-      expect(result.dedicatedIp).toBe(true); // From enterprise preset
+      expect(result.eventTracking?.archiveRetention).toBe("1year"); // From enterprise preset
     });
 
     it("should preserve mailFromDomain when upgrading", () => {
@@ -1295,7 +1295,6 @@ describe("applyConfigUpdates", () => {
       expect(result.tracking?.httpsEnabled).toBe(true);
 
       // Enterprise features applied
-      expect(result.dedicatedIp).toBe(true);
       expect(result.eventTracking?.archiveRetention).toBe("1year");
     });
   });

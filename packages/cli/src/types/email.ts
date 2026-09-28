@@ -222,8 +222,12 @@ export type WrapsEmailConfig = {
   };
 
   // Advanced options
+  /** @deprecated Never read by any code path. */
   ipPool?: string;
+  /** @deprecated Never provisioned anything; kept so existing metadata still parses. */
   dedicatedIp?: boolean;
+  /** Route the stack's configuration set through an SES managed dedicated IP pool (wraps-email-managed). */
+  managedDedicatedIps?: boolean;
   sendingEnabled?: boolean;
   vdmOptions?: {
     engagementTrackingEnabled?: boolean;

@@ -64,6 +64,7 @@ export function applyDefaults(props: WrapsEmailProps): ResolvedConfig {
     reputationMetrics: props.reputationMetrics ?? true,
     tlsRequired: props.tlsRequired ?? false,
     dedicatedIp: props.dedicatedIp ?? false,
+    managedDedicatedIps: props.managedDedicatedIps ?? false,
     sendingEnabled: props.sendingEnabled ?? true,
     webhook: props.webhook,
     removalPolicy: props.removalPolicy ?? cdk.RemovalPolicy.RETAIN,

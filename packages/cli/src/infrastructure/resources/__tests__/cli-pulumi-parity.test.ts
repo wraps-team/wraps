@@ -2,10 +2,16 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ALL_EVENT_TYPES, EMAIL_ROLE_NAME } from "@wraps/core";
-import { resolveMatchingEventTypes as pulumiResolveMatchingEventTypes } from "@wraps.dev/pulumi";
+import {
+  buildDeliveryOptions as pulumiBuildDeliveryOptions,
+  resolveMatchingEventTypes as pulumiResolveMatchingEventTypes,
+} from "@wraps.dev/pulumi";
 import { describe, expect, it } from "vitest";
 import { deriveServiceRoleName } from "../../shared/iam.js";
-import { resolveMatchingEventTypes as cliResolveMatchingEventTypes } from "../ses.js";
+import {
+  buildDeliveryOptions as cliBuildDeliveryOptions,
+  resolveMatchingEventTypes as cliResolveMatchingEventTypes,
+} from "../ses.js";
 
 /**
  * Plan 183: there are two Pulumi implementations of the email stack
@@ -58,6 +64,30 @@ describe("resolveMatchingEventTypes: cli and pulumi agree on the default-set der
     expect(pulumiResolveMatchingEventTypes(undefined)).toEqual(ALL_EVENT_TYPES);
     expect(cliResolveMatchingEventTypes([])).toEqual(ALL_EVENT_TYPES);
     expect(pulumiResolveMatchingEventTypes([])).toEqual(ALL_EVENT_TYPES);
+  });
+});
+
+describe("buildDeliveryOptions: cli and pulumi agree", () => {
+  const cases: {
+    label: string;
+    input: { tlsRequired?: boolean; sendingPoolName?: string };
+  }[] = [
+    { label: "neither set", input: {} },
+    { label: "tlsRequired only", input: { tlsRequired: true } },
+    {
+      label: "sendingPoolName only",
+      input: { sendingPoolName: "wraps-email-managed" },
+    },
+    {
+      label: "both set",
+      input: { tlsRequired: true, sendingPoolName: "wraps-email-managed" },
+    },
+  ];
+
+  it.each(cases)("$label", ({ input }) => {
+    expect(cliBuildDeliveryOptions(input)).toEqual(
+      pulumiBuildDeliveryOptions(input)
+    );
   });
 });
 

@@ -1,5 +1,5 @@
 import * as clack from "@clack/prompts";
-
+import { MANAGED_DEDICATED_IP_POOL_NAME } from "@wraps/core";
 import pc from "picocolors";
 import { trackError } from "../../telemetry/events.js";
 import { isJsonMode, jsonError } from "./json-output.js";
@@ -1044,6 +1044,34 @@ export const errors = {
       "EVENT_TYPES_MISSING_SUPPRESSION_EVENTS",
       'BOUNCE and COMPLAINT must always be included in eventTracking.events. Without them your pipeline never learns about bounces or complaints, so bad addresses keep getting sent to and your domain reputation degrades.\n\nTo stop OPEN/CLICK tracking without losing suppression visibility, drop only those types:\n  eventTracking: { events: ["SEND", "DELIVERY", "BOUNCE", "COMPLAINT", "REJECT", "RENDERING_FAILURE", "DELIVERY_DELAY", "SUBSCRIPTION"] }',
       "https://wraps.dev/docs/infrastructure/events"
+    ),
+
+  // Managed dedicated IP pool (plan 374). Wraps only ever creates or attaches
+  // the pool it names (MANAGED_DEDICATED_IP_POOL_NAME); it never replaces a
+  // pool it did not attach, and never converts a STANDARD pool to MANAGED
+  // (that conversion is one-way in SES).
+  sendingPoolConflict: (poolName: string) =>
+    new WrapsError(
+      `The configuration set already sends through dedicated IP pool "${poolName}"`,
+      "SENDING_POOL_CONFLICT",
+      "Wraps will not replace a pool it did not attach. Detach it in the SES console (Configuration sets → Delivery options) or leave managed dedicated IPs off.",
+      "https://wraps.dev/docs/reference/errors"
+    ),
+
+  managedPoolNameTaken: () =>
+    new WrapsError(
+      `A STANDARD dedicated IP pool named "${MANAGED_DEDICATED_IP_POOL_NAME}" already exists`,
+      "MANAGED_POOL_NAME_TAKEN",
+      "Wraps will not convert it (MANAGED is irreversible). Rename or delete that pool, then retry.",
+      "https://wraps.dev/docs/reference/errors"
+    ),
+
+  managedDedicatedIpsUnavailable: (reason: string) =>
+    new WrapsError(
+      `Managed dedicated IPs are unavailable on your SES plan: ${reason}`,
+      "MANAGED_DEDICATED_IPS_UNAVAILABLE",
+      "Check your current SES pricing plan: wraps email plan",
+      "https://wraps.dev/docs/reference/errors"
     ),
 
   // Generic AWS error fallbacks — used by awsErrorToWrapsError when no specific

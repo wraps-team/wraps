@@ -84,7 +84,7 @@ export const PRODUCTION_PRESET: WrapsEmailConfig = {
  * Enterprise preset - full features for high-volume senders
  * Perfect for: Large platforms, high-volume transactional email
  * Volume: 500k+ emails/month
- * Cost: ~$100-200/month (includes $24.95 dedicated IP, add ~$50+/mo for archiving)
+ * Cost: ~$100-200/month (add ~$50+/mo for archiving)
  */
 export const ENTERPRISE_PRESET: WrapsEmailConfig = {
   tracking: {
@@ -122,7 +122,6 @@ export const ENTERPRISE_PRESET: WrapsEmailConfig = {
       complaintRateCritical: 0.0005, // 0.05% (vs 0.08% default)
     },
   },
-  dedicatedIp: true,
   sendingEnabled: true,
 };
 
@@ -215,7 +214,6 @@ export function getPresetInfo(preset: ConfigPreset): PresetInfo {
       volume: "500k+ emails/month",
       features: [
         "Everything in Production",
-        "Dedicated IP address",
         "1-year email history",
         "Stricter alert thresholds (catch issues earlier)",
         "Optional: 1-year+ email archiving",
@@ -286,11 +284,6 @@ export function getUpgradePath(
     );
   }
 
-  // Check dedicated IP
-  if (!current.dedicatedIp && target.dedicatedIp) {
-    changes.push("Add dedicated IP address");
-  }
-
   return changes;
 }
 
@@ -299,13 +292,6 @@ export function getUpgradePath(
  */
 export function validateConfig(config: WrapsEmailConfig): string[] {
   const warnings: string[] = [];
-
-  // Warn about dedicated IP without high volume
-  if (config.dedicatedIp) {
-    warnings.push(
-      "⚠️  Dedicated IPs require 100k+ emails/day for proper warmup. Consider starting with shared IPs."
-    );
-  }
 
   // Warn about event tracking without storage
   if (config.eventTracking?.enabled && !config.eventTracking?.dynamoDBHistory) {

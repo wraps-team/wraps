@@ -223,6 +223,7 @@ export class WrapsEmail extends pulumi.ComponentResource {
     nodes.configSet = sesResult.configSet;
     nodes.domainIdentity = sesResult.domainIdentity;
     nodes.domainDkim = sesResult.domainDkim;
+    nodes.dedicatedIpPool = sesResult.dedicatedIpPool;
 
     // SES Auto Validation (if configured) — opt-in, stored inside the
     // configuration set's suppression options, so it depends on the config
@@ -311,6 +312,14 @@ export class WrapsEmail extends pulumi.ComponentResource {
           "The configuration set will use SES's OPTIONAL HTTPS policy, which wraps click links in the original link's protocol — " +
           "so https:// links in your emails will resolve against a domain with no matching certificate and show recipients a warning. " +
           "Set tracking.httpsEnabled: true to deploy CloudFront + ACM for this domain.",
+        this
+      );
+    }
+
+    if (config.dedicatedIp) {
+      pulumi.log.warn(
+        "dedicatedIp is deprecated and has no effect: @wraps.dev/pulumi does not provision a dedicated IP. " +
+          "No IP pool is created and the configuration set sends from shared SES IPs.",
         this
       );
     }

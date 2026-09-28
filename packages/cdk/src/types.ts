@@ -136,11 +136,18 @@ export type WrapsEmailProps = {
   tlsRequired?: boolean;
 
   /**
-   * Enable dedicated IP address.
-   * Adds ~$25/month to AWS costs.
-   * @default false
+   * @deprecated Has no effect — no dedicated IP is provisioned. Kept so
+   * existing code still compiles.
    */
   dedicatedIp?: boolean;
+
+  /**
+   * Route the configuration set through an SES managed dedicated IP pool
+   * named wraps-email-managed. Included on the SES Pro and Enterprise
+   * plans; billed as an add-on otherwise.
+   * @default false
+   */
+  managedDedicatedIps?: boolean;
 
   /**
    * Enable sending on the SES configuration set.
@@ -180,6 +187,7 @@ export type ResolvedConfig = {
   reputationMetrics: boolean;
   tlsRequired: boolean;
   dedicatedIp: boolean;
+  managedDedicatedIps: boolean;
   sendingEnabled: boolean;
   webhook?: WebhookConfig;
   removalPolicy: cdk.RemovalPolicy;
@@ -219,4 +227,6 @@ export type WrapsEmailResources = {
   webhookConnection?: events.IConnection;
   /** EventBridge API Destination for webhook (if webhook is configured) */
   webhookApiDestination?: events.IApiDestination;
+  /** SES managed dedicated IP pool (if managedDedicatedIps is true) */
+  dedicatedIpPool?: ses.IDedicatedIpPool;
 };

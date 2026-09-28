@@ -393,6 +393,26 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         solution: "Use one of the two flags",
       },
       {
+        code: "SENDING_POOL_CONFLICT",
+        message:
+          'The configuration set already sends through dedicated IP pool "<pool>"',
+        solution:
+          "Wraps will not replace a pool it did not attach. Detach it in the SES console or leave managed dedicated IPs off.",
+      },
+      {
+        code: "MANAGED_POOL_NAME_TAKEN",
+        message:
+          'A STANDARD dedicated IP pool named "wraps-email-managed" already exists',
+        solution:
+          "Wraps will not convert it (MANAGED is irreversible). Rename or delete that pool, then retry.",
+      },
+      {
+        code: "MANAGED_DEDICATED_IPS_UNAVAILABLE",
+        message:
+          "Managed dedicated IPs are unavailable on your SES plan: <reason>",
+        solution: "Check your current SES pricing plan: wraps email plan",
+      },
+      {
         code: "PRODUCTION_ACCESS_PENDING",
         message:
           "A production access request is already under review for this account",

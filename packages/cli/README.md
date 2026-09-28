@@ -223,7 +223,7 @@ wraps email init --provider vercel --region us-east-1 --domain myapp.com --prese
 | `wraps email check` | Check email deliverability for a domain |
 | `wraps email config` | Apply CLI config updates to infrastructure (alias: `sync`) |
 | `wraps email status` | Show email infrastructure details |
-| `wraps email upgrade` | Add features incrementally (presets, tracking domain, SMTP, dedicated IP, etc.) |
+| `wraps email upgrade` | Add features incrementally (presets, tracking domain, SMTP, managed dedicated IPs, etc.) |
 | `wraps email verify` | Verify domain DNS records (DKIM, SPF, DMARC) |
 | `wraps email restore` | Restore infrastructure from saved metadata |
 | `wraps email destroy` | Remove all email infrastructure |
@@ -435,11 +435,10 @@ The CLI offers four presets that control which AWS resources are created:
 
 ### Enterprise (~$50-100/mo)
 - Everything in Production
-- Dedicated IP address ($24.95/mo from AWS)
 - 1-year DynamoDB TTL (Production's is 90 days; event-type coverage is the same as Production)
 
 ### Custom
-Select individual features. Useful if you want event storage without a dedicated IP, or specific event types only.
+Useful if you want event storage without archiving, or specific event types only.
 
 ## DNS Configuration
 
@@ -931,7 +930,6 @@ wraps email init
 - [x] Custom tracking domain (HTTP, HTTPS coming in v1.1.0)
 - [x] Configurable event types (10 SES event types available)
 - [x] Configurable email history retention (7 days to 1 year TTL)
-- [x] Dedicated IP address provisioning
 - [x] Lambda bundling with esbuild
 - [x] Vercel OIDC integration
 - [x] Event pipeline: EventBridge → SQS → Lambda → DynamoDB

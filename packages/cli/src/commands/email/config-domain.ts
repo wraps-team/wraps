@@ -572,10 +572,19 @@ async function applyDelivery(
   ctx: ApplyContext,
   tlsRequired: boolean
 ): Promise<void> {
+  // PutConfigurationSetDeliveryOptions is a PUT: omitting SendingPoolName
+  // risks detaching a dedicated IP pool the customer attached themselves.
+  const current = await ctx.sesClient.send(
+    new GetConfigurationSetCommand({
+      ConfigurationSetName: ctx.candidate.configSetName,
+    })
+  );
   await ctx.sesClient.send(
     new PutConfigurationSetDeliveryOptionsCommand({
       ConfigurationSetName: ctx.candidate.configSetName,
       TlsPolicy: tlsRequired ? "REQUIRE" : "OPTIONAL",
+      SendingPoolName: current?.DeliveryOptions?.SendingPoolName,
+      MaxDeliverySeconds: current?.DeliveryOptions?.MaxDeliverySeconds,
     })
   );
   persistCandidateField(ctx, "tlsRequired", tlsRequired);

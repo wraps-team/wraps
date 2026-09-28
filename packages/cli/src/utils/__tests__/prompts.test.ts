@@ -661,7 +661,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(true) // event tracking (stores in DynamoDB)
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving
 
       vi.mocked(clack.select).mockResolvedValue("90days");
@@ -674,7 +673,7 @@ describe("Prompts", () => {
       expect(result.eventTracking.dynamoDBHistory).toBe(true);
       expect(result.tlsRequired).toBe(true);
       expect(result.reputationMetrics).toBe(true);
-      expect(result.dedicatedIp).toBe(false);
+      expect(result.dedicatedIp).toBeUndefined();
     });
 
     it("should return configuration with minimal options", async () => {
@@ -684,7 +683,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // event tracking
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving
 
       const result = await promptCustomConfig();
@@ -693,7 +691,7 @@ describe("Prompts", () => {
       expect(result.eventTracking.enabled).toBe(false);
       expect(result.tlsRequired).toBe(true);
       expect(result.reputationMetrics).toBe(false);
-      expect(result.dedicatedIp).toBe(false);
+      expect(result.dedicatedIp).toBeUndefined();
     });
 
     it("should prompt for retention when event tracking is enabled", async () => {
@@ -703,7 +701,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(true) // event tracking (stores in DynamoDB)
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving
 
       vi.mocked(clack.select).mockResolvedValue("1year");
@@ -722,7 +719,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // event tracking - DISABLED
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving - DISABLED
 
       await promptCustomConfig();
@@ -744,7 +740,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(true) // event tracking (stores in DynamoDB)
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving
 
       vi.mocked(clack.select).mockResolvedValue("90days");
@@ -773,7 +768,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(true) // event tracking (stores in DynamoDB)
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving
 
       vi.mocked(clack.select).mockResolvedValue("90days");
@@ -793,7 +787,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // event tracking
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving
 
       const result = await promptCustomConfig();
@@ -809,7 +802,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // event tracking
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving
 
       const result = await promptCustomConfig();
@@ -824,7 +816,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // event tracking
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(true); // email archiving
 
       vi.mocked(clack.select).mockResolvedValue("90days");
@@ -842,7 +833,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // event tracking
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving
 
       const result = await promptCustomConfig();
@@ -860,7 +850,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // event tracking
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(true); // email archiving
 
       vi.mocked(clack.select).mockResolvedValue("1year");
@@ -890,7 +879,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // event tracking
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(true); // email archiving
 
       vi.mocked(clack.select).mockResolvedValue("18months");
@@ -907,7 +895,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // event tracking
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(true) // custom MAIL FROM - ENABLED
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving
 
       vi.mocked(clack.text).mockResolvedValue("bounce");
@@ -924,7 +911,6 @@ describe("Prompts", () => {
         .mockResolvedValueOnce(false) // event tracking
         .mockResolvedValueOnce(true) // TLS
         .mockResolvedValueOnce(false) // custom MAIL FROM - DISABLED
-        .mockResolvedValueOnce(false) // dedicated IP
         .mockResolvedValueOnce(false); // email archiving
 
       const result = await promptCustomConfig();

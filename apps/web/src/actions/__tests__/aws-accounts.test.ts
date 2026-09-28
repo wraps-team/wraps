@@ -1638,6 +1638,120 @@ describe("scanAWSAccountFeatures — config set detection", () => {
     expect(row?.features?.email?.configSetName).toBe("wraps-email-tracking");
   });
 
+  it("records the sending pool and managed dedicated IP count", async () => {
+    mockSend.mockImplementation(
+      (command: { _type: string; ConfigurationSetName?: string }) => {
+        if (command._type === "ListConfigurationSetsCommand") {
+          return Promise.resolve({
+            ConfigurationSets: ["wraps-email-example-com"],
+          });
+        }
+        if (command._type === "GetConfigurationSetCommand") {
+          return Promise.resolve({
+            TrackingOptions: {},
+            DeliveryOptions: { SendingPoolName: "wraps-email-managed" },
+          });
+        }
+        if (command._type === "GetConfigurationSetEventDestinationsCommand") {
+          return Promise.resolve({
+            EventDestinations: [{ MatchingEventTypes: ["SEND", "OPEN"] }],
+          });
+        }
+        switch (command._type) {
+          case "GetAccountCommand":
+            return Promise.resolve({ ProductionAccessEnabled: true });
+          case "GetDedicatedIpsCommand":
+            return Promise.resolve({
+              DedicatedIps: [
+                {
+                  Ip: "192.0.2.1",
+                  WarmupStatus: "NOT_APPLICABLE",
+                  WarmupPercentage: -1,
+                  PoolName: "wraps-email-managed",
+                },
+                {
+                  Ip: "192.0.2.2",
+                  WarmupStatus: "DONE",
+                  WarmupPercentage: 100,
+                  PoolName: "legacy",
+                },
+              ],
+            });
+          case "ListEmailIdentitiesCommand":
+            return Promise.resolve({ EmailIdentities: [] });
+          default:
+            return Promise.reject(
+              new Error(`Unexpected SES command: ${command._type}`)
+            );
+        }
+      }
+    );
+
+    const result = await scanAWSAccountFeatures(
+      scanTestAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq }) => eq(a.id, scanTestAccount.id),
+    });
+    expect(row?.features?.email?.sendingPoolBySet).toEqual([
+      {
+        configSetName: "wraps-email-example-com",
+        poolName: "wraps-email-managed",
+      },
+    ]);
+    expect(row?.features?.email?.dedicatedIpCount).toBe(2);
+    expect(row?.features?.email?.managedDedicatedIpCount).toBe(1);
+  });
+
+  it("records no sending pool and zero managed IPs when none exist", async () => {
+    mockSend.mockImplementation(
+      (command: { _type: string; ConfigurationSetName?: string }) => {
+        if (command._type === "ListConfigurationSetsCommand") {
+          return Promise.resolve({
+            ConfigurationSets: ["wraps-email-tracking"],
+          });
+        }
+        if (command._type === "GetConfigurationSetCommand") {
+          return Promise.resolve({ TrackingOptions: {} });
+        }
+        if (command._type === "GetConfigurationSetEventDestinationsCommand") {
+          return Promise.resolve({
+            EventDestinations: [{ MatchingEventTypes: ["SEND", "OPEN"] }],
+          });
+        }
+        switch (command._type) {
+          case "GetAccountCommand":
+            return Promise.resolve({ ProductionAccessEnabled: true });
+          case "GetDedicatedIpsCommand":
+            return Promise.resolve({ DedicatedIps: [] });
+          case "ListEmailIdentitiesCommand":
+            return Promise.resolve({ EmailIdentities: [] });
+          default:
+            return Promise.reject(
+              new Error(`Unexpected SES command: ${command._type}`)
+            );
+        }
+      }
+    );
+
+    const result = await scanAWSAccountFeatures(
+      scanTestAccount.id,
+      testOrganization.id
+    );
+
+    expect(result.success).toBe(true);
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq }) => eq(a.id, scanTestAccount.id),
+    });
+    expect(row?.features?.email?.sendingPoolBySet).toEqual([]);
+    expect(row?.features?.email?.managedDedicatedIpCount).toBe(0);
+  });
+
   it("falls back to per-domain config set when wraps-email-tracking is missing", async () => {
     const notFound = Object.assign(new Error("NotFoundException"), {
       name: "NotFoundException",

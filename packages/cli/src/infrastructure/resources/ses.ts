@@ -1,5 +1,9 @@
 import * as aws from "@pulumi/aws";
-import { ALL_EVENT_TYPES, DEFAULT_CONFIG_SET_NAME } from "@wraps/core";
+import {
+  ALL_EVENT_TYPES,
+  DEFAULT_CONFIG_SET_NAME,
+  MANAGED_DEDICATED_IP_POOL_NAME,
+} from "@wraps/core";
 import type { SESEventType } from "../../types/index.js";
 import { domainToConfigSetName } from "../../utils/email/config-set-slug.js";
 import { errors } from "../../utils/shared/errors.js";
@@ -30,6 +34,49 @@ export function resolveMatchingEventTypes(
   eventTypes?: SESEventType[]
 ): SESEventType[] {
   return eventTypes && eventTypes.length > 0 ? eventTypes : ALL_EVENT_TYPES;
+}
+
+/**
+ * Build the configuration set's `deliveryOptions` from resolved TLS and
+ * dedicated-IP-pool inputs. Returns undefined when neither is set, so an
+ * account with no opinion on either gets SES's own defaults rather than an
+ * explicit empty object.
+ */
+export function buildDeliveryOptions(opts: {
+  tlsRequired?: boolean;
+  sendingPoolName?: string;
+}): aws.types.input.sesv2.ConfigurationSetDeliveryOptions | undefined {
+  if (!(opts.tlsRequired || opts.sendingPoolName)) {
+    return;
+  }
+  return {
+    ...(opts.tlsRequired ? { tlsPolicy: "REQUIRE" } : {}),
+    ...(opts.sendingPoolName ? { sendingPoolName: opts.sendingPoolName } : {}),
+  };
+}
+
+/**
+ * Which pool the stack's configuration set should send through.
+ * - managed on:  ours; refuse if a different pool is already attached.
+ * - managed off: keep a foreign pool; drop ours (the pool is being deleted).
+ */
+export function resolveSendingPoolName(opts: {
+  managedDedicatedIps: boolean;
+  existingPoolName?: string;
+}): string | undefined {
+  const { managedDedicatedIps, existingPoolName } = opts;
+  if (managedDedicatedIps) {
+    if (
+      existingPoolName &&
+      existingPoolName !== MANAGED_DEDICATED_IP_POOL_NAME
+    ) {
+      throw errors.sendingPoolConflict(existingPoolName);
+    }
+    return MANAGED_DEDICATED_IP_POOL_NAME;
+  }
+  return existingPoolName === MANAGED_DEDICATED_IP_POOL_NAME
+    ? undefined
+    : existingPoolName;
 }
 
 /**
@@ -73,6 +120,8 @@ export type SESResourcesConfig = {
   suppressionReasons?: ("BOUNCE" | "COMPLAINT")[]; // Which event types trigger account suppression list
   importExistingEventDestination?: boolean; // Import existing event destination if it exists
   skipResourceImports?: boolean; // Skip import flags when resources already exist in Pulumi state
+  managedDedicatedIps?: boolean; // Route this config set through the wraps-email-managed pool
+  dedicatedIpPool?: aws.sesv2.DedicatedIpPool; // Created by createManagedDedicatedIpPool when managedDedicatedIps is on
 };
 
 /**
@@ -98,6 +147,34 @@ async function configurationSetExists(
     }
     console.error("Error checking for existing configuration set:", error);
     return false;
+  }
+}
+
+/**
+ * Read the dedicated IP pool currently attached to a configuration set's
+ * DeliveryOptions, if any. Used so a deploy never silently detaches a pool
+ * the customer (or Wraps, on a prior deploy) already attached — see
+ * resolveSendingPoolName.
+ */
+export async function getConfigurationSetSendingPoolName(
+  configSetName: string,
+  region: string
+): Promise<string | undefined> {
+  try {
+    const { SESv2Client, GetConfigurationSetCommand } = await import(
+      "@aws-sdk/client-sesv2"
+    );
+    const ses = new SESv2Client({ region });
+
+    const response = await ses.send(
+      new GetConfigurationSetCommand({ ConfigurationSetName: configSetName })
+    );
+    return response.DeliveryOptions?.SendingPoolName;
+  } catch (error) {
+    if (error instanceof Error && error.name === "NotFoundException") {
+      return;
+    }
+    throw error;
   }
 }
 
@@ -182,13 +259,41 @@ export async function createSESResources(
   const configSetName = config.domain
     ? domainToConfigSetName(config.domain)
     : DEFAULT_CONFIG_SET_NAME;
+
+  // Read whatever pool (if any) the configuration set already sends
+  // through, so a deploy never silently detaches a pool the customer — or
+  // Wraps, on a prior deploy — already attached.
+  // managedDedicatedIps on: fail closed on a read error, since guessing
+  // "no pool" here could let this deploy attach ours over a customer's.
+  // managedDedicatedIps off: today's behavior — a read failure never blocks
+  // a deploy that doesn't use pools at all.
+  let existingPoolName: string | undefined;
+  if (config.managedDedicatedIps) {
+    existingPoolName = await getConfigurationSetSendingPoolName(
+      configSetName,
+      config.region
+    );
+  } else {
+    try {
+      existingPoolName = await getConfigurationSetSendingPoolName(
+        configSetName,
+        config.region
+      );
+    } catch {
+      existingPoolName = undefined;
+    }
+  }
+  const sendingPoolName = resolveSendingPoolName({
+    managedDedicatedIps: !!config.managedDedicatedIps,
+    existingPoolName,
+  });
+
   const configSetOptions: aws.sesv2.ConfigurationSetArgs = {
     configurationSetName: configSetName,
-    deliveryOptions: config.tlsRequired
-      ? {
-          tlsPolicy: "REQUIRE", // Require TLS 1.2+ for all emails
-        }
-      : undefined,
+    deliveryOptions: buildDeliveryOptions({
+      tlsRequired: config.tlsRequired,
+      sendingPoolName,
+    }),
     suppressionOptions: {
       suppressedReasons: config.suppressionReasons ?? ["BOUNCE", "COMPLAINT"],
     },
@@ -227,12 +332,15 @@ export async function createSESResources(
   // Only use import when the resource exists in AWS but not yet in Pulumi state.
   // When skipResourceImports is true, the resource is already tracked in state
   // (e.g., from a prior `wraps email init`), so import would cause a collision.
-  const configSet =
-    exists && !config.skipResourceImports
-      ? new aws.sesv2.ConfigurationSet(configSetName, configSetOptions, {
-          import: configSetName,
-        })
-      : new aws.sesv2.ConfigurationSet(configSetName, configSetOptions);
+  const configSetResourceOpts = {
+    ...(exists && !config.skipResourceImports ? { import: configSetName } : {}),
+    ...(config.dedicatedIpPool ? { dependsOn: [config.dedicatedIpPool] } : {}),
+  };
+  const configSet = new aws.sesv2.ConfigurationSet(
+    configSetName,
+    configSetOptions,
+    configSetResourceOpts
+  );
 
   // SES can only send to the default EventBridge bus
   // We'll use EventBridge rules to route from default bus to SQS

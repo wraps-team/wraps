@@ -45,6 +45,7 @@ export {
 } from "./oidc.js";
 // SES resources
 export {
+  buildDeliveryOptions,
   createConfigSet,
   createConfigSetV2,
   createDomainIdentity,

@@ -741,31 +741,15 @@ describe("upgrade command", () => {
   });
 
   describe("Dedicated IP Tests", () => {
-    it("should enable dedicated IP", async () => {
+    it("does not provision anything for the retired dedicated-ip action", async () => {
       await setupPulumiMock();
-      vi.mocked(prompts.select).mockResolvedValueOnce("dedicated-ip" as never);
-      vi.mocked(prompts.confirm).mockResolvedValue(true as never);
 
-      await upgrade({});
+      await expect(upgrade({ action: "dedicated-ip" })).rejects.toThrow();
 
-      expect(deployEmailStack).toHaveBeenCalledWith(
-        expect.objectContaining({
-          emailConfig: expect.objectContaining({
-            dedicatedIp: true,
-          }),
-        })
-      );
-    });
-
-    it("should cancel when declining dedicated IP", async () => {
-      await setupPulumiMock();
-      vi.mocked(prompts.select).mockResolvedValueOnce("dedicated-ip" as never);
-      vi.mocked(prompts.confirm).mockResolvedValue(false as never);
-
-      await expect(upgrade({})).rejects.toThrow();
       expect(prompts.log.info).toHaveBeenCalledWith(
-        "Dedicated IP not enabled."
+        "Use `wraps email upgrade --action managed-dedicated-ips` — SES managed dedicated IPs."
       );
+      expect(deployEmailStack).not.toHaveBeenCalled();
     });
   });
 

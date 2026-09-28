@@ -40,6 +40,8 @@
 export { WrapsEmail } from "./email.js";
 // Resource functions (for advanced users who want to compose their own)
 export {
+  // SES
+  buildDeliveryOptions,
   convertToSMTPPassword,
   // ACM
   createACMCertificate,

@@ -40,6 +40,26 @@ describe("Email Cost Calculation - User Webhook", () => {
       expect(costs.userWebhook).toBeUndefined();
     });
 
+    it("should not charge for the retired dedicatedIp flag", () => {
+      const withFlag = calculateCosts(
+        { dedicatedIp: true } as WrapsEmailConfig,
+        100_000
+      );
+      const withoutFlag = calculateCosts({} as WrapsEmailConfig, 100_000);
+
+      expect(withFlag.dedicatedIp).toBeUndefined();
+      expect(withFlag.total.monthly).toBe(withoutFlag.total.monthly);
+    });
+
+    it("should charge the à la carte fixed fee for managedDedicatedIps", () => {
+      const costs = calculateCosts(
+        { managedDedicatedIps: true } as WrapsEmailConfig,
+        100_000
+      );
+
+      expect(costs.dedicatedIp?.monthly).toBe(15);
+    });
+
     it("should include user webhook cost in total", () => {
       const configWithout: WrapsEmailConfig = {};
       const configWith: WrapsEmailConfig = {

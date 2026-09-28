@@ -291,6 +291,21 @@ describe("applyDefaults", () => {
       expect(result.dedicatedIp).toBe(true);
     });
 
+    it("should default managedDedicatedIps to false", () => {
+      const result = applyDefaults({});
+
+      expect(result.managedDedicatedIps).toBe(false);
+    });
+
+    it("should configure managedDedicatedIps", () => {
+      const props: WrapsEmailProps = {
+        managedDedicatedIps: true,
+      };
+      const result = applyDefaults(props);
+
+      expect(result.managedDedicatedIps).toBe(true);
+    });
+
     it("should configure reputation metrics", () => {
       const props: WrapsEmailProps = {
         reputationMetrics: false,

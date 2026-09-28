@@ -95,6 +95,9 @@ export const HISTORY_TABLE_NAME = "wraps-email-history";
 /** 30-day EventBridge archive of raw SES events, for outage replay */
 export const EVENTS_ARCHIVE_NAME = "wraps-email-events-archive";
 
+/** SES managed dedicated IP pool Wraps creates when managedDedicatedIps is on */
+export const MANAGED_DEDICATED_IP_POOL_NAME = "wraps-email-managed";
+
 /**
  * EventBridge rule pattern matching all SES events on the default bus. No
  * `detail-type` filter — SES emits different detail-types per event type,

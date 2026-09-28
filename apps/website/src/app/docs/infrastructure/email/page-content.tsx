@@ -507,28 +507,11 @@ export default function InfrastructureEmailPageContent() {
           <Badge variant="secondary">~$50-100/mo</Badge>
         </h2>
         <p className="mb-4 text-muted-foreground">
-          The Enterprise preset includes everything in Production plus dedicated
-          IP, extended history retention, and full event type coverage.
+          The Enterprise preset includes everything in Production plus extended
+          history retention and full event type coverage.
         </p>
 
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Dedicated IP Address</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="list-disc space-y-2 pl-5 text-muted-foreground text-sm">
-                <li>SES dedicated IP pool assigned to your account</li>
-                <li>Full control over sender reputation</li>
-                <li>
-                  Requires IP warming: ramp up sending volume gradually over 2-4
-                  weeks
-                </li>
-                <li>~$24.95/mo per dedicated IP (billed by AWS)</li>
-              </ul>
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Extended History</CardTitle>
@@ -634,7 +617,6 @@ export default function InfrastructureEmailPageContent() {
           <p className="mt-1 text-muted-foreground text-sm">
             SES charges $0.10 per 1,000 emails sent. Infrastructure costs
             (DynamoDB, Lambda, SQS) are additional but minimal at most volumes.
-            Enterprise costs include ~$24.95/mo for a dedicated IP address.
           </p>
         </div>
       </section>

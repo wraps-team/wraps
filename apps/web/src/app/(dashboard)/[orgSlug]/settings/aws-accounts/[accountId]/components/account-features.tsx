@@ -140,6 +140,10 @@ export function AccountFeatures({
   };
 
   const dedicatedIpCount = emailFeatures?.dedicatedIpCount ?? 0;
+  const managedIpCount = emailFeatures?.managedDedicatedIpCount ?? 0;
+  const sendingPools = [
+    ...new Set((emailFeatures?.sendingPoolBySet ?? []).map((s) => s.poolName)),
+  ];
   const trackedEvents = emailFeatures?.trackedEvents ?? [];
   const sesSandbox = emailFeatures?.sandbox ?? true; // Default to sandbox
   const smsPhoneNumbers = smsFeatures?.phoneNumbers ?? [];
@@ -156,7 +160,7 @@ export function AccountFeatures({
     eventHistory: !!emailFeatures?.eventHistoryEnabled,
     archiving: !!emailFeatures?.archivingEnabled,
     customTrackingDomain: !!emailFeatures?.customTrackingDomain,
-    dedicatedIp: dedicatedIpCount > 0,
+    dedicatedIp: dedicatedIpCount > 0 || sendingPools.length > 0,
     inbound: !!emailFeatures?.inboundBucketName,
   };
 
@@ -406,7 +410,13 @@ export function AccountFeatures({
               description="Dedicated sending IP address"
               detail={
                 dedicatedIpCount > 0
-                  ? `${dedicatedIpCount} IP${dedicatedIpCount > 1 ? "s" : ""} assigned`
+                  ? `${dedicatedIpCount} IP${dedicatedIpCount > 1 ? "s" : ""} assigned${
+                      managedIpCount > 0 ? ` (${managedIpCount} managed)` : ""
+                    }${
+                      sendingPools.length > 0
+                        ? ` · Pool: ${sendingPools.join(", ")}`
+                        : ""
+                    }`
                   : undefined
               }
               enabled={emailFeatureStatus.dedicatedIp}

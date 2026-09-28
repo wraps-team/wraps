@@ -103,6 +103,7 @@ export function applyDefaults(args: WrapsEmailArgs): ResolvedConfig {
     reputationMetrics: (args.reputationMetrics as boolean) ?? true,
     tlsRequired: (args.tlsRequired as boolean) ?? false,
     dedicatedIp: (args.dedicatedIp as boolean) ?? false,
+    managedDedicatedIps: (args.managedDedicatedIps as boolean) ?? false,
     sendingEnabled: (args.sendingEnabled as boolean) ?? true,
     webhook: args.webhook as
       | { awsAccountNumber: string; webhookSecret: string; webhookUrl?: string }

@@ -17,6 +17,7 @@ import {
 } from "../../utils/dns/credentials.js";
 import { calculateCosts, formatCost } from "../../utils/email/costs.js";
 import { checkEventPipeline } from "../../utils/email/event-pipeline-check.js";
+import { confirmManagedDedicatedIps } from "../../utils/email/managed-dedicated-ips.js";
 import { getAllPresetInfo, getPreset } from "../../utils/email/presets.js";
 import { resolveDashboardUrl } from "../../utils/selfhost/dashboard-url.js";
 import { validateAWSCredentials } from "../../utils/shared/aws.js";
@@ -175,8 +176,10 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     }
   }
 
-  if (config.dedicatedIp) {
-    console.log(`  ${pc.green("✓")} Dedicated IP Address`);
+  if (config.managedDedicatedIps) {
+    console.log(
+      `  ${pc.green("✓")} Managed Dedicated IPs (wraps-email-managed)`
+    );
   }
 
   if (config.emailArchiving?.enabled) {
@@ -275,11 +278,6 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       hint: "Choose which SES events to track",
     },
     {
-      value: "dedicated-ip",
-      label: "Enable dedicated IP address",
-      hint: "Requires 100k+ emails/day ($50-100/mo)",
-    },
-    {
       value: "alerts",
       label: config.alerts?.enabled
         ? "Manage reputation alerts"
@@ -287,6 +285,13 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       hint: config.alerts?.enabled
         ? "Update thresholds or notification settings"
         : "Get notified before AWS suspends your account",
+    },
+    {
+      value: "managed-dedicated-ips",
+      label: config.managedDedicatedIps
+        ? "Disable managed dedicated IPs"
+        : "Enable managed dedicated IPs",
+      hint: "SES-managed dedicated IP pool (included on SES Pro/Enterprise)",
     },
     {
       value: "custom",
@@ -887,25 +892,29 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     }
 
     case "dedicated-ip": {
-      const confirmed = await clack.confirm({
-        message:
-          "Enable dedicated IP? (Requires 100k+ emails/day, adds ~$50-100/mo)",
-        initialValue: false,
+      clack.log.info(
+        "Use `wraps email upgrade --action managed-dedicated-ips` — SES managed dedicated IPs."
+      );
+      process.exit(0);
+      break;
+    }
+
+    case "managed-dedicated-ips": {
+      const enable = !config.managedDedicatedIps;
+      const confirmed = await confirmManagedDedicatedIps({
+        region,
+        enable,
+        yes: options.yes,
       });
 
-      if (clack.isCancel(confirmed)) {
-        clack.cancel("Upgrade cancelled.");
-        process.exit(0);
-      }
-
       if (!confirmed) {
-        clack.log.info("Dedicated IP not enabled.");
+        clack.log.info("Managed dedicated IPs unchanged.");
         process.exit(0);
       }
 
       updatedConfig = {
         ...config,
-        dedicatedIp: true,
+        managedDedicatedIps: enable,
       };
       newPreset = undefined; // Custom config
       break;
@@ -2662,8 +2671,8 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   if (updatedConfig.eventTracking?.dynamoDBHistory) {
     enabledFeatures.push("dynamodb_history");
   }
-  if (updatedConfig.dedicatedIp) {
-    enabledFeatures.push("dedicated_ip");
+  if (updatedConfig.managedDedicatedIps) {
+    enabledFeatures.push("managed_dedicated_ips");
   }
   if (updatedConfig.emailArchiving?.enabled) {
     enabledFeatures.push("email_archiving");

@@ -1,7 +1,10 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildSuppressionOptions } from "@wraps/core";
+import {
+  buildSuppressionOptions,
+  MANAGED_DEDICATED_IP_POOL_NAME,
+} from "@wraps/core";
 import * as cdk from "aws-cdk-lib";
 import { Annotations } from "aws-cdk-lib";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
@@ -178,8 +181,20 @@ export class WrapsEmail extends Construct {
     // ============================================
     // 3. CREATE SES CONFIGURATION SET
     // ============================================
+    const dedicatedIpPool = config.managedDedicatedIps
+      ? new ses.DedicatedIpPool(this, "ManagedDedicatedIpPool", {
+          dedicatedIpPoolName: MANAGED_DEDICATED_IP_POOL_NAME,
+          scalingMode: ses.ScalingMode.MANAGED,
+        })
+      : undefined;
+    // A retained pool holds no data and keeps billing — always delete it
+    // with the stack, regardless of the construct's own removalPolicy.
+    dedicatedIpPool?.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
+    resources.dedicatedIpPool = dedicatedIpPool;
+
     const configSet = new ses.ConfigurationSet(this, "ConfigSet", {
       configurationSetName: "wraps-email-tracking",
+      dedicatedIpPool,
       reputationMetrics: config.reputationMetrics,
       sendingEnabled: config.sendingEnabled,
       tlsPolicy: config.tlsRequired
@@ -218,6 +233,13 @@ export class WrapsEmail extends Construct {
           "the SES configuration set is created without tracking options, so open and click links will use the default " +
           "r.<region>.awstrack.me domain. Use the Wraps CLI (`wraps email domains config --tracking-domain`) or " +
           "@wraps.dev/pulumi if you need a branded tracking domain today."
+      );
+    }
+
+    if (config.dedicatedIp) {
+      Annotations.of(this).addWarning(
+        "dedicatedIp is deprecated and has no effect: @wraps.dev/cdk does not provision a dedicated IP. " +
+          "No IP pool is created and the configuration set sends from shared SES IPs."
       );
     }
 

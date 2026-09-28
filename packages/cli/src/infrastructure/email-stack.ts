@@ -3,6 +3,7 @@ import { DEFAULT_SUPPRESSION_REASONS, retentionToDays } from "@wraps/core";
 import type { EmailStackConfig, StackOutputs } from "../types/index.js";
 import { domainToConfigSetName } from "../utils/email/config-set-slug.js";
 import { createAlertingResources } from "./resources/alerting.js";
+import { createManagedDedicatedIpPool } from "./resources/dedicated-ip-pool.js";
 import { createDynamoDBTables } from "./resources/dynamodb.js";
 import { createEventBridgeResources } from "./resources/eventbridge.js";
 import { createIAMRole } from "./resources/iam.js";
@@ -142,6 +143,13 @@ export async function deployEmailStack(
           }
         : emailConfig.tracking;
 
+    const dedicatedIpPool = emailConfig.managedDedicatedIps
+      ? await createManagedDedicatedIpPool({
+          region: config.region,
+          skipResourceImports: config.skipResourceImports,
+        })
+      : undefined;
+
     sesResources = await createSESResources({
       domain: emailConfig.domain,
       mailFromDomain,
@@ -155,6 +163,8 @@ export async function deployEmailStack(
       suppressionReasons: emailConfig.suppressionList?.reasons,
       importExistingEventDestination: shouldImportEventDest,
       skipResourceImports: config.skipResourceImports,
+      managedDedicatedIps: emailConfig.managedDedicatedIps,
+      dedicatedIpPool,
     });
   }
 

@@ -67,7 +67,7 @@ const presets = [
       "DynamoDB",
       "IAM User Management",
     ],
-    description: "All features including SMTP credentials and dedicated IP",
+    description: "All features including SMTP credentials",
   },
 ];
 

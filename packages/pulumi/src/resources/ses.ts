@@ -1,6 +1,10 @@
 import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
-import { ALL_EVENT_TYPES, DEFAULT_CONFIG_SET_NAME } from "@wraps/core";
+import {
+  ALL_EVENT_TYPES,
+  DEFAULT_CONFIG_SET_NAME,
+  MANAGED_DEDICATED_IP_POOL_NAME,
+} from "@wraps/core";
 import type {
   ResolvedConfig,
   SESEventType,
@@ -17,6 +21,7 @@ export type SESResourcesResult = {
   domainDkim?: aws.ses.DomainDkim;
   mailFromAttributes?: aws.sesv2.EmailIdentityMailFromAttributes;
   dkimTokens: pulumi.Output<string[]>;
+  dedicatedIpPool?: aws.sesv2.DedicatedIpPool;
 };
 
 /**
@@ -44,6 +49,26 @@ export function createConfigSet(
 }
 
 /**
+ * Build the configuration set's `deliveryOptions` from resolved TLS and
+ * dedicated-IP-pool inputs. Returns undefined when neither is set, so an
+ * account with no opinion on either gets SES's own defaults rather than an
+ * explicit empty object. Mirrors `packages/cli`'s `buildDeliveryOptions` —
+ * see `cli-pulumi-parity.test.ts`.
+ */
+export function buildDeliveryOptions(opts: {
+  tlsRequired?: boolean;
+  sendingPoolName?: string;
+}): aws.types.input.sesv2.ConfigurationSetDeliveryOptions | undefined {
+  if (!(opts.tlsRequired || opts.sendingPoolName)) {
+    return;
+  }
+  return {
+    ...(opts.tlsRequired ? { tlsPolicy: "REQUIRE" } : {}),
+    ...(opts.sendingPoolName ? { sendingPoolName: opts.sendingPoolName } : {}),
+  };
+}
+
+/**
  * Create SES configuration set with v2 API (supports more options)
  */
 export function createConfigSetV2(
@@ -54,7 +79,12 @@ export function createConfigSetV2(
 ): aws.sesv2.ConfigurationSet {
   const args: aws.sesv2.ConfigurationSetArgs = {
     configurationSetName: DEFAULT_CONFIG_SET_NAME,
-    deliveryOptions: config.tlsRequired ? { tlsPolicy: "REQUIRE" } : undefined,
+    deliveryOptions: buildDeliveryOptions({
+      tlsRequired: config.tlsRequired,
+      sendingPoolName: config.managedDedicatedIps
+        ? MANAGED_DEDICATED_IP_POOL_NAME
+        : undefined,
+    }),
     suppressionOptions: config.suppressionList.enabled
       ? { suppressedReasons: config.suppressionList.reasons }
       : undefined,
@@ -214,8 +244,29 @@ export function createSESResources(
   _transform?: TransformFunctions,
   opts?: pulumi.ComponentResourceOptions
 ): SESResourcesResult {
+  // Managed dedicated IP pool (plan 374). Pulumi has no way to read live AWS
+  // state at deploy time — unlike the CLI's own Pulumi program, which checks
+  // for a foreign pool before attaching — so this always creates and owns
+  // its own pool under Pulumi state.
+  const dedicatedIpPool = config.managedDedicatedIps
+    ? new aws.sesv2.DedicatedIpPool(
+        `${name}-managed-ip-pool`,
+        {
+          poolName: MANAGED_DEDICATED_IP_POOL_NAME,
+          scalingMode: "MANAGED",
+          tags,
+        },
+        opts
+      )
+    : undefined;
+
   // Create configuration set with v2 API for full feature support
-  const configSet = createConfigSetV2(name, config, tags, opts);
+  const configSet = createConfigSetV2(
+    name,
+    config,
+    tags,
+    dedicatedIpPool ? { ...opts, dependsOn: [dedicatedIpPool] } : opts
+  );
 
   // Create event destination if events are configured
   let eventDestination: aws.sesv2.ConfigurationSetEventDestination | undefined;
@@ -268,5 +319,6 @@ export function createSESResources(
     domainDkim: undefined,
     mailFromAttributes,
     dkimTokens,
+    dedicatedIpPool,
   };
 }

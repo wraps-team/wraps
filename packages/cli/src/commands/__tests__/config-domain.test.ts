@@ -541,6 +541,42 @@ describe("configDomain — extended config set options", () => {
     expect(vi.mocked(clack.select)).not.toHaveBeenCalled();
   });
 
+  it("Unit 11b: flag mode: preserves an existing dedicated IP pool and max delivery seconds when changing TLS", async () => {
+    sesClientMock.on(GetConfigurationSetCommand).resolves({
+      DeliveryOptions: {
+        TlsPolicy: "OPTIONAL",
+        SendingPoolName: "customer-pool",
+        MaxDeliverySeconds: 600,
+      },
+    });
+    sesClientMock.on(PutConfigurationSetDeliveryOptionsCommand).resolves({});
+
+    await configDomain({ domain: "test.com", tlsRequired: true });
+
+    const deliveryCalls = sesClientMock.commandCalls(
+      PutConfigurationSetDeliveryOptionsCommand
+    );
+    expect(deliveryCalls.length).toBe(1);
+    expect(deliveryCalls[0].args[0].input).toMatchObject({
+      TlsPolicy: "REQUIRE",
+      SendingPoolName: "customer-pool",
+      MaxDeliverySeconds: 600,
+    });
+  });
+
+  it("Unit 11c: flag mode: no existing pool → PutDeliveryOptions gets an undefined SendingPoolName", async () => {
+    sesClientMock.on(GetConfigurationSetCommand).resolves({});
+    sesClientMock.on(PutConfigurationSetDeliveryOptionsCommand).resolves({});
+
+    await configDomain({ domain: "test.com", tlsRequired: true });
+
+    const deliveryCalls = sesClientMock.commandCalls(
+      PutConfigurationSetDeliveryOptionsCommand
+    );
+    expect(deliveryCalls.length).toBe(1);
+    expect(deliveryCalls[0].args[0].input.SendingPoolName).toBeUndefined();
+  });
+
   it("Unit 12: flag mode: primary domain → saves to emailConfig, not additionalDomains", async () => {
     const metadata = await import("../../utils/shared/metadata");
     vi.mocked(metadata.loadConnectionMetadata).mockResolvedValueOnce(

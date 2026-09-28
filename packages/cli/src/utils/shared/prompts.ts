@@ -805,17 +805,6 @@ export async function promptCustomConfig(existingConfig?: any): Promise<any> {
     );
   }
 
-  // Dedicated IP
-  const dedicatedIp = await clack.confirm({
-    message: "Request dedicated IP address? (requires 100k+ emails/day)",
-    initialValue: existingConfig?.dedicatedIp ?? false,
-  });
-
-  if (clack.isCancel(dedicatedIp)) {
-    clack.cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
   // Email Archiving
   const emailArchivingEnabled = await clack.confirm({
     message:
@@ -909,7 +898,6 @@ export async function promptCustomConfig(existingConfig?: any): Promise<any> {
               : "90days",
         }
       : { enabled: false, retention: "90days" },
-    dedicatedIp,
     sendingEnabled: true,
   };
 }

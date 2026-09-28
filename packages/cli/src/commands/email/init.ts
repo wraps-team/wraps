@@ -918,8 +918,8 @@ export async function init(options: InitOptions): Promise<void> {
   if (emailConfig.eventTracking?.dynamoDBHistory) {
     enabledFeatures.push("dynamodb_history");
   }
-  if (emailConfig.dedicatedIp) {
-    enabledFeatures.push("dedicated_ip");
+  if (emailConfig.managedDedicatedIps) {
+    enabledFeatures.push("managed_dedicated_ips");
   }
   if (emailConfig.emailArchiving?.enabled) {
     enabledFeatures.push("email_archiving");

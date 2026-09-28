@@ -9,7 +9,6 @@ import {
   CardTitle,
 } from "@wraps/ui/components/ui/card";
 import {
-  AlertTriangle,
   ArrowRight,
   CheckCircle2,
   Layers,
@@ -203,20 +202,6 @@ export default function ConfigurationPresetsPageContent() {
               </tr>
               <tr className="border-b">
                 <td className="py-3 pr-4 font-medium text-foreground">
-                  Dedicated IP Address
-                </td>
-                <td className="py-3 px-4 text-center text-muted-foreground">
-                  &mdash;
-                </td>
-                <td className="py-3 px-4 text-center text-muted-foreground">
-                  &mdash;
-                </td>
-                <td className="py-3 pl-4 text-center">
-                  <CheckCircle2 className="mx-auto h-4 w-4 text-success" />
-                </td>
-              </tr>
-              <tr className="border-b">
-                <td className="py-3 pr-4 font-medium text-foreground">
                   SES Event Types
                 </td>
                 <td className="py-3 px-4 text-center">4</td>
@@ -379,8 +364,8 @@ export default function ConfigurationPresetsPageContent() {
         </Badge>
         <p className="mb-4 text-muted-foreground">
           For high-volume senders processing 100K+ emails per month. Includes
-          everything in Production plus a dedicated IP address, extended history
-          retention, and all 10 SES event types.
+          everything in Production plus extended history retention and all 10
+          SES event types.
         </p>
         <Card className="mb-4">
           <CardContent className="p-6">
@@ -388,12 +373,6 @@ export default function ConfigurationPresetsPageContent() {
               Everything in Production, plus:
             </h3>
             <ul className="space-y-2">
-              <li className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
-                <span className="text-muted-foreground">
-                  Dedicated IP address for sending
-                </span>
-              </li>
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
                 <span className="text-muted-foreground">
@@ -426,21 +405,6 @@ export default function ConfigurationPresetsPageContent() {
             </div>
           </CardContent>
         </Card>
-        <div className="mt-4 rounded-lg border-warning border-l-4 bg-warning/10 p-4">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-            <div>
-              <p className="font-medium text-sm">
-                Dedicated IPs require warming
-              </p>
-              <p className="mt-1 text-muted-foreground text-sm">
-                If you send fewer than 100K emails per day, a shared IP is
-                usually better for deliverability. Dedicated IPs need a gradual
-                warm-up period to build reputation with email providers.
-              </p>
-            </div>
-          </div>
-        </div>
       </section>
 
       {/* Cost by Volume */}

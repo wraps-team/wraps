@@ -125,8 +125,8 @@ describe("Preset Configurations", () => {
       expect(ENTERPRISE_PRESET.eventTracking?.archiveRetention).toBe("1year");
     });
 
-    it("should have dedicated IP", () => {
-      expect(ENTERPRISE_PRESET.dedicatedIp).toBe(true);
+    it("should not have dedicated IP", () => {
+      expect(ENTERPRISE_PRESET.dedicatedIp).toBeUndefined();
     });
   });
 
@@ -226,7 +226,7 @@ describe("Preset Configurations", () => {
         const info = getPresetInfo("enterprise");
 
         expect(info.features).toContain("Everything in Production");
-        expect(info.features).toContain("Dedicated IP address");
+        expect(info.features).not.toContain("Dedicated IP address");
         expect(info.features).toContain("1-year email history");
         expect(info.features).toContain("All event types tracked");
       });
@@ -366,20 +366,6 @@ describe("Preset Configurations", () => {
       expect(changes).toContain("Upgrade retention: 90days → 1year");
     });
 
-    it("should detect dedicated IP upgrade", () => {
-      const current: WrapsEmailConfig = {
-        dedicatedIp: false,
-      };
-
-      const target: WrapsEmailConfig = {
-        dedicatedIp: true,
-      };
-
-      const changes = getUpgradePath(current, target);
-
-      expect(changes).toContain("Add dedicated IP address");
-    });
-
     it("should detect multiple changes", () => {
       const current: WrapsEmailConfig = {
         tracking: { enabled: false },
@@ -389,15 +375,13 @@ describe("Preset Configurations", () => {
       const target: WrapsEmailConfig = {
         tracking: { enabled: true, opens: true, clicks: true },
         reputationMetrics: true,
-        dedicatedIp: true,
       };
 
       const changes = getUpgradePath(current, target);
 
-      expect(changes).toHaveLength(3);
+      expect(changes).toHaveLength(2);
       expect(changes).toContain("Enable email tracking (opens & clicks)");
       expect(changes).toContain("Enable reputation metrics");
-      expect(changes).toContain("Add dedicated IP address");
     });
 
     it("should return empty array for no changes", () => {
@@ -425,7 +409,6 @@ describe("Preset Configurations", () => {
 
       expect(changes.length).toBeGreaterThan(0);
       expect(changes).toContain("Upgrade retention: 90days → 1year");
-      expect(changes).toContain("Add dedicated IP address");
     });
 
     it("should handle upgrade from starter to enterprise", () => {
@@ -433,22 +416,10 @@ describe("Preset Configurations", () => {
 
       expect(changes.length).toBeGreaterThan(0);
       expect(changes).toContain("Enable reputation metrics");
-      expect(changes).toContain("Add dedicated IP address");
     });
   });
 
   describe("validateConfig", () => {
-    it("should warn about dedicated IP", () => {
-      const config: WrapsEmailConfig = {
-        dedicatedIp: true,
-      };
-
-      const warnings = validateConfig(config);
-
-      expect(warnings.length).toBeGreaterThan(0);
-      expect(warnings[0]).toContain("Dedicated IPs require 100k+ emails/day");
-    });
-
     it("should warn about event tracking without storage", () => {
       const config: WrapsEmailConfig = {
         eventTracking: {
@@ -485,7 +456,6 @@ describe("Preset Configurations", () => {
 
     it("should return multiple warnings for multiple issues", () => {
       const config: WrapsEmailConfig = {
-        dedicatedIp: true,
         eventTracking: {
           enabled: true,
           dynamoDBHistory: true,
@@ -495,7 +465,7 @@ describe("Preset Configurations", () => {
 
       const warnings = validateConfig(config);
 
-      expect(warnings.length).toBe(2);
+      expect(warnings.length).toBe(1);
     });
 
     it("should return empty array for valid config", () => {
@@ -526,11 +496,10 @@ describe("Preset Configurations", () => {
       expect(warnings).toEqual([]);
     });
 
-    it("should warn about enterprise preset (dedicated IP)", () => {
+    it("should not warn about enterprise preset", () => {
       const warnings = validateConfig(ENTERPRISE_PRESET);
 
-      expect(warnings.length).toBeGreaterThan(0);
-      expect(warnings[0]).toContain("Dedicated IPs");
+      expect(warnings).toEqual([]);
     });
   });
 
@@ -565,7 +534,7 @@ describe("Preset Configurations", () => {
       );
 
       // But enterprise has additional features
-      expect(ENTERPRISE_PRESET.dedicatedIp).toBe(true);
+      expect(ENTERPRISE_PRESET.dedicatedIp).toBeUndefined();
       expect(ENTERPRISE_PRESET.eventTracking?.archiveRetention).toBe("1year");
       expect(PRODUCTION_PRESET.dedicatedIp).toBeUndefined();
       expect(PRODUCTION_PRESET.eventTracking?.archiveRetention).toBe("90days");

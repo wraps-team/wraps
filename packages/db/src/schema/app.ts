@@ -270,6 +270,18 @@ export const awsAccount = pgTable(
           httpsPolicy?: "REQUIRE" | "REQUIRE_OPEN_ONLY" | "OPTIONAL";
         }>;
         dedicatedIpCount?: number;
+        /**
+         * How many of dedicatedIpCount are SES *managed* dedicated IPs (GetDedicatedIps
+         * reports WarmupStatus NOT_APPLICABLE for those). The rest are standard/BYOIP.
+         * Absent on rows scanned before this field.
+         */
+        managedDedicatedIpCount?: number;
+        /**
+         * The dedicated IP pool each wraps-email-* configuration set sends through,
+         * from GetConfigurationSet's DeliveryOptions.SendingPoolName. Only sets with
+         * a pool are recorded. Absent on rows scanned before this field.
+         */
+        sendingPoolBySet?: Array<{ configSetName: string; poolName: string }>;
         inboundBucketName?: string;
         identities?: Array<{
           identity: string;

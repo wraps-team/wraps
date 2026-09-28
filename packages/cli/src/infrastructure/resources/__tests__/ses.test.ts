@@ -1,7 +1,12 @@
-import { ALL_EVENT_TYPES } from "@wraps/core";
+import { ALL_EVENT_TYPES, MANAGED_DEDICATED_IP_POOL_NAME } from "@wraps/core";
 import { describe, expect, it } from "vitest";
 import { WrapsError } from "../../../utils/shared/errors.js";
-import { resolveMatchingEventTypes, validateEventTypes } from "../ses.js";
+import {
+  buildDeliveryOptions,
+  resolveMatchingEventTypes,
+  resolveSendingPoolName,
+  validateEventTypes,
+} from "../ses.js";
 
 /**
  * Plan 182: `eventTracking.events` was declared on the type but never read —
@@ -107,5 +112,86 @@ describe("validateEventTypes", () => {
     expect(() =>
       validateEventTypes(["SEND", "DELIVERY", "BOUNCE", "COMPLAINT"])
     ).not.toThrow();
+  });
+});
+
+describe("buildDeliveryOptions", () => {
+  it("returns undefined when neither tlsRequired nor sendingPoolName is set", () => {
+    expect(buildDeliveryOptions({})).toBeUndefined();
+  });
+
+  it("returns only tlsPolicy when only tlsRequired is set", () => {
+    expect(buildDeliveryOptions({ tlsRequired: true })).toEqual({
+      tlsPolicy: "REQUIRE",
+    });
+  });
+
+  it("returns only sendingPoolName when only a pool is set", () => {
+    expect(
+      buildDeliveryOptions({ sendingPoolName: "wraps-email-managed" })
+    ).toEqual({ sendingPoolName: "wraps-email-managed" });
+  });
+
+  it("returns both when tlsRequired and a pool are both set", () => {
+    expect(
+      buildDeliveryOptions({
+        tlsRequired: true,
+        sendingPoolName: "wraps-email-managed",
+      })
+    ).toEqual({ tlsPolicy: "REQUIRE", sendingPoolName: "wraps-email-managed" });
+  });
+});
+
+describe("resolveSendingPoolName", () => {
+  it("returns the managed pool name when managed is on and nothing is attached", () => {
+    expect(resolveSendingPoolName({ managedDedicatedIps: true })).toBe(
+      MANAGED_DEDICATED_IP_POOL_NAME
+    );
+  });
+
+  it("returns the managed pool name when managed is on and it's already attached", () => {
+    expect(
+      resolveSendingPoolName({
+        managedDedicatedIps: true,
+        existingPoolName: MANAGED_DEDICATED_IP_POOL_NAME,
+      })
+    ).toBe(MANAGED_DEDICATED_IP_POOL_NAME);
+  });
+
+  it("refuses to replace a foreign pool when managed is on", () => {
+    expect(() =>
+      resolveSendingPoolName({
+        managedDedicatedIps: true,
+        existingPoolName: "customer-pool",
+      })
+    ).toThrow(WrapsError);
+    try {
+      resolveSendingPoolName({
+        managedDedicatedIps: true,
+        existingPoolName: "customer-pool",
+      });
+      throw new Error("expected resolveSendingPoolName to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(WrapsError);
+      expect((error as WrapsError).code).toBe("SENDING_POOL_CONFLICT");
+    }
+  });
+
+  it("drops our own pool when managed is off (it's being deleted)", () => {
+    expect(
+      resolveSendingPoolName({
+        managedDedicatedIps: false,
+        existingPoolName: MANAGED_DEDICATED_IP_POOL_NAME,
+      })
+    ).toBeUndefined();
+  });
+
+  it("keeps a foreign pool untouched when managed is off", () => {
+    expect(
+      resolveSendingPoolName({
+        managedDedicatedIps: false,
+        existingPoolName: "customer-pool",
+      })
+    ).toBe("customer-pool");
   });
 });

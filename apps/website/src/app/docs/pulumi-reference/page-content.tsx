@@ -323,7 +323,8 @@ ${fullConfigCode}
 | \`autoValidation\` | AutoValidationConfig | SES Auto Validation on the configuration set (requires suppressionList.enabled) |
 | \`reputationMetrics\` | boolean | Enable SES reputation metrics (default: true) |
 | \`tlsRequired\` | boolean | Require TLS for outbound emails (default: false) |
-| \`dedicatedIp\` | boolean | Enable dedicated IP (~$25/mo) |
+| \`dedicatedIp\` | boolean | Deprecated — has no effect; no dedicated IP is provisioned |
+| \`managedDedicatedIps\` | boolean | Route sending through an SES managed dedicated IP pool (wraps-email-managed). Included on SES Pro/Enterprise; add-on otherwise (default: false) |
 | \`sendingEnabled\` | boolean | Enable sending (default: true) |
 | \`tags\` | Record<string, string> | Tags to apply to all resources |
 | \`transform\` | TransformFunctions | Transform functions for resource customization |`,

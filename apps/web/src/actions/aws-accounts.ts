@@ -362,6 +362,18 @@ export type ScanFeaturesResult =
             customRedirectDomain?: string;
             httpsPolicy?: "REQUIRE" | "REQUIRE_OPEN_ONLY" | "OPTIONAL";
           }>;
+          dedicatedIpCount?: number;
+          /**
+           * How many of dedicatedIpCount are SES *managed* dedicated IPs.
+           * Absent on rows scanned before this field.
+           */
+          managedDedicatedIpCount?: number;
+          /**
+           * The dedicated IP pool each wraps-email-* configuration set sends
+           * through. Only sets with a pool are recorded. Absent on rows
+           * scanned before this field.
+           */
+          sendingPoolBySet?: Array<{ configSetName: string; poolName: string }>;
           inboundBucketName?: string;
           identities?: Array<{
             identity: string;
@@ -494,6 +506,10 @@ export const scanAWSAccountFeatures: (
         customRedirectDomain?: string;
         httpsPolicy?: "REQUIRE" | "REQUIRE_OPEN_ONLY" | "OPTIONAL";
       }> = [];
+      const sendingPoolBySet: Array<{
+        configSetName: string;
+        poolName: string;
+      }> = [];
 
       const sesClientForConfigSet = new SESv2Client({
         region: account.region,
@@ -532,6 +548,13 @@ export const scanAWSAccountFeatures: (
                 configSetName: setName,
                 customRedirectDomain: trackingDomain,
                 httpsPolicy: trackingHttpsPolicy,
+              });
+            }
+            const sendingPoolName = csResponse.DeliveryOptions?.SendingPoolName;
+            if (sendingPoolName) {
+              sendingPoolBySet.push({
+                configSetName: setName,
+                poolName: sendingPoolName,
               });
             }
             const eventDestResponse = await sesClientForConfigSet.send(
@@ -679,6 +702,7 @@ export const scanAWSAccountFeatures: (
 
       // 12. Scan for dedicated IPs
       let dedicatedIpCount = 0;
+      let managedDedicatedIpCount = 0;
 
       try {
         const sesClient = new SESv2Client({
@@ -690,7 +714,11 @@ export const scanAWSAccountFeatures: (
           new GetDedicatedIpsCommand({})
         );
 
-        dedicatedIpCount = dedicatedIpsResponse.DedicatedIps?.length ?? 0;
+        const dedicatedIps = dedicatedIpsResponse.DedicatedIps ?? [];
+        dedicatedIpCount = dedicatedIps.length;
+        managedDedicatedIpCount = dedicatedIps.filter(
+          (ip) => ip.WarmupStatus === "NOT_APPLICABLE"
+        ).length;
       } catch (error: unknown) {
         // AccessDeniedException means user hasn't granted permissions
         // That's fine - assume no dedicated IPs
@@ -802,7 +830,9 @@ export const scanAWSAccountFeatures: (
           customTrackingDomain,
           trackingHttpsPolicy: customTrackingHttpsPolicy,
           trackingBySet,
+          sendingPoolBySet,
           dedicatedIpCount,
+          managedDedicatedIpCount,
           inboundBucketName,
           identities,
         },
