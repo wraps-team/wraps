@@ -50,6 +50,7 @@ import {
   displayPreview,
 } from "../../utils/shared/output.js";
 import {
+  ensureInteractive,
   promptInboundSubdomain,
   promptWebhookUrl,
 } from "../../utils/shared/prompts.js";
@@ -236,6 +237,7 @@ export async function inboundInit(
       trackedDomains[0];
     domain = primaryTrackedDomain.domain;
   } else {
+    ensureInteractive("Domain selection", "--yes");
     const selected = await clack.select({
       message: "Which domain do you want to receive email on?",
       options: trackedDomains.map((d) => ({
@@ -279,6 +281,7 @@ export async function inboundInit(
 
   // 10. Confirm deployment
   if (!(options.yes || options.preview)) {
+    ensureInteractive("Deployment confirmation", "--yes");
     const confirmed = await clack.confirm({
       message: "Deploy inbound email infrastructure?",
       initialValue: true,
@@ -665,6 +668,7 @@ export async function inboundDestroy(
       }
     }
 
+    ensureInteractive("Destroy confirmation", "--force");
     const confirmed = await clack.confirm({
       message: "Are you sure you want to destroy inbound email infrastructure?",
       initialValue: false,
@@ -1436,6 +1440,10 @@ export async function inboundAdd(
     } else if (allDomains.length === 1) {
       parentDomain = allDomains[0];
     } else {
+      ensureInteractive(
+        "Parent domain selection",
+        "--domain <domain> (or --yes)"
+      );
       const selected = await clack.select({
         message: "Which domain should the inbound subdomain be under?",
         options: allDomains.map((d) => ({
@@ -1738,6 +1746,10 @@ export async function inboundRemove(
     if (inboundDomains.length === 1) {
       domainToRemove = inboundDomains[0].receivingDomain;
     } else {
+      ensureInteractive(
+        "Inbound domain selection",
+        "--domain <receiving-domain>"
+      );
       const selected = await clack.select({
         message: "Which inbound domain do you want to remove?",
         options: inboundDomains.map((d) => ({
@@ -1788,6 +1800,7 @@ export async function inboundRemove(
       }
     }
 
+    ensureInteractive("Removal confirmation", "--yes");
     const confirmed = await clack.confirm({
       message: `Remove inbound domain ${pc.cyan(domainToRemove)}?`,
       initialValue: false,

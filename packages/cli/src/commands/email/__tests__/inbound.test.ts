@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildInboundDNSRecords } from "../../../utils/dns/create-records.js";
 import { setJsonMode } from "../../../utils/shared/json-output.js";
 
@@ -60,6 +60,12 @@ vi.mock("../../../utils/email/receipt-rules.js", async (importOriginal) => {
     getReceiptRuleDomains: vi.fn().mockResolvedValue([]),
     deleteReceiptRule: vi.fn().mockResolvedValue(undefined),
     deleteReceiptRuleSet: vi.fn().mockResolvedValue(undefined),
+    // Only reached by inboundInit's deploy path (step 14, "Creating SES
+    // receipt rules") — mocked so its non-interactive-guard success test
+    // doesn't fall through to the real AWS SDK client.
+    createReceiptRuleSet: vi.fn().mockResolvedValue(undefined),
+    createReceiptRule: vi.fn().mockResolvedValue(undefined),
+    setActiveReceiptRuleSet: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -193,7 +199,12 @@ vi.mock("../../../utils/shared/fs.js", () => ({
   getPulumiWorkDir: vi.fn().mockReturnValue("/tmp/wraps-test/pulumi"),
 }));
 
-import { inboundAdd, inboundDestroy, inboundRemove } from "../inbound.js";
+import {
+  inboundAdd,
+  inboundDestroy,
+  inboundInit,
+  inboundRemove,
+} from "../inbound.js";
 
 const baseMetadata = {
   version: "1.0.0",
@@ -553,6 +564,36 @@ describe("inboundAdd successful no-op DNS write", () => {
   });
 });
 
+describe("inboundAdd non-interactive guard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setJsonMode(false);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+  });
+
+  it("throws NON_INTERACTIVE_INPUT selecting a parent domain when multiple are tracked and neither --domain nor --yes is set", async () => {
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+    vi.mocked(loadConnectionMetadata).mockResolvedValue(
+      cloneMetadata((m) => {
+        m.services.email.config.additionalDomains = [
+          {
+            domain: "second.example.com",
+            addedAt: "2024-01-02T00:00:00.000Z",
+          },
+        ];
+      })
+    );
+
+    await expect(inboundAdd({ subdomain: "support" })).rejects.toMatchObject({
+      name: "WrapsError",
+      code: "NON_INTERACTIVE_INPUT",
+    });
+  });
+});
+
 describe("buildInboundDNSRecords", () => {
   it("returns exactly the inbound MX and SPF records for the receiving domain", () => {
     const records = buildInboundDNSRecords("support.example.com", "us-east-1");
@@ -574,6 +615,79 @@ describe("buildInboundDNSRecords", () => {
   });
 });
 
+describe("inboundInit non-interactive guard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setJsonMode(false);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+
+    // Deliberately NOT simulating a TTY here — process.stdin.isTTY /
+    // process.stdout.isTTY default to undefined under vitest, which is
+    // exactly the non-interactive condition ensureInteractive() is meant
+    // to catch.
+  });
+
+  // Mirrors twoDomainMetadata() in the inboundRemove describe block below,
+  // but for the primary/additionalDomains shape inboundInit reads via
+  // getAllTrackedDomains(), rather than inboundDomains.
+  function twoTrackedDomainsMetadata(): typeof baseMetadata {
+    return cloneMetadata((m) => {
+      m.services.email.config.additionalDomains = [
+        { domain: "second.example.com", addedAt: "2024-01-02T00:00:00.000Z" },
+      ];
+    });
+  }
+
+  it("throws NON_INTERACTIVE_INPUT selecting a domain when multiple domains are tracked and --yes is absent", async () => {
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+    vi.mocked(loadConnectionMetadata).mockResolvedValue(
+      twoTrackedDomainsMetadata()
+    );
+
+    await expect(inboundInit({ root: true })).rejects.toMatchObject({
+      name: "WrapsError",
+      code: "NON_INTERACTIVE_INPUT",
+    });
+  });
+
+  it("throws NON_INTERACTIVE_INPUT on the deploy confirmation when --yes is absent", async () => {
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+    // Single tracked domain, so the domain-select guard above is never
+    // reached — this isolates the deploy-confirmation guard.
+    vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+
+    await expect(
+      inboundInit({
+        root: true,
+        webhookUrl: "https://example.com/hook",
+      })
+    ).rejects.toMatchObject({
+      name: "WrapsError",
+      code: "NON_INTERACTIVE_INPUT",
+    });
+  });
+
+  it("resolves without prompting when --root --yes --json are all set", async () => {
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+    vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+
+    await expect(
+      inboundInit({ root: true, yes: true, json: true })
+    ).resolves.toBeUndefined();
+
+    const clack = await import("@clack/prompts");
+    expect(vi.mocked(clack.select)).not.toHaveBeenCalled();
+    expect(vi.mocked(clack.confirm)).not.toHaveBeenCalled();
+  });
+});
+
 describe("inboundDestroy", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -581,10 +695,22 @@ describe("inboundDestroy", () => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
 
+    // inboundDestroy's confirm is now guarded by ensureInteractive(), which
+    // reads real process.stdin/stdout — simulate an interactive TTY so the
+    // guard is a no-op and the mocked clack.confirm below is still reached.
+    process.stdin.isTTY = true;
+    process.stdout.isTTY = true;
+    delete process.env.CI;
+
     const { confirm } = await import("@clack/prompts");
     // Interactive path (no --force), proceeding — reaches the full teardown
     // deterministically without relying on process.exit fallthrough behavior.
     vi.mocked(confirm).mockResolvedValue(true);
+  });
+
+  afterEach(() => {
+    process.stdin.isTTY = true;
+    process.stdout.isTTY = true;
   });
 
   // The ownership rule this plan encodes: r.mail.<domain> belongs to
@@ -675,6 +801,14 @@ describe("inboundRemove", () => {
     setJsonMode(false);
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+
+    // inboundDestroy's afterEach (above) leaves process.stdin/stdout.isTTY
+    // set to true for its own interactive-path tests — reset to the default
+    // vitest state (undefined/non-interactive) so this block's
+    // NON_INTERACTIVE_INPUT test isn't accidentally made interactive by
+    // that leaked state.
+    process.stdin.isTTY = undefined;
+    process.stdout.isTTY = undefined;
   });
 
   // Sets a non-"manual" dnsProvider, mirroring cloneMetadataWithDnsProvider
@@ -874,5 +1008,17 @@ describe("inboundRemove", () => {
     expect(vi.mocked(clack.log.error)).toHaveBeenCalledWith(
       expect.stringContaining("Cannot remove the last inbound domain")
     );
+  });
+
+  it("throws NON_INTERACTIVE_INPUT selecting a domain to remove when multiple are tracked and --domain is absent", async () => {
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+    vi.mocked(loadConnectionMetadata).mockResolvedValue(twoDomainMetadata());
+
+    await expect(inboundRemove({})).rejects.toMatchObject({
+      name: "WrapsError",
+      code: "NON_INTERACTIVE_INPUT",
+    });
   });
 });
