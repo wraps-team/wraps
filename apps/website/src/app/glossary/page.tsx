@@ -68,6 +68,13 @@ export default function Page() {
               where a failure mode already has its own page, this links to it
               instead of restating it.
             </p>
+            <p className="mt-4 text-muted-foreground text-sm">
+              Part of the Wraps{" "}
+              <Link className="underline hover:no-underline" href="/learning">
+                Learning Center
+              </Link>
+              .
+            </p>
           </div>
         </header>
 

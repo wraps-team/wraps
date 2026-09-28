@@ -340,6 +340,8 @@ Failures SES throws no exception for. Every percentage is quoted from AWS docume
 
 Definitions written from the code that actually checks each mechanism (SPF, DKIM, DMARC, BIMI lookups and validation live in packages/email-check), not from general knowledge. Links back to the /ses/errors and /ses pages that document a specific failure mode in depth.
 
+- [Learning Center](https://wraps.dev/learning): The glossary, the /ses operational reference, and the deep guides and tools, organized by topic — authentication, deliverability, infrastructure, compliance, and metrics
+
 <!-- BEGIN GENERATED GLOSSARY -->
 - [All email terminology](https://wraps.dev/glossary): Every term grouped by authentication, deliverability, infrastructure, compliance, and metrics
 - [SPF (Sender Policy Framework)](https://wraps.dev/glossary/spf): An SPF record is a DNS TXT record that lists which servers are allowed to send mail for a domain, checked against the envelope return-path rather than the visible From address.

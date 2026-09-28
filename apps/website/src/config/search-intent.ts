@@ -2109,6 +2109,19 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
       "Written from what packages/email-check actually evaluates for this term rather than general knowledge, and linked from every /ses, /versus, and /blog page that already uses the term without defining it.",
   },
   // END GENERATED GLOSSARY INTENT
+  {
+    route: "/learning",
+    primaryQuery:
+      "email deliverability and authentication reference for developers",
+    secondaryQueries: [
+      "spf dkim dmarc explained",
+      "email infrastructure glossary",
+      "amazon ses reference guide",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "The one page that organizes the /glossary, /ses, and /blog clusters by topic instead of leaving a visitor to discover them independently — the internal-link hub the glossary's own whyItMatters argued for at the entry level.",
+  },
 ];
 
 /** Routes that exist for reasons other than search. */
