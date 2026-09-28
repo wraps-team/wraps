@@ -331,6 +331,75 @@ describe("account-health with an unusable customer role", () => {
     expect(withoutReview?.[0].healthStatus).toBe(withReview?.[0].healthStatus);
   });
 
+  it("persists SES's pricing plan into healthDetail, independent of healthStatus", async () => {
+    mockStsSend.mockResolvedValue({
+      Credentials: {
+        AccessKeyId: "AKIA-test",
+        SecretAccessKey: "secret",
+        SessionToken: "token",
+        Expiration: new Date("2099-01-01"),
+      },
+    });
+    mockCloudWatchSend.mockResolvedValue({ MetricDataResults: [] });
+
+    // First sweep: AWS reports the account on Essentials, moving to à la
+    // carte next billing cycle.
+    mockSesSend.mockResolvedValue({
+      SendingEnabled: true,
+      EnforcementStatus: "HEALTHY",
+      SendQuota: { Max24HourSend: 50_000, SentLast24Hours: 10 },
+      PricingAttributes: { CurrentPlan: "ESSENTIALS", NextPlan: "NONE" },
+    });
+    await invoke();
+    const withPlan = mockDbSet.mock.calls.find(
+      (call) => call[0]?.healthStatus !== undefined
+    );
+    expect(withPlan).toBeDefined();
+    expect(withPlan?.[0].healthDetail).toMatchObject({
+      sesPricingPlan: { current: "ESSENTIALS", next: "NONE" },
+    });
+
+    mockDbSet.mockClear();
+
+    // Second sweep: AWS reports Pro with nothing scheduled — NextPlan is
+    // absent, not an empty string.
+    mockSesSend.mockResolvedValue({
+      SendingEnabled: true,
+      EnforcementStatus: "HEALTHY",
+      SendQuota: { Max24HourSend: 50_000, SentLast24Hours: 10 },
+      PricingAttributes: { CurrentPlan: "PRO" },
+    });
+    await invoke();
+    const withNoNextPlan = mockDbSet.mock.calls.find(
+      (call) => call[0]?.healthStatus !== undefined
+    );
+    expect(withNoNextPlan).toBeDefined();
+    expect(withNoNextPlan?.[0].healthDetail).toMatchObject({
+      sesPricingPlan: { current: "PRO", next: null },
+    });
+
+    mockDbSet.mockClear();
+
+    // Third sweep: AWS reports no PricingAttributes at all (e.g. a Region
+    // that doesn't offer plans) — must persist null, never a guess.
+    mockSesSend.mockResolvedValue({
+      SendingEnabled: true,
+      EnforcementStatus: "HEALTHY",
+      SendQuota: { Max24HourSend: 50_000, SentLast24Hours: 10 },
+    });
+    await invoke();
+    const withNoPlan = mockDbSet.mock.calls.find(
+      (call) => call[0]?.healthStatus !== undefined
+    );
+    expect(withNoPlan).toBeDefined();
+    expect(withNoPlan?.[0].healthDetail).toMatchObject({
+      sesPricingPlan: { current: null, next: null },
+    });
+
+    // The pricing plan must never influence the health classification.
+    expect(withNoPlan?.[0].healthStatus).toBe(withPlan?.[0].healthStatus);
+  });
+
   it("does not stamp reachability when the role is unusable", async () => {
     mockStsSend.mockRejectedValue(accessDeniedError());
 

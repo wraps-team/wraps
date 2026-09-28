@@ -103,6 +103,10 @@ export default defineConfig(async () => {
     resolve: {
       alias: {
         "@": path.resolve(import.meta.dirname, "./src"),
+        "@wraps/core/ses-plans": path.resolve(
+          import.meta.dirname,
+          "../../packages/core/src/ses-plans.ts"
+        ),
         "@wraps/db": path.resolve(import.meta.dirname, "../../packages/db/src"),
         "@wraps/auth": path.resolve(
           import.meta.dirname,

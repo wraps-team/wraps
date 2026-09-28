@@ -10,6 +10,7 @@ import { AccountFeatures } from "./components/account-features";
 import { EventFeedStaleBanner } from "./components/event-feed-stale-banner";
 import { IAMConfiguration } from "./components/iam-configuration";
 import { QuotaReserve } from "./components/quota-reserve";
+import { SesPlanCard } from "./components/ses-plan-card";
 import { StalePolicyBanner } from "./components/stale-policy-banner";
 import { WebhookConfiguration } from "./components/webhook-configuration";
 
@@ -107,6 +108,9 @@ export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
 
       {/* Deployed Features */}
       <AccountFeatures account={account} organizationId={organization.id} />
+
+      {/* AWS SES pricing plan - read-only, visible to every viewer */}
+      <SesPlanCard account={account} />
 
       {/* Account Details */}
       <AccountDetails account={account} />

@@ -218,6 +218,81 @@ export default function CLIReferenceEmailPageContent() {
         </Card>
       </section>
 
+      {/* wraps email plan */}
+      <section className="mb-12">
+        <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">
+          <Terminal className="h-6 w-6 text-primary" />
+          wraps email plan
+        </h2>
+        <p className="mb-4 text-muted-foreground">
+          Show the SES pricing plan for each Region you've deployed to, price
+          your recent sending volume under all four billing modes, and
+          optionally switch a Region's plan.
+        </p>
+
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle className="text-lg">Usage</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CLICommand command="npx @wraps.dev/cli email plan" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Options</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <code className="rounded bg-muted px-2 py-1">
+                  --region &lt;region&gt;
+                </code>{" "}
+                <span className="text-muted-foreground">
+                  Region to read or change. Required with{" "}
+                  <code className="rounded bg-muted px-1">--set</code> when
+                  you've deployed to more than one Region and the terminal isn't
+                  interactive.
+                </span>
+              </li>
+              <li>
+                <code className="rounded bg-muted px-2 py-1">
+                  --volume &lt;n&gt;
+                </code>{" "}
+                <span className="text-muted-foreground">
+                  Monthly volume to price. Defaults to your last 24 hours of
+                  sending × 30.
+                </span>
+              </li>
+              <li>
+                <code className="rounded bg-muted px-2 py-1">
+                  --set &lt;NONE|ESSENTIALS|PRO|ENTERPRISE&gt;
+                </code>{" "}
+                <span className="text-muted-foreground">
+                  Switch the Region's plan.{" "}
+                  <code className="rounded bg-muted px-1">NONE</code> is à la
+                  carte. Asks for confirmation.
+                </span>
+              </li>
+              <li>
+                <code className="rounded bg-muted px-2 py-1">--yes</code>{" "}
+                <span className="text-muted-foreground">
+                  Skip the confirmation for{" "}
+                  <code className="rounded bg-muted px-1">--set</code>.
+                </span>
+              </li>
+              <li>
+                <code className="rounded bg-muted px-2 py-1">--json</code>{" "}
+                <span className="text-muted-foreground">
+                  Machine-readable output.
+                </span>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+      </section>
+
       {/* wraps email domains */}
       <section className="mb-12">
         <h2 className="mb-4 flex items-center gap-2 font-bold text-2xl">

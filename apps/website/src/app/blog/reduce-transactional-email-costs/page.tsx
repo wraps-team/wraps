@@ -524,7 +524,7 @@ wraps email plan
 wraps email plan --volume 100000
 
 # Move a Region back to à la carte
-wraps email plan --region us-east-1 --set alacarte`}
+wraps email plan --region us-east-1 --set NONE`}
               title="terminal"
             />
 

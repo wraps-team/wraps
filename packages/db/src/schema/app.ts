@@ -193,6 +193,17 @@ export const awsAccount = pgTable(
       max24HourSend: number | null;
       sentLast24Hours: number | null;
       maxSendRate: number | null;
+      /**
+       * SES pricing plan for this account and Region, straight from
+       * `GetAccount`'s `PricingAttributes`. Raw AWS values
+       * (`NONE`/`ESSENTIALS`/`PRO`/`ENTERPRISE` today), kept as strings like
+       * `enforcementStatus` so a plan AWS adds later is stored, not dropped.
+       * `current: null` means AWS reported no plan (e.g. a Region without
+       * plans). `next` is the plan taking effect next billing cycle, `null`
+       * when none is scheduled. Absent on rows swept before this field.
+       * GetAccount does not say whether Essentials was chosen or defaulted.
+       */
+      sesPricingPlan?: { current: string | null; next: string | null };
       /** Machine-readable reasons, worst first. Empty when healthy. */
       reasons: string[];
     }>(),

@@ -521,6 +521,10 @@ async function checkAccount(account: AccountRow): Promise<void> {
         max24HourSend: quotaMax24h,
         sentLast24Hours: quotaSent24h,
         maxSendRate: info.SendQuota?.MaxSendRate ?? null,
+        sesPricingPlan: {
+          current: info.PricingAttributes?.CurrentPlan ?? null,
+          next: info.PricingAttributes?.NextPlan ?? null,
+        },
         reasons: verdict.reasons,
       },
     })

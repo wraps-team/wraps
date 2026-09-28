@@ -11,6 +11,10 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
+    "./ses-plans": {
+      "import": "./dist/ses-plans.js",
+      "types": "./dist/ses-plans.d.ts"
+    },
     "./lambda": {
       "import": "./dist/lambda/index.js",
       "types": "./dist/lambda/index.d.ts"

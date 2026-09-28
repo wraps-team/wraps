@@ -86,6 +86,19 @@ wraps email status
 - SES sending status (sandbox/production)
 - Infrastructure resource summary
 
+### `wraps email plan`
+
+Show the SES pricing plan per Region and what your volume costs under each.
+
+```bash
+wraps email plan                              # every deployed Region
+wraps email plan --volume 100000              # price a specific monthly volume
+wraps email plan --region us-east-1 --set NONE  # switch a Region to à la carte
+```
+
+`--set` accepts `NONE` (à la carte), `ESSENTIALS`, `PRO`, `ENTERPRISE`, asks
+for confirmation (skip with `--yes`), and never guesses the Region.
+
 ### `wraps email verify`
 
 Check and guide domain DNS verification.

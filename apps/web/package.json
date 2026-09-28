@@ -81,6 +81,7 @@
     "@wraps.dev/email": "0.13.0",
     "@wraps/ai": "workspace:*",
     "@wraps/auth": "workspace:*",
+    "@wraps/core": "workspace:*",
     "@wraps/db": "workspace:*",
     "@wraps/email": "workspace:*",
     "@wraps/email-send": "workspace:*",

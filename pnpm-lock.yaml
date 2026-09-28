@@ -618,6 +618,9 @@ importers:
       '@wraps/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@wraps/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@wraps/db':
         specifier: workspace:*
         version: link:../../packages/db
