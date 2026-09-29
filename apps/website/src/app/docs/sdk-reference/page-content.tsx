@@ -479,6 +479,20 @@ if (nextToken) {
   });
 }`;
 
+const suppressionHistoryCode = `// Why an address stopped receiving email, even after it left the SES list.
+// Requires historyTableName, and infrastructure deployed with CLI v3.15.0+,
+// CDK v0.5.0+ or Pulumi v0.6.0+.
+const history = await email.events?.getSuppressionHistory('user@example.com');
+
+if (history) {
+  console.log('Reason:', history.reason);          // 'bounce' | 'complaint' | 'validation'
+  console.log('Detail:', history.detail);          // SES bounce subtype or complaint feedback type
+  console.log('First:', history.firstSuppressedAt);
+  console.log('Last:', history.suppressedAt);
+}
+
+// History is not current state. Use suppression.get() to decide whether to send.`;
+
 const errorHandlingCode = `import { WrapsEmail, SESError, DynamoDBError, ValidationError } from '@wraps.dev/email';
 
 try {
@@ -1062,13 +1076,19 @@ ${suppressionRemoveCode}
 ${suppressionListCode}
 \`\`\`
 
+### Suppression History
+\`\`\`typescript
+${suppressionHistoryCode}
+\`\`\`
+
 ### Available Methods
 | Method | Description |
 |--------|-------------|
 | \`suppression.get(email)\` | Check if an email is suppressed (returns null if not) |
 | \`suppression.add(email, reason)\` | Add email to suppression list |
 | \`suppression.remove(email)\` | Remove from suppression list (idempotent) |
-| \`suppression.list(options?)\` | List suppressed emails with filters and pagination |`,
+| \`suppression.list(options?)\` | List suppressed emails with filters and pagination |
+| \`events.getSuppressionHistory(email)\` | Read why and when an address was suppressed. Needs \`historyTableName\`; returns null when no history exists |`,
 
   errorHandling: `## Error Handling
 
@@ -3848,6 +3868,60 @@ export default function SDKReferencePageContent() {
               </CodeBlockBody>
             </CodeBlock>
           </div>
+
+          <div>
+            <p className="mb-2 text-muted-foreground text-sm">
+              With <code>historyTableName</code> configured,{" "}
+              <code>events.getSuppressionHistory()</code> reads the record the
+              Wraps event processor keeps in your{" "}
+              <code>wraps-email-history</code> table for each hard bounce,
+              complaint and validation suppression. The record stays after the
+              address is removed from the SES list. It is history, not current
+              state, and <code>null</code> does not mean the address is safe to
+              send to.
+            </p>
+          </div>
+          <div>
+            <p className="mb-2 font-medium text-sm">Suppression History</p>
+            <CodeBlock
+              className="h-auto"
+              data={[
+                {
+                  language: "typescript",
+                  filename: "suppression-history.ts",
+                  code: suppressionHistoryCode,
+                },
+              ]}
+              defaultValue="typescript"
+            >
+              <CodeBlockHeader>
+                <CodeBlockFiles>
+                  {(item) => (
+                    <CodeBlockFilename
+                      key={item.language}
+                      value={item.language}
+                    >
+                      {item.filename}
+                    </CodeBlockFilename>
+                  )}
+                </CodeBlockFiles>
+                <CodeBlockCopyButton />
+              </CodeBlockHeader>
+              <CodeBlockBody>
+                {(item) => (
+                  <CodeBlockItem
+                    key={item.language}
+                    lineNumbers={false}
+                    value={item.language}
+                  >
+                    <CodeBlockContent language={item.language}>
+                      {item.code}
+                    </CodeBlockContent>
+                  </CodeBlockItem>
+                )}
+              </CodeBlockBody>
+            </CodeBlock>
+          </div>
         </div>
 
         <Card className="mt-6">
@@ -3889,7 +3963,7 @@ export default function SDKReferencePageContent() {
                     Remove from suppression list (idempotent)
                   </td>
                 </tr>
-                <tr>
+                <tr className="border-b">
                   <td className="py-2">
                     <code className="rounded bg-muted px-1.5 py-0.5">
                       suppression.list(options?)
@@ -3897,6 +3971,18 @@ export default function SDKReferencePageContent() {
                   </td>
                   <td className="py-2">
                     List suppressed emails with filters and pagination
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2">
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      events.getSuppressionHistory(email)
+                    </code>
+                  </td>
+                  <td className="py-2">
+                    Read why and when an address was suppressed. Needs{" "}
+                    <code>historyTableName</code>; returns null when no history
+                    exists
                   </td>
                 </tr>
               </tbody>
