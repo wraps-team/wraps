@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBClient,
+  PutItemCommand,
+  UpdateItemCommand,
+} from "@aws-sdk/client-dynamodb";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import type { Context, SQSEvent } from "aws-lambda";
 
@@ -12,6 +16,54 @@ const awsDefaults = {
 };
 
 const dynamodb = new DynamoDBClient(awsDefaults);
+
+type LedgerEntry = {
+  reason: "bounce" | "complaint" | "validation";
+  detail?: string;
+};
+
+/** Which SES events write a suppression-history item, and with what reason. */
+export function ledgerEntryFor(message: {
+  eventType?: string;
+  notificationType?: string;
+  bounce?: { bounceType?: string; bounceSubType?: string };
+  complaint?: { complaintFeedbackType?: string };
+}): LedgerEntry | null {
+  const type = message.eventType || message.notificationType;
+  if (type === "Bounce" && message.bounce) {
+    const sub = message.bounce.bounceSubType;
+    if (sub === "EmailValidationSuppressed") {
+      return { reason: "validation", detail: sub };
+    }
+    if (sub === "Suppressed" || sub === "OnAccountSuppressionList") {
+      return { reason: "bounce", detail: sub };
+    }
+    if (message.bounce.bounceType === "Permanent") {
+      return { reason: "bounce", detail: sub };
+    }
+    return null;
+  }
+  if (type === "Complaint" && message.complaint) {
+    return {
+      reason: "complaint",
+      detail: message.complaint.complaintFeedbackType,
+    };
+  }
+  return null;
+}
+
+export function recipientEmails(recipients: unknown): string[] {
+  if (!Array.isArray(recipients)) return [];
+  return recipients
+    .map((r) =>
+      r && typeof r === "object"
+        ? (r as { emailAddress?: unknown }).emailAddress
+        : undefined
+    )
+    .filter((e): e is string => typeof e === "string")
+    .map((e) => e.toLowerCase().trim())
+    .filter((e) => e.length > 0);
+}
 
 /**
  * Lambda handler for processing SES events from SQS (via EventBridge)
@@ -210,6 +262,70 @@ export async function handler(event: SQSEvent, context: Context) {
       );
 
       log("Stored event", { eventType, messageId });
+
+      const ledger = ledgerEntryFor(message);
+      if (ledger) {
+        const recipients = recipientEmails(
+          ledger.reason === "complaint"
+            ? message.complaint?.complainedRecipients
+            : message.bounce?.bouncedRecipients
+        );
+        const feedbackId: string | undefined =
+          message.bounce?.feedbackId || message.complaint?.feedbackId;
+        if (recipients.length === 0) {
+          log("No recipients for suppression ledger", {
+            messageId,
+            reason: ledger.reason,
+          });
+        }
+        for (const email of recipients) {
+          try {
+            await dynamodb.send(
+              new UpdateItemCommand({
+                TableName: tableName,
+                Key: {
+                  messageId: { S: `SUPPRESSION#${email}` },
+                  sentAt: { N: "0" },
+                },
+                UpdateExpression:
+                  "SET #et = :et, #em = :em, #r = :r, #src = :src, #sa = :sa, " +
+                  "#fsa = if_not_exists(#fsa, :sa)" +
+                  (ledger.detail ? ", #d = :d" : "") +
+                  (feedbackId ? ", #fid = :fid" : ""),
+                ExpressionAttributeNames: {
+                  "#et": "eventType",
+                  "#em": "email",
+                  "#r": "reason",
+                  "#src": "source",
+                  "#sa": "suppressedAt",
+                  "#fsa": "firstSuppressedAt",
+                  ...(ledger.detail ? { "#d": "detail" } : {}),
+                  ...(feedbackId ? { "#fid": "feedbackId" } : {}),
+                },
+                ExpressionAttributeValues: {
+                  ":et": { S: "Suppressed" },
+                  ":em": { S: email },
+                  ":r": { S: ledger.reason },
+                  ":src": { S: "ses_event" },
+                  ":sa": { N: eventTimestamp.toString() },
+                  ...(ledger.detail ? { ":d": { S: ledger.detail } } : {}),
+                  ...(feedbackId ? { ":fid": { S: feedbackId } } : {}),
+                },
+              })
+            );
+            log("Recorded suppression ledger entry", {
+              messageId,
+              reason: ledger.reason,
+            });
+          } catch (error) {
+            // Ledger write must never abort the SQS batch or skip other recipients.
+            logError("Error recording suppression ledger entry", error, {
+              messageId,
+              reason: ledger.reason,
+            });
+          }
+        }
+      }
     } catch (error) {
       logError("Error processing record", error, {
         sqsMessageId: record.messageId,
