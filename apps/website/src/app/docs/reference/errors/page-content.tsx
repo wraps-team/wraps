@@ -67,7 +67,7 @@ const jsonErrorEnvelopeCode = `{
   "success": false,
   "command": "email.init",
   "error": {
-    "code": "<one of the CLI error codes below>",
+    "code": "<error code — see below>",
     "message": "...",
     "suggestion": "...",
     "docsUrl": "https://wraps.dev/docs/..."
@@ -766,6 +766,15 @@ const sectionMd = (s: ErrorSection) =>
     ...s.rows.map((r) => `| ${r.code} | ${r.message} | ${r.solution} |`),
   ].join("\n");
 
+const PREFIXED_CODES_MD = `### Codes that carry a prefix in \`--json\`
+
+Most codes reach \`--json\` exactly as the tables below list them. Two families are emitted with a prefix added.
+
+- **\`PULUMI_*\`** — a failure during infrastructure deployment is emitted as \`PULUMI_\` plus the code in the tables, so \`STACK_LOCKED\` arrives as \`PULUMI_STACK_LOCKED\`. A Pulumi failure the CLI could not classify is emitted as \`PULUMI_PULUMI_ERROR\`.
+- **\`AWS_*\`** — an error raised by the AWS SDK itself is emitted as \`AWS_\` plus the SDK's own error name, for example \`AWS_ExpiredTokenException\` or \`AWS_AccessDenied\`. This family is open-ended and not listed here. The two \`AWS_*\` rows in the tables (\`AWS_THROTTLED\`, \`AWS_LIMIT_EXCEEDED\`) are Wraps' own codes, not members of it.
+
+Match on the documented code. Treat an unrecognised \`AWS_*\` or \`PULUMI_*\` code as the underlying tool's error, surfaced verbatim.`;
+
 const CLI_ERRORS_MD = CLI_ERROR_SECTIONS.map(sectionMd).join("\n\n");
 
 const EXIT_CODES_MD = `### Exit Codes
@@ -824,6 +833,8 @@ const FULL_PAGE_MD = `# Error Codes & Troubleshooting
 Complete reference for all CLI error codes and SDK error classes, with solutions for each.
 
 ## CLI Error Codes
+
+${PREFIXED_CODES_MD}
 
 ${CLI_ERRORS_MD}
 
@@ -915,9 +926,72 @@ export default function PageContent() {
         <SectionHeading
           className="mb-6"
           id="cli-error-codes"
-          markdown={`## CLI Error Codes\n\n${CLI_ERRORS_MD}`}
+          markdown={`## CLI Error Codes\n\n${PREFIXED_CODES_MD}\n\n${CLI_ERRORS_MD}`}
           title="CLI Error Codes"
         />
+
+        <div className="mb-8">
+          <h3 className="mb-3 font-medium text-lg" id="prefixed-codes">
+            Codes that carry a prefix in{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">--json</code>
+          </h3>
+          <p className="mb-3 text-muted-foreground">
+            Most codes reach{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">--json</code>{" "}
+            exactly as the tables below list them. Two families are emitted with
+            a prefix added.
+          </p>
+          <ul className="mb-3 list-disc space-y-2 pl-6 text-muted-foreground">
+            <li>
+              <code className="rounded bg-muted px-1.5 py-0.5">PULUMI_*</code>:
+              a failure during infrastructure deployment is emitted as{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">PULUMI_</code>{" "}
+              plus the code in the tables, so{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                STACK_LOCKED
+              </code>{" "}
+              arrives as{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                PULUMI_STACK_LOCKED
+              </code>
+              . A Pulumi failure the CLI could not classify is emitted as{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                PULUMI_PULUMI_ERROR
+              </code>
+              .
+            </li>
+            <li>
+              <code className="rounded bg-muted px-1.5 py-0.5">AWS_*</code>: an
+              error raised by the AWS SDK itself is emitted as{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">AWS_</code> plus
+              the SDK&apos;s own error name, for example{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                AWS_ExpiredTokenException
+              </code>{" "}
+              or{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                AWS_AccessDenied
+              </code>
+              . This family is open-ended and not listed here. The two{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">AWS_*</code> rows
+              in the tables (
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                AWS_THROTTLED
+              </code>
+              ,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                AWS_LIMIT_EXCEEDED
+              </code>
+              ) are Wraps&apos; own codes, not members of it.
+            </li>
+          </ul>
+          <p className="text-muted-foreground">
+            Match on the documented code. Treat an unrecognised{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">AWS_*</code> or{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">PULUMI_*</code>{" "}
+            code as the underlying tool&apos;s error, surfaced verbatim.
+          </p>
+        </div>
 
         {CLI_ERROR_SECTIONS.map((section) => (
           <div className="mb-8" key={section.id}>
