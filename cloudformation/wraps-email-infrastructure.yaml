@@ -806,11 +806,35 @@ Resources:
           AWS_ACCOUNT_ID: !Ref AWS::AccountId
       Code:
         ZipFile: |
-          const { DynamoDBClient, PutItemCommand } = require('@aws-sdk/client-dynamodb');
+          const { DynamoDBClient, PutItemCommand, UpdateItemCommand } = require('@aws-sdk/client-dynamodb');
           const dynamodb = new DynamoDBClient({});
           const TABLE_NAME = process.env.TABLE_NAME;
           const RETENTION_DAYS = parseInt(process.env.RETENTION_DAYS || '90', 10);
           const ACCOUNT_ID = process.env.AWS_ACCOUNT_ID || 'unknown';
+
+          function ledgerEntryFor(message) {
+            const type = message.eventType || message.notificationType;
+            if (type === 'Bounce' && message.bounce) {
+              const sub = message.bounce.bounceSubType;
+              if (sub === 'EmailValidationSuppressed') return { reason: 'validation', detail: sub };
+              if (sub === 'Suppressed' || sub === 'OnAccountSuppressionList') return { reason: 'bounce', detail: sub };
+              if (message.bounce.bounceType === 'Permanent') return { reason: 'bounce', detail: sub };
+              return null;
+            }
+            if (type === 'Complaint' && message.complaint) {
+              return { reason: 'complaint', detail: message.complaint.complaintFeedbackType };
+            }
+            return null;
+          }
+
+          function recipientEmails(recipients) {
+            if (!Array.isArray(recipients)) return [];
+            return recipients
+              .map(function(r) { return r && typeof r === 'object' ? r.emailAddress : undefined; })
+              .filter(function(e) { return typeof e === 'string'; })
+              .map(function(e) { return e.toLowerCase().trim(); })
+              .filter(function(e) { return e.length > 0; });
+          }
 
           exports.handler = async (event) => {
             for (const record of event.Records) {
@@ -920,6 +944,7 @@ Resources:
                   Item: {
                     messageId: { S: messageId },
                     sentAt: { N: eventTimestamp.toString() },
+                    mailSentAt: { N: mailTimestamp.toString() },
                     accountId: { S: ACCOUNT_ID },
                     from: { S: from },
                     to: { L: to.map(function(e) { return { S: e }; }) },
@@ -931,6 +956,46 @@ Resources:
                     expiresAt: { N: expiresAt.toString() },
                   },
                 }));
+
+                const ledger = ledgerEntryFor(message);
+                if (ledger) {
+                  const recipients = recipientEmails(
+                    ledger.reason === 'complaint'
+                      ? message.complaint && message.complaint.complainedRecipients
+                      : message.bounce && message.bounce.bouncedRecipients
+                  );
+                  const feedbackId =
+                    (message.bounce && message.bounce.feedbackId) ||
+                    (message.complaint && message.complaint.feedbackId) ||
+                    undefined;
+                  for (const email of recipients) {
+                    try {
+                      const names = {
+                        '#et': 'eventType', '#em': 'email', '#r': 'reason', '#src': 'source',
+                        '#sa': 'suppressedAt', '#fsa': 'firstSuppressedAt',
+                      };
+                      const values = {
+                        ':et': { S: 'Suppressed' }, ':em': { S: email }, ':r': { S: ledger.reason },
+                        ':src': { S: 'ses_event' }, ':sa': { N: eventTimestamp.toString() },
+                      };
+                      if (ledger.detail) { names['#d'] = 'detail'; values[':d'] = { S: ledger.detail }; }
+                      if (feedbackId) { names['#fid'] = 'feedbackId'; values[':fid'] = { S: feedbackId }; }
+                      await dynamodb.send(new UpdateItemCommand({
+                        TableName: TABLE_NAME,
+                        Key: { messageId: { S: 'SUPPRESSION#' + email }, sentAt: { N: '0' } },
+                        UpdateExpression:
+                          'SET #et = :et, #em = :em, #r = :r, #src = :src, #sa = :sa, ' +
+                          '#fsa = if_not_exists(#fsa, :sa)' +
+                          (ledger.detail ? ', #d = :d' : '') +
+                          (feedbackId ? ', #fid = :fid' : ''),
+                        ExpressionAttributeNames: names,
+                        ExpressionAttributeValues: values,
+                      }));
+                    } catch (error) {
+                      console.error('Error recording suppression ledger entry:', error);
+                    }
+                  }
+                }
               } catch (error) {
                 console.error('Error processing record:', error);
               }
