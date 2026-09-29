@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "../index";
 import {
+  cancelBroadcast,
   checkSegmentUsable,
   countBroadcastRecipients,
   getBroadcastClickBreakdown,
@@ -938,5 +939,110 @@ describe("Repository: getBroadcastClickBreakdown", () => {
       { url: "https://acme.example.com/pricing", count: 1 },
     ]);
     expect(result.unsubscribeCount).toBe(0);
+  });
+});
+
+describe("Repository: cancelBroadcast org scope", () => {
+  const rand = crypto.randomUUID().slice(0, 8);
+  const orgA = `repo-cancel-orgA-${rand}`;
+  const orgB = `repo-cancel-orgB-${rand}`;
+  const batchA = `repo-cancel-batchA-${rand}`;
+  const batchA2 = `repo-cancel-batchA2-${rand}`;
+  const batchB = `repo-cancel-batchB-${rand}`;
+
+  const readBatch = async (id: string) => {
+    const [row] = await db
+      .select({
+        status: batchSend.status,
+        organizationId: batchSend.organizationId,
+      })
+      .from(batchSend)
+      .where(eq(batchSend.id, id));
+    return row;
+  };
+
+  beforeAll(async () => {
+    await db
+      .insert(organization)
+      .values([
+        {
+          id: orgA,
+          name: "Cancel Org A",
+          slug: `cancel-a-${rand}`,
+          createdAt: new Date(),
+        },
+        {
+          id: orgB,
+          name: "Cancel Org B",
+          slug: `cancel-b-${rand}`,
+          createdAt: new Date(),
+        },
+      ])
+      .onConflictDoNothing();
+
+    await db
+      .insert(batchSend)
+      .values([
+        {
+          id: batchA,
+          organizationId: orgA,
+          channel: "email",
+          status: "scheduled",
+          name: "Cancel A",
+          subject: "cancel scope",
+          createdAt: new Date(),
+        },
+        {
+          id: batchA2,
+          organizationId: orgA,
+          channel: "email",
+          status: "scheduled",
+          name: "Cancel A2 bystander",
+          subject: "cancel scope",
+          createdAt: new Date(),
+        },
+        {
+          id: batchB,
+          organizationId: orgB,
+          channel: "email",
+          status: "scheduled",
+          name: "Cancel B",
+          subject: "cancel scope",
+          createdAt: new Date(),
+        },
+      ])
+      .onConflictDoNothing();
+  });
+
+  beforeEach(async () => {
+    for (const id of [batchA, batchA2, batchB]) {
+      await db
+        .update(batchSend)
+        .set({ status: "scheduled" })
+        .where(eq(batchSend.id, id));
+    }
+  });
+
+  afterAll(async () => {
+    await db.delete(batchSend).where(eq(batchSend.organizationId, orgA));
+    await db.delete(batchSend).where(eq(batchSend.organizationId, orgB));
+    await db.delete(organization).where(eq(organization.id, orgA));
+    await db.delete(organization).where(eq(organization.id, orgB));
+  });
+
+  it("cancelBroadcast with another org's id leaves that row unchanged", async () => {
+    await cancelBroadcast(batchB, orgA);
+
+    const row = await readBatch(batchB);
+    expect(row?.status).toBe("scheduled");
+    expect(row?.organizationId).toBe(orgB);
+  });
+
+  it("cancelBroadcast cancels only the named row in the caller's org", async () => {
+    await cancelBroadcast(batchA, orgA);
+
+    expect((await readBatch(batchA))?.status).toBe("cancelled");
+    expect((await readBatch(batchA2))?.status).toBe("scheduled");
+    expect((await readBatch(batchB))?.status).toBe("scheduled");
   });
 });
