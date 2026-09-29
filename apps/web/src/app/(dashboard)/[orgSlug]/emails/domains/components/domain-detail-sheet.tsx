@@ -1,6 +1,13 @@
 "use client";
 
+import type { DomainAuthRecordState } from "@wraps/db";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@wraps/ui/components/ui/alert";
 import { Badge } from "@wraps/ui/components/ui/badge";
+import { Button } from "@wraps/ui/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -11,10 +18,11 @@ import {
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { AlertTriangleIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { SendingDomain } from "@/actions/domains";
 import {
   type ConfigurationSetDetail,
+  checkDomainAuth,
   getConfigurationSetDetail,
   probeTrackingDomain,
 } from "@/actions/domains";
@@ -349,6 +357,144 @@ function ConfigurationSetPanel({
   );
 }
 
+type DomainAuthState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "loaded"; records: DomainAuthRecordState[] }
+  | { status: "error"; error: string };
+
+const AUTH_KIND_LABELS: Record<DomainAuthRecordState["recordKind"], string> = {
+  dkim: "DKIM",
+  mailfrom_mx: "MAIL FROM MX",
+  mailfrom_spf: "MAIL FROM SPF",
+  dmarc: "DMARC",
+};
+
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+function AuthStatusBadge({
+  status,
+}: {
+  status: DomainAuthRecordState["status"];
+}) {
+  switch (status) {
+    case "verified":
+      return <Badge variant="success">Verified</Badge>;
+    case "missing":
+      return <Badge variant="destructive">Missing</Badge>;
+    case "incorrect":
+      return <Badge variant="destructive">Incorrect</Badge>;
+    default:
+      return <Badge variant="secondary">Couldn't check</Badge>;
+  }
+}
+
+/**
+ * Live DNS check for the identity: resolves each authentication record now
+ * and flags any that were verified before and are failing today. Runs on
+ * open and on "Re-check"; the action re-derives every hostname from SES, so
+ * nothing here passes a name to probe.
+ */
+function DomainAuthPanel({
+  domain,
+  organizationId,
+}: {
+  domain: SendingDomain;
+  organizationId: string;
+}) {
+  const [state, setState] = useState<DomainAuthState>({ status: "idle" });
+  const [runId, setRunId] = useState(0);
+
+  useEffect(() => {
+    // runId only exists to re-trigger this effect from the Re-check button.
+    void runId;
+    let cancelled = false;
+    setState({ status: "loading" });
+
+    checkDomainAuth(organizationId, domain.awsAccountId, domain.identity).then(
+      (result) => {
+        if (cancelled) {
+          return;
+        }
+        if (result.success) {
+          setState({ status: "loaded", records: result.records });
+        } else {
+          setState({ status: "error", error: result.error });
+        }
+      }
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId, domain.awsAccountId, domain.identity, runId]);
+
+  const recheck = useCallback(() => setRunId((id) => id + 1), []);
+
+  if (state.status === "idle" || state.status === "loading") {
+    return <p className="text-muted-foreground text-sm">Checking DNS...</p>;
+  }
+
+  if (state.status === "error") {
+    return <p className="text-muted-foreground text-sm">{state.error}</p>;
+  }
+
+  const drifted = state.records.filter((r) => r.drifted);
+  const lastVerified = drifted
+    .map((r) => r.lastVerifiedAt)
+    .filter((d): d is Date => d !== null)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+
+  return (
+    <div className="space-y-3">
+      {drifted.length > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangleIcon />
+          <AlertTitle>A record that was verified is now failing</AlertTitle>
+          <AlertDescription>
+            <p>
+              {drifted.map((r) => r.recordName).join(", ")}
+              {lastVerified
+                ? `. Last verified ${dateFormatter.format(new Date(lastVerified))}.`
+                : "."}
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+      {state.records.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          Email address identities have no DNS records to check.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {state.records.map((record) => (
+            <li
+              className="flex flex-wrap items-center justify-between gap-2"
+              key={`${record.recordKind}:${record.recordName}`}
+            >
+              <div className="min-w-0">
+                <div className="font-medium text-xs">
+                  {AUTH_KIND_LABELS[record.recordKind]}
+                </div>
+                <div className="break-all font-mono text-muted-foreground text-xs">
+                  {record.recordName}
+                </div>
+              </div>
+              <AuthStatusBadge status={record.status} />
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button onClick={recheck} size="sm" variant="outline">
+        Re-check
+      </Button>
+    </div>
+  );
+}
+
 export function DomainDetailSheet({
   domain,
   onClose,
@@ -411,6 +557,15 @@ export function DomainDetailSheet({
               DNS records to publish
             </h4>
             <DnsRecordsTable domain={domain} />
+          </div>
+
+          <div>
+            <h4 className="mb-2 font-semibold text-xs">Live DNS check</h4>
+            <DomainAuthPanel
+              domain={domain}
+              key={domain.identity}
+              organizationId={organizationId}
+            />
           </div>
 
           <div>

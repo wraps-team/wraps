@@ -26,6 +26,11 @@ vi.mock("../add-domain-form", () => ({
 const mockGetConfigurationSetDetail = vi.fn();
 const mockProbeTrackingDomain = vi.fn();
 vi.mock("@/actions/domains", () => ({
+  checkDomainAuth: async () => ({
+    success: true,
+    records: [],
+    checkedAt: new Date(0).toISOString(),
+  }),
   getConfigurationSetDetail: (...args: unknown[]) =>
     mockGetConfigurationSetDetail(...args),
   probeTrackingDomain: (...args: unknown[]) => mockProbeTrackingDomain(...args),

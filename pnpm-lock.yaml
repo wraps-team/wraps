@@ -612,6 +612,9 @@ importers:
       '@wraps.dev/email':
         specifier: 0.13.0
         version: 0.13.0(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+      '@wraps.dev/email-check':
+        specifier: workspace:*
+        version: link:../../packages/email-check
       '@wraps/ai':
         specifier: workspace:*
         version: link:../../packages/ai

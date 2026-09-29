@@ -10,9 +10,18 @@ import {
   ListEmailIdentitiesCommand,
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
-import { and, awsAccount, db, eq } from "@wraps/db";
+import {
+  and,
+  awsAccount,
+  type DomainAuthRecordState,
+  db,
+  eq,
+  recordDomainAuthCheck,
+} from "@wraps/db";
+import { nodeDns } from "@wraps.dev/email-check";
 import { revalidatePath } from "next/cache";
 import { getOrAssumeRole } from "@/lib/aws/credential-cache";
+import { checkDomainAuthRecords } from "@/lib/domain-auth-check";
 import { probeTrackingTls, type TrackingTlsResult } from "@/lib/tracking-tls";
 import { orgAction } from "./shared/org-action";
 
@@ -482,6 +491,132 @@ export const probeTrackingDomain = orgAction(
         return {
           success: false,
           error: `Configuration set "${configurationSetName}" no longer exists.`,
+          unreachable: false,
+        };
+      }
+      throw error;
+    }
+  }
+);
+
+export type CheckDomainAuthResult =
+  | { success: true; records: DomainAuthRecordState[]; checkedAt: string }
+  | { success: false; error: string; unreachable: boolean };
+
+/**
+ * Resolves the live DNS for one sending identity, compares it against what
+ * SES expects (`dnsRecordsFor`), and records the result so a record that was
+ * verified and has since regressed shows up as drift.
+ *
+ * Like `probeTrackingDomain`, takes no hostname: the identity is confirmed to
+ * exist in the caller's own AWS account via `GetEmailIdentity`, and every DNS
+ * name probed is derived from that response, never from the caller. A lookup
+ * that fails comes back as `unknown` and is never persisted.
+ *
+ * No audit log entry: this is a read-permission health observation, not a
+ * mutation of customer-visible configuration.
+ */
+export const checkDomainAuth = orgAction(
+  {
+    name: "checkDomainAuth",
+    resource: "awsAccounts",
+    permission: ["read"],
+    orgId: (organizationId: string, _awsAccountId: string, _identity: string) =>
+      organizationId,
+    onError: "Failed to check DNS records",
+  },
+  async (
+    _ctx,
+    organizationId: string,
+    awsAccountId: string,
+    identity: string
+  ): Promise<CheckDomainAuthResult> => {
+    // Never look up an AWS account by id alone — scope to the caller's org.
+    const account = await db.query.awsAccount.findFirst({
+      where: and(
+        eq(awsAccount.id, awsAccountId),
+        eq(awsAccount.organizationId, organizationId)
+      ),
+    });
+    if (!account) {
+      return {
+        success: false,
+        error: "AWS account not found",
+        unreachable: false,
+      };
+    }
+
+    try {
+      const credentials = await getOrAssumeRole({
+        roleArn: account.roleArn,
+        externalId: account.externalId,
+      });
+
+      const client = new SESv2Client({
+        region: account.region,
+        credentials: {
+          accessKeyId: credentials.accessKeyId,
+          secretAccessKey: credentials.secretAccessKey,
+          sessionToken: credentials.sessionToken,
+        },
+      });
+
+      const response = await client.send(
+        new GetEmailIdentityCommand({ EmailIdentity: identity })
+      );
+      const sendingDomain: SendingDomain = {
+        identity,
+        identityType: response.IdentityType ?? null,
+        verifiedForSending: response.VerifiedForSendingStatus ?? false,
+        verificationStatus: response.VerificationStatus ?? null,
+        dkim: response.DkimAttributes
+          ? {
+              status: response.DkimAttributes.Status ?? null,
+              tokens: response.DkimAttributes.Tokens ?? [],
+            }
+          : null,
+        mailFromDomain: response.MailFromAttributes?.MailFromDomain
+          ? {
+              domain: response.MailFromAttributes.MailFromDomain,
+              status: response.MailFromAttributes.MailFromDomainStatus ?? null,
+            }
+          : null,
+        configurationSet: response.ConfigurationSetName ?? null,
+        awsAccountId: account.id,
+        region: account.region,
+      };
+
+      const results = await checkDomainAuthRecords(sendingDomain, nodeDns);
+      const records = await recordDomainAuthCheck({
+        organizationId,
+        awsAccountId: account.id,
+        identity,
+        observations: results.map((r) => ({
+          recordKind: r.kind,
+          recordName: r.name,
+          status: r.status,
+          found: r.found,
+        })),
+      });
+
+      return { success: true, records, checkedAt: new Date().toISOString() };
+    } catch (error) {
+      if (isRoleAccessError(error)) {
+        return {
+          success: false,
+          error:
+            "This AWS account could not be read. Check its connection under AWS Accounts settings.",
+          unreachable: true,
+        };
+      }
+      if (
+        error instanceof Error &&
+        (error.name === "NotFoundException" ||
+          error.message.includes("NotFoundException"))
+      ) {
+        return {
+          success: false,
+          error: `"${identity}" is no longer an identity in this AWS account.`,
           unreachable: false,
         };
       }

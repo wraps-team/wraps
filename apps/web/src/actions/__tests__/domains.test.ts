@@ -1,4 +1,11 @@
-import { awsAccount, db, member, organization, user } from "@wraps/db";
+import {
+  awsAccount,
+  db,
+  domainAuthCheck,
+  member,
+  organization,
+  user,
+} from "@wraps/db";
 import { eq } from "drizzle-orm";
 import {
   afterAll,
@@ -12,6 +19,7 @@ import {
 import { dnsRecordsFor } from "@/lib/dns-records";
 import {
   addSendingDomain,
+  checkDomainAuth,
   getConfigurationSetDetail,
   listSendingDomains,
   probeTrackingDomain,
@@ -58,6 +66,15 @@ const mockGetOrAssumeRole = vi.fn();
 vi.mock("@/lib/aws/credential-cache", () => ({
   getOrAssumeRole: (...args: unknown[]) => mockGetOrAssumeRole(...args),
 }));
+
+// vi.hoisted: vi.mock factories run before module-level consts, and the fake
+// resolver has to exist by then. No real DNS is ever queried.
+const mockNodeDns = vi.hoisted(() => ({
+  resolveTxt: vi.fn(),
+  resolveMx: vi.fn(),
+  resolveCname: vi.fn(),
+}));
+vi.mock("@wraps.dev/email-check", () => ({ nodeDns: mockNodeDns }));
 
 const mockProbeTrackingTls = vi.fn();
 vi.mock("@/lib/tracking-tls", () => ({
@@ -1219,5 +1236,143 @@ describe("probeTrackingDomain", () => {
       unreachable: true,
     });
     expect(mockProbeTrackingTls).not.toHaveBeenCalled();
+  });
+});
+
+describe("checkDomainAuth", () => {
+  const IDENTITY = "auth-check.example.com";
+
+  function mockIdentity() {
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "GetEmailIdentityCommand") {
+        return Promise.resolve({
+          IdentityType: "DOMAIN",
+          VerifiedForSendingStatus: true,
+          VerificationStatus: "SUCCESS",
+          DkimAttributes: { Status: "SUCCESS", Tokens: ["tokA", "tokB"] },
+          MailFromAttributes: {
+            MailFromDomain: `mail.${IDENTITY}`,
+            MailFromDomainStatus: "SUCCESS",
+          },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+  }
+
+  function mockDnsResolvesEverything() {
+    mockNodeDns.resolveCname.mockImplementation(async (name: string) => [
+      `${name.split("._domainkey.")[0]}.dkim.amazonses.com`,
+    ]);
+    mockNodeDns.resolveMx.mockResolvedValue([
+      { exchange: "feedback-smtp.us-east-1.amazonses.com", priority: 10 },
+    ]);
+    mockNodeDns.resolveTxt.mockImplementation(async (name: string) =>
+      name.startsWith("_dmarc.")
+        ? [["v=DMARC1; p=none"]]
+        : [["v=spf1 include:amazonses.com ~all"]]
+    );
+  }
+
+  async function storedRows() {
+    return db
+      .select()
+      .from(domainAuthCheck)
+      .where(eq(domainAuthCheck.awsAccountId, testAwsAccount.id));
+  }
+
+  beforeEach(async () => {
+    for (const fn of Object.values(mockNodeDns)) {
+      fn.mockReset();
+    }
+    await db
+      .delete(domainAuthCheck)
+      .where(eq(domainAuthCheck.awsAccountId, testAwsAccount.id));
+  });
+
+  it("checks one dkim row per token plus mail-from and dmarc, each with a status", async () => {
+    mockIdentity();
+    mockDnsResolvesEverything();
+
+    const result = await checkDomainAuth(
+      testOrganization.id,
+      testAwsAccount.id,
+      IDENTITY
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      return;
+    }
+    expect(result.records.map((r) => r.recordKind).sort()).toEqual([
+      "dkim",
+      "dkim",
+      "dmarc",
+      "mailfrom_mx",
+      "mailfrom_spf",
+    ]);
+    expect(result.records.every((r) => r.status === "verified")).toBe(true);
+    expect(await storedRows()).toHaveLength(5);
+  });
+
+  it("refuses an AWS account belonging to a different organization, never calling SES", async () => {
+    mockIdentity();
+
+    const result = await checkDomainAuth(
+      testOrganization.id,
+      testAwsAccountForeign.id,
+      IDENTITY
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "AWS account not found",
+      unreachable: false,
+    });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("reports an identity SES no longer has", async () => {
+    mockSend.mockImplementation(() => {
+      const err = new Error("NotFoundException");
+      err.name = "NotFoundException";
+      return Promise.reject(err);
+    });
+
+    const result = await checkDomainAuth(
+      testOrganization.id,
+      testAwsAccount.id,
+      IDENTITY
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: `"${IDENTITY}" is no longer an identity in this AWS account.`,
+      unreachable: false,
+    });
+    expect(mockNodeDns.resolveCname).not.toHaveBeenCalled();
+  });
+
+  it("returns every record unknown and writes no rows when DNS lookups all fail", async () => {
+    mockIdentity();
+    const timeout = () => Promise.reject(new Error("DNS lookup timed out"));
+    mockNodeDns.resolveCname.mockImplementation(timeout);
+    mockNodeDns.resolveMx.mockImplementation(timeout);
+    mockNodeDns.resolveTxt.mockImplementation(timeout);
+
+    const result = await checkDomainAuth(
+      testOrganization.id,
+      testAwsAccount.id,
+      IDENTITY
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      return;
+    }
+    expect(result.records).toHaveLength(5);
+    expect(result.records.every((r) => r.status === "unknown")).toBe(true);
+    expect(result.records.every((r) => r.drifted === false)).toBe(true);
+    expect(await storedRows()).toEqual([]);
   });
 });

@@ -539,3 +539,55 @@ export const auditLogRelations = relations(auditLog, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+// Last-known live-DNS status of each authentication record (DKIM CNAMEs,
+// MAIL FROM MX/SPF, DMARC) for a sending identity, written each time the
+// Sending Domains detail sheet runs a live check.
+//
+// One row per (awsAccountId, recordKind, recordName), holding only the LATEST
+// state: checks run on every sheet open, so an append-only history would grow
+// without bound and need a retention job. Drift detection only needs the
+// previous status; lastVerifiedAt and driftedAt keep the timeline an operator
+// actually asks about ("when did this last work, when did it break").
+//
+// "unknown" (resolver timeout / failure) is NEVER written. Not being able to
+// tell is not evidence a record changed, so it must not create a row, clear
+// drift, or trigger it. This is per-record domain health and is deliberately
+// separate from aws_account.health_* (account-level health).
+export const domainAuthCheck = pgTable(
+  "domain_auth_check",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    organizationId: text("organization_id")
+      .references(() => organization.id, { onDelete: "cascade" })
+      .notNull(),
+    awsAccountId: text("aws_account_id")
+      .references(() => awsAccount.id, { onDelete: "cascade" })
+      .notNull(),
+    identity: text("identity").notNull(),
+    recordKind: text("record_kind")
+      .$type<"dkim" | "mailfrom_mx" | "mailfrom_spf" | "dmarc">()
+      .notNull(),
+    recordName: text("record_name").notNull(),
+    status: text("status")
+      .$type<"verified" | "incorrect" | "missing">()
+      .notNull(),
+    found: json("found").$type<string[]>().default([]).notNull(),
+    checkedAt: timestamp("checked_at").notNull(),
+    lastVerifiedAt: timestamp("last_verified_at"),
+    driftedAt: timestamp("drifted_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    orgIdx: index("domain_auth_check_org_idx").on(table.organizationId),
+    recordIdx: uniqueIndex("domain_auth_check_record_idx").on(
+      table.organizationId,
+      table.awsAccountId,
+      table.identity,
+      table.recordKind,
+      table.recordName
+    ),
+  })
+);
