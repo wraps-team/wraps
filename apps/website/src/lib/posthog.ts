@@ -3,6 +3,10 @@
  * @module lib/posthog
  */
 
+// Deliberately NOT using @wraps/analytics: this reads POSTHOG_API_KEY, not
+// POSTHOG_KEY / NEXT_PUBLIC_POSTHOG_KEY, and may point at a different PostHog
+// project (CLI telemetry vs product analytics). Unifying the key chain would
+// either break this or silently merge two event streams.
 import { PostHog } from "posthog-node";
 
 // Singleton instance

@@ -1,9 +1,9 @@
 import { captureException } from "@sentry/nextjs";
+import { getPostHogClient } from "@wraps/analytics";
 import { db, eq, notifyOrg } from "@wraps/db";
 import * as schema from "@wraps/db/schema/auth";
 import { getWrapsClient } from "@wraps/email";
 import { createPlatformClient } from "@wraps.dev/client";
-import { PostHog } from "posthog-node";
 import type Stripe from "stripe";
 import { stripeClient } from "./index";
 
@@ -20,40 +20,6 @@ const structuredError = (
     extra: { msg, ...data },
   });
 };
-
-// PostHog client for subscription tracking (lazy singleton)
-let posthogClient: PostHog | null = null;
-
-// Get PostHog host URL for server-side usage
-// The NEXT_PUBLIC_POSTHOG_HOST may be set to "/ingest" for client-side proxy,
-// but server-side needs the full URL
-function getPostHogHost(): string {
-  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
-  // If host is a relative path (starts with /), use the full PostHog URL
-  if (!host || host.startsWith("/")) {
-    return "https://us.i.posthog.com";
-  }
-  return host;
-}
-
-function getPostHogClient(): PostHog | null {
-  // Local dev and test runs load apps/web/.env.local, which carries the
-  // production key; without this every test signup lands in prod analytics.
-  if (
-    process.env.NODE_ENV !== "production" ||
-    !process.env.NEXT_PUBLIC_POSTHOG_KEY
-  ) {
-    return null;
-  }
-  if (!posthogClient) {
-    posthogClient = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-      host: getPostHogHost(),
-      flushAt: 1,
-      flushInterval: 0,
-    });
-  }
-  return posthogClient;
-}
 
 /** Fire-and-forget PostHog capture for subscription events. Never throws. */
 function capturePostHog(

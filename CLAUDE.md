@@ -21,7 +21,8 @@ When implementing multi-step features (e.g., create resource -> save state -> us
 ## Architecture Overview
 
 Turborepo monorepo with pnpm 11 workspaces. Every package below except `packages/ai`
-has its own CLAUDE.md with detailed context — read it before working in that package.
+and except `packages/analytics` has its own CLAUDE.md with detailed context — read it
+before working in that package.
 
 **Apps**
 
@@ -36,6 +37,7 @@ has its own CLAUDE.md with detailed context — read it before working in that p
 | Path | What it is |
 |---|---|
 | `packages/ai` | `@wraps/ai` — AI SDK wiring for template generation and chat |
+| `packages/analytics` | `@wraps/analytics` — server-side PostHog client for `apps/web`, `apps/api` and `packages/auth` (not `apps/website`, which uses a separate key) |
 | `packages/auth` | better-auth setup, SSO/SCIM, org + session handling |
 | `packages/cdk` | `@wraps.dev/cdk` — AWS CDK L3 construct for email infra (mirrors `pulumi`) |
 | `packages/cli` | `@wraps.dev/cli` — the `wraps` command |

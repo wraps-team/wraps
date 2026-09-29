@@ -40,13 +40,13 @@
     "@wraps.dev/client": "0.10.1",
     "@wraps.dev/email": "^0.13.0",
     "@wraps.dev/sms": "^0.2.0",
+    "@wraps/analytics": "workspace:*",
     "@wraps/db": "workspace:*",
     "@wraps/email": "workspace:*",
     "better-auth": "catalog:",
     "better-inbox": "catalog:",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
-    "posthog-node": "catalog:",
     "stripe": "catalog:",
     "zod": "catalog:"
   }

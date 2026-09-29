@@ -1,0 +1,29 @@
+{
+  "name": "@wraps/analytics",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Server-side PostHog client shared by apps/web, apps/api and packages/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "posthog-node": "catalog:"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "typescript": "catalog:"
+  }
+}

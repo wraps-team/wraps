@@ -41,6 +41,9 @@ const config: KnipConfig = {
     "packages/ai": {
       project: ["src/**/*.ts"],
     },
+    "packages/analytics": {
+      project: ["src/**/*.ts"],
+    },
     "packages/cli": {
       project: ["src/**/*.ts"],
     },

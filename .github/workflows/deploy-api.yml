@@ -118,7 +118,7 @@ jobs:
 
           # Keep in sync with `pnpm --filter "@wraps/api^..." list`.
           if git diff --name-only "$last" "$HEAD_SHA" | grep -qE \
-            '^(apps/api/|packages/(auth|core|db|email|email-check|email-send|template-render|unsubscribe-token)/|infra/|sst\.config\.ts$|\.github/workflows/deploy-api\.yml$)'; then
+            '^(apps/api/|packages/(analytics|auth|core|db|email|email-check|email-send|template-render|unsubscribe-token)/|infra/|sst\.config\.ts$|\.github/workflows/deploy-api\.yml$)'; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
             echo "api-relevant paths changed: deploying"
           else
