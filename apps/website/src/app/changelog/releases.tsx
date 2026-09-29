@@ -113,6 +113,46 @@ export const Code = ({ children }: { children: ReactNode }) => (
 
 export const releases: Release[] = [
   {
+    slug: "suppression-history",
+    versions: [
+      "CLI v3.15.0",
+      "CDK v0.5.0",
+      "Pulumi v0.6.0",
+      "@wraps.dev/email v0.15.0",
+    ],
+    date: "2026-09-29",
+    icon: ShieldCheck,
+    title: "Suppression history for every recipient",
+    tags: ["cli", "iac", "sdk"],
+    summary:
+      "Look up why an address stopped receiving your email, and when, even after it has left the SES suppression list.",
+    items: [
+      <>
+        Run <Code>wraps email sync</Code> on CLI v3.15.0, or redeploy with CDK
+        v0.5.0 or Pulumi v0.6.0, to start recording. Each hard bounce, complaint
+        and validation suppression writes one record per recipient to the{" "}
+        <Code>wraps-email-history</Code> table in your AWS account. Transient
+        bounces are skipped, and suppressions from before the redeploy are not
+        backfilled
+      </>,
+      <>
+        Call <Code>email.events.getSuppressionHistory(address)</Code> in{" "}
+        <Code>@wraps.dev/email</Code> v0.15.0 to read the reason, the SES
+        subtype, and when the address was first and last suppressed
+      </>,
+      "The record outlives the SES suppression list entry, and it exists for recipients who are not contacts",
+      <>
+        Use <Code>email.suppression.get()</Code> for current state. A history
+        record says what happened, not whether it is safe to send, and a{" "}
+        <Code>null</Code> result does not mean the address is clean
+      </>,
+    ],
+    docs: "/docs/sdk-reference#suppression",
+    alsoFixed: [
+      "The cost estimate in wraps email init and wraps email upgrade prices SES sends on your SES plan, Essentials by default, instead of the $0.10 per 1,000 à la carte rate.",
+    ],
+  },
+  {
     slug: "ses-production-access-from-the-cli",
     versions: ["CLI v3.13.0"],
     date: "2026-09-26",
