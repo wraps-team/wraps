@@ -153,6 +153,79 @@ export const releases: Release[] = [
     ],
   },
   {
+    slug: "live-dns-checks-for-sending-domains",
+    date: "2026-09-29",
+    icon: Search,
+    title: "Live DNS checks for sending domains",
+    tags: ["dashboard"],
+    summary:
+      "Check a sending domain's DKIM, MAIL FROM and DMARC records against live DNS from the dashboard, and see when a record that passed has stopped passing.",
+    items: [
+      "Open a domain on the Sending Domains page to resolve its DKIM CNAMEs, MAIL FROM MX and SPF, and DMARC record live, instead of reading the verification status SES caches",
+      "A record that passed on an earlier check and fails now raises a drift alert on the domain, so an edit in your DNS provider shows up in Wraps",
+      "DMARC is checked as well. SES does not check it at all",
+      "The check runs when you open the domain. A lookup that fails or times out reads as unknown, and it never raises or clears an alert on its own",
+    ],
+  },
+  {
+    slug: "ses-plan-bundled-features",
+    versions: ["CLI v3.14.0", "CDK v0.4.0", "Pulumi v0.5.0"],
+    date: "2026-09-28",
+    icon: Gauge,
+    title: "SES plan features you can see and turn on",
+    tags: ["cli", "dashboard", "iac"],
+    summary:
+      "See which SES pricing plan each connected account is on, and turn on the deliverability features that plan already includes.",
+    items: [
+      "Open an AWS account in the dashboard to see its SES pricing plan, how it compares with à la carte at your sending volume, and the Virtual Deliverability Manager (VDM) recommendations from the hourly health check",
+      <>
+        Run <Code>wraps email vdm</Code> to see VDM status for the account and
+        turn it on. VDM is included on the Essentials, Pro and Enterprise plans
+      </>,
+      <>
+        Turn on SES Auto Validation with{" "}
+        <Code>wraps email domains config --auto-validation</Code>, or{" "}
+        <Code>autoValidation</Code> in CDK and Pulumi, to drop sends to
+        addresses that fail validation before SES attempts them. It is included
+        on Pro and Enterprise and billed as an add-on otherwise
+      </>,
+      "Tick Validate addresses with SES before importing in the contact import dialog to reject low-confidence addresses. The option appears only for accounts on Pro or Enterprise, and the dashboard shows the metered cost before anything runs",
+    ],
+    docs: "/docs/cli-reference/email",
+    alsoFixed: [
+      "Sends dropped by SES Auto Validation no longer count as bounces in the dashboard.",
+    ],
+  },
+  {
+    slug: "ses-managed-dedicated-ips",
+    versions: ["CLI v3.14.0", "CDK v0.4.0", "Pulumi v0.5.0"],
+    date: "2026-09-28",
+    icon: Send,
+    title: "SES managed dedicated IPs",
+    tags: ["cli", "iac"],
+    summary:
+      "Route your sending through an SES managed dedicated IP pool from the CLI, CDK or Pulumi.",
+    items: [
+      <>
+        Run <Code>wraps email upgrade --action managed-dedicated-ips</Code> to
+        turn the pool on or off. The CLI shows the cost on your SES plan and
+        asks for confirmation first
+      </>,
+      <>
+        Set <Code>managedDedicatedIps: true</Code> in CDK or Pulumi to create a
+        pool named <Code>wraps-email-managed</Code> and route the configuration
+        set through it
+      </>,
+      "Managed dedicated IPs are included on the SES Pro and Enterprise plans and billed as an add-on on the others",
+      <>
+        The older <Code>dedicatedIp</Code> option is deprecated and has no
+        effect. If your stack sets it, switch to{" "}
+        <Code>managedDedicatedIps</Code>
+      </>,
+    ],
+    docs: "/docs/cdk-reference",
+  },
+  {
     slug: "ses-production-access-from-the-cli",
     versions: ["CLI v3.13.0"],
     date: "2026-09-26",
