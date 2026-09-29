@@ -157,3 +157,53 @@ describe("Email Cost Calculation - User Webhook", () => {
     });
   });
 });
+
+describe("Email Cost Calculation - SES plan pricing", () => {
+  const config = { sendingEnabled: true } as WrapsEmailConfig;
+
+  it("defaults to the Essentials plan", () => {
+    const costs = calculateCosts(config, 10_000);
+
+    expect(costs.total.monthly).toBe(1.6);
+    expect(costs.total.perEmail).toBeCloseTo(0.00016, 10);
+  });
+
+  it("prices at the à la carte rate when asked", () => {
+    const costs = calculateCosts(config, 10_000, "NONE");
+
+    expect(costs.total.monthly).toBe(1);
+    expect(costs.total.perEmail).toBeCloseTo(0.0001, 10);
+  });
+
+  it("includes the plan base fee", () => {
+    const costs = calculateCosts(config, 10_000, "PRO");
+
+    expect(costs.total.monthly).toBeCloseTo(107.2, 2);
+  });
+
+  it("applies tiers marginally", () => {
+    const costs = calculateCosts(config, 20_000_000);
+
+    expect(costs.total.monthly).toBeCloseTo(3000, 2);
+  });
+
+  it("leaves infrastructure lines unchanged by plan", () => {
+    const infra = { managedDedicatedIps: true } as WrapsEmailConfig;
+    const essentials = calculateCosts(infra, 100_000, "ESSENTIALS");
+    const alaCarte = calculateCosts(infra, 100_000, "NONE");
+
+    expect(essentials.total.monthly - alaCarte.total.monthly).toBeCloseTo(6, 2);
+    expect(essentials.dedicatedIp?.monthly).toBe(15);
+    expect(alaCarte.dedicatedIp?.monthly).toBe(15);
+  });
+
+  it("names the plan in the summary", () => {
+    const essentials = getCostSummary(config, 10_000);
+    const alaCarte = getCostSummary(config, 10_000, "NONE");
+
+    expect(essentials).toContain("$0.16/1k emails");
+    expect(essentials).toContain("Essentials");
+    expect(alaCarte).toContain("$0.10/1k emails");
+    expect(alaCarte).toContain("À la carte");
+  });
+});

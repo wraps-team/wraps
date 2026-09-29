@@ -4,6 +4,14 @@ import type {
   FeatureCostBreakdown,
   WrapsEmailConfig,
 } from "../../types/index.js";
+import {
+  monthlyCostForPlan,
+  SES_PLAN_RATES,
+  type SESPricingPlan,
+} from "./ses-plans.js";
+
+// AWS's default plan for new accounts (and accounts with no SES activity since 2025-06-01).
+const DEFAULT_SES_PLAN: SESPricingPlan = "ESSENTIALS";
 
 /**
  * AWS pricing constants (as of 2025)
@@ -12,7 +20,6 @@ import type {
  */
 const AWS_PRICING = {
   // SES pricing
-  SES_PER_EMAIL: 0.0001, // $0.10 per 1,000 emails (outbound)
   SES_ATTACHMENT_PER_GB: 0.12, // $0.12 per GB of attachments
 
   // DynamoDB pricing (on-demand, Standard table class)
@@ -57,10 +64,6 @@ const AWS_PRICING = {
  * Note: Some limits are permanently free, others only for first 12 months
  */
 const FREE_TIER = {
-  // SES: no free sending tier (the 3,000/mo-for-12-months offer was retired
-  // 2026-07-21; new accounts get generic $200 AWS credits instead)
-  SES_EMAILS: 0,
-
   // Lambda: Permanently free tier
   LAMBDA_REQUESTS: 1_000_000, // 1M requests per month (always free)
   LAMBDA_COMPUTE_GB_SECONDS: 400_000, // 400,000 GB-seconds per month (always free)
@@ -456,11 +459,13 @@ function calculateUserWebhookCost(
  *
  * @param config Email configuration
  * @param emailsPerMonth Estimated monthly email volume
+ * @param sesPlan SES pricing plan the SES sending line is priced on
  * @returns Detailed cost breakdown
  */
 export function calculateCosts(
   config: WrapsEmailConfig,
-  emailsPerMonth = 10_000
+  emailsPerMonth = 10_000,
+  sesPlan: SESPricingPlan = DEFAULT_SES_PLAN
 ): FeatureCostBreakdown {
   const tracking = calculateTrackingCost(config);
   const reputationMetrics = calculateReputationMetricsCost(config);
@@ -473,10 +478,8 @@ export function calculateCosts(
   const alerts = calculateAlertingCost(config);
   const userWebhook = calculateUserWebhookCost(config, emailsPerMonth);
 
-  // Calculate SES base costs (always present)
-  const sesEmailCost =
-    Math.max(0, emailsPerMonth - FREE_TIER.SES_EMAILS) *
-    AWS_PRICING.SES_PER_EMAIL;
+  // SES sending cost on the account's SES pricing plan (base fee + marginal tiers)
+  const sesEmailCost = monthlyCostForPlan(sesPlan, emailsPerMonth);
 
   // Sum all costs
   const totalMonthlyCost =
@@ -505,7 +508,7 @@ export function calculateCosts(
     userWebhook,
     total: {
       monthly: totalMonthlyCost,
-      perEmail: AWS_PRICING.SES_PER_EMAIL,
+      perEmail: SES_PLAN_RATES[sesPlan].tiers[0].per1K / 1000,
       description: `Total estimated cost for ${emailsPerMonth.toLocaleString()} emails/month`,
     },
   };
@@ -529,16 +532,17 @@ export function formatCost(cost: number): string {
  */
 export function getCostSummary(
   config: WrapsEmailConfig,
-  emailsPerMonth = 10_000
+  emailsPerMonth = 10_000,
+  sesPlan: SESPricingPlan = DEFAULT_SES_PLAN
 ): string {
-  const costs = calculateCosts(config, emailsPerMonth);
+  const costs = calculateCosts(config, emailsPerMonth, sesPlan);
   const lines: string[] = [];
 
   lines.push(
     `Estimated cost for ${emailsPerMonth.toLocaleString()} emails/month: ${formatCost(costs.total.monthly)}/mo`
   );
   lines.push(
-    `  (${formatCost((costs.total.perEmail ?? 0) * 1000)}/1k emails + infrastructure)`
+    `  (${formatCost((costs.total.perEmail ?? 0) * 1000)}/1k emails on the SES ${SES_PLAN_RATES[sesPlan].label} plan + infrastructure)`
   );
 
   if (costs.tracking) {
