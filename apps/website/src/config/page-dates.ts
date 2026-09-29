@@ -124,7 +124,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/docs/reference": "2026-04-14T13:00:57-06:00",
   "/docs/reference/api": "2026-09-15T08:41:41-06:00",
   "/docs/reference/environment-variables": "2026-08-14T16:36:01-06:00",
-  "/docs/reference/errors": "2026-09-28T14:32:44-06:00",
+  "/docs/reference/errors": "2026-09-29T14:23:51-06:00",
   "/docs/reference/json-output": "2026-09-03T16:43:30-06:00",
   "/docs/reference/rate-limits": "2026-09-01T12:14:38-06:00",
   "/docs/reference/versioning": "2026-09-15T08:41:41-06:00",
