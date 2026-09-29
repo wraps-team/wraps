@@ -1,6 +1,9 @@
 import * as Sentry from "@sentry/nextjs";
 import posthog from "posthog-js";
 import { sentryEnvironment } from "@/lib/sentry-environment";
+import { installTranslateDomGuard } from "@/lib/translate-dom-guard";
+
+installTranslateDomGuard();
 
 // Sentry client-side initialization
 Sentry.init({
