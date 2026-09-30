@@ -113,6 +113,40 @@ export const Code = ({ children }: { children: ReactNode }) => (
 
 export const releases: Release[] = [
   {
+    slug: "tracking-for-domains-added-in-the-dashboard",
+    versions: ["CLI v3.16.0"],
+    date: "2026-09-30",
+    icon: LayoutDashboard,
+    title: "Tracking for domains added in the dashboard",
+    tags: ["dashboard", "cli", "iac"],
+    summary:
+      "Add a sending domain from the dashboard and get the same per-domain configuration set and event tracking that the CLI sets up.",
+    items: [
+      <>
+        Add a domain on the Sending Domains page to create its{" "}
+        <Code>wraps-email-*</Code> configuration set, with an EventBridge
+        destination, and attach it to the new identity. This matches{" "}
+        <Code>wraps email domains add</Code>, so opens, clicks, bounces and
+        deliveries are tracked from the first send
+      </>,
+      "Open a domain that was added without one and click Attach Wraps tracking to set it up. A domain already on a configuration set of your own is left as it is",
+      <>
+        Run <Code>wraps platform update-role</Code> on CLI v3.16.0, or update
+        your CloudFormation stack, to grant the console role the new
+        permissions. Until you do, adding a domain still works, without
+        tracking, and the form says so
+      </>,
+      <>
+        The role can only create configuration sets whose names start with{" "}
+        <Code>wraps-email-</Code>
+      </>,
+    ],
+    docs: "/docs/cli-reference/platform",
+    alsoFixed: [
+      "The domain field on the Sending Domains page no longer shows an Enter a domain error after a successful add.",
+    ],
+  },
+  {
     slug: "suppression-history",
     versions: [
       "CLI v3.15.0",
