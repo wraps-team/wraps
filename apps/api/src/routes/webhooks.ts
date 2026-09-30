@@ -25,6 +25,7 @@ import { isSelfHosted } from "../(ee)/lib/license";
 import { trackFirstEmailDelivered } from "../lib/activation-tracking";
 import { recordSendingIdentity } from "../lib/identity-backstop";
 import { log } from "../lib/logger";
+import { logNonHomeRegionEvent } from "../lib/region-mismatch";
 import { hasActiveSubscription } from "../lib/subscription-gate";
 import {
   deleteScheduledStep,
@@ -217,6 +218,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
         webhookSecret: awsAccount.webhookSecret,
         organizationId: awsAccount.organizationId,
         features: awsAccount.features,
+        region: awsAccount.region,
       })
       .from(awsAccount)
       .where(eq(awsAccount.accountId, awsAccountNumber));
@@ -308,6 +310,13 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
         awsAccountNumber,
       });
     }
+
+    logNonHomeRegionEvent({
+      accountId: account.id,
+      awsAccountNumber,
+      eventRegion: event.region,
+      storedRegion: account.region,
+    });
 
     // Backstop for a stale identities snapshot: never throws.
     await recordSendingIdentity({ account, tags: mail.tags });
