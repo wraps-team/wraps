@@ -27,7 +27,7 @@ export const CEILINGS = {
   "shadcn(no-inline-styles) apps/website": 1,
   "shadcn(no-inline-styles) packages/console": 1,
   "shadcn(no-inline-styles) packages/ui": 2,
-  "shadcn(no-raw-colors) apps/web": 474,
+  "shadcn(no-raw-colors) apps/web": 460,
   "shadcn(no-raw-colors) apps/website": 49,
   "shadcn(no-raw-colors) packages/console": 23,
   "shadcn(no-restyle) apps/web": 0,

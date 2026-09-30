@@ -12,13 +12,6 @@ import {
 } from "@wraps/ui/components/ui/alert-dialog";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -26,28 +19,33 @@ import {
   DialogTitle,
 } from "@wraps/ui/components/ui/dialog";
 import {
-  CheckCircle2,
-  Cloud,
-  ExternalLink,
-  Loader2,
-  Plus,
-  Trash2,
-  XCircle,
-} from "lucide-react";
-import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@wraps/ui/components/ui/dropdown-menu";
 import {
-  type AWSAccountWithCreator,
-  deleteAWSAccount,
-  listAWSAccounts,
-} from "@/actions/aws-accounts";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@wraps/ui/components/ui/table";
+import { Loader2, MoreHorizontal, Plus } from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+import { deleteAWSAccount } from "@/actions/aws-accounts";
 import { ConnectAWSAccountForm } from "@/components/forms/connect-aws-account-form";
 import { Button } from "@/components/ui/button";
+import type { AccountRow } from "@/lib/aws/account-status";
 import { canAddAwsAccount, getAwsAccountLimit, type PlanId } from "@/lib/plans";
 
 type OrganizationSettingsAwsAccountsProps = {
+  accounts: AccountRow[];
   organization: {
     id: string;
     name: string;
@@ -66,7 +64,15 @@ type OrganizationSettingsAwsAccountsProps = {
   selfHosted: boolean;
 };
 
+const LEVEL_BADGE_VARIANT = {
+  healthy: "success",
+  warning: "warning",
+  critical: "destructive",
+  unknown: "secondary",
+} as const;
+
 export function OrganizationSettingsAwsAccounts({
+  accounts,
   organization,
   userRole,
   planId = "free",
@@ -74,13 +80,13 @@ export function OrganizationSettingsAwsAccounts({
   selfHosted,
 }: OrganizationSettingsAwsAccountsProps) {
   const params = useParams();
+  const router = useRouter();
   const orgSlug = params.orgSlug as string;
-  const [accounts, setAccounts] = useState<AWSAccountWithCreator[]>([]);
-  const [loading, setLoading] = useState(true);
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [accountToDelete, setAccountToDelete] =
-    useState<AWSAccountWithCreator | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<AccountRow | null>(
+    null
+  );
   const [deleting, setDeleting] = useState(false);
 
   const canEdit = userRole === "owner" || userRole === "admin";
@@ -88,45 +94,13 @@ export function OrganizationSettingsAwsAccounts({
   const canAddMore = unlimited || canAddAwsAccount(planId, accounts.length);
   const isAtLimit = !canAddMore && accountLimit !== -1;
 
-  // Load AWS accounts. Called on mount and again after connect/delete, so the
-  // list reflects the change without a page reload.
-  const loadAccounts = useCallback(async () => {
-    try {
-      const result = await listAWSAccounts(organization.id);
-      if (result.success) {
-        setAccounts(result.accounts);
-      } else {
-        toast.error(result.error);
-      }
-    } catch (_err) {
-      toast.error(
-        "Couldn't load your AWS accounts — the request failed. Refresh the page to try again."
-      );
-    }
-  }, [organization.id]);
-
-  useEffect(() => {
-    loadAccounts().finally(() => setLoading(false));
-  }, [loadAccounts]);
-
-  const formatDate = (date: Date | null) => {
-    if (!date) {
-      return "Never";
-    }
-    return new Date(date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
   function handleConnectSuccess() {
     setConnectDialogOpen(false);
-    loadAccounts();
+    router.refresh();
     toast.success("AWS account connected successfully");
   }
 
-  function handleDeleteClick(account: AWSAccountWithCreator) {
+  function handleDeleteClick(account: AccountRow) {
     setAccountToDelete(account);
     setDeleteDialogOpen(true);
   }
@@ -144,29 +118,34 @@ export function OrganizationSettingsAwsAccounts({
       );
 
       if (result.success) {
-        toast.success("AWS account deleted successfully");
+        toast.success("AWS account removed from Wraps");
         setDeleteDialogOpen(false);
         setAccountToDelete(null);
-        await loadAccounts();
+        router.refresh();
       } else {
         toast.error(result.error);
       }
     } catch (_err) {
       toast.error(
-        "Couldn't delete the AWS account — the request failed. Please try again, and if it keeps happening contact support."
+        "Couldn't remove the AWS account — the request failed. Please try again, and if it keeps happening contact support."
       );
     } finally {
       setDeleting(false);
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const connectButton = canEdit ? (
+    <Button
+      disabled={isAtLimit}
+      onClick={() => setConnectDialogOpen(true)}
+      title={
+        isAtLimit ? "Upgrade your plan to add more AWS accounts" : undefined
+      }
+    >
+      <Plus className="mr-2 h-4 w-4" />
+      Connect account
+    </Button>
+  ) : null;
 
   return (
     <div className="space-y-6">
@@ -187,15 +166,15 @@ export function OrganizationSettingsAwsAccounts({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Remove Confirmation Dialog */}
       <AlertDialog onOpenChange={setDeleteDialogOpen} open={deleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete AWS Account?</AlertDialogTitle>
+            <AlertDialogTitle>Remove from Wraps?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete{" "}
+              Are you sure you want to remove{" "}
               <strong>{accountToDelete?.name}</strong> (
-              {accountToDelete?.accountId})?
+              {accountToDelete?.accountId}) from Wraps?
               <br />
               <br />
               This action cannot be undone. All associated data and
@@ -219,179 +198,163 @@ export function OrganizationSettingsAwsAccounts({
               {deleting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
+                  Removing...
                 </>
               ) : (
-                "Delete Account"
+                "Remove account"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                AWS Accounts
-                {accountLimit !== -1 && (
-                  <Badge variant="outline">
-                    {accounts.length} / {accountLimit}
-                  </Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                Manage AWS accounts connected to your organization.
-                {isAtLimit && (
-                  <span className="mt-1 block text-amber-600 dark:text-amber-400">
-                    You've reached your plan's AWS account limit.{" "}
-                    <Link
-                      className="underline hover:no-underline"
-                      href={`/${orgSlug}/settings/billing`}
-                    >
-                      Upgrade your plan
-                    </Link>{" "}
-                    for more.
-                  </span>
-                )}
-              </CardDescription>
-            </div>
-            {canEdit && (
-              <Button
-                disabled={isAtLimit}
-                onClick={() => setConnectDialogOpen(true)}
-                title={
-                  isAtLimit
-                    ? "Upgrade your plan to add more AWS accounts"
-                    : undefined
-                }
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Connect Account
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {accounts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
-              <Cloud className="mb-4 h-12 w-12 text-muted-foreground" />
-              <h3 className="mb-2 font-semibold text-lg">
-                No AWS Accounts Connected
-              </h3>
-              <p className="mb-4 text-muted-foreground text-sm">
-                Connect your first AWS account to start using Wraps.
-              </p>
-              {canEdit && (
-                <Button onClick={() => setConnectDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Connect Account
-                </Button>
+      {accounts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
+          <h2 className="mb-2 font-semibold text-lg">
+            Connect your first AWS account
+          </h2>
+          <p className="mb-2 max-w-xl text-muted-foreground text-sm">
+            Wraps deploys into your account and reads it through an IAM role you
+            own. We never store AWS keys.
+          </p>
+          <p className="mb-4 max-w-xl text-muted-foreground text-sm">
+            You'll need administrator access, permission to create IAM roles,
+            and CloudFormation execution permissions.
+          </p>
+          {connectButton}
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-4">
+            <div className="text-muted-foreground text-sm">
+              {accountLimit === -1
+                ? `${accounts.length} connected`
+                : `${accounts.length} of ${accountLimit} on your plan`}
+              {isAtLimit && (
+                <span className="mt-1 block text-warning">
+                  You've reached your plan's AWS account limit.{" "}
+                  <Link
+                    className="underline hover:no-underline"
+                    href={`/${orgSlug}/settings/billing`}
+                  >
+                    Upgrade your plan
+                  </Link>{" "}
+                  for more.
+                </span>
               )}
             </div>
-          ) : (
-            <div className="space-y-4">
-              {accounts.map((account) => (
-                <div
-                  className="flex items-center justify-between rounded-lg border p-4"
-                  key={account.id}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900">
-                      <Cloud className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                    </div>
-                    <div>
+            {connectButton}
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Account / Region</TableHead>
+                <TableHead>Services</TableHead>
+                <TableHead>Health</TableHead>
+                <TableHead>Events</TableHead>
+                <TableHead className="w-12" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {accounts.map((account) => {
+                const detailHref = `/${orgSlug}/settings/aws-accounts/${account.id}`;
+                const hasServices = account.emailEnabled || account.smsEnabled;
+                return (
+                  <TableRow key={account.id}>
+                    <TableCell className="font-medium">
+                      <Link className="hover:underline" href={detailHref}>
+                        {account.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-mono text-sm">
+                        {account.accountId}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        {account.region}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {hasServices ? (
+                        <div className="flex gap-1">
+                          {account.emailEnabled && (
+                            <Badge variant="secondary">Email</Badge>
+                          )}
+                          {account.smsEnabled && (
+                            <Badge variant="secondary">SMS</Badge>
+                          )}
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">{account.name}</h4>
-                        {account.isVerified ? (
-                          <Badge variant="success">
-                            <CheckCircle2 className="mr-1 h-3 w-3" />
-                            Verified
+                        <div>
+                          <Badge
+                            variant={LEVEL_BADGE_VARIANT[account.status.level]}
+                          >
+                            {account.status.label}
                           </Badge>
-                        ) : (
-                          <Badge variant="warning">
-                            <XCircle className="mr-1 h-3 w-3" />
-                            Pending
-                          </Badge>
+                          {account.status.detail && (
+                            <div className="mt-1 text-muted-foreground text-xs">
+                              {account.status.detail}
+                            </div>
+                          )}
+                        </div>
+                        {account.status.label === "Role unreachable" && (
+                          <Button asChild size="sm" variant="outline">
+                            <Link href={`${detailHref}#iam-role`}>Fix</Link>
+                          </Button>
                         )}
                       </div>
-                      <p className="font-mono text-muted-foreground text-sm">
-                        {account.accountId}
-                      </p>
-                      <p className="text-muted-foreground text-xs">
-                        {account.region} • Added {formatDate(account.createdAt)}
-                        {account.createdBy && ` by ${account.createdBy.name}`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {canEdit && (
-                      <Link
-                        href={`/${orgSlug}/settings/aws-accounts/${account.id}`}
-                      >
-                        <Button variant="outline">
-                          <ExternalLink className="mr-2 h-4 w-4" />
-                          Manage
-                        </Button>
-                      </Link>
-                    )}
-                    {canEdit && (
-                      <Button
-                        aria-label={`Delete ${account.name}`}
-                        onClick={() => handleDeleteClick(account)}
-                        variant="ghost-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Connection Guide</CardTitle>
-          <CardDescription>
-            How to connect your AWS account to Wraps.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <h4 className="font-medium">Prerequisites</h4>
-            <ul className="list-inside list-disc space-y-1 text-muted-foreground text-sm">
-              <li>AWS account with administrator access</li>
-              <li>Permission to create IAM roles</li>
-              <li>CloudFormation execution permissions</li>
-            </ul>
-          </div>
-          <div className="space-y-2">
-            <h4 className="font-medium">Connection Process</h4>
-            <ol className="list-inside list-decimal space-y-1 text-muted-foreground text-sm">
-              <li>Click the "Connect Account" button above</li>
-              <li>Launch the CloudFormation stack in your AWS account</li>
-              <li>Copy the Role ARN from the stack outputs</li>
-              <li>Complete the connection form with your account details</li>
-              <li>Wraps will verify the connection automatically</li>
-            </ol>
-          </div>
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950">
-            <h4 className="mb-2 font-medium text-blue-900 text-sm dark:text-blue-100">
-              Why do we need an IAM role?
-            </h4>
-            <p className="text-blue-800 text-sm dark:text-blue-200">
-              Wraps uses IAM roles with AssumeRole to securely access your AWS
-              account. This means we never store your AWS credentials - we only
-              temporarily assume a role when needed, with the minimum required
-              permissions.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {account.lastEventAt ?? "—"}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            aria-label={`Actions for ${account.name}`}
+                            size="icon"
+                            variant="ghost"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={detailHref}>Open</Link>
+                          </DropdownMenuItem>
+                          {canEdit && (
+                            <>
+                              <DropdownMenuItem asChild>
+                                <Link href={`${detailHref}/permissions`}>
+                                  Access
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onSelect={() => handleDeleteClick(account)}
+                                variant="destructive"
+                              >
+                                Remove from Wraps...
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </>
+      )}
     </div>
   );
 }
