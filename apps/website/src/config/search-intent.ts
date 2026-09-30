@@ -612,6 +612,42 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     rationale:
       "A lookup is an action on a specific domain, unlike the MX record glossary entry that defines the term. This page returns the records and explains what a missing, unresolvable, or misordered one breaks.",
   },
+  {
+    route: "/tools/dmarc-builder",
+    primaryQuery: "dmarc record generator",
+    secondaryQueries: [
+      "create dmarc record",
+      "dmarc record builder",
+      "what should my dmarc record be",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Someone typing this has no record yet and wants text to paste into DNS, which is a different intent from the DMARC record checker's read-an-existing-record lookup. The page writes the record and warns on combinations that would break mail.",
+  },
+  {
+    route: "/tools/email-header-analyzer",
+    primaryQuery: "email header analyzer tool",
+    secondaryQueries: [
+      "analyze email headers",
+      "read email headers spf dkim dmarc",
+      "why did dmarc fail email headers",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "The searcher holds one message and wants to know what happened to it, unlike the domain-level checkers that read DNS. This page parses pasted headers in the browser into the hop chain, authentication results, and alignment.",
+  },
+  {
+    route: "/tools/bounce-rate-calculator",
+    primaryQuery: "ses bounce rate calculator",
+    secondaryQueries: [
+      "ses bounce rate threshold calculator",
+      "ses complaint rate calculator",
+      "how many bounces before ses review",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "This is the compute-my-own-numbers intent, distinct from the ses bounce rate too high reference page that explains what SES counts. The page turns sends, hard bounces and complaints into an estimate against the review and pause lines.",
+  },
 
   // --- Migrate ---
   {
