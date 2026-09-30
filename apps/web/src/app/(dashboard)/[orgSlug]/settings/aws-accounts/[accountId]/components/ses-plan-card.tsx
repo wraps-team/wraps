@@ -10,7 +10,6 @@ import {
   type SesPlanComparison,
   type SesPricingPlan,
 } from "@wraps/core/ses-plans";
-import type { awsAccount } from "@wraps/db";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
   Card,
@@ -28,16 +27,13 @@ import {
   TableHeader,
   TableRow,
 } from "@wraps/ui/components/ui/table";
-import type { InferSelectModel } from "drizzle-orm";
 import { CheckCircle2, Copy } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import type { ClientAccount } from "../lib/client-account";
 
 type SesPlanCardProps = {
-  account: Pick<
-    InferSelectModel<typeof awsAccount>,
-    "region" | "healthDetail" | "features"
-  >;
+  account: Pick<ClientAccount, "region" | "healthDetail" | "features">;
 };
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {

@@ -1,6 +1,5 @@
 "use client";
 
-import type { awsAccount } from "@wraps/db";
 import {
   Card,
   CardContent,
@@ -9,13 +8,13 @@ import {
   CardTitle,
 } from "@wraps/ui/components/ui/card";
 import { Separator } from "@wraps/ui/components/ui/separator";
-import type { InferSelectModel } from "drizzle-orm";
 import { CheckCircle2, Copy } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import type { ClientAccount } from "../lib/client-account";
 
 type AccountDetailsProps = {
-  account: InferSelectModel<typeof awsAccount>;
+  account: ClientAccount;
 };
 
 export function AccountDetails({ account }: AccountDetailsProps) {
@@ -27,7 +26,7 @@ export function AccountDetails({ account }: AccountDetailsProps) {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const isConnected = !!account.webhookSecret;
+  const isConnected = account.webhookConnected;
 
   return (
     <Card>

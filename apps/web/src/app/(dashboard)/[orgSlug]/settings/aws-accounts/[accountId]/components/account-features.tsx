@@ -1,6 +1,5 @@
 "use client";
 
-import type { awsAccount } from "@wraps/db";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
   Card,
@@ -14,7 +13,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@wraps/ui/components/ui/collapsible";
-import type { InferSelectModel } from "drizzle-orm";
 import {
   Archive,
   AtSign,
@@ -41,9 +39,10 @@ import { useState, useTransition } from "react";
 import { scanAWSAccountFeatures } from "@/actions/aws-accounts";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { ClientAccount } from "../lib/client-account";
 
 type AccountFeaturesProps = {
-  account: InferSelectModel<typeof awsAccount>;
+  account: ClientAccount;
   organizationId: string;
 };
 

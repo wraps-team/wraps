@@ -1,6 +1,5 @@
 "use client";
 
-import type { awsAccount } from "@wraps/db";
 import {
   Card,
   CardContent,
@@ -8,15 +7,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@wraps/ui/components/ui/card";
-import type { InferSelectModel } from "drizzle-orm";
 import { Copy, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { resolveCloudFormationRepairRoute } from "@/lib/aws/cloudformation-url";
+import type { ClientAccount } from "../lib/client-account";
 import { ConsolePolicyRecheck } from "./console-policy-recheck";
 
 type IAMConfigurationProps = {
-  account: InferSelectModel<typeof awsAccount>;
+  account: ClientAccount;
   /**
    * True on self-hosted deployments, where the platform template would grant
    * the wrong account. The External ID still shows — only the stack flow is

@@ -3,7 +3,6 @@ import {
   isSesPricingPlan,
   SES_PLAN_RATES,
 } from "@wraps/core/ses-plans";
-import type { awsAccount } from "@wraps/db";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
   Card,
@@ -13,10 +12,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@wraps/ui/components/ui/card";
-import type { InferSelectModel } from "drizzle-orm";
+import type { ClientAccount } from "../lib/client-account";
 
 type VdmStatusCardProps = {
-  account: Pick<InferSelectModel<typeof awsAccount>, "healthDetail" | "region">;
+  account: Pick<ClientAccount, "healthDetail" | "region">;
 };
 
 /**

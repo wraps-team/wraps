@@ -1,6 +1,5 @@
 "use client";
 
-import type { awsAccount } from "@wraps/db";
 import { Alert, AlertDescription } from "@wraps/ui/components/ui/alert";
 import {
   Card,
@@ -16,7 +15,6 @@ import {
 } from "@wraps/ui/components/ui/collapsible";
 import { Label } from "@wraps/ui/components/ui/label";
 import { Separator } from "@wraps/ui/components/ui/separator";
-import type { InferSelectModel } from "drizzle-orm";
 import {
   AlertCircle,
   CheckCircle2,
@@ -33,9 +31,10 @@ import {
 } from "@/actions/aws-accounts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { ClientAccount } from "../lib/client-account";
 
 type WebhookConfigurationProps = {
-  account: InferSelectModel<typeof awsAccount>;
+  account: ClientAccount;
 };
 
 export function WebhookConfiguration({ account }: WebhookConfigurationProps) {
@@ -45,7 +44,7 @@ export function WebhookConfiguration({ account }: WebhookConfigurationProps) {
   const [success, setSuccess] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  const isConnected = !!account.webhookSecret;
+  const isConnected = account.webhookConnected;
 
   const handleSave = async () => {
     if (!webhookSecret.trim()) {

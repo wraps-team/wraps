@@ -15,9 +15,8 @@
 
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import type { awsAccount } from "@wraps/db";
-import type { InferSelectModel } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
+import type { ClientAccount } from "../../lib/client-account";
 import { IAMConfiguration } from "../iam-configuration";
 
 const CONSOLE_ACCESS_TEMPLATE =
@@ -32,7 +31,7 @@ function makeAccount(externalId: string, region = "us-east-1") {
     accountId: "313932316635",
     region,
     externalId,
-  } as unknown as InferSelectModel<typeof awsAccount>;
+  } as unknown as ClientAccount;
 }
 
 /** The stack ID the infrastructure template hands back as the External ID. */

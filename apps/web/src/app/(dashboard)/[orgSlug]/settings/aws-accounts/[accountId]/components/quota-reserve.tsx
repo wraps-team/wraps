@@ -1,6 +1,5 @@
 "use client";
 
-import type { awsAccount } from "@wraps/db";
 import { Alert, AlertDescription } from "@wraps/ui/components/ui/alert";
 import {
   Card,
@@ -10,15 +9,15 @@ import {
   CardTitle,
 } from "@wraps/ui/components/ui/card";
 import { Label } from "@wraps/ui/components/ui/label";
-import type { InferSelectModel } from "drizzle-orm";
 import { AlertCircle, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { saveDailyQuotaReserveAction } from "@/actions/aws-accounts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { ClientAccount } from "../lib/client-account";
 
 type QuotaReserveProps = {
-  account: InferSelectModel<typeof awsAccount>;
+  account: ClientAccount;
 };
 
 export function QuotaReserve({ account }: QuotaReserveProps) {
