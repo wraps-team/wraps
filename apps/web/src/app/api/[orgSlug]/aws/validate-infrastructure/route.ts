@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { auth } from "@wraps/auth";
-import { db, writeIdentitySnapshot } from "@wraps/db";
+import { applyStackEmailFeatures, db, writeIdentitySnapshot } from "@wraps/db";
 import { awsAccount } from "@wraps/db/schema/app";
 import { scanWrapsIdentities } from "@wraps/email";
 import { eq } from "drizzle-orm";
@@ -182,22 +182,25 @@ export async function POST(request: Request, context: RouteContext) {
             isVerified: true,
             lastVerifiedAt: new Date(),
             updatedAt: new Date(),
-            // Set emailEnabled if config set is detected
-            emailEnabled: !!detectedFeatures?.configSetName,
-            // Store features in JSON
-            features: detectedFeatures
-              ? {
-                  email: {
-                    configSetName: detectedFeatures.configSetName,
-                    eventTrackingEnabled: detectedFeatures.eventTracking,
-                    eventHistoryEnabled: detectedFeatures.historyStorage,
-                    archivingEnabled: detectedFeatures.archiving,
-                    archiveArn: detectedFeatures.archiveArn,
-                  },
-                }
-              : existingAccount.features,
           })
           .where(eq(awsAccount.id, existingAccount.id));
+
+        // Overlay only what the stack reports; the scanned keys (sms, sandbox,
+        // identities, ...) stay. With no stack there is nothing to overlay,
+        // and emailEnabled keeps its stored value.
+        if (detectedFeatures) {
+          await applyStackEmailFeatures({
+            organizationId: orgWithMembership.id,
+            awsAccountId: existingAccount.id,
+            stack: {
+              configSetName: detectedFeatures.configSetName,
+              eventTrackingEnabled: detectedFeatures.eventTracking,
+              eventHistoryEnabled: detectedFeatures.historyStorage,
+              archivingEnabled: detectedFeatures.archiving,
+              archiveArn: detectedFeatures.archiveArn,
+            },
+          });
+        }
       } else {
         // Check account limit for new accounts.
         // `getOrganizationPlan` honours a self-host licence, requires an

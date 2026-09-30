@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../index";
 import {
+  applyStackEmailFeatures,
   claimIdentityRefresh,
   upsertSnapshotIdentity,
   writeIdentitySnapshot,
@@ -72,7 +73,7 @@ describe("Repository: aws-account-identities", () => {
   });
 
   afterAll(async () => {
-    for (const n of [1, 2, 3, 4, 5, 6]) {
+    for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
       await db.delete(awsAccount).where(eq(awsAccount.id, acct(n)));
     }
     await db.delete(organization).where(eq(organization.id, orgA));
@@ -187,5 +188,84 @@ describe("Repository: aws-account-identities", () => {
     expect(await claimIdentityRefresh({ ...base, organizationId: orgB })).toBe(
       false
     );
+  });
+
+  // applyStackEmailFeatures
+  it("overlays stack values and preserves every other key", async () => {
+    const seeded = {
+      email: {
+        configSetName: "wraps-email-old",
+        sandbox: true,
+        archivingEnabled: true,
+        archiveArn:
+          "arn:aws:ses:us-east-1:333333333333:mailmanager-archive/a-1",
+        identities: [domain("a.example.com")],
+        trackingBySet: [
+          {
+            configSetName: "wraps-email-old",
+            customRedirectDomain: "t.example.com",
+          },
+        ],
+        productionAccessRequest: { status: "PENDING", caseId: "case-1" },
+      },
+      sms: { enabled: true, phoneNumbers: [] },
+    } as unknown as (typeof awsAccount.$inferInsert)["features"];
+    await seed(7, seeded);
+
+    await applyStackEmailFeatures({
+      organizationId: orgA,
+      awsAccountId: acct(7),
+      stack: {
+        configSetName: "wraps-email-new",
+        eventTrackingEnabled: true,
+        eventHistoryEnabled: false,
+        archivingEnabled: false,
+        archiveArn: undefined,
+      },
+    });
+
+    const row = await read(7);
+    expect(row.features?.sms).toEqual(seeded?.sms);
+    expect(row.features?.email?.sandbox).toBe(true);
+    expect(row.features?.email?.identities).toEqual(seeded?.email?.identities);
+    expect(row.features?.email?.trackingBySet).toEqual(
+      seeded?.email?.trackingBySet
+    );
+    expect(row.features?.email?.productionAccessRequest).toEqual(
+      seeded?.email?.productionAccessRequest
+    );
+    expect(row.features?.email?.configSetName).toBe("wraps-email-new");
+    expect(row.features?.email?.archivingEnabled).toBe(false);
+    expect(row.features?.email?.archiveArn).toBe(seeded?.email?.archiveArn);
+    expect(row.features?.email?.eventTrackingEnabled).toBe(true);
+    expect(row.emailEnabled).toBe(true);
+  });
+
+  it("handles null features", async () => {
+    await seed(8, null);
+    await applyStackEmailFeatures({
+      organizationId: orgA,
+      awsAccountId: acct(8),
+      stack: { configSetName: "wraps-email-x", archivingEnabled: false },
+    });
+    const row = await read(8);
+    expect(row.features).toEqual({
+      email: { configSetName: "wraps-email-x", archivingEnabled: false },
+    });
+    expect(row.emailEnabled).toBe(true);
+  });
+
+  it("with the wrong organizationId changes nothing", async () => {
+    await seed(9, {
+      sms: { enabled: true },
+    } as unknown as (typeof awsAccount.$inferInsert)["features"]);
+    await applyStackEmailFeatures({
+      organizationId: orgB,
+      awsAccountId: acct(9),
+      stack: { configSetName: "wraps-email-z" },
+    });
+    const row = await read(9);
+    expect(row.features).toEqual({ sms: { enabled: true } });
+    expect(row.emailEnabled).toBe(false);
   });
 });

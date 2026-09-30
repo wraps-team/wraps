@@ -148,3 +148,64 @@ export async function upsertSnapshotIdentity(input: {
       );
   });
 }
+
+export type StackEmailFeatures = {
+  configSetName?: string;
+  eventTrackingEnabled?: boolean;
+  eventHistoryEnabled?: boolean;
+  archivingEnabled?: boolean;
+  archiveArn?: string;
+};
+
+/**
+ * Overlays what a CloudFormation stack reports onto features.email, leaving
+ * every other key (sms, sandbox, identities, trackingBySet, ...) in place.
+ * Keys whose value is undefined are skipped, so a stack without an output
+ * never erases a value the feature scan stored.
+ */
+export async function applyStackEmailFeatures(input: {
+  organizationId: string;
+  awsAccountId: string;
+  stack: StackEmailFeatures;
+  now?: Date;
+}): Promise<void> {
+  const now = input.now ?? new Date();
+  await db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({ features: awsAccount.features })
+      .from(awsAccount)
+      .where(
+        and(
+          eq(awsAccount.id, input.awsAccountId),
+          eq(awsAccount.organizationId, input.organizationId)
+        )
+      )
+      .for("update");
+    if (!row) {
+      return;
+    }
+
+    const overlay = Object.fromEntries(
+      Object.entries(input.stack).filter(([, v]) => v !== undefined)
+    );
+    const merged: Features = {
+      ...(row.features ?? {}),
+      email: { ...(row.features?.email ?? {}), ...overlay },
+    };
+    await tx
+      .update(awsAccount)
+      .set({
+        features: merged,
+        emailEnabled:
+          (merged.email?.identities?.length ?? 0) > 0 ||
+          !!merged.email?.configSetName,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(awsAccount.id, input.awsAccountId),
+          eq(awsAccount.organizationId, input.organizationId)
+        )
+      );
+  });
+}
