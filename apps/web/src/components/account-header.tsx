@@ -24,11 +24,11 @@ export function AccountHeader({
   return (
     <div className="space-y-4">
       {/* Back Button */}
-      <div className="px-4 lg:px-6">
+      <div>
         <Button asChild size="sm" variant="ghost">
-          <Link href={`/${orgSlug}/settings?tab=aws-accounts`}>
+          <Link href={`/${orgSlug}/settings/aws-accounts`}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Settings
+            AWS Accounts
           </Link>
         </Button>
       </div>

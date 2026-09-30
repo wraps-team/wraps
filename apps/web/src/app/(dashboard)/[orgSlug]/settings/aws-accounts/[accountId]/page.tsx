@@ -43,11 +43,12 @@ export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
 
   // Get AWS account
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, accountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, accountId), eq(a.organizationId, organization.id)),
   });
 
-  if (!account || account.organizationId !== organization.id) {
-    redirect(`/${orgSlug}/settings?tab=aws-accounts`);
+  if (!account) {
+    redirect(`/${orgSlug}/settings/aws-accounts`);
   }
 
   // Check if user has view permission
