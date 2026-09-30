@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
     "esbuild",
     "pino",
     "pino-pretty",
+    "undici",
   ],
 
   // Image optimization

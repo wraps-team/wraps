@@ -1,12 +1,22 @@
 /**
  * SSRF Guard — blocks requests to private/internal IP ranges and reserved hostnames.
  *
- * Use assertPublicUrl() (async, resolves DNS) before any server-side fetch of a
- * user-supplied URL, and pair the fetch with `redirect: "manual"`.
+ * Use assertPublicUrl() before any server-side fetch of a user-supplied URL,
+ * then fetch with publicFetch() — never the global fetch.
  */
 
+import {
+  lookup as dnsLookup,
+  type LookupAddress,
+  type LookupOptions,
+} from "node:dns";
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
+import {
+  Agent,
+  type RequestInit as UndiciRequestInit,
+  fetch as undiciFetch,
+} from "undici";
 
 const BLOCKED_RANGES = new BlockList();
 for (const [network, prefix] of [
@@ -108,4 +118,63 @@ export async function assertPublicUrl(
     };
   }
   return pre;
+}
+
+/**
+ * Connect-time SSRF check: the lookup undici uses to open each socket. Rejects
+ * when any resolved address is private/reserved, so the IP that is checked is
+ * the IP that is connected to. IP-literal hosts never reach this — undici skips
+ * lookup for them — which is why assertPublicUrl() must still run first.
+ *
+ * @exported for testing
+ */
+export function ssrfSafeLookup(
+  hostname: string,
+  options: LookupOptions,
+  callback: (
+    err: NodeJS.ErrnoException | null,
+    address: string | LookupAddress[],
+    family?: number
+  ) => void
+): void {
+  dnsLookup(hostname, options, (err, address, family) => {
+    if (err) {
+      callback(err, address, family);
+      return;
+    }
+    const addresses = Array.isArray(address)
+      ? address.map((a) => a.address)
+      : [address];
+    if (addresses.length === 0 || addresses.some((a) => isPrivateHost(a))) {
+      callback(
+        Object.assign(
+          new Error(
+            `SSRF guard: ${hostname} resolves to a private or reserved address`
+          ),
+          { code: "ESSRFBLOCKED" }
+        ),
+        address,
+        family
+      );
+      return;
+    }
+    callback(null, address, family);
+  });
+}
+
+const ssrfSafeDispatcher = new Agent({ connect: { lookup: ssrfSafeLookup } });
+
+/**
+ * fetch() for user-supplied URLs. Call assertPublicUrl() first, then this.
+ * Never follows redirects and pins every connection through ssrfSafeLookup.
+ */
+export function publicFetch(
+  url: string,
+  init: Omit<UndiciRequestInit, "dispatcher" | "redirect"> = {}
+) {
+  return undiciFetch(url, {
+    ...init,
+    redirect: "manual",
+    dispatcher: ssrfSafeDispatcher,
+  });
 }

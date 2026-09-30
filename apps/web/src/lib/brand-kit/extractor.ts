@@ -8,7 +8,7 @@
  * - Company name (from og:site_name or title)
  */
 
-import { assertPublicUrl } from "@/lib/ssrf-guard";
+import { assertPublicUrl, publicFetch } from "@/lib/ssrf-guard";
 
 export type ExtractedBrandKit = {
   logoUrl: string | null;
@@ -57,13 +57,12 @@ export async function extractBrandKitFromDomain(
   const timeoutId = setTimeout(() => controller.abort(), 5000);
 
   try {
-    const response = await fetch(url, {
+    const response = await publicFetch(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (compatible; WrapsBrandExtractor/1.0; +https://wraps.dev)",
         Accept: "text/html",
       },
-      redirect: "manual",
       signal: controller.signal,
     });
 
@@ -161,13 +160,12 @@ async function fetchFirstStylesheet(
       return "";
     }
 
-    const response = await fetch(targetUrl, {
+    const response = await publicFetch(targetUrl, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (compatible; WrapsBrandExtractor/1.0; +https://wraps.dev)",
         Accept: "text/css",
       },
-      redirect: "manual",
       signal,
     });
 

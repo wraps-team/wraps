@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { requireRoutePermission } from "@/app/api/shared/route-permission";
 import { logger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
-import { assertPublicUrl } from "@/lib/ssrf-guard";
+import { assertPublicUrl, publicFetch } from "@/lib/ssrf-guard";
 
 type RouteContext = {
   params: Promise<{
@@ -73,9 +73,8 @@ export async function POST(request: Request, context: RouteContext) {
     const timeout = setTimeout(() => controller.abort(), 5000);
 
     try {
-      const response = await fetch(parsedUrl.toString(), {
+      const response = await publicFetch(parsedUrl.toString(), {
         method: "HEAD",
-        redirect: "manual",
         signal: controller.signal,
       });
 

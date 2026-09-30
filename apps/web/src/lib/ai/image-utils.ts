@@ -1,4 +1,4 @@
-import { assertPublicUrl } from "@/lib/ssrf-guard";
+import { assertPublicUrl, publicFetch } from "@/lib/ssrf-guard";
 
 export type ProcessedImage = {
   base64: string;
@@ -22,8 +22,7 @@ export async function fetchAndProcessImage(
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
   try {
-    const response = await fetch(urlValidation.parsedUrl.toString(), {
-      redirect: "manual",
+    const response = await publicFetch(urlValidation.parsedUrl.toString(), {
       signal: controller.signal,
     });
     clearTimeout(timeout);

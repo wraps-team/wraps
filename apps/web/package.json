@@ -127,6 +127,7 @@
     "sonner": "^2.0.7",
     "sucrase": "3.35.1",
     "ua-parser-js": "2.0.10",
+    "undici": "^7.29.0",
     "uuidv7": "1.1.0",
     "vaul": "^1.1.2",
     "zod": "catalog:",
