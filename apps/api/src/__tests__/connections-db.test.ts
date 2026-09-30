@@ -7,7 +7,7 @@
  *
  * This file covers what only a real DB can verify:
  *   - Actual row insertion and field persistence
- *   - Upsert returns same connectionId/externalId, new webhookSecret
+ *   - Upsert returns same connectionId/externalId/webhookSecret
  *   - GET list returns correct shape (no webhookSecret, webhookConnected: true)
  *   - Org-scoping (other org sees empty list)
  *   - DELETE clears webhookSecret but preserves row
@@ -276,7 +276,7 @@ describe("POST /v1/connections — upsert (real DB)", () => {
     expect(secondBody.externalId).toBe(firstBody.externalId);
   });
 
-  it("issues a new webhookSecret on upsert", async () => {
+  it("returns the existing webhookSecret on upsert", async () => {
     const app = createTestApp();
 
     const first = await postConnection(app);
@@ -285,6 +285,41 @@ describe("POST /v1/connections — upsert (real DB)", () => {
     const second = await postConnection(app);
     const secondBody = await second.json();
 
+    expect(secondBody.webhookSecret).toBe(firstBody.webhookSecret);
+  });
+
+  it("keeps the webhookSecret when a second region connects", async () => {
+    const app = createTestApp();
+
+    const first = await postConnection(app, { region: "us-east-1" });
+    const firstBody = await first.json();
+
+    const second = await postConnection(app, { region: "eu-west-1" });
+    const secondBody = await second.json();
+
+    expect(secondBody.webhookSecret).toBe(firstBody.webhookSecret);
+
+    const [row] = await db
+      .select({ webhookSecret: awsAccount.webhookSecret })
+      .from(awsAccount)
+      .where(eq(awsAccount.id, firstBody.connectionId));
+    expect(row.webhookSecret).toBe(firstBody.webhookSecret);
+  });
+
+  it("issues a new webhookSecret after DELETE cleared it", async () => {
+    const app = createTestApp();
+
+    const first = await postConnection(app);
+    const firstBody = await first.json();
+
+    const del = await deleteConnection(app, firstBody.connectionId);
+    expect(del.status).toBe(200);
+
+    const second = await postConnection(app);
+    const secondBody = await second.json();
+
+    expect(typeof secondBody.webhookSecret).toBe("string");
+    expect(secondBody.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
     expect(secondBody.webhookSecret).not.toBe(firstBody.webhookSecret);
   });
 

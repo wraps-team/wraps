@@ -84,7 +84,11 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
 
         // Upsert: find existing by (organizationId, accountId)
         const [existing] = await tx
-          .select({ id: awsAccount.id, externalId: awsAccount.externalId })
+          .select({
+            id: awsAccount.id,
+            externalId: awsAccount.externalId,
+            webhookSecret: awsAccount.webhookSecret,
+          })
           .from(awsAccount)
           .where(
             and(
@@ -102,8 +106,12 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
           return { limited: true as const, maxAccounts };
         }
 
-        // Generate secrets
-        const webhookSecret = randomBytes(32).toString("hex");
+        // Reuse the existing secret: each region's EventBridge connection holds
+        // a copy, and a connect only redeploys its own region, so rotating here
+        // would leave every other region sending a stale key (401). A secret
+        // cleared by DELETE is re-issued.
+        const webhookSecret =
+          existing?.webhookSecret || randomBytes(32).toString("hex");
         const externalId = existing?.externalId || generateExternalId();
         // Self-hosted deployments assume their own role so they never contend
         // with the platform over a single trust policy. SST injects "" for
