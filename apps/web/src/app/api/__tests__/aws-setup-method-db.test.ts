@@ -181,4 +181,31 @@ describe("setupMethod persistence — real DB", () => {
 
     expect(row?.setupMethod).toBe("onboarding_wizard");
   });
+
+  it("onboarding/aws/validate keeps a custom account name on an existing account", async () => {
+    const { POST } = await import("../[orgSlug]/onboarding/aws/validate/route");
+    const body = {
+      roleArn: roleArnFor(ONBOARDING_ACCOUNT_ID),
+      externalId: EXTERNAL_ID,
+      region: "us-east-1",
+    };
+
+    const first = await POST(buildRequest(body), context);
+    expect(first.status).toBe(200);
+
+    await db
+      .update(awsAccount)
+      .set({ name: "production" })
+      .where(eq(awsAccount.accountId, ONBOARDING_ACCOUNT_ID));
+
+    const second = await POST(buildRequest(body), context);
+    expect(second.status).toBe(200);
+
+    const [row] = await db
+      .select({ name: awsAccount.name })
+      .from(awsAccount)
+      .where(eq(awsAccount.accountId, ONBOARDING_ACCOUNT_ID));
+
+    expect(row?.name).toBe("production");
+  });
 });

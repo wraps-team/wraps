@@ -124,6 +124,7 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
         const features = body.features as Record<string, unknown> | undefined;
         const hasEmailFeature = features?.email !== undefined;
         const hasSmsFeature = features?.sms !== undefined;
+        const hasFeatures = !!features && Object.keys(features).length > 0;
 
         let connectionId: string;
 
@@ -137,9 +138,13 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
               webhookSecret,
               isVerified: true,
               lastVerifiedAt: new Date(),
-              emailEnabled: hasEmailFeature,
-              smsEnabled: hasSmsFeature,
-              features: (features ?? null) as any,
+              // An adopted reconnect (no local metadata) posts `features: {}`;
+              // writing that would erase what the first connect or a scan recorded.
+              ...(hasFeatures && {
+                emailEnabled: hasEmailFeature,
+                smsEnabled: hasSmsFeature,
+                features: features as any,
+              }),
               updatedAt: new Date(),
             })
             .where(

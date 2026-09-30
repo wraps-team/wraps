@@ -323,6 +323,75 @@ describe("POST /v1/connections — upsert (real DB)", () => {
     expect(secondBody.webhookSecret).not.toBe(firstBody.webhookSecret);
   });
 
+  const storedFeatures = (overrides: Record<string, unknown> = {}) => ({
+    email: { configSetName: "x" },
+    sms: { phoneNumberId: "pn-1" },
+    ...overrides,
+  });
+
+  const readFlags = async (connectionId: string) => {
+    const [row] = await db
+      .select({
+        emailEnabled: awsAccount.emailEnabled,
+        smsEnabled: awsAccount.smsEnabled,
+        features: awsAccount.features,
+      })
+      .from(awsAccount)
+      .where(eq(awsAccount.id, connectionId));
+    return row;
+  };
+
+  it("keeps stored features and flags when a reconnect posts empty features", async () => {
+    const app = createTestApp();
+    const features = storedFeatures();
+
+    const first = await postConnection(app, { features });
+    const { connectionId } = await first.json();
+    const before = await readFlags(connectionId);
+    expect(before.emailEnabled).toBe(true);
+    expect(before.smsEnabled).toBe(true);
+
+    const second = await postConnection(app, { features: {} });
+    expect(second.status).toBe(200);
+
+    const after = await readFlags(connectionId);
+    expect(after.emailEnabled).toBe(true);
+    expect(after.smsEnabled).toBe(true);
+    expect(after.features).toEqual(features);
+  });
+
+  it("keeps stored features when a reconnect omits features", async () => {
+    const app = createTestApp();
+    const features = storedFeatures();
+
+    const first = await postConnection(app, { features });
+    const { connectionId } = await first.json();
+
+    const second = await postConnection(app);
+    expect(second.status).toBe(200);
+
+    const after = await readFlags(connectionId);
+    expect(after.emailEnabled).toBe(true);
+    expect(after.smsEnabled).toBe(true);
+    expect(after.features).toEqual(features);
+  });
+
+  it("replaces features when a reconnect posts non-empty features", async () => {
+    const app = createTestApp();
+
+    const first = await postConnection(app, { features: storedFeatures() });
+    const { connectionId } = await first.json();
+
+    const emailOnly = { email: { configSetName: "y" } };
+    const second = await postConnection(app, { features: emailOnly });
+    expect(second.status).toBe(200);
+
+    const after = await readFlags(connectionId);
+    expect(after.emailEnabled).toBe(true);
+    expect(after.smsEnabled).toBe(false);
+    expect(after.features).toEqual(emailOnly);
+  });
+
   it("only one row exists in DB after create + upsert", async () => {
     const app = createTestApp();
     await postConnection(app);
