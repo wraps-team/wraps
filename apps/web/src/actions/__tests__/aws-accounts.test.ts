@@ -6,7 +6,7 @@ import {
   organization,
   user,
 } from "@wraps/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import {
   afterAll,
@@ -2893,5 +2893,95 @@ describe("connectAWSAccountAction — setupMethod persistence", () => {
         eqOp(a.organizationId, connectActionVictimOrg.id),
     });
     expect(victimRow).toBeUndefined();
+  });
+
+  it("does not insert a second row for an AWS account the org already connected", async () => {
+    const first = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+    const firstId = (first as { account: { id: string } }).account.id;
+
+    const second = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect(second).toEqual({
+      error: "This AWS account is already connected",
+      existingAccountId: firstId,
+      existingAccountHref: `/${connectActionOrg.slug}/settings/aws-accounts/${firstId}`,
+    });
+
+    const rows = await db
+      .select()
+      .from(awsAccount)
+      .where(
+        and(
+          eq(awsAccount.organizationId, connectActionOrg.id),
+          eq(awsAccount.accountId, CONNECT_ACTION_ACCOUNT_ID)
+        )
+      );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("does not call AWS for an already-connected account", async () => {
+    await connectAWSAccountAction(undefined, buildConnectAWSAccountFormData());
+    mockGetCredentials.mockClear();
+
+    await connectAWSAccountAction(undefined, buildConnectAWSAccountFormData());
+
+    expect(mockGetCredentials).toHaveBeenCalledTimes(0);
+  });
+
+  it("still lets a different org connect the same AWS account number", async () => {
+    await db.insert(awsAccount).values({
+      id: "connect-action-victim-same-account",
+      organizationId: connectActionVictimOrg.id,
+      name: "Victim Org Account",
+      accountId: CONNECT_ACTION_ACCOUNT_ID,
+      region: "us-east-1",
+      roleArn: `arn:aws:iam::${CONNECT_ACTION_ACCOUNT_ID}:role/wraps-console-access-role`,
+      externalId: "victim-external-id",
+      isVerified: true,
+      createdBy: testUser.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect((result as { success?: boolean }).success).toBe(true);
+    const rows = await db
+      .select()
+      .from(awsAccount)
+      .where(
+        and(
+          eq(awsAccount.organizationId, connectActionOrg.id),
+          eq(awsAccount.accountId, CONNECT_ACTION_ACCOUNT_ID)
+        )
+      );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("reports already-connected rather than the plan limit when the org is at its limit", async () => {
+    const first = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+    expect((first as { success?: boolean }).success).toBe(true);
+
+    const second = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect(second).not.toHaveProperty("limitReached");
+    expect((second as { error?: string }).error).toBe(
+      "This AWS account is already connected"
+    );
   });
 });

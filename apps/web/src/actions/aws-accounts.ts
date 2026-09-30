@@ -186,6 +186,24 @@ export const connectAWSAccountAction = orgAction(
         "Connecting AWS account"
       );
 
+      // One row per AWS account per org. Every other connect path upserts on
+      // (organizationId, accountId); inserting here is how duplicates arise.
+      const alreadyConnected = await db.query.awsAccount.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, ctx.organizationId),
+            eq(table.accountId, validatedData.accountId)
+          ),
+        columns: { id: true },
+      });
+      if (alreadyConnected) {
+        return {
+          error: "This AWS account is already connected",
+          existingAccountId: alreadyConnected.id,
+          existingAccountHref: `/${ctx.access.orgSlug}/settings/aws-accounts/${alreadyConnected.id}`,
+        };
+      }
+
       // 4. Check AWS account limit based on subscription plan.
       // `getOrganizationPlan` is the single source of truth: it honours a
       // self-host licence, requires an active/trialing subscription on a real
