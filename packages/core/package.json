@@ -15,6 +15,10 @@
       "import": "./dist/ses-plans.js",
       "types": "./dist/ses-plans.d.ts"
     },
+    "./config-set-name": {
+      "import": "./dist/config-set-name.js",
+      "types": "./dist/config-set-name.d.ts"
+    },
     "./lambda": {
       "import": "./dist/lambda/index.js",
       "types": "./dist/lambda/index.d.ts"

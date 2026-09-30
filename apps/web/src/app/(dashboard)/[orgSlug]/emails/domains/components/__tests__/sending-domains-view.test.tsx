@@ -25,7 +25,12 @@ vi.mock("../add-domain-form", () => ({
 
 const mockGetConfigurationSetDetail = vi.fn();
 const mockProbeTrackingDomain = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
+
 vi.mock("@/actions/domains", () => ({
+  attachDomainTracking: async () => ({ success: true, configSetName: "x" }),
   checkDomainAuth: async () => ({
     success: true,
     records: [],

@@ -404,7 +404,9 @@ export function buildConsolePolicyDocument(
       // Write, deliberately. verifyOwnEmailIdentity in
       // apps/web/src/actions/ses-onboarding.ts creates the operator's own
       // address as an SES identity so a sandboxed account can complete a
-      // real first send. This is the ONLY identity write the role grants.
+      // real first send. CreateEmailIdentity and
+      // PutEmailIdentityConfigurationSetAttributes (statement below) are the
+      // only identity writes the role grants.
       "ses:CreateEmailIdentity",
       // SES v2 API for configuration set scanning (needed by dashboard).
       // List is what makes Get reachable — Get takes a name only List can find.
@@ -421,6 +423,23 @@ export function buildConsolePolicyDocument(
       // billed per call, never probed by the console-policy ladder.
       "ses:GetEmailAddressInsights",
     ],
+    Resource: "*",
+  });
+
+  // Write. The dashboard's "Add domain" creates the domain's per-domain
+  // `wraps-email-*` configuration set and attaches it, matching
+  // `wraps email domains add`; see plan 376.
+  statements.push({
+    Effect: "Allow",
+    Action: [
+      "ses:CreateConfigurationSet",
+      "ses:CreateConfigurationSetEventDestination",
+    ],
+    Resource: "arn:aws:ses:*:*:configuration-set/wraps-email-*",
+  });
+  statements.push({
+    Effect: "Allow",
+    Action: ["ses:PutEmailIdentityConfigurationSetAttributes"],
     Resource: "*",
   });
 

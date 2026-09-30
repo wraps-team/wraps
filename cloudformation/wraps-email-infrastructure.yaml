@@ -1312,6 +1312,21 @@ Resources:
                   - "ses:GetEmailAddressInsights"
                 Resource: "*"
 
+              # SES - Domain Tracking Write. The dashboard's "Add domain"
+              # creates the domain's per-domain wraps-email-* configuration set
+              # and attaches it, matching `wraps email domains add`; see plan 376.
+              - Sid: "SESDomainTrackingWrite"
+                Effect: Allow
+                Action:
+                  - "ses:CreateConfigurationSet"
+                  - "ses:CreateConfigurationSetEventDestination"
+                Resource: !Sub "arn:aws:ses:*:${AWS::AccountId}:configuration-set/wraps-email-*"
+              - Sid: "SESDomainTrackingAttach"
+                Effect: Allow
+                Action:
+                  - "ses:PutEmailIdentityConfigurationSetAttributes"
+                Resource: "*"
+
               # S3 - Inbound Bucket Feature Detection. The dashboard sends
               # HeadBucket, which is authorized by s3:ListBucket — there is no
               # s3:HeadBucket IAM action.

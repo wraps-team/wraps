@@ -107,6 +107,7 @@ describe("AddDomainForm", () => {
       success: true,
       domain: "example.com",
       alreadyExisted: false,
+      trackingAttached: true,
     });
 
     render(<AddDomainForm organizationId="org-1" />);
@@ -129,6 +130,35 @@ describe("AddDomainForm", () => {
     });
   });
 
+  it("tells the user tracking is not attached when the role predates domain tracking", async () => {
+    mockListAWSAccounts.mockResolvedValue({
+      success: true,
+      accounts: oneAccount,
+    });
+    mockAddSendingDomain.mockResolvedValue({
+      success: true,
+      domain: "example.com",
+      alreadyExisted: false,
+      trackingAttached: false,
+    });
+
+    render(<AddDomainForm organizationId="org-1" />);
+
+    await waitFor(() => {
+      expect(mockListAWSAccounts).toHaveBeenCalled();
+    });
+
+    fireEvent.change(screen.getByLabelText("Domain"), {
+      target: { value: "example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add domain/i }));
+
+    expect(
+      await screen.findByText(/Tracking isn't attached yet/)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/wraps platform update-role/)).toBeInTheDocument();
+  });
+
   it("renders an account selector when the org has more than one AWS account, and submits the chosen id", async () => {
     mockListAWSAccounts.mockResolvedValue({
       success: true,
@@ -138,6 +168,7 @@ describe("AddDomainForm", () => {
       success: true,
       domain: "example.com",
       alreadyExisted: false,
+      trackingAttached: true,
     });
 
     render(<AddDomainForm organizationId="org-1" />);

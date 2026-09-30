@@ -2,11 +2,14 @@ import { Resolver } from "node:dns/promises";
 import {
   CreateConfigurationSetCommand,
   CreateConfigurationSetEventDestinationCommand,
-  type EventType,
   GetEmailIdentityCommand,
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
 import * as clack from "@clack/prompts";
+import {
+  DOMAIN_CONFIG_SET_EVENT_TYPES,
+  DOMAIN_EVENT_DESTINATION_NAME,
+} from "@wraps/core/config-set-name";
 import pc from "picocolors";
 import { getTelemetryClient } from "../../telemetry/client.js";
 import { trackCommand, trackFeature } from "../../telemetry/events.js";
@@ -789,18 +792,7 @@ export async function addDomain(options: {
       opens: purpose === "marketing" || purpose === "notifications",
       clicks: purpose === "marketing" || purpose === "notifications",
     };
-    const matchingEventTypes: EventType[] = [
-      "SEND",
-      "DELIVERY",
-      "OPEN",
-      "CLICK",
-      "BOUNCE",
-      "COMPLAINT",
-      "REJECT",
-      "RENDERING_FAILURE",
-      "DELIVERY_DELAY",
-      "SUBSCRIPTION",
-    ];
+    const matchingEventTypes = [...DOMAIN_CONFIG_SET_EVENT_TYPES];
 
     const eventBusArn = `arn:aws:events:${region}:${identity.accountId}:event-bus/default`;
 
@@ -820,7 +812,7 @@ export async function addDomain(options: {
         await sesClient.send(
           new CreateConfigurationSetEventDestinationCommand({
             ConfigurationSetName: configSetName,
-            EventDestinationName: "wraps-email-eventbridge",
+            EventDestinationName: DOMAIN_EVENT_DESTINATION_NAME,
             EventDestination: {
               Enabled: true,
               MatchingEventTypes: matchingEventTypes,

@@ -33,6 +33,19 @@ export const CONSOLE_ACCESS_POLICY_JSON = JSON.stringify(
       },
       {
         Effect: "Allow",
+        Action: [
+          "ses:CreateConfigurationSet",
+          "ses:CreateConfigurationSetEventDestination",
+        ],
+        Resource: "arn:aws:ses:*:*:configuration-set/wraps-email-*",
+      },
+      {
+        Effect: "Allow",
+        Action: ["ses:PutEmailIdentityConfigurationSetAttributes"],
+        Resource: "*",
+      },
+      {
+        Effect: "Allow",
         Action: ["s3:ListBucket"],
         Resource: "arn:aws:s3:::wraps-inbound-*",
       },

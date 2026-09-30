@@ -107,9 +107,13 @@ export function AddDomainForm({ organizationId }: AddDomainFormProps) {
       if (result.success) {
         setResultMessage({
           kind: "success",
-          text: result.alreadyExisted
-            ? `${result.domain} was already added. Publish its DKIM CNAME records below to finish verification.`
-            : `${result.domain} added. Publish its DKIM CNAME records below to verify it for sending.`,
+          text:
+            (result.alreadyExisted
+              ? `${result.domain} was already added. Publish its DKIM CNAME records below to finish verification.`
+              : `${result.domain} added. Publish its DKIM CNAME records below to verify it for sending.`) +
+            (result.trackingAttached
+              ? ""
+              : " Tracking isn't attached yet: Wraps' role in this AWS account needs updating (`wraps platform update-role`). You can attach it from the domain's details afterwards."),
         });
         formApi.setFieldValue("domain", "");
         // The action already revalidated the route; refresh re-fetches the

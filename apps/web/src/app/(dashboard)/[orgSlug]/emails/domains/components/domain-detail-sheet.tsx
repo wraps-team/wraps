@@ -18,9 +18,11 @@ import {
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { AlertTriangleIcon } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import type { SendingDomain } from "@/actions/domains";
 import {
+  attachDomainTracking,
   type ConfigurationSetDetail,
   checkDomainAuth,
   getConfigurationSetDetail,
@@ -122,6 +124,62 @@ function renderHttpsPolicyWarning(
   );
 }
 
+function AttachTrackingButton({
+  awsAccountId,
+  identity,
+  organizationId,
+}: {
+  awsAccountId: string;
+  identity: string;
+  organizationId: string;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [attachedSet, setAttachedSet] = useState<string | null>(null);
+
+  const onClick = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await attachDomainTracking(
+        organizationId,
+        awsAccountId,
+        identity
+      );
+      if (result.success) {
+        setAttachedSet(result.configSetName);
+        router.refresh();
+      } else {
+        setError(result.error);
+      }
+    });
+  };
+
+  if (attachedSet) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Tracking attached ({attachedSet}). New opens, clicks and delivery events
+        will be recorded.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <Button
+        disabled={pending}
+        onClick={onClick}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        {pending ? "Attaching..." : "Attach Wraps tracking"}
+      </Button>
+      {error ? <p className="text-destructive text-sm">{error}</p> : null}
+    </div>
+  );
+}
+
 function ConfigurationSetPanel({
   domain,
   organizationId,
@@ -215,10 +273,17 @@ function ConfigurationSetPanel({
 
   if (!configurationSet) {
     return (
-      <p className="text-muted-foreground text-sm">
-        This identity has no configuration set attached, so opens, clicks, and
-        delivery events are not tracked for it.
-      </p>
+      <div className="space-y-3">
+        <p className="text-muted-foreground text-sm">
+          This identity has no configuration set attached, so opens, clicks, and
+          delivery events are not tracked for it.
+        </p>
+        <AttachTrackingButton
+          awsAccountId={domain.awsAccountId}
+          identity={domain.identity}
+          organizationId={organizationId}
+        />
+      </div>
     );
   }
 

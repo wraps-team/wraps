@@ -1,3 +1,4 @@
+import { domainToConfigSetName } from "@wraps/core/config-set-name";
 import {
   awsAccount,
   db,
@@ -19,6 +20,7 @@ import {
 import { dnsRecordsFor } from "@/lib/dns-records";
 import {
   addSendingDomain,
+  attachDomainTracking,
   checkDomainAuth,
   getConfigurationSetDetail,
   listSendingDomains,
@@ -119,6 +121,27 @@ vi.mock("@aws-sdk/client-sesv2", () => ({
   },
   CreateEmailIdentityCommand: class {
     _type = "CreateEmailIdentityCommand";
+    input: Record<string, unknown>;
+    constructor(input: Record<string, unknown>) {
+      this.input = input;
+    }
+  },
+  CreateConfigurationSetCommand: class {
+    _type = "CreateConfigurationSetCommand";
+    input: Record<string, unknown>;
+    constructor(input: Record<string, unknown>) {
+      this.input = input;
+    }
+  },
+  CreateConfigurationSetEventDestinationCommand: class {
+    _type = "CreateConfigurationSetEventDestinationCommand";
+    input: Record<string, unknown>;
+    constructor(input: Record<string, unknown>) {
+      this.input = input;
+    }
+  },
+  PutEmailIdentityConfigurationSetAttributesCommand: class {
+    _type = "PutEmailIdentityConfigurationSetAttributesCommand";
     input: Record<string, unknown>;
     constructor(input: Record<string, unknown>) {
       this.input = input;
@@ -740,17 +763,40 @@ describe("listSendingDomains", () => {
 
 // ─── addSendingDomain ───────────────────────────────────────────────────────
 
+function awsError(name: string) {
+  const err = new Error(name);
+  err.name = name;
+  return err;
+}
+
+/** Routes each SES command to a handler by `_type`; unlisted commands reject. */
+function mockSes(handlers: Record<string, () => unknown>) {
+  mockSend.mockImplementation((command: SesCommand) => {
+    const handler = handlers[command._type];
+    if (!handler) {
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    }
+    try {
+      return Promise.resolve(handler());
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  });
+}
+
+const sentTypes = () =>
+  mockSend.mock.calls.map((call) => (call[0] as SesCommand)._type);
+
 describe("addSendingDomain", () => {
   function mockCreateSuccess() {
-    mockSend.mockImplementation((command: SesCommand) => {
-      if (command._type === "CreateEmailIdentityCommand") {
-        return Promise.resolve({});
-      }
-      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    mockSes({
+      CreateConfigurationSetCommand: () => ({}),
+      CreateConfigurationSetEventDestinationCommand: () => ({}),
+      CreateEmailIdentityCommand: () => ({}),
     });
   }
 
-  it("sends CreateEmailIdentityCommand with the trimmed, lowercased domain and reports a fresh create", async () => {
+  it("creates the config set, its destination, then the identity attached to the set", async () => {
     mockCreateSuccess();
 
     const result = await addSendingDomain(
@@ -763,11 +809,34 @@ describe("addSendingDomain", () => {
       success: true,
       domain: "example.com",
       alreadyExisted: false,
+      trackingAttached: true,
     });
-    expect(mockSend).toHaveBeenCalledTimes(1);
-    const sentCommand = mockSend.mock.calls[0][0] as SesCommand;
-    expect(sentCommand._type).toBe("CreateEmailIdentityCommand");
-    expect(sentCommand.input).toEqual({ EmailIdentity: "example.com" });
+    expect(sentTypes()).toEqual([
+      "CreateConfigurationSetCommand",
+      "CreateConfigurationSetEventDestinationCommand",
+      "CreateEmailIdentityCommand",
+    ]);
+    const [setCmd, destCmd, identityCmd] = mockSend.mock.calls.map(
+      (call) => call[0] as SesCommand
+    );
+    expect(setCmd.input).toEqual({
+      ConfigurationSetName: "wraps-email-example-com",
+      SuppressionOptions: { SuppressedReasons: ["BOUNCE", "COMPLAINT"] },
+    });
+    expect(destCmd.input).toMatchObject({
+      ConfigurationSetName: "wraps-email-example-com",
+      EventDestinationName: "wraps-email-eventbridge",
+      EventDestination: {
+        Enabled: true,
+        EventBridgeDestination: {
+          EventBusArn: `arn:aws:events:${testAwsAccount.region}:${testAwsAccount.accountId}:event-bus/default`,
+        },
+      },
+    });
+    expect(identityCmd.input).toEqual({
+      EmailIdentity: "example.com",
+      ConfigurationSetName: "wraps-email-example-com",
+    });
   });
 
   it("normalises surrounding whitespace and mixed case before sending", async () => {
@@ -783,19 +852,103 @@ describe("addSendingDomain", () => {
       success: true,
       domain: "example.com",
       alreadyExisted: false,
+      trackingAttached: true,
     });
-    const sentCommand = mockSend.mock.calls[0][0] as SesCommand;
-    expect(sentCommand.input).toEqual({ EmailIdentity: "example.com" });
+    const identityCmd = mockSend.mock.calls
+      .map((call) => call[0] as SesCommand)
+      .find((c) => c._type === "CreateEmailIdentityCommand");
+    expect(identityCmd?.input).toEqual({
+      EmailIdentity: "example.com",
+      ConfigurationSetName: "wraps-email-example-com",
+    });
   });
 
-  it("treats AlreadyExistsException as success, not a failure", async () => {
-    mockSend.mockImplementation((command: SesCommand) => {
-      if (command._type === "CreateEmailIdentityCommand") {
-        const err = new Error("AlreadyExistsException");
-        err.name = "AlreadyExistsException";
-        return Promise.reject(err);
-      }
-      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+  it("tolerates the config set and destination already existing", async () => {
+    mockSes({
+      CreateConfigurationSetCommand: () => {
+        throw awsError("AlreadyExistsException");
+      },
+      CreateConfigurationSetEventDestinationCommand: () => {
+        throw awsError("AlreadyExistsException");
+      },
+      CreateEmailIdentityCommand: () => ({}),
+    });
+
+    const result = await addSendingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "example.com"
+    );
+
+    expect(result).toEqual({
+      success: true,
+      domain: "example.com",
+      alreadyExisted: false,
+      trackingAttached: true,
+    });
+    const identityCmd = mockSend.mock.calls
+      .map((call) => call[0] as SesCommand)
+      .find((c) => c._type === "CreateEmailIdentityCommand");
+    expect(identityCmd?.input).toEqual({
+      EmailIdentity: "example.com",
+      ConfigurationSetName: "wraps-email-example-com",
+    });
+  });
+
+  it("creates the identity without a config set when the role predates plan 376", async () => {
+    mockSes({
+      CreateConfigurationSetCommand: () => {
+        throw awsError("AccessDeniedException");
+      },
+      CreateEmailIdentityCommand: () => ({}),
+    });
+
+    const result = await addSendingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "example.com"
+    );
+
+    expect(result).toEqual({
+      success: true,
+      domain: "example.com",
+      alreadyExisted: false,
+      trackingAttached: false,
+    });
+    expect(sentTypes()).toEqual([
+      "CreateConfigurationSetCommand",
+      "CreateEmailIdentityCommand",
+    ]);
+    const identityCmd = mockSend.mock.calls[1][0] as SesCommand;
+    expect(identityCmd.input).toEqual({ EmailIdentity: "example.com" });
+  });
+
+  it("uses domainToConfigSetName for a hyphenated domain", async () => {
+    mockCreateSuccess();
+
+    await addSendingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "my-domain.com"
+    );
+
+    const expected = domainToConfigSetName("my-domain.com");
+    const [setCmd, , identityCmd] = mockSend.mock.calls.map(
+      (call) => call[0] as SesCommand
+    );
+    expect(setCmd.input?.ConfigurationSetName).toBe(expected);
+    expect(identityCmd.input?.ConfigurationSetName).toBe(expected);
+  });
+
+  it("attaches the set when the identity already exists with no config set", async () => {
+    mockSes({
+      CreateConfigurationSetCommand: () => ({}),
+      CreateConfigurationSetEventDestinationCommand: () => ({}),
+      CreateEmailIdentityCommand: () => {
+        throw awsError("AlreadyExistsException");
+      },
+      GetEmailIdentityCommand: () => ({}),
+      PutEmailIdentityConfigurationSetAttributesCommand: () => ({}),
     });
 
     const result = await addSendingDomain(
@@ -808,17 +961,53 @@ describe("addSendingDomain", () => {
       success: true,
       domain: "already-there.com",
       alreadyExisted: true,
+      trackingAttached: true,
+    });
+    const putCmd = mockSend.mock.calls
+      .map((call) => call[0] as SesCommand)
+      .find(
+        (c) => c._type === "PutEmailIdentityConfigurationSetAttributesCommand"
+      );
+    expect(putCmd?.input).toEqual({
+      EmailIdentity: "already-there.com",
+      ConfigurationSetName: domainToConfigSetName("already-there.com"),
     });
   });
 
-  it("maps an access-denied error to the wraps platform update-role remediation string", async () => {
-    mockSend.mockImplementation((command: SesCommand) => {
-      if (command._type === "CreateEmailIdentityCommand") {
-        const err = new Error("AccessDeniedException");
-        err.name = "AccessDeniedException";
-        return Promise.reject(err);
-      }
-      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+  it("leaves an existing non-Wraps config set untouched and reports no tracking", async () => {
+    mockSes({
+      CreateConfigurationSetCommand: () => ({}),
+      CreateConfigurationSetEventDestinationCommand: () => ({}),
+      CreateEmailIdentityCommand: () => {
+        throw awsError("AlreadyExistsException");
+      },
+      GetEmailIdentityCommand: () => ({ ConfigurationSetName: "customer-set" }),
+    });
+
+    const result = await addSendingDomain(
+      testOrganization.id,
+      testAwsAccount.id,
+      "already-there.com"
+    );
+
+    expect(result).toEqual({
+      success: true,
+      domain: "already-there.com",
+      alreadyExisted: true,
+      trackingAttached: false,
+    });
+    expect(sentTypes()).not.toContain(
+      "PutEmailIdentityConfigurationSetAttributesCommand"
+    );
+  });
+
+  it("maps an access-denied error on identity creation to the wraps platform update-role remediation string", async () => {
+    mockSes({
+      CreateConfigurationSetCommand: () => ({}),
+      CreateConfigurationSetEventDestinationCommand: () => ({}),
+      CreateEmailIdentityCommand: () => {
+        throw awsError("AccessDeniedException");
+      },
     });
 
     const result = await addSendingDomain(
@@ -888,8 +1077,117 @@ describe("addSendingDomain", () => {
       "easy-dkim.com"
     );
 
-    const sentCommand = mockSend.mock.calls[0][0] as SesCommand;
-    expect(sentCommand.input).not.toHaveProperty("DkimSigningAttributes");
+    const identityCmd = mockSend.mock.calls
+      .map((call) => call[0] as SesCommand)
+      .find((c) => c._type === "CreateEmailIdentityCommand");
+    expect(identityCmd?.input).not.toHaveProperty("DkimSigningAttributes");
+  });
+});
+
+describe("attachDomainTracking", () => {
+  it("creates the set and attaches it to an identity that has none", async () => {
+    mockSes({
+      GetEmailIdentityCommand: () => ({}),
+      CreateConfigurationSetCommand: () => ({}),
+      CreateConfigurationSetEventDestinationCommand: () => ({}),
+      PutEmailIdentityConfigurationSetAttributesCommand: () => ({}),
+    });
+
+    const result = await attachDomainTracking(
+      testOrganization.id,
+      testAwsAccount.id,
+      "example.com"
+    );
+
+    expect(result).toEqual({
+      success: true,
+      configSetName: "wraps-email-example-com",
+    });
+    expect(sentTypes()).toEqual([
+      "GetEmailIdentityCommand",
+      "CreateConfigurationSetCommand",
+      "CreateConfigurationSetEventDestinationCommand",
+      "PutEmailIdentityConfigurationSetAttributesCommand",
+    ]);
+    const putCmd = mockSend.mock.calls[3][0] as SesCommand;
+    expect(putCmd.input).toEqual({
+      EmailIdentity: "example.com",
+      ConfigurationSetName: "wraps-email-example-com",
+    });
+  });
+
+  it("is idempotent when the identity is already on its Wraps config set", async () => {
+    mockSes({
+      GetEmailIdentityCommand: () => ({
+        ConfigurationSetName: "wraps-email-example-com",
+      }),
+    });
+
+    const result = await attachDomainTracking(
+      testOrganization.id,
+      testAwsAccount.id,
+      "example.com"
+    );
+
+    expect(result).toEqual({
+      success: true,
+      configSetName: "wraps-email-example-com",
+    });
+    expect(sentTypes()).toEqual(["GetEmailIdentityCommand"]);
+  });
+
+  it("refuses to replace a config set the identity already has", async () => {
+    mockSes({
+      GetEmailIdentityCommand: () => ({ ConfigurationSetName: "customer-set" }),
+    });
+
+    const result = await attachDomainTracking(
+      testOrganization.id,
+      testAwsAccount.id,
+      "example.com"
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        "This domain already has a configuration set (customer-set). Wraps won't replace it.",
+    });
+    expect(sentTypes()).toEqual(["GetEmailIdentityCommand"]);
+  });
+
+  it("explains the stale role when access is denied", async () => {
+    mockSes({
+      GetEmailIdentityCommand: () => ({}),
+      CreateConfigurationSetCommand: () => {
+        throw awsError("AccessDeniedException");
+      },
+    });
+
+    const result = await attachDomainTracking(
+      testOrganization.id,
+      testAwsAccount.id,
+      "example.com"
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("predates domain tracking");
+      expect(result.error).toContain("wraps platform update-role");
+    }
+    expect(sentTypes()).not.toContain(
+      "PutEmailIdentityConfigurationSetAttributesCommand"
+    );
+  });
+
+  it("refuses an AWS account belonging to a different organization, without calling AWS", async () => {
+    const result = await attachDomainTracking(
+      testOrganization.id,
+      testAwsAccountForeign.id,
+      "example.com"
+    );
+
+    expect(result).toEqual({ success: false, error: "AWS account not found" });
+    expect(mockSend).not.toHaveBeenCalled();
   });
 });
 

@@ -1,6 +1,8 @@
 "use server";
 
 import {
+  CreateConfigurationSetCommand,
+  CreateConfigurationSetEventDestinationCommand,
   CreateEmailIdentityCommand,
   type EventDestination,
   GetConfigurationSetCommand,
@@ -8,8 +10,14 @@ import {
   GetEmailIdentityCommand,
   type IdentityInfo,
   ListEmailIdentitiesCommand,
+  PutEmailIdentityConfigurationSetAttributesCommand,
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
+import {
+  DOMAIN_CONFIG_SET_EVENT_TYPES,
+  DOMAIN_EVENT_DESTINATION_NAME,
+  domainToConfigSetName,
+} from "@wraps/core/config-set-name";
 import {
   and,
   awsAccount,
@@ -70,6 +78,58 @@ function isAccessDeniedError(error: unknown): boolean {
     error.name === "AccessDeniedException" ||
     error.message.includes("AccessDeniedException")
   );
+}
+
+function isAlreadyExistsError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "AlreadyExistsException" ||
+      error.message.includes("AlreadyExistsException"))
+  );
+}
+
+/**
+ * Creates the domain's per-domain Wraps config set and its EventBridge
+ * destination, tolerating either already existing. Mirrors
+ * `wraps email domains add`. Throws AccessDeniedException through on a role
+ * that predates plan 376.
+ */
+async function ensureDomainConfigSet(
+  client: SESv2Client,
+  params: { configSetName: string; region: string; awsAccountNumber: string }
+): Promise<void> {
+  const { configSetName, region, awsAccountNumber } = params;
+  try {
+    await client.send(
+      new CreateConfigurationSetCommand({
+        ConfigurationSetName: configSetName,
+        SuppressionOptions: { SuppressedReasons: ["BOUNCE", "COMPLAINT"] },
+      })
+    );
+  } catch (error) {
+    if (!isAlreadyExistsError(error)) {
+      throw error;
+    }
+  }
+  try {
+    await client.send(
+      new CreateConfigurationSetEventDestinationCommand({
+        ConfigurationSetName: configSetName,
+        EventDestinationName: DOMAIN_EVENT_DESTINATION_NAME,
+        EventDestination: {
+          Enabled: true,
+          MatchingEventTypes: [...DOMAIN_CONFIG_SET_EVENT_TYPES],
+          EventBridgeDestination: {
+            EventBusArn: `arn:aws:events:${region}:${awsAccountNumber}:event-bus/default`,
+          },
+        },
+      })
+    );
+  } catch (error) {
+    if (!isAlreadyExistsError(error)) {
+      throw error;
+    }
+  }
 }
 
 /**
@@ -625,8 +685,46 @@ export const checkDomainAuth = orgAction(
   }
 );
 
+/**
+ * Attaches the domain's config set to an identity that already existed, unless
+ * it already has one. Returns whether a Wraps set ends up attached. Never
+ * replaces a set the identity already has (it is the customer's resource).
+ * An access-denied response means the role predates plan 376: no tracking.
+ */
+async function attachToExistingIdentity(
+  client: SESv2Client,
+  domain: string,
+  configSetName: string
+): Promise<boolean> {
+  try {
+    const existing = await client.send(
+      new GetEmailIdentityCommand({ EmailIdentity: domain })
+    );
+    if (existing.ConfigurationSetName) {
+      return existing.ConfigurationSetName.startsWith("wraps-email-");
+    }
+    await client.send(
+      new PutEmailIdentityConfigurationSetAttributesCommand({
+        EmailIdentity: domain,
+        ConfigurationSetName: configSetName,
+      })
+    );
+    return true;
+  } catch (error) {
+    if (isAccessDeniedError(error)) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 export type AddSendingDomainResult =
-  | { success: true; domain: string; alreadyExisted: boolean }
+  | {
+      success: true;
+      domain: string;
+      alreadyExisted: boolean;
+      trackingAttached: boolean;
+    }
   | { success: false; error: string };
 
 const WHITESPACE_RE = /\s/;
@@ -702,27 +800,55 @@ export const addSendingDomain = orgAction(
       },
     });
 
+    const configSetName = domainToConfigSetName(domain);
+    let canAttach = true;
+    try {
+      await ensureDomainConfigSet(client, {
+        configSetName,
+        region: account.region,
+        awsAccountNumber: account.accountId,
+      });
+    } catch (error) {
+      // A role that predates plan 376 cannot create config sets. Still add
+      // the domain, just without tracking.
+      if (!isAccessDeniedError(error)) {
+        throw error;
+      }
+      canAttach = false;
+    }
+
     try {
       // No DkimSigningAttributes: omitting it selects SES-managed Easy DKIM,
-      // the same default the CloudFormation path produces. This also means
-      // no MAIL FROM subdomain is configured — the console role has no
-      // permission to set MAIL FROM attributes on an identity, and granting
-      // a write action nothing else calls would widen the cross-account
-      // trust boundary for nothing. `wraps email domains add` is the path
-      // that sets one up.
+      // the same default the CloudFormation path produces. MAIL FROM is not
+      // configured here — the console role has no permission to set MAIL FROM
+      // attributes on an identity, and granting a write action nothing else
+      // calls would widen the cross-account trust boundary for nothing.
+      // `wraps email domains add` is the path that sets one up.
       await client.send(
-        new CreateEmailIdentityCommand({ EmailIdentity: domain })
+        new CreateEmailIdentityCommand({
+          EmailIdentity: domain,
+          ...(canAttach ? { ConfigurationSetName: configSetName } : {}),
+        })
       );
       revalidatePath(`/${ctx.access.orgSlug}/emails/domains`, "page");
-      return { success: true, domain, alreadyExisted: false };
+      return {
+        success: true,
+        domain,
+        alreadyExisted: false,
+        trackingAttached: canAttach,
+      };
     } catch (error) {
-      if (
-        error instanceof Error &&
-        (error.name === "AlreadyExistsException" ||
-          error.message.includes("AlreadyExistsException"))
-      ) {
+      if (isAlreadyExistsError(error)) {
+        const trackingAttached =
+          canAttach &&
+          (await attachToExistingIdentity(client, domain, configSetName));
         revalidatePath(`/${ctx.access.orgSlug}/emails/domains`, "page");
-        return { success: true, domain, alreadyExisted: true };
+        return {
+          success: true,
+          domain,
+          alreadyExisted: true,
+          trackingAttached,
+        };
       }
       if (isAccessDeniedError(error)) {
         // Verbatim copy of the string `mapCommonAwsError` returns for an
@@ -737,5 +863,90 @@ export const addSendingDomain = orgAction(
       }
       throw error;
     }
+  }
+);
+
+export type AttachDomainTrackingResult =
+  | { success: true; configSetName: string }
+  | { success: false; error: string };
+
+export const attachDomainTracking = orgAction(
+  {
+    name: "attachDomainTracking",
+    resource: "awsAccounts",
+    permission: ["write"],
+    orgId: (organizationId: string, _awsAccountId: string, _identity: string) =>
+      organizationId,
+    onError: "Failed to attach tracking",
+  },
+  async (
+    ctx,
+    organizationId: string,
+    awsAccountId: string,
+    identity: string
+  ): Promise<AttachDomainTrackingResult> => {
+    // Never look up an AWS account by id alone — scope to the caller's org.
+    const account = await db.query.awsAccount.findFirst({
+      where: and(
+        eq(awsAccount.id, awsAccountId),
+        eq(awsAccount.organizationId, organizationId)
+      ),
+    });
+    if (!account) {
+      return { success: false, error: "AWS account not found" };
+    }
+
+    const credentials = await getOrAssumeRole({
+      roleArn: account.roleArn,
+      externalId: account.externalId,
+    });
+
+    const client = new SESv2Client({
+      region: account.region,
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+        sessionToken: credentials.sessionToken,
+      },
+    });
+
+    const configSetName = domainToConfigSetName(identity);
+    try {
+      const existing = await client.send(
+        new GetEmailIdentityCommand({ EmailIdentity: identity })
+      );
+      if (existing.ConfigurationSetName?.startsWith("wraps-email-")) {
+        return { success: true, configSetName: existing.ConfigurationSetName };
+      }
+      if (existing.ConfigurationSetName) {
+        return {
+          success: false,
+          error: `This domain already has a configuration set (${existing.ConfigurationSetName}). Wraps won't replace it.`,
+        };
+      }
+      await ensureDomainConfigSet(client, {
+        configSetName,
+        region: account.region,
+        awsAccountNumber: account.accountId,
+      });
+      await client.send(
+        new PutEmailIdentityConfigurationSetAttributesCommand({
+          EmailIdentity: identity,
+          ConfigurationSetName: configSetName,
+        })
+      );
+    } catch (error) {
+      if (isAccessDeniedError(error)) {
+        return {
+          success: false,
+          error:
+            "Wraps' role in this AWS account predates domain tracking. Run `wraps platform update-role`, or update your CloudFormation stack, then try again.",
+        };
+      }
+      throw error;
+    }
+
+    revalidatePath(`/${ctx.access.orgSlug}/emails/domains`, "page");
+    return { success: true, configSetName };
   }
 );
