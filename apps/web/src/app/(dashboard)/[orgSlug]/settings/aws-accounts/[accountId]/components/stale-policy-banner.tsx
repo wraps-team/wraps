@@ -16,6 +16,8 @@ export const CURRENT_CONSOLE_POLICY_VERSION = 6;
 
 type StalePolicyBannerProps = {
   account: Pick<InferSelectModel<typeof awsAccount>, "consolePolicyVersion">;
+  /** Where the IAM role card link points. Defaults to the same-page anchor. */
+  href?: string;
 };
 
 /**
@@ -26,7 +28,10 @@ type StalePolicyBannerProps = {
  * deployed features look switched off. Server component — reads the already
  * org-scoped `account` row fetched by the parent page, no extra query needed.
  */
-export function StalePolicyBanner({ account }: StalePolicyBannerProps) {
+export function StalePolicyBanner({
+  account,
+  href = "#iam-role",
+}: StalePolicyBannerProps) {
   // NULL means never probed — which covers both a brand-new connection and
   // every account that existed before plan 282's column shipped. An unprobed
   // role and a stale role are indistinguishable from here, so telling a
@@ -50,7 +55,7 @@ export function StalePolicyBanner({ account }: StalePolicyBannerProps) {
           is missing permissions added since it was created. Features that
           depend on them may appear switched off even though they are deployed.
           See{" "}
-          <a className="underline" href="#iam-role">
+          <a className="underline" href={href}>
             IAM Role Configuration
           </a>{" "}
           below to update it.

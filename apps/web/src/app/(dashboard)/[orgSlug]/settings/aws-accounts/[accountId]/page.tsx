@@ -1,113 +1,41 @@
-import { auth } from "@wraps/auth";
-import { db } from "@wraps/db";
-import { redirect } from "next/navigation";
-import { AccountHeader } from "@/components/account-header";
-import { getOrganizationBySlug } from "@/lib/organization";
-import { checkAWSAccountAccess } from "@/lib/permissions/check-access";
 import { isSelfHosted } from "@/lib/plan-limits";
 import { AccountDetails } from "./components/account-details";
 import { AccountFeatures } from "./components/account-features";
-import { EventFeedStaleBanner } from "./components/event-feed-stale-banner";
 import { IAMConfiguration } from "./components/iam-configuration";
 import { QuotaReserve } from "./components/quota-reserve";
 import { SesPlanCard } from "./components/ses-plan-card";
-import { StalePolicyBanner } from "./components/stale-policy-banner";
 import { VdmStatusCard } from "./components/vdm-status-card";
 import { WebhookConfiguration } from "./components/webhook-configuration";
+import { loadAccountPage } from "./lib/load-account";
 
 type AWSAccountPageProps = {
   params: Promise<{
     orgSlug: string;
     accountId: string;
   }>;
+  searchParams: Promise<{
+    region?: string | string[];
+  }>;
 };
 
-export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
+export default async function AWSAccountPage({
+  params,
+  searchParams,
+}: AWSAccountPageProps) {
   const { orgSlug, accountId } = await params;
+  const { region } = await searchParams;
 
-  // Get session
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
+  // An array is "present but not equal" and redirects like any other mismatch.
+  const { account, organization, permissions } = await loadAccountPage({
+    orgSlug,
+    accountId,
+    tab: "",
+    region,
+    require: "view",
   });
-
-  if (!session?.user) {
-    redirect("/auth");
-  }
-
-  // Get organization
-  const organization = await getOrganizationBySlug(orgSlug);
-
-  if (!organization) {
-    redirect("/");
-  }
-
-  // Get AWS account
-  const account = await db.query.awsAccount.findFirst({
-    where: (a, { and, eq }) =>
-      and(eq(a.id, accountId), eq(a.organizationId, organization.id)),
-  });
-
-  if (!account) {
-    redirect(`/${orgSlug}/settings/aws-accounts`);
-  }
-
-  // Check if user has view permission
-  const access = await checkAWSAccountAccess({
-    userId: session.user.id,
-    organizationId: organization.id,
-    awsAccountId: accountId,
-    permission: "view",
-  });
-
-  if (!access.authorized) {
-    redirect(`/${orgSlug}/emails`);
-  }
-
-  // Check all permissions
-  const [viewAccess, sendAccess, manageAccess] = await Promise.all([
-    checkAWSAccountAccess({
-      userId: session.user.id,
-      organizationId: organization.id,
-      awsAccountId: accountId,
-      permission: "view",
-    }),
-    checkAWSAccountAccess({
-      userId: session.user.id,
-      organizationId: organization.id,
-      awsAccountId: accountId,
-      permission: "send",
-    }),
-    checkAWSAccountAccess({
-      userId: session.user.id,
-      organizationId: organization.id,
-      awsAccountId: accountId,
-      permission: "manage",
-    }),
-  ]);
-
-  const permissions = {
-    canView: viewAccess.authorized,
-    canSend: sendAccess.authorized,
-    canManage: manageAccess.authorized,
-  };
 
   return (
-    <div className="space-y-6 px-4 lg:px-6">
-      {/* Header */}
-      <AccountHeader
-        account={account}
-        orgSlug={orgSlug}
-        permissions={permissions}
-      />
-
-      {/* Stale Event Feed Warning */}
-      <EventFeedStaleBanner account={account} />
-
-      {/* Stale Console Policy Warning - manager-only, unlike the banner
-          above: its only call to action is a link to the IAM role card,
-          which only managers can see. */}
-      {permissions.canManage && <StalePolicyBanner account={account} />}
-
+    <div className="space-y-6">
       {/* Deployed Features */}
       <AccountFeatures account={account} organizationId={organization.id} />
 

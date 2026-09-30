@@ -100,7 +100,7 @@ export const recheckConsolePolicyAction = orgAction(
     // stale — which is the entire point of the button.
     revalidatePath(
       `/${ctx.access.orgSlug}/settings/aws-accounts/${awsAccountId}`,
-      "page"
+      "layout"
     );
 
     return { success: true, ...data };
