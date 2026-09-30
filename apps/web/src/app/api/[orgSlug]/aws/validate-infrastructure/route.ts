@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { auth } from "@wraps/auth";
-import { db } from "@wraps/db";
+import { db, writeIdentitySnapshot } from "@wraps/db";
 import { awsAccount } from "@wraps/db/schema/app";
+import { scanWrapsIdentities } from "@wraps/email";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireRoutePermission } from "@/app/api/shared/route-permission";
@@ -165,6 +166,8 @@ export async function POST(request: Request, context: RouteContext) {
       const webhookSecret =
         clientWebhookSecret || randomBytes(32).toString("hex");
 
+      let created: { id: string } | undefined;
+
       if (existingAccount) {
         // Update existing account with detected features
         // biome-ignore lint/plugin: existingAccount.id comes from the org-scoped findFirst above (eq(table.organizationId, orgWithMembership.id)).
@@ -225,35 +228,57 @@ export async function POST(request: Request, context: RouteContext) {
         }
 
         // Create new account with detected features
-        await db.insert(awsAccount).values({
-          organizationId: orgWithMembership.id,
-          name: `AWS Account ${accountId}`,
-          accountId,
-          region,
-          roleArn,
-          // Save the actual external ID from the CloudFormation stack
-          externalId,
-          // Save webhook secret for EventBridge webhook authentication
-          webhookSecret,
-          isVerified: true,
-          lastVerifiedAt: new Date(),
-          createdBy: session.user.id,
-          setupMethod: "cfn_infrastructure",
-          // Set emailEnabled if config set is detected
-          emailEnabled: !!detectedFeatures?.configSetName,
-          // Store features in JSON
-          features: detectedFeatures
-            ? {
-                email: {
-                  configSetName: detectedFeatures.configSetName,
-                  eventTrackingEnabled: detectedFeatures.eventTracking,
-                  eventHistoryEnabled: detectedFeatures.historyStorage,
-                  archivingEnabled: detectedFeatures.archiving,
-                  archiveArn: detectedFeatures.archiveArn,
-                },
-              }
-            : undefined,
-        });
+        [created] = await db
+          .insert(awsAccount)
+          .values({
+            organizationId: orgWithMembership.id,
+            name: `AWS Account ${accountId}`,
+            accountId,
+            region,
+            roleArn,
+            // Save the actual external ID from the CloudFormation stack
+            externalId,
+            // Save webhook secret for EventBridge webhook authentication
+            webhookSecret,
+            isVerified: true,
+            lastVerifiedAt: new Date(),
+            createdBy: session.user.id,
+            setupMethod: "cfn_infrastructure",
+            // Set emailEnabled if config set is detected
+            emailEnabled: !!detectedFeatures?.configSetName,
+            // Store features in JSON
+            features: detectedFeatures
+              ? {
+                  email: {
+                    configSetName: detectedFeatures.configSetName,
+                    eventTrackingEnabled: detectedFeatures.eventTracking,
+                    eventHistoryEnabled: detectedFeatures.historyStorage,
+                    archivingEnabled: detectedFeatures.archiving,
+                    archiveArn: detectedFeatures.archiveArn,
+                  },
+                }
+              : undefined,
+          })
+          .returning({ id: awsAccount.id });
+      }
+
+      // Populate the identities snapshot now, so the overview is right on
+      // first render. Best-effort: a scan failure must never fail the connect.
+      const snapshotAccountId = existingAccount?.id ?? created?.id;
+      if (snapshotAccountId) {
+        try {
+          const identities = await scanWrapsIdentities(
+            assumedCredentials,
+            region
+          );
+          await writeIdentitySnapshot({
+            organizationId: orgWithMembership.id,
+            awsAccountId: snapshotAccountId,
+            identities,
+          });
+        } catch (error: unknown) {
+          log.warn({ err: error }, "Identity scan failed during connect");
+        }
       }
 
       return NextResponse.json({

@@ -20,7 +20,14 @@ import {
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
 import { createServerValidate } from "@tanstack/react-form-nextjs";
-import { auditLog, awsAccount, db, notifyOrg } from "@wraps/db";
+import {
+  auditLog,
+  awsAccount,
+  db,
+  notifyOrg,
+  writeIdentitySnapshot,
+} from "@wraps/db";
+import { scanWrapsIdentities } from "@wraps/email";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -209,8 +216,9 @@ export const connectAWSAccountAction = orgAction(
       const externalId = validatedData.externalId;
 
       // 6. Test connection by attempting to get credentials (may assume role or use dev mode)
+      let connectCredentials: Awaited<ReturnType<typeof getCredentials>>;
       try {
-        await getCredentials({
+        connectCredentials = await getCredentials({
           roleArn: validatedData.roleArn,
           externalId,
           region: validatedData.region,
@@ -244,6 +252,22 @@ export const connectAWSAccountAction = orgAction(
 
       if (!account) {
         return { error: "Failed to create AWS account record" };
+      }
+
+      // Populate the identities snapshot now, so the overview is right on
+      // first render. Best-effort: a scan failure must never fail the connect.
+      try {
+        const identities = await scanWrapsIdentities(
+          connectCredentials,
+          validatedData.region
+        );
+        await writeIdentitySnapshot({
+          organizationId: ctx.organizationId,
+          awsAccountId: account.id,
+          identities,
+        });
+      } catch (error: unknown) {
+        ctx.log.warn({ err: error }, "Identity scan failed during connect");
       }
 
       // 7. Grant default access to all org members (except owners)
@@ -735,42 +759,9 @@ export const scanAWSAccountFeatures: (
       }> = [];
 
       try {
-        const sesClient = new SESv2Client({
-          region: account.region,
-          credentials: awsCredentials,
-        });
-
-        const listResponse = await sesClient.send(
-          new ListEmailIdentitiesCommand({ PageSize: 100 })
+        identities.push(
+          ...(await scanWrapsIdentities(awsCredentials, account.region))
         );
-
-        // Check each sending-enabled identity for Wraps config set
-        const sendingEnabled =
-          listResponse.EmailIdentities?.filter((i) => i.SendingEnabled) ?? [];
-
-        for (const identity of sendingEnabled) {
-          try {
-            const details = await sesClient.send(
-              new GetEmailIdentityCommand({
-                EmailIdentity: identity.IdentityName,
-              })
-            );
-            if (
-              details.VerifiedForSendingStatus &&
-              details.ConfigurationSetName?.startsWith("wraps-email-")
-            ) {
-              identities.push({
-                identity: identity.IdentityName!,
-                type: identity.IdentityType as "DOMAIN" | "EMAIL_ADDRESS",
-                // Store the identity's config set so sends can resolve it by
-                // lookup — a name SES just confirmed exists, never derived.
-                configSetName: details.ConfigurationSetName,
-              });
-            }
-          } catch {
-            // Skip identities we can't access
-          }
-        }
       } catch (error: unknown) {
         if (!isAwsErrorNamed(error, "AccessDeniedException")) {
           ctx.log.warn({ err: error }, "Error scanning identities");
@@ -856,6 +847,7 @@ export const scanAWSAccountFeatures: (
           emailEnabled,
           smsEnabled,
           features: featuresJson,
+          identitiesScannedAt: new Date(),
           updatedAt: new Date(),
         })
         .where(

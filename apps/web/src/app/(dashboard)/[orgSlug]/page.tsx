@@ -9,6 +9,8 @@ import {
 import { count, desc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { refreshIdentitySnapshots } from "@/lib/aws/identity-refresh";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { getSetupStatus } from "@/lib/setup-status";
 import { ExploreFirstDashboard } from "./components/explore-first-dashboard";
@@ -161,6 +163,12 @@ export default async function OrganizationDashboard({
   const { setupStatus, awsAccount: awsAccountData } = await getSetupStatus(
     orgWithMembership.id
   );
+
+  // The overview reads a cached identities snapshot. When it claims no
+  // verified domains, refresh it after the response is sent.
+  if (setupStatus.hasAwsAccount && setupStatus.domainCount === 0) {
+    after(() => refreshIdentitySnapshots(orgWithMembership.id));
+  }
 
   // Calculate completion percentage
   const requiredSteps = [

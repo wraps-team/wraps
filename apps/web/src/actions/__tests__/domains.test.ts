@@ -91,6 +91,12 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+// listSendingDomains schedules its snapshot write-through with after(), which
+// throws outside a request scope.
+vi.mock("next/server", () => ({
+  after: vi.fn(),
+}));
+
 type SesCommand = {
   _type: string;
   EmailIdentity?: string;
