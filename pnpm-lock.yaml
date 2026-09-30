@@ -757,7 +757,7 @@ importers:
         specifier: 2.0.10
         version: 2.0.10
       undici:
-        specifier: ^7.29.0
+        specifier: ^7.28.0
         version: 7.29.0
       uuidv7:
         specifier: 1.1.0
