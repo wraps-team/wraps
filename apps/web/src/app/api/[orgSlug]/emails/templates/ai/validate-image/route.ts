@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { requireRoutePermission } from "@/app/api/shared/route-permission";
 import { logger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
-import { validatePublicUrl } from "@/lib/ssrf-guard";
+import { assertPublicUrl } from "@/lib/ssrf-guard";
 
 type RouteContext = {
   params: Promise<{
@@ -59,7 +59,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     // Validate URL format and block private/internal addresses (SSRF prevention)
-    const urlValidation = validatePublicUrl(url);
+    const urlValidation = await assertPublicUrl(url);
     if (!urlValidation.valid) {
       return NextResponse.json(
         { valid: false, error: urlValidation.error },
@@ -75,6 +75,7 @@ export async function POST(request: Request, context: RouteContext) {
     try {
       const response = await fetch(parsedUrl.toString(), {
         method: "HEAD",
+        redirect: "manual",
         signal: controller.signal,
       });
 

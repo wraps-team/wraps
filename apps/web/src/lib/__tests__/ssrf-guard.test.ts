@@ -5,8 +5,18 @@
  * requests to private, reserved, and link-local IP ranges/hostnames.
  */
 
-import { describe, expect, it } from "vitest";
-import { isPrivateHost, validatePublicUrl } from "../ssrf-guard";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mockLookup = vi.fn();
+vi.mock("node:dns/promises", () => ({
+  lookup: (...args: unknown[]) => mockLookup(...args),
+}));
+
+import {
+  assertPublicUrl,
+  isPrivateHost,
+  validatePublicUrl,
+} from "../ssrf-guard";
 
 describe("isPrivateHost", () => {
   describe("blocks reserved hostnames", () => {
@@ -231,6 +241,92 @@ describe("validatePublicUrl", () => {
           "https://example.com/image.png"
         );
       }
+    });
+  });
+});
+
+describe("isPrivateHost — IPv6 literals and extra ranges", () => {
+  it("blocks bracketed IPv6 loopback", () => {
+    expect(isPrivateHost("[::1]")).toBe(true);
+  });
+
+  it("blocks IPv4-mapped IMDS in hex and dotted forms", () => {
+    expect(isPrivateHost("[::ffff:a9fe:a9fe]")).toBe(true);
+    expect(isPrivateHost("::ffff:169.254.169.254")).toBe(true);
+  });
+
+  it("blocks CGNAT, multicast, broadcast and unspecified", () => {
+    expect(isPrivateHost("100.64.0.1")).toBe(true);
+    expect(isPrivateHost("224.0.0.1")).toBe(true);
+    expect(isPrivateHost("255.255.255.255")).toBe(true);
+    expect(isPrivateHost("::")).toBe(true);
+  });
+
+  it("leaves hostnames to DNS resolution", () => {
+    expect(isPrivateHost("10.example.com")).toBe(false);
+  });
+});
+
+describe("validatePublicUrl — IPv6 literal bypass is closed", () => {
+  it("rejects http://[::1]/", () => {
+    expect(validatePublicUrl("http://[::1]/").valid).toBe(false);
+  });
+
+  it("rejects IPv4-mapped IMDS literal", () => {
+    expect(
+      validatePublicUrl("http://[::ffff:169.254.169.254]/latest/meta-data/")
+        .valid
+    ).toBe(false);
+  });
+});
+
+describe("assertPublicUrl", () => {
+  beforeEach(() => {
+    mockLookup.mockReset();
+  });
+
+  it("rejects private IP literals without a DNS lookup", async () => {
+    const result = await assertPublicUrl("http://127.0.0.1/");
+    expect(result.valid).toBe(false);
+    expect(mockLookup).not.toHaveBeenCalled();
+  });
+
+  it("rejects a public hostname resolving to IMDS", async () => {
+    mockLookup.mockResolvedValue([{ address: "169.254.169.254", family: 4 }]);
+    const result = await assertPublicUrl("https://evil.example.com/");
+    expect(result).toEqual({
+      valid: false,
+      error: "URL resolves to a private or reserved address",
+    });
+  });
+
+  it("rejects when any resolved address is private", async () => {
+    mockLookup.mockResolvedValue([
+      { address: "93.184.216.34", family: 4 },
+      { address: "10.0.0.5", family: 4 },
+    ]);
+    expect((await assertPublicUrl("https://example.com/")).valid).toBe(false);
+  });
+
+  it("rejects IPv4-mapped IPv6 loopback resolution", async () => {
+    mockLookup.mockResolvedValue([{ address: "::ffff:127.0.0.1", family: 6 }]);
+    expect((await assertPublicUrl("https://example.com/")).valid).toBe(false);
+  });
+
+  it("accepts a hostname resolving only to public addresses", async () => {
+    mockLookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+    const result = await assertPublicUrl("https://example.com/");
+    expect(result.valid).toBe(true);
+    expect(mockLookup).toHaveBeenCalledWith("example.com", { all: true });
+  });
+
+  it("rejects when DNS resolution fails", async () => {
+    mockLookup.mockRejectedValue(
+      Object.assign(new Error("ENOTFOUND"), { code: "ENOTFOUND" })
+    );
+    expect(await assertPublicUrl("https://nope.example.com/")).toEqual({
+      valid: false,
+      error: "Could not resolve host",
     });
   });
 });

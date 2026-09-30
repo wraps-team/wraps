@@ -8,7 +8,7 @@
  * - Company name (from og:site_name or title)
  */
 
-import { isPrivateHost } from "@/lib/ssrf-guard";
+import { assertPublicUrl } from "@/lib/ssrf-guard";
 
 export type ExtractedBrandKit = {
   logoUrl: string | null;
@@ -45,10 +45,10 @@ export async function extractBrandKitFromDomain(
   try {
     const parsed = new URL(url);
     normalizedDomain = parsed.hostname;
-    if (isPrivateHost(normalizedDomain)) {
-      return { ...DEFAULT_BRAND_KIT, sourceDomain: domain };
-    }
   } catch {
+    return { ...DEFAULT_BRAND_KIT, sourceDomain: domain };
+  }
+  if (!(await assertPublicUrl(url)).valid) {
     return { ...DEFAULT_BRAND_KIT, sourceDomain: domain };
   }
 
@@ -149,7 +149,7 @@ async function fetchFirstStylesheet(
       const parsedAbsolute = new URL(absoluteUrl);
       if (
         FONT_CDN_HOSTNAMES.has(parsedAbsolute.hostname) ||
-        isPrivateHost(parsedAbsolute.hostname)
+        !(await assertPublicUrl(absoluteUrl)).valid
       ) {
         continue;
       }
@@ -167,6 +167,7 @@ async function fetchFirstStylesheet(
           "Mozilla/5.0 (compatible; WrapsBrandExtractor/1.0; +https://wraps.dev)",
         Accept: "text/css",
       },
+      redirect: "manual",
       signal,
     });
 
