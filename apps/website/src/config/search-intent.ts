@@ -580,6 +580,38 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     rationale:
       'The sandbox guide explains the process; this is the artifact you send, and nothing else on the web generates one. Someone typing this has already read an explainer and wants text they can paste into a support case, which is a different intent from the guide\'s "get out of aws ses sandbox".',
   },
+  {
+    route: "/tools/dmarc-checker",
+    primaryQuery: "dmarc record checker",
+    secondaryQueries: ["dmarc lookup", "check dmarc record"],
+    audience: "stranger-with-problem",
+    rationale:
+      'Someone typing "dmarc record checker" wants to paste a domain and read the result, not learn what alignment is. The glossary and the DMARC blog post own the "what is" queries; this page owns the lookup and explains how to read and fix what the tool reports.',
+  },
+  {
+    route: "/tools/dkim-checker",
+    primaryQuery: "dkim record checker",
+    secondaryQueries: ["dkim lookup", "dkim selector lookup"],
+    audience: "stranger-with-problem",
+    rationale:
+      'A lookup query has a domain in hand and wants a verdict. The glossary entries for DKIM and the DKIM selector answer "what is it"; this page runs the check and covers why a selector miss, especially with SES, does not mean DKIM is off.',
+  },
+  {
+    route: "/tools/blacklist-check",
+    primaryQuery: "domain blacklist check",
+    secondaryQueries: ["is my domain blacklisted", "email blacklist check"],
+    audience: "stranger-with-problem",
+    rationale:
+      "The searcher suspects a listing and wants to know now. The blocklist glossary entry explains the concept; this page runs the query against ten lists and says which ones matter and what the check does not cover.",
+  },
+  {
+    route: "/tools/mx-lookup",
+    primaryQuery: "mx record lookup",
+    secondaryQueries: ["mx lookup", "check mx records"],
+    audience: "stranger-with-problem",
+    rationale:
+      "A lookup is an action on a specific domain, unlike the MX record glossary entry that defines the term. This page returns the records and explains what a missing, unresolvable, or misordered one breaks.",
+  },
 
   // --- Migrate ---
   {

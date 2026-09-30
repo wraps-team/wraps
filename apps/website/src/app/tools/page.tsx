@@ -135,6 +135,74 @@ export default function ToolsPage() {
               </Card>
             </div>
 
+            {/* Per-check tools */}
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="font-heading text-base tracking-tight">
+                    DMARC record checker
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-muted-foreground text-sm">
+                  Read the policy, alignment modes, and reporting addresses.{" "}
+                  <a
+                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    href="/tools/dmarc-checker"
+                  >
+                    Check DMARC →
+                  </a>
+                </CardContent>
+              </Card>
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="font-heading text-base tracking-tight">
+                    DKIM record checker
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-muted-foreground text-sm">
+                  Test common selectors or enter your own.{" "}
+                  <a
+                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    href="/tools/dkim-checker"
+                  >
+                    Check DKIM →
+                  </a>
+                </CardContent>
+              </Card>
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="font-heading text-base tracking-tight">
+                    Domain blacklist check
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-muted-foreground text-sm">
+                  Query your domain and mail server IPs against 10 blocklists.{" "}
+                  <a
+                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    href="/tools/blacklist-check"
+                  >
+                    Check blocklists →
+                  </a>
+                </CardContent>
+              </Card>
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="font-heading text-base tracking-tight">
+                    MX record lookup
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-muted-foreground text-sm">
+                  See mail servers, priorities, and whether each one resolves.{" "}
+                  <a
+                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    href="/tools/mx-lookup"
+                  >
+                    Look up MX →
+                  </a>
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Production access CTA */}
             <Card className="mt-8 border-border bg-card">
               <CardContent>

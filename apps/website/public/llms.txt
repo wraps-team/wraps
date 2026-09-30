@@ -516,6 +516,10 @@ stated catch on every entry including ours, and the incumbent kept on the list.
 - [SES Calculator](https://wraps.dev/tools/ses-calculator): Estimate AWS SES costs
 - [SPF Builder](https://wraps.dev/tools/spf-builder): Build SPF DNS records
 - [SES Production Access Request Builder](https://wraps.dev/tools/ses-production-access): Write the SES production access request, or diagnose a denial
+- [DMARC Record Checker](https://wraps.dev/tools/dmarc-checker): Look up a domain's DMARC record and read its policy, alignment, and reporting tags
+- [DKIM Record Checker](https://wraps.dev/tools/dkim-checker): Check a domain's DKIM keys against 25 common selectors or your own
+- [Domain Blacklist Check](https://wraps.dev/tools/blacklist-check): Check a domain and its MX server IPs against 10 DNS blocklists
+- [MX Record Lookup](https://wraps.dev/tools/mx-lookup): Look up a domain's MX records, priorities, and hostname resolution
 
 ## Code
 

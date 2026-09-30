@@ -38,7 +38,7 @@ import Link from "next/link";
 import Script from "next/script";
 import { parseAsString, useQueryStates } from "nuqs";
 import type * as React from "react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 // Turnstile types for Cloudflare bot protection
 declare global {
@@ -309,7 +309,18 @@ const checkerParsers = {
   dkim: parseAsString.withDefault(""),
 };
 
-export default function ToolsPageContent() {
+type CheckKey = "spf" | "dkim" | "dmarc" | "mx" | "blacklist";
+
+type ToolsPageContentProps = {
+  /** Renders this check's result first inside the DNS Records card. */
+  focus?: CheckKey;
+};
+
+const DEFAULT_ORDER: CheckKey[] = ["spf", "dmarc", "dkim", "mx", "blacklist"];
+
+export default function ToolsPageContent({
+  focus,
+}: ToolsPageContentProps = {}) {
   const [{ domain, dkim }, setParams] = useQueryStates(checkerParsers, {
     shallow: false,
   });
@@ -527,6 +538,218 @@ export default function ToolsPageContent() {
       return "Weak";
     }
     return "Failing";
+  };
+
+  const renderRecordSections = (result: EmailCheckResult) => {
+    const recordSections: Record<CheckKey, React.ReactNode> = {
+      spf: (
+        <>
+          <RecordDisplay
+            extra={
+              result.spf.exists ? (
+                <span
+                  className={`font-mono text-xs ${
+                    result.spf.lookupCount > result.spf.lookupLimit
+                      ? "text-destructive"
+                      : result.spf.lookupCount > 7
+                        ? "text-warning"
+                        : "text-success"
+                  }`}
+                >
+                  {result.spf.lookupCount}/{result.spf.lookupLimit} lookups
+                </span>
+              ) : undefined
+            }
+            label="SPF"
+            record={result.spf.record}
+            status={getSpfStatus()}
+            warnings={result.spf.warnings}
+          />
+        </>
+      ),
+      dmarc: (
+        <>
+          <RecordDisplay
+            label="DMARC"
+            record={result.dmarc.record}
+            status={getDmarcStatus()}
+            warnings={result.dmarc.warnings}
+          />
+        </>
+      ),
+      dkim: (
+        <>
+          {(result.dkim?.selectorsFound?.length ?? 0) > 0 && (
+            <div className="rounded-lg border bg-card">
+              <div className="flex items-center justify-between p-4">
+                <StatusBadge label="DKIM" status={getDkimStatus()} />
+                <span className="text-muted-foreground text-sm">
+                  {result.dkim?.selectorsFound?.length ?? 0} selector(s) found
+                </span>
+              </div>
+              <div className="border-t bg-muted/30 p-4">
+                <div className="space-y-2">
+                  {result.dkim?.selectorsFound?.map((sel) => (
+                    <div
+                      className="flex items-center justify-between rounded bg-background p-2 text-sm"
+                      key={sel.selector}
+                    >
+                      <code className="font-mono">{sel.selector}</code>
+                      <span className="text-muted-foreground">
+                        {sel.keyType} {sel.keyBits}-bit
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {(result.dkim?.warnings?.length ?? 0) > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {result.dkim.warnings.map((warning, i) => (
+                      <div
+                        className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/5 p-2.5 text-xs text-warning"
+                        key={`dkim-warning-${i}`}
+                      >
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                        {warning}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      ),
+      mx: (
+        <>
+          {result.mx.records.length > 0 && (
+            <div className="rounded-lg border bg-card">
+              <div className="flex items-center justify-between p-4">
+                <StatusBadge label="MX" status={getMxStatus()} />
+                <span className="text-muted-foreground text-sm">
+                  {result.mx.records.length} record(s)
+                </span>
+              </div>
+              <div className="border-t bg-muted/30 p-4">
+                <div className="space-y-2">
+                  {result.mx.records.map((mx) => (
+                    <div
+                      className="flex items-center justify-between rounded bg-background p-2 text-sm"
+                      key={mx.exchange}
+                    >
+                      <code className="font-mono">{mx.exchange}</code>
+                      <span className="text-muted-foreground">
+                        Priority: {mx.priority}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      ),
+      blacklist: (
+        <>
+          {/* Blacklist Status */}
+          {result.blacklist?.checked && (
+            <div className="rounded-lg border bg-card">
+              <div className="flex items-center justify-between p-4">
+                <StatusBadge
+                  label="Blacklists"
+                  status={result.blacklist.overallClean ? "pass" : "fail"}
+                />
+                {result.blacklist.overallClean ? (
+                  <Badge variant="outline">Clean</Badge>
+                ) : (
+                  <span className="text-destructive text-sm">
+                    {result.blacklist.domainListings.length +
+                      result.blacklist.ipListings.length}{" "}
+                    listing(s)
+                  </span>
+                )}
+              </div>
+              {!result.blacklist.overallClean && (
+                <div className="border-t bg-muted/30 p-4">
+                  <div className="space-y-2">
+                    {result.blacklist.domainListings.map((listing, i) => (
+                      <div
+                        className="flex items-center justify-between rounded bg-background p-2 text-sm"
+                        key={`domain-bl-${i}`}
+                      >
+                        <div>
+                          <span className="font-medium">
+                            {listing.blacklist}
+                          </span>
+                          <Badge
+                            className="ml-2"
+                            variant={
+                              listing.priority === "high"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                          >
+                            {listing.priority}
+                          </Badge>
+                        </div>
+                        {listing.delistUrl && (
+                          <a
+                            className="text-primary text-xs hover:underline"
+                            href={listing.delistUrl}
+                            rel="noopener noreferrer"
+                            target="_blank"
+                          >
+                            Delist
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                    {result.blacklist.ipListings.map((listing, i) => (
+                      <div
+                        className="flex items-center justify-between rounded bg-background p-2 text-sm"
+                        key={`ip-bl-${i}`}
+                      >
+                        <div>
+                          <code className="font-mono text-xs">
+                            {listing.target}
+                          </code>
+                          <span className="ml-2 text-muted-foreground">
+                            {listing.blacklist}
+                          </span>
+                          <Badge
+                            className="ml-2"
+                            variant={
+                              listing.priority === "high"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                          >
+                            {listing.priority}
+                          </Badge>
+                        </div>
+                        {listing.delistUrl && (
+                          <a
+                            className="text-primary text-xs hover:underline"
+                            href={listing.delistUrl}
+                            rel="noopener noreferrer"
+                            target="_blank"
+                          >
+                            Delist
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      ),
+    };
+    const order = focus
+      ? [focus, ...DEFAULT_ORDER.filter((k) => k !== focus)]
+      : DEFAULT_ORDER;
+    return order.map((k) => <Fragment key={k}>{recordSections[k]}</Fragment>);
   };
 
   return (
@@ -1001,190 +1224,7 @@ export default function ToolsPageContent() {
               <CardTitle>DNS Records</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <RecordDisplay
-                extra={
-                  result.spf.exists ? (
-                    <span
-                      className={`font-mono text-xs ${
-                        result.spf.lookupCount > result.spf.lookupLimit
-                          ? "text-destructive"
-                          : result.spf.lookupCount > 7
-                            ? "text-warning"
-                            : "text-success"
-                      }`}
-                    >
-                      {result.spf.lookupCount}/{result.spf.lookupLimit} lookups
-                    </span>
-                  ) : undefined
-                }
-                label="SPF"
-                record={result.spf.record}
-                status={getSpfStatus()}
-                warnings={result.spf.warnings}
-              />
-              <RecordDisplay
-                label="DMARC"
-                record={result.dmarc.record}
-                status={getDmarcStatus()}
-                warnings={result.dmarc.warnings}
-              />
-              {(result.dkim?.selectorsFound?.length ?? 0) > 0 && (
-                <div className="rounded-lg border bg-card">
-                  <div className="flex items-center justify-between p-4">
-                    <StatusBadge label="DKIM" status={getDkimStatus()} />
-                    <span className="text-muted-foreground text-sm">
-                      {result.dkim?.selectorsFound?.length ?? 0} selector(s)
-                      found
-                    </span>
-                  </div>
-                  <div className="border-t bg-muted/30 p-4">
-                    <div className="space-y-2">
-                      {result.dkim?.selectorsFound?.map((sel) => (
-                        <div
-                          className="flex items-center justify-between rounded bg-background p-2 text-sm"
-                          key={sel.selector}
-                        >
-                          <code className="font-mono">{sel.selector}</code>
-                          <span className="text-muted-foreground">
-                            {sel.keyType} {sel.keyBits}-bit
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    {(result.dkim?.warnings?.length ?? 0) > 0 && (
-                      <div className="mt-3 space-y-2">
-                        {result.dkim.warnings.map((warning, i) => (
-                          <div
-                            className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/5 p-2.5 text-xs text-warning"
-                            key={`dkim-warning-${i}`}
-                          >
-                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-                            {warning}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              {result.mx.records.length > 0 && (
-                <div className="rounded-lg border bg-card">
-                  <div className="flex items-center justify-between p-4">
-                    <StatusBadge label="MX" status={getMxStatus()} />
-                    <span className="text-muted-foreground text-sm">
-                      {result.mx.records.length} record(s)
-                    </span>
-                  </div>
-                  <div className="border-t bg-muted/30 p-4">
-                    <div className="space-y-2">
-                      {result.mx.records.map((mx) => (
-                        <div
-                          className="flex items-center justify-between rounded bg-background p-2 text-sm"
-                          key={mx.exchange}
-                        >
-                          <code className="font-mono">{mx.exchange}</code>
-                          <span className="text-muted-foreground">
-                            Priority: {mx.priority}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {/* Blacklist Status */}
-              {result.blacklist?.checked && (
-                <div className="rounded-lg border bg-card">
-                  <div className="flex items-center justify-between p-4">
-                    <StatusBadge
-                      label="Blacklists"
-                      status={result.blacklist.overallClean ? "pass" : "fail"}
-                    />
-                    {result.blacklist.overallClean ? (
-                      <Badge variant="outline">Clean</Badge>
-                    ) : (
-                      <span className="text-destructive text-sm">
-                        {result.blacklist.domainListings.length +
-                          result.blacklist.ipListings.length}{" "}
-                        listing(s)
-                      </span>
-                    )}
-                  </div>
-                  {!result.blacklist.overallClean && (
-                    <div className="border-t bg-muted/30 p-4">
-                      <div className="space-y-2">
-                        {result.blacklist.domainListings.map((listing, i) => (
-                          <div
-                            className="flex items-center justify-between rounded bg-background p-2 text-sm"
-                            key={`domain-bl-${i}`}
-                          >
-                            <div>
-                              <span className="font-medium">
-                                {listing.blacklist}
-                              </span>
-                              <Badge
-                                className="ml-2"
-                                variant={
-                                  listing.priority === "high"
-                                    ? "destructive"
-                                    : "secondary"
-                                }
-                              >
-                                {listing.priority}
-                              </Badge>
-                            </div>
-                            {listing.delistUrl && (
-                              <a
-                                className="text-primary text-xs hover:underline"
-                                href={listing.delistUrl}
-                                rel="noopener noreferrer"
-                                target="_blank"
-                              >
-                                Delist
-                              </a>
-                            )}
-                          </div>
-                        ))}
-                        {result.blacklist.ipListings.map((listing, i) => (
-                          <div
-                            className="flex items-center justify-between rounded bg-background p-2 text-sm"
-                            key={`ip-bl-${i}`}
-                          >
-                            <div>
-                              <code className="font-mono text-xs">
-                                {listing.target}
-                              </code>
-                              <span className="ml-2 text-muted-foreground">
-                                {listing.blacklist}
-                              </span>
-                              <Badge
-                                className="ml-2"
-                                variant={
-                                  listing.priority === "high"
-                                    ? "destructive"
-                                    : "secondary"
-                                }
-                              >
-                                {listing.priority}
-                              </Badge>
-                            </div>
-                            {listing.delistUrl && (
-                              <a
-                                className="text-primary text-xs hover:underline"
-                                href={listing.delistUrl}
-                                rel="noopener noreferrer"
-                                target="_blank"
-                              >
-                                Delist
-                              </a>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              {renderRecordSections(result)}
             </CardContent>
           </Card>
 
