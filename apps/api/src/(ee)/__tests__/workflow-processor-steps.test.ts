@@ -7,6 +7,7 @@
  * subscribe_topic, unsubscribe_topic.
  */
 
+import { Agent } from "undici";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -1879,6 +1880,46 @@ describe("handleWebhook", () => {
       })
     );
     expect(result.data.status).toBeUndefined();
+  });
+
+  it("passes the SSRF-safe dispatcher to fetch and destroys it after a response", async () => {
+    mockFetch.mockResolvedValue({ status: 200, ok: true });
+
+    await handleWebhook(
+      {
+        type: "webhook",
+        url: "https://example.com/hook",
+        method: "POST",
+      } as never,
+      makeContact() as never,
+      makeExecution() as never
+    );
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const options = mockFetch.mock.calls[0][1] as {
+      dispatcher: Agent;
+      redirect: string;
+    };
+    expect(options.dispatcher).toBeInstanceOf(Agent);
+    expect(options.redirect).toBe("manual");
+    expect(options.dispatcher.destroyed).toBe(true);
+  });
+
+  it("destroys the dispatcher when fetch throws", async () => {
+    mockFetch.mockRejectedValue(new Error("read ECONNRESET"));
+
+    await handleWebhook(
+      {
+        type: "webhook",
+        url: "https://example.com/hook",
+        method: "POST",
+      } as never,
+      makeContact() as never,
+      makeExecution() as never
+    );
+
+    const options = mockFetch.mock.calls[0][1] as { dispatcher: Agent };
+    expect(options.dispatcher.destroyed).toBe(true);
   });
 });
 
