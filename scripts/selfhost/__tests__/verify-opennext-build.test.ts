@@ -1,6 +1,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { resolveOpenNextCommand } from "../verify-opennext-build.mjs";
+import {
+  checkNextCeiling,
+  resolveOpenNextCommand,
+} from "../verify-opennext-build.mjs";
 
 // This helper picks which OpenNext the canary build runs. If it silently
 // returns the wrong version the job still passes — it just stops testing the
@@ -96,6 +99,74 @@ describe("resolveOpenNextCommand", () => {
 
     expect(resolved.command).toBe("@opennextjs/aws@3.10.4");
     expect(resolved.pinned).toBe(true);
+  });
+});
+
+describe("checkNextCeiling", () => {
+  const ceilings = { "3.9.14": "16.3" };
+
+  it("admits any patch of the verified minor, and older minors", () => {
+    for (const nextVersion of ["16.3.0", "16.3.99", "16.2.12", "15.5.10"]) {
+      expect(
+        checkNextCeiling({ openNextVersion: "3.9.14", nextVersion, ceilings })
+          .error
+      ).toBeUndefined();
+    }
+  });
+
+  it("rejects the next minor, the next major, and their prereleases", () => {
+    for (const nextVersion of ["16.4.0", "17.0.0", "16.4.0-canary.3"]) {
+      expect(
+        checkNextCeiling({ openNextVersion: "3.9.14", nextVersion, ceilings })
+          .error
+      ).toContain(`next ${nextVersion} is newer than 16.3.x`);
+    }
+  });
+
+  // An sst bump moves SST's default OpenNext; the ceiling for the old adapter
+  // says nothing about the new one, so it must not be inherited silently.
+  it("rejects an OpenNext version the table has never verified", () => {
+    expect(
+      checkNextCeiling({
+        openNextVersion: "3.9.15",
+        nextVersion: "16.3.6",
+        ceilings,
+      }).error
+    ).toContain("OpenNext 3.9.15 has no entry");
+  });
+});
+
+// The tripwire itself. Runs on every push in test-scripts, without the build
+// step's path filter, so a Next bump past what the self-host deploy's OpenNext
+// is verified for fails in a minute rather than in a customer's account.
+describe("this repo's Next version", () => {
+  const { version: openNextVersion } = resolveOpenNextCommand({
+    platformSource,
+    nextSpecifier: "16.0.0",
+    configSource,
+  });
+
+  const repoFile = (relative: string) =>
+    readFileSync(new URL(`../../../${relative}`, import.meta.url), "utf-8");
+
+  // next is pinned twice — the manifest and pnpm-workspace.yaml's overrides —
+  // and the override is what actually installs, so both are held to it.
+  it.each([
+    [
+      "apps/web/package.json",
+      JSON.parse(repoFile("apps/web/package.json")).dependencies.next,
+    ],
+    [
+      "pnpm-workspace.yaml overrides",
+      repoFile("pnpm-workspace.yaml").match(
+        /^\s+next:\s*['"]?([^'"\s]+)/m
+      )?.[1],
+    ],
+  ])("%s is within the self-host OpenNext ceiling", (_, nextVersion) => {
+    expect(nextVersion).toMatch(/\d+\.\d+/);
+    expect(
+      checkNextCeiling({ openNextVersion, nextVersion }).error
+    ).toBeUndefined();
   });
 });
 
