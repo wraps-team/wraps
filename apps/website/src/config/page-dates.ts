@@ -19,7 +19,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/approaches": "2026-09-15T09:08:13-06:00",
   "/blog": "2026-09-15T08:41:41-06:00",
   "/blog/agent-mailboxes": "2026-09-15T10:04:17-06:00",
-  "/blog/agent-readable-docs": "2026-10-01T08:10:15-06:00",
+  "/blog/agent-readable-docs": "2026-10-01T08:18:59-06:00",
   "/blog/aws-ses-marketing-tools": "2026-09-03T13:19:49-06:00",
   "/blog/aws-ses-simplified": "2026-09-15T08:41:41-06:00",
   "/blog/base44-send-email": "2026-05-06T15:11:03-06:00",
