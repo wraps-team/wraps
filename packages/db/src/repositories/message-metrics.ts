@@ -1,5 +1,15 @@
 import type { Column, SQL } from "drizzle-orm";
-import { and, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lt,
+  lte,
+  ne,
+  sql,
+} from "drizzle-orm";
 import { BOT_UA_KEYWORDS } from "../email-bot-detection";
 import { db } from "../index";
 import { awsAccount } from "../schema/app";
@@ -350,4 +360,173 @@ export async function getMessageMetrics(
   ]);
 
   return { totals, data };
+}
+
+// ─── Cost attribution inputs ────────────────────────────────────────────────
+// The repository returns billable volumes only. Pricing lives in apps/api
+// (packages/db must not depend on @wraps/core).
+
+export type BillableCell = {
+  dimensionKey: string;
+  awsAccountId: string | null;
+  billingMonth: string; // 'YYYY-MM', UTC
+  billable: number;
+};
+
+export type AccountMonthVolume = {
+  awsAccountId: string;
+  billingMonth: string; // 'YYYY-MM', UTC
+  billable: number;
+};
+
+const DIMENSION_FIELD = {
+  period: "period",
+  domain: "domain",
+  broadcast: "broadcastId",
+  template: "templateId",
+  source: "source",
+  account: "awsAccountId",
+  region: "region",
+} as const satisfies Record<MetricsDimension, string>;
+
+type DimensionKeyRow = Partial<
+  Record<(typeof DIMENSION_FIELD)[MetricsDimension], string | null | undefined>
+>;
+
+/**
+ * Stable key identifying a row's dimension values. The single implementation
+ * shared by the repository (cells) and apps/api (MetricsRow), so both sides
+ * join on the identical string. With no dimensions the key is "[]".
+ */
+export function metricsDimensionKey(
+  row: DimensionKeyRow,
+  dimensions: MetricsDimension[]
+): string {
+  return JSON.stringify(
+    dimensions.map((dim) => row[DIMENSION_FIELD[dim]] ?? null)
+  );
+}
+
+/**
+ * Billable (non-failed) sends in the query window, split by the requested
+ * dimensions x sending account x UTC calendar month.
+ */
+export async function queryBillableCells(
+  query: MetricsQuery,
+  dbClient: DbClient = db
+): Promise<BillableCell[]> {
+  const timezone = assertValidTimezone(query.timezone ?? "UTC");
+  const dimensions = query.dimensions ?? [];
+  const granularity = query.granularity ?? "daily";
+  const maxRows = query.maxRows ?? DEFAULT_MAX_ROWS;
+  const tzLiteral = sql.raw(`'${timezone}'`);
+
+  const conditions = [
+    ...buildWhereConditions(query),
+    ne(messageSend.status, "failed"),
+  ];
+  const { columns, groupBy, needsAccountJoin } = buildDimensionSelect(
+    dimensions,
+    granularity,
+    tzLiteral
+  );
+
+  // AWS bills in UTC, so the month a send is tiered in is fixed to UTC and
+  // deliberately ignores the caller's timezone (which only moves `period`).
+  // sent_at is `timestamp` without time zone holding UTC wall-clock, so a plain
+  // to_char is correct; `AT TIME ZONE 'UTC'` would make it a timestamptz that
+  // to_char formats in the session zone.
+  const billingMonthExpr = () =>
+    sql<string>`to_char(${messageSend.sentAt}, 'YYYY-MM')`;
+
+  const baseQuery = dbClient
+    .select({
+      ...columns,
+      costAccountId: messageSend.awsAccountId,
+      billingMonth: billingMonthExpr(),
+      billable: sql<number>`count(*)::int`,
+    })
+    .from(messageSend)
+    .$dynamic();
+
+  const joined = needsAccountJoin
+    ? baseQuery.leftJoin(
+        awsAccount,
+        eq(messageSend.awsAccountId, awsAccount.id)
+      )
+    : baseQuery;
+
+  // biome-ignore lint/plugin: buildWhereConditions above always returns eq(messageSend.organizationId, query.organizationId) as its first entry — the plugin can't trace `organizationId` through the `...conditions` spread.
+  const rows = await joined
+    .where(and(...conditions))
+    .groupBy(...groupBy, messageSend.awsAccountId, billingMonthExpr())
+    .limit(maxRows * 20 + 1);
+
+  if (rows.length > maxRows * 20) {
+    throw new MetricsQueryError(
+      "row_cap_exceeded",
+      `Metrics query returned more than ${maxRows * 20} cost cells; narrow the time window, add filters, or use a coarser granularity`
+    );
+  }
+
+  return rows.map((row) => {
+    const { costAccountId, billingMonth, billable, ...dims } = row as Record<
+      string,
+      unknown
+    >;
+    return {
+      dimensionKey: metricsDimensionKey(dims as DimensionKeyRow, dimensions),
+      awsAccountId: (costAccountId as string | null) ?? null,
+      billingMonth: billingMonth as string,
+      billable: billable as number,
+    };
+  });
+}
+
+/**
+ * Each account's billable sends over the WHOLE UTC months touched by
+ * [startTime, endTime]. Tiering depends on the account's full month, so the
+ * broadcast/template/domain filters and the window itself are ignored here;
+ * only the account filter applies.
+ */
+export async function queryAccountMonthVolumes(
+  query: MetricsQuery,
+  dbClient: DbClient = db
+): Promise<AccountMonthVolume[]> {
+  const rangeStart = new Date(
+    Date.UTC(query.startTime.getUTCFullYear(), query.startTime.getUTCMonth(), 1)
+  );
+  const rangeEnd = new Date(
+    Date.UTC(query.endTime.getUTCFullYear(), query.endTime.getUTCMonth() + 1, 1)
+  );
+
+  const conditions = [
+    eq(messageSend.organizationId, query.organizationId),
+    eq(messageSend.channel, "email"),
+    isNotNull(messageSend.sentAt),
+    ne(messageSend.status, "failed"),
+    gte(messageSend.sentAt, rangeStart),
+    lt(messageSend.sentAt, rangeEnd),
+    isNotNull(messageSend.awsAccountId),
+  ];
+  if (query.awsAccountId?.length) {
+    conditions.push(inArray(messageSend.awsAccountId, query.awsAccountId));
+  }
+
+  // UTC month: see queryBillableCells.
+  const billingMonthExpr = () =>
+    sql<string>`to_char(${messageSend.sentAt}, 'YYYY-MM')`;
+
+  // biome-ignore lint/plugin: conditions[0] is eq(messageSend.organizationId, query.organizationId) — the plugin can't trace `organizationId` through the `...conditions` spread.
+  const rows = await dbClient
+    .select({
+      awsAccountId: messageSend.awsAccountId,
+      billingMonth: billingMonthExpr(),
+      billable: sql<number>`count(*)::int`,
+    })
+    .from(messageSend)
+    .where(and(...conditions))
+    .groupBy(messageSend.awsAccountId, billingMonthExpr());
+
+  return rows as AccountMonthVolume[];
 }

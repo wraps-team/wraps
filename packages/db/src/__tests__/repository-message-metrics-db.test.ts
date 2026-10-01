@@ -4,6 +4,8 @@ import { db } from "../index";
 import {
   getMessageMetrics,
   MetricsQueryError,
+  queryAccountMonthVolumes,
+  queryBillableCells,
   queryMessageMetricBuckets,
 } from "../repositories/message-metrics";
 import { awsAccount, batchSend, messageSend, organization } from "../schema";
@@ -16,6 +18,11 @@ const ACCOUNT_A = `metrics-acct-a-${suffix}`;
 const ACCOUNT_B = `metrics-acct-b-${suffix}`;
 const BATCH_A = `metrics-batch-a-${suffix}`;
 const BATCH_B = `metrics-batch-b-${suffix}`;
+const COST_ORG = `metrics-cost-org-${suffix}`;
+const COST_OTHER_ORG = `metrics-cost-other-org-${suffix}`;
+const COST_ACCOUNT = `metrics-cost-acct-${suffix}`;
+const COST_OTHER_ACCOUNT = `metrics-cost-other-acct-${suffix}`;
+const COST_BATCH = `metrics-cost-batch-${suffix}`;
 
 const REAL_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
@@ -410,6 +417,17 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await db.delete(messageSend).where(eq(messageSend.organizationId, COST_ORG));
+  await db
+    .delete(messageSend)
+    .where(eq(messageSend.organizationId, COST_OTHER_ORG));
+  await db.delete(batchSend).where(eq(batchSend.organizationId, COST_ORG));
+  await db.delete(awsAccount).where(eq(awsAccount.organizationId, COST_ORG));
+  await db
+    .delete(awsAccount)
+    .where(eq(awsAccount.organizationId, COST_OTHER_ORG));
+  await db.delete(organization).where(eq(organization.id, COST_ORG));
+  await db.delete(organization).where(eq(organization.id, COST_OTHER_ORG));
   await db.delete(messageSend).where(eq(messageSend.organizationId, ORG_A));
   await db.delete(messageSend).where(eq(messageSend.organizationId, ORG_B));
   await db.delete(batchSend).where(eq(batchSend.organizationId, ORG_A));
@@ -653,5 +671,213 @@ describe("Repository: message metrics", () => {
     // earlier for an unrelated reason.
     expect(result.totals.openedRaw).toBe(1);
     expect(result.totals.opened).toBe(0);
+  });
+});
+
+describe("billable volume for cost attribution", () => {
+  const costRow = (
+    organizationId: string,
+    awsAccountId: string,
+    sentAt: string,
+    status: "sent" | "failed" = "sent",
+    batchSendId: string | null = null
+  ) => {
+    const id = rowId();
+    return {
+      id,
+      organizationId,
+      awsAccountId,
+      batchSendId,
+      channel: "email" as const,
+      sourceType: "transactional" as const,
+      recipient: "recipient@example.com",
+      from: "billing@wraps.dev",
+      messageId: id,
+      status,
+      sentAt: new Date(sentAt),
+    };
+  };
+
+  beforeAll(async () => {
+    await db
+      .insert(organization)
+      .values([
+        {
+          id: COST_ORG,
+          name: "Metrics Cost Org",
+          slug: `metrics-cost-${suffix}`,
+          createdAt: new Date(),
+        },
+        {
+          id: COST_OTHER_ORG,
+          name: "Metrics Cost Other Org",
+          slug: `metrics-cost-other-${suffix}`,
+          createdAt: new Date(),
+        },
+      ])
+      .onConflictDoNothing();
+
+    await db
+      .insert(awsAccount)
+      .values([
+        {
+          id: COST_ACCOUNT,
+          organizationId: COST_ORG,
+          name: "Cost A",
+          accountId: "333333333333",
+          region: "us-east-1",
+          roleArn: "arn:aws:iam::333333333333:role/wraps",
+          externalId: `${suffix}-ext-cost`,
+        },
+        {
+          id: COST_OTHER_ACCOUNT,
+          organizationId: COST_OTHER_ORG,
+          name: "Cost B",
+          accountId: "444444444444",
+          region: "us-east-1",
+          roleArn: "arn:aws:iam::444444444444:role/wraps",
+          externalId: `${suffix}-ext-cost-other`,
+        },
+      ])
+      .onConflictDoNothing();
+
+    await db
+      .insert(batchSend)
+      .values({ id: COST_BATCH, organizationId: COST_ORG })
+      .onConflictDoNothing();
+
+    const rows = [
+      // March: 2 sends just before the month boundary.
+      costRow(COST_ORG, COST_ACCOUNT, "2026-03-31T23:30:00Z"),
+      costRow(COST_ORG, COST_ACCOUNT, "2026-03-31T23:31:00Z"),
+      // April 1 02:00Z: 3 sends + 1 failed (still 2026-03-31 in New York).
+      costRow(COST_ORG, COST_ACCOUNT, "2026-04-01T02:00:00Z"),
+      costRow(COST_ORG, COST_ACCOUNT, "2026-04-01T02:00:00Z"),
+      costRow(COST_ORG, COST_ACCOUNT, "2026-04-01T02:00:00Z"),
+      costRow(COST_ORG, COST_ACCOUNT, "2026-04-01T02:00:00Z", "failed"),
+      // Mid April: 2 in a broadcast, 1 failed, and 1 later outside the window.
+      costRow(
+        COST_ORG,
+        COST_ACCOUNT,
+        "2026-04-15T12:00:00Z",
+        "sent",
+        COST_BATCH
+      ),
+      costRow(
+        COST_ORG,
+        COST_ACCOUNT,
+        "2026-04-15T12:00:00Z",
+        "sent",
+        COST_BATCH
+      ),
+      costRow(COST_ORG, COST_ACCOUNT, "2026-04-15T12:00:00Z", "failed"),
+      costRow(COST_ORG, COST_ACCOUNT, "2026-04-20T12:00:00Z"),
+      // Another org, same month.
+      ...Array.from({ length: 5 }, () =>
+        costRow(COST_OTHER_ORG, COST_OTHER_ACCOUNT, "2026-04-15T12:00:00Z")
+      ),
+    ];
+    await db.insert(messageSend).values(rows).onConflictDoNothing();
+  });
+
+  const APRIL_15 = {
+    startTime: new Date("2026-04-15T00:00:00Z"),
+    endTime: new Date("2026-04-15T23:59:59Z"),
+  };
+
+  it("excludes failed rows from cells", async () => {
+    const cells = await queryBillableCells({
+      organizationId: COST_ORG,
+      ...APRIL_15,
+    });
+
+    expect(cells).toEqual([
+      {
+        dimensionKey: "[]",
+        awsAccountId: COST_ACCOUNT,
+        billingMonth: "2026-04",
+        billable: 2,
+      },
+    ]);
+  });
+
+  it("splits a window spanning a month boundary into two billing months", async () => {
+    const cells = await queryBillableCells({
+      organizationId: COST_ORG,
+      startTime: new Date("2026-03-31T23:00:00Z"),
+      endTime: new Date("2026-04-01T03:00:00Z"),
+    });
+
+    const byMonth = Object.fromEntries(
+      cells.map((c) => [c.billingMonth, c.billable])
+    );
+    expect(byMonth).toEqual({ "2026-03": 2, "2026-04": 3 });
+  });
+
+  it("keeps the billing month in UTC while the period follows the caller's timezone", async () => {
+    const cells = await queryBillableCells({
+      organizationId: COST_ORG,
+      startTime: new Date("2026-03-31T23:00:00Z"),
+      endTime: new Date("2026-04-01T03:00:00Z"),
+      timezone: "America/New_York",
+      dimensions: ["period"],
+    });
+
+    const april = cells.find((c) => c.billingMonth === "2026-04");
+    expect(april).toMatchObject({
+      dimensionKey: JSON.stringify(["2026-03-31"]),
+      billable: 3,
+    });
+  });
+
+  it("counts an account's whole UTC month, ignoring the window and non-account filters", async () => {
+    const unfiltered = await queryAccountMonthVolumes({
+      organizationId: COST_ORG,
+      ...APRIL_15,
+    });
+    expect(unfiltered).toEqual([
+      { awsAccountId: COST_ACCOUNT, billingMonth: "2026-04", billable: 6 },
+    ]);
+
+    const filtered = await queryAccountMonthVolumes({
+      organizationId: COST_ORG,
+      ...APRIL_15,
+      broadcastId: [COST_BATCH],
+    });
+    expect(filtered).toEqual(unfiltered);
+  });
+
+  it("never returns another org's sends", async () => {
+    const window = {
+      startTime: new Date("2026-03-01T00:00:00Z"),
+      endTime: new Date("2026-04-30T23:59:59Z"),
+    };
+    const cells = await queryBillableCells({
+      organizationId: COST_ORG,
+      ...window,
+    });
+    const volumes = await queryAccountMonthVolumes({
+      organizationId: COST_ORG,
+      ...window,
+    });
+
+    expect(cells.some((c) => c.awsAccountId === COST_OTHER_ACCOUNT)).toBe(
+      false
+    );
+    expect(volumes.some((v) => v.awsAccountId === COST_OTHER_ACCOUNT)).toBe(
+      false
+    );
+
+    const other = await queryAccountMonthVolumes({
+      organizationId: COST_OTHER_ORG,
+      ...window,
+    });
+    expect(other).toEqual([
+      {
+        awsAccountId: COST_OTHER_ACCOUNT,
+        billingMonth: "2026-04",
+        billable: 5,
+      },
+    ]);
   });
 });

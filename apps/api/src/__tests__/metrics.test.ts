@@ -2,14 +2,32 @@ import { Elysia } from "elysia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthContext } from "../middleware/auth";
 
-const { mockGetMessageMetrics } = vi.hoisted(() => ({
+const {
+  mockGetMessageMetrics,
+  mockQueryBillableCells,
+  mockQueryAccountMonthVolumes,
+  mockAccountWhere,
+} = vi.hoisted(() => ({
   mockGetMessageMetrics: vi.fn(),
+  mockQueryBillableCells: vi.fn(),
+  mockQueryAccountMonthVolumes: vi.fn(),
+  mockAccountWhere: vi.fn(),
 }));
 
 vi.mock("@wraps/db", async () => {
   const actual = await vi.importActual<typeof import("@wraps/db")>("@wraps/db");
   return {
     getMessageMetrics: mockGetMessageMetrics,
+    queryBillableCells: mockQueryBillableCells,
+    queryAccountMonthVolumes: mockQueryAccountMonthVolumes,
+    metricsDimensionKey: actual.metricsDimensionKey,
+    db: { select: () => ({ from: () => ({ where: mockAccountWhere }) }) },
+    awsAccount: {
+      id: "awsAccount.id",
+      healthDetail: "awsAccount.healthDetail",
+      organizationId: "awsAccount.organizationId",
+    },
+    eq: (column: unknown, value: unknown) => ({ column, value }),
     MetricsQueryError: actual.MetricsQueryError,
   };
 });
@@ -86,6 +104,9 @@ describe("GET /v1/email/metrics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetMessageMetrics.mockResolvedValue(emptyResult);
+    mockQueryBillableCells.mockResolvedValue([]);
+    mockQueryAccountMonthVolumes.mockResolvedValue([]);
+    mockAccountWhere.mockResolvedValue([]);
   });
 
   it("returns 401 when no auth header is provided", async () => {
@@ -219,5 +240,87 @@ describe("GET /v1/email/metrics", () => {
     });
     expect(body.meta.start_date).toEqual(expect.any(String));
     expect(body.meta.end_date).toEqual(expect.any(String));
+    expect(body.totals.costUsd).toBe(0);
+    expect(body.data[0].costUsd).toBe(0);
+    expect(body.meta.cost).toMatchObject({
+      currency: "USD",
+      basis: "monthly-average",
+      planSource: "current",
+      plans: {},
+      unattributed: 0,
+    });
+  });
+
+  it("states what the cost estimate excludes and that months are billed in UTC", async () => {
+    const app = createApp();
+    const response = await app.handle(
+      authedGet("/v1/email/metrics?timezone=America/New_York")
+    );
+    const body = await response.json();
+
+    expect(body.meta.cost.billingTimezone).toBe("UTC");
+    expect(body.meta.cost.includes).toEqual(["ses-outbound-sending"]);
+    expect(body.meta.cost.excludes).toEqual(
+      expect.arrayContaining([
+        "plan-base-fee",
+        "data-transfer",
+        "storage",
+        "lambda",
+        "dedicated-ip",
+        "sends-not-made-through-wraps",
+      ])
+    );
+    expect(body.meta.cost.excludes).toHaveLength(6);
+  });
+
+  it("scopes the account plan read to the auth context's org", async () => {
+    const app = createApp();
+    await app.handle(authedGet("/v1/email/metrics?organization_id=other-org"));
+
+    expect(mockAccountWhere).toHaveBeenCalledTimes(1);
+    const where = mockAccountWhere.mock.calls[0]?.[0];
+    expect(where).toEqual({
+      column: "awsAccount.organizationId",
+      value: mockAuthContext.organizationId,
+    });
+    expect(JSON.stringify(where)).not.toContain("other-org");
+    expect(mockQueryBillableCells.mock.calls[0]?.[0].organizationId).toBe(
+      mockAuthContext.organizationId
+    );
+    expect(mockQueryAccountMonthVolumes.mock.calls[0]?.[0].organizationId).toBe(
+      mockAuthContext.organizationId
+    );
+  });
+
+  it("reports null cost, not 0, for an account with no recorded plan", async () => {
+    mockGetMessageMetrics.mockResolvedValue({
+      totals: { ...emptyResult.totals, sent: 5 },
+      data: [{ period: "2026-08-30", ...emptyResult.totals, sent: 5 }],
+    });
+    mockQueryBillableCells.mockResolvedValue([
+      {
+        dimensionKey: JSON.stringify(["2026-08-30"]),
+        awsAccountId: "acct-no-plan",
+        billingMonth: "2026-08",
+        billable: 5,
+      },
+    ]);
+    mockQueryAccountMonthVolumes.mockResolvedValue([
+      { awsAccountId: "acct-no-plan", billingMonth: "2026-08", billable: 5 },
+    ]);
+    mockAccountWhere.mockResolvedValue([
+      { id: "acct-no-plan", healthDetail: null },
+    ]);
+
+    const app = createApp();
+    const response = await app.handle(
+      authedGet("/v1/email/metrics?dimensions=period")
+    );
+    const body = await response.json();
+
+    expect(body.totals.costUsd).toBeNull();
+    expect(body.data[0].costUsd).toBeNull();
+    expect(body.meta.cost.unattributed).toBeGreaterThan(0);
+    expect(body.meta.cost.plans).toEqual({ "acct-no-plan": null });
   });
 });

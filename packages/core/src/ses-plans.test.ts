@@ -5,7 +5,9 @@ import {
   monthlyCostForPlan,
   SES_PLAN_FEATURE_LABELS,
   SES_PLAN_FEATURES,
+  SES_PLAN_RATES,
   SES_PRICING_PLANS,
+  sendingCostForPlan,
 } from "./ses-plans.js";
 
 const IMPORT_STATEMENT_PATTERN = /^import /m;
@@ -101,5 +103,29 @@ describe("monthlyCostForPlan spot checks", () => {
   it("prices 300K emails/mo on PRO at $171 (base + first-tier rate)", () => {
     // $105 base plus 300 * $0.22 = $66.
     expect(monthlyCostForPlan("PRO", 300_000)).toBe(171);
+  });
+});
+
+describe("sendingCostForPlan", () => {
+  it("does not round: one email on ESSENTIALS is $0.00016", () => {
+    expect(sendingCostForPlan("ESSENTIALS", 1)).toBeCloseTo(0.000_16, 10);
+  });
+
+  it("excludes the base fee: zero emails on PRO cost nothing", () => {
+    expect(sendingCostForPlan("PRO", 0)).toBe(0);
+  });
+
+  it("agrees with monthlyCostForPlan once base is added and cents are rounded", () => {
+    for (const plan of SES_PRICING_PLANS) {
+      for (const volume of [0, 1, 300_000, 20_000_000]) {
+        expect(monthlyCostForPlan(plan, volume)).toBe(
+          Math.round(
+            (SES_PLAN_RATES[plan].monthlyBase +
+              sendingCostForPlan(plan, volume)) *
+              100
+          ) / 100
+        );
+      }
+    }
   });
 });
