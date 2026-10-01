@@ -210,7 +210,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/tools/mx-lookup": "2026-09-29T22:47:50-06:00",
   "/tools/ses-calculator": "2026-09-24T09:11:17-06:00",
   "/tools/ses-production-access": "2026-09-18T16:14:52-06:00",
-  "/tools/spf-builder": "2026-09-18T16:14:44-06:00",
+  "/tools/spf-builder": "2026-10-01T02:02:29-06:00",
   "/versus": "2026-09-16T13:30:58-06:00",
   "/versus/agentmail-vs-mailslurp": "2026-09-16T16:18:25-06:00",
   "/versus/agentmail-vs-nylas": "2026-09-16T16:18:25-06:00",
