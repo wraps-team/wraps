@@ -288,8 +288,13 @@ describe("topic_subscribers_page_changed", () => {
         name: "View subscribers for Product Updates",
       })
     );
-    await waitFor(() => expect(getTopicSubscribers).toHaveBeenCalled());
-    await userEvent.click(screen.getByRole("button", { name: /^next$/i }));
+    // The fetch runs in a transition: `total` can commit (rendering Next)
+    // while `isPending` still disables it, and a click on a disabled button
+    // is a no-op. Wait for page 1 to land and Next to be clickable.
+    await screen.findByText("c0@example.com");
+    const next = screen.getByRole("button", { name: /^next$/i });
+    await waitFor(() => expect(next).toBeEnabled());
+    await userEvent.click(next);
 
     expect(capture).toHaveBeenCalledWith("topic_subscribers_page_changed", {
       direction: "next",
