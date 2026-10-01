@@ -1,10 +1,7 @@
 import { isSelfHosted } from "@/lib/plan-limits";
 import { AccountDetails } from "./components/account-details";
-import { AccountFeatures } from "./components/account-features";
 import { IAMConfiguration } from "./components/iam-configuration";
 import { QuotaReserve } from "./components/quota-reserve";
-import { SesPlanCard } from "./components/ses-plan-card";
-import { VdmStatusCard } from "./components/vdm-status-card";
 import { WebhookConfiguration } from "./components/webhook-configuration";
 import { toClientAccount } from "./lib/client-account";
 import { loadAccountPage } from "./lib/load-account";
@@ -27,7 +24,7 @@ export default async function AWSAccountPage({
   const { region } = await searchParams;
 
   // An array is "present but not equal" and redirects like any other mismatch.
-  const { account, organization, permissions } = await loadAccountPage({
+  const { account, permissions, regional } = await loadAccountPage({
     orgSlug,
     accountId,
     tab: "",
@@ -37,22 +34,10 @@ export default async function AWSAccountPage({
 
   // Props to client components are serialized whole: hand them the allowlist,
   // never the row (it carries the SES webhook secret).
-  const clientAccount = toClientAccount(account);
+  const clientAccount = toClientAccount(account, regional);
 
   return (
     <div className="space-y-6">
-      {/* Deployed Features */}
-      <AccountFeatures
-        account={clientAccount}
-        organizationId={organization.id}
-      />
-
-      {/* AWS SES pricing plan - read-only, visible to every viewer */}
-      <SesPlanCard account={clientAccount} />
-
-      {/* Virtual Deliverability Manager - read-only, visible to every viewer */}
-      <VdmStatusCard account={clientAccount} />
-
       {/* Account Details */}
       <AccountDetails account={clientAccount} />
 

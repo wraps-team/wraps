@@ -1,4 +1,5 @@
 import type { awsAccount } from "@wraps/db";
+import type { AccountRegionalView } from "./load-account";
 
 type AwsAccountRow = typeof awsAccount.$inferSelect;
 
@@ -26,7 +27,10 @@ export type ClientAccount = Pick<
   webhookConnected: boolean;
 };
 
-export function toClientAccount(row: AwsAccountRow): ClientAccount {
+export function toClientAccount(
+  row: AwsAccountRow,
+  regional: AccountRegionalView
+): ClientAccount {
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -36,9 +40,9 @@ export function toClientAccount(row: AwsAccountRow): ClientAccount {
     roleArn: row.roleArn,
     externalId: row.externalId,
     updatedAt: row.updatedAt,
-    features: row.features,
-    healthDetail: row.healthDetail,
-    dailyQuotaReserve: row.dailyQuotaReserve,
-    webhookConnected: !!row.webhookSecret,
+    features: regional.features,
+    healthDetail: regional.healthDetail,
+    dailyQuotaReserve: regional.dailyQuotaReserve,
+    webhookConnected: regional.webhookConnected,
   };
 }

@@ -16,6 +16,7 @@ import type { ClientAccount } from "../lib/client-account";
 
 type VdmStatusCardProps = {
   account: Pick<ClientAccount, "healthDetail" | "region">;
+  iamRoleHref: string;
 };
 
 /**
@@ -25,7 +26,7 @@ type VdmStatusCardProps = {
  * the already org-scoped `account` row the parent page passes down, same
  * pattern as `stale-policy-banner.tsx`. Visible to every viewer.
  */
-export function VdmStatusCard({ account }: VdmStatusCardProps) {
+export function VdmStatusCard({ account, iamRoleHref }: VdmStatusCardProps) {
   const vdm = account.healthDetail?.vdm;
 
   // Never measured yet — say nothing rather than guess.
@@ -109,7 +110,7 @@ export function VdmStatusCard({ account }: VdmStatusCardProps) {
           <p className="text-muted-foreground text-sm">
             Wraps can&apos;t read VDM recommendations: this account&apos;s
             wraps-console-access-role is missing ses:ListRecommendations.{" "}
-            <a className="underline" href="#iam-role">
+            <a className="underline" href={iamRoleHref}>
               Update the IAM role
             </a>
             .

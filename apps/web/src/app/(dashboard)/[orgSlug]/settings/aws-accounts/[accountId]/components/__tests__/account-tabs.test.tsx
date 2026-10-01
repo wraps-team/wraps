@@ -43,6 +43,15 @@ describe("AccountTabs", () => {
     );
   });
 
+  it("marks Services current on the services segment", () => {
+    useSelectedLayoutSegment.mockReturnValue("services");
+    render(<AccountTabs baseHref={baseHref} canManage={true} />);
+
+    const services = screen.getByRole("link", { name: "Services" });
+    expect(services).toHaveAttribute("aria-current", "page");
+    expect(services).toHaveAttribute("href", `${baseHref}/services`);
+  });
+
   it("hides the Access tab when the user cannot manage", () => {
     useSelectedLayoutSegment.mockReturnValue(null);
     render(<AccountTabs baseHref={baseHref} canManage={false} />);

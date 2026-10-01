@@ -14,6 +14,7 @@ type Tab = {
 // Later phases append to this array.
 const TABS: readonly Tab[] = [
   { segment: null, label: "Overview", href: "" },
+  { segment: "services", label: "Services", href: "/services" },
   { segment: "access", label: "Access", href: "/access", manageOnly: true },
 ];
 

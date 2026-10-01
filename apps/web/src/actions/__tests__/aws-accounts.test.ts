@@ -1636,6 +1636,12 @@ describe("scanAWSAccountFeatures — config set detection", () => {
     });
     expect(row?.emailEnabled).toBe(true);
     expect(row?.features?.email?.configSetName).toBe("wraps-email-tracking");
+
+    const scannedAt = row?.features?.scannedAt;
+    expect(typeof scannedAt).toBe("string");
+    const ageMs = Date.now() - new Date(scannedAt as string).getTime();
+    expect(ageMs).toBeGreaterThanOrEqual(0);
+    expect(ageMs).toBeLessThan(60_000);
   });
 
   it("records the sending pool and managed dedicated IP count", async () => {

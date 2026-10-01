@@ -827,6 +827,7 @@ export const scanAWSAccountFeatures: (
 
       // 15. Build features JSON object
       const featuresJson = {
+        scannedAt: new Date().toISOString(),
         email: {
           configSetName,
           sandbox: sesSandbox,
@@ -930,7 +931,10 @@ export const scanAWSAccountFeatures: (
 
       // 18. Revalidate pages (layout will re-fetch products status)
       const orgSlug = ctx.access.orgSlug;
-      revalidatePath(`/${orgSlug}/settings/aws-accounts/${awsAccountId}`);
+      revalidatePath(
+        `/${orgSlug}/settings/aws-accounts/${awsAccountId}`,
+        "layout"
+      );
       revalidatePath(`/${orgSlug}/settings`);
       revalidatePath(`/${orgSlug}`);
       revalidatePath(`/${orgSlug}/emails/inbound`);

@@ -31,7 +31,10 @@ function healthDetail(overrides: Partial<HealthDetail> = {}): HealthDetail {
 describe("VdmStatusCard", () => {
   it("renders nothing when healthDetail is null", () => {
     const { container } = render(
-      <VdmStatusCard account={{ region: "us-east-1", healthDetail: null }} />
+      <VdmStatusCard
+        account={{ region: "us-east-1", healthDetail: null }}
+        iamRoleHref="/acme/settings/aws-accounts/acct-1#iam-role"
+      />
     );
 
     expect(container.innerHTML).toBe("");
@@ -41,6 +44,7 @@ describe("VdmStatusCard", () => {
     const { container } = render(
       <VdmStatusCard
         account={{ region: "us-east-1", healthDetail: healthDetail() }}
+        iamRoleHref="/acme/settings/aws-accounts/acct-1#iam-role"
       />
     );
 
@@ -62,6 +66,7 @@ describe("VdmStatusCard", () => {
             },
           }),
         }}
+        iamRoleHref="/acme/settings/aws-accounts/acct-1#iam-role"
       />
     );
 
@@ -89,12 +94,16 @@ describe("VdmStatusCard", () => {
             },
           }),
         }}
+        iamRoleHref="/acme/settings/aws-accounts/acct-1#iam-role"
       />
     );
 
     expect(screen.getByText(/ses:ListRecommendations/)).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Update the IAM role" });
-    expect(link).toHaveAttribute("href", "#iam-role");
+    expect(link).toHaveAttribute(
+      "href",
+      "/acme/settings/aws-accounts/acct-1#iam-role"
+    );
   });
 
   it("shows 'No open recommendations.' when status is ok with an empty list", () => {
@@ -112,6 +121,7 @@ describe("VdmStatusCard", () => {
             },
           }),
         }}
+        iamRoleHref="/acme/settings/aws-accounts/acct-1#iam-role"
       />
     );
 
@@ -132,6 +142,7 @@ describe("VdmStatusCard", () => {
             },
           }),
         }}
+        iamRoleHref="/acme/settings/aws-accounts/acct-1#iam-role"
       />
     );
 
@@ -156,6 +167,7 @@ describe("VdmStatusCard", () => {
               },
             }),
           }}
+          iamRoleHref="/acme/settings/aws-accounts/acct-1#iam-role"
         />
       )
     ).not.toThrow();
@@ -180,6 +192,7 @@ describe("VdmStatusCard", () => {
             },
           }),
         }}
+        iamRoleHref="/acme/settings/aws-accounts/acct-1#iam-role"
       />
     );
 

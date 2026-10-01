@@ -246,6 +246,8 @@ export const awsAccount = pgTable(
 
     // Detailed scanned features (populated by "Scan Features" button)
     features: json("features").$type<{
+      /** ISO time of the last full scanAWSAccountFeatures run. Absent on rows scanned before this field, and on features written by other paths. */
+      scannedAt?: string;
       email?: {
         configSetName?: string;
         sandbox?: boolean;
