@@ -37,7 +37,10 @@ export default async function AccountLayout({
           above: its only call to action is a link to the IAM role card,
           which only managers can see. */}
       {permissions.canManage && (
-        <StalePolicyBanner account={account} href={`${baseHref}#iam-role`} />
+        <StalePolicyBanner
+          account={account}
+          href={`${baseHref}/connection#iam-role`}
+        />
       )}
 
       <AccountTabs baseHref={baseHref} canManage={permissions.canManage} />

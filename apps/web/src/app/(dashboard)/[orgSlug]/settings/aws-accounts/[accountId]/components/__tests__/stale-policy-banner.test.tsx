@@ -52,7 +52,7 @@ describe("StalePolicyBanner", () => {
     expect(
       screen.getByText("Your AWS role is behind the current Wraps policy")
     ).toBeInTheDocument();
-    const link = screen.getByRole("link", { name: "IAM Role Configuration" });
+    const link = screen.getByRole("link", { name: "Connection → Role access" });
     expect(link).toHaveAttribute("href", "#iam-role");
   });
 

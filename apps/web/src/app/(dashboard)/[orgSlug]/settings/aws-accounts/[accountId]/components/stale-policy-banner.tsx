@@ -54,11 +54,11 @@ export function StalePolicyBanner({
           Wraps can still reach this account, but its wraps-console-access-role
           is missing permissions added since it was created. Features that
           depend on them may appear switched off even though they are deployed.
-          See{" "}
+          Open{" "}
           <a className="underline" href={href}>
-            IAM Role Configuration
+            Connection → Role access
           </a>{" "}
-          below to update it.
+          to update it.
         </p>
       </AlertDescription>
     </Alert>

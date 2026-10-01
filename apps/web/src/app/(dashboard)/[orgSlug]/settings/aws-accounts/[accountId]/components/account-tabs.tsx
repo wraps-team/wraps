@@ -15,6 +15,7 @@ type Tab = {
 const TABS: readonly Tab[] = [
   { segment: null, label: "Overview", href: "" },
   { segment: "services", label: "Services", href: "/services" },
+  { segment: "connection", label: "Connection", href: "/connection" },
   { segment: "access", label: "Access", href: "/access", manageOnly: true },
 ];
 

@@ -105,7 +105,7 @@ function DeniedState({
               ID as-is. Details, including the template URL, are on the
               account&apos;s{" "}
               <Link className="underline underline-offset-4" href={iamRoleHref}>
-                IAM Role Configuration
+                Role access
               </Link>{" "}
               card.
             </p>
@@ -200,7 +200,7 @@ export default async function SuppressionsPage({
   if (allDenied) {
     const iamRoleHref =
       accounts.length === 1
-        ? `/${orgSlug}/settings/aws-accounts/${accounts[0].id}#iam-role`
+        ? `/${orgSlug}/settings/aws-accounts/${accounts[0].id}/connection#iam-role`
         : `/${orgSlug}/settings/aws-accounts`;
 
     return (

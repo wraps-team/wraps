@@ -306,7 +306,9 @@ export function OrganizationSettingsAwsAccounts({
                         </div>
                         {account.status.label === "Role unreachable" && (
                           <Button asChild size="sm" variant="outline">
-                            <Link href={`${detailHref}#iam-role`}>Fix</Link>
+                            <Link href={`${detailHref}/connection#iam-role`}>
+                              Fix
+                            </Link>
                           </Button>
                         )}
                       </div>

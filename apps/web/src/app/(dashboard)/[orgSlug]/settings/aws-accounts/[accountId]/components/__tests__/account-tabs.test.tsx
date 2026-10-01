@@ -52,6 +52,15 @@ describe("AccountTabs", () => {
     expect(services).toHaveAttribute("href", `${baseHref}/services`);
   });
 
+  it("marks Connection current on the connection segment", () => {
+    useSelectedLayoutSegment.mockReturnValue("connection");
+    render(<AccountTabs baseHref={baseHref} canManage={true} />);
+
+    const connection = screen.getByRole("link", { name: "Connection" });
+    expect(connection).toHaveAttribute("aria-current", "page");
+    expect(connection).toHaveAttribute("href", `${baseHref}/connection`);
+  });
+
   it("hides the Access tab when the user cannot manage", () => {
     useSelectedLayoutSegment.mockReturnValue(null);
     render(<AccountTabs baseHref={baseHref} canManage={false} />);

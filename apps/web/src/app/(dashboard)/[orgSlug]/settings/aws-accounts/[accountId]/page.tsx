@@ -1,8 +1,4 @@
-import { isSelfHosted } from "@/lib/plan-limits";
-import { AccountDetails } from "./components/account-details";
-import { IAMConfiguration } from "./components/iam-configuration";
 import { QuotaReserve } from "./components/quota-reserve";
-import { WebhookConfiguration } from "./components/webhook-configuration";
 import { toClientAccount } from "./lib/client-account";
 import { loadAccountPage } from "./lib/load-account";
 
@@ -38,21 +34,6 @@ export default async function AWSAccountPage({
 
   return (
     <div className="space-y-6">
-      {/* Account Details */}
-      <AccountDetails account={clientAccount} />
-
-      {/* IAM role repair - the landing spot for the aws.role_unreachable
-          notification, so the CloudFormation fix has to live here and not
-          only on the account list. Managers only: it rewrites the role. */}
-      {permissions.canManage && (
-        <IAMConfiguration account={clientAccount} selfHosted={isSelfHosted()} />
-      )}
-
-      {/* Platform Connection - only show to managers */}
-      {permissions.canManage && (
-        <WebhookConfiguration account={clientAccount} />
-      )}
-
       {/* Daily Quota Reserve - only show to managers */}
       {permissions.canManage && <QuotaReserve account={clientAccount} />}
     </div>

@@ -38,7 +38,7 @@ export function buildEventFeedStaleEmail({
   lastEventAt,
   observedSendCount,
 }: EventFeedStaleContent): { subject: string; html: string; text: string } {
-  const settingsUrl = `${resolveAppUrl()}/${orgSlug}/settings/aws-accounts/${awsAccountId}`;
+  const settingsUrl = `${resolveAppUrl()}/${orgSlug}/settings/aws-accounts/${awsAccountId}/connection?region=${encodeURIComponent(region)}`;
   const since = formatTimestamp(lastEventAt);
 
   const subject = `SES event feed stalled for ${accountName} (${awsAccountNumber})`;

@@ -145,7 +145,7 @@ describe("self-hosted AWS connect instructions", () => {
 
       const link = screen.getByRole("link", { name: "Fix" });
       expect(link.getAttribute("href")).toBe(
-        "/acme/settings/aws-accounts/acct-1#iam-role"
+        "/acme/settings/aws-accounts/acct-1/connection#iam-role"
       );
       // Every account in this list is already connected, and a quick-create
       // link can only create: `stackName` must be unique per region and the

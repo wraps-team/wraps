@@ -247,7 +247,9 @@ describe("account-health console-policy-stale notification", () => {
       awsAccountId: ACCOUNT_ROW.id,
       version: CURRENT_CONSOLE_POLICY_VERSION - 1,
     });
-    expect(payload.href).toBe(`/acme/settings/aws-accounts/${ACCOUNT_ROW.id}`);
+    expect(payload.href).toBe(
+      `/acme/settings/aws-accounts/${ACCOUNT_ROW.id}/connection`
+    );
     expect(mockCaptureException).not.toHaveBeenCalled();
     // Not an incident — no internal Sentry signal, unlike aws.role_unreachable.
     expect(mockCaptureMessage).not.toHaveBeenCalled();

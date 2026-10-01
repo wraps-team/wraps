@@ -51,7 +51,7 @@ export default async function ServicesPage({
       {/* Virtual Deliverability Manager - read-only, visible to every viewer */}
       <VdmStatusCard
         account={clientAccount}
-        iamRoleHref={`/${orgSlug}/settings/aws-accounts/${accountId}#iam-role`}
+        iamRoleHref={`/${orgSlug}/settings/aws-accounts/${accountId}/connection#iam-role`}
       />
 
       {regional.smsEnabled && (
