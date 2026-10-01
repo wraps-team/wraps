@@ -78,7 +78,7 @@ jobs:
         run: pnpm --dir packages/cli test -- --coverage
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         if: matrix.node-version == '22.x'
         with:
           files: ./packages/cli/coverage/coverage-final.json
