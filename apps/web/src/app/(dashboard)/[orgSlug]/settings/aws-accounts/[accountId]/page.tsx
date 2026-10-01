@@ -1,5 +1,3 @@
-import { QuotaReserve } from "./components/quota-reserve";
-import { toClientAccount } from "./lib/client-account";
 import { loadAccountPage } from "./lib/load-account";
 
 type AWSAccountPageProps = {
@@ -20,7 +18,7 @@ export default async function AWSAccountPage({
   const { region } = await searchParams;
 
   // An array is "present but not equal" and redirects like any other mismatch.
-  const { account, permissions, regional } = await loadAccountPage({
+  await loadAccountPage({
     orgSlug,
     accountId,
     tab: "",
@@ -28,14 +26,11 @@ export default async function AWSAccountPage({
     require: "view",
   });
 
-  // Props to client components are serialized whole: hand them the allowlist,
-  // never the row (it carries the SES webhook secret).
-  const clientAccount = toClientAccount(account, regional);
-
+  // Phase 7 puts the health summary here; everything else has moved to a tab.
   return (
-    <div className="space-y-6">
-      {/* Daily Quota Reserve - only show to managers */}
-      {permissions.canManage && <QuotaReserve account={clientAccount} />}
-    </div>
+    <p className="text-muted-foreground text-sm">
+      Use the tabs above to see this account's services, connection and
+      settings.
+    </p>
   );
 }

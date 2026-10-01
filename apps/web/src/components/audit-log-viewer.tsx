@@ -126,6 +126,7 @@ const ACTION_LABELS: Record<AuditLogAction, string> = {
   "settings.webhook_secret_saved": "Webhook Secret Saved",
   "settings.webhook_secret_removed": "Webhook Secret Removed",
   "settings.daily_quota_reserve_saved": "Daily Quota Reserve Saved",
+  "aws_account.renamed": "AWS Account Renamed",
   "block.updated": "Block Updated",
   "block.deleted": "Block Deleted",
   "template.duplicated": "Template Duplicated",

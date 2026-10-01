@@ -61,6 +61,24 @@ describe("AccountTabs", () => {
     expect(connection).toHaveAttribute("href", `${baseHref}/connection`);
   });
 
+  it("marks Settings current on the settings segment", () => {
+    useSelectedLayoutSegment.mockReturnValue("settings");
+    render(<AccountTabs baseHref={baseHref} canManage={true} />);
+
+    const settings = screen.getByRole("link", { name: "Settings" });
+    expect(settings).toHaveAttribute("aria-current", "page");
+    expect(settings).toHaveAttribute("href", `${baseHref}/settings`);
+  });
+
+  it("hides the Settings tab when the user cannot manage", () => {
+    useSelectedLayoutSegment.mockReturnValue(null);
+    render(<AccountTabs baseHref={baseHref} canManage={false} />);
+
+    expect(
+      screen.queryByRole("link", { name: "Settings" })
+    ).not.toBeInTheDocument();
+  });
+
   it("hides the Access tab when the user cannot manage", () => {
     useSelectedLayoutSegment.mockReturnValue(null);
     render(<AccountTabs baseHref={baseHref} canManage={false} />);

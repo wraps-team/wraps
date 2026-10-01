@@ -27,7 +27,12 @@ export type AccountRegionalView = {
   webhookConnected: boolean;
 };
 
-export type AccountTab = "" | "/access" | "/services" | "/connection";
+export type AccountTab =
+  | ""
+  | "/access"
+  | "/services"
+  | "/connection"
+  | "/settings";
 
 // Cached per request on primitive args (React cache() dedupes by argument
 // identity), so the layout and the page share one lookup.

@@ -18,9 +18,10 @@ import type { ClientAccount } from "../lib/client-account";
 
 type QuotaReserveProps = {
   account: ClientAccount;
+  region: string;
 };
 
-export function QuotaReserve({ account }: QuotaReserveProps) {
+export function QuotaReserve({ account, region }: QuotaReserveProps) {
   const [reserveInput, setReserveInput] = useState(
     account.dailyQuotaReserve != null ? String(account.dailyQuotaReserve) : ""
   );
@@ -58,11 +59,11 @@ export function QuotaReserve({ account }: QuotaReserveProps) {
   };
 
   return (
-    <Card>
+    <Card id="quota-reserve">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5" />
-          Daily quota reserve
+          Daily quota reserve · {region}
         </CardTitle>
         <CardDescription>
           Broadcasts will never use this many emails of your daily SES quota,

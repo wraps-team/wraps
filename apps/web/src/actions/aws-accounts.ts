@@ -42,10 +42,12 @@ import {
 } from "@/lib/aws/assume-role";
 import { getOrAssumeRole } from "@/lib/aws/credential-cache";
 import { findWrapsArchive } from "@/lib/aws/mailmanager";
+import { renameAwsAccountSchema } from "@/lib/forms/aws-account";
 import {
   connectAWSAccountFormOpts,
   connectAWSAccountSchema,
 } from "@/lib/forms/connect-aws-account";
+import { checkAWSAccountAccess } from "@/lib/permissions/check-access";
 import { grantAWSAccountAccess } from "@/lib/permissions/grant-access";
 import { getOrganizationPlan, isSelfHosted } from "@/lib/plan-limits";
 import { canAddAwsAccount, getAwsAccountLimitMessage } from "@/lib/plans";
@@ -1130,6 +1132,92 @@ export type SaveDailyQuotaReserveResult =
   | { success: true; message: string }
   | { success: false; error: string };
 
+type RenameAWSAccountResult =
+  | { success: true; unchanged?: true }
+  | { success: false; error: string };
+
+/**
+ * Rename an AWS account. Managers only: the Settings tab is manager-gated, and
+ * this re-checks per-account manage access so a direct call cannot bypass it.
+ */
+export const renameAWSAccountAction = orgAction(
+  {
+    name: "renameAWSAccount",
+    resource: "awsAccounts",
+    permission: ["write"],
+    orgId: (_awsAccountId: string, _name: string, organizationId: string) =>
+      organizationId,
+    onError: "Couldn't rename the AWS account. Please try again.",
+  },
+  async (
+    ctx,
+    awsAccountId: string,
+    name: string,
+    organizationId: string
+  ): Promise<RenameAWSAccountResult> => {
+    const access = await checkAWSAccountAccess({
+      userId: ctx.access.userId,
+      organizationId,
+      awsAccountId,
+      permission: "manage",
+    });
+    if (!access.authorized) {
+      return {
+        success: false,
+        error: "You don't have permission to manage this AWS account",
+      };
+    }
+
+    const parsed = renameAwsAccountSchema.safeParse({ name });
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid name",
+      };
+    }
+    const newName = parsed.data.name;
+
+    // Scoped to the caller's org (prevents cross-org enumeration)
+    const account = await db.query.awsAccount.findFirst({
+      where: (a, { and: andOp, eq: eqOp }) =>
+        andOp(eqOp(a.id, awsAccountId), eqOp(a.organizationId, organizationId)),
+    });
+    if (!account) {
+      return { success: false, error: "AWS account not found" };
+    }
+    if (account.name === newName) {
+      return { success: true, unchanged: true };
+    }
+
+    await ctx.audited(
+      async (tx) => {
+        await tx
+          .update(awsAccount)
+          .set({ name: newName, updatedAt: new Date() })
+          .where(
+            and(
+              eq(awsAccount.id, awsAccountId),
+              eq(awsAccount.organizationId, organizationId)
+            )
+          );
+      },
+      () => ({
+        action: "aws_account.renamed",
+        resource: "aws_account",
+        resourceId: awsAccountId,
+        metadata: { from: account.name, to: newName },
+      })
+    );
+
+    revalidatePath(`/${ctx.access.orgSlug}/settings/aws-accounts`, "page");
+    revalidatePath(
+      `/${ctx.access.orgSlug}/settings/aws-accounts/${awsAccountId}`,
+      "layout"
+    );
+    return { success: true };
+  }
+);
+
 // SES's largest published daily-quota tier. A reserve above this is almost
 // certainly a typo (e.g. an extra zero), not a real quota-protection value.
 const MAX_DAILY_QUOTA_RESERVE = 14_000_000;
@@ -1210,7 +1298,8 @@ export const saveDailyQuotaReserveAction = orgAction(
 
     // Revalidate the page
     revalidatePath(
-      `/${ctx.access.orgSlug}/settings/aws-accounts/${awsAccountId}`
+      `/${ctx.access.orgSlug}/settings/aws-accounts/${awsAccountId}`,
+      "layout"
     );
 
     ctx.log.info("Daily quota reserve saved");

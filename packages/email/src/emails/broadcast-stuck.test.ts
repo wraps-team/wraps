@@ -59,12 +59,24 @@ describe("buildBroadcastStuckEmail", () => {
 
   it("includes both the reserve-settings link and the cancel link when awsAccountId is set", () => {
     const { html, text } = buildBroadcastStuckEmail(BASE_PARAMS);
-    const reserveUrl = `${APP_URL}/acme/settings/aws-accounts/aws-account-1`;
+    const reserveUrl = `${APP_URL}/acme/settings/aws-accounts/aws-account-1/settings#quota-reserve`;
     const cancelUrl = `${APP_URL}/acme/emails/broadcasts/batch-1`;
 
     for (const content of [html, text]) {
       expect(content).toContain(reserveUrl);
       expect(content).toContain(cancelUrl);
+    }
+  });
+
+  it("carries the region into the reserve-settings link when given", () => {
+    const { html, text } = buildBroadcastStuckEmail({
+      ...BASE_PARAMS,
+      region: "eu-west-1",
+    });
+    const reserveUrl = `${APP_URL}/acme/settings/aws-accounts/aws-account-1/settings?region=eu-west-1#quota-reserve`;
+
+    for (const content of [html, text]) {
+      expect(content).toContain(reserveUrl);
     }
   });
 
