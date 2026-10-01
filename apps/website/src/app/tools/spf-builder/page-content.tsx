@@ -23,6 +23,12 @@ import {
 import { parseAsString, useQueryState } from "nuqs";
 import type * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  buildSpfRecord,
+  SPF_PROVIDERS as PROVIDERS,
+  SPF_QUALIFIERS as QUALIFIERS,
+  type SpfQualifier,
+} from "@/lib/spf-record";
 
 // Custom include with resolved lookup count
 type CustomInclude = {
@@ -109,172 +115,6 @@ async function countSpfLookups(
 
   return count;
 }
-
-// Provider data with verified SPF mechanisms and lookup counts
-// All mechanisms verified via DNS lookup on 2026-01-16
-const PROVIDERS: Record<
-  string,
-  { name: string; mechanism: string; lookups: number; logo: string }
-> = {
-  // Email providers - verified
-  google: {
-    name: "Google Workspace",
-    mechanism: "include:_spf.google.com",
-    lookups: 1, // Only contains IP ranges
-    logo: "google.png",
-  },
-  microsoft: {
-    name: "Microsoft 365",
-    mechanism: "include:spf.protection.outlook.com",
-    lookups: 1, // Only contains IP ranges
-    logo: "microsoft.png",
-  },
-  // Transactional - verified
-  ses: {
-    name: "AWS SES",
-    mechanism: "include:amazonses.com",
-    lookups: 1, // Only contains IP ranges
-    logo: "aws.png",
-  },
-  resend: {
-    name: "Resend",
-    mechanism: "include:send.resend.com",
-    lookups: 2, // Includes amazonses.com
-    logo: "resend.png",
-  },
-  sendgrid: {
-    name: "SendGrid",
-    mechanism: "include:sendgrid.net",
-    lookups: 2, // Includes ab.sendgrid.net
-    logo: "sendgrid.png",
-  },
-  postmark: {
-    name: "Postmark",
-    mechanism: "include:spf.mtasv.net",
-    lookups: 1, // Only contains IP ranges
-    logo: "postmark.png",
-  },
-  mailchimp: {
-    name: "Mailchimp",
-    mechanism: "include:servers.mcsv.net",
-    lookups: 1, // Only contains IP ranges
-    logo: "mailchimp.png",
-  },
-  mailgun: {
-    name: "Mailgun",
-    mechanism: "include:mailgun.org",
-    lookups: 5, // Complex: includes _spf.mailgun.org, _spf.eu.mailgun.org, then _spf1/_spf2
-    logo: "mailgun.png",
-  },
-  // Marketing/CRM - verified
-  hubspot: {
-    name: "HubSpot",
-    mechanism: "include:hubspotemail.net",
-    lookups: 1, // Only contains IP ranges
-    logo: "hubspot.png",
-  },
-  drip: {
-    name: "Drip",
-    mechanism: "include:stspg-customer.com",
-    lookups: 1, // Only contains IP ranges
-    logo: "drip.png",
-  },
-  activecampaign: {
-    name: "ActiveCampaign",
-    mechanism: "include:emsd1.com",
-    lookups: 1, // Only contains IP ranges
-    logo: "activecampaign.png",
-  },
-  constantcontact: {
-    name: "Constant Contact",
-    mechanism: "include:spf.constantcontact.com",
-    lookups: 1, // Only contains IP ranges
-    logo: "constantcontact.png",
-  },
-  convertkit: {
-    name: "ConvertKit",
-    mechanism: "include:convertkit.com",
-    lookups: 3, // Includes _spf.google.com + hubspotemail.net
-    logo: "convertkit.png",
-  },
-  customerio: {
-    name: "Customer.io",
-    mechanism: "include:customeriomail.com",
-    lookups: 3, // Includes sendgrid.net
-    logo: "customerio.png",
-  },
-  klaviyo: {
-    name: "Klaviyo",
-    mechanism: "include:send.klaviyo.com",
-    lookups: 3, // CNAMEs to sendgrid.net
-    logo: "klaviyo.png",
-  },
-  // Business tools - verified
-  shopify: {
-    name: "Shopify",
-    mechanism: "include:shops.shopify.com",
-    lookups: 1, // Only contains ~all (pass-through)
-    logo: "shopify.png",
-  },
-  intercom: {
-    name: "Intercom",
-    mechanism: "include:intercom-mail.com",
-    lookups: 1, // Only contains IP ranges
-    logo: "intercom.png",
-  },
-  salesforce: {
-    name: "Salesforce",
-    mechanism: "include:_spf.salesforce.com",
-    lookups: 2, // Uses exists: mechanism
-    logo: "salesforce.png",
-  },
-  zendesk: {
-    name: "Zendesk",
-    mechanism: "include:mail.zendesk.com",
-    lookups: 1, // Only contains IP ranges
-    logo: "zendesk.png",
-  },
-  freshdesk: {
-    name: "Freshdesk",
-    mechanism: "include:email.freshdesk.com",
-    lookups: 7, // Includes sendgrid.net (2) + 4 freshemail.io subdomains
-    logo: "freshdesk.png",
-  },
-  zoho: {
-    name: "Zoho",
-    mechanism: "include:zoho.com",
-    lookups: 4, // Includes spf.zoho.com + zcsend.net + spf.zohomail.com (all IPs)
-    logo: "zoho.png",
-  },
-  stripe: {
-    name: "Stripe",
-    mechanism: "include:spf1.stripe.com",
-    lookups: 4, // Includes _spf.google.com, amazonses.com, mail.zendesk.com
-    logo: "stripe.png",
-  },
-};
-
-// Qualifier options
-const QUALIFIERS: Record<
-  string,
-  { label: string; description: string; recommended?: boolean }
-> = {
-  "~all": {
-    label: "Soft Fail (~all)",
-    description:
-      "Mark unauthorized mail and let DMARC enforce — recommended for sending domains",
-    recommended: true,
-  },
-  "-all": {
-    label: "Hard Fail (-all)",
-    description:
-      "Reject unauthorized mail at SMTP — best for parked domains that never send",
-  },
-  "?all": {
-    label: "Neutral (?all)",
-    description: "No assertion — testing only, not recommended",
-  },
-};
 
 type SpfLookupResult = {
   record: string;
@@ -536,13 +376,24 @@ export default function SPFBuilderWidget() {
     }
   }, [lookUpSpf, lookupDomain]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Calculate total lookups using real counts from custom includes
+  const built = useMemo(
+    () =>
+      buildSpfRecord({
+        providers: selectedProviders,
+        ips: customIPs,
+        includes: customIncludes.map((inc) => inc.domain),
+        qualifier: qualifier as SpfQualifier,
+      }),
+    [selectedProviders, customIPs, customIncludes, qualifier]
+  );
+
+  // Custom includes resolve their real lookup count over DNS; the library
+  // can only assume 2, so the page's total prefers the resolved value.
   const lookupCount = useMemo(() => {
     const providerLookups = selectedProviders.reduce(
       (sum, p) => sum + (PROVIDERS[p]?.lookups || 0),
       0
     );
-    // Use real lookup counts, default to 2 if still loading
     const customLookups = customIncludes.reduce(
       (sum, inc) => sum + (inc.lookups ?? 2),
       0
@@ -550,32 +401,7 @@ export default function SPFBuilderWidget() {
     return providerLookups + customLookups;
   }, [selectedProviders, customIncludes]);
 
-  // Generate the SPF record
-  const spfRecord = useMemo(() => {
-    const parts = ["v=spf1"];
-
-    // Add custom IPs first (they don't count toward lookups)
-    for (const ip of customIPs) {
-      parts.push(ip.includes(":") ? `ip6:${ip}` : `ip4:${ip}`);
-    }
-
-    // Add provider includes
-    for (const p of selectedProviders) {
-      if (PROVIDERS[p]) {
-        parts.push(PROVIDERS[p].mechanism);
-      }
-    }
-
-    // Add custom includes
-    for (const inc of customIncludes) {
-      parts.push(`include:${inc.domain}`);
-    }
-
-    // Add qualifier
-    parts.push(qualifier);
-
-    return parts.join(" ");
-  }, [selectedProviders, customIPs, customIncludes, qualifier]);
+  const spfRecord = built.record;
 
   const toggleProvider = (key: string) => {
     setSelectedProviders((prev) =>

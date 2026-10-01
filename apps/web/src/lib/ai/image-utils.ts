@@ -1,4 +1,4 @@
-import { validatePublicUrl } from "@/lib/ssrf-guard";
+import { assertPublicUrl, publicFetch } from "@/lib/ssrf-guard";
 
 export type ProcessedImage = {
   base64: string;
@@ -13,7 +13,7 @@ const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 export async function fetchAndProcessImage(
   url: string
 ): Promise<ProcessedImage> {
-  const urlValidation = validatePublicUrl(url);
+  const urlValidation = await assertPublicUrl(url);
   if (!urlValidation.valid) {
     throw new Error(`Invalid image URL: ${urlValidation.error}`);
   }
@@ -22,7 +22,7 @@ export async function fetchAndProcessImage(
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
   try {
-    const response = await fetch(urlValidation.parsedUrl.toString(), {
+    const response = await publicFetch(urlValidation.parsedUrl.toString(), {
       signal: controller.signal,
     });
     clearTimeout(timeout);

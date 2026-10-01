@@ -42,7 +42,7 @@ const LEVEL_TEXT: Record<MeterLevel, string> = {
  * on its own and everything next to "AWS reviews at 5%". A bare colour would
  * say "bad" without ever saying how much room is left.
  */
-function RateMeter({
+export function RateMeter({
   label,
   value,
   review,
@@ -105,7 +105,7 @@ function RateMeter({
 }
 
 /** Quota has no AWS enforcement line — running out is just running out. */
-function QuotaMeter({ detail }: { detail: SesHealthDetail }) {
+export function QuotaMeter({ detail }: { detail: SesHealthDetail }) {
   const { sentLast24Hours, max24HourSend, maxSendRate, quotaUsedRatio } =
     detail;
 
@@ -169,7 +169,7 @@ function QuotaMeter({ detail }: { detail: SesHealthDetail }) {
  * how close it is to being stopped. Each renders only when it is true, so a
  * healthy production account shows nothing here.
  */
-function AccountFlags({
+export function AccountFlags({
   detail,
   orgSlug,
 }: {

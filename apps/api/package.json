@@ -17,7 +17,7 @@
     "test:ee": "vitest run --testNamePattern='.*' src/\\(ee\\) --exclude='**/*.integration.test.ts'",
     "test:watch": "vitest --exclude='**/*.integration.test.ts'",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage --exclude='**/*.integration.test.ts'"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "catalog:",

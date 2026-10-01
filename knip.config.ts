@@ -44,6 +44,9 @@ const config: KnipConfig = {
     "packages/analytics": {
       project: ["src/**/*.ts"],
     },
+    "packages/observability": {
+      project: ["src/**/*.ts"],
+    },
     "packages/cli": {
       project: ["src/**/*.ts"],
     },

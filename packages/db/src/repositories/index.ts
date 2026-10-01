@@ -1,5 +1,6 @@
 export * from "./agents";
 export * from "./api-keys";
+export * from "./aws-account-identities";
 export * from "./broadcasts";
 export * from "./contacts";
 export * from "./domain-auth";

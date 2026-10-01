@@ -7,6 +7,8 @@ export type BroadcastStuckContent = {
   batchId: string;
   orgSlug: string;
   awsAccountId: string | null;
+  /** The SES region of the account. Defaults to the account's home region when omitted. */
+  region?: string;
   stuckSince: Date;
   processedRecipients: number;
   totalRecipients: number;
@@ -39,6 +41,7 @@ export function buildBroadcastStuckEmail({
   batchId,
   orgSlug,
   awsAccountId,
+  region,
   stuckSince,
   processedRecipients,
   totalRecipients,
@@ -50,7 +53,7 @@ export function buildBroadcastStuckEmail({
   const hours = elapsedHours(stuckSince, now);
   const broadcastUrl = `${resolveAppUrl()}/${orgSlug}/emails/broadcasts/${batchId}`;
   const reserveSettingsUrl = awsAccountId
-    ? `${resolveAppUrl()}/${orgSlug}/settings/aws-accounts/${awsAccountId}`
+    ? `${resolveAppUrl()}/${orgSlug}/settings/aws-accounts/${awsAccountId}/settings${region ? `?region=${encodeURIComponent(region)}` : ""}#quota-reserve`
     : null;
 
   const subject = `Broadcast "${broadcastName}" has been paused for ${hours} hours`;

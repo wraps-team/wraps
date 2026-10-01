@@ -110,14 +110,11 @@ export function isSesPricingPlan(value: string): value is SesPricingPlan {
 }
 
 /**
- * Monthly USD cost of `emailsPerMonth` on `plan`: the base fee plus the
- * graduated per-1K sending cost.
- *
- * The tiers are marginal, not flat — an account sending 20M on Essentials pays
- * $0.16/1K on the first 10M and $0.14/1K on the next 10M, for $3,000. Applying
- * a single rate to the whole volume would understate it as $2,800.
+ * USD sending cost of `emailsPerMonth` on `plan`: graduated per-1K tiers only,
+ * no base fee, NOT rounded. For attributing cost to slices of a month — the
+ * rounded, base-inclusive figure is `monthlyCostForPlan`.
  */
-export function monthlyCostForPlan(
+export function sendingCostForPlan(
   plan: SesPricingPlan,
   emailsPerMonth: number
 ): number {
@@ -139,7 +136,24 @@ export function monthlyCostForPlan(
     previousLimit = tier.upTo;
   }
 
-  return roundCents(rate.monthlyBase + sendingCost);
+  return sendingCost;
+}
+
+/**
+ * Monthly USD cost of `emailsPerMonth` on `plan`: the base fee plus the
+ * graduated per-1K sending cost.
+ *
+ * The tiers are marginal, not flat — an account sending 20M on Essentials pays
+ * $0.16/1K on the first 10M and $0.14/1K on the next 10M, for $3,000. Applying
+ * a single rate to the whole volume would understate it as $2,800.
+ */
+export function monthlyCostForPlan(
+  plan: SesPricingPlan,
+  emailsPerMonth: number
+): number {
+  return roundCents(
+    SES_PLAN_RATES[plan].monthlyBase + sendingCostForPlan(plan, emailsPerMonth)
+  );
 }
 
 /**

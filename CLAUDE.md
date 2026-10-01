@@ -20,8 +20,8 @@ When implementing multi-step features (e.g., create resource -> save state -> us
 
 ## Architecture Overview
 
-Turborepo monorepo with pnpm 11 workspaces. Every package below except `packages/ai`
-and except `packages/analytics` has its own CLAUDE.md with detailed context — read it
+Turborepo monorepo with pnpm 11 workspaces. Every package below except `packages/ai`,
+except `packages/analytics` and except `packages/observability` has its own CLAUDE.md with detailed context — read it
 before working in that package.
 
 **Apps**
@@ -38,6 +38,7 @@ before working in that package.
 |---|---|
 | `packages/ai` | `@wraps/ai` — AI SDK wiring for template generation and chat |
 | `packages/analytics` | `@wraps/analytics` — server-side PostHog client for `apps/web`, `apps/api` and `packages/auth` (not `apps/website`, which uses a separate key) |
+| `packages/observability` | `@wraps/observability` — provider-agnostic `ErrorReporter`, Lambda `createInstrumentHandler`, and `StructuredLogger` contract; zero runtime deps, SDKs injected by each app |
 | `packages/auth` | better-auth setup, SSO/SCIM, org + session handling |
 | `packages/cdk` | `@wraps.dev/cdk` — AWS CDK L3 construct for email infra (mirrors `pulumi`) |
 | `packages/cli` | `@wraps.dev/cli` — the `wraps` command |

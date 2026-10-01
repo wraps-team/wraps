@@ -581,7 +581,7 @@ async function alertOwner(account: {
         type: "events.feed_stale",
         title: `Event feed stale for ${account.name}`,
         body: `The last delivery event we received from AWS account ${account.accountId} (${account.region}) was ${account.lastEventAt.toISOString()}, but mail is still being sent.${observedSentence} Delivery, bounce, and complaint tracking are blind until this is fixed.`,
-        href: `/${orgSlug}/settings/aws-accounts/${account.id}`,
+        href: `/${orgSlug}/settings/aws-accounts/${account.id}/connection?region=${account.region}`,
         data: { awsAccountId: account.id, region: account.region },
       });
     } catch (notifyError) {

@@ -302,6 +302,8 @@ async function checkAccount(account: AccountRow): Promise<void> {
     return;
   }
   const accountHref = `/${orgSlug}/settings/aws-accounts/${account.id}`;
+  // Role health is account-scoped, so no region.
+  const connectionHref = `${accountHref}/connection`;
 
   // Assuming the role and reading SES are the two points where a deleted role,
   // a drifted trust policy, or a stripped inline policy surfaces. That is the
@@ -349,8 +351,8 @@ async function checkAccount(account: AccountRow): Promise<void> {
       account,
       type: "aws.role_unreachable",
       title: "Wraps can no longer reach your AWS account",
-      body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) cannot be assumed or is missing SES permissions. Sending uses this same role, so email is blocked until it is repaired — and health checks (sending paused, reputation, and quota alerts) are not running either. Open this account in Wraps and choose "Repair IAM Role" for the steps: update your CloudFormation stack if you deployed one, or run \`wraps platform update-role\` if you connected with the CLI (\`wraps platform connect\` if the role was deleted).`,
-      href: accountHref,
+      body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) cannot be assumed or is missing SES permissions. Sending uses this same role, so email is blocked until it is repaired — and health checks (sending paused, reputation, and quota alerts) are not running either. Open this account in Wraps and open Connection → Role access for the steps: update your CloudFormation stack if you deployed one, or run \`wraps platform update-role\` if you connected with the CLI (\`wraps platform connect\` if the role was deleted).`,
+      href: connectionHref,
       data: { reason, lastReachableAt },
     });
     log.warn("[account-health] Customer role unusable, skipping account", {
@@ -457,8 +459,8 @@ async function checkAccount(account: AccountRow): Promise<void> {
             account,
             type: "aws.role_policy_stale",
             title: "Your AWS role is behind the current Wraps policy",
-            body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) is missing permissions added since it was created. Wraps can still reach it, but features that depend on the newer permissions may appear switched off even though they are deployed. Open this account in Wraps and see "IAM Role Configuration" for the fastest fix.`,
-            href: accountHref,
+            body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) is missing permissions added since it was created. Wraps can still reach it, but features that depend on the newer permissions may appear switched off even though they are deployed. Open this account in Wraps and see Connection → Role access for the fastest fix.`,
+            href: connectionHref,
             data: { version: result.version },
           });
         }

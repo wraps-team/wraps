@@ -75,6 +75,7 @@ export type AuditLogAction =
   | "settings.webhook_secret_saved"
   | "settings.webhook_secret_removed"
   | "settings.daily_quota_reserve_saved"
+  | "aws_account.renamed"
   | "block.updated"
   | "block.deleted"
   | "template.duplicated"

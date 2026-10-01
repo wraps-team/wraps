@@ -20,7 +20,7 @@ const articleSchema = {
   description:
     "Per-page markdown over content negotiation, well-known discovery documents, an in-browser tool surface, and AI crawl signals. What we shipped, what it does not do, and which of it is actually a standard.",
   datePublished: "2026-05-21T00:00:00.000Z",
-  dateModified: "2026-05-21T00:00:00.000Z",
+  dateModified: "2026-10-01T00:00:00.000Z",
   author: {
     "@type": "Organization",
     name: "Wraps",
@@ -636,7 +636,7 @@ link: </docs>; rel="service-doc", </.well-known/api-catalog>; rel="api-catalog"`
           <section>
             <h2 className="mb-6 flex items-center gap-3 font-bold text-3xl">
               <Bot className="text-brand" />
-              Three tools for a browser API that does not exist yet
+              Five tools for a browser API that does not exist yet
             </h2>
 
             <p className="mb-4 text-foreground/80 text-lg leading-relaxed">
@@ -645,41 +645,60 @@ link: </docs>; rel="service-doc", </.well-known/api-catalog>; rel="api-catalog"`
               at our page the way a person would. WebMCP is a proposal for that
               case: a page calls{" "}
               <code className="rounded bg-muted px-1.5 py-0.5">
-                navigator.modelContext.provideContext()
+                document.modelContext.registerTool()
               </code>{" "}
-              and hands the browser a set of named tools, so the agent can call
-              a function instead of guessing which button to click.
+              once per tool and hands the browser a named function, so the agent
+              can call it instead of guessing which button to click.
             </p>
 
             <p className="mb-4 text-foreground/80 text-lg leading-relaxed">
-              wraps.dev now registers three, site-wide, from a component mounted
-              in the root layout:
+              wraps.dev now registers five, site-wide, from a component mounted
+              in the root layout:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                get_pricing
+              </code>
+              ,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                estimate_cost
+              </code>
+              ,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                get_quickstart
+              </code>
+              ,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                search_docs
+              </code>
+              , and{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                build_spf_record
+              </code>
+              . The definitions live in{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                src/lib/webmcp-tools.ts
+              </code>
+              ; the component only registers them.
             </p>
 
             <CodeBlock
               code={`export function WebMCP() {
   useEffect(() => {
-    if (!navigator.modelContext) return;
+    const modelContext = document.modelContext;
+    if (!modelContext) {
+      return;
+    }
 
-    const cleanup = navigator.modelContext.provideContext({
-      name: "Wraps",
-      description:
-        "Deploy email (AWS SES), SMS, and CDN infrastructure to your AWS account with one command. Full ownership, AWS pricing, no credentials stored.",
-      tools: [
-        {
-          name: "get_pricing",
-          description: "Get Wraps pricing plans and feature comparison",
-          inputSchema: { type: "object", properties: {} },
-          execute: async () => {
-            const res = await fetch("/pricing.md");
-            return res.ok ? res.text() : { error: "unavailable" };
-          },
-        },
-        // get_quickstart, search_docs
-      ],
-    });
+    const controller = new AbortController();
 
-    return cleanup;
+    for (const tool of webMcpTools()) {
+      modelContext
+        .registerTool(tool, { signal: controller.signal })
+        .catch(() => {
+          // Registration refused by policy — the page works without it.
+        });
+    }
+
+    return () => controller.abort();
   }, []);
 
   return null;
@@ -691,21 +710,27 @@ link: </docs>; rel="service-doc", </.well-known/api-catalog>; rel="api-catalog"`
             <p className="mb-4 text-foreground/80 text-lg leading-relaxed">
               The component renders{" "}
               <code className="rounded bg-muted px-1.5 py-0.5">null</code>; it
-              is a pure side effect. Line three is the whole compatibility
-              story:{" "}
+              is a pure side effect. The guard at the top is the whole
+              compatibility story:{" "}
               <code className="rounded bg-muted px-1.5 py-0.5">
                 modelContext
               </code>{" "}
               is optional on the{" "}
-              <code className="rounded bg-muted px-1.5 py-0.5">Navigator</code>{" "}
-              type and guarded at runtime, so in a browser without the API this
-              code returns immediately and does nothing at all. The effect
-              returns the cleanup function the API hands back, which unregisters
-              the tools on unmount.
+              <code className="rounded bg-muted px-1.5 py-0.5">Document</code>{" "}
+              type and checked at runtime, so in a browser without the API this
+              code returns immediately and does nothing at all. Every
+              registration shares one{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                AbortController
+              </code>
+              , and the effect&apos;s cleanup aborts it, which unregisters all
+              five tools on unmount. A registration the browser refuses, such as
+              under a Permissions-Policy that disables the tools permission, is
+              caught so it does not log an error on every page.
             </p>
 
             <p className="mb-4 text-foreground/80 text-lg leading-relaxed">
-              Two of the three names promise more than the implementations
+              Two of the five names promise more than the implementations
               deliver.{" "}
               <code className="rounded bg-muted px-1.5 py-0.5">
                 search_docs
@@ -722,12 +747,33 @@ link: </docs>; rel="service-doc", </.well-known/api-catalog>; rel="api-catalog"`
               <code className="rounded bg-muted px-1.5 py-0.5">service</code>{" "}
               enum of email, sms, and cdn, then ignores it and returns{" "}
               <code className="rounded bg-muted px-1.5 py-0.5">llms.txt</code>{" "}
-              for every value. Only{" "}
+              for every value. The other three do what they say.{" "}
               <code className="rounded bg-muted px-1.5 py-0.5">
                 get_pricing
               </code>{" "}
-              does exactly what its name says. Wiring the other two to the
-              per-page markdown route is the obvious next move.
+              returns{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                /pricing.md
+              </code>
+              .{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                estimate_cost
+              </code>{" "}
+              runs the same cost engine as the SES calculator, in the page, with
+              no network call.{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                build_spf_record
+              </code>{" "}
+              uses the same builder as the SPF tool and reports the
+              record&apos;s DNS lookup count against the limit of 10. Wiring{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                search_docs
+              </code>{" "}
+              and{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                get_quickstart
+              </code>{" "}
+              to the per-page markdown route is the obvious next move.
             </p>
 
             <Card className="p-6">
@@ -737,17 +783,12 @@ link: </docs>; rel="service-doc", </.well-known/api-catalog>; rel="api-catalog"`
                 Group. It is a Community Group draft, not a W3C standard, and it
                 is not Anthropic&apos;s Model Context Protocol&mdash;it borrows
                 MCP&apos;s tool-description shape and nothing else. There is no
-                server, no transport, and no handshake; it is a page handing an
-                object to a browser. As of this writing it exists behind a flag
-                in one browser, with no signal from Mozilla or WebKit. Since
-                publication the draft has moved the API off{" "}
-                <code className="rounded bg-muted px-1.5 py-0.5">
-                  navigator
-                </code>{" "}
-                and onto{" "}
+                server, no transport, and no handshake; it is a page handing
+                objects to a browser. As of this writing it exists behind a flag
+                in one browser, with no signal from Mozilla or WebKit. The code
+                above follows the current draft, which puts the API on{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">document</code>
-                , so the exact surface shown above is already dated. What is
-                quoted here is what shipped on this date.
+                , and a draft can still change.
               </p>
             </Card>
           </section>
@@ -957,10 +998,10 @@ Sitemap: https://wraps.dev/sitemap.xml`}
                 </h3>
                 <p className="text-foreground/80 leading-relaxed">
                   The API exists behind a flag in one browser. The feature guard
-                  means the overwhelming majority of page loads run three lines
-                  and return. We shipped it because the cost is a few kilobytes
-                  and an unmount handler, not because anyone is calling these
-                  tools today.
+                  means the overwhelming majority of page loads run a single
+                  feature check and return. We shipped it because the cost is a
+                  few kilobytes and an unmount handler, not because anyone is
+                  calling these tools today.
                 </p>
               </div>
 

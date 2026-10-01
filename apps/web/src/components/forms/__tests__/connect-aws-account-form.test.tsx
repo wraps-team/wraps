@@ -89,4 +89,25 @@ describe("ConnectAWSAccountForm success", () => {
       expect.objectContaining({ organization_id: "org-1" })
     );
   });
+
+  it("links to the existing account when it is already connected", async () => {
+    vi.mocked(connectAWSAccountAction).mockResolvedValue({
+      error: "This AWS account is already connected",
+      existingAccountId: "acc-123",
+      existingAccountHref: "/test-org/settings/aws-accounts/acc-123",
+    } as never);
+    render(<ConnectAWSAccountForm organizationId="org-1" selfHosted={false} />);
+
+    const submit = await screen.findByRole("button", {
+      name: /connect account/i,
+    });
+    await userEvent.click(submit);
+
+    const link = await screen.findByRole("link", {
+      name: /open the connected account/i,
+    });
+    expect(link.getAttribute("href")).toBe(
+      "/test-org/settings/aws-accounts/acc-123"
+    );
+  });
 });

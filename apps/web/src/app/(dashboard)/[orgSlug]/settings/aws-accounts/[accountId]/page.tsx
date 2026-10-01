@@ -1,136 +1,79 @@
-import { auth } from "@wraps/auth";
-import { db } from "@wraps/db";
-import { redirect } from "next/navigation";
-import { AccountHeader } from "@/components/account-header";
-import { getOrganizationBySlug } from "@/lib/organization";
-import { checkAWSAccountAccess } from "@/lib/permissions/check-access";
-import { isSelfHosted } from "@/lib/plan-limits";
-import { AccountDetails } from "./components/account-details";
-import { AccountFeatures } from "./components/account-features";
-import { EventFeedStaleBanner } from "./components/event-feed-stale-banner";
-import { IAMConfiguration } from "./components/iam-configuration";
-import { QuotaReserve } from "./components/quota-reserve";
-import { SesPlanCard } from "./components/ses-plan-card";
-import { StalePolicyBanner } from "./components/stale-policy-banner";
-import { VdmStatusCard } from "./components/vdm-status-card";
-import { WebhookConfiguration } from "./components/webhook-configuration";
+import { getAccountStatus } from "@/lib/aws/account-status";
+import { HealthSummary } from "./components/overview/health-summary";
+import { StatusList } from "./components/overview/status-list";
+import { loadAccountPage } from "./lib/load-account";
+import { getRoleStatus } from "./lib/role-status";
 
 type AWSAccountPageProps = {
   params: Promise<{
     orgSlug: string;
     accountId: string;
   }>;
+  searchParams: Promise<{
+    region?: string | string[];
+  }>;
 };
 
-export default async function AWSAccountPage({ params }: AWSAccountPageProps) {
+export default async function AWSAccountPage({
+  params,
+  searchParams,
+}: AWSAccountPageProps) {
   const { orgSlug, accountId } = await params;
+  const { region: regionParam } = await searchParams;
 
-  // Get session
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
+  // An array is "present but not equal" and redirects like any other mismatch.
+  const { account, region, regional } = await loadAccountPage({
+    orgSlug,
+    accountId,
+    tab: "",
+    region: regionParam,
+    require: "view",
   });
 
-  if (!session?.user) {
-    redirect("/auth");
-  }
-
-  // Get organization
-  const organization = await getOrganizationBySlug(orgSlug);
-
-  if (!organization) {
-    redirect("/");
-  }
-
-  // Get AWS account
-  const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, accountId),
+  // Everything below reads persisted columns: no AWS call on page load.
+  const now = new Date();
+  const reasons = regional.healthDetail?.reasons ?? [];
+  const status = getAccountStatus({
+    role: { lastReachableAt: account.roleLastReachableAt },
+    regional: {
+      healthStatus: regional.healthStatus,
+      healthReasons: reasons,
+      eventFeedStaleSince: regional.eventFeedStaleSince,
+      lastEventReceivedAt: regional.lastEventReceivedAt,
+    },
+    now,
   });
-
-  if (!account || account.organizationId !== organization.id) {
-    redirect(`/${orgSlug}/settings?tab=aws-accounts`);
-  }
-
-  // Check if user has view permission
-  const access = await checkAWSAccountAccess({
-    userId: session.user.id,
-    organizationId: organization.id,
-    awsAccountId: accountId,
-    permission: "view",
+  const roleStatus = getRoleStatus({
+    lastReachableAt: account.roleLastReachableAt,
+    consolePolicyVersion: account.consolePolicyVersion,
+    consolePolicyCheckedAt: account.consolePolicyCheckedAt,
+    now,
   });
-
-  if (!access.authorized) {
-    redirect(`/${orgSlug}/emails`);
-  }
-
-  // Check all permissions
-  const [viewAccess, sendAccess, manageAccess] = await Promise.all([
-    checkAWSAccountAccess({
-      userId: session.user.id,
-      organizationId: organization.id,
-      awsAccountId: accountId,
-      permission: "view",
-    }),
-    checkAWSAccountAccess({
-      userId: session.user.id,
-      organizationId: organization.id,
-      awsAccountId: accountId,
-      permission: "send",
-    }),
-    checkAWSAccountAccess({
-      userId: session.user.id,
-      organizationId: organization.id,
-      awsAccountId: accountId,
-      permission: "manage",
-    }),
-  ]);
-
-  const permissions = {
-    canView: viewAccess.authorized,
-    canSend: sendAccess.authorized,
-    canManage: manageAccess.authorized,
-  };
 
   return (
-    <div className="space-y-6 px-4 lg:px-6">
-      {/* Header */}
-      <AccountHeader
-        account={account}
+    <div className="space-y-6">
+      <StatusList
+        accountId={accountId}
+        emailEnabled={regional.emailEnabled}
+        lastEventReceivedAt={
+          regional.lastEventReceivedAt?.toISOString() ?? null
+        }
         orgSlug={orgSlug}
-        permissions={permissions}
+        region={region}
+        roleStatus={roleStatus}
+        scannedAt={regional.features?.scannedAt ?? null}
+        smsEnabled={regional.smsEnabled}
+        staleSince={regional.eventFeedStaleSince?.toISOString() ?? null}
+        webhookConnected={regional.webhookConnected}
       />
-
-      {/* Stale Event Feed Warning */}
-      <EventFeedStaleBanner account={account} />
-
-      {/* Stale Console Policy Warning - manager-only, unlike the banner
-          above: its only call to action is a link to the IAM role card,
-          which only managers can see. */}
-      {permissions.canManage && <StalePolicyBanner account={account} />}
-
-      {/* Deployed Features */}
-      <AccountFeatures account={account} organizationId={organization.id} />
-
-      {/* AWS SES pricing plan - read-only, visible to every viewer */}
-      <SesPlanCard account={account} />
-
-      {/* Virtual Deliverability Manager - read-only, visible to every viewer */}
-      <VdmStatusCard account={account} />
-
-      {/* Account Details */}
-      <AccountDetails account={account} />
-
-      {/* IAM role repair - the landing spot for the aws.role_unreachable
-          notification, so the CloudFormation fix has to live here and not
-          only on the account list. Managers only: it rewrites the role. */}
-      {permissions.canManage && (
-        <IAMConfiguration account={account} selfHosted={isSelfHosted()} />
-      )}
-
-      {/* Platform Connection - only show to managers */}
-      {permissions.canManage && <WebhookConfiguration account={account} />}
-
-      {/* Daily Quota Reserve - only show to managers */}
-      {permissions.canManage && <QuotaReserve account={account} />}
+      <HealthSummary
+        healthCheckedAt={regional.healthCheckedAt?.toISOString() ?? null}
+        healthDetail={regional.healthDetail}
+        orgSlug={orgSlug}
+        reasons={reasons}
+        region={region}
+        status={status}
+      />
     </div>
   );
 }

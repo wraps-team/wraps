@@ -1,6 +1,5 @@
 "use client";
 
-import type { awsAccount } from "@wraps/db";
 import { Alert, AlertDescription } from "@wraps/ui/components/ui/alert";
 import {
   Card,
@@ -10,18 +9,19 @@ import {
   CardTitle,
 } from "@wraps/ui/components/ui/card";
 import { Label } from "@wraps/ui/components/ui/label";
-import type { InferSelectModel } from "drizzle-orm";
 import { AlertCircle, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { saveDailyQuotaReserveAction } from "@/actions/aws-accounts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { ClientAccount } from "../lib/client-account";
 
 type QuotaReserveProps = {
-  account: InferSelectModel<typeof awsAccount>;
+  account: ClientAccount;
+  region: string;
 };
 
-export function QuotaReserve({ account }: QuotaReserveProps) {
+export function QuotaReserve({ account, region }: QuotaReserveProps) {
   const [reserveInput, setReserveInput] = useState(
     account.dailyQuotaReserve != null ? String(account.dailyQuotaReserve) : ""
   );
@@ -59,11 +59,11 @@ export function QuotaReserve({ account }: QuotaReserveProps) {
   };
 
   return (
-    <Card>
+    <Card id="quota-reserve">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5" />
-          Daily quota reserve
+          Daily quota reserve · {region}
         </CardTitle>
         <CardDescription>
           Broadcasts will never use this many emails of your daily SES quota,

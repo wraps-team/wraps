@@ -216,6 +216,10 @@ export default function DmarcCheckerPage() {
                 <Link className={linkClass} href="/tools/spf-builder">
                   SPF builder
                 </Link>
+                . No record yet? Generate one with the{" "}
+                <Link className={linkClass} href="/tools/dmarc-builder">
+                  DMARC record generator
+                </Link>
                 .
               </p>
             </section>

@@ -115,7 +115,9 @@ export function AddDomainForm({ organizationId }: AddDomainFormProps) {
               ? ""
               : " Tracking isn't attached yet: Wraps' role in this AWS account needs updating (`wraps platform update-role`). You can attach it from the domain's details afterwards."),
         });
-        formApi.setFieldValue("domain", "");
+        // resetField, not setFieldValue: setting "" re-runs the validator and
+        // shows "Enter a domain." under a successful add.
+        formApi.resetField("domain");
         // The action already revalidated the route; refresh re-fetches the
         // server component so the new identity's DKIM records show up here
         // without a manual reload.

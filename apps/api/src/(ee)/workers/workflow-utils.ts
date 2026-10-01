@@ -6,6 +6,7 @@
  */
 
 import { lookup as dnsLookup } from "node:dns";
+import { BlockList, isIP } from "node:net";
 import { toPlainText } from "@react-email/render";
 import { renderTemplateStrict } from "@wraps/template-render";
 import { Agent } from "undici";
@@ -191,55 +192,90 @@ export const FIRST_CLASS_CONTACT_FIELDS = new Set([
 // WEBHOOK / SSRF VALIDATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const BLOCKED_IPV4_RANGES = [
-  { prefix: "127.", label: "loopback" },
-  { prefix: "10.", label: "private (10/8)" },
-  { prefix: "169.254.", label: "link-local/IMDS" },
-  { prefix: "0.", label: "unspecified" },
+// Order matters: the first matching entry's label is returned. `::1` and `::`
+// come before `::/96` so they keep the "loopback" label.
+const BLOCKED_SUBNETS = [
+  { network: "127.0.0.0", prefix: 8, family: "ipv4", label: "loopback" },
+  { network: "10.0.0.0", prefix: 8, family: "ipv4", label: "private (10/8)" },
+  {
+    network: "169.254.0.0",
+    prefix: 16,
+    family: "ipv4",
+    label: "link-local/IMDS",
+  },
+  { network: "0.0.0.0", prefix: 8, family: "ipv4", label: "unspecified" },
+  {
+    network: "100.64.0.0",
+    prefix: 10,
+    family: "ipv4",
+    label: "private (100.64/10 CGN)",
+  },
+  {
+    network: "172.16.0.0",
+    prefix: 12,
+    family: "ipv4",
+    label: "private (172.16/12)",
+  },
+  {
+    network: "192.0.0.0",
+    prefix: 24,
+    family: "ipv4",
+    label: "IETF protocol assignments (192.0.0/24)",
+  },
+  {
+    network: "192.168.0.0",
+    prefix: 16,
+    family: "ipv4",
+    label: "private (192.168/16)",
+  },
+  {
+    network: "198.18.0.0",
+    prefix: 15,
+    family: "ipv4",
+    label: "benchmarking (198.18/15)",
+  },
+  { network: "224.0.0.0", prefix: 4, family: "ipv4", label: "multicast" },
+  {
+    network: "240.0.0.0",
+    prefix: 4,
+    family: "ipv4",
+    label: "reserved/broadcast (240/4)",
+  },
+  { network: "::1", prefix: 128, family: "ipv6", label: "loopback" },
+  { network: "::", prefix: 128, family: "ipv6", label: "loopback" },
+  {
+    network: "::",
+    prefix: 96,
+    family: "ipv6",
+    label: "IPv4-compatible (deprecated)",
+  },
+  { network: "64:ff9b::", prefix: 96, family: "ipv6", label: "NAT64" },
+  { network: "fc00::", prefix: 7, family: "ipv6", label: "private (ULA)" },
+  { network: "fe80::", prefix: 10, family: "ipv6", label: "link-local" },
+  { network: "ff00::", prefix: 8, family: "ipv6", label: "multicast" },
 ] as const;
+
+// One BlockList per entry so a match can report its label. BlockList matches
+// IPv4-mapped IPv6 (::ffff:7f00:1 and ::ffff:127.0.0.1) against IPv4 entries.
+const BLOCKED_LISTS = BLOCKED_SUBNETS.map(
+  ({ network, prefix, family, label }) => {
+    const list = new BlockList();
+    list.addSubnet(network, prefix, family);
+    return { list, label };
+  }
+);
 
 /** @exported for testing */
 export function isBlockedIp(ip: string): string | null {
-  // IPv4-mapped IPv6 (::ffff:1.2.3.4) — extract the IPv4 and re-check
-  if (ip.startsWith("::ffff:")) {
-    const v4 = ip.slice(7);
-    if (v4.includes(".")) {
-      return isBlockedIp(v4);
+  const family = isIP(ip);
+  if (family === 0) {
+    return "not an IP address";
+  }
+  const type = family === 4 ? "ipv4" : "ipv6";
+  for (const { list, label } of BLOCKED_LISTS) {
+    if (list.check(ip, type)) {
+      return label;
     }
-  }
-
-  for (const range of BLOCKED_IPV4_RANGES) {
-    if (ip.startsWith(range.prefix)) {
-      return range.label;
-    }
-  }
-  // 100.64.0.0/10 (Carrier-grade NAT / AWS VPC)
-  if (ip.startsWith("100.")) {
-    const second = Number.parseInt(ip.split(".")[1], 10);
-    if (second >= 64 && second <= 127) {
-      return "private (100.64/10 CGN)";
-    }
-  }
-  // 172.16.0.0/12
-  if (ip.startsWith("172.")) {
-    const second = Number.parseInt(ip.split(".")[1], 10);
-    if (second >= 16 && second <= 31) {
-      return "private (172.16/12)";
-    }
-  }
-  // 192.168.0.0/16
-  if (ip.startsWith("192.168.")) {
-    return "private (192.168/16)";
-  }
-  // IPv6
-  if (ip === "::1" || ip === "::") {
-    return "loopback";
-  }
-  if (ip.startsWith("fe80:")) {
-    return "link-local";
-  }
-  if (ip.startsWith("fd") || ip.startsWith("fc")) {
-    return "private (ULA)";
   }
   return null;
 }

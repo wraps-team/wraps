@@ -108,7 +108,7 @@ async function validateAndLoadMetadata(
   if (!metadata) {
     // No local record. This is expected for a CloudFormation-first customer
     // (or a machine with no local file and no S3 state bucket to sync from):
-    // registration is idempotent on the External ID
+    // registration is idempotent on the External ID and webhook secret
     // (`apps/api/src/routes/connections.ts`), so re-registering an
     // already-connected account is safe and returns the account's existing
     // identity rather than rotating it.

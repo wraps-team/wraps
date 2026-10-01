@@ -148,6 +148,12 @@ export const awsAccount = pgTable(
     // NULL = no event ever received. Used for staleness detection/alerting.
     lastEventReceivedAt: timestamp("last_event_received_at"),
 
+    // When features.email.identities was last refreshed from SES, or last
+    // claimed for a refresh. The on-read refresh and the SES-webhook backstop
+    // both claim it atomically so a burst of page views or events triggers at
+    // most one SES scan per cooldown. NULL = never refreshed.
+    identitiesScannedAt: timestamp("identities_scanned_at"),
+
     // Set by the event-feed-staleness cron when the feed is detected stale;
     // cleared when events resume. Drives the dashboard warning banner.
     eventFeedStaleSince: timestamp("event_feed_stale_since"),
@@ -240,6 +246,8 @@ export const awsAccount = pgTable(
 
     // Detailed scanned features (populated by "Scan Features" button)
     features: json("features").$type<{
+      /** ISO time of the last full scanAWSAccountFeatures run. Absent on rows scanned before this field, and on features written by other paths. */
+      scannedAt?: string;
       email?: {
         configSetName?: string;
         sandbox?: boolean;

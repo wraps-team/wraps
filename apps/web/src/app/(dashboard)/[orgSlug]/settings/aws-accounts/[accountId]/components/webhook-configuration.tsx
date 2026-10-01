@@ -1,7 +1,7 @@
 "use client";
 
-import type { awsAccount } from "@wraps/db";
 import { Alert, AlertDescription } from "@wraps/ui/components/ui/alert";
+import { Badge } from "@wraps/ui/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -16,7 +16,6 @@ import {
 } from "@wraps/ui/components/ui/collapsible";
 import { Label } from "@wraps/ui/components/ui/label";
 import { Separator } from "@wraps/ui/components/ui/separator";
-import type { InferSelectModel } from "drizzle-orm";
 import {
   AlertCircle,
   CheckCircle2,
@@ -33,19 +32,39 @@ import {
 } from "@/actions/aws-accounts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { ClientAccount } from "../lib/client-account";
+import { getStreamingStatus } from "../lib/streaming-status";
 
 type WebhookConfigurationProps = {
-  account: InferSelectModel<typeof awsAccount>;
+  account: ClientAccount;
+  region: string;
+  /** ISO time of the last SES event received, or null if none yet. */
+  lastEventReceivedAt: string | null;
+  /** ISO time the feed was flagged stalled, or null if it is not. */
+  staleSince: string | null;
+  canManage: boolean;
 };
 
-export function WebhookConfiguration({ account }: WebhookConfigurationProps) {
+export function WebhookConfiguration({
+  account,
+  region,
+  lastEventReceivedAt,
+  staleSince,
+  canManage,
+}: WebhookConfigurationProps) {
   const [webhookSecret, setWebhookSecret] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  const isConnected = !!account.webhookSecret;
+  const isConnected = account.webhookConnected;
+
+  const status = getStreamingStatus({
+    connected: isConnected,
+    lastEventReceivedAt,
+    staleSince,
+  });
 
   const handleSave = async () => {
     if (!webhookSecret.trim()) {
@@ -97,37 +116,32 @@ export function WebhookConfiguration({ account }: WebhookConfigurationProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Link2 className="h-5 w-5" />
-          Platform Connection
+          Event streaming · {region}
         </CardTitle>
         <CardDescription>
-          Connect your AWS account to the Wraps platform to stream real-time
-          email events to your dashboard.
+          Delivery, bounce, complaint, open and click events from SES. They
+          power the email timeline, analytics and suppression handling.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Connection Status */}
+        {/* Streaming status */}
         <div className="flex items-center gap-2">
-          {isConnected ? (
-            <>
-              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 font-medium text-green-800 text-xs">
-                <CheckCircle2 className="h-3 w-3" />
-                Connected
-              </span>
-              <span className="text-muted-foreground text-sm">
-                Real-time events streaming to Wraps dashboard
-              </span>
-            </>
-          ) : (
-            <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 font-medium text-gray-800 text-xs">
-              Not Connected
+          <Badge variant={status.variant}>{status.label}</Badge>
+          {status.detail && (
+            <span className="text-muted-foreground text-sm">
+              {status.detail}
             </span>
           )}
         </div>
+        <p className="text-muted-foreground text-sm">
+          Not receiving events? Run{" "}
+          <code className="font-mono">wraps email doctor</code>.
+        </p>
 
-        <Separator />
+        {canManage && <Separator />}
 
         {/* Success/Error Messages */}
-        {success && (
+        {canManage && success && (
           <Alert>
             <CheckCircle2 className="h-4 w-4 text-success" />
             <div className="col-start-2 grid justify-items-start gap-1 text-sm text-success [&_p]:leading-relaxed">
@@ -136,7 +150,7 @@ export function WebhookConfiguration({ account }: WebhookConfigurationProps) {
           </Alert>
         )}
 
-        {error && (
+        {canManage && error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
@@ -144,12 +158,11 @@ export function WebhookConfiguration({ account }: WebhookConfigurationProps) {
         )}
 
         {/* Connected State */}
-        {isConnected ? (
+        {canManage && isConnected && (
           <div className="space-y-4">
             <p className="text-muted-foreground text-sm">
-              Your account is connected and events are streaming to the Wraps
-              dashboard. You can disconnect if you want to stop receiving
-              events.
+              Disconnecting stops events from reaching Wraps. It does not remove
+              this account from Wraps.
             </p>
             <Button
               disabled={isLoading}
@@ -161,10 +174,12 @@ export function WebhookConfiguration({ account }: WebhookConfigurationProps) {
               ) : (
                 <Unlink className="mr-2 h-4 w-4" />
               )}
-              Disconnect
+              Disconnect streaming
             </Button>
           </div>
-        ) : (
+        )}
+
+        {canManage && !isConnected && (
           <div className="space-y-4">
             {/* CLI Command - Primary CTA */}
             <div className="rounded-lg border bg-muted/50 p-4">
@@ -190,7 +205,7 @@ export function WebhookConfiguration({ account }: WebhookConfigurationProps) {
                   <ChevronDown
                     className={`h-4 w-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
                   />
-                  Advanced
+                  Advanced: set webhook secret manually
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-2 space-y-4">

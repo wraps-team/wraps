@@ -153,7 +153,6 @@ export async function POST(request: Request, context: RouteContext) {
         await db
           .update(awsAccount)
           .set({
-            name: `AWS Account (${accountId})`,
             accountId,
             roleArn,
             externalId,

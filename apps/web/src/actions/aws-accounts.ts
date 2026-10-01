@@ -20,7 +20,14 @@ import {
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
 import { createServerValidate } from "@tanstack/react-form-nextjs";
-import { auditLog, awsAccount, db, notifyOrg } from "@wraps/db";
+import {
+  auditLog,
+  awsAccount,
+  db,
+  notifyOrg,
+  writeIdentitySnapshot,
+} from "@wraps/db";
+import { scanWrapsIdentities } from "@wraps/email";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -35,10 +42,12 @@ import {
 } from "@/lib/aws/assume-role";
 import { getOrAssumeRole } from "@/lib/aws/credential-cache";
 import { findWrapsArchive } from "@/lib/aws/mailmanager";
+import { renameAwsAccountSchema } from "@/lib/forms/aws-account";
 import {
   connectAWSAccountFormOpts,
   connectAWSAccountSchema,
 } from "@/lib/forms/connect-aws-account";
+import { checkAWSAccountAccess } from "@/lib/permissions/check-access";
 import { grantAWSAccountAccess } from "@/lib/permissions/grant-access";
 import { getOrganizationPlan, isSelfHosted } from "@/lib/plan-limits";
 import { canAddAwsAccount, getAwsAccountLimitMessage } from "@/lib/plans";
@@ -179,6 +188,24 @@ export const connectAWSAccountAction = orgAction(
         "Connecting AWS account"
       );
 
+      // One row per AWS account per org. Every other connect path upserts on
+      // (organizationId, accountId); inserting here is how duplicates arise.
+      const alreadyConnected = await db.query.awsAccount.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, ctx.organizationId),
+            eq(table.accountId, validatedData.accountId)
+          ),
+        columns: { id: true },
+      });
+      if (alreadyConnected) {
+        return {
+          error: "This AWS account is already connected",
+          existingAccountId: alreadyConnected.id,
+          existingAccountHref: `/${ctx.access.orgSlug}/settings/aws-accounts/${alreadyConnected.id}`,
+        };
+      }
+
       // 4. Check AWS account limit based on subscription plan.
       // `getOrganizationPlan` is the single source of truth: it honours a
       // self-host licence, requires an active/trialing subscription on a real
@@ -209,8 +236,9 @@ export const connectAWSAccountAction = orgAction(
       const externalId = validatedData.externalId;
 
       // 6. Test connection by attempting to get credentials (may assume role or use dev mode)
+      let connectCredentials: Awaited<ReturnType<typeof getCredentials>>;
       try {
-        await getCredentials({
+        connectCredentials = await getCredentials({
           roleArn: validatedData.roleArn,
           externalId,
           region: validatedData.region,
@@ -244,6 +272,22 @@ export const connectAWSAccountAction = orgAction(
 
       if (!account) {
         return { error: "Failed to create AWS account record" };
+      }
+
+      // Populate the identities snapshot now, so the overview is right on
+      // first render. Best-effort: a scan failure must never fail the connect.
+      try {
+        const identities = await scanWrapsIdentities(
+          connectCredentials,
+          validatedData.region
+        );
+        await writeIdentitySnapshot({
+          organizationId: ctx.organizationId,
+          awsAccountId: account.id,
+          identities,
+        });
+      } catch (error: unknown) {
+        ctx.log.warn({ err: error }, "Identity scan failed during connect");
       }
 
       // 7. Grant default access to all org members (except owners)
@@ -735,42 +779,9 @@ export const scanAWSAccountFeatures: (
       }> = [];
 
       try {
-        const sesClient = new SESv2Client({
-          region: account.region,
-          credentials: awsCredentials,
-        });
-
-        const listResponse = await sesClient.send(
-          new ListEmailIdentitiesCommand({ PageSize: 100 })
+        identities.push(
+          ...(await scanWrapsIdentities(awsCredentials, account.region))
         );
-
-        // Check each sending-enabled identity for Wraps config set
-        const sendingEnabled =
-          listResponse.EmailIdentities?.filter((i) => i.SendingEnabled) ?? [];
-
-        for (const identity of sendingEnabled) {
-          try {
-            const details = await sesClient.send(
-              new GetEmailIdentityCommand({
-                EmailIdentity: identity.IdentityName,
-              })
-            );
-            if (
-              details.VerifiedForSendingStatus &&
-              details.ConfigurationSetName?.startsWith("wraps-email-")
-            ) {
-              identities.push({
-                identity: identity.IdentityName!,
-                type: identity.IdentityType as "DOMAIN" | "EMAIL_ADDRESS",
-                // Store the identity's config set so sends can resolve it by
-                // lookup — a name SES just confirmed exists, never derived.
-                configSetName: details.ConfigurationSetName,
-              });
-            }
-          } catch {
-            // Skip identities we can't access
-          }
-        }
       } catch (error: unknown) {
         if (!isAwsErrorNamed(error, "AccessDeniedException")) {
           ctx.log.warn({ err: error }, "Error scanning identities");
@@ -818,6 +829,7 @@ export const scanAWSAccountFeatures: (
 
       // 15. Build features JSON object
       const featuresJson = {
+        scannedAt: new Date().toISOString(),
         email: {
           configSetName,
           sandbox: sesSandbox,
@@ -856,6 +868,7 @@ export const scanAWSAccountFeatures: (
           emailEnabled,
           smsEnabled,
           features: featuresJson,
+          identitiesScannedAt: new Date(),
           updatedAt: new Date(),
         })
         .where(
@@ -920,7 +933,10 @@ export const scanAWSAccountFeatures: (
 
       // 18. Revalidate pages (layout will re-fetch products status)
       const orgSlug = ctx.access.orgSlug;
-      revalidatePath(`/${orgSlug}/settings/aws-accounts/${awsAccountId}`);
+      revalidatePath(
+        `/${orgSlug}/settings/aws-accounts/${awsAccountId}`,
+        "layout"
+      );
       revalidatePath(`/${orgSlug}/settings`);
       revalidatePath(`/${orgSlug}`);
       revalidatePath(`/${orgSlug}/emails/inbound`);
@@ -1116,6 +1132,92 @@ export type SaveDailyQuotaReserveResult =
   | { success: true; message: string }
   | { success: false; error: string };
 
+type RenameAWSAccountResult =
+  | { success: true; unchanged?: true }
+  | { success: false; error: string };
+
+/**
+ * Rename an AWS account. Managers only: the Settings tab is manager-gated, and
+ * this re-checks per-account manage access so a direct call cannot bypass it.
+ */
+export const renameAWSAccountAction = orgAction(
+  {
+    name: "renameAWSAccount",
+    resource: "awsAccounts",
+    permission: ["write"],
+    orgId: (_awsAccountId: string, _name: string, organizationId: string) =>
+      organizationId,
+    onError: "Couldn't rename the AWS account. Please try again.",
+  },
+  async (
+    ctx,
+    awsAccountId: string,
+    name: string,
+    organizationId: string
+  ): Promise<RenameAWSAccountResult> => {
+    const access = await checkAWSAccountAccess({
+      userId: ctx.access.userId,
+      organizationId,
+      awsAccountId,
+      permission: "manage",
+    });
+    if (!access.authorized) {
+      return {
+        success: false,
+        error: "You don't have permission to manage this AWS account",
+      };
+    }
+
+    const parsed = renameAwsAccountSchema.safeParse({ name });
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid name",
+      };
+    }
+    const newName = parsed.data.name;
+
+    // Scoped to the caller's org (prevents cross-org enumeration)
+    const account = await db.query.awsAccount.findFirst({
+      where: (a, { and: andOp, eq: eqOp }) =>
+        andOp(eqOp(a.id, awsAccountId), eqOp(a.organizationId, organizationId)),
+    });
+    if (!account) {
+      return { success: false, error: "AWS account not found" };
+    }
+    if (account.name === newName) {
+      return { success: true, unchanged: true };
+    }
+
+    await ctx.audited(
+      async (tx) => {
+        await tx
+          .update(awsAccount)
+          .set({ name: newName, updatedAt: new Date() })
+          .where(
+            and(
+              eq(awsAccount.id, awsAccountId),
+              eq(awsAccount.organizationId, organizationId)
+            )
+          );
+      },
+      () => ({
+        action: "aws_account.renamed",
+        resource: "aws_account",
+        resourceId: awsAccountId,
+        metadata: { from: account.name, to: newName },
+      })
+    );
+
+    revalidatePath(`/${ctx.access.orgSlug}/settings/aws-accounts`, "page");
+    revalidatePath(
+      `/${ctx.access.orgSlug}/settings/aws-accounts/${awsAccountId}`,
+      "layout"
+    );
+    return { success: true };
+  }
+);
+
 // SES's largest published daily-quota tier. A reserve above this is almost
 // certainly a typo (e.g. an extra zero), not a real quota-protection value.
 const MAX_DAILY_QUOTA_RESERVE = 14_000_000;
@@ -1196,7 +1298,8 @@ export const saveDailyQuotaReserveAction = orgAction(
 
     // Revalidate the page
     revalidatePath(
-      `/${ctx.access.orgSlug}/settings/aws-accounts/${awsAccountId}`
+      `/${ctx.access.orgSlug}/settings/aws-accounts/${awsAccountId}`,
+      "layout"
     );
 
     ctx.log.info("Daily quota reserve saved");

@@ -6,13 +6,24 @@
  * @wraps/db message-metrics repository so the numbers never diverge.
  */
 
+import type { SesPricingPlan } from "@wraps/core/ses-plans";
 import {
+  awsAccount,
+  db,
+  eq,
   getMessageMetrics,
   type MetricsDimension,
   type MetricsGranularity,
   MetricsQueryError,
+  queryAccountMonthVolumes,
+  queryBillableCells,
 } from "@wraps/db";
 import { t } from "elysia";
+import {
+  type AccountPlans,
+  attributeCost,
+  parseSesPlan,
+} from "../lib/metrics-cost";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import { rateLimitMiddleware } from "../middleware/rate-limit";
 
@@ -122,7 +133,7 @@ export const metricsRoutes = createAuthenticatedRoutes("/v1/email/metrics")
       const granularity: MetricsGranularity = query.granularity ?? "daily";
 
       try {
-        const result = await getMessageMetrics({
+        const metricsQuery = {
           organizationId: authContext.organizationId,
           startTime,
           endTime,
@@ -133,18 +144,70 @@ export const metricsRoutes = createAuthenticatedRoutes("/v1/email/metrics")
           templateId: parsedFilters.template_id,
           awsAccountId: parsedFilters.aws_account_id,
           domain: parsedFilters.domain,
+        };
+
+        const [result, cells, volumes, accounts] = await Promise.all([
+          getMessageMetrics(metricsQuery),
+          queryBillableCells(metricsQuery),
+          queryAccountMonthVolumes(metricsQuery),
+          db
+            .select({
+              id: awsAccount.id,
+              healthDetail: awsAccount.healthDetail,
+            })
+            .from(awsAccount)
+            .where(eq(awsAccount.organizationId, authContext.organizationId)),
+        ]);
+
+        const plans: AccountPlans = new Map(
+          accounts.map((acct) => [
+            acct.id,
+            parseSesPlan(acct.healthDetail?.sesPricingPlan?.current),
+          ])
+        );
+        const cost = attributeCost({
+          data: result.data,
+          dimensions,
+          cells,
+          volumes,
+          plans,
         });
+
+        const cellPlans: Record<string, SesPricingPlan | null> = {};
+        for (const cell of cells) {
+          if (cell.awsAccountId) {
+            cellPlans[cell.awsAccountId] = plans.get(cell.awsAccountId) ?? null;
+          }
+        }
 
         return {
           object: "metrics" as const,
-          totals: result.totals,
-          data: result.data,
+          totals: { ...result.totals, costUsd: cost.totalCostUsd },
+          data: cost.data,
           meta: {
             start_date: startTime.toISOString(),
             end_date: endTime.toISOString(),
             timezone,
             granularity,
             dimensions,
+            cost: {
+              currency: "USD" as const,
+              basis: "monthly-average" as const,
+              billingTimezone: "UTC" as const,
+              includes: ["ses-outbound-sending"],
+              excludes: [
+                "plan-base-fee",
+                "data-transfer",
+                "storage",
+                "lambda",
+                "dedicated-ip",
+                "sends-not-made-through-wraps",
+              ],
+              // Today's plan is applied to every month in the window.
+              planSource: "current" as const,
+              plans: cellPlans,
+              unattributed: cost.unattributed,
+            },
           },
         };
       } catch (err) {
@@ -201,7 +264,13 @@ export const metricsRoutes = createAuthenticatedRoutes("/v1/email/metrics")
           "grouped by period/domain/broadcast/template/source/account/region. " +
           "`opened` excludes user agents matching a known-bot list; " +
           "`openedRaw` reports the same count with no bot filter applied; " +
-          "`clicked` is currently unfiltered (see plan 107 for this asymmetry).",
+          "`clicked` is currently unfiltered (see plan 107 for this asymmetry). " +
+          "`costUsd` is an estimate from published AWS SES rates, not a billed amount. " +
+          "It covers outbound sending only (billable means non-failed sends), " +
+          "tiered by UTC calendar month at each account's current SES pricing plan " +
+          "and spread as the account's average per-email cost for that month. " +
+          "`null` means the cost is unknown (no recorded plan or no account). " +
+          "Figures for the current month can shift as month-to-date volume grows.",
       },
     }
   );

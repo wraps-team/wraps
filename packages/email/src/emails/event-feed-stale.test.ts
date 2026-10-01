@@ -50,7 +50,7 @@ describe("buildEventFeedStaleEmail", () => {
 
   it("links to the account settings page scoped by orgSlug and awsAccountId", () => {
     const { html, text } = buildEventFeedStaleEmail(BASE_PARAMS);
-    const expectedUrl = `${APP_URL}/acme/settings/aws-accounts/aws-account-1`;
+    const expectedUrl = `${APP_URL}/acme/settings/aws-accounts/aws-account-1/connection?region=us-east-1`;
 
     expect(html).toContain(expectedUrl);
     expect(text).toContain(expectedUrl);

@@ -44,6 +44,13 @@ export {
   generateMarketplaceLinkToken,
   verifyMarketplaceLinkToken,
 } from "./lib/marketplace-link-token";
+// SES identity snapshot
+export type { WrapsIdentity } from "./lib/ses-identities";
+export {
+  getWrapsIdentity,
+  scanWrapsIdentities,
+  toWrapsIdentity,
+} from "./lib/ses-identities";
 // SES templates
 export type {
   SESCredentials,

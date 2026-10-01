@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sanitizeWebhookHeaders } from "../workers/workflow-step-handlers";
 import {
   assertResolvedIpAllowed,
@@ -6,8 +8,40 @@ import {
 } from "../workers/workflow-utils";
 
 describe("createSsrfSafeDispatcher", () => {
-  it("returns a defined object", () => {
-    expect(createSsrfSafeDispatcher()).toBeDefined();
+  // A real loopback server, reached by the NAME "localhost" so the dispatcher's
+  // connect-time lookup runs. No DNS mock: this proves the real socket path.
+  let server: Server;
+  let port: number;
+
+  beforeAll(async () => {
+    server = createServer((_req, res) => res.end("internal"));
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve)
+    );
+    port = (server.address() as AddressInfo).port;
+  });
+
+  afterAll(async () => {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  it("control: the loopback server is reachable without the dispatcher", async () => {
+    const res = await fetch(`http://localhost:${port}/`);
+    expect(await res.text()).toBe("internal");
+  });
+
+  it("refuses to connect when the hostname resolves to loopback", async () => {
+    const dispatcher = createSsrfSafeDispatcher();
+    const err = await fetch(`http://localhost:${port}/`, {
+      dispatcher,
+    } as RequestInit & { dispatcher: unknown }).catch((e: unknown) => e);
+    await dispatcher.destroy();
+
+    expect(err).toBeInstanceOf(TypeError);
+    expect((err as { cause?: Error }).cause?.message).toContain(
+      "blocked address"
+    );
   });
 });
 

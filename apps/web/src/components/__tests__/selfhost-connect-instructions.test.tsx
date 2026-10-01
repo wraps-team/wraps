@@ -16,8 +16,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AWSAccountList } from "../aws-account-list";
+import type { AccountRow } from "@/lib/aws/account-status";
 import { ConnectAWSAccountForm } from "../forms/connect-aws-account-form";
+import { OrganizationSettingsAwsAccounts } from "../organization-settings-aws-accounts";
 
 vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
@@ -25,6 +26,12 @@ vi.mock("posthog-js", () => ({
 
 vi.mock("@/actions/aws-accounts", () => ({
   connectAWSAccountAction: vi.fn(),
+  deleteAWSAccount: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ orgSlug: "acme" }),
+  useRouter: () => ({ refresh: vi.fn() }),
 }));
 
 const PLATFORM_ACCOUNT_ID = "905130073023";
@@ -49,15 +56,20 @@ function renderedMarkup() {
   return document.body.innerHTML;
 }
 
-const account = {
+const account: AccountRow = {
   id: "acct-1",
   name: "Production",
   accountId: "111122223333",
   region: "us-east-1",
-  externalId: "wraps_test_external_id",
-  isVerified: true,
-  permissions: { canView: true, canSend: true, canManage: true },
-} as unknown as Parameters<typeof AWSAccountList>[0]["accounts"][number];
+  emailEnabled: true,
+  smsEnabled: false,
+  status: {
+    level: "critical",
+    label: "Role unreachable",
+    detail: "Last reached 4h ago",
+  },
+  lastEventAt: null,
+};
 
 describe("self-hosted AWS connect instructions", () => {
   beforeEach(() => {
@@ -119,20 +131,21 @@ describe("self-hosted AWS connect instructions", () => {
     });
   });
 
-  describe("AWSAccountList", () => {
+  describe("OrganizationSettingsAwsAccounts repair link", () => {
     it("sends repair to the account page, not a CloudFormation quick-create", () => {
       render(
-        <AWSAccountList
+        <OrganizationSettingsAwsAccounts
           accounts={[account]}
-          organizationId="org-1"
-          orgSlug="acme"
+          organization={{ id: "org-1", name: "Acme" }}
           selfHosted={false}
+          unlimited={true}
+          userRole="owner"
         />
       );
 
-      const link = screen.getByRole("link", { name: /repair iam role/i });
+      const link = screen.getByRole("link", { name: "Fix" });
       expect(link.getAttribute("href")).toBe(
-        "/acme/settings/aws-accounts/acct-1#iam-role"
+        "/acme/settings/aws-accounts/acct-1/connection#iam-role"
       );
       // Every account in this list is already connected, and a quick-create
       // link can only create: `stackName` must be unique per region and the
@@ -141,23 +154,20 @@ describe("self-hosted AWS connect instructions", () => {
       expect(renderedMarkup()).not.toContain("stacks/create/review");
     });
 
-    it("renders no CloudFormation link and shows the CLI command when self-hosted", () => {
+    it("renders no CloudFormation link when self-hosted", () => {
       render(
-        <AWSAccountList
+        <OrganizationSettingsAwsAccounts
           accounts={[account]}
-          organizationId="org-1"
-          orgSlug="acme"
+          organization={{ id: "org-1", name: "Acme" }}
           selfHosted={true}
+          unlimited={true}
+          userRole="owner"
         />
       );
 
-      expect(
-        screen.queryByRole("link", { name: /repair iam role/i })
-      ).not.toBeInTheDocument();
       expect(renderedMarkup()).not.toContain(CFN_CONSOLE_HOST);
       expect(renderedMarkup()).not.toContain(WRAPS_TEMPLATE_BUCKET);
       expect(renderedMarkup()).not.toContain(PLATFORM_ACCOUNT_ID);
-      expect(screen.getByText(SELFHOST_CLI_COMMAND)).toBeInTheDocument();
     });
   });
 });

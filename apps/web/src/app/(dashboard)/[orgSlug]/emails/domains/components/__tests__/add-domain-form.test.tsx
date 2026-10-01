@@ -130,6 +130,34 @@ describe("AddDomainForm", () => {
     });
   });
 
+  it("clears the field after a successful add without flagging it as invalid", async () => {
+    mockListAWSAccounts.mockResolvedValue({
+      success: true,
+      accounts: oneAccount,
+    });
+    mockAddSendingDomain.mockResolvedValue({
+      success: true,
+      domain: "example.com",
+      alreadyExisted: false,
+      trackingAttached: true,
+    });
+
+    render(<AddDomainForm organizationId="org-1" />);
+
+    await waitFor(() => {
+      expect(mockListAWSAccounts).toHaveBeenCalled();
+    });
+
+    fireEvent.change(screen.getByLabelText("Domain"), {
+      target: { value: "example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add domain/i }));
+
+    expect(await screen.findByText(/example\.com added/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Domain")).toHaveValue("");
+    expect(screen.queryByText("Enter a domain.")).not.toBeInTheDocument();
+  });
+
   it("tells the user tracking is not attached when the role predates domain tracking", async () => {
     mockListAWSAccounts.mockResolvedValue({
       success: true,

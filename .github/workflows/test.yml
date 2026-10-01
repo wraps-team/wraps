@@ -326,6 +326,7 @@ jobs:
             --filter=wraps-website \
             --filter=@wraps/ai \
             --filter=@wraps/analytics \
+            --filter=@wraps/observability \
             --filter=@wraps/core \
             --filter=@wraps/email \
             --filter=@wraps.dev/email-check \
@@ -550,6 +551,6 @@ jobs:
             echo "nothing OpenNext-relevant changed: skipping the build"
           fi
 
-      - name: OpenNext can build apps/web on this Next version
+      - name: OpenNext can build and serve apps/web on this Next version
         if: steps.scope.outputs.build == 'true'
         run: node scripts/selfhost/verify-opennext-build.mjs

@@ -1502,6 +1502,11 @@ export async function handleWebhook(
         error: error instanceof Error ? error.message : "Webhook failed",
       },
     };
+  } finally {
+    // destroy(), never close(): close() waits for the unread response body
+    // and never resolves. Per-call Agent, not a module singleton: a pooled
+    // socket can come back dead after a Lambda freeze, and a POST is not retried.
+    await dispatcher.destroy();
   }
 }
 

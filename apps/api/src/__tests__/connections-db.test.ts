@@ -7,7 +7,7 @@
  *
  * This file covers what only a real DB can verify:
  *   - Actual row insertion and field persistence
- *   - Upsert returns same connectionId/externalId, new webhookSecret
+ *   - Upsert returns same connectionId/externalId/webhookSecret
  *   - GET list returns correct shape (no webhookSecret, webhookConnected: true)
  *   - Org-scoping (other org sees empty list)
  *   - DELETE clears webhookSecret but preserves row
@@ -276,7 +276,7 @@ describe("POST /v1/connections — upsert (real DB)", () => {
     expect(secondBody.externalId).toBe(firstBody.externalId);
   });
 
-  it("issues a new webhookSecret on upsert", async () => {
+  it("returns the existing webhookSecret on upsert", async () => {
     const app = createTestApp();
 
     const first = await postConnection(app);
@@ -285,7 +285,111 @@ describe("POST /v1/connections — upsert (real DB)", () => {
     const second = await postConnection(app);
     const secondBody = await second.json();
 
+    expect(secondBody.webhookSecret).toBe(firstBody.webhookSecret);
+  });
+
+  it("keeps the webhookSecret when a second region connects", async () => {
+    const app = createTestApp();
+
+    const first = await postConnection(app, { region: "us-east-1" });
+    const firstBody = await first.json();
+
+    const second = await postConnection(app, { region: "eu-west-1" });
+    const secondBody = await second.json();
+
+    expect(secondBody.webhookSecret).toBe(firstBody.webhookSecret);
+
+    const [row] = await db
+      .select({ webhookSecret: awsAccount.webhookSecret })
+      .from(awsAccount)
+      .where(eq(awsAccount.id, firstBody.connectionId));
+    expect(row.webhookSecret).toBe(firstBody.webhookSecret);
+  });
+
+  it("issues a new webhookSecret after DELETE cleared it", async () => {
+    const app = createTestApp();
+
+    const first = await postConnection(app);
+    const firstBody = await first.json();
+
+    const del = await deleteConnection(app, firstBody.connectionId);
+    expect(del.status).toBe(200);
+
+    const second = await postConnection(app);
+    const secondBody = await second.json();
+
+    expect(typeof secondBody.webhookSecret).toBe("string");
+    expect(secondBody.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
     expect(secondBody.webhookSecret).not.toBe(firstBody.webhookSecret);
+  });
+
+  const storedFeatures = (overrides: Record<string, unknown> = {}) => ({
+    email: { configSetName: "x" },
+    sms: { phoneNumberId: "pn-1" },
+    ...overrides,
+  });
+
+  const readFlags = async (connectionId: string) => {
+    const [row] = await db
+      .select({
+        emailEnabled: awsAccount.emailEnabled,
+        smsEnabled: awsAccount.smsEnabled,
+        features: awsAccount.features,
+      })
+      .from(awsAccount)
+      .where(eq(awsAccount.id, connectionId));
+    return row;
+  };
+
+  it("keeps stored features and flags when a reconnect posts empty features", async () => {
+    const app = createTestApp();
+    const features = storedFeatures();
+
+    const first = await postConnection(app, { features });
+    const { connectionId } = await first.json();
+    const before = await readFlags(connectionId);
+    expect(before.emailEnabled).toBe(true);
+    expect(before.smsEnabled).toBe(true);
+
+    const second = await postConnection(app, { features: {} });
+    expect(second.status).toBe(200);
+
+    const after = await readFlags(connectionId);
+    expect(after.emailEnabled).toBe(true);
+    expect(after.smsEnabled).toBe(true);
+    expect(after.features).toEqual(features);
+  });
+
+  it("keeps stored features when a reconnect omits features", async () => {
+    const app = createTestApp();
+    const features = storedFeatures();
+
+    const first = await postConnection(app, { features });
+    const { connectionId } = await first.json();
+
+    const second = await postConnection(app);
+    expect(second.status).toBe(200);
+
+    const after = await readFlags(connectionId);
+    expect(after.emailEnabled).toBe(true);
+    expect(after.smsEnabled).toBe(true);
+    expect(after.features).toEqual(features);
+  });
+
+  it("replaces features when a reconnect posts non-empty features", async () => {
+    const app = createTestApp();
+
+    const first = await postConnection(app, { features: storedFeatures() });
+    const { connectionId } = await first.json();
+
+    const emailOnly = { email: { configSetName: "y" } };
+    const second = await postConnection(app, { features: emailOnly });
+    expect(second.status).toBe(200);
+
+    const after = await readFlags(connectionId);
+    expect(after.emailEnabled).toBe(true);
+    expect(after.smsEnabled).toBe(false);
+    expect(after.features).toEqual(emailOnly);
   });
 
   it("only one row exists in DB after create + upsert", async () => {

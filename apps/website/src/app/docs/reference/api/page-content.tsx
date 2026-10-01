@@ -258,7 +258,8 @@ const metricsResponseExample = `// GET /v1/email/metrics response
     "opened": 640,
     "openedRaw": 705,
     "clicked": 210,
-    "failed": 22
+    "failed": 22,
+    "costUsd": 0.1975
   },
   "data": [
     {
@@ -274,7 +275,8 @@ const metricsResponseExample = `// GET /v1/email/metrics response
       "opened": 92,
       "openedRaw": 101,
       "clicked": 30,
-      "failed": 2
+      "failed": 2,
+      "costUsd": 0.0288
     }
   ],
   "meta": {
@@ -282,7 +284,24 @@ const metricsResponseExample = `// GET /v1/email/metrics response
     "end_date": "2026-08-31T00:00:00.000Z",
     "timezone": "UTC",
     "granularity": "daily",
-    "dimensions": ["period"]
+    "dimensions": ["period"],
+    "cost": {
+      "currency": "USD",
+      "basis": "monthly-average",
+      "billingTimezone": "UTC",
+      "includes": ["ses-outbound-sending"],
+      "excludes": [
+        "plan-base-fee",
+        "data-transfer",
+        "storage",
+        "lambda",
+        "dedicated-ip",
+        "sends-not-made-through-wraps"
+      ],
+      "planSource": "current",
+      "plans": { "acct_abc123": "ESSENTIALS" },
+      "unattributed": 0
+    }
   }
 }`;
 
@@ -481,8 +500,10 @@ Counts are maintained incrementally during the send and reflect SES events recei
 
 **Response (200):**
 \`\`\`json
-{ "object": "metrics", "totals": { "sent": 1234, "delivered": 1200 }, "data": [{ "period": "2026-08-30", "sent": 180 }], "meta": { "start_date": "...", "end_date": "...", "timezone": "UTC", "granularity": "daily", "dimensions": ["period"] } }
+{ "object": "metrics", "totals": { "sent": 1234, "delivered": 1200 }, "data": [{ "period": "2026-08-30", "sent": 180 }], "meta": { "start_date": "...", "end_date": "...", "timezone": "UTC", "granularity": "daily", "dimensions": ["period"], "cost": { "currency": "USD", "basis": "monthly-average", "billingTimezone": "UTC" } } }
 \`\`\`
+
+\`costUsd\` (on \`totals\` and every \`data\` row) is an estimate from published AWS SES rates, not a billed amount. It covers outbound sending only: non-failed sends, priced at each AWS account's current SES pricing plan and tiered by UTC calendar month. It excludes the plan base fee, data transfer, storage, Lambda, dedicated IPs, and sends not made through Wraps (\`meta.cost.excludes\`). Each send is charged the account's average per-email cost for that month, so rows add up to the total under any grouping. For example, an account that sends 20,000,000 in a UTC month on Essentials is charged $3,000 for the month, so a 10,000-send broadcast that month is attributed $1.50, not $1.60. \`null\` means the cost is unknown (no recorded plan for the account), never zero. Figures for the current month can shift as month-to-date volume grows.
 
 \`opened\` excludes user agents matching a known-bot list; \`openedRaw\` reports the same count with no bot filter applied. \`clicked\` is currently unfiltered. There is no \`tags\` dimension -- SES message tags are not persisted on sends. The \`template\`, \`source\`, \`account\`, and \`region\` dimensions have no equivalent in other providers' email APIs.`,
 
@@ -1630,6 +1651,29 @@ export default function PageContent() {
           rendering failures -- optionally grouped by dimension and time
           granularity. It shares the same per-minute API rate limit as every
           other endpoint; reading your own numbers is not a paid feature.
+        </p>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            costUsd
+          </code>{" "}
+          (on{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">totals</code>{" "}
+          and every{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">data</code>{" "}
+          row) is an estimate from published AWS SES rates, not a billed amount.
+          It covers outbound sending only: non-failed sends, priced at each AWS
+          account&apos;s current SES pricing plan and tiered by UTC calendar
+          month. It excludes the plan base fee, data transfer, storage, Lambda,
+          dedicated IPs, and sends not made through Wraps. Each send is charged
+          the account&apos;s average per-email cost for that month, so rows add
+          up to the total under any grouping. For example, an account that sends
+          20,000,000 in a UTC month on Essentials is charged $3,000 for the
+          month, so a 10,000-send broadcast that month is attributed $1.50, not
+          $1.60.{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">null</code>{" "}
+          means the cost is unknown (no recorded plan for the account), never
+          zero. Figures for the current month can shift as month-to-date volume
+          grows.
         </p>
         <Card className="mb-4">
           <CardContent className="p-0">

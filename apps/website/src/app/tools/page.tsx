@@ -203,6 +203,61 @@ export default function ToolsPage() {
               </Card>
             </div>
 
+            {/* Generators and calculators */}
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="font-heading text-base tracking-tight">
+                    DMARC record generator
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-muted-foreground text-sm">
+                  Build a DMARC record and see what would break before you
+                  publish it.{" "}
+                  <a
+                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    href="/tools/dmarc-builder"
+                  >
+                    Build DMARC →
+                  </a>
+                </CardContent>
+              </Card>
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="font-heading text-base tracking-tight">
+                    Email header analyzer
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-muted-foreground text-sm">
+                  Paste raw headers and read the hops, auth results, and
+                  alignment. Nothing leaves your browser.{" "}
+                  <a
+                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    href="/tools/email-header-analyzer"
+                  >
+                    Analyze headers →
+                  </a>
+                </CardContent>
+              </Card>
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="font-heading text-base tracking-tight">
+                    SES bounce rate calculator
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-muted-foreground text-sm">
+                  See where your rates sit against the SES review and pause
+                  lines.{" "}
+                  <a
+                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    href="/tools/bounce-rate-calculator"
+                  >
+                    Calculate rates →
+                  </a>
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Production access CTA */}
             <Card className="mt-8 border-border bg-card">
               <CardContent>

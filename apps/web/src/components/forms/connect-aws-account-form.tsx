@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@wraps/ui/components/ui/select";
 import { AlertCircle, CheckCircle, Copy, ExternalLink } from "lucide-react";
+import Link from "next/link";
 import posthog from "posthog-js";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
@@ -312,6 +313,16 @@ export function ConnectAWSAccountForm({
                 {"details" in state && state.details ? (
                   <AlertDescription className="text-xs">
                     {String(state.details) as string}
+                  </AlertDescription>
+                ) : null}
+                {"existingAccountHref" in state && state.existingAccountHref ? (
+                  <AlertDescription>
+                    <Link
+                      className="underline underline-offset-4"
+                      href={String(state.existingAccountHref)}
+                    >
+                      Open the connected account
+                    </Link>
                   </AlertDescription>
                 ) : null}
               </Alert>

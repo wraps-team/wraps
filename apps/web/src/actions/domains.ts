@@ -25,9 +25,13 @@ import {
   db,
   eq,
   recordDomainAuthCheck,
+  type SnapshotIdentity,
+  writeIdentitySnapshot,
 } from "@wraps/db";
+import { toWrapsIdentity } from "@wraps/email";
 import { nodeDns } from "@wraps.dev/email-check";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getOrAssumeRole } from "@/lib/aws/credential-cache";
 import { checkDomainAuthRecords } from "@/lib/domain-auth-check";
 import { probeTrackingTls, type TrackingTlsResult } from "@/lib/tracking-tls";
@@ -256,7 +260,10 @@ export const listSendingDomains = orgAction(
                 awsAccountId: account.id,
                 region: account.region,
               };
-              return domain;
+              return {
+                domain,
+                snapshot: toWrapsIdentity(identity, response),
+              };
             } catch (err) {
               ctx.log.warn(
                 {
@@ -271,10 +278,34 @@ export const listSendingDomains = orgAction(
           })
         );
 
+        const snapshotIdentities: SnapshotIdentity[] = [];
         for (const detail of details) {
           if (detail) {
-            domains.push(detail);
+            domains.push(detail.domain);
+            if (detail.snapshot) {
+              snapshotIdentities.push(detail.snapshot);
+            }
           }
+        }
+
+        // Write-through: this page just read SES live, so refresh the cached
+        // snapshot for free. Skipped when the list was truncated or any detail
+        // lookup failed, since a partial view would drop identities.
+        if (!nextToken && details.every(Boolean)) {
+          after(async () => {
+            try {
+              await writeIdentitySnapshot({
+                organizationId,
+                awsAccountId: account.id,
+                identities: snapshotIdentities,
+              });
+            } catch (error) {
+              ctx.log.warn(
+                { err: error, awsAccountId: account.id },
+                "Identity snapshot write-through failed"
+              );
+            }
+          });
         }
       } catch (error) {
         // A single unreachable account must not fail the whole request —

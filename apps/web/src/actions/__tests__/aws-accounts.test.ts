@@ -1,4 +1,5 @@
 import {
+  auditLog,
   awsAccount,
   db,
   member,
@@ -6,7 +7,7 @@ import {
   organization,
   user,
 } from "@wraps/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import {
   afterAll,
@@ -26,6 +27,7 @@ import {
   getVerifiedDomains,
   listAWSAccounts,
   removeWebhookSecretAction,
+  renameAWSAccountAction,
   saveWebhookSecretAction,
   scanAWSAccountFeatures,
 } from "../aws-accounts";
@@ -1636,6 +1638,12 @@ describe("scanAWSAccountFeatures — config set detection", () => {
     });
     expect(row?.emailEnabled).toBe(true);
     expect(row?.features?.email?.configSetName).toBe("wraps-email-tracking");
+
+    const scannedAt = row?.features?.scannedAt;
+    expect(typeof scannedAt).toBe("string");
+    const ageMs = Date.now() - new Date(scannedAt as string).getTime();
+    expect(ageMs).toBeGreaterThanOrEqual(0);
+    expect(ageMs).toBeLessThan(60_000);
   });
 
   it("records the sending pool and managed dedicated IP count", async () => {
@@ -2893,5 +2901,257 @@ describe("connectAWSAccountAction — setupMethod persistence", () => {
         eqOp(a.organizationId, connectActionVictimOrg.id),
     });
     expect(victimRow).toBeUndefined();
+  });
+
+  it("does not insert a second row for an AWS account the org already connected", async () => {
+    const first = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+    const firstId = (first as { account: { id: string } }).account.id;
+
+    const second = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect(second).toEqual({
+      error: "This AWS account is already connected",
+      existingAccountId: firstId,
+      existingAccountHref: `/${connectActionOrg.slug}/settings/aws-accounts/${firstId}`,
+    });
+
+    const rows = await db
+      .select()
+      .from(awsAccount)
+      .where(
+        and(
+          eq(awsAccount.organizationId, connectActionOrg.id),
+          eq(awsAccount.accountId, CONNECT_ACTION_ACCOUNT_ID)
+        )
+      );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("does not call AWS for an already-connected account", async () => {
+    await connectAWSAccountAction(undefined, buildConnectAWSAccountFormData());
+    mockGetCredentials.mockClear();
+
+    await connectAWSAccountAction(undefined, buildConnectAWSAccountFormData());
+
+    expect(mockGetCredentials).toHaveBeenCalledTimes(0);
+  });
+
+  it("still lets a different org connect the same AWS account number", async () => {
+    await db.insert(awsAccount).values({
+      id: "connect-action-victim-same-account",
+      organizationId: connectActionVictimOrg.id,
+      name: "Victim Org Account",
+      accountId: CONNECT_ACTION_ACCOUNT_ID,
+      region: "us-east-1",
+      roleArn: `arn:aws:iam::${CONNECT_ACTION_ACCOUNT_ID}:role/wraps-console-access-role`,
+      externalId: "victim-external-id",
+      isVerified: true,
+      createdBy: testUser.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect((result as { success?: boolean }).success).toBe(true);
+    const rows = await db
+      .select()
+      .from(awsAccount)
+      .where(
+        and(
+          eq(awsAccount.organizationId, connectActionOrg.id),
+          eq(awsAccount.accountId, CONNECT_ACTION_ACCOUNT_ID)
+        )
+      );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("reports already-connected rather than the plan limit when the org is at its limit", async () => {
+    const first = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+    expect((first as { success?: boolean }).success).toBe(true);
+
+    const second = await connectAWSAccountAction(
+      undefined,
+      buildConnectAWSAccountFormData()
+    );
+
+    expect(second).not.toHaveProperty("limitReached");
+    expect((second as { error?: string }).error).toBe(
+      "This AWS account is already connected"
+    );
+  });
+});
+
+describe("renameAWSAccountAction", () => {
+  const renameAccount = {
+    id: "test-rename-account-1",
+    organizationId: connectActionOrg.id,
+    name: "AWS Account (555000111222)",
+    accountId: "555000111333",
+    region: "us-east-1",
+    roleArn: "arn:aws:iam::555000111333:role/wraps-console-access-role",
+    externalId: "wraps_rename_test_external_id",
+    isVerified: true,
+    createdBy: testUser.id,
+    webhookSecret: null,
+  };
+  const victimAccount = {
+    ...renameAccount,
+    id: "test-rename-victim-account-1",
+    organizationId: connectActionVictimOrg.id,
+    name: "Victim Account",
+    accountId: "555000111444",
+    externalId: "wraps_rename_victim_external_id",
+  };
+
+  const readName = async (id: string) =>
+    (
+      await db.query.awsAccount.findFirst({
+        where: (a, { eq: eqOp }) => eqOp(a.id, id),
+      })
+    )?.name;
+
+  const readRenameAudit = (id: string) =>
+    db.query.auditLog.findMany({
+      where: (a, { and: andOp, eq: eqOp }) =>
+        andOp(eqOp(a.resourceId, id), eqOp(a.action, "aws_account.renamed")),
+    });
+
+  beforeAll(async () => {
+    await db
+      .insert(organization)
+      .values([connectActionOrg, connectActionVictimOrg])
+      .onConflictDoNothing();
+    await db.insert(user).values(connectActionAdminUser).onConflictDoNothing();
+    await db
+      .insert(member)
+      .values([connectActionMember, connectActionAdminMember])
+      .onConflictDoNothing();
+  });
+
+  afterAll(async () => {
+    await clearRenameAudit();
+    await db
+      .delete(awsAccount)
+      .where(eq(awsAccount.organizationId, connectActionOrg.id));
+    await db
+      .delete(awsAccount)
+      .where(eq(awsAccount.organizationId, connectActionVictimOrg.id));
+    await db.delete(member).where(eq(member.id, connectActionMember.id));
+    await db.delete(member).where(eq(member.id, connectActionAdminMember.id));
+    await db.delete(user).where(eq(user.id, connectActionAdminUser.id));
+    await db
+      .delete(organization)
+      .where(eq(organization.id, connectActionOrg.id));
+    await db
+      .delete(organization)
+      .where(eq(organization.id, connectActionVictimOrg.id));
+  });
+
+  const clearRenameAudit = async () => {
+    for (const id of [renameAccount.id, victimAccount.id]) {
+      await db.delete(auditLog).where(eq(auditLog.resourceId, id));
+    }
+  };
+
+  beforeEach(async () => {
+    currentMockUserId = testUser.id;
+    await clearRenameAudit();
+    await db
+      .delete(awsAccount)
+      .where(eq(awsAccount.organizationId, connectActionOrg.id));
+    await db
+      .delete(awsAccount)
+      .where(eq(awsAccount.organizationId, connectActionVictimOrg.id));
+    await db.insert(awsAccount).values([renameAccount, victimAccount]);
+  });
+
+  it("renames the account and writes exactly one audit row", async () => {
+    const result = await renameAWSAccountAction(
+      renameAccount.id,
+      "  production  ",
+      connectActionOrg.id
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(await readName(renameAccount.id)).toBe("production");
+
+    const rows = await readRenameAudit(renameAccount.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].resource).toBe("aws_account");
+    expect(rows[0].metadata).toEqual({
+      from: renameAccount.name,
+      to: "production",
+    });
+  });
+
+  it("returns unchanged and writes no audit row when the name is the same", async () => {
+    const result = await renameAWSAccountAction(
+      renameAccount.id,
+      renameAccount.name,
+      connectActionOrg.id
+    );
+
+    expect(result).toEqual({ success: true, unchanged: true });
+    expect(await readRenameAudit(renameAccount.id)).toHaveLength(0);
+  });
+
+  it("returns not-found for another org's account and leaves its name alone", async () => {
+    const result = await renameAWSAccountAction(
+      victimAccount.id,
+      "hijacked",
+      connectActionOrg.id
+    );
+
+    expect(result).toEqual({ success: false, error: "AWS account not found" });
+    expect(await readName(victimAccount.id)).toBe(victimAccount.name);
+    expect(await readRenameAudit(victimAccount.id)).toHaveLength(0);
+  });
+
+  it("refuses an admin with no per-account manage grant and leaves the name alone", async () => {
+    // connectActionAdminUser holds awsAccounts write via the admin role, so it
+    // passes orgAction's gate, but has no awsAccountPermission grant on this
+    // account (owners bypass that check; admins do not).
+    currentMockUserId = connectActionAdminUser.id;
+
+    const result = await renameAWSAccountAction(
+      renameAccount.id,
+      "production",
+      connectActionOrg.id
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "You don't have permission to manage this AWS account",
+    });
+    expect(await readName(renameAccount.id)).toBe(renameAccount.name);
+    expect(await readRenameAudit(renameAccount.id)).toHaveLength(0);
+  });
+
+  it.each([
+    ["65 characters", "a".repeat(65)],
+    ["empty after trim", "   "],
+  ])("rejects a name that is %s and writes nothing", async (_label, name) => {
+    const result = await renameAWSAccountAction(
+      renameAccount.id,
+      name,
+      connectActionOrg.id
+    );
+
+    expect(result.success).toBe(false);
+    expect(await readName(renameAccount.id)).toBe(renameAccount.name);
+    expect(await readRenameAudit(renameAccount.id)).toHaveLength(0);
   });
 });

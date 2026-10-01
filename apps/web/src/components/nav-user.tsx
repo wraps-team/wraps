@@ -36,6 +36,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useSession } from "@/contexts/session-context";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { authClient } from "@/lib/auth-client";
 
 export function NavUser() {
@@ -43,9 +44,10 @@ export function NavUser() {
   const router = useRouter();
   const session = useSession();
   const { theme, setTheme } = useTheme();
+  const hydrated = useHydrated();
   const user = session.data?.user;
 
-  if (session.isPending) {
+  if (!hydrated || session.isPending) {
     return (
       <SidebarMenu>
         <SidebarMenuItem>

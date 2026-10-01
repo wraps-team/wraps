@@ -214,12 +214,14 @@ describe("account-health with an unusable customer role", () => {
     // act on it. The dashboard button comes first: `href` lands them on the
     // account page, and a dashboard-only customer may have no CLI at all.
     expect(`${payload.title} ${payload.body}`).toContain("472506473063");
-    expect(payload.body).toContain("Repair IAM Role");
+    expect(payload.body).toContain("Connection → Role access");
     expect(payload.body).toContain("wraps platform update-role");
     // Sending assumes this same role, so the alert must say email is blocked —
     // "health checks are not running" alone reads as cosmetic.
     expect(payload.body).toContain("blocked");
-    expect(payload.href).toBe(`/acme/settings/aws-accounts/${ACCOUNT_ROW.id}`);
+    expect(payload.href).toBe(
+      `/acme/settings/aws-accounts/${ACCOUNT_ROW.id}/connection`
+    );
 
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
