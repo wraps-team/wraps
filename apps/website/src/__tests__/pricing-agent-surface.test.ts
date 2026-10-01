@@ -83,11 +83,21 @@ describe("markdown content negotiation", () => {
     expect(llms).toContain("$0.16 per 1,000 emails");
   });
 
-  it("exposes estimate_cost as a WebMCP tool on the site", () => {
-    const source = read("src/components/webmcp.tsx");
-    expect(source).toContain('name: "estimate_cost"');
-    expect(source).toContain("/api/pricing/estimate");
-    expect(source).toContain("essentials");
+  it("exposes estimate_cost as a WebMCP tool wired to the cost engine", async () => {
+    const { webMcpTools } = await import("@/lib/webmcp-tools");
+    const tool = webMcpTools().find((t) => t.name === "estimate_cost");
+
+    expect(tool).toBeDefined();
+    const sesPlan = (
+      tool?.inputSchema.properties as { sesPlan: { enum: readonly string[] } }
+    ).sesPlan;
+    expect(sesPlan.enum).toContain("essentials");
+
+    const result = await tool?.execute({ emails: 50_000 });
+    expect(result?.isError).toBeFalsy();
+    expect(typeof (result?.structuredContent as { total: unknown }).total).toBe(
+      "number"
+    );
   });
 
   it("advertises only the three purchasable tiers in the MCP estimate_cost enum", async () => {
