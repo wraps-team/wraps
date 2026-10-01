@@ -96,8 +96,17 @@ export default defineConfig(async () => {
           "src/lib/permissions/**/*.ts",
           "src/actions/**/*.ts",
           "src/lib/**/*.ts",
+          "src/app/**/*.{ts,tsx}",
         ],
-        exclude: ["**/__tests__/**", "**/*.test.ts", "**/types.ts"],
+        exclude: [
+          "**/__tests__/**",
+          "**/*.test.ts",
+          "**/types.ts",
+          "**/layout.tsx",
+          "**/loading.tsx",
+          "**/error.tsx",
+          "**/not-found.tsx",
+        ],
       },
     },
     resolve: {
