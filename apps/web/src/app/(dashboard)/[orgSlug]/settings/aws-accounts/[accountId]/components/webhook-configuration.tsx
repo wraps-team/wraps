@@ -32,8 +32,8 @@ import {
 } from "@/actions/aws-accounts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatRelativeTime } from "@/lib/utils";
 import type { ClientAccount } from "../lib/client-account";
+import { getStreamingStatus } from "../lib/streaming-status";
 
 type WebhookConfigurationProps = {
   account: ClientAccount;
@@ -60,27 +60,11 @@ export function WebhookConfiguration({
 
   const isConnected = account.webhookConnected;
 
-  const lastEvent = lastEventReceivedAt
-    ? `Last event ${formatRelativeTime(new Date(lastEventReceivedAt))}`
-    : null;
-  let status: {
-    variant: "secondary" | "destructive" | "success";
-    label: string;
-    detail: string | null;
-  };
-  if (!isConnected) {
-    status = { variant: "secondary", label: "Off", detail: null };
-  } else if (staleSince) {
-    status = { variant: "destructive", label: "Stopped", detail: lastEvent };
-  } else if (lastEventReceivedAt) {
-    status = { variant: "success", label: "Receiving", detail: lastEvent };
-  } else {
-    status = {
-      variant: "secondary",
-      label: "Waiting for first event",
-      detail: null,
-    };
-  }
+  const status = getStreamingStatus({
+    connected: isConnected,
+    lastEventReceivedAt,
+    staleSince,
+  });
 
   const handleSave = async () => {
     if (!webhookSecret.trim()) {
