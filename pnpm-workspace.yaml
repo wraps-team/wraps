@@ -24,17 +24,17 @@ overrides:
   '@types/react-dom': 19.2.3
   hono: ^4.11.7
   '@modelcontextprotocol/sdk': ^1.26.0
-  nodemailer: ^9.0.5
-  next: 16.2.12
+  nodemailer: ^10.0.6
+  next: 16.3.6
   'path-to-regexp@6': ^6.3.0
   tar: ^7.5.11
   '@smithy/types': ^4.12.0
   '@aws-sdk/util-dynamodb': 3.996.5
   fast-xml-parser: ^5.3.8
   '@isaacs/brace-expansion': ^5.0.1
-  'brace-expansion@<2': ^1.1.18
+  'brace-expansion@<2': ^1.1.21
   'brace-expansion@>=2 <5': ^2.0.3
-  'brace-expansion@>=5': ^5.0.9
+  'brace-expansion@>=5': ^5.0.12
   lodash: ^4.18.1
   loader-utils: ^2.0.4
   defu: ^6.1.5
@@ -42,7 +42,7 @@ overrides:
   'picomatch@>=3 <5': ^4.0.4
   'path-to-regexp@<1': ^0.1.13
   'path-to-regexp@8': ^8.4.0
-  qs: ^6.14.2
+  qs: ^6.16.0
   markdown-it: ^14.1.1
   seroval: ^1.4.1
   stage-js: 1.0.0-alpha.17
@@ -52,7 +52,7 @@ overrides:
   better-call: 1.4.0
   '@better-auth/utils': 0.4.2
   react-router: ^7.18.2
-  undici: ^7.28.0
+  undici: ^7.29.1
   'diff@<5': ^4.0.4
   'diff@>=5 <8': ^5.2.2
   'diff@>=8': ^8.0.3
@@ -74,12 +74,17 @@ overrides:
   samlify: ^2.13.0
   shell-quote: ^1.8.4
   postcss: ^8.5.26
-  js-yaml: ^4.3.1
+  js-yaml: ^4.3.2
   'nanoid@<4': ^3.3.18
   linkify-it: ^5.0.2
-  fast-uri: ^3.1.5
-  sharp: ^0.35.3
+  fast-uri: ^3.1.8
+  sharp: ^0.35.4
+  engine.io: ^6.6.10
   'file-type@>=17': ^21.3.1
+  ip-address: ^10.7.1
+  '@xmldom/xmldom@<0.9': ^0.8.15
+  'fflate@>=0.8 <0.9': ^0.8.3
+  '@ai-sdk/provider-utils@<4': ^3.0.30
 
 catalog:
   '@aws-sdk/client-acm': 3.1074.0
@@ -111,8 +116,8 @@ catalog:
   '@react-email/render': 2.1.0
   '@types/node': 24.10.0
   '@types/pg': ^8.20.0
-  '@vitest/coverage-v8': 4.1.9
-  '@vitest/ui': 4.1.9
+  '@vitest/coverage-v8': 4.1.11
+  '@vitest/ui': 4.1.11
   better-auth: 1.7.5
   better-inbox: 0.3.1
   dotenv: ^17.4.2
@@ -124,7 +129,7 @@ catalog:
   tsdown: ^0.22.14
   tsup: ^8.5.1
   typescript: ^5.9.3
-  vitest: 4.1.9
+  vitest: 4.1.11
   zod: ^4.6.5
 
 strictDepBuilds: true
