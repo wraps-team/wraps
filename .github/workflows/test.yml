@@ -326,6 +326,7 @@ jobs:
             --filter=wraps-website \
             --filter=@wraps/ai \
             --filter=@wraps/analytics \
+            --filter=@wraps/observability \
             --filter=@wraps/core \
             --filter=@wraps/email \
             --filter=@wraps.dev/email-check \
