@@ -76,7 +76,7 @@ jobs:
 
     steps:
       - name: Checkout the tested commit
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           # Full history: the last successful deploy may be many pushes back.
@@ -182,7 +182,7 @@ jobs:
       # `workflow_run` the default checkout is the default branch's head at
       # trigger time, which can already be a newer, untested commit.
       - name: Checkout the tested commit
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
         with:
           ref: ${{ needs.gate.outputs.sha }}
 
