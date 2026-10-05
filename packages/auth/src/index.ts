@@ -762,7 +762,7 @@ export const auth = betterAuth<BetterAuthOptions>({
         "This password has been exposed in a data breach. Please choose a more secure password.",
     }),
     // Upserts the Wraps contact and emits user.signup, which is what triggers
-    // the onboarding-rescue workflow. `attribution: true` reads the
+    // the welcome-series workflow. `attribution: true` reads the
     // wraps_attribution cookie the marketing site sets on first touch, so the
     // contact record carries the campaign that produced the signup.
     //

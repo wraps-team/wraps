@@ -103,9 +103,8 @@ export default function WelcomeSeriesWelcome({
       />
 
       <Small>
-        I&apos;ll send a short quickstart in a couple of hours. If something is
-        already in your way, just reply to this — it reaches me, and I read all
-        of them. &mdash; Jarod
+        If something is already in your way, just reply to this — it reaches me,
+        and I read all of them. &mdash; Jarod
       </Small>
     </Shell>
   );

@@ -48,9 +48,9 @@ export default function WelcomeSeriesLastCall({
 
       <P>
         {"{{#if firstName}}{{firstName}}, you{{else}}You{{/if}}"} signed up a
-        little while back and never deployed. This is the last automated email
-        in the sequence, so I would rather use it to be straight with you than
-        to pitch again.
+        week ago. This is the last automated email in the sequence, so I would
+        rather use it to be straight with you than to pitch again. If you have
+        already deployed, ignore the rest of this and carry on.
       </P>
 
       <Rule />
