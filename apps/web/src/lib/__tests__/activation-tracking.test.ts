@@ -666,6 +666,27 @@ describe("activation-tracking: emit() calls to Wraps platform", () => {
     );
   });
 
+  it("trackAwsConnected should still PATCH hasConnectedAws on a later AWS account", async () => {
+    // The first account may have come through a path that never tracked it,
+    // so every connect sets the flag, not just the first.
+    mockPatch.mockResolvedValue({ data: { success: true }, error: null });
+    mockDbWhere.mockResolvedValueOnce([{ count: 2 }]);
+
+    await trackAwsConnected("user@example.com", "org-123", {
+      region: "us-east-1",
+      accountId: "123456789012",
+    });
+
+    expect(mockPatch).toHaveBeenCalledWith(
+      "/v1/contacts/{id}",
+      expect.objectContaining({
+        body: {
+          properties: expect.objectContaining({ hasConnectedAws: true }),
+        },
+      })
+    );
+  });
+
   it("trackDomainVerified should PATCH hasDomainVerified on first domain", async () => {
     mockPatch.mockResolvedValue({ data: { success: true }, error: null });
 

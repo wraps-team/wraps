@@ -6,6 +6,7 @@ import { scanWrapsIdentities } from "@wraps/email";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireRoutePermission } from "@/app/api/shared/route-permission";
+import { trackAwsConnected } from "@/lib/activation-tracking";
 import {
   AssumeRoleError,
   type AssumeRoleErrorCode,
@@ -263,6 +264,11 @@ export async function POST(request: Request, context: RouteContext) {
               : undefined,
           })
           .returning({ id: awsAccount.id });
+
+        await trackAwsConnected(session.user.email, orgWithMembership.id, {
+          region,
+          accountId,
+        });
       }
 
       // Populate the identities snapshot now, so the overview is right on

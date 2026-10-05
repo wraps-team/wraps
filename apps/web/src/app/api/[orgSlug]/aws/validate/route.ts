@@ -4,6 +4,7 @@ import { awsAccount } from "@wraps/db/schema/app";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireRoutePermission } from "@/app/api/shared/route-permission";
+import { trackAwsConnected } from "@/lib/activation-tracking";
 import { AssumeRoleError, assumeRole } from "@/lib/aws/assume-role";
 import { createRequestLogger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
@@ -171,6 +172,11 @@ export async function POST(request: Request, context: RouteContext) {
           lastVerifiedAt: new Date(),
           createdBy: session.user.id,
           setupMethod: "cfn_console_role",
+        });
+
+        await trackAwsConnected(session.user.email, orgWithMembership.id, {
+          region,
+          accountId,
         });
       }
 

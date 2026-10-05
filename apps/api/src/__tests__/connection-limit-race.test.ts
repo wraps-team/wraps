@@ -75,9 +75,14 @@ vi.mock("../lib/logger", () => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
+vi.mock("../lib/activation-tracking", () => ({
+  trackAwsConnected: vi.fn(),
+}));
+
 // --- Import after mocks ---
 const { connectionsRoutes } = await import("../routes/connections");
 const { db } = await import("@wraps/db");
+const { trackAwsConnected } = await import("../lib/activation-tracking");
 
 // --- Test helpers ---
 const mockAuth = {
@@ -135,6 +140,13 @@ describe("Connection plan limit race condition", () => {
 
       // Insert went through tx, not db directly
       expect(mockTx.insert).toHaveBeenCalled();
+
+      // A new connection is tracked after the transaction commits
+      expect(trackAwsConnected).toHaveBeenCalledWith(
+        "org-test-123",
+        "user-test",
+        { region: "us-east-1", accountId: "123456789012" }
+      );
       expect(db.insert).not.toHaveBeenCalled();
     });
   });
@@ -182,6 +194,8 @@ describe("Connection plan limit race condition", () => {
       // Update, not insert
       expect(mockTx.update).toHaveBeenCalled();
       expect(mockTx.insert).not.toHaveBeenCalled();
+      // A reconnect is not a new connection, so activation isn't re-tracked
+      expect(trackAwsConnected).not.toHaveBeenCalled();
     });
   });
 

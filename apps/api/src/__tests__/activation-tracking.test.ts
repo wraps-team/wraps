@@ -6,35 +6,40 @@ const {
   mockCapture,
   mockGroupIdentify,
   mockPlatformPost,
+  mockPlatformGet,
+  mockPlatformPatch,
   mockSelectResults,
   mockInsertResults,
 } = vi.hoisted(() => ({
   mockCapture: vi.fn(),
   mockGroupIdentify: vi.fn(),
   mockPlatformPost: vi.fn(),
+  mockPlatformGet: vi.fn(),
+  mockPlatformPatch: vi.fn(),
   mockSelectResults: [] as MockRow[][],
   mockInsertResults: [] as MockRow[][],
 }));
 
 vi.mock("@wraps/db", () => ({
   db: {
-    select: vi.fn(() => ({
-      from: vi.fn(() => ({
-        where: vi.fn(() => {
-          const result = mockSelectResults.shift() ?? [];
+    select: vi.fn(() => {
+      const where = vi.fn(() => {
+        const result = mockSelectResults.shift() ?? [];
 
-          return {
-            limit: vi.fn(() => Promise.resolve(result)),
-            then(
-              resolve: (value: MockRow[]) => unknown,
-              reject?: (reason: unknown) => unknown
-            ) {
-              return Promise.resolve(result).then(resolve, reject);
-            },
-          };
-        }),
-      })),
-    })),
+        return {
+          limit: vi.fn(() => Promise.resolve(result)),
+          then(
+            resolve: (value: MockRow[]) => unknown,
+            reject?: (reason: unknown) => unknown
+          ) {
+            return Promise.resolve(result).then(resolve, reject);
+          },
+        };
+      });
+      return {
+        from: vi.fn(() => ({ where, innerJoin: vi.fn(() => ({ where })) })),
+      };
+    }),
     // Atomic claim used by trackFirstEmailSent / trackFirstEmailDelivered.
     // The returned array's length decides whether this caller won the claim.
     insert: vi.fn(() => ({
@@ -46,6 +51,9 @@ vi.mock("@wraps/db", () => ({
         })),
       })),
     })),
+  },
+  awsAccount: {
+    organizationId: "aws_account.organization_id",
   },
   messageSend: {
     organizationId: "message_send.organization_id",
@@ -73,6 +81,8 @@ vi.mock("@wraps/db", () => ({
 vi.mock("@wraps.dev/client", () => ({
   createPlatformClient: vi.fn(() => ({
     POST: mockPlatformPost,
+    GET: mockPlatformGet,
+    PATCH: mockPlatformPatch,
   })),
 }));
 
@@ -95,6 +105,7 @@ const {
   trackFirstEmailSent,
   trackFirstEmailDelivered,
   trackFirstResourceCreated,
+  trackAwsConnected,
 } = await import("../lib/activation-tracking");
 
 function queueSelectResults(...results: MockRow[][]) {
@@ -124,6 +135,9 @@ describe("activation tracking", () => {
     mockGroupIdentify.mockReset();
     mockPlatformPost.mockReset();
     mockPlatformPost.mockResolvedValue({ error: null });
+    mockPlatformGet.mockReset();
+    mockPlatformGet.mockResolvedValue({ data: { contacts: [] } });
+    mockPlatformPatch.mockReset();
     process.env.WRAPS_API_KEY = "wraps_test_key";
   });
 
@@ -331,5 +345,78 @@ describe("activation tracking", () => {
     expect(mockCapture).not.toHaveBeenCalled();
     expect(mockGroupIdentify).not.toHaveBeenCalled();
     expect(mockPlatformPost).not.toHaveBeenCalled();
+  });
+
+  it("flags the contact hasConnectedAws and emits on the first AWS connect", async () => {
+    queueSelectResults([{ email: "owner@example.com" }], [{ count: 1 }]);
+    mockPlatformGet.mockResolvedValue({
+      data: {
+        contacts: [
+          {
+            id: "contact-1",
+            email: "Owner@Example.com",
+            properties: { onboardingPath: "connect_aws" },
+          },
+        ],
+      },
+    });
+
+    await trackAwsConnected("org-aws", "user-1", {
+      region: "us-east-1",
+      accountId: "123456789012",
+    });
+
+    expect(mockPlatformPatch).toHaveBeenCalledWith("/v1/contacts/{id}", {
+      params: { path: { id: "contact-1" } },
+      body: {
+        properties: { onboardingPath: "connect_aws", hasConnectedAws: true },
+      },
+    });
+    expect(mockPlatformPost).toHaveBeenCalledWith("/v1/events/", {
+      body: {
+        name: "activation.aws_connected",
+        contactEmail: "owner@example.com",
+        properties: {
+          organization_id: "org-aws",
+          region: "us-east-1",
+          account_id: "123456789012",
+        },
+      },
+    });
+  });
+
+  it("still flags the contact on a later AWS connect, without re-emitting", async () => {
+    queueSelectResults([{ email: "owner@example.com" }], [{ count: 2 }]);
+    mockPlatformGet.mockResolvedValue({
+      data: {
+        contacts: [
+          { id: "contact-1", email: "owner@example.com", properties: null },
+        ],
+      },
+    });
+
+    await trackAwsConnected("org-aws", "user-1", {
+      region: "eu-west-1",
+      accountId: "123456789012",
+    });
+
+    expect(mockPlatformPatch).toHaveBeenCalledWith("/v1/contacts/{id}", {
+      params: { path: { id: "contact-1" } },
+      body: { properties: { hasConnectedAws: true } },
+    });
+    expect(mockPlatformPost).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the org owner when connected with an API key", async () => {
+    queueSelectResults([{ email: "founder@example.com" }], [{ count: 1 }]);
+
+    await trackAwsConnected("org-aws", null, {
+      region: "us-east-1",
+      accountId: "123456789012",
+    });
+
+    expect(mockPlatformGet).toHaveBeenCalledWith("/v1/contacts/", {
+      params: { query: { search: "founder@example.com", pageSize: "10" } },
+    });
   });
 });

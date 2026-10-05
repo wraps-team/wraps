@@ -337,11 +337,9 @@ export async function trackAwsConnected(
       });
       await emit(userId, "activation.aws_connected", props);
     }
-    await updateActivationScore(
-      userId,
-      organizationId,
-      existing === 1 ? { hasConnectedAws: true } : undefined
-    );
+    await updateActivationScore(userId, organizationId, {
+      hasConnectedAws: true,
+    });
   } catch {
     // never throw from tracking
   }

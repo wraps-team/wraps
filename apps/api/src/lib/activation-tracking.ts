@@ -1,4 +1,11 @@
-import { db, organizationExtension, template, user, workflow } from "@wraps/db";
+import {
+  awsAccount,
+  db,
+  organizationExtension,
+  template,
+  user,
+  workflow,
+} from "@wraps/db";
 import { member } from "@wraps/db/schema/auth";
 import { createPlatformClient } from "@wraps.dev/client";
 import { and, count, eq, isNull } from "drizzle-orm";
@@ -257,6 +264,48 @@ async function setContactProperties(
     log.warn("activation tracking failed", {
       error: String(error),
       step: "setContactProperties",
+    });
+  }
+}
+
+/**
+ * Track an AWS account connected from the CLI (`wraps platform connect`).
+ * The dashboard connect paths track this web-side; this route never did, so
+ * onboarding workflows gating on `hasConnectedAws` kept emailing CLI users
+ * who had already connected. Called after insert, so count === 1 is the first.
+ * MUST be awaited in Lambda.
+ */
+export async function trackAwsConnected(
+  organizationId: string,
+  userId: string | null,
+  properties: { region: string; accountId: string }
+) {
+  try {
+    const userEmail = userId
+      ? await getUserEmail(userId)
+      : await getOrgOwnerEmail(organizationId);
+    if (!userEmail) {
+      return;
+    }
+
+    await setContactProperties(userEmail, { hasConnectedAws: true });
+
+    const [r] = await db
+      .select({ count: count() })
+      .from(awsAccount)
+      .where(eq(awsAccount.organizationId, organizationId));
+    if ((r?.count ?? 0) === 1) {
+      await emit(userEmail, "activation.aws_connected", {
+        organization_id: organizationId,
+        region: properties.region,
+        account_id: properties.accountId,
+      });
+    }
+  } catch (error) {
+    // never throw from tracking
+    log.warn("activation tracking failed", {
+      error: String(error),
+      step: "trackAwsConnected",
     });
   }
 }

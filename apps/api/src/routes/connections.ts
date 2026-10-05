@@ -20,6 +20,7 @@ import {
 } from "@wraps/db";
 import { count } from "drizzle-orm";
 import { t } from "elysia";
+import { trackAwsConnected } from "../lib/activation-tracking";
 import { log } from "../lib/logger";
 import { isPlanId, type PlanId } from "../lib/plan-ids";
 import { resolveApiUrl } from "../lib/urls";
@@ -202,6 +203,17 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
         return {
           error: `AWS account limit reached (${result.maxAccounts}). Upgrade your plan to add more accounts.`,
         };
+      }
+
+      if (!result.isUpdate) {
+        await trackAwsConnected(
+          authContext.organizationId,
+          authContext.userId,
+          {
+            region: body.region,
+            accountId: body.accountId,
+          }
+        );
       }
 
       ctx.set.status = result.isUpdate ? 200 : 201;

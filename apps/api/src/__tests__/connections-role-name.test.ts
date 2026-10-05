@@ -71,6 +71,10 @@ vi.mock("../lib/logger", () => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
+vi.mock("../lib/activation-tracking", () => ({
+  trackAwsConnected: vi.fn(),
+}));
+
 // --- Import after mocks ---
 const { connectionsRoutes } = await import("../routes/connections");
 
