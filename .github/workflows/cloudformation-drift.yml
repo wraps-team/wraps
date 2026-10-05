@@ -20,7 +20,7 @@ permissions:
 jobs:
   drift:
     if: github.repository == 'wraps-team/wraps'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

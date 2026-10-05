@@ -23,19 +23,19 @@ concurrency:
   cancel-in-progress: false
 
 # Runner allocation is by wall-clock position, not by job kind. This workflow
-# finishes when test-web finishes (~330s; 263s of that is `Run web tests`).
-# Every other job lands under ~200s, so each has 130s+ of slack — enough to
-# absorb a slower runner without moving the finish line. So the three jobs on
-# or near the critical path stay on Blacksmith and the other eight run on
-# GitHub-hosted runners, which are free on this public repo:
+# finishes when test-web finishes (~366s on Blacksmith 4vCPU). Only test-web
+# stays on Blacksmith; everything else runs on GitHub-hosted runners, which
+# are free on this public repo and ran 1.2-1.8x slower than Blacksmith for
+# the jobs that moved.
 #
-#   Blacksmith  test-web (329s, sets the wall clock), test-api (201s),
-#               selfhost-smoke (its OpenNext step runs a full Next production
-#               build, so it is CPU-bound and growing)
-#   ubuntu-latest  everything else (42-92s on Blacksmith)
+# The constraint is Blacksmith's free tier: 3,000 2vCPU-minutes a month, and a
+# 4vCPU minute costs two. Over 2026-09-05..10-05 (~156 Test runs) test-web
+# used ~1,036 4vCPU-minutes (~2,070 of the 3,000). test-api (~676) and
+# selfhost-smoke (~337) on top took the total to ~4,100, so both moved off.
 #
 # Before moving a job onto Blacksmith, check it against test-web's duration —
-# if it finishes well inside that, paying for it buys no PR feedback time.
+# if it finishes well inside that, paying for it buys no PR feedback time —
+# and check the monthly minutes still fit the free tier.
 
 jobs:
   # Every job here is guarded to the upstream repo — forks lack the test
@@ -88,7 +88,7 @@ jobs:
 
   test-api:
     if: github.repository == 'wraps-team/wraps'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -406,7 +406,7 @@ jobs:
   # six shipped bugs were only visible from a clean clone.
   selfhost-smoke:
     if: github.repository == 'wraps-team/wraps'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
