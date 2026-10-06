@@ -2043,9 +2043,9 @@ describe("clickable table rows are reachable by keyboard", () => {
 // ─────────────────────────────────────────────────────────
 // Agent briefing files stay true to the repo
 //
-// AGENTS.md (CLAUDE.md is a symlink to it) is loaded before every agent task, and
-// CODING_STANDARDS.md before any code is written; agents answer from them without
-// re-checking. Keeping them accurate competes with real work
+// AGENTS.md (CLAUDE.md is a symlink to it) is loaded before every agent task;
+// CODING_STANDARDS.md and the docs/agents/ files it points at are loaded when their
+// trigger fires. Agents answer from all of them without re-checking. Keeping them accurate competes with real work
 // and quietly loses — packages/cdk sat unmentioned for seven months. These tests
 // make the drift fail CI instead of surfacing as a confidently wrong answer.
 // ─────────────────────────────────────────────────────────
@@ -2054,6 +2054,10 @@ describe("agent briefing files stay true", () => {
   const claudeMd = readFile("CLAUDE.md");
   const agentsMd = readFile("AGENTS.md");
   const codingStandardsMd = readFile("CODING_STANDARDS.md");
+  const disclosedDocs = globSync("docs/agents/*.md", { cwd: ROOT })
+    .map((f) => f.toString())
+    .sort();
+  const disclosed = disclosedDocs.map((f) => [f, readFile(f)] as const);
   const rootPkg = JSON.parse(readFile("package.json"));
 
   function workspaceDirs(parent: string): string[] {
@@ -2116,6 +2120,7 @@ describe("agent briefing files stay true", () => {
       ["CLAUDE.md", claudeMd],
       ["AGENTS.md", agentsMd],
       ["CODING_STANDARDS.md", codingStandardsMd],
+      ...disclosed,
     ] as const) {
       for (const claimed of source.matchAll(/Node\.js (\d+)\+/g)) {
         if (claimed[1] !== nodeMajor) {
@@ -2141,6 +2146,9 @@ describe("agent briefing files stay true", () => {
     const missing = [
       ...claudeMd.matchAll(/`?pnpm ([\w:]+)/g),
       ...codingStandardsMd.matchAll(/`?pnpm ([\w:]+)/g),
+      ...disclosed.flatMap(([, source]) => [
+        ...source.matchAll(/`?pnpm ([\w:]+)/g),
+      ]),
     ]
       .map((m) => m[1])
       .filter((name) => !(scripts.has(name) || /^\d/.test(name)))
@@ -2148,7 +2156,25 @@ describe("agent briefing files stay true", () => {
 
     expect(
       [...new Set(missing)],
-      `CLAUDE.md or CODING_STANDARDS.md tells agents to run these, but they are not scripts in the root package.json:\n${[...new Set(missing)].join("\n")}`
+      `CLAUDE.md, CODING_STANDARDS.md or docs/agents/ tells agents to run these, but they are not scripts in the root package.json:\n${[...new Set(missing)].join("\n")}`
+    ).toEqual([]);
+  });
+
+  test("every docs/agents file is pointed at from AGENTS.md, and every pointer resolves", () => {
+    expect(
+      disclosedDocs.length,
+      "docs/agents/ holds no briefing files"
+    ).toBeGreaterThan(0);
+
+    const unreachable = disclosedDocs.filter((f) => !agentsMd.includes(f));
+    const dangling = [...agentsMd.matchAll(/docs\/agents\/[\w.-]+\.md/g)]
+      .map((m) => m[0])
+      .filter((f) => !existsSync(resolve(ROOT, f)));
+
+    expect(
+      [...unreachable, ...new Set(dangling)],
+      "AGENTS.md is the only way agents reach docs/agents/. These files have no pointer " +
+        `there, or a pointer names a file that does not exist:\n${[...unreachable, ...new Set(dangling)].join("\n")}`
     ).toEqual([]);
   });
 });
