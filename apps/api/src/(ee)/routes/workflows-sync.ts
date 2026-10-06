@@ -26,6 +26,7 @@ import { t } from "elysia";
 import { trackFirstResourceCreated } from "../../lib/activation-tracking";
 import type { AuthContext } from "../../middleware/auth";
 import { createAuthenticatedRoutes, getAuth } from "../../middleware/auth";
+import { checkWorkflowPushLimit } from "../lib/workflow-limit";
 
 type DbOrTx =
   | typeof db
@@ -42,6 +43,16 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
     async (ctx) => {
       const authContext = getAuth(ctx);
       const { body } = ctx;
+
+      const limitCheck = await checkWorkflowPushLimit(db, {
+        organizationId: authContext.organizationId,
+        planId: authContext.planId,
+        slugs: [body.slug],
+      });
+      if (!limitCheck.allowed) {
+        ctx.set.status = 403;
+        return { error: "workflow_limit", message: limitCheck.message };
+      }
 
       // Resolve template slugs to IDs
       const resolvedSteps = await resolveTemplateReferences(
@@ -170,6 +181,16 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
     async (ctx) => {
       const authContext = getAuth(ctx);
       const { body } = ctx;
+
+      const limitCheck = await checkWorkflowPushLimit(db, {
+        organizationId: authContext.organizationId,
+        planId: authContext.planId,
+        slugs: body.workflows.map((w) => w.slug),
+      });
+      if (!limitCheck.allowed) {
+        ctx.set.status = 403;
+        return { error: "workflow_limit", message: limitCheck.message };
+      }
 
       const results = await db.transaction(async (tx) => {
         const settled = await Promise.allSettled(

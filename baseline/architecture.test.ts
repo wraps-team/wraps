@@ -2449,6 +2449,16 @@ describe("apps/api plan allowances match apps/web", () => {
     ).toEqual(readWebPlanField("maxAwsAccounts"));
   });
 
+  test("workflow limits match maxWorkflows", () => {
+    expect(
+      readApiTable(
+        "apps/api/src/(ee)/lib/workflow-limit.ts",
+        "const PLAN_WORKFLOW_LIMITS",
+        "(-?\\d+)"
+      )
+    ).toEqual(readWebPlanField("maxWorkflows"));
+  });
+
   test("per-minute rate limits match rateLimits.minuteRequests", () => {
     expect(
       readApiTable(
