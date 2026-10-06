@@ -13,37 +13,38 @@ In multi-step features (create resource → save state → use resource), persis
 step's side effects before starting the next. Save critical state (IDs, external
 references) immediately after creation, before any later operation that might fail.
 
-## Banned dependencies
+## Dependencies
 
-Enforced by `baseline.toml` (CI will fail):
-- **axios** — use native `fetch()`
-- **moment** / **dayjs** — use `date-fns` or `Intl` API
-- **next/router** — use `next/navigation` (App Router)
-- **@radix-ui/\*** directly in `apps/` — import from `components/ui/` (shadcn wrappers)
-- **react-hook-form** / **@hookform/resolvers** — use `@tanstack/react-form`
+`baseline.toml` bans these and CI fails on them; use the replacement:
 
-## Security patterns
+- **HTTP**: native `fetch()` (not axios)
+- **Dates**: `date-fns` or the `Intl` API (not moment / dayjs)
+- **Routing**: `next/navigation`, App Router (not `next/router`)
+- **Radix primitives in `apps/`**: the shadcn wrappers in `components/ui/` (not `@radix-ui/*` directly)
+- **Forms**: `@tanstack/react-form` (not react-hook-form / `@hookform/resolvers`)
 
-- **SSRF Validation**: Webhook URLs must call `validateWebhookUrl()` before HTTP requests
-- **Timing-Safe Secrets**: Use `timingSafeEqual()` for webhook secrets, API keys, tokens — never `===`
-- **Cross-Org IDOR Prevention**: All DB queries must scope by `organizationId` from `authContext` — never query by ID alone
-- **Resource Ownership Validation**: Verify user-provided `awsAccountId` belongs to authenticated org before use
-- **AWS credentials**: keep them out of storage and logs
+## Security
+
+- **SSRF**: pass every webhook URL through `validateWebhookUrl()` before the HTTP request.
+- **Timing-safe compares**: compare webhook secrets, API keys, and tokens with `timingSafeEqual()`.
+- **Org scoping (IDOR)**: scope every DB query by `organizationId` from `authContext`, including lookups by ID.
+- **Resource ownership**: verify a user-provided `awsAccountId` belongs to the authenticated org before using it.
+- **AWS credentials**: keep them out of storage and logs.
 
 ## Code style
 
-- ESM modules only — no `require()` or `module.exports`
-- Use `@ts-expect-error` instead of `@ts-ignore`
-- Structured logging only — never `console.log` in production code paths
+- ESM only: `import` / `export`.
+- `@ts-expect-error` for suppressions (it fails once the error is gone; `@ts-ignore` does not).
+- Log through the structured logger in production code paths:
   - `apps/web`: Pino logger at `src/lib/logger.ts`
-  - `apps/api`: Custom JSON logger at `src/lib/logger.ts`
+  - `apps/api`: custom JSON logger at `src/lib/logger.ts`
 
 ## Design system
 
-- No arbitrary hex colors in `apps/web/` — use semantic theme tokens (`bg-background`, `text-foreground`)
-- Brand orange is `brand`, status colours are `success`/`warning`/`info`/`destructive`;
-  write these tokens, not palette colours (`orange-500`, `green-600`). Status badges use
-  `<Badge variant="success|warning|info">`, brand CTAs use `<Button variant="brand">`.
+- Colour with semantic theme tokens (`bg-background`, `text-foreground`): brand orange is
+  `brand`, status colours are `success`/`warning`/`info`/`destructive`. These replace
+  palette colours (`orange-500`, `green-600`) and arbitrary hex values.
+- Status badges use `<Badge variant="success|warning|info">`; brand CTAs use `<Button variant="brand">`.
 - After touching `className` in `apps/web`, `apps/website`, `packages/ui`, or
   `packages/console`, run `pnpm lint:design` (oxlint + `@shadcn/lint`, config in
   `.oxlintrc.json`). It is gated by per-rule ceilings in `pnpm check:design` (part of
