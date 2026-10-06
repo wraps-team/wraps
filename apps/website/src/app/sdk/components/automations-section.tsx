@@ -189,8 +189,7 @@ export function SdkAutomationsSection() {
                   <span className="font-medium">Multi-channel</span>
                   <span className="text-muted-foreground">
                     {" "}
-                    &mdash; send email, SMS, or fire webhooks in the same
-                    workflow
+                    &mdash; send email and SMS in the same workflow
                   </span>
                 </p>
               </div>

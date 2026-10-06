@@ -10,6 +10,7 @@ import {
   CodeBlockContent,
   CodeBlockItem,
 } from "@/components/ui/shadcn-io/code-block";
+import { TIER_LIMITS } from "@/config/pricing";
 import { cn } from "@/lib/utils";
 import { FadeIn, ScaleIn } from "./animations";
 import { InteractiveWorkflowBuilder } from "./workflow-builder-section";
@@ -264,7 +265,8 @@ export function AutomationsCodePanel() {
           </a>
         </Button>
         <p className="mt-3 text-muted-foreground text-sm">
-          1 workflow included free. Unlimited workflows on Pro ($29/mo).
+          {TIER_LIMITS.free.workflows} workflows included free. Unlimited
+          workflows on Pro ($29/mo).
         </p>
       </FadeIn>
     </div>

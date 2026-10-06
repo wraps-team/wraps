@@ -7,6 +7,7 @@ import {
   Zap,
 } from "lucide-react";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
+import { TIER_LIMITS } from "@/config/pricing";
 import { assetUrl } from "@/lib/utils";
 
 const features = [
@@ -34,7 +35,8 @@ const features = [
   {
     icon: MousePointerClick,
     title: "Actions",
-    description: "Send emails, update contacts, trigger webhooks",
+    description:
+      "Send emails and SMS, update contacts, manage topic subscriptions",
   },
 ];
 
@@ -89,7 +91,7 @@ export function DashboardAutomationsSection() {
               <p className="text-sm">
                 <span className="font-medium text-foreground">Free:</span>{" "}
                 <span className="text-muted-foreground">
-                  1 workflow included
+                  {TIER_LIMITS.free.workflows} workflows included
                 </span>
               </p>
               <p className="text-sm">
