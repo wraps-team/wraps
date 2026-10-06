@@ -20,9 +20,9 @@ import {
  * someone back was a single "here's the quickstart" follow-up; the rest drew
  * more unsubscribe clicks than setup clicks. Fewer, later, conditional.
  *
- * `hasConnectedAws` is only set on the dashboard connect path, so CLI-connected
- * users still get the day-1 and day-7 emails. Both are written to read fine
- * for someone who has already deployed.
+ * `hasConnectedAws` is set on every connect path (CLI, dashboard and both
+ * CloudFormation routes), so the day-1 and day-7 emails can assume the reader
+ * hasn't connected yet.
  *
  * Onboarding Rescue and both Activation Drips were deleted in favour of this
  * flow. They are still paused in the dashboard; leave them that way, or

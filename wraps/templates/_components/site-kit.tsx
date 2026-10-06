@@ -560,6 +560,94 @@ export function Step({
   );
 }
 
+// ── Setup track ───────────────────────────────────────────────────────────
+
+/**
+ * The three stops between signup and a first send, with the reader's current
+ * one marked. A 2px orange top border carries "you are here" so it survives
+ * clients that drop the label text colour.
+ */
+type TrackState = "done" | "active" | "todo";
+
+const trackRule: Record<TrackState, string> = {
+  done: color.ink,
+  active: color.orange,
+  todo: color.border,
+};
+
+function trackLabel(state: TrackState, index: number) {
+  if (state === "done") {
+    return "Done";
+  }
+  if (state === "active") {
+    return "You are here";
+  }
+  return `Step ${index + 1}`;
+}
+
+export function SetupTrack({
+  steps,
+  current,
+}: {
+  steps: string[];
+  /** Zero-based index of the step the reader is on. */
+  current: number;
+}) {
+  return (
+    <Section style={{ margin: "8px 0 28px" }}>
+      <Row>
+        {steps.map((label, i) => {
+          let state: TrackState = "todo";
+          if (i < current) {
+            state = "done";
+          }
+          if (i === current) {
+            state = "active";
+          }
+          return (
+            <Column
+              key={label}
+              style={{
+                width: `${100 / steps.length}%`,
+                verticalAlign: "top",
+                padding: i === 0 ? "12px 8px 0 0" : "12px 8px 0",
+                borderTop: `2px solid ${trackRule[state]}`,
+              }}
+            >
+              <Text
+                style={{
+                  margin: "0 0 4px",
+                  fontFamily: font.mono,
+                  fontSize: "11px",
+                  lineHeight: "1.2",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: state === "active" ? color.orange : color.muted,
+                }}
+              >
+                {trackLabel(state, i)}
+              </Text>
+              <Text
+                style={{
+                  margin: 0,
+                  fontFamily: font.heading,
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  lineHeight: "1.3",
+                  letterSpacing: "-0.01em",
+                  color: state === "todo" ? color.muted : color.ink,
+                }}
+              >
+                {label}
+              </Text>
+            </Column>
+          );
+        })}
+      </Row>
+    </Section>
+  );
+}
+
 // ── Shell ─────────────────────────────────────────────────────────────────
 
 /**

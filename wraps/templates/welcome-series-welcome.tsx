@@ -1,23 +1,22 @@
-import { Section, Text } from "@react-email/components";
 import {
-  A,
   DarkCta,
+  Figure,
   H1,
   Kicker,
   P,
+  Panel,
+  SetupTrack,
   Shell,
   Small,
   StatGrid,
-  Terminal,
 } from "./_components/site-kit";
-import { text } from "./_components/style-guide";
 
 // -- Metadata --
 
 export const subject = "Welcome to Wraps, {{firstName|there}}";
 export const emailType = "transactional" as const;
 export const previewText =
-  "One command deploys sending infrastructure into your own AWS account. Here's where to start.";
+  "Three steps to your first send. The first one is a single command.";
 
 // -- Test Data (for preview) --
 
@@ -50,61 +49,65 @@ export default function WelcomeSeriesWelcome({
       <H1>Email that sends through your AWS.</H1>
 
       <P>
-        {"{{#if firstName}}Hey {{firstName}} — thanks{{else}}Thanks{{/if}}"} for
-        signing up. Wraps is the platform layer on top of Amazon SES:
-        automations, templates, broadcasts, and a TypeScript SDK, with the
-        sending itself running inside your own AWS account. You pay AWS directly
-        for delivery. We charge for the tooling, not the infrastructure.
+        {"{{#if firstName}}Hey {{firstName}}, thanks{{else}}Thanks{{/if}}"} for
+        signing up. Wraps runs your email on Amazon SES inside your own AWS
+        account. You pay AWS for sending. We charge for the tooling on top:
+        templates, workflows, broadcasts, and the SDK.
       </P>
+
+      <P>Three steps get you from here to a first send.</P>
+
+      <SetupTrack
+        current={0}
+        steps={["Connect AWS", "Verify a domain", "First send"]}
+      />
 
       <P>
-        The whole first step is one command. It provisions SES, DynamoDB,
-        Lambda, EventBridge, and the IAM roles they need, then hands you back a
-        deployment you own.
+        Step one is one command. It deploys the whole stack into your account
+        and touches nothing that is already there.
       </P>
 
-      <Terminal
-        lines={[
-          { kind: "command", text: "npx @wraps.dev/cli email init" },
-          { kind: "output", text: "Deploying to us-east-1..." },
-          { kind: "success", text: "✓ SES identity verified" },
-          { kind: "success", text: "✓ DKIM, SPF, DMARC configured" },
-          { kind: "success", text: "✓ Event tracking pipeline deployed" },
-          { kind: "output", text: "Ready to send. Run: wraps email status" },
-        ]}
+      <Figure
+        alt="A terminal running npx @wraps.dev/cli email init. It deploys an IAM role, an SES configuration set, an EventBridge rule, a Lambda and a DynamoDB table, then sets up DKIM, SPF and DMARC for the domain."
+        caption="npx @wraps.dev/cli email init"
+        height={430}
+        href="https://wraps.dev/docs/quickstart"
+        src="https://wraps.dev/email/2026-10-welcome-deploy-cli-552.gif"
       />
+
+      <P>
+        No terminal handy? The dashboard deploys the same stack from your
+        browser with CloudFormation. No Node.js, no local credentials.
+      </P>
 
       <StatGrid
         stats={[
           { value: "~2 min", label: "typical first deploy" },
-          { value: "$0.10", label: "per 1k emails, paid to AWS" },
+          { value: "$0.16", label: "per 1k emails on AWS's default plan" },
           { value: "0", label: "credentials we store" },
         ]}
       />
 
-      <Section style={{ marginTop: "8px" }}>
-        <Text style={text.body}>
-          Two things worth knowing before you start. If your AWS account is new
-          to SES, it begins in the sandbox, which means you can only send to
-          addresses you have verified. Getting production access is AWS&apos;s
-          call, not ours, and it takes anywhere from a few hours to a few days.
-          And AWS now defaults new accounts to the $0.16 per 1,000 pricing plan
-          rather than $0.10 —{" "}
-          <A href="https://wraps.dev/docs/cli-reference">wraps email plan</A>{" "}
-          shows you which one you are on.
-        </Text>
-      </Section>
+      <Panel label="Start this on day one">
+        <P>
+          New SES accounts begin in the sandbox, where you can only send to
+          addresses you have verified. AWS decides when you get out, and it can
+          take a few hours or a few days. The dashboard has a production access
+          form that tells you what AWS wants to see. File it as soon as you
+          deploy, not the day you need to send.
+        </P>
+      </Panel>
 
       <DarkCta
         ctaHref="https://app.wraps.dev"
-        ctaText="Open the dashboard"
-        description="Follow the setup checklist, or run the CLI and let the dashboard catch up."
-        title="Ready when you are"
+        ctaText="Connect your AWS account"
+        description="Pick the CLI or the browser deploy. The dashboard walks you through either."
+        title="Start with step one"
       />
 
       <Small>
-        If something is already in your way, just reply to this — it reaches me,
-        and I read all of them. &mdash; Jarod
+        If something is already in your way, reply to this. It reaches me, and I
+        read all of them. &mdash; Jarod
       </Small>
     </Shell>
   );

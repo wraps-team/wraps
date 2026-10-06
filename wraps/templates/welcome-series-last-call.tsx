@@ -48,9 +48,9 @@ export default function WelcomeSeriesLastCall({
 
       <P>
         {"{{#if firstName}}{{firstName}}, you{{else}}You{{/if}}"} signed up a
-        week ago. This is the last automated email in the sequence, so I would
-        rather use it to be straight with you than to pitch again. If you have
-        already deployed, ignore the rest of this and carry on.
+        week ago and haven&apos;t connected AWS yet. This is the last automated
+        email in the sequence, so I would rather use it to be straight with you
+        than to pitch again.
       </P>
 
       <Rule />
@@ -70,13 +70,20 @@ export default function WelcomeSeriesLastCall({
         that than have you churn in two months.
       </P>
 
+      <P>
+        It is also more than you need if all you send is magic links and
+        password resets. Plain SES handles that fine on its own. Wraps earns its
+        keep once you have templates, broadcasts, or workflows to manage.
+      </P>
+
       <Rule />
 
       <P>
         If it was closer to &ldquo;I ran out of time,&rdquo; the door stays
         open. Your account, org, and settings are all still there. The{" "}
         <A href="https://wraps.dev/docs/quickstart">quickstart</A> is about ten
-        minutes, and{" "}
+        minutes, there is a browser deploy if you&apos;d rather not install
+        anything, and{" "}
         <A href="https://github.com/wraps-team/wraps">
           the whole thing is on GitHub
         </A>{" "}

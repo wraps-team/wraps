@@ -2,11 +2,12 @@ import {
   A,
   Code,
   DarkCta,
+  Figure,
   H1,
   Kicker,
   P,
   Panel,
-  Rule,
+  SetupTrack,
   Shell,
   Small,
   Step,
@@ -15,10 +16,10 @@ import {
 
 // -- Metadata --
 
-export const subject = "The short version of getting Wraps running";
+export const subject = "You haven't connected AWS yet. Here's the short path.";
 export const emailType = "transactional" as const;
 export const previewText =
-  "Three commands to a verified domain and a first send. The slow part is DNS, not the deploy.";
+  "Deploy, verify a domain, send a test. The slow part is DNS and the SES sandbox, not the deploy.";
 
 // -- Test Data (for preview) --
 
@@ -48,43 +49,49 @@ export default function WelcomeSeriesQuickstart({
     >
       <Kicker>Quickstart</Kicker>
 
-      <H1>Three commands, then you&apos;re sending.</H1>
+      <H1>Three steps, then you&apos;re sending.</H1>
 
       <P>
-        {"{{#if firstName}}{{firstName}}, this{{else}}This{{/if}}"} is the whole
-        path from a fresh account to a real send. Everything runs against your
-        AWS credentials, so you need a terminal and an AWS account you can
-        deploy to.
+        {"{{#if firstName}}{{firstName}}, you{{else}}You{{/if}}"} signed up
+        yesterday but haven&apos;t connected AWS yet. This is the whole path
+        from here to a real send.
       </P>
 
-      <Rule />
+      <SetupTrack
+        current={0}
+        steps={["Connect AWS", "Verify a domain", "First send"]}
+      />
 
-      <Step number={1} title="Deploy the infrastructure">
-        <A href="https://wraps.dev/docs/quickstart">wraps email init</A> creates
-        the SES configuration set, the event pipeline, and the IAM roles in your
-        account. Nothing existing gets modified — every resource it makes
-        carries a <Code>wraps-email-</Code> prefix.
+      <Step number={1} title="Connect AWS">
+        <A href="https://wraps.dev/docs/quickstart">wraps email init</A> asks
+        for your sending domain, then creates the SES configuration set, the
+        event pipeline, and the IAM roles in your account. If your DNS is on
+        Route 53 or a provider it supports, it writes the DKIM records too.
+        Nothing existing gets modified. Every resource it makes carries a{" "}
+        <Code>wraps-email-</Code> prefix.
       </Step>
 
-      <Step number={2} title="Add and verify a domain">
-        You get DKIM records to paste into your DNS. Verification is usually
-        quick, but propagation is the one step nobody can rush, so start it
-        before you need it.
+      <Step number={2} title="Verify a domain">
+        Verification waits on DNS propagation, which nobody can rush. Usually
+        minutes, sometimes longer. Check it with the verify command below, or
+        watch the status flip on the Domains page.
       </Step>
 
-      <Step number={3} title="Send something to yourself">
-        <Code>wraps email test</Code> proves the whole path end to end. In the
-        sandbox it can only reach addresses you have already verified, which is
-        why your own is the right first target.
+      <Figure
+        alt="The Sending Domains page with notify.acme.dev pending verification, and its detail sheet listing the three DKIM CNAME records to publish"
+        height={310}
+        src="https://wraps.dev/email/2026-09-dashboard-domains-clip.png"
+      />
+
+      <Step number={3} title="First send">
+        <Code>wraps email test</Code> offers the SES simulator first. It works
+        in the sandbox and doesn&apos;t touch your sending reputation, so
+        it&apos;s the fastest way to prove the whole path end to end.
       </Step>
 
       <Terminal
         lines={[
           { kind: "command", text: "npx @wraps.dev/cli email init" },
-          {
-            kind: "command",
-            text: "npx @wraps.dev/cli email domains add -d yourdomain.com",
-          },
           {
             kind: "command",
             text: "npx @wraps.dev/cli email domains verify -d yourdomain.com",
@@ -94,28 +101,26 @@ export default function WelcomeSeriesQuickstart({
         ]}
       />
 
-      <Panel label="Already have SES set up">
+      <Panel label="Other ways in">
         <P>
-          If your AWS account is already sending through SES, skip{" "}
-          <Code>init</Code> and run <Code>wraps email connect</Code> instead. It
-          adopts what you have rather than deploying a second stack alongside
-          it.
+          No terminal? The dashboard deploys the same stack from your browser
+          with CloudFormation. Already sending through SES? Run{" "}
+          <Code>wraps email connect</Code> instead of <Code>init</Code>. It
+          adopts what you have rather than deploying a second stack.
         </P>
       </Panel>
 
       <P>
-        From there the SDK is four lines. Install{" "}
-        <A href="https://wraps.dev/docs/sdk-reference">@wraps.dev/email</A>,
-        construct a <Code>WrapsEmail</Code> client, and <Code>send()</Code> does
-        the rest. Credentials resolve the same way the AWS CLI resolves them, so
-        there is nothing to paste into an env file.
+        Start your production access request today too. A new SES account can
+        only send to verified addresses until AWS approves it, and that takes
+        hours to days. The form is in the dashboard.
       </P>
 
       <DarkCta
-        ctaHref="https://wraps.dev/docs/quickstart"
-        ctaText="Read the quickstart"
-        description="The full walkthrough, including the AWS permissions each command needs."
-        title="Every step, written out"
+        ctaHref="https://app.wraps.dev"
+        ctaText="Connect your AWS account"
+        description="Pick the CLI or the browser deploy. The dashboard walks you through either."
+        title="Pick up where you left off"
       />
 
       <Small>
