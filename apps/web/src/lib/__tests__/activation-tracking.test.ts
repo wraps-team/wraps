@@ -61,6 +61,12 @@ vi.mock("@wraps.dev/client", () => ({
 const mockDbWhere = vi.fn(
   (): Promise<unknown[]> => Promise.resolve([{ count: 1 }])
 );
+// The contact lookups narrow with .limit(1); the count queries await where()
+// directly. Both resolve to whatever mockDbWhere returns next.
+const whereWithLimit = vi.fn(() => {
+  const result = mockDbWhere();
+  return Object.assign(result, { limit: () => result });
+});
 const mockDbInsertOnConflict = vi.fn(() => Promise.resolve());
 // Drives the atomic first-email claim: non-empty array = this caller won.
 // Defaults to "won" so first-email tests fire; override per-test to simulate
@@ -82,7 +88,8 @@ vi.mock("@wraps/db", () => ({
   db: {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
-        where: mockDbWhere,
+        where: whereWithLimit,
+        innerJoin: vi.fn(() => ({ where: whereWithLimit })),
       })),
     })),
     insert: vi.fn(() => ({
@@ -113,6 +120,11 @@ vi.mock("@wraps/db", () => ({
   invitation: { organizationId: "organizationId", status: "status" },
   workflow: { organizationId: "organizationId" },
   organizationExtension: { organizationId: "organizationId" },
+}));
+
+vi.mock("@wraps/db/schema/auth", () => ({
+  user: { id: "id", email: "email" },
+  member: { organizationId: "organizationId", userId: "userId", role: "role" },
 }));
 
 // Mock setup-status for computeActivationScore
@@ -160,6 +172,7 @@ import {
   trackFirstEmailSent,
   trackOnboardingCompleted,
   trackOnboardingPathChosen,
+  trackProductionAccess,
   trackTeammateInvited,
   trackTemplateCreated,
   trackTemplatePublished,
@@ -1010,5 +1023,58 @@ describe("activation-tracking: template variable props on first-milestone events
     expect(call).toBeDefined();
     expect(call[1].properties.recipientCount).toBe("10");
     expect(call[1].properties.templateName).toBeUndefined();
+  });
+
+  it("trackProductionAccess flags the connecting user before emitting", async () => {
+    mockDbWhere.mockResolvedValueOnce([{ email: "connector@example.com" }]);
+
+    await trackProductionAccess("org-123", "user-1", {
+      region: "us-east-1",
+      accountId: "123456789012",
+    });
+
+    expect(mockPatch).toHaveBeenCalledWith("/v1/contacts/{id}", {
+      params: { path: { id: "connector@example.com" } },
+      body: { properties: { sesProductionAccess: true } },
+    });
+    expect(mockTrack).toHaveBeenCalledWith("activation.production_access", {
+      contactEmail: "connector@example.com",
+      properties: {
+        organization_id: "org-123",
+        region: "us-east-1",
+        account_id: "123456789012",
+      },
+    });
+    // A workflow started by the event must not read a stale property.
+    expect(mockPatch.mock.invocationCallOrder[0]).toBeLessThan(
+      mockTrack.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("trackProductionAccess falls back to the owner when the connecting user is gone", async () => {
+    mockDbWhere
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ email: "owner@example.com" }]);
+
+    await trackProductionAccess("org-123", "deleted-user", {
+      region: "us-east-1",
+      accountId: "123456789012",
+    });
+
+    expect(mockTrack).toHaveBeenCalledWith(
+      "activation.production_access",
+      expect.objectContaining({ contactEmail: "owner@example.com" })
+    );
+  });
+
+  it("trackProductionAccess emits nothing when no contact resolves", async () => {
+    mockDbWhere.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await trackProductionAccess("org-123", "deleted-user", {
+      region: "us-east-1",
+      accountId: "123456789012",
+    });
+
+    expect(mockTrack).not.toHaveBeenCalled();
   });
 });

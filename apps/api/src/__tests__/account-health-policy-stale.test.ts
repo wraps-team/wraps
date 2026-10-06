@@ -181,6 +181,12 @@ vi.mock("drizzle-orm", () => ({
 const { CURRENT_CONSOLE_POLICY_VERSION } = await import(
   "../lib/console-policy-version"
 );
+// Its platform calls are covered by activation-tracking.test.ts; the real
+// module drags in schema imports the drizzle-orm mock above cannot satisfy.
+vi.mock("../lib/activation-tracking", () => ({
+  trackProductionAccess: vi.fn().mockResolvedValue(undefined),
+}));
+
 const { handler } = await import("../workers/account-health");
 
 const invoke = () =>

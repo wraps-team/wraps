@@ -18,7 +18,10 @@ import {
   it,
   vi,
 } from "vitest";
-import { trackAwsConnected } from "@/lib/activation-tracking";
+import {
+  trackAwsConnected,
+  trackProductionAccess,
+} from "@/lib/activation-tracking";
 import { AssumeRoleError } from "@/lib/aws/assume-role";
 import {
   connectAWSAccountAction,
@@ -292,6 +295,7 @@ vi.mock("@/lib/aws/mailmanager", () => ({
 vi.mock("@/lib/activation-tracking", () => ({
   trackDomainVerified: vi.fn().mockResolvedValue(undefined),
   trackAwsConnected: vi.fn().mockResolvedValue(undefined),
+  trackProductionAccess: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Capture warnings so tests can assert on them. `serializeError` stays real —
@@ -3153,5 +3157,107 @@ describe("renameAWSAccountAction", () => {
     expect(result.success).toBe(false);
     expect(await readName(renameAccount.id)).toBe(renameAccount.name);
     expect(await readRenameAudit(renameAccount.id)).toHaveLength(0);
+  });
+});
+
+describe("scanAWSAccountFeatures — production access event", () => {
+  const account = { ...scanTestAccount, id: "test-scan-account-prod" };
+
+  async function scanWith(
+    features: Record<string, unknown> | null,
+    productionAccess: boolean | Error
+  ) {
+    await db
+      .update(awsAccount)
+      .set({ features } as never)
+      .where(eq(awsAccount.id, account.id));
+    setupQuietScanDefaults();
+    const quiet = mockSend.getMockImplementation();
+    mockSend.mockImplementation(
+      (command: { _type: string; ConfigurationSetName?: string }) =>
+        command._type === "GetAccountCommand"
+          ? productionAccess instanceof Error
+            ? Promise.reject(productionAccess)
+            : Promise.resolve({ ProductionAccessEnabled: productionAccess })
+          : // biome-ignore lint/style/noNonNullAssertion: set just above
+            quiet!(command)
+    );
+    vi.mocked(trackProductionAccess).mockClear();
+    return scanAWSAccountFeatures(account.id, testOrganization.id);
+  }
+
+  beforeAll(async () => {
+    await db
+      .insert(awsAccount)
+      .values(account)
+      .onConflictDoUpdate({
+        target: awsAccount.id,
+        set: { updatedAt: new Date() },
+      });
+  });
+
+  afterAll(async () => {
+    await db.delete(awsAccount).where(eq(awsAccount.id, account.id));
+  });
+
+  it("emits when an account leaves the sandbox", async () => {
+    const result = await scanWith({ email: { sandbox: true } }, true);
+
+    expect(result.success).toBe(true);
+    // The user who connected the account, not whoever ran the scan.
+    expect(trackProductionAccess).toHaveBeenCalledWith(
+      testOrganization.id,
+      testUser.id,
+      { region: "us-east-1", accountId: "333444555666" }
+    );
+  });
+
+  it("emits for an account scanned for the first time already in production", async () => {
+    await scanWith(null, true);
+
+    expect(trackProductionAccess).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not re-emit once production access is already recorded", async () => {
+    await scanWith({ email: { sandbox: false } }, true);
+
+    expect(trackProductionAccess).not.toHaveBeenCalled();
+  });
+
+  it("does not emit while the account is in the sandbox", async () => {
+    await scanWith({ email: { sandbox: true } }, false);
+
+    expect(trackProductionAccess).not.toHaveBeenCalled();
+  });
+
+  it("keeps a recorded production flag when GetAccount fails", async () => {
+    // A throttled check used to write sandbox: true over a known false, so the
+    // next good check re-announced production access and re-emitted the event.
+    const throttled = Object.assign(new Error("Rate exceeded"), {
+      name: "TooManyRequestsException",
+    });
+
+    const result = await scanWith({ email: { sandbox: false } }, throttled);
+
+    expect(result.success).toBe(true);
+    expect(trackProductionAccess).not.toHaveBeenCalled();
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq }) => eq(a.id, account.id),
+    });
+    expect(row?.features?.email?.sandbox).toBe(false);
+  });
+
+  it("still assumes sandbox when the first scan cannot read GetAccount", async () => {
+    const denied = Object.assign(new Error("denied"), {
+      name: "AccessDeniedException",
+    });
+
+    await scanWith(null, denied);
+
+    const row = await db.query.awsAccount.findFirst({
+      where: (a, { eq }) => eq(a.id, account.id),
+    });
+    expect(row?.features?.email?.sandbox).toBe(true);
+    expect(trackProductionAccess).not.toHaveBeenCalled();
   });
 });

@@ -106,6 +106,7 @@ const {
   trackFirstEmailDelivered,
   trackFirstResourceCreated,
   trackAwsConnected,
+  trackProductionAccess,
 } = await import("../lib/activation-tracking");
 
 function queueSelectResults(...results: MockRow[][]) {
@@ -418,5 +419,86 @@ describe("activation tracking", () => {
     expect(mockPlatformGet).toHaveBeenCalledWith("/v1/contacts/", {
       params: { query: { search: "founder@example.com", pageSize: "10" } },
     });
+  });
+  it("flags the user who connected the account and emits", async () => {
+    queueSelectResults([{ email: "connector@example.com" }]);
+    mockPlatformGet.mockResolvedValue({
+      data: {
+        contacts: [
+          {
+            id: "contact-1",
+            email: "connector@example.com",
+            properties: { hasConnectedAws: true },
+          },
+        ],
+      },
+    });
+
+    await trackProductionAccess("org-aws", "user-1", {
+      region: "us-east-1",
+      accountId: "123456789012",
+    });
+
+    expect(mockPlatformPatch).toHaveBeenCalledWith("/v1/contacts/{id}", {
+      params: { path: { id: "contact-1" } },
+      body: {
+        properties: { hasConnectedAws: true, sesProductionAccess: true },
+      },
+    });
+    expect(mockPlatformPost).toHaveBeenCalledWith("/v1/events/", {
+      body: {
+        name: "activation.production_access",
+        contactEmail: "connector@example.com",
+        properties: {
+          organization_id: "org-aws",
+          region: "us-east-1",
+          account_id: "123456789012",
+        },
+      },
+    });
+    // The property lands before the event, so a workflow the event starts
+    // never reads a stale sesProductionAccess.
+    expect(mockPlatformPatch.mock.invocationCallOrder[0]).toBeLessThan(
+      mockPlatformPost.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("falls back to the org owner when the connecting user is unknown", async () => {
+    queueSelectResults([{ email: "owner@example.com" }]);
+
+    await trackProductionAccess("org-aws", null, {
+      region: "us-east-1",
+      accountId: "123456789012",
+    });
+
+    expect(mockPlatformGet).toHaveBeenCalledWith("/v1/contacts/", {
+      params: { query: { search: "owner@example.com", pageSize: "10" } },
+    });
+  });
+
+  it("falls back to the org owner when the connecting user is gone", async () => {
+    // Creator lookup finds nobody, then the owner lookup answers.
+    queueSelectResults([], [{ email: "owner@example.com" }]);
+
+    await trackProductionAccess("org-aws", "deleted-user", {
+      region: "us-east-1",
+      accountId: "123456789012",
+    });
+
+    expect(mockPlatformGet).toHaveBeenCalledWith("/v1/contacts/", {
+      params: { query: { search: "owner@example.com", pageSize: "10" } },
+    });
+  });
+
+  it("emits nothing when no contact can be resolved", async () => {
+    queueSelectResults([], []);
+
+    await trackProductionAccess("org-orphan", "deleted-user", {
+      region: "us-east-1",
+      accountId: "123456789012",
+    });
+
+    expect(mockPlatformPatch).not.toHaveBeenCalled();
+    expect(mockPlatformPost).not.toHaveBeenCalled();
   });
 });

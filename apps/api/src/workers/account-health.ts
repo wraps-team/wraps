@@ -9,7 +9,9 @@
  *   - ses.reputation_warning  bounce rate >= 5% or complaint rate >= 0.1%
  *                             (SES review thresholds; pause is 10% / 0.5%)
  *   - ses.quota_warning       >= 80% of the 24h send quota consumed
- *   - ses.production_access   sandbox -> production transition observed
+ *   - ses.production_access   sandbox -> production transition observed;
+ *                             also emits the `activation.production_access`
+ *                             platform event that onboarding workflows use
  *   - aws.role_unreachable    the customer's console-access role cannot be
  *                             assumed, or no longer grants SES read access.
  *                             Only raised for an account that previously
@@ -65,6 +67,7 @@ import {
 } from "@wraps/db";
 import type { Handler } from "aws-lambda";
 import { and, eq, isNotNull } from "drizzle-orm";
+import { trackProductionAccess } from "../lib/activation-tracking";
 import {
   CURRENT_CONSOLE_POLICY_VERSION,
   probeConsolePolicyVersion,
@@ -87,6 +90,7 @@ type AccountRow = {
   accountId: string;
   region: string;
   features: typeof awsAccount.$inferSelect.features;
+  createdBy: string | null;
   roleLastReachableAt: Date | null;
   consolePolicyVersion: number | null;
   consolePolicyCheckedAt: Date | null;
@@ -490,14 +494,15 @@ async function checkAccount(account: AccountRow): Promise<void> {
     });
   }
 
-  // 2. Sandbox -> production transition.
-  if (
-    info.ProductionAccessEnabled &&
-    account.features?.email?.sandbox === true
-  ) {
+  // 2. Production access. `!== false` rather than `=== true` so an account
+  // whose sandbox flag was never recorded (no dashboard scan yet) still gets
+  // the flag and the activation event; only a real sandbox exit is announced
+  // as "granted" in the inbox.
+  const email = account.features?.email;
+  if (info.ProductionAccessEnabled && email && email.sandbox !== false) {
     const features = {
       ...account.features,
-      email: { ...account.features.email, sandbox: false },
+      email: { ...email, sandbox: false },
     };
     await db
       .update(awsAccount)
@@ -508,12 +513,18 @@ async function checkAccount(account: AccountRow): Promise<void> {
           eq(awsAccount.organizationId, account.organizationId)
         )
       );
-    await notifyOnce({
-      account,
-      type: "ses.production_access",
-      title: "SES production access granted",
-      body: `AWS account ${account.accountId} (${account.region}) is out of the SES sandbox. You can now send email to any recipient.`,
-      href: `/${orgSlug}/emails`,
+    if (email.sandbox === true) {
+      await notifyOnce({
+        account,
+        type: "ses.production_access",
+        title: "SES production access granted",
+        body: `AWS account ${account.accountId} (${account.region}) is out of the SES sandbox. You can now send email to any recipient.`,
+        href: `/${orgSlug}/emails`,
+      });
+    }
+    await trackProductionAccess(account.organizationId, account.createdBy, {
+      region: account.region,
+      accountId: account.accountId,
     });
   }
 
@@ -646,6 +657,7 @@ export const handler: Handler = wrapHandler(async () =>
             accountId: awsAccount.accountId,
             region: awsAccount.region,
             features: awsAccount.features,
+            createdBy: awsAccount.createdBy,
             roleLastReachableAt: awsAccount.roleLastReachableAt,
             consolePolicyVersion: awsAccount.consolePolicyVersion,
             consolePolicyCheckedAt: awsAccount.consolePolicyCheckedAt,

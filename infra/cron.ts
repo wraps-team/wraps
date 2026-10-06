@@ -252,6 +252,13 @@ export const accountHealthCron = new sst.aws.CronV2("AccountHealth", {
         (() => {
           throw new Error("DATABASE_URL is required");
         })(),
+      // The sweep emits `activation.production_access` to the platform. An
+      // unset key turns that emit into a silent no-op, so fail the deploy.
+      WRAPS_API_KEY:
+        process.env.WRAPS_API_KEY ||
+        (() => {
+          throw new Error("WRAPS_API_KEY is required");
+        })(),
       AXIOM_TOKEN: axiomToken.value,
       AXIOM_DATASET: "wraps",
       // Per-account failures are skipped so one broken role cannot abort the

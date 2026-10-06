@@ -34,6 +34,7 @@ import { after } from "next/server";
 import {
   trackAwsConnected,
   trackDomainVerified,
+  trackProductionAccess,
 } from "@/lib/activation-tracking";
 import { auditLogEntry, getAuditContext } from "@/lib/audit";
 import {
@@ -655,7 +656,10 @@ export const scanAWSAccountFeatures: (
       const eventTrackingEnabled = trackedEvents.length > 0;
 
       // 9. Check SES sandbox status
-      let sesSandbox = true; // Default to sandbox (safer assumption)
+      // null = GetAccount did not answer this scan. Never let a failed check
+      // overwrite a recorded value: writing `true` over a known `false` would
+      // make the next successful check re-announce production access.
+      let sesSandbox: boolean | null = null;
       let sesProductionAccessRequest: SesProductionAccessRequest = null;
 
       try {
@@ -832,7 +836,8 @@ export const scanAWSAccountFeatures: (
         scannedAt: new Date().toISOString(),
         email: {
           configSetName,
-          sandbox: sesSandbox,
+          // Unknown on a first scan still defaults to sandbox, the safer guess.
+          sandbox: sesSandbox ?? account.features?.email?.sandbox ?? true,
           productionAccessRequest: sesProductionAccessRequest,
           archivingEnabled,
           archiveArn,
@@ -913,7 +918,7 @@ export const scanAWSAccountFeatures: (
 
       // 17b. Notify when SES production access is granted (sandbox -> production)
       const wasSandbox = account.features?.email?.sandbox === true;
-      if (wasSandbox && !sesSandbox) {
+      if (wasSandbox && sesSandbox === false) {
         try {
           await notifyOrg({
             organizationId,
@@ -929,6 +934,16 @@ export const scanAWSAccountFeatures: (
             "Failed to write production-access notification"
           );
         }
+      }
+
+      // 17c. Emit the activation event onboarding workflows trigger on. Unlike
+      // the notification this also fires for an account first seen already in
+      // production, so the flag reaches contacts whose sandbox was never stored.
+      if (sesSandbox === false && account.features?.email?.sandbox !== false) {
+        await trackProductionAccess(organizationId, account.createdBy, {
+          region: account.region,
+          accountId: account.accountId,
+        });
       }
 
       // 18. Revalidate pages (layout will re-fetch products status)

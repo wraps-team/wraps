@@ -311,6 +311,43 @@ export async function trackAwsConnected(
 }
 
 /**
+ * Track an AWS account seen with SES production access, from the hourly
+ * account-health sweep. AWS publishes no event for leaving the sandbox, so
+ * this poll is the only signal. Flags the user who connected the account (the
+ * contact `activation.aws_connected` went to), or the org owner when that
+ * user is unknown or gone, and sets `sesProductionAccess` before emitting so a workflow
+ * triggered by the event (or gating on the property) never reads a stale
+ * value. MUST be awaited in Lambda.
+ */
+export async function trackProductionAccess(
+  organizationId: string,
+  createdBy: string | null,
+  properties: { region: string; accountId: string }
+) {
+  try {
+    const userEmail =
+      (createdBy ? await getUserEmail(createdBy) : null) ??
+      (await getOrgOwnerEmail(organizationId));
+    if (!userEmail) {
+      return;
+    }
+
+    await setContactProperties(userEmail, { sesProductionAccess: true });
+    await emit(userEmail, "activation.production_access", {
+      organization_id: organizationId,
+      region: properties.region,
+      account_id: properties.accountId,
+    });
+  } catch (error) {
+    // never throw from tracking
+    log.warn("activation tracking failed", {
+      error: String(error),
+      step: "trackProductionAccess",
+    });
+  }
+}
+
+/**
  * Track first resource creation for an organization.
  * Catches CLI pushes that bypass web-side activation tracking.
  * Sets contact properties so activation workflows don't send

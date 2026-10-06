@@ -9,6 +9,7 @@ import {
   template,
   workflow,
 } from "@wraps/db";
+import { member, user } from "@wraps/db/schema/auth";
 import { createPlatformClient } from "@wraps.dev/client";
 import { and, count, eq, isNull, ne } from "drizzle-orm";
 import { logger } from "./logger";
@@ -340,6 +341,67 @@ export async function trackAwsConnected(
     await updateActivationScore(userId, organizationId, {
       hasConnectedAws: true,
     });
+  } catch {
+    // never throw from tracking
+  }
+}
+
+/**
+ * The contact to flag for an account: the user who connected it (who also got
+ * `activation.aws_connected`), else the org owner. Not the user running the
+ * scan — a teammate's scan would flag the wrong contact, and once the stored
+ * sandbox flag flips nothing would ever flag the right one.
+ */
+async function getAccountContactEmail(
+  organizationId: string,
+  createdBy: string | null
+): Promise<string | null> {
+  if (createdBy) {
+    const [creator] = await db
+      .select({ email: user.email })
+      .from(user)
+      .where(eq(user.id, createdBy))
+      .limit(1);
+    if (creator?.email) {
+      return creator.email;
+    }
+  }
+  const [owner] = await db
+    .select({ email: user.email })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(
+      and(eq(member.organizationId, organizationId), eq(member.role, "owner"))
+    )
+    .limit(1);
+  return owner?.email ?? null;
+}
+
+/**
+ * An AWS account seen with SES production access during a dashboard scan.
+ * The hourly account-health sweep emits the same event from the API side;
+ * whichever sees it first flips the stored sandbox flag, so the other stays
+ * quiet. The contact property is set before the event so a workflow gating on
+ * `sesProductionAccess` never reads a stale value.
+ */
+export async function trackProductionAccess(
+  organizationId: string,
+  createdBy: string | null,
+  properties: { region: string; accountId: string }
+) {
+  try {
+    const userEmail = await getAccountContactEmail(organizationId, createdBy);
+    if (!userEmail) {
+      return;
+    }
+    const props = {
+      organization_id: organizationId,
+      region: properties.region,
+      account_id: properties.accountId,
+    };
+    capture(userEmail, "ses_production_access", props);
+    await setContactProperties(userEmail, { sesProductionAccess: true });
+    await emit(userEmail, "activation.production_access", props);
   } catch {
     // never throw from tracking
   }

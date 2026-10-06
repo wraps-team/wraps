@@ -19,6 +19,7 @@ const noop = () => Promise.resolve();
 vi.mock("@/lib/activation-tracking", () => ({
   trackAwsConnected: vi.fn(noop),
   trackDomainVerified: vi.fn(noop),
+  trackProductionAccess: vi.fn(noop),
   trackFirstEmailSent: vi.fn(noop),
   trackOnboardingCompleted: vi.fn(noop),
   trackContactCreated: vi.fn(noop),

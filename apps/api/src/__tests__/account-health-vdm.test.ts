@@ -150,6 +150,12 @@ vi.mock("drizzle-orm", () => ({
   isNotNull: vi.fn(),
 }));
 
+// Its platform calls are covered by activation-tracking.test.ts; the real
+// module drags in schema imports the drizzle-orm mock above cannot satisfy.
+vi.mock("../lib/activation-tracking", () => ({
+  trackProductionAccess: vi.fn().mockResolvedValue(undefined),
+}));
+
 const { handler } = await import("../workers/account-health");
 
 const invoke = () =>
