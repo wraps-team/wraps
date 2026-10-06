@@ -18,6 +18,8 @@ let mockExistingWorkflow: Record<string, unknown> | null = null;
 let mockTemplates: Array<{ id: string; slug: string }> = [];
 let lastInsertValues: Record<string, unknown> | null = null;
 let lastUpdateSet: Record<string, unknown> | null = null;
+let mockOrgDefaultAccountId: string | null = null;
+let mockOrgAccounts: Array<{ id: string }> = [{ id: "aws-acc-1" }];
 
 // Mock @wraps/db before imports
 vi.mock("@wraps/db", () => ({
@@ -28,16 +30,26 @@ vi.mock("@wraps/db", () => ({
         const createWhereResult = () => {
           const promise = Promise.resolve(mockTemplates);
           // Add limit method for workflow queries
-          (promise as any).limit = vi.fn(() => {
-            // awsAccount queries return an account with id
+          const limit = vi.fn(() => {
+            if (
+              table?.defaultAwsAccountId ===
+              "organizationExtension.defaultAwsAccountId"
+            ) {
+              return mockOrgDefaultAccountId
+                ? [{ defaultAwsAccountId: mockOrgDefaultAccountId }]
+                : [];
+            }
+            // awsAccount queries return the org's accounts
             if (table?.id === "awsAccount.id") {
-              return [{ id: "aws-acc-1" }];
+              return mockOrgAccounts.slice(0, 1);
             }
             if (mockExistingWorkflow) {
               return [mockExistingWorkflow];
             }
             return [];
           });
+          (promise as any).limit = limit;
+          (promise as any).orderBy = vi.fn(() => ({ limit }));
           return promise;
         };
 
@@ -69,6 +81,11 @@ vi.mock("@wraps/db", () => ({
   awsAccount: {
     id: "awsAccount.id",
     organizationId: "awsAccount.organizationId",
+    createdAt: "awsAccount.createdAt",
+  },
+  organizationExtension: {
+    organizationId: "organizationExtension.organizationId",
+    defaultAwsAccountId: "organizationExtension.defaultAwsAccountId",
   },
   workflow: "workflow",
   template: "template",
@@ -78,6 +95,7 @@ vi.mock("@wraps/db", () => ({
 }));
 
 vi.mock("drizzle-orm", () => ({
+  asc: vi.fn(),
   inArray: vi.fn(),
   relations: vi.fn(() => ({})),
   sql: (strings: TemplateStringsArray, ..._values: unknown[]) => ({
@@ -134,6 +152,8 @@ beforeEach(() => {
   mockTemplates = [];
   lastInsertValues = null;
   lastUpdateSet = null;
+  mockOrgDefaultAccountId = null;
+  mockOrgAccounts = [{ id: "aws-acc-1" }];
   vi.clearAllMocks();
 });
 
@@ -141,6 +161,8 @@ describe("upsertWorkflowFromCli - Push Conflict Detection", () => {
   it("should return conflict when lastEditedFrom=dashboard and force=false", async () => {
     mockExistingWorkflow = {
       id: "wf-1",
+      status: "enabled",
+      awsAccountId: null,
       lastEditedFrom: "dashboard",
       updatedAt: new Date("2024-06-15T12:00:00Z"),
     };
@@ -165,6 +187,8 @@ describe("upsertWorkflowFromCli - Push Conflict Detection", () => {
   it("should return conflict when lastEditedFrom=dashboard and force not provided", async () => {
     mockExistingWorkflow = {
       id: "wf-1",
+      status: "enabled",
+      awsAccountId: null,
       lastEditedFrom: "dashboard",
       updatedAt: new Date("2024-06-15T12:00:00Z"),
     };
@@ -187,6 +211,8 @@ describe("upsertWorkflowFromCli - Push Conflict Detection", () => {
   it("should succeed with force=true even when lastEditedFrom=dashboard", async () => {
     mockExistingWorkflow = {
       id: "wf-1",
+      status: "enabled",
+      awsAccountId: null,
       lastEditedFrom: "dashboard",
       updatedAt: new Date("2024-06-15T12:00:00Z"),
     };
@@ -212,6 +238,8 @@ describe("upsertWorkflowFromCli - Push Conflict Detection", () => {
   it("should succeed when lastEditedFrom=cli", async () => {
     mockExistingWorkflow = {
       id: "wf-1",
+      status: "enabled",
+      awsAccountId: null,
       lastEditedFrom: "cli",
       updatedAt: new Date("2024-06-15T12:00:00Z"),
     };
@@ -236,6 +264,8 @@ describe("upsertWorkflowFromCli - Push Conflict Detection", () => {
   it("should succeed when lastEditedFrom is null", async () => {
     mockExistingWorkflow = {
       id: "wf-1",
+      status: "enabled",
+      awsAccountId: null,
       lastEditedFrom: null,
       updatedAt: new Date("2024-06-15T12:00:00Z"),
     };
@@ -315,6 +345,8 @@ describe("upsertWorkflowFromCli - Update Existing Workflow", () => {
   it("should set pushedFromCli=true on update", async () => {
     mockExistingWorkflow = {
       id: "wf-1",
+      status: "enabled",
+      awsAccountId: null,
       lastEditedFrom: "cli",
       updatedAt: new Date(),
     };
@@ -332,6 +364,8 @@ describe("upsertWorkflowFromCli - Update Existing Workflow", () => {
   it("should update steps and transitions", async () => {
     mockExistingWorkflow = {
       id: "wf-1",
+      status: "enabled",
+      awsAccountId: null,
       lastEditedFrom: "cli",
       updatedAt: new Date(),
     };
@@ -350,6 +384,8 @@ describe("upsertWorkflowFromCli - Update Existing Workflow", () => {
   it("should update trigger config", async () => {
     mockExistingWorkflow = {
       id: "wf-1",
+      status: "enabled",
+      awsAccountId: null,
       lastEditedFrom: "cli",
       updatedAt: new Date(),
     };
@@ -605,6 +641,8 @@ describe("upsertWorkflowFromCli - Draft Push", () => {
   it("should default to status=enabled when draft not provided (update)", async () => {
     mockExistingWorkflow = {
       id: "wf-1",
+      status: "enabled",
+      awsAccountId: null,
       lastEditedFrom: "cli",
       updatedAt: new Date(),
     };
@@ -622,6 +660,8 @@ describe("upsertWorkflowFromCli - Draft Push", () => {
   it("should update existing workflow with status=draft when draft=true", async () => {
     mockExistingWorkflow = {
       id: "wf-1",
+      status: "enabled",
+      awsAccountId: null,
       lastEditedFrom: "cli",
       updatedAt: new Date(),
     };
@@ -676,6 +716,8 @@ describe("upsertWorkflowFromCli - Draft Push", () => {
   it("should return status=enabled in result when draft not provided (update)", async () => {
     mockExistingWorkflow = {
       id: "wf-1",
+      status: "enabled",
+      awsAccountId: null,
       lastEditedFrom: "cli",
       updatedAt: new Date(),
     };
@@ -697,6 +739,8 @@ describe("upsertWorkflowFromCli - Draft Push", () => {
   it("should return status=draft in result when draft=true (update)", async () => {
     mockExistingWorkflow = {
       id: "wf-1",
+      status: "enabled",
+      awsAccountId: null,
       lastEditedFrom: "cli",
       updatedAt: new Date(),
     };
@@ -712,5 +756,94 @@ describe("upsertWorkflowFromCli - Draft Push", () => {
     });
 
     expect(result.status).toBe("draft");
+  });
+});
+
+describe("upsertWorkflowFromCli - status and account preservation", () => {
+  async function push(body: Record<string, unknown> = {}) {
+    const { upsertWorkflowFromCli } = await import(
+      "../(ee)/routes/workflows-sync"
+    );
+    const { db } = await import("@wraps/db");
+    return upsertWorkflowFromCli(db as never, authContext, {
+      ...basePushBody,
+      ...body,
+    });
+  }
+
+  function existing(over: Record<string, unknown>) {
+    mockExistingWorkflow = {
+      id: "wf-1",
+      status: "enabled",
+      awsAccountId: "aws-acc-1",
+      lastEditedFrom: "cli",
+      updatedAt: new Date(),
+      ...over,
+    };
+  }
+
+  it("keeps a paused workflow paused on update", async () => {
+    existing({ status: "paused" });
+    const result = await push();
+    expect(lastUpdateSet?.status).toBe("paused");
+    expect(result.status).toBe("paused");
+  });
+
+  it("keeps a dashboard-paused workflow paused even with force", async () => {
+    existing({ status: "paused", lastEditedFrom: "dashboard" });
+    const result = await push({ force: true });
+    expect(lastUpdateSet?.status).toBe("paused");
+    expect(result.status).toBe("paused");
+  });
+
+  it("enables a draft workflow on update", async () => {
+    existing({ status: "draft" });
+    const result = await push();
+    expect(lastUpdateSet?.status).toBe("enabled");
+    expect(result.status).toBe("enabled");
+  });
+
+  it("moves an enabled workflow to draft when draft=true", async () => {
+    existing({ status: "enabled" });
+    const result = await push({ draft: true });
+    expect(lastUpdateSet?.status).toBe("draft");
+    expect(result.status).toBe("draft");
+  });
+
+  it("keeps the existing AWS account on update", async () => {
+    existing({ awsAccountId: "aws-existing" });
+    await push();
+    expect(lastUpdateSet?.awsAccountId).toBe("aws-existing");
+  });
+
+  it("falls back to the org's account when the existing row has none", async () => {
+    existing({ awsAccountId: null });
+    await push();
+    expect(lastUpdateSet?.awsAccountId).toBe("aws-acc-1");
+  });
+
+  it("uses the org default AWS account on insert when the org owns it", async () => {
+    mockOrgDefaultAccountId = "aws-default";
+    mockOrgAccounts = [{ id: "aws-default" }];
+    await push();
+    expect(lastInsertValues?.awsAccountId).toBe("aws-default");
+  });
+
+  it("uses the oldest org account on insert when there is no default", async () => {
+    await push();
+    expect(lastInsertValues?.awsAccountId).toBe("aws-acc-1");
+  });
+
+  it("uses null on insert when the org has no accounts", async () => {
+    mockOrgAccounts = [];
+    await push();
+    expect(lastInsertValues?.awsAccountId).toBeNull();
+  });
+
+  it("ignores a default account the org does not own", async () => {
+    mockOrgDefaultAccountId = "aws-foreign";
+    mockOrgAccounts = [{ id: "aws-acc-1" }];
+    await push();
+    expect(lastInsertValues?.awsAccountId).toBe("aws-acc-1");
   });
 });

@@ -159,11 +159,11 @@ export async function workflowsValidate(options: WorkflowsValidateOptions) {
     }
   }
 
+  const allValid =
+    parseErrors.length === 0 && validationResults.every((r) => r.valid);
+
   // Output results
   if (isJsonMode()) {
-    const allValid =
-      parseErrors.length === 0 && validationResults.every((r) => r.valid);
-
     if (allValid) {
       jsonSuccess("email.workflows.validate", {
         workflows: validationResults,
@@ -222,11 +222,14 @@ export async function workflowsValidate(options: WorkflowsValidateOptions) {
   }
 
   trackCommand("email:workflows:validate", {
-    success:
-      parseErrors.length === 0 && validationResults.every((r) => r.valid),
+    success: allValid,
     duration_ms: Date.now() - startTime,
     valid_count: validationResults.filter((r) => r.valid).length,
     invalid_count: validationResults.filter((r) => !r.valid).length,
     parse_error_count: parseErrors.length,
   });
+
+  if (!allValid) {
+    process.exitCode = 1;
+  }
 }

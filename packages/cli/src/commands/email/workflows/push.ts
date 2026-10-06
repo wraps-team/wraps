@@ -234,7 +234,21 @@ export async function workflowsPush(options: WorkflowsPushOptions) {
         pc.red("Cannot push due to validation errors. Fix errors and retry.")
       );
       console.log();
+      for (const v of validationErrors) {
+        console.log(`  ${pc.cyan(v.slug)}:`);
+        for (const e of v.errors) {
+          console.log(
+            `    ${pc.red("✕")} ${e.nodeId ? `[${e.nodeId}] ` : ""}${e.message}`
+          );
+        }
+      }
+      for (const parseErr of parseErrors) {
+        console.log(`  ${pc.cyan(parseErr.slug)}:`);
+        console.log(`    ${pc.red("✕")} Parse error: ${parseErr.error}`);
+      }
+      console.log();
     }
+    process.exitCode = 1;
     return;
   }
 
@@ -316,11 +330,14 @@ export async function workflowsPush(options: WorkflowsPushOptions) {
   const pushed = apiResults.filter((r) => r.success);
   const conflicts = apiResults.filter((r) => r.conflict);
 
+  const failed = apiResults.filter((r) => !(r.success || r.conflict));
+
   const drafts = pushed.filter((r) => r.status === "draft");
-  const enabled = pushed.filter((r) => r.status !== "draft");
+  const paused = pushed.filter((r) => r.status === "paused");
+  const enabled = pushed.filter((r) => r.status === "enabled");
 
   if (isJsonMode()) {
-    if (conflicts.length === 0) {
+    if (conflicts.length === 0 && failed.length === 0) {
       jsonSuccess("email.workflows.push", {
         pushed: pushed.map((r) => ({
           slug: r.slug,
@@ -330,10 +347,15 @@ export async function workflowsPush(options: WorkflowsPushOptions) {
         unchanged,
         conflicts: [],
       });
-    } else {
+    } else if (conflicts.length > 0) {
       jsonError("email.workflows.push", {
         code: "CONFLICT",
         message: `${conflicts.length} workflow(s) were edited on dashboard since last push`,
+      });
+    } else {
+      jsonError("email.workflows.push", {
+        code: "SYNC_FAILED",
+        message: `${failed.length} workflow(s) failed to sync`,
       });
     }
   } else {
@@ -347,6 +369,14 @@ export async function workflowsPush(options: WorkflowsPushOptions) {
       clack.log.success(
         pc.green(`${drafts.length} workflow(s) pushed as draft`)
       );
+    }
+    for (const r of paused) {
+      clack.log.warn(
+        `${r.slug} updated but left paused (it was paused in the dashboard). Resume it there.`
+      );
+    }
+    if (failed.length > 0) {
+      clack.log.error(`${failed.length} workflow(s) failed to sync`);
     }
     if (unchanged.length > 0) {
       clack.log.info(`${unchanged.length} unchanged (use --force to re-push)`);
@@ -363,12 +393,16 @@ export async function workflowsPush(options: WorkflowsPushOptions) {
   }
 
   trackCommand("email:workflows:push", {
-    success: conflicts.length === 0 && pushed.length > 0,
+    success: conflicts.length === 0 && failed.length === 0 && pushed.length > 0,
     duration_ms: Date.now() - startTime,
     pushed_count: pushed.length,
     unchanged_count: unchanged.length,
     conflict_count: conflicts.length,
   });
+
+  if (conflicts.length > 0 || failed.length > 0) {
+    process.exitCode = 1;
+  }
 }
 
 // ── API Push ──

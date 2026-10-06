@@ -614,6 +614,61 @@ describe("Workflows Server Actions", () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe("updateWorkflow", () => {
+    describe("dashboard edit marker", () => {
+      async function createPushed() {
+        const createResult = await createWorkflow(testOrganization.id, {
+          name: "Pushed Workflow",
+        });
+        expect(createResult.success).toBe(true);
+        if (!createResult.success) {
+          throw new Error("create failed");
+        }
+        const id = createResult.workflow.id;
+        await db
+          .update(workflow)
+          .set({ pushedFromCli: true, lastEditedFrom: "cli" })
+          .where(eq(workflow.id, id));
+        return id;
+      }
+
+      async function lastEditedFrom(id: string) {
+        const row = await db.query.workflow.findFirst({
+          where: eq(workflow.id, id),
+        });
+        return row?.lastEditedFrom;
+      }
+
+      it("marks a builder edit of a CLI-pushed workflow as a dashboard edit", async () => {
+        const id = await createPushed();
+        await updateWorkflow(id, testOrganization.id, {
+          name: "Edited in builder",
+        });
+        expect(await lastEditedFrom(id)).toBe("dashboard");
+      });
+
+      it("leaves a canvasViewport-only update alone", async () => {
+        const id = await createPushed();
+        await updateWorkflow(id, testOrganization.id, {
+          canvasViewport: { x: 1, y: 2, zoom: 1 },
+        });
+        expect(await lastEditedFrom(id)).toBe("cli");
+      });
+
+      it("does not mark a workflow that was never pushed from the CLI", async () => {
+        const createResult = await createWorkflow(testOrganization.id, {
+          name: "Dashboard Only",
+        });
+        expect(createResult.success).toBe(true);
+        if (!createResult.success) {
+          return;
+        }
+        await updateWorkflow(createResult.workflow.id, testOrganization.id, {
+          name: "x",
+        });
+        expect(await lastEditedFrom(createResult.workflow.id)).toBeNull();
+      });
+    });
+
     it("should update workflow name", async () => {
       const createResult = await createWorkflow(testOrganization.id, {
         name: "Old Name",

@@ -13,6 +13,7 @@ import {
   awsAccount,
   db,
   eq,
+  organizationExtension,
   type TriggerConfig,
   template,
   type WorkflowStep,
@@ -20,7 +21,7 @@ import {
   type WorkflowTriggerType,
   workflow,
 } from "@wraps/db";
-import { inArray, sql } from "drizzle-orm";
+import { asc, inArray, sql } from "drizzle-orm";
 import { t } from "elysia";
 import { trackFirstResourceCreated } from "../../lib/activation-tracking";
 import type { AuthContext } from "../../middleware/auth";
@@ -388,7 +389,7 @@ type PushBody = {
 type UpsertResult = {
   id: string;
   slug: string;
-  status: "draft" | "enabled";
+  status: "draft" | "enabled" | "paused" | "archived";
   updatedAt: string;
   created: boolean;
   conflict?: boolean;
@@ -455,20 +456,52 @@ export async function resolveTemplateReferences(
   });
 }
 
+/**
+ * Which AWS account a newly pushed workflow sends through: the org's default
+ * (only if the org owns it), else its oldest account, else none. Ordering is
+ * explicit so a multi-account org never gets an arbitrary row.
+ */
+async function resolvePushAwsAccountId(
+  tx: DbOrTx,
+  organizationId: string
+): Promise<string | null> {
+  const [ext] = await tx
+    .select({ defaultAwsAccountId: organizationExtension.defaultAwsAccountId })
+    .from(organizationExtension)
+    .where(eq(organizationExtension.organizationId, organizationId))
+    .limit(1);
+
+  if (ext?.defaultAwsAccountId) {
+    const [owned] = await tx
+      .select({ id: awsAccount.id })
+      .from(awsAccount)
+      .where(
+        and(
+          eq(awsAccount.id, ext.defaultAwsAccountId),
+          eq(awsAccount.organizationId, organizationId)
+        )
+      )
+      .limit(1);
+    if (owned?.id === ext.defaultAwsAccountId) {
+      return owned.id;
+    }
+  }
+
+  const [oldest] = await tx
+    .select({ id: awsAccount.id })
+    .from(awsAccount)
+    .where(eq(awsAccount.organizationId, organizationId))
+    .orderBy(asc(awsAccount.createdAt), asc(awsAccount.id))
+    .limit(1);
+  return oldest?.id ?? null;
+}
+
 export async function upsertWorkflowFromCli(
   tx: DbOrTx,
   authContext: AuthContext,
   body: PushBody
 ): Promise<UpsertResult> {
   const now = new Date();
-  const targetStatus = body.draft ? "draft" : "enabled";
-
-  // Look up the org's AWS account so workflows can send emails/SMS
-  const [orgAwsAccount] = await tx
-    .select({ id: awsAccount.id })
-    .from(awsAccount)
-    .where(eq(awsAccount.organizationId, authContext.organizationId))
-    .limit(1);
 
   // Check for existing workflow by (organizationId, slug)
   const [existing] = await tx
@@ -476,6 +509,8 @@ export async function upsertWorkflowFromCli(
       id: workflow.id,
       lastEditedFrom: workflow.lastEditedFrom,
       updatedAt: workflow.updatedAt,
+      status: workflow.status,
+      awsAccountId: workflow.awsAccountId,
     })
     .from(workflow)
     .where(
@@ -487,12 +522,21 @@ export async function upsertWorkflowFromCli(
     .limit(1);
 
   if (existing) {
+    // A workflow paused in the dashboard stays paused: resuming it is a
+    // dashboard decision, not something a push should undo.
+    let targetStatus: "draft" | "paused" | "enabled" = "enabled";
+    if (body.draft) {
+      targetStatus = "draft";
+    } else if (existing.status === "paused") {
+      targetStatus = "paused";
+    }
+
     // Conflict check: if last edited from dashboard and not forcing, reject
     if (existing.lastEditedFrom === "dashboard" && !body.force) {
       return {
         id: existing.id,
         slug: body.slug,
-        status: targetStatus,
+        status: existing.status,
         updatedAt: existing.updatedAt.toISOString(),
         created: false,
         conflict: true,
@@ -512,7 +556,9 @@ export async function upsertWorkflowFromCli(
         version: sql`${workflow.version} + 1`,
         triggerType: body.triggerType as WorkflowTriggerType,
         triggerConfig: body.triggerConfig ?? {},
-        awsAccountId: orgAwsAccount?.id ?? null,
+        awsAccountId:
+          existing.awsAccountId ??
+          (await resolvePushAwsAccountId(tx, authContext.organizationId)),
         allowReentry: body.settings?.allowReentry ?? false,
         reentryDelaySeconds: body.settings?.reentryDelaySeconds,
         maxConcurrentExecutions: body.settings?.maxConcurrentExecutions,
@@ -545,11 +591,12 @@ export async function upsertWorkflowFromCli(
   }
 
   // Insert new workflow
+  const targetStatus = body.draft ? "draft" : "enabled";
   const id = crypto.randomUUID();
   await tx.insert(workflow).values({
     id,
     organizationId: authContext.organizationId,
-    awsAccountId: orgAwsAccount?.id ?? null,
+    awsAccountId: await resolvePushAwsAccountId(tx, authContext.organizationId),
     name: body.name,
     slug: body.slug,
     description: body.description,

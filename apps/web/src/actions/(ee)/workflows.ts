@@ -665,6 +665,32 @@ export const updateWorkflow = orgAction(
       updateData.defaultSenderId = data.defaultSenderId;
     }
 
+    // A push only checks for a conflict when lastEditedFrom === "dashboard"
+    // (workflows-sync.ts). Without this, the next `wraps email workflows push`
+    // silently overwrites builder edits to a code-managed workflow.
+    const pushOwnedFields = [
+      "name",
+      "description",
+      "triggerType",
+      "triggerConfig",
+      "steps",
+      "transitions",
+      "allowReentry",
+      "reentryDelaySeconds",
+      "maxConcurrentExecutions",
+      "contactCooldownSeconds",
+      "defaultFrom",
+      "defaultFromName",
+      "defaultReplyTo",
+      "defaultSenderId",
+    ] as const;
+    if (
+      existing.pushedFromCli &&
+      pushOwnedFields.some((f) => data[f] !== undefined)
+    ) {
+      updateData.lastEditedFrom = "dashboard";
+    }
+
     // Update workflow + audit log in one transaction
     await ctx.audited(
       async (tx) => {
