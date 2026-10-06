@@ -515,6 +515,7 @@ describe("Workflow Events Service", () => {
       const result = await checkSegmentEntry({
         contactId: "contact-123",
         organizationId: "org-123",
+        previousSegmentIds: [],
       });
 
       expect(result.workflowsTriggered).toBe(0);
@@ -532,6 +533,7 @@ describe("Workflow Events Service", () => {
       const result = await checkSegmentEntry({
         contactId: "contact-123",
         organizationId: "org-123",
+        previousSegmentIds: [],
       });
 
       // The workflow is skipped because segmentId is missing
@@ -548,6 +550,7 @@ describe("Workflow Events Service", () => {
       const result = await checkSegmentEntry({
         contactId: "contact-123",
         organizationId: "org-123",
+        previousSegmentIds: [],
       });
 
       expect(result).toHaveProperty("workflowsTriggered");

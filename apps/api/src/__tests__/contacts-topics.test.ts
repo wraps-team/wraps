@@ -7,6 +7,7 @@ vi.mock("../services/workflow-events", () => ({
   emitTopicUnsubscribed: vi.fn().mockResolvedValue({ workflowsTriggered: 0 }),
   checkSegmentEntry: vi.fn().mockResolvedValue(undefined),
   checkSegmentExit: vi.fn().mockResolvedValue(undefined),
+  getSegmentMembership: vi.fn().mockResolvedValue([]),
   emitContactCreated: vi.fn().mockResolvedValue({ workflowsTriggered: 0 }),
   emitContactUpdated: vi.fn().mockResolvedValue({ workflowsTriggered: 0 }),
   emitWorkflowEvent: vi.fn().mockResolvedValue({ workflowsTriggered: 0 }),
@@ -40,6 +41,7 @@ import {
   checkSegmentExit,
   emitTopicSubscribed,
   emitTopicUnsubscribed,
+  getSegmentMembership,
 } from "../services/workflow-events";
 
 const TEST_PREFIX = "ct-topics-test";
@@ -497,6 +499,7 @@ describe("PUT /v1/contacts/:id/topics", () => {
         expect.objectContaining({
           contactId: testContact.id,
           organizationId: testOrg.id,
+          previousSegmentIds: [],
         })
       );
       expect(checkSegmentExit).toHaveBeenCalledTimes(1);
@@ -504,8 +507,36 @@ describe("PUT /v1/contacts/:id/topics", () => {
         expect.objectContaining({
           contactId: testContact.id,
           organizationId: testOrg.id,
+          previousSegmentIds: [],
         })
       );
+    });
+
+    it("passes the pre-write membership snapshot to both checks", async () => {
+      vi.mocked(getSegmentMembership).mockResolvedValueOnce(["seg-1"]);
+      const app = createTestApp();
+      await putTopics(app, testContact.id, { topicIds: [normalTopic.id] });
+
+      expect(checkSegmentEntry).toHaveBeenCalledWith(
+        expect.objectContaining({ previousSegmentIds: ["seg-1"] })
+      );
+      expect(checkSegmentExit).toHaveBeenCalledWith(
+        expect.objectContaining({ previousSegmentIds: ["seg-1"] })
+      );
+    });
+
+    it("skips both checks but still returns 200 when the snapshot fails", async () => {
+      vi.mocked(getSegmentMembership).mockRejectedValueOnce(
+        new Error("snapshot failed")
+      );
+      const app = createTestApp();
+      const res = await putTopics(app, testContact.id, {
+        topicIds: [normalTopic.id],
+      });
+
+      expect(res.status).toBe(200);
+      expect(checkSegmentEntry).not.toHaveBeenCalled();
+      expect(checkSegmentExit).not.toHaveBeenCalled();
     });
 
     it("calls segment checks even when topicIds is empty", async () => {

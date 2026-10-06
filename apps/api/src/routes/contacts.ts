@@ -47,6 +47,7 @@ import {
   emitContactCreated,
   emitContactUpdated,
   emitTopicSubscribed,
+  getSegmentMembership,
 } from "../services/workflow-events";
 
 // Common response schemas
@@ -581,6 +582,7 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
       await checkSegmentEntry({
         contactId: newContact.id,
         organizationId: authContext.organizationId,
+        previousSegmentIds: [],
       }).catch((err) => {
         log.error("Failed to check segment entry", err, {
           organizationId: authContext.organizationId,
@@ -752,6 +754,18 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
       if (body.jobTitle !== undefined) updateValues.jobTitle = body.jobTitle;
       if (body.preferredChannel !== undefined)
         updateValues.preferredChannel = body.preferredChannel;
+
+      // Membership before the write, so segment triggers fire on transitions
+      // only. null = snapshot failed: skip segment triggers rather than guess.
+      const previousSegmentIds = await getSegmentMembership({
+        contactId,
+        organizationId: authContext.organizationId,
+      }).catch((err) => {
+        log.error("Failed to snapshot segment membership", err, {
+          organizationId: authContext.organizationId,
+        });
+        return null;
+      });
 
       // Update contact (scoped by org for defense-in-depth)
       let updated: ContactRecord;
@@ -1014,23 +1028,27 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
         });
       });
 
-      await checkSegmentEntry({
-        contactId,
-        organizationId: authContext.organizationId,
-      }).catch((err) => {
-        log.error("Failed to check segment entry", err, {
+      if (previousSegmentIds) {
+        await checkSegmentEntry({
+          contactId,
           organizationId: authContext.organizationId,
+          previousSegmentIds,
+        }).catch((err) => {
+          log.error("Failed to check segment entry", err, {
+            organizationId: authContext.organizationId,
+          });
         });
-      });
 
-      await checkSegmentExit({
-        contactId,
-        organizationId: authContext.organizationId,
-      }).catch((err) => {
-        log.error("Failed to check segment exit", err, {
+        await checkSegmentExit({
+          contactId,
           organizationId: authContext.organizationId,
+          previousSegmentIds,
+        }).catch((err) => {
+          log.error("Failed to check segment exit", err, {
+            organizationId: authContext.organizationId,
+          });
         });
-      });
+      }
 
       return {
         id: updated.id,

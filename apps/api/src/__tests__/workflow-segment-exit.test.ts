@@ -39,6 +39,7 @@ function selectChainNoLimit(rows: unknown[]) {
 const BASE_PARAMS = {
   contactId: "contact-1",
   organizationId: "org-1",
+  previousSegmentIds: ["seg-1"],
 };
 
 const mockSegment = (id: string, name = "Test Segment") => ({
@@ -170,6 +171,24 @@ describe("checkSegmentExit", () => {
 
     expect(result).toEqual({ workflowsTriggered: 0 });
     expect(log.error).toHaveBeenCalled();
+    expect(enqueueWorkflowStepBatch).not.toHaveBeenCalled();
+  });
+
+  it("does not enqueue for a contact that was never in the segment", async () => {
+    mockDbSelect.mockReturnValue(
+      selectChainNoLimit([
+        { id: "wf-1", triggerConfig: { segmentId: "seg-1" } },
+      ])
+    );
+    mockContactMatchesCondition.mockResolvedValue(false);
+
+    const result = await checkSegmentExit({
+      ...BASE_PARAMS,
+      previousSegmentIds: [],
+    });
+
+    expect(result).toEqual({ workflowsTriggered: 0 });
+    expect(mockGetSegmentsByIds).not.toHaveBeenCalled();
     expect(enqueueWorkflowStepBatch).not.toHaveBeenCalled();
   });
 });

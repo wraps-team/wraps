@@ -98,6 +98,7 @@ describe("checkSegmentEntry", () => {
     const result = await checkSegmentEntry({
       contactId: "contact-1",
       organizationId: "org-1",
+      previousSegmentIds: [],
     });
 
     expect(result).toEqual({ workflowsTriggered: 0 });
@@ -139,6 +140,7 @@ describe("checkSegmentEntry", () => {
     const result = await checkSegmentEntry({
       contactId: "contact-1",
       organizationId: "org-1",
+      previousSegmentIds: [],
     });
 
     expect(result).toEqual({ workflowsTriggered: 1 });
@@ -186,6 +188,7 @@ describe("checkSegmentEntry", () => {
     const result = await checkSegmentEntry({
       contactId: "contact-1",
       organizationId: "org-1",
+      previousSegmentIds: [],
     });
 
     expect(result).toEqual({ workflowsTriggered: 0 });
@@ -204,6 +207,7 @@ describe("checkSegmentExit", () => {
     const result = await checkSegmentExit({
       contactId: "contact-1",
       organizationId: "org-1",
+      previousSegmentIds: ["seg-1"],
     });
 
     expect(result).toEqual({ workflowsTriggered: 0 });
@@ -243,6 +247,7 @@ describe("checkSegmentExit", () => {
     const result = await checkSegmentExit({
       contactId: "contact-1",
       organizationId: "org-1",
+      previousSegmentIds: ["seg-1"],
     });
 
     expect(result).toEqual({ workflowsTriggered: 1 });
@@ -282,6 +287,7 @@ describe("checkSegmentExit", () => {
     const result = await checkSegmentExit({
       contactId: "contact-1",
       organizationId: "org-1",
+      previousSegmentIds: ["seg-1"],
     });
 
     expect(result).toEqual({ workflowsTriggered: 0 });

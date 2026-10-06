@@ -39,6 +39,7 @@ function selectChainNoLimit(rows: unknown[]) {
 const BASE_PARAMS = {
   contactId: "contact-1",
   organizationId: "org-1",
+  previousSegmentIds: [] as string[],
 };
 
 const mockSegment = (id: string, name = "Test Segment") => ({
@@ -172,5 +173,48 @@ describe("checkSegmentEntry", () => {
     expect(result).toEqual({ workflowsTriggered: 0 });
     expect(log.error).toHaveBeenCalled();
     expect(enqueueWorkflowStepBatch).not.toHaveBeenCalled();
+  });
+
+  it("does not enqueue when the contact already was in the segment", async () => {
+    mockDbSelect.mockReturnValue(
+      selectChainNoLimit([
+        { id: "wf-1", triggerConfig: { segmentId: "seg-1" } },
+      ])
+    );
+    mockGetSegmentsByIds.mockResolvedValue(
+      new Map([["seg-1", mockSegment("seg-1")]])
+    );
+    mockContactMatchesCondition.mockResolvedValue(true);
+
+    const result = await checkSegmentEntry({
+      ...BASE_PARAMS,
+      previousSegmentIds: ["seg-1"],
+    });
+
+    expect(result).toEqual({ workflowsTriggered: 0 });
+    expect(enqueueWorkflowStepBatch).not.toHaveBeenCalled();
+  });
+
+  it("enqueues only the newly entered segment", async () => {
+    mockDbSelect.mockReturnValue(
+      selectChainNoLimit([
+        { id: "wf-1", triggerConfig: { segmentId: "seg-1" } },
+        { id: "wf-2", triggerConfig: { segmentId: "seg-2" } },
+      ])
+    );
+    mockGetSegmentsByIds.mockResolvedValue(
+      new Map([["seg-2", mockSegment("seg-2", "Segment Two")]])
+    );
+    mockContactMatchesCondition.mockResolvedValue(true);
+
+    const result = await checkSegmentEntry({
+      ...BASE_PARAMS,
+      previousSegmentIds: ["seg-1"],
+    });
+
+    expect(result).toEqual({ workflowsTriggered: 1 });
+    expect(enqueueWorkflowStepBatch).toHaveBeenCalledWith([
+      expect.objectContaining({ workflowId: "wf-2" }),
+    ]);
   });
 });

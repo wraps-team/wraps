@@ -24,6 +24,7 @@ import {
   checkSegmentExit,
   emitTopicSubscribed,
   emitTopicUnsubscribed,
+  getSegmentMembership,
 } from "../services/workflow-events";
 
 // Common response schemas
@@ -55,6 +56,18 @@ export const contactsTopicsRoutes = createAuthenticatedRoutes("/v1/contacts")
         ctx.set.status = 404;
         return { error: "Contact not found" };
       }
+
+      // Membership before the write, so segment triggers fire on transitions
+      // only. null = snapshot failed: skip segment triggers rather than guess.
+      const previousSegmentIds = await getSegmentMembership({
+        contactId: params.id,
+        organizationId: authContext.organizationId,
+      }).catch((err) => {
+        log.error("Failed to snapshot segment membership", err, {
+          organizationId: authContext.organizationId,
+        });
+        return null;
+      });
 
       // Resolve topic slugs to IDs if provided
       let topicIds = body.topicIds || [];
@@ -235,24 +248,28 @@ export const contactsTopicsRoutes = createAuthenticatedRoutes("/v1/contacts")
       }
 
       // Check segment triggers (topic changes may affect segment membership)
-      await Promise.all([
-        checkSegmentEntry({
-          contactId: params.id,
-          organizationId: authContext.organizationId,
-        }).catch((err) => {
-          log.error("Failed to check segment entry", err, {
+      if (previousSegmentIds) {
+        await Promise.all([
+          checkSegmentEntry({
+            contactId: params.id,
             organizationId: authContext.organizationId,
-          });
-        }),
-        checkSegmentExit({
-          contactId: params.id,
-          organizationId: authContext.organizationId,
-        }).catch((err) => {
-          log.error("Failed to check segment exit", err, {
+            previousSegmentIds,
+          }).catch((err) => {
+            log.error("Failed to check segment entry", err, {
+              organizationId: authContext.organizationId,
+            });
+          }),
+          checkSegmentExit({
+            contactId: params.id,
             organizationId: authContext.organizationId,
-          });
-        }),
-      ]);
+            previousSegmentIds,
+          }).catch((err) => {
+            log.error("Failed to check segment exit", err, {
+              organizationId: authContext.organizationId,
+            });
+          }),
+        ]);
+      }
 
       // Get updated topics to return
       const updatedTopics = await db

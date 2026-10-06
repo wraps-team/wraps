@@ -98,6 +98,7 @@ vi.mock("../middleware/auth", () => ({
 vi.mock("../services/workflow-events", () => ({
   checkSegmentEntry: vi.fn(async () => {}),
   checkSegmentExit: vi.fn(async () => {}),
+  getSegmentMembership: vi.fn(async () => []),
   emitContactCreated: vi.fn(async () => {}),
   emitContactUpdated: vi.fn(async () => {}),
   emitTopicSubscribed: vi.fn(async () => {}),

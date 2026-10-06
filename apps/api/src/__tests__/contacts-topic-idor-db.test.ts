@@ -45,6 +45,7 @@ vi.mock("../services/workflow-events", () => ({
   emitContactUpdated: vi.fn().mockResolvedValue(undefined),
   checkSegmentEntry: vi.fn().mockResolvedValue(undefined),
   checkSegmentExit: vi.fn().mockResolvedValue(undefined),
+  getSegmentMembership: vi.fn().mockResolvedValue([]),
   emitTopicSubscribed: vi.fn().mockResolvedValue(undefined),
   emitTopicUnsubscribed: vi.fn().mockResolvedValue(undefined),
 }));

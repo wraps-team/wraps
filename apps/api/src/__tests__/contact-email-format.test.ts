@@ -135,6 +135,7 @@ vi.mock("../services/workflow-events", () => ({
   emitTopicSubscribed: vi.fn().mockResolvedValue(undefined),
   checkSegmentEntry: vi.fn().mockResolvedValue(undefined),
   checkSegmentExit: vi.fn().mockResolvedValue(undefined),
+  getSegmentMembership: vi.fn().mockResolvedValue([]),
 }));
 
 import { contactsRoutes } from "../routes/contacts";

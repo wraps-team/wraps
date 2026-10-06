@@ -342,8 +342,68 @@ export async function emitTopicUnsubscribed(params: {
 }
 
 /**
+ * Segments (referenced by an enabled segment_entry/segment_exit workflow) the
+ * contact currently matches. Take this BEFORE mutating a contact and pass it
+ * as `previousSegmentIds` to checkSegmentEntry/checkSegmentExit afterwards, so
+ * they fire on transitions rather than on current state.
+ *
+ * Throws on evaluation failure; callers must treat a failed snapshot as
+ * "skip segment triggers" rather than "contact was in no segments".
+ */
+export async function getSegmentMembership(params: {
+  contactId: string;
+  organizationId: string;
+}): Promise<string[]> {
+  const segmentWorkflows = await db
+    .select({ triggerConfig: workflow.triggerConfig })
+    .from(workflow)
+    .where(
+      and(
+        eq(workflow.organizationId, params.organizationId),
+        eq(workflow.status, "enabled"),
+        inArray(workflow.triggerType, ["segment_entry", "segment_exit"])
+      )
+    );
+
+  const segmentIds = [
+    ...new Set(
+      segmentWorkflows
+        .map(
+          (wf) => (wf.triggerConfig as { segmentId?: string } | null)?.segmentId
+        )
+        .filter((id): id is string => !!id)
+    ),
+  ];
+  if (segmentIds.length === 0) {
+    return [];
+  }
+
+  const segmentsMap = await getSegmentsByIds(
+    db,
+    segmentIds,
+    params.organizationId
+  );
+
+  const memberOf: string[] = [];
+  for (const [segmentId, seg] of segmentsMap) {
+    if (
+      await contactMatchesCondition(
+        db,
+        params.contactId,
+        params.organizationId,
+        seg.condition
+      )
+    ) {
+      memberOf.push(segmentId);
+    }
+  }
+  return memberOf;
+}
+
+/**
  * Check and emit segment entry events for a contact
- * Call this after a contact is created or updated
+ * Call this after a contact is created or updated. Fires only when the contact
+ * matches the segment now and was not in `previousSegmentIds` before.
  *
  * Uses SQL-based evaluation: batch-fetches segments (1 query),
  * then runs one SQL query per segment to check if contact matches.
@@ -351,6 +411,7 @@ export async function emitTopicUnsubscribed(params: {
 export async function checkSegmentEntry(params: {
   contactId: string;
   organizationId: string;
+  previousSegmentIds: string[];
 }): Promise<{ workflowsTriggered: number }> {
   // 1. Get workflows with segment_entry trigger
   const segmentWorkflows = await db
@@ -378,7 +439,9 @@ export async function checkSegmentEntry(params: {
         .map(
           (wf) => (wf.triggerConfig as { segmentId?: string } | null)?.segmentId
         )
-        .filter((id): id is string => !!id)
+        .filter(
+          (id): id is string => !!id && !params.previousSegmentIds.includes(id)
+        )
     ),
   ];
 
@@ -399,6 +462,11 @@ export async function checkSegmentEntry(params: {
   for (const wf of segmentWorkflows) {
     const config = wf.triggerConfig as { segmentId?: string } | null;
     if (!config?.segmentId) {
+      continue;
+    }
+
+    // Already a member before the change: not an entry
+    if (params.previousSegmentIds.includes(config.segmentId)) {
       continue;
     }
 
@@ -451,7 +519,8 @@ export async function checkSegmentEntry(params: {
 
 /**
  * Check and emit segment exit events for a contact
- * Call this after a contact is updated
+ * Call this after a contact is updated. Fires only for segments in
+ * `previousSegmentIds` that the contact no longer matches.
  *
  * Uses SQL-based evaluation: batch-fetches segments (1 query),
  * then runs one SQL query per segment to check if contact no longer matches.
@@ -459,7 +528,7 @@ export async function checkSegmentEntry(params: {
 export async function checkSegmentExit(params: {
   contactId: string;
   organizationId: string;
-  previousSegmentIds?: string[]; // Optional: segments contact was previously in
+  previousSegmentIds: string[];
 }): Promise<{ workflowsTriggered: number }> {
   // 1. Get workflows with segment_exit trigger
   const segmentWorkflows = await db
@@ -480,7 +549,7 @@ export async function checkSegmentExit(params: {
     return { workflowsTriggered: 0 };
   }
 
-  // 2. Extract unique segment IDs, filtering by previousSegmentIds if provided
+  // 2. Extract unique segment IDs, filtering by previousSegmentIds
   const segmentIds = [
     ...new Set(
       segmentWorkflows
@@ -491,10 +560,7 @@ export async function checkSegmentExit(params: {
           if (!id) {
             return false;
           }
-          if (
-            params.previousSegmentIds &&
-            !params.previousSegmentIds.includes(id)
-          ) {
+          if (!params.previousSegmentIds.includes(id)) {
             return false;
           }
           return true;
@@ -523,10 +589,7 @@ export async function checkSegmentExit(params: {
     }
 
     // Skip if not in previousSegmentIds
-    if (
-      params.previousSegmentIds &&
-      !params.previousSegmentIds.includes(config.segmentId)
-    ) {
+    if (!params.previousSegmentIds.includes(config.segmentId)) {
       continue;
     }
 
