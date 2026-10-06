@@ -343,6 +343,7 @@ export async function workflowsPush(options: WorkflowsPushOptions) {
           slug: r.slug,
           id: r.id,
           status: r.status,
+          scheduleError: r.scheduleError,
         })),
         unchanged,
         conflicts: [],
@@ -373,6 +374,11 @@ export async function workflowsPush(options: WorkflowsPushOptions) {
     for (const r of paused) {
       clack.log.warn(
         `${r.slug} updated but left paused (it was paused in the dashboard). Resume it there.`
+      );
+    }
+    for (const r of pushed.filter((p) => p.scheduleError)) {
+      clack.log.warn(
+        `${r.slug} was saved as draft: its schedule could not be registered (${r.scheduleError}). Fix it and push again.`
       );
     }
     if (failed.length > 0) {
@@ -411,6 +417,7 @@ type APIPushResult = {
   slug: string;
   id?: string;
   status?: string;
+  scheduleError?: string;
   success: boolean;
   conflict?: boolean;
 };
@@ -501,13 +508,19 @@ async function pushToAPI(
         }
       } else if (resp.ok) {
         const data = (await resp.json()) as {
-          results: Array<{ slug: string; id: string; status: string }>;
+          results: Array<{
+            slug: string;
+            id: string;
+            status: string;
+            scheduleError?: string;
+          }>;
         };
         for (const r of data.results) {
           results.push({
             slug: r.slug,
             id: r.id,
             status: r.status,
+            scheduleError: r.scheduleError,
             success: true,
           });
         }
@@ -562,11 +575,13 @@ async function pushToAPI(
           id: string;
           slug: string;
           status: string;
+          scheduleError?: string;
         };
         results.push({
           slug: data.slug,
           id: data.id,
           status: data.status,
+          scheduleError: data.scheduleError,
           success: true,
         });
         progress.succeed(`Synced ${pc.cyan(w.slug)} to dashboard`);

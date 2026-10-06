@@ -24,9 +24,14 @@ import {
 import { asc, inArray, sql } from "drizzle-orm";
 import { t } from "elysia";
 import { trackFirstResourceCreated } from "../../lib/activation-tracking";
+import { log } from "../../lib/logger";
 import type { AuthContext } from "../../middleware/auth";
 import { createAuthenticatedRoutes, getAuth } from "../../middleware/auth";
 import { checkWorkflowPushLimit } from "../lib/workflow-limit";
+import {
+  deleteWorkflowSchedule,
+  updateWorkflowSchedule,
+} from "../services/workflow-scheduler";
 
 type DbOrTx =
   | typeof db
@@ -77,6 +82,8 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
         };
       }
 
+      const synced = await applyPushedSchedule(authContext, result);
+
       if (result.created) {
         await trackFirstResourceCreated(
           authContext.organizationId,
@@ -91,9 +98,12 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
       return {
         id: result.id,
         slug: result.slug,
-        status: result.status,
+        status: synced.status,
         updatedAt: result.updatedAt,
         remoteHash: body.sourceHash,
+        ...(synced.scheduleError
+          ? { scheduleError: synced.scheduleError }
+          : {}),
       };
     },
     {
@@ -192,7 +202,7 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
         return { error: "workflow_limit", message: limitCheck.message };
       }
 
-      const results = await db.transaction(async (tx) => {
+      const written = await db.transaction(async (tx) => {
         const settled = await Promise.allSettled(
           body.workflows.map(async (wf) => {
             const resolvedSteps = await resolveTemplateReferences(
@@ -224,6 +234,11 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
           .map((s) => s.value);
       });
 
+      // EventBridge calls happen only after the transaction has committed.
+      const results = await Promise.all(
+        written.map((r) => applyPushedSchedule(authContext, r))
+      );
+
       // Check if any had conflicts
       const conflicts = results.filter((r) => r.conflict);
       if (conflicts.length > 0) {
@@ -241,6 +256,7 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
               slug: r.slug,
               id: r.id,
               status: r.status,
+              ...(r.scheduleError ? { scheduleError: r.scheduleError } : {}),
             })),
         };
       }
@@ -262,6 +278,7 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
           slug: r.slug,
           id: r.id,
           status: r.status,
+          ...(r.scheduleError ? { scheduleError: r.scheduleError } : {}),
         })),
       };
     },
@@ -407,14 +424,113 @@ type PushBody = {
   draft?: boolean;
 };
 
-type UpsertResult = {
+export type ScheduleIntent =
+  | { action: "none" }
+  | { action: "sync"; cronExpression: string; timezone?: string }
+  | { action: "missing_cron" }
+  | { action: "delete" };
+
+export type UpsertResult = {
   id: string;
   slug: string;
   status: "draft" | "enabled" | "paused" | "archived";
   updatedAt: string;
   created: boolean;
   conflict?: boolean;
+  /** What push must do to EventBridge once the write has committed. */
+  schedule: ScheduleIntent;
+  /** Set by the route when registering the schedule failed; the row was moved to draft. */
+  scheduleError?: string;
 };
+
+/**
+ * EventBridge work a push implies. A schedule-triggered workflow fires only
+ * from its EventBridge schedule, so an enabled one needs a schedule (created or
+ * updated), and one that stops being an enabled scheduled workflow should lose it.
+ */
+export function scheduleIntentFor(
+  previous: { triggerType: string | null } | null,
+  next: { status: string; triggerType: string; triggerConfig: TriggerConfig }
+): ScheduleIntent {
+  if (next.status === "enabled" && next.triggerType === "schedule") {
+    return next.triggerConfig.schedule
+      ? {
+          action: "sync",
+          cronExpression: next.triggerConfig.schedule,
+          timezone: next.triggerConfig.timezone,
+        }
+      : { action: "missing_cron" };
+  }
+  if (previous?.triggerType === "schedule") {
+    return { action: "delete" };
+  }
+  return { action: "none" };
+}
+
+/**
+ * Make EventBridge match a pushed workflow. Runs after the DB write has
+ * committed. If a schedule cannot be registered, the workflow is moved to draft
+ * so it is never shown as enabled while nothing will fire it; a later push
+ * enables it again and retries.
+ */
+export async function applyPushedSchedule(
+  authContext: AuthContext,
+  result: UpsertResult
+): Promise<UpsertResult> {
+  const { schedule } = result;
+  if (result.conflict || schedule.action === "none") {
+    return result;
+  }
+
+  if (schedule.action === "delete") {
+    try {
+      await deleteWorkflowSchedule(result.id);
+    } catch (error) {
+      // A leftover schedule fires once, sees the workflow is no longer an
+      // enabled scheduled workflow, and stops (workflow-processor.ts).
+      log.warn("Push: failed to delete workflow schedule", {
+        workflowId: result.id,
+        organizationId: authContext.organizationId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return result;
+  }
+
+  let scheduleError: string | undefined;
+  if (schedule.action === "missing_cron") {
+    scheduleError =
+      "Schedule trigger has no cron expression (trigger.schedule).";
+  } else {
+    try {
+      await updateWorkflowSchedule({
+        workflowId: result.id,
+        organizationId: authContext.organizationId,
+        cronExpression: schedule.cronExpression,
+        timezone: schedule.timezone,
+      });
+      return result;
+    } catch (error) {
+      log.error("Push: failed to register workflow schedule", error, {
+        workflowId: result.id,
+        organizationId: authContext.organizationId,
+      });
+      scheduleError =
+        error instanceof Error ? error.message : "Failed to register schedule";
+    }
+  }
+
+  await db
+    .update(workflow)
+    .set({ status: "draft", updatedAt: new Date() })
+    .where(
+      and(
+        eq(workflow.id, result.id),
+        eq(workflow.organizationId, authContext.organizationId)
+      )
+    );
+  return { ...result, status: "draft", scheduleError };
+}
 
 /**
  * Resolve template slug references to UUIDs.
@@ -532,6 +648,8 @@ export async function upsertWorkflowFromCli(
       updatedAt: workflow.updatedAt,
       status: workflow.status,
       awsAccountId: workflow.awsAccountId,
+      triggerType: workflow.triggerType,
+      triggerConfig: workflow.triggerConfig,
     })
     .from(workflow)
     .where(
@@ -561,6 +679,7 @@ export async function upsertWorkflowFromCli(
         updatedAt: existing.updatedAt.toISOString(),
         created: false,
         conflict: true,
+        schedule: { action: "none" },
       };
     }
 
@@ -608,6 +727,14 @@ export async function upsertWorkflowFromCli(
       status: targetStatus,
       updatedAt: now.toISOString(),
       created: false,
+      schedule: scheduleIntentFor(
+        { triggerType: existing.triggerType },
+        {
+          status: targetStatus,
+          triggerType: body.triggerType,
+          triggerConfig: body.triggerConfig ?? {},
+        }
+      ),
     };
   }
 
@@ -649,5 +776,10 @@ export async function upsertWorkflowFromCli(
     status: targetStatus,
     updatedAt: now.toISOString(),
     created: true,
+    schedule: scheduleIntentFor(null, {
+      status: targetStatus,
+      triggerType: body.triggerType,
+      triggerConfig: body.triggerConfig ?? {},
+    }),
   };
 }

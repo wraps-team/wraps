@@ -160,6 +160,28 @@ describe("workflowsPush", () => {
     expect(warnings.some((m) => m.includes("left paused"))).toBe(true);
   });
 
+  it("warns why a scheduled workflow was saved as draft", async () => {
+    fetchMock.mockResolvedValue(
+      response(200, {
+        id: "1",
+        slug: "a",
+        status: "draft",
+        scheduleError: "bad cron",
+      })
+    );
+    await workflowsPush({});
+    const warnings = vi
+      .mocked(prompts.log.warn)
+      .mock.calls.map((c) => String(c[0]));
+    expect(
+      warnings.some(
+        (m) =>
+          m.includes("schedule could not be registered") &&
+          m.includes("bad cron")
+      )
+    ).toBe(true);
+  });
+
   it("exits 1 on a dashboard conflict", async () => {
     fetchMock.mockResolvedValue(response(409, {}));
     await workflowsPush({});

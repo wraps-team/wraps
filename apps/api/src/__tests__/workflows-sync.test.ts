@@ -21,6 +21,18 @@ let lastUpdateSet: Record<string, unknown> | null = null;
 let mockOrgDefaultAccountId: string | null = null;
 let mockOrgAccounts: Array<{ id: string }> = [{ id: "aws-acc-1" }];
 
+const mockUpdateWorkflowSchedule = vi.hoisted(() => vi.fn());
+const mockDeleteWorkflowSchedule = vi.hoisted(() => vi.fn());
+vi.mock("../(ee)/services/workflow-scheduler", () => ({
+  createNextWorkflowSchedule: vi.fn(),
+  deleteWorkflowSchedule: mockDeleteWorkflowSchedule,
+  updateWorkflowSchedule: mockUpdateWorkflowSchedule,
+}));
+
+vi.mock("../lib/logger", () => ({
+  log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
 // Mock @wraps/db before imports
 vi.mock("@wraps/db", () => ({
   db: {
@@ -155,6 +167,8 @@ beforeEach(() => {
   mockOrgDefaultAccountId = null;
   mockOrgAccounts = [{ id: "aws-acc-1" }];
   vi.clearAllMocks();
+  mockUpdateWorkflowSchedule.mockResolvedValue("wraps-wf-sched-x");
+  mockDeleteWorkflowSchedule.mockResolvedValue(undefined);
 });
 
 describe("upsertWorkflowFromCli - Push Conflict Detection", () => {
@@ -845,5 +859,192 @@ describe("upsertWorkflowFromCli - status and account preservation", () => {
     mockOrgAccounts = [{ id: "aws-acc-1" }];
     await push();
     expect(lastInsertValues?.awsAccountId).toBe("aws-acc-1");
+  });
+});
+
+describe("scheduleIntentFor", () => {
+  const cfg = { schedule: "0 9 * * 1", timezone: "UTC" };
+
+  it("syncs an enabled schedule workflow with a cron", async () => {
+    const { scheduleIntentFor } = await import("../(ee)/routes/workflows-sync");
+    expect(
+      scheduleIntentFor(null, {
+        status: "enabled",
+        triggerType: "schedule",
+        triggerConfig: cfg,
+      })
+    ).toEqual({
+      action: "sync",
+      cronExpression: "0 9 * * 1",
+      timezone: "UTC",
+    });
+  });
+
+  it("flags an enabled schedule workflow with no cron", async () => {
+    const { scheduleIntentFor } = await import("../(ee)/routes/workflows-sync");
+    expect(
+      scheduleIntentFor(null, {
+        status: "enabled",
+        triggerType: "schedule",
+        triggerConfig: {},
+      })
+    ).toEqual({ action: "missing_cron" });
+  });
+
+  it("deletes the schedule when a scheduled workflow becomes draft", async () => {
+    const { scheduleIntentFor } = await import("../(ee)/routes/workflows-sync");
+    expect(
+      scheduleIntentFor(
+        { triggerType: "schedule" },
+        { status: "draft", triggerType: "schedule", triggerConfig: cfg }
+      )
+    ).toEqual({ action: "delete" });
+  });
+
+  it("deletes the schedule when the trigger type changes away from schedule", async () => {
+    const { scheduleIntentFor } = await import("../(ee)/routes/workflows-sync");
+    expect(
+      scheduleIntentFor(
+        { triggerType: "schedule" },
+        { status: "enabled", triggerType: "contact_created", triggerConfig: {} }
+      )
+    ).toEqual({ action: "delete" });
+  });
+
+  it("does nothing for a non-scheduled workflow that stays non-scheduled", async () => {
+    const { scheduleIntentFor } = await import("../(ee)/routes/workflows-sync");
+    expect(
+      scheduleIntentFor(
+        { triggerType: "contact_created" },
+        { status: "enabled", triggerType: "contact_created", triggerConfig: {} }
+      )
+    ).toEqual({ action: "none" });
+  });
+
+  it("does nothing for a new paused schedule workflow", async () => {
+    const { scheduleIntentFor } = await import("../(ee)/routes/workflows-sync");
+    expect(
+      scheduleIntentFor(null, {
+        status: "paused",
+        triggerType: "schedule",
+        triggerConfig: cfg,
+      })
+    ).toEqual({ action: "none" });
+  });
+});
+
+describe("applyPushedSchedule", () => {
+  const base = {
+    id: "wf-1",
+    slug: "weekly",
+    updatedAt: "2026-10-06T00:00:00.000Z",
+    created: false,
+  } as const;
+
+  it("registers the schedule and leaves the workflow enabled", async () => {
+    const { applyPushedSchedule } = await import(
+      "../(ee)/routes/workflows-sync"
+    );
+    const result = await applyPushedSchedule(authContext, {
+      ...base,
+      status: "enabled",
+      schedule: {
+        action: "sync",
+        cronExpression: "0 9 * * 1",
+        timezone: "UTC",
+      },
+    });
+    expect(mockUpdateWorkflowSchedule).toHaveBeenCalledTimes(1);
+    expect(mockUpdateWorkflowSchedule).toHaveBeenCalledWith({
+      workflowId: "wf-1",
+      organizationId: "org-1",
+      cronExpression: "0 9 * * 1",
+      timezone: "UTC",
+    });
+    expect(result.status).toBe("enabled");
+    expect(result.scheduleError).toBeUndefined();
+    expect(lastUpdateSet).toBeNull();
+  });
+
+  it("moves the workflow to draft when registration fails (never enabled without a schedule)", async () => {
+    mockUpdateWorkflowSchedule.mockRejectedValue(new Error("boom"));
+    const { applyPushedSchedule } = await import(
+      "../(ee)/routes/workflows-sync"
+    );
+    const result = await applyPushedSchedule(authContext, {
+      ...base,
+      status: "enabled",
+      schedule: { action: "sync", cronExpression: "0 9 * * 1" },
+    });
+    expect(result.status).toBe("draft");
+    expect(result.scheduleError).toBe("boom");
+    expect(lastUpdateSet?.status).toBe("draft");
+  });
+
+  it("moves the workflow to draft when the cron is missing", async () => {
+    const { applyPushedSchedule } = await import(
+      "../(ee)/routes/workflows-sync"
+    );
+    const result = await applyPushedSchedule(authContext, {
+      ...base,
+      status: "enabled",
+      schedule: { action: "missing_cron" },
+    });
+    expect(mockUpdateWorkflowSchedule).not.toHaveBeenCalled();
+    expect(result.status).toBe("draft");
+    expect(result.scheduleError).toContain("cron");
+    expect(lastUpdateSet?.status).toBe("draft");
+  });
+
+  it("deletes the schedule, and tolerates a delete failure", async () => {
+    const { applyPushedSchedule } = await import(
+      "../(ee)/routes/workflows-sync"
+    );
+    const input = {
+      ...base,
+      status: "draft" as const,
+      schedule: { action: "delete" } as const,
+    };
+    await applyPushedSchedule(authContext, input);
+    expect(mockDeleteWorkflowSchedule).toHaveBeenCalledWith("wf-1");
+
+    mockDeleteWorkflowSchedule.mockRejectedValue(new Error("aws down"));
+    const result = await applyPushedSchedule(authContext, input);
+    expect(result).toEqual(input);
+    expect(lastUpdateSet).toBeNull();
+  });
+
+  it("does nothing for a conflict", async () => {
+    const { applyPushedSchedule } = await import(
+      "../(ee)/routes/workflows-sync"
+    );
+    await applyPushedSchedule(authContext, {
+      ...base,
+      status: "enabled",
+      conflict: true,
+      schedule: { action: "none" },
+    });
+    expect(mockUpdateWorkflowSchedule).not.toHaveBeenCalled();
+    expect(mockDeleteWorkflowSchedule).not.toHaveBeenCalled();
+  });
+});
+
+describe("upsertWorkflowFromCli - schedule intent", () => {
+  it("returns a sync intent for a new enabled schedule workflow", async () => {
+    mockExistingWorkflow = null;
+    const { upsertWorkflowFromCli } = await import(
+      "../(ee)/routes/workflows-sync"
+    );
+    const { db } = await import("@wraps/db");
+    const result = await upsertWorkflowFromCli(db as never, authContext, {
+      ...basePushBody,
+      triggerType: "schedule",
+      triggerConfig: { schedule: "0 9 * * 1", timezone: "UTC" },
+    });
+    expect(result.schedule).toEqual({
+      action: "sync",
+      cronExpression: "0 9 * * 1",
+      timezone: "UTC",
+    });
   });
 });
