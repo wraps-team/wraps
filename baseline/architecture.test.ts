@@ -2045,8 +2045,9 @@ describe("clickable table rows are reachable by keyboard", () => {
 //
 // AGENTS.md (CLAUDE.md is a symlink to it) is loaded before every agent task;
 // CODING_STANDARDS.md and the docs/agents/ files it points at are loaded when their
-// trigger fires. Agents answer from all of them without re-checking. Keeping them accurate competes with real work
-// and quietly loses — packages/cdk sat unmentioned for seven months. These tests
+// trigger fires; the workspace map and CLI service list live in
+// docs/agents/repo-map.md. Agents answer from all of them without re-checking.
+// Keeping them accurate competes with real work and quietly loses — packages/cdk sat unmentioned for seven months. These tests
 // make the drift fail CI instead of surfacing as a confidently wrong answer.
 // ─────────────────────────────────────────────────────────
 
@@ -2054,6 +2055,7 @@ describe("agent briefing files stay true", () => {
   const claudeMd = readFile("CLAUDE.md");
   const agentsMd = readFile("AGENTS.md");
   const codingStandardsMd = readFile("CODING_STANDARDS.md");
+  const repoMapMd = readFile("docs/agents/repo-map.md");
   const disclosedDocs = globSync("docs/agents/*.md", { cwd: ROOT })
     .map((f) => f.toString())
     .sort();
@@ -2066,15 +2068,15 @@ describe("agent briefing files stay true", () => {
       .sort();
   }
 
-  test("every app and package is named in CLAUDE.md", () => {
+  test("every app and package is named in the repo map", () => {
     const missing = [
       ...workspaceDirs("apps"),
       ...workspaceDirs("packages"),
-    ].filter((dir) => !claudeMd.includes(dir));
+    ].filter((dir) => !repoMapMd.includes(dir));
 
     expect(
       missing,
-      `CLAUDE.md never mentions these workspaces, so agents answer as if they do not exist:\n${missing.join("\n")}`
+      `docs/agents/repo-map.md never mentions these workspaces, so agents answer as if they do not exist:\n${missing.join("\n")}`
     ).toEqual([]);
   });
 
@@ -2083,29 +2085,29 @@ describe("agent briefing files stay true", () => {
       (dir) => !existsSync(resolve(ROOT, dir, "CLAUDE.md"))
     );
     const unacknowledged = undocumented.filter(
-      (dir) => !claudeMd.includes(`except \`${dir}\``)
+      (dir) => !repoMapMd.includes(`except \`${dir}\``)
     );
 
     expect(
       unacknowledged,
-      "CLAUDE.md claims every package has its own CLAUDE.md. These do not, and are not " +
+      "docs/agents/repo-map.md claims every package has its own CLAUDE.md. These do not, and are not " +
         `listed as exceptions — either add the file or update the claim:\n${unacknowledged.join("\n")}`
     ).toEqual([]);
   });
 
-  test("every CLI service directory is named in CLAUDE.md", () => {
+  test("every CLI service directory is named in the repo map", () => {
     const services = globSync("packages/cli/src/commands/*/", { cwd: ROOT })
       .map((f) => f.toString().replace(/\/$/, "").split("/").pop() as string)
       .filter((name) => name !== "__tests__" && name !== "shared")
       .sort();
 
     const missing = services.filter(
-      (name) => !claudeMd.includes(`\`${name}\``)
+      (name) => !repoMapMd.includes(`\`${name}\``)
     );
 
     expect(
       missing,
-      `CLAUDE.md lists the CLI services but omits these, which exist in packages/cli/src/commands:\n${missing.join("\n")}`
+      `docs/agents/repo-map.md lists the CLI services but omits these, which exist in packages/cli/src/commands:\n${missing.join("\n")}`
     ).toEqual([]);
   });
 
