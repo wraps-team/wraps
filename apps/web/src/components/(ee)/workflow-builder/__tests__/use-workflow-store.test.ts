@@ -675,7 +675,7 @@ describe("useWorkflowStore", () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe("updateWorkflowAfterSave", () => {
-    it("should update workflow metadata without marking dirty", () => {
+    it("should update workflow metadata and preserve isDirty when no key is given", () => {
       useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
       useWorkflowStore.setState({ isDirty: true });
 
@@ -689,7 +689,54 @@ describe("useWorkflowStore", () => {
 
       const state = useWorkflowStore.getState();
       expect(state.workflow?.name).toBe("Saved Workflow");
-      expect(state.isDirty).toBe(false);
+      expect(state.isDirty).toBe(true);
+    });
+
+    it("should clear isDirty when nothing changed since the snapshot key", () => {
+      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useWorkflowStore.setState({ isDirty: true });
+      const key = useWorkflowStore.getState().getSaveKey();
+
+      useWorkflowStore
+        .getState()
+        .updateWorkflowAfterSave(
+          createMockWorkflow({ steps: [], transitions: [] }),
+          key
+        );
+
+      expect(useWorkflowStore.getState().isDirty).toBe(false);
+    });
+
+    it("should stay dirty when a node was edited while the save was in flight", () => {
+      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useWorkflowStore.setState({ isDirty: true });
+      const key = useWorkflowStore.getState().getSaveKey();
+
+      useWorkflowStore.getState().updateNodeName("test-uuid-1", "Renamed");
+      useWorkflowStore
+        .getState()
+        .updateWorkflowAfterSave(
+          createMockWorkflow({ steps: [], transitions: [] }),
+          key
+        );
+
+      expect(useWorkflowStore.getState().isDirty).toBe(true);
+    });
+
+    it("should treat selection-only changes as not an edit", () => {
+      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useWorkflowStore.setState({ isDirty: true });
+      const key = useWorkflowStore.getState().getSaveKey();
+
+      useWorkflowStore.getState().selectNode("test-uuid-1");
+      useWorkflowStore
+        .getState()
+        .updateWorkflowAfterSave(
+          createMockWorkflow({ steps: [], transitions: [] }),
+          key
+        );
+
+      expect(useWorkflowStore.getState().isDirty).toBe(false);
     });
 
     it("should preserve existing nodes/edges", () => {

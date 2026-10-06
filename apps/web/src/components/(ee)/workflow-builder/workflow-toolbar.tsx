@@ -24,13 +24,7 @@ import {
   Undo2,
 } from "lucide-react";
 import Link from "next/link";
-import {
-  useDeferredValue,
-  useEffect,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   disableWorkflow,
@@ -44,7 +38,10 @@ import { EnableReadinessDialog } from "./enable-readiness-dialog";
 import { getLayoutedNodes } from "./layout/auto-layout";
 import { UnsavedChangesGuard } from "./unsaved-changes-guard";
 import { useBeforeUnload } from "./use-before-unload";
+import { useLiveValidation } from "./use-live-validation";
 import {
+  redoWorkflowEdit,
+  undoWorkflowEdit,
   useCanRedo,
   useCanUndo,
   useIsDirty,
@@ -101,8 +98,8 @@ export function WorkflowToolbar({
   // Undo/redo state
   const canUndo = useCanUndo();
   const canRedo = useCanRedo();
-  const handleUndo = () => useWorkflowStore.temporal.getState().undo();
-  const handleRedo = () => useWorkflowStore.temporal.getState().redo();
+  const handleUndo = undoWorkflowEdit;
+  const handleRedo = redoWorkflowEdit;
 
   // Auto-layout
   const { fitView } = useReactFlow();
@@ -143,20 +140,7 @@ export function WorkflowToolbar({
   const [editedName, setEditedName] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // Run validation when workflow structure or config changes
-  // Use deferred nodes reference to batch rapid changes and reduce CPU usage during drag operations
-  // (Using nodes ref instead of isDirty boolean because isDirty stays true after first change,
-  // which would prevent re-validation on subsequent config changes)
-  const nodes = useWorkflowStore((state) => state.nodes);
-  const edges = useWorkflowStore((state) => state.edges);
-  const _deferredNodes = useDeferredValue(nodes);
-  const _deferredEdges = useDeferredValue(edges);
-  useEffect(() => {
-    // Only run validation if we have nodes (workflow is loaded)
-    if (nodeCount > 0) {
-      runValidation();
-    }
-  }, [runValidation, nodeCount]);
+  useLiveValidation();
 
   // Focus input when editing starts
   useEffect(() => {
@@ -198,6 +182,7 @@ export function WorkflowToolbar({
       setIsSaving(true);
       try {
         const definition = getWorkflowDefinition();
+        const savedKey = useWorkflowStore.getState().getSaveKey();
 
         // Extract trigger config from the trigger step (source of truth)
         const triggerStep = definition.steps.find((s) => s.type === "trigger");
@@ -229,7 +214,7 @@ export function WorkflowToolbar({
         if (result.success) {
           // Update workflow metadata without touching nodes/edges
           // This prevents React Flow from firing change events that would re-dirty the state
-          updateWorkflowAfterSave(result.workflow);
+          updateWorkflowAfterSave(result.workflow, savedKey);
           toast.success("Workflow saved");
         } else {
           toast.error(result.error);
@@ -248,8 +233,9 @@ export function WorkflowToolbar({
     // Run validation first
     const result = runValidation();
     if (!result.isValid) {
+      const issues = result.errors.filter((e) => e.severity === "error").length;
       toast.error(
-        `Cannot enable: ${errorCount} issue${errorCount > 1 ? "s" : ""} to fix`
+        `Cannot enable: ${issues} issue${issues === 1 ? "" : "s"} to fix`
       );
       return;
     }

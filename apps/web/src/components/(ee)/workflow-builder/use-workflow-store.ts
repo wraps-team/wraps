@@ -145,12 +145,14 @@ type WorkflowStoreState = {
     transitions: WorkflowTransition[];
     canvasViewport: CanvasViewport;
   };
+  // Serialized form of everything the toolbar Save sends; equal keys = nothing to save
+  getSaveKey: () => string;
 
   setIsSaving: (isSaving: boolean) => void;
   markClean: () => void;
 
   // Update workflow after save without touching nodes/edges (avoids re-triggering dirty state)
-  updateWorkflowAfterSave: (workflow: Workflow) => void;
+  updateWorkflowAfterSave: (workflow: Workflow, savedKey?: string) => void;
 
   // Validation
   runValidation: () => ValidationResult;
@@ -1238,6 +1240,17 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
         };
       },
 
+      getSaveKey: () => {
+        const state = get();
+        const { steps, transitions } = state.getWorkflowDefinition();
+        return JSON.stringify({
+          steps,
+          transitions,
+          name: state.workflow?.name ?? null,
+          description: state.workflow?.description ?? null,
+        });
+      },
+
       setIsSaving: (isSaving) => {
         set({ isSaving });
       },
@@ -1246,10 +1259,16 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
         set({ isDirty: false });
       },
 
-      updateWorkflowAfterSave: (workflow) => {
-        // Only update workflow metadata, don't touch nodes/edges
-        // This prevents React Flow from firing change events that would set isDirty=true
-        set({ workflow, isDirty: false });
+      updateWorkflowAfterSave: (workflow, savedKey) => {
+        // Only update workflow metadata, don't touch nodes/edges.
+        // savedKey given (canvas save): clear isDirty only if nothing was edited
+        // while the save was in flight. No key (status/settings saves): the
+        // canvas wasn't saved, so leave isDirty exactly as it is.
+        const isDirty =
+          savedKey === undefined
+            ? get().isDirty
+            : get().getSaveKey() !== savedKey;
+        set({ workflow, isDirty });
       },
 
       runValidation: () => {
@@ -1412,6 +1431,26 @@ export const useNodeValidation = (nodeId: string) => {
 // UNDO/REDO
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** Undo one canvas edit. The canvas no longer matches what was saved. */
+export function undoWorkflowEdit() {
+  const temporal = useWorkflowStore.temporal.getState();
+  if (temporal.pastStates.length === 0) {
+    return;
+  }
+  temporal.undo();
+  useWorkflowStore.setState({ isDirty: true });
+}
+
+/** Redo one canvas edit. The canvas no longer matches what was saved. */
+export function redoWorkflowEdit() {
+  const temporal = useWorkflowStore.temporal.getState();
+  if (temporal.futureStates.length === 0) {
+    return;
+  }
+  temporal.redo();
+  useWorkflowStore.setState({ isDirty: true });
+}
+
 /**
  * Handle undo/redo keyboard events.
  * Accepts a plain key descriptor (not DOM-specific) for testability.
@@ -1429,11 +1468,11 @@ export function handleUndoRedo(event: {
   }
 
   if (event.key === "z" && event.shiftKey) {
-    useWorkflowStore.temporal.getState().redo();
+    redoWorkflowEdit();
   } else if (event.key === "z") {
-    useWorkflowStore.temporal.getState().undo();
+    undoWorkflowEdit();
   } else if (event.key === "y") {
-    useWorkflowStore.temporal.getState().redo();
+    redoWorkflowEdit();
   }
 }
 

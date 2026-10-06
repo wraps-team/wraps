@@ -461,6 +461,63 @@ describe("undo/redo", () => {
       expect(useWorkflowStore.getState().nodes).toHaveLength(1);
     });
   });
+
+  describe("dirty state after undo/redo", () => {
+    it("undoWorkflowEdit marks dirty after a clean save", async () => {
+      const { undoWorkflowEdit } = await import("../use-workflow-store");
+
+      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useWorkflowStore.setState({ isDirty: false });
+
+      undoWorkflowEdit();
+
+      expect(useWorkflowStore.getState().isDirty).toBe(true);
+      expect(useWorkflowStore.getState().nodes).toHaveLength(0);
+    });
+
+    it("redoWorkflowEdit marks dirty and the dirty write adds no history entry", async () => {
+      const { undoWorkflowEdit, redoWorkflowEdit } = await import(
+        "../use-workflow-store"
+      );
+
+      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useWorkflowStore.setState({ isDirty: false });
+
+      undoWorkflowEdit();
+      expect(useWorkflowStore.temporal.getState().futureStates).toHaveLength(1);
+
+      useWorkflowStore.setState({ isDirty: false });
+      redoWorkflowEdit();
+
+      expect(useWorkflowStore.getState().nodes).toHaveLength(1);
+      expect(useWorkflowStore.getState().isDirty).toBe(true);
+      expect(useWorkflowStore.temporal.getState().futureStates).toHaveLength(0);
+    });
+
+    it("undoWorkflowEdit with empty history is a no-op", async () => {
+      const { undoWorkflowEdit } = await import("../use-workflow-store");
+
+      undoWorkflowEdit();
+
+      expect(useWorkflowStore.getState().isDirty).toBe(false);
+    });
+
+    it("Cmd+Z marks dirty after a clean save", async () => {
+      const { handleUndoRedo } = await import("../use-workflow-store");
+
+      useWorkflowStore.getState().addNode("trigger", { x: 0, y: 0 });
+      useWorkflowStore.setState({ isDirty: false });
+
+      handleUndoRedo({
+        key: "z",
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: false,
+      });
+
+      expect(useWorkflowStore.getState().isDirty).toBe(true);
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
