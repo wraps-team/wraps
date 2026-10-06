@@ -1,621 +1,223 @@
 # AGENTS.md - Wraps
 
-Wraps is a CLI, web dashboard, and TypeScript SDK that deploys production-ready email, SMS, and CDN infrastructure to a user's AWS account. Zero credentials stored. OIDC authentication. The user owns everything.
+Contributor briefing for this repo. `CLAUDE.md` is a symlink to this file; edit this one.
 
-## Prerequisites
+**Before writing or reviewing code**, read `CODING_STANDARDS.md`: error handling for
+external APIs and multi-step flows, banned dependencies, security patterns (SSRF,
+timing-safe compares, org scoping), logging, and the design-system lint.
 
-- Node.js 22+
-- AWS credentials configured (`aws configure` or environment variables)
-- A verified domain (for email)
+Using Wraps as a product (CLI flags, SDK calls, presets, pricing) is documented in
+`apps/website/public/llms-full.txt` and `wraps <command> --help`.
 
-## Install
+## Project Overview
+
+**Wraps** is a CLI tool, web platform, and TypeScript SDK that deploys communication infrastructure (email via AWS SES, SMS via AWS End User Messaging, CDN via S3+CloudFront) to users' AWS accounts with zero stored credentials, beautiful developer experience, and AWS pricing.
+
+**The Wraps Model**: Deploy infrastructure to the user's AWS account (not ours). Users own their infrastructure and data, pay AWS directly at transparent pricing, no vendor lock-in. We provide tooling, dashboard, and great DX.
+
+**TypeScript SDKs** (all under `@wraps.dev`): `@wraps.dev/email` (separate repo: `wraps-js`), `@wraps.dev/sms`
+
+## Architecture Overview
+
+Turborepo monorepo with pnpm 11 workspaces. Every package below except `packages/ai`,
+except `packages/analytics` and except `packages/observability` has its own CLAUDE.md with detailed context — read it
+before working in that package.
+
+**Apps**
+
+| Path | What it is |
+|---|---|
+| `apps/web` | Dashboard (Next.js App Router) — `app.wraps.dev` |
+| `apps/website` | Marketing site + docs — `wraps.dev` |
+| `apps/api` | Elysia API on AWS Lambda — `api.wraps.dev` |
+
+**Packages**
+
+| Path | What it is |
+|---|---|
+| `packages/ai` | `@wraps/ai` — AI SDK wiring for template generation and chat |
+| `packages/analytics` | `@wraps/analytics` — server-side PostHog client for `apps/web`, `apps/api` and `packages/auth` (not `apps/website`, which uses a separate key) |
+| `packages/observability` | `@wraps/observability` — provider-agnostic `ErrorReporter`, Lambda `createInstrumentHandler`, and `StructuredLogger` contract; zero runtime deps, SDKs injected by each app |
+| `packages/auth` | better-auth setup, SSO/SCIM, org + session handling |
+| `packages/cdk` | `@wraps.dev/cdk` — AWS CDK L3 construct for email infra (mirrors `pulumi`) |
+| `packages/cli` | `@wraps.dev/cli` — the `wraps` command |
+| `packages/console` | Local web console served by `wraps console` |
+| `packages/core` | Shared config types + `applyDefaults()` — the source of truth for both IaC packages |
+| `packages/db` | Drizzle schema, migrations, repositories |
+| `packages/email` | Internal email primitives |
+| `packages/email-check` | Deliverability auditing (DKIM/SPF/DMARC/blacklists) behind `wraps email check` |
+| `packages/email-send` | Send path shared by API and Lambda |
+| `packages/mail-audit` | Mailbox auditing |
+| `packages/pulumi` | Pulumi provider for email infra (mirrors `cdk`) |
+| `packages/template-render` | React Email → HTML rendering |
+| `packages/tui` | Terminal UI components for the CLI |
+| `packages/ui` | Shared React component library |
+| `packages/unsubscribe-token` | Signed unsubscribe token mint/verify |
+
+`packages/cdk` and `packages/pulumi` deploy the same infrastructure two ways and share
+types from `packages/core`. **Change a default in one, change it in both.**
+
+Multi-service CLI architecture: `wraps <service> <command>`. Services are `email`, `sms`,
+`cdn`, `auth`, `aws`, `platform`, `selfhost`, `workflow`, and `license`, plus global
+commands (`status`, `doctor`, `destroy`, `console`, `permissions`, `completion`, `telemetry`,
+`update`, `news`, `support`). The whole tree is dispatched from `packages/cli/src/cli.ts`.
+See `cli-commands` skill for the detailed reference.
+
+## Critical Design Principles
+
+1. **Non-Destructive**: Never modify existing AWS resources; Wraps always creates new ones
+2. **Namespace Everything**: All resources prefixed with `wraps-{service}-` (e.g., `wraps-email-`, `wraps-sms-`)
+3. **Fail Fast**: Validate early, deploy confidently
+4. **Destructive commands need the user**: run `wraps destroy`, `wraps <service> destroy`, or
+   any `--force` flag only after the user explicitly confirms
+
+## Environment Setup
+
+Prerequisites: Node.js 22+, pnpm 11+, AWS CLI configured. Standard scripts (`install`, `build`, `dev`, `test`, `check`, `fix`) are in the root `package.json`. The non-obvious ones:
 
 ```bash
-# Deploy infrastructure (no install needed)
-npx @wraps.dev/cli email init
-
-# Or install globally
-npm install -g @wraps.dev/cli
-
-# SDKs
-npm install @wraps.dev/email
-npm install @wraps.dev/sms
+pnpm sst:dev           # Run SST dev (API Lambda + linked resources)
+pnpm cli email status  # Run CLI (auto-points at local API/app)
+pnpm test:ee           # Run enterprise edition tests
+pnpm check:all         # Full CI check: lint -> typecheck -> baseline -> build -> test
 ```
 
-## CLI Commands
-
-### Email
-
-```
-wraps email init          Deploy email infrastructure (SES, Lambda, DynamoDB, EventBridge)
-  -p, --provider          Hosting provider (vercel, aws, railway, other)
-  -r, --region            AWS region
-  -d, --domain            Domain name
-  --preset                Config preset (starter, production, enterprise, custom)
-  -y, --yes               Skip confirmation
-  --preview               Preview changes without deploying
-
-wraps email connect       Connect to existing SES infrastructure
-  -r, --region            AWS region
-  --preview               Preview changes
-
-wraps email status        Show email infrastructure details
-  --account               AWS account ID
-  -r, --region            AWS region
-
-wraps email check [domain]  Check email deliverability
-  -q, --quick             Fewer checks (top blacklists, fewer DKIM selectors)
-  -j, --json              Output as JSON
-  --verbose               Show all checks including passing
-  --dkimSelector          Specific DKIM selector
-  --skipBlacklists        Skip blacklist checks
-  --skipTls               Skip MX TLS checks
-  --timeout               DNS timeout in ms
-
-wraps email verify        Verify domain DNS records
-  -d, --domain            Domain name (required)
-
-wraps email config        Apply CLI updates to infrastructure
-  -r, --region            AWS region
-  -y, --yes               Skip confirmation
-
-wraps email upgrade       Add features to existing deployment
-  -r, --region            AWS region
-  -y, --yes               Skip confirmation
-  --preview               Preview changes
-
-wraps email restore       Restore from saved metadata
-  -r, --region            AWS region
-  -f, --force             Force without confirmation
-  --preview               Preview changes
-
-wraps email destroy       Remove all email infrastructure
-  -f, --force             Force without confirmation
-  -r, --region            AWS region
-  --preview               Preview changes
-
-wraps email doctor        Diagnose email infrastructure problems
-  -r, --region            AWS region
-  --cleanup               Clean up orphaned resources
-  -j, --json              Output as JSON
-
-wraps email plan          Show or change the SES plan for an account
-  --account               AWS account ID
-  -r, --region            AWS region
-  --set                   Plan to switch to
-  --volume                Monthly email volume for the estimate
-  -y, --yes               Skip confirmation
-
-wraps email production-access   Show SES production-access / review status, or file the request
-  --account               AWS account ID
-  -r, --region            AWS region
-  --request               Submit the request (asks for confirmation; --yes to skip)
-  --website               Your website URL (required with --request)
-  --mail-type             transactional | marketing (required with --request)
-  --contact               Up to 4 extra contact emails, comma-separated
-
-wraps email logs list     List recent sends
-  --status                Filter by delivery status
-  --limit                 Page size
-  --cursor                Pagination cursor
-  -j, --json              Output as JSON
-
-wraps email logs get <message-id>   Show the event timeline for one message
-  -j, --json              Output as JSON
-```
-
-### Email Agents
-
-Agent mailboxes — alias-bound identities with an approval queue.
-
-```
-wraps email agent create  Create an agent mailbox
-  --name                  Agent name
-  -r, --region            AWS region
-
-wraps email agent list    List agent mailboxes
-wraps email agent kill    Revoke an agent mailbox
-```
-
-### Email Domains
-
-```
-wraps email domains add       Add a domain to SES
-  -d, --domain                Domain name (required)
-
-wraps email domains list      List all SES domains with status
-
-wraps email domains get-dkim  Get DKIM tokens for DNS configuration
-  -d, --domain                Domain name (required)
-
-wraps email domains verify    Verify DKIM, SPF, DMARC records
-  -d, --domain                Domain name (required)
-
-wraps email domains remove    Remove a domain from SES
-  -d, --domain                Domain name (required)
-  -f, --force                 Skip confirmation
-```
-
-### Email Inbound
-
-```
-wraps email inbound init      Enable inbound email receiving
-  -r, --region                AWS region
-  -d, --domain                Subdomain for inbound
-  -y, --yes                   Skip confirmation
-  --preview                   Preview changes
-
-wraps email inbound status    Show inbound email status
-  -r, --region                AWS region
-
-wraps email inbound verify    Verify inbound DNS records
-  -r, --region                AWS region
-
-wraps email inbound test      Send test email and verify receipt
-  -r, --region                AWS region
-
-wraps email inbound destroy   Remove inbound infrastructure
-  -r, --region                AWS region
-  -f, --force                 Force without confirmation
-```
-
-### SMS
-
-```
-wraps sms init            Deploy SMS infrastructure (AWS End User Messaging)
-  -p, --provider          Hosting provider
-  -r, --region            AWS region
-  --preset                Config preset (starter, production, enterprise, custom)
-  -y, --yes               Skip confirmation
-
-wraps sms status          Show SMS infrastructure details
-  --account               AWS account ID
-
-wraps sms test            Send a test SMS
-  --to                    Destination number (E.164 format)
-  --message               Message content
-
-wraps sms verify-number   Verify a destination phone number
-  --phoneNumber           Number to verify (E.164)
-  --code                  Verification code
-  --list                  List verified numbers
-  --delete                Delete a verified number
-  --resend                Resend verification code
-
-wraps sms upgrade         Upgrade SMS features
-  -r, --region            AWS region
-  -y, --yes               Skip confirmation
-
-wraps sms register        Register toll-free number
-  -r, --region            AWS region
-
-wraps sms sync            Sync infrastructure
-  -r, --region            AWS region
-  -y, --yes               Skip confirmation
-
-wraps sms destroy         Remove SMS infrastructure
-  -f, --force             Force without confirmation
-  --preview               Preview changes
-```
-
-### CDN
-
-```
-wraps cdn init            Deploy CDN infrastructure (S3 + CloudFront)
-  -p, --provider          Hosting provider
-  -r, --region            AWS region
-  -d, --domain            Custom CDN domain
-  --preview               Preview changes
-
-wraps cdn status          Show CDN infrastructure details
-  -r, --region            AWS region
-
-wraps cdn verify          Check DNS and certificate status
-  -r, --region            AWS region
-
-wraps cdn upgrade         Add custom domain after cert validation
-  -r, --region            AWS region
-  -y, --yes               Skip confirmation
-  --preview               Preview changes
-
-wraps cdn sync            Sync infrastructure with current config
-  -r, --region            AWS region
-
-wraps cdn destroy         Remove CDN infrastructure
-  -f, --force             Force without confirmation
-  -r, --region            AWS region
-  --preview               Preview changes
-```
-
-### AWS Setup
-
-```
-wraps aws setup           Interactive AWS credential setup wizard
-  -y, --yes               Skip confirmation
-
-wraps aws doctor          Diagnose AWS configuration issues
-```
-
-### Platform
-
-```
-wraps platform            Show platform info and pricing
-wraps platform connect    Connect to Wraps Platform (events + IAM)
-  -r, --region            AWS region
-  -f, --force             Force
-  -y, --yes               Skip confirmation
-
-wraps platform update-role  Update platform IAM permissions
-  -r, --region            AWS region
-  -f, --force             Force
-```
-
-### Auth
-
-```
-wraps auth login          Sign in to wraps.dev (device flow)
-wraps auth status         Show current auth state
-wraps auth logout         Sign out and remove the stored token
-```
-
-### Workflow
-
-```
-wraps workflow init       Scaffold a workflow definition file
-```
-
-### Selfhost
-
-```
-wraps selfhost login      Sign in to a self-hosted deployment
-wraps selfhost status     Show self-hosted deployment status
-wraps selfhost env        Manage self-hosted environment config
-wraps selfhost logs       Tail self-hosted logs
-wraps selfhost logout     Sign out of the self-hosted deployment
-```
-
-### License
-
-```
-wraps license generate    Generate an enterprise license key
-```
-
-### Global
-
-```
-wraps status              Show overview of all deployed services
-  --account               AWS account ID
-
-wraps destroy             Remove all deployed infrastructure
-  -f, --force             Force without confirmation
-  --preview               Preview changes
-
-wraps console             Start local web dashboard
-  --port                  Dashboard port
-  --noOpen                Don't open browser
-
-wraps permissions         Show required AWS IAM permissions
-  --json                  Output as JSON
-  --preset                Config preset
-  --service               Service type (email, sms, cdn)
-
-wraps update              Update the CLI to the latest version
-wraps completion          Generate shell completion script
-wraps telemetry           Manage telemetry (enable|disable|status)
-wraps news                Show recent updates
-wraps support             Get help and support info
-```
-
-## SDK: @wraps.dev/email
-
-### Send an email
-
-```typescript
-import { WrapsEmail } from '@wraps.dev/email';
-
-const email = new WrapsEmail({ region: 'us-east-1' });
-
-const result = await email.send({
-  from: 'hello@yourapp.com',
-  to: 'user@example.com',
-  subject: 'Welcome!',
-  html: '<h1>Hello from Wraps!</h1>',
-});
-
-console.log('Sent:', result.messageId);
-```
-
-### Send with React.email
-
-```typescript
-import { WrapsEmail } from '@wraps.dev/email';
-import { WelcomeEmail } from './emails/Welcome';
-
-const email = new WrapsEmail();
-
-await email.send({
-  from: 'hello@yourapp.com',
-  to: 'user@example.com',
-  subject: 'Welcome!',
-  react: <WelcomeEmail name="Alice" />,
-});
-```
-
-### Send with attachments
-
-```typescript
-await email.send({
-  from: 'hello@yourapp.com',
-  to: 'user@example.com',
-  subject: 'Your Invoice',
-  html: '<p>Invoice attached.</p>',
-  attachments: [
-    {
-      filename: 'invoice.pdf',
-      content: pdfBuffer, // Buffer or base64 string
-      contentType: 'application/pdf',
-    },
-  ],
-});
-```
-
-### Templates
-
-```typescript
-// Create
-await email.templates.create({
-  name: 'welcome',
-  subject: 'Welcome {{name}}!',
-  html: '<h1>Hello {{name}}</h1>',
-});
-
-// Send with template
-await email.sendTemplate({
-  from: 'hello@yourapp.com',
-  to: 'user@example.com',
-  template: 'welcome',
-  templateData: { name: 'Alice' },
-});
-
-// Bulk send (up to 50 recipients)
-await email.sendBulkTemplate({
-  from: 'hello@yourapp.com',
-  template: 'weekly-digest',
-  destinations: [
-    { to: 'alice@example.com', templateData: { name: 'Alice' } },
-    { to: 'bob@example.com', templateData: { name: 'Bob' } },
-  ],
-});
-
-// Other template operations
-await email.templates.get('welcome');
-await email.templates.list();
-await email.templates.update({ name: 'welcome', subject: 'New subject' });
-await email.templates.delete('welcome');
-```
-
-### Error handling
-
-```typescript
-import { WrapsEmailError, ValidationError, SESError } from '@wraps.dev/email';
-
-try {
-  await email.send({ /* ... */ });
-} catch (error) {
-  if (error instanceof ValidationError) {
-    console.error('Invalid input:', error.field, error.message);
-  } else if (error instanceof SESError) {
-    console.error('SES error:', error.code, error.retryable);
-  }
-}
-```
-
-## SDK: @wraps.dev/sms
-
-### Send an SMS
-
-```typescript
-import { WrapsSMS } from '@wraps.dev/sms';
-
-const sms = new WrapsSMS();
-
-const result = await sms.send({
-  to: '+14155551234',
-  message: 'Your verification code is 123456',
-});
-
-console.log('Sent:', result.messageId);
-```
-
-### Batch send
-
-```typescript
-const result = await sms.sendBatch({
-  messages: [
-    { to: '+14155551234', message: 'Hello Alice!' },
-    { to: '+14155555678', message: 'Hello Bob!' },
-  ],
-  messageType: 'TRANSACTIONAL',
-});
-```
-
-### Opt-out management
-
-```typescript
-await sms.optOuts.check('+14155551234');  // boolean
-await sms.optOuts.add('+14155551234');
-await sms.optOuts.remove('+14155551234');
-```
-
-### List phone numbers
-
-```typescript
-const numbers = await sms.numbers.list();
-```
-
-### Error handling
-
-```typescript
-import { SMSError, ValidationError, OptedOutError } from '@wraps.dev/sms';
-
-try {
-  await sms.send({ to: '+14155551234', message: 'Hello!' });
-} catch (error) {
-  if (error instanceof OptedOutError) {
-    console.log('User opted out:', error.phoneNumber);
-  } else if (error instanceof ValidationError) {
-    console.log('Invalid input:', error.field);
-  } else if (error instanceof SMSError) {
-    console.log('AWS error:', error.code, error.retryable);
-  }
-}
-```
-
-## Authentication Patterns
-
-All SDKs support the same authentication methods:
-
-### 1. Default credential chain (recommended)
-
-```typescript
-const email = new WrapsEmail();
-// Resolves: env vars -> ~/.aws/credentials -> IAM role
-```
-
-### 2. OIDC (Vercel, EKS, GitHub Actions)
-
-```typescript
-const email = new WrapsEmail({
-  roleArn: process.env.AWS_ROLE_ARN,
-});
-```
-
-### 3. Explicit credentials
-
-```typescript
-const email = new WrapsEmail({
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-  region: 'us-east-1',
-});
-```
-
-## Common Workflows
-
-### Deploy email and send first message
+### `pnpm check:all` needs a bootstrap in a fresh checkout
+
+`pnpm install` is **not** enough for `check:all` in a tree nobody has built in — a fresh
+clone, a CI runner, or an isolated git worktree. Its `typecheck:infra` step is a bare
+`tsc` over `sst.config.ts` and `infra/selfhost.config.ts`, and both files open with
+`/// <reference path="./.sst/platform/config.d.ts" />`. That file is *generated*, never
+built, so no amount of `turbo run build` produces it:
 
 ```bash
-# 1. Deploy infrastructure
-npx @wraps.dev/cli email init
-
-# 2. Add your domain
-npx @wraps.dev/cli email domains add -d yourapp.com
-
-# 3. Configure DNS records (DKIM, SPF, DMARC)
-npx @wraps.dev/cli email domains get-dkim -d yourapp.com
-# Add the CNAME records to your DNS provider
-
-# 4. Verify DNS propagation
-npx @wraps.dev/cli email domains verify -d yourapp.com
-
-# 5. Install SDK and send
-npm install @wraps.dev/email
+pnpm install
+node_modules/.bin/sst install                        # root .sst/platform
+cd infra && ../node_modules/.bin/sst install \        # infra/.sst
+  --config selfhost.config.ts --stage production
 ```
 
-```typescript
-import { WrapsEmail } from '@wraps.dev/email';
-const email = new WrapsEmail();
-await email.send({
-  from: 'hello@yourapp.com',
-  to: 'test@example.com',
-  subject: 'It works!',
-  html: '<h1>Hello from Wraps!</h1>',
-});
-```
+The `infra` form is the one CI uses (`.github/workflows/test.yml`, "SST config builds
+from zero"). Do not try to fix this by copying the directories in from another checkout:
+`.sst/platform` is ~460MB and `infra/.sst` ~1.3GB, and both are version-pinned, so a copy
+goes stale the moment a branch changes the SST version.
 
-### Deploy SMS and send first message
+Note that CI runs neither `check:all` nor `typecheck:infra`, so this gate is exercised
+only locally — which is why the gap stayed invisible until a fresh worktree hit it.
+`pnpm typecheck` itself is fine anywhere: turbo declares `typecheck: dependsOn ["^build"]`.
+
+### A worktree owns a Neon branch — reclaim it after teardown
+
+Every git worktree gets its own Neon test-database branch (`wt-<sanitized-name>`) so
+parallel test runs cannot collide on the shared fixtures. Deleting the worktree does
+**not** delete the branch:
 
 ```bash
-# 1. Deploy infrastructure
-npx @wraps.dev/cli sms init
-
-# 2. Verify a destination number (sandbox mode)
-npx @wraps.dev/cli sms verify-number --phoneNumber +14155551234
-
-# 3. Send a test
-npx @wraps.dev/cli sms test --to +14155551234 --message "Hello from Wraps!"
-
-# 4. Install SDK
-npm install @wraps.dev/sms
+node scripts/test-db/reap-branches.mjs        # delete wt-* branches whose worktree is gone
+node scripts/test-db/reap-branches.mjs --all  # also delete LIVE wt-* branches — use after
+                                              # new Drizzle migrations, to force every
+                                              # worktree onto fresh schema
 ```
 
-```typescript
-import { WrapsSMS } from '@wraps.dev/sms';
-const sms = new WrapsSMS();
-await sms.send({ to: '+14155551234', message: 'Hello!' });
-```
+**Run it after removing the worktree, never before.** The reaper identifies orphans by
+the absence of the checkout, so reaping first finds nothing and leaves the branch live
+indefinitely.
 
-### Run a deliverability audit
+### After a migration lands, refresh the test branches — two steps, not one
+
+An **existing** `wt-*` branch is reused verbatim forever: `resolve-branch.mjs` cuts a
+branch from the shared test DB only when one does not already exist, and never re-cuts
+or migrates it afterwards. So a schema change reaches your tests only if you both
+update the parent *and* drop the stale child:
 
 ```bash
-npx @wraps.dev/cli email check yourapp.com
-# Checks: DKIM, SPF, DMARC, MX TLS, blacklists, DNS propagation
+pnpm test-db:refresh   # = db:push:test (updates the shared parent)
+                       #   + reap-branches.mjs --self (drops THIS checkout's
+                       #     branch so it re-cuts from that parent next run)
 ```
 
-### Connect existing SES and upgrade
+`--self` is the concurrency-safe form of `--all`: it deletes only the current
+checkout's branch, so it cannot pull the database out from under another agent's
+worktree mid-run. Use `--all` only when you deliberately want every checkout refreshed.
+
+**`db:push` and `db:push:test` alone do not do this.** `db:push` targets the dev DB in
+`.env.local`; `db:push:test` targets the raw `DATABASE_URL` in `.env.test` — the shared
+*parent*. Neither is the database your tests read, because every vitest config rewrites
+`DATABASE_URL` through `resolveTestDatabaseUrl` to the per-checkout branch. Running
+either and seeing tests still fail `42703` is this gap, not a broken push.
+
+`pnpm dev` serves every app through `portless` (a global CLI) on HTTPS hostnames, not
+ports. Use these when checking local work in a browser — `localhost:3000` will not be listening:
+
+| App | Local dev URL | Production |
+|---|---|---|
+| Dashboard (`apps/web`) | `https://web.wraps.localhost` | `https://app.wraps.dev` |
+| Marketing site (`apps/website`) | `https://website.wraps.localhost` | `https://wraps.dev` |
+| API (`apps/api`) | `https://api.wraps.localhost` | `https://api.wraps.dev` |
+
+`pnpm cli` uses the CLI's own defaults (`http://localhost:3001` / `:3000`); use `pnpm cli:dev`
+to point the CLI at the portless URLs above.
+
+## CI and the production deploy
+
+`deploy-api.yml` does **not** trigger on `push`. It triggers on the Test workflow
+*completing* for a commit on main, and deploys only if that run's conclusion is `success`:
+
+```yaml
+on:
+  workflow_run:
+    workflows: [Test]
+    types: [completed]
+    branches: [main]
+```
+
+It used to call `test.yml` as a reusable workflow. Do not go back to that. `test.yml`
+carries a workflow-level `concurrency` group for the single shared Neon test database, so
+the called copy and the standalone push-triggered run competed for one slot: on `92413fa3`
+the called copy lost, all twelve jobs were cancelled, and `deploy` was skipped — a
+production deploy that silently did not happen, on a run whose conclusion read `cancelled`
+rather than `failure`. `baseline/deploy-api-workflow.test.ts` fails if `deploy-api.yml`
+calls `test.yml` again.
+
+Two consequences before editing either file:
+
+- **`workflow_run` has no `paths:` filter**, so the deploy's path list lives in the `gate`
+  job, which diffs against *the last commit this workflow actually deployed* — not `HEAD^`.
+  A `HEAD^` comparison strands changes whenever a deploy is cancelled, fails, or a push
+  carries several commits. Keep the list in sync with `pnpm --filter "@wraps/api^..." list`.
+- **The deploy checks out the tested SHA** (`needs.gate.outputs.sha`), not the branch tip.
+  Under `workflow_run` the default checkout is main's head at trigger time, which may
+  already be a newer, untested commit.
+
+### A red `test-api`/`test-web` is usually contention, not code
+
+Every DB-backed CI job shares one Neon branch — `TEST_DATABASE_URL` is a single secret, and
+`resolve-branch.mjs` only isolates worktrees, never CI. `test.yml`'s concurrency group
+serialises runs **per ref**, so two pushes to main queue behind each other, but two
+different PRs still run at once and collide.
+
+The signature: `test-api` and `test-web` fail while every other job passes, and the
+failures sit in `*-db.test.ts` files — rows coming back `undefined`, FK `23503`, duplicate
+keys, PATCH routes returning 500. Check for overlapping runs before reading the diff:
 
 ```bash
-# 1. Connect existing SES setup
-npx @wraps.dev/cli email connect
-
-# 2. Add tracking, history, or dedicated IP
-npx @wraps.dev/cli email upgrade
+gh run list --workflow=test.yml --limit 5 --json headBranch,startedAt,conclusion
 ```
 
-## Boundaries
+On 2026-09-09 four runs started within 135 seconds and all four failed; the next run, with
+the database to itself, passed on unchanged code.
 
-Agents should **never**:
+## Design Context
 
-- Modify existing AWS resources (Wraps is non-destructive, always creates new resources with `wraps-` prefix)
-- Store or log AWS credentials
-- Skip DNS verification steps
-- Run `wraps destroy` or `wraps email destroy` without explicit user confirmation
-- Assume a domain is verified without checking (`wraps email domains verify`)
-- Use `--force` on destructive commands without user approval
+Target users, brand personality, aesthetic direction, design principles, accessibility bar,
+and the design system inventory live in the `design-context` skill. Read it before any UI,
+visual, or marketing-copy work in `apps/web` or `apps/website`.
 
-## Configuration Presets
-
-### Email
-| Preset | Monthly Cost | Features |
-|--------|-------------|----------|
-| starter | ~$0.05 | Open/click tracking, bounce suppression |
-| production | ~$2-5 | + Event tracking, 90-day history, reputation metrics |
-| enterprise | ~$50-100 | + Dedicated IP, 1-year history, all event types |
-
-### SMS
-| Preset | Monthly Cost | Features |
-|--------|-------------|----------|
-| starter | ~$1 | Simulator phone number |
-| production | ~$2-10 | Toll-free number, event tracking |
-| enterprise | ~$10-50 | Full features, link tracking |
-
-Email sending: ~$0.10 per 1,000 emails a la carte, or ~$0.16 on AWS's default
-Essentials plan (AWS SES pricing). SES no longer has a perpetual free tier.
-SMS sending: ~$0.00849/segment + carrier fees (AWS pricing).
-
-## Links
-
-- Website: https://wraps.dev
-- Quickstart: https://wraps.dev/docs/quickstart/email
-- SDK Reference: https://wraps.dev/docs/sdk-reference
-- SMS SDK Reference: https://wraps.dev/docs/sms-sdk-reference
-- CLI Reference: https://wraps.dev/cli
-- GitHub SDK: https://github.com/wraps-team/wraps-js
-- npm (email): https://npmjs.com/package/@wraps.dev/email
-- npm (sms): https://npmjs.com/package/@wraps.dev/sms
-- npm (cli): https://npmjs.com/package/@wraps.dev/cli
+<!-- NEXT-AGENTS-MD-START -->
+Next.js docs live in `./.next-docs` (gitignored, generated). STOP — what you remember
+about Next.js is WRONG for this project; search and read those docs before any Next.js task.
+If the directory is missing: `npx @next/codemod agents-md --output AGENTS.md`
+<!-- NEXT-AGENTS-MD-END -->
 
 <!-- polylane:start -->
 ## Investigating production with Polylane

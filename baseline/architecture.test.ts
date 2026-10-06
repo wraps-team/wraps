@@ -1753,6 +1753,8 @@ describe("file-presence guardrails (baseline.toml's file-presence rules don't lo
   test("required project files exist", () => {
     const required = [
       "CLAUDE.md",
+      "AGENTS.md",
+      "CODING_STANDARDS.md",
       "baseline.toml",
       "turbo.json",
       "biome.jsonc",
@@ -2041,8 +2043,9 @@ describe("clickable table rows are reachable by keyboard", () => {
 // ─────────────────────────────────────────────────────────
 // Agent briefing files stay true to the repo
 //
-// CLAUDE.md and AGENTS.md are loaded before every agent task, and agents answer
-// from them without re-checking. Keeping them accurate competes with real work
+// AGENTS.md (CLAUDE.md is a symlink to it) is loaded before every agent task, and
+// CODING_STANDARDS.md before any code is written; agents answer from them without
+// re-checking. Keeping them accurate competes with real work
 // and quietly loses — packages/cdk sat unmentioned for seven months. These tests
 // make the drift fail CI instead of surfacing as a confidently wrong answer.
 // ─────────────────────────────────────────────────────────
@@ -2050,6 +2053,7 @@ describe("clickable table rows are reachable by keyboard", () => {
 describe("agent briefing files stay true", () => {
   const claudeMd = readFile("CLAUDE.md");
   const agentsMd = readFile("AGENTS.md");
+  const codingStandardsMd = readFile("CODING_STANDARDS.md");
   const rootPkg = JSON.parse(readFile("package.json"));
 
   function workspaceDirs(parent: string): string[] {
@@ -2111,6 +2115,7 @@ describe("agent briefing files stay true", () => {
     for (const [name, source] of [
       ["CLAUDE.md", claudeMd],
       ["AGENTS.md", agentsMd],
+      ["CODING_STANDARDS.md", codingStandardsMd],
     ] as const) {
       for (const claimed of source.matchAll(/Node\.js (\d+)\+/g)) {
         if (claimed[1] !== nodeMajor) {
@@ -2131,16 +2136,19 @@ describe("agent briefing files stay true", () => {
     expect(violations, violations.join("\n")).toEqual([]);
   });
 
-  test("every pnpm script CLAUDE.md tells agents to run exists", () => {
+  test("every pnpm script the briefings tell agents to run exists", () => {
     const scripts = new Set(Object.keys(rootPkg.scripts ?? {}));
-    const missing = [...claudeMd.matchAll(/`?pnpm ([\w:]+)/g)]
+    const missing = [
+      ...claudeMd.matchAll(/`?pnpm ([\w:]+)/g),
+      ...codingStandardsMd.matchAll(/`?pnpm ([\w:]+)/g),
+    ]
       .map((m) => m[1])
       .filter((name) => !(scripts.has(name) || /^\d/.test(name)))
       .filter((name) => !["install", "dlx", "add", "exec"].includes(name));
 
     expect(
       [...new Set(missing)],
-      `CLAUDE.md tells agents to run these, but they are not scripts in the root package.json:\n${[...new Set(missing)].join("\n")}`
+      `CLAUDE.md or CODING_STANDARDS.md tells agents to run these, but they are not scripts in the root package.json:\n${[...new Set(missing)].join("\n")}`
     ).toEqual([]);
   });
 });
