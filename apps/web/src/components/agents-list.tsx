@@ -40,13 +40,13 @@ type AgentsListProps = {
   userRole: string;
 };
 
-function policySummary(agent: AgentWithMeta): string {
+export function policySummary(agent: AgentWithMeta): string {
   const { maxPerHour, maxPerDay, allowedRecipients, allowedRecipientDomains } =
     agent.policy;
   const allowlist = allowedRecipients.length + allowedRecipientDomains.length;
   const allowlistLabel =
     allowlist === 0
-      ? "any recipient"
+      ? "no allowlist, every send needs approval"
       : `${allowlist} allowlisted ${allowlist === 1 ? "target" : "targets"}`;
   return `${maxPerHour}/hr · ${maxPerDay}/day · ${allowlistLabel}`;
 }
