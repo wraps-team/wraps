@@ -1,7 +1,10 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { BatchSendWithMeta } from "@/lib/batch";
 import {
   mapBatchToCampaignData,
+  requiredPlanName,
   stripSelfReferencingPlaceholder,
 } from "../batch-form-utils";
 
@@ -189,5 +192,24 @@ describe("mapBatchToCampaignData", () => {
 
     expect(result.scheduleType).toBe("now");
     expect(result.scheduledDate).toBeUndefined();
+  });
+});
+
+describe("requiredPlanName", () => {
+  it.each(["topics", "segments", "campaigns"] as const)(
+    "%s unlocks on a current public plan",
+    (feature) => {
+      expect(requiredPlanName(feature)).toBe("Pro");
+    }
+  );
+});
+
+describe("batch-form lock labels", () => {
+  it("never names a retired plan", () => {
+    const src = readFileSync(
+      fileURLToPath(new URL("../batch-form.tsx", import.meta.url)),
+      "utf8"
+    );
+    expect(src).not.toMatch(/\b(Starter|Growth|Scale)\b/);
   });
 });

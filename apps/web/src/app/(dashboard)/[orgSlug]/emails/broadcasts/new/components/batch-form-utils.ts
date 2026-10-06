@@ -5,6 +5,12 @@ import type {
   ContentType,
   VariableMapping,
 } from "@/lib/batch";
+import { getRequiredPlan, PLANS, type PlanFeature } from "@/lib/plans";
+
+/** Display name of the cheapest public plan that unlocks `feature`. */
+export function requiredPlanName(feature: PlanFeature): string {
+  return PLANS[getRequiredPlan(feature) ?? "pro"].name;
+}
 
 export type ScheduleType = "now" | "later";
 

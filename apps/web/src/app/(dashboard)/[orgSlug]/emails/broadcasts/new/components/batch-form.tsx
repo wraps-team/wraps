@@ -105,6 +105,7 @@ import type {
 import { cn } from "@/lib/utils";
 import {
   type CampaignData,
+  requiredPlanName,
   type ScheduleType,
   stripSelfReferencingPlaceholder,
 } from "./batch-form-utils";
@@ -1674,7 +1675,7 @@ function AudienceStep({
                         className="text-primary hover:underline"
                         href={`/${orgSlug}/settings/billing`}
                       >
-                        Growth
+                        {requiredPlanName("topics")}
                       </Link>
                     </span>
                   )}
@@ -1726,7 +1727,7 @@ function AudienceStep({
                         className="text-primary hover:underline"
                         href={`/${orgSlug}/settings/billing`}
                       >
-                        Growth
+                        {requiredPlanName("segments")}
                       </Link>
                     </span>
                   )}
@@ -2486,14 +2487,14 @@ function SchedulingCard({
                   Schedule for later
                   {!schedulingEnabled && (
                     <span className="ml-2 text-muted-foreground text-xs">
-                      (Starter plan)
+                      ({requiredPlanName("campaigns")} plan)
                     </span>
                   )}
                 </label>
                 <p className="mt-1 text-muted-foreground text-xs">
                   {schedulingEnabled
                     ? "Choose a specific date and time to send"
-                    : "Upgrade to Starter to schedule broadcasts for later"}
+                    : `Upgrade to ${requiredPlanName("campaigns")} to schedule broadcasts for later`}
                 </p>
               </div>
               {data.scheduleType === "later" && (
