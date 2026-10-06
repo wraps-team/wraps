@@ -21,6 +21,7 @@ import { errors } from "../../../utils/shared/errors.js";
 import { isJsonMode, jsonSuccess } from "../../../utils/shared/json-output.js";
 import { loadLockfile, saveLockfile } from "../../../utils/shared/lockfile.js";
 import { DeploymentProgress } from "../../../utils/shared/output.js";
+import { resolvePushOrg } from "../../../utils/shared/push-org.js";
 
 type TemplatesPushOptions = {
   template?: string;
@@ -29,6 +30,7 @@ type TemplatesPushOptions = {
   yes?: boolean;
   json?: boolean;
   token?: string;
+  org?: string;
 };
 
 type CompiledTemplate = {
@@ -87,7 +89,32 @@ export async function templatesPush(options: TemplatesPushOptions) {
 
   // Fetch remote template slugs to detect deletions
   const target = await resolveApiTarget({ token: options.token });
-  const remoteTemplateSlugs = await fetchRemoteTemplateSlugs(target, progress);
+  const org = await resolvePushOrg({
+    target,
+    flagOrg: options.org,
+    configOrg: config.org,
+    yes: options.yes,
+  });
+  if (
+    org &&
+    lockfile.org &&
+    lockfile.org.toLowerCase() !== org.slug.toLowerCase()
+  ) {
+    // The lockfile's hashes and IDs belong to another org. Reusing them would
+    // report everything "unchanged" and push nothing to this one.
+    if (!isJsonMode()) {
+      clack.log.info(
+        `Last push went to "${lockfile.org}" — pushing everything to ${pc.cyan(org.slug)}.`
+      );
+    }
+    lockfile.templates = {};
+    lockfile.workflows = {};
+  }
+  const remoteTemplateSlugs = await fetchRemoteTemplateSlugs(
+    target,
+    progress,
+    org?.id
+  );
 
   // Compile templates
   const compiled: CompiledTemplate[] = [];
@@ -191,7 +218,7 @@ export async function templatesPush(options: TemplatesPushOptions) {
   // Push to API (target already resolved above)
   const apiResults =
     sesSucceeded.length > 0
-      ? await pushToAPI(sesSucceeded, target, progress, options.force)
+      ? await pushToAPI(sesSucceeded, target, progress, options.force, org?.id)
       : [];
 
   // Only update lockfile for templates that succeeded in at least one target.
@@ -212,7 +239,7 @@ export async function templatesPush(options: TemplatesPushOptions) {
     }
   }
   lockfile.lastSync = new Date().toISOString();
-  lockfile.org = config.org;
+  lockfile.org = org?.slug ?? config.org;
   await saveLockfile(wrapsDir, lockfile);
 
   // Output results
@@ -549,7 +576,8 @@ async function pushToSES(
 
 async function fetchRemoteTemplateSlugs(
   target: ApiTarget,
-  progress: DeploymentProgress
+  progress: DeploymentProgress,
+  orgId?: string
 ): Promise<Set<string> | null> {
   const { apiBase, token } = target;
   if (!(apiBase && token)) {
@@ -564,6 +592,7 @@ async function fetchRemoteTemplateSlugs(
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
+        ...(orgId ? { "X-Organization-Id": orgId } : {}),
       },
     });
 
@@ -599,7 +628,8 @@ async function pushToAPI(
   templates: CompiledTemplate[],
   target: ApiTarget,
   progress: DeploymentProgress,
-  force?: boolean
+  force?: boolean,
+  orgId?: string
 ): Promise<APIPushResult[]> {
   const check = checkApiTarget(target);
   if (!check.ok) {
@@ -621,6 +651,7 @@ async function pushToAPI(
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          ...(orgId ? { "X-Organization-Id": orgId } : {}),
         },
         body: JSON.stringify({
           templates: templates.map((t) => ({
@@ -702,6 +733,7 @@ async function pushToAPI(
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          ...(orgId ? { "X-Organization-Id": orgId } : {}),
         },
         body: JSON.stringify({
           slug: t.slug,

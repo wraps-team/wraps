@@ -45,6 +45,7 @@ import {
 } from "../../../utils/shared/json-output.js";
 import { loadLockfile, saveLockfile } from "../../../utils/shared/lockfile.js";
 import { DeploymentProgress } from "../../../utils/shared/output.js";
+import { resolvePushOrg } from "../../../utils/shared/push-org.js";
 
 type WorkflowsPushOptions = {
   workflow?: string;
@@ -54,6 +55,7 @@ type WorkflowsPushOptions = {
   yes?: boolean;
   json?: boolean;
   token?: string;
+  org?: string;
 };
 
 type TransformedWorkflowData = {
@@ -116,6 +118,29 @@ export async function workflowsPush(options: WorkflowsPushOptions) {
 
   // Load lockfile
   const lockfile = await loadLockfile(wrapsDir);
+
+  const target = await resolveApiTarget({ token: options.token });
+  const org = await resolvePushOrg({
+    target,
+    flagOrg: options.org,
+    configOrg: config.org,
+    yes: options.yes,
+  });
+  if (
+    org &&
+    lockfile.org &&
+    lockfile.org.toLowerCase() !== org.slug.toLowerCase()
+  ) {
+    // The lockfile's hashes and IDs belong to another org. Reusing them would
+    // report everything "unchanged" and push nothing to this one.
+    if (!isJsonMode()) {
+      clack.log.info(
+        `Last push went to "${lockfile.org}" — pushing everything to ${pc.cyan(org.slug)}.`
+      );
+    }
+    lockfile.templates = {};
+    lockfile.workflows = {};
+  }
 
   // Discover local templates for reference validation
   const templatesDir = join(wrapsDir, config.templatesDir || "./templates");
@@ -260,11 +285,16 @@ export async function workflowsPush(options: WorkflowsPushOptions) {
   }
 
   // Push to API
-  const target = await resolveApiTarget({ token: options.token });
-  const apiResults = await pushToAPI(toProcess, target, progress, {
-    force: options.force,
-    draft: options.draft,
-  });
+  const apiResults = await pushToAPI(
+    toProcess,
+    target,
+    progress,
+    {
+      force: options.force,
+      draft: options.draft,
+    },
+    org?.id
+  );
 
   // Only update lockfile for workflows that succeeded
   for (const w of toProcess) {
@@ -279,7 +309,7 @@ export async function workflowsPush(options: WorkflowsPushOptions) {
     }
   }
   lockfile.lastSync = new Date().toISOString();
-  lockfile.org = config.org;
+  lockfile.org = org?.slug ?? config.org;
   await saveLockfile(wrapsDir, lockfile);
 
   // Output results
@@ -355,7 +385,8 @@ async function pushToAPI(
   workflows: TransformedWorkflowData[],
   target: ApiTarget,
   progress: DeploymentProgress,
-  options: { force?: boolean; draft?: boolean }
+  options: { force?: boolean; draft?: boolean },
+  orgId?: string
 ): Promise<APIPushResult[]> {
   const check = checkApiTarget(target);
   if (!check.ok) {
@@ -377,6 +408,7 @@ async function pushToAPI(
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          ...(orgId ? { "X-Organization-Id": orgId } : {}),
         },
         body: JSON.stringify({
           workflows: workflows.map((w) => ({
@@ -466,6 +498,7 @@ async function pushToAPI(
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          ...(orgId ? { "X-Organization-Id": orgId } : {}),
         },
         body: JSON.stringify({
           slug: w.slug,

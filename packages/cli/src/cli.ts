@@ -418,6 +418,9 @@ function showHelp() {
   console.log(`  ${pc.dim("--account")}        AWS account ID or alias`);
   console.log(`  ${pc.dim("--preset")}         Configuration preset`);
   console.log(`  ${pc.dim("--token")}          API key or token for auth`);
+  console.log(
+    `  ${pc.dim("--org")}            Organization slug or ID (push, connect)`
+  );
   console.log(`  ${pc.dim("-y, --yes")}        Skip confirmation prompts`);
   console.log(`  ${pc.dim("-f, --force")}      Force destructive operations`);
   console.log(
@@ -1115,6 +1118,7 @@ async function run() {
                 yes: flags.yes,
                 json: flags.json,
                 token: flags.token,
+                org: flags.org,
               });
               break;
 
@@ -1166,6 +1170,7 @@ async function run() {
                 yes: flags.yes,
                 json: flags.json,
                 token: flags.token,
+                org: flags.org,
               });
               break;
 
@@ -1686,6 +1691,7 @@ async function run() {
           yes: flags.yes,
           json: flags.json,
           token: flags.token,
+          org: flags.org,
         });
         break;
 
