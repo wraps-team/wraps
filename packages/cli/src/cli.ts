@@ -926,11 +926,11 @@ async function run() {
               await agentPolicy({
                 // baseline:allow-no-region — API-backed like agentList/agentKill, not direct AWS
                 name: sub[3] || flags.name,
-                maxPerHour: flags["max-per-hour"],
-                maxPerDay: flags["max-per-day"],
-                allowRecipient: flags["allow-recipient"],
-                allowDomain: flags["allow-domain"],
-                clearAllowlist: flags["clear-allowlist"] === true,
+                maxPerHour: flags.maxPerHour,
+                maxPerDay: flags.maxPerDay,
+                allowRecipient: flags.allowRecipient,
+                allowDomain: flags.allowDomain,
+                clearAllowlist: flags.clearAllowlist === true,
                 token: flags.token,
                 json: flags.json,
               });

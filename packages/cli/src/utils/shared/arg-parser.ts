@@ -57,6 +57,15 @@ export type CliFlags = {
   // Inbound
   subdomain?: string;
   root?: boolean;
+  all?: boolean;
+
+  // Email agent
+  name?: string;
+  maxPerHour?: string;
+  maxPerDay?: string;
+  allowRecipient?: string[];
+  allowDomain?: string[];
+  clearAllowlist?: boolean;
 
   // Doctor
   cleanup?: boolean;
@@ -142,6 +151,9 @@ export type ParsedCli = {
  * instead of coercing to numbers).
  */
 const STRING_FLAGS = [
+  "name",
+  "max-per-hour",
+  "max-per-day",
   "provider",
   "region",
   "domain",
@@ -192,6 +204,8 @@ const STRING_FLAGS = [
  * root cause of wraps-team/wraps#100 under `args` v5.
  */
 const BOOLEAN_FLAGS = [
+  "clear-allowlist",
+  "all",
   "yes",
   "force",
   "preview",
@@ -251,6 +265,25 @@ const NEGATED_BOOLEANS: Array<{ positive: string; camelKey: keyof CliFlags }> =
   ];
 
 /**
+ * Convert a kebab-cased option name to camelCase.
+ */
+const toCamel = (name: string): string =>
+  name.replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase());
+
+/**
+ * Repeatable string flags. mri returns a string for one occurrence and an
+ * array for several; both surface as string[] so handlers never branch on
+ * the shape.
+ */
+const LIST_FLAGS = ["allow-recipient", "allow-domain"] as const;
+
+/** Every camelCase key parseCliArgs can put on `flags`. */
+export const KNOWN_FLAG_KEYS: ReadonlySet<string> = new Set([
+  ...[...STRING_FLAGS, ...LIST_FLAGS, ...BOOLEAN_FLAGS].map(toCamel),
+  ...NEGATED_BOOLEANS.map((n) => n.camelKey),
+]);
+
+/**
  * Short-form aliases. mri populates both sides when either is set.
  */
 const ALIAS: Record<string, string> = {
@@ -289,12 +322,6 @@ export function resolveNegatableFlag(
 }
 
 /**
- * Convert a kebab-cased option name to camelCase.
- */
-const toCamel = (name: string): string =>
-  name.replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase());
-
-/**
  * Parse `process.argv` (including the leading `node` + script entries) into a
  * legacy-compatible `{ flags, sub }` shape.
  *
@@ -313,7 +340,7 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 
   const parsed = mri<Record<string, unknown>>(userArgs, {
     boolean: [...BOOLEAN_FLAGS, ...NEGATED_BOOLEANS.map((n) => n.positive)],
-    string: [...STRING_FLAGS],
+    string: [...STRING_FLAGS, ...LIST_FLAGS],
     alias: ALIAS,
   });
 
@@ -323,6 +350,16 @@ export function parseCliArgs(argv: string[]): ParsedCli {
     const value = parsed[key];
     if (typeof value === "string" && value.length > 0) {
       (flags as Record<string, unknown>)[toCamel(key)] = value;
+    }
+  }
+
+  for (const key of LIST_FLAGS) {
+    const raw = parsed[key];
+    const values = (Array.isArray(raw) ? raw : [raw]).filter(
+      (v): v is string => typeof v === "string" && v.length > 0
+    );
+    if (values.length > 0) {
+      (flags as Record<string, unknown>)[toCamel(key)] = values;
     }
   }
 
