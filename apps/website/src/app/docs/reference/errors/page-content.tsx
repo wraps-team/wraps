@@ -83,8 +83,8 @@ type ErrorSection = { id: string; title: string; rows: ErrorRow[] };
 
 // Source of truth: the second argument to every `new WrapsError(...)` call
 // across packages/cli/src, plus the UNKNOWN_ERROR JSON-mode fallback in
-// handleCLIError (errors.ts:364). Re-extract with the CLI source if this
-// page ever drifts — see apps/website/src/__tests__/cli-error-codes.test.ts.
+// handleCLIError (errors.ts:375). Re-extract with the CLI source if this
+// page ever drifts — see baseline/cli-error-code-docs-parity.test.ts.
 const CLI_ERROR_SECTIONS: ErrorSection[] = [
   {
     id: "credentials-session",

@@ -11,7 +11,7 @@ const AWS_DOCS_PREFIX = "https://docs.aws.amazon.com/";
 
 /**
  * Every code passed as the second argument to `new WrapsError(...)` anywhere
- * in packages/cli/src. Same extraction rule as cli-error-codes.test.ts — the
+ * in packages/cli/src. Same extraction rule as baseline/cli-error-code-docs-parity.test.ts — the
  * point here is the reverse direction: the SES pages may only claim a code the
  * CLI actually raises, so their remediation text stays traceable to the
  * catalog it was adapted from instead of drifting into invention.

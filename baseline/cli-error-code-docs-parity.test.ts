@@ -33,6 +33,18 @@ const DOCS_PAGE = "apps/website/src/app/docs/reference/errors/page-content.tsx";
 // correctly absent from the thrown set.
 const DOCUMENTED_BUT_NOT_THROWN = new Set(["UNKNOWN_ERROR"]);
 
+// Codes the docs page once invented: it documented 22 codes the CLI never
+// emitted until it was rewritten from CLI source (4d9c8f83). These five are
+// named so those specific inventions cannot come back. Moved here from the
+// website's error-code test when the two were merged (plan 348).
+const FICTIONAL_CODES = [
+  "CREDENTIALS_NOT_FOUND",
+  "MISSING_PERMISSIONS",
+  "STACK_NOT_FOUND",
+  "DOMAIN_NOT_VERIFIED",
+  "SES_SANDBOX",
+];
+
 const WRAPS_ERROR_MARKER = "new WrapsError(";
 // The code is always the second constructor argument: a lone, double-quoted
 // UPPER_SNAKE literal sitting alone on its own line, even when the message
@@ -179,6 +191,31 @@ describe("CLI error codes stay in sync with the website error reference", () => 
     expect(
       orphaned,
       `these codes are documented in ${DOCS_PAGE} but are never constructed via \`new WrapsError(\` in packages/cli/src: ${orphaned.join(", ")} — either the docs row is stale (the code was renamed or removed) and should go, or it belongs in DOCUMENTED_BUT_NOT_THROWN with a comment explaining why it is never thrown`
+    ).toEqual([]);
+  });
+
+  it("documents every DOCUMENTED_BUT_NOT_THROWN code", () => {
+    const missing = [...DOCUMENTED_BUT_NOT_THROWN].filter(
+      (code) => !documentedCodes.has(code)
+    );
+
+    expect(
+      missing,
+      `these codes are emitted outside \`new WrapsError(\` (so no extractor finds them) and must still have a \`code: "..."\` row in ${DOCS_PAGE}: ${missing.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("never re-documents the fictional codes the page once invented", () => {
+    const source = read(DOCS_PAGE);
+    // Word-boundary match, not .includes(): a longer code must not mask a
+    // shorter one (b6033316).
+    const reintroduced = FICTIONAL_CODES.filter((code) =>
+      new RegExp(`\\b${code}\\b`).test(source)
+    );
+
+    expect(
+      reintroduced,
+      `${DOCS_PAGE} documents codes the CLI has never emitted and that were deliberately removed in 4d9c8f83: ${reintroduced.join(", ")} — delete those rows`
     ).toEqual([]);
   });
 });
