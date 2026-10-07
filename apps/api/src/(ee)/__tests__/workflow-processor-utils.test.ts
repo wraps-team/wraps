@@ -16,6 +16,7 @@ import {
   sanitizeEmailSubject,
   substituteVariables,
 } from "../workers/workflow-processor";
+import { isRetryableStep } from "../workers/workflow-utils";
 
 // =============================================================================
 // evaluateCondition
@@ -448,5 +449,29 @@ describe("substituteVariables", () => {
       } as unknown as Record<string, string>);
       expect(result).toBe("Active: true");
     });
+  });
+});
+
+// =============================================================================
+// isRetryableStep
+// =============================================================================
+
+describe("isRetryableStep", () => {
+  const snapshot = { steps: [{ id: "step-a" }, { id: "step-b" }] };
+
+  it("allows retry for pre-snapshot executions (null snapshot)", () => {
+    expect(isRetryableStep(null, "unknown")).toBe(true);
+  });
+
+  it("allows retry when the step is in the snapshot", () => {
+    expect(isRetryableStep(snapshot, "step-b")).toBe(true);
+  });
+
+  it("refuses retry when the step is absent from the snapshot", () => {
+    expect(isRetryableStep(snapshot, "step-z")).toBe(false);
+  });
+
+  it("refuses retry for the reaper's 'unknown' placeholder", () => {
+    expect(isRetryableStep(snapshot, "unknown")).toBe(false);
   });
 });

@@ -26,6 +26,7 @@ import {
   type WorkflowJob,
 } from "../../services/workflow-queue";
 import { cancelWorkflowExecution } from "../services/workflow-cancel";
+import { isRetryableStep } from "../workers/workflow-utils";
 
 // Common response schemas
 const _errorResponse = t.Object({
@@ -433,6 +434,18 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
 
       if (!exec.errorStepId) {
         return { success: false, error: "No error step to retry from" };
+      }
+
+      if (
+        !isRetryableStep(
+          exec.definitionSnapshot as { steps: { id: string }[] } | null,
+          exec.errorStepId
+        )
+      ) {
+        return {
+          success: false,
+          error: `Step ${exec.errorStepId} is not part of this execution's workflow definition, so it cannot be retried`,
+        };
       }
 
       if ((exec.retryCount ?? 0) >= MAX_WORKFLOW_RETRIES) {

@@ -101,6 +101,7 @@ describe("workflow reaper (real DB) — SQL time-filter", () => {
       executionRow(fx.ids, {
         id: execId,
         status: "paused",
+        currentStepId: "step-delay",
         nextStepScheduledAt: STUCK_PAUSED_AT(),
       })
     );
@@ -110,12 +111,33 @@ describe("workflow reaper (real DB) — SQL time-filter", () => {
     const exec = await readExecution(execId);
     expect(exec.status).toBe("failed");
     expect(exec.error).toBe("execution stuck: paused step not delivered");
-    expect(exec.errorStepId).toBe("unknown");
+    expect(exec.errorStepId).toBe("step-delay"); // carried from currentStepId
     expect(exec.completedAt).not.toBeNull();
 
     const counters = await readWorkflowCounters();
     expect(counters.active).toBe(0); // decremented from 1
     expect(counters.failed).toBe(1); // incremented
+  });
+
+  // The reaper only knows the step if the row recorded one; "unknown" is the
+  // fallback for rows with no currentStepId.
+  it("falls back to errorStepId 'unknown' when currentStepId is null", async () => {
+    await seedWorkflow();
+    const execId = `${fx.ids.org}-exec-nostep`;
+    await db.insert(workflowExecution).values(
+      executionRow(fx.ids, {
+        id: execId,
+        status: "paused",
+        currentStepId: null,
+        nextStepScheduledAt: STUCK_PAUSED_AT(),
+      })
+    );
+
+    await runReaper(db);
+
+    const exec = await readExecution(execId);
+    expect(exec.status).toBe("failed");
+    expect(exec.errorStepId).toBe("unknown");
   });
 
   // Unit 14 — fresh paused execution is NOT reaped (SQL filter excludes it).
@@ -151,6 +173,7 @@ describe("workflow reaper (real DB) — SQL time-filter", () => {
       executionRow(fx.ids, {
         id: expiredId,
         status: "waiting",
+        currentStepId: "step-wait",
         waitTimeoutAt: EXPIRED_WAITING_AT(),
       }),
       executionRow(fx.ids, {
@@ -165,7 +188,7 @@ describe("workflow reaper (real DB) — SQL time-filter", () => {
     const expired = await readExecution(expiredId);
     expect(expired.status).toBe("failed");
     expect(expired.error).toBe("execution stuck: waiting timeout expired");
-    expect(expired.errorStepId).toBe("unknown");
+    expect(expired.errorStepId).toBe("step-wait");
 
     const fresh = await readExecution(freshId);
     expect(fresh.status).toBe("waiting"); // untouched

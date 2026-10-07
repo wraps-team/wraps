@@ -35,6 +35,7 @@ import {
   enqueueWorkflowStepBatch,
   type WorkflowJob,
 } from "../../services/workflow-queue";
+import { notifyWorkflowExecutionFailed } from "../services/workflow-failure-notification";
 import { createNextWorkflowSchedule } from "../services/workflow-scheduler";
 
 import {
@@ -1074,8 +1075,8 @@ export async function failExecution(
   error: string,
   stepId: string,
   organizationId: string
-): Promise<void> {
-  await db.transaction(async (tx) => {
+): Promise<{ workflowId: string } | null> {
+  const failed = await db.transaction(async (tx) => {
     const [execution] = await tx
       .update(workflowExecution)
       .set({
@@ -1107,12 +1108,23 @@ export async function failExecution(
             eq(workflow.organizationId, organizationId)
           )
         );
-    } else {
-      log.warn("failExecution: execution already in terminal state, skipping", {
-        executionId,
-      });
+      return { workflowId: execution.workflowId };
     }
+    log.warn("failExecution: execution already in terminal state, skipping", {
+      executionId,
+    });
+    return null;
   });
+
+  if (failed) {
+    await notifyWorkflowExecutionFailed({
+      organizationId,
+      workflowId: failed.workflowId,
+      executionId,
+      error,
+    });
+  }
+  return failed;
 }
 
 export {

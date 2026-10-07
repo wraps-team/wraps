@@ -25,6 +25,7 @@ import { and, desc, notInArray, sql } from "drizzle-orm";
 
 import { flushLogger, log } from "../../lib/logger";
 import type { WorkflowJob } from "../../services/workflow-queue";
+import { notifyWorkflowExecutionFailed } from "../services/workflow-failure-notification";
 import { createNextWorkflowSchedule } from "../services/workflow-scheduler";
 
 const TERMINAL_STATUSES = new Set(["completed", "cancelled", "failed"]);
@@ -123,6 +124,7 @@ async function handleTrigger(job: Extract<WorkflowJob, { type: "trigger" }>) {
     .select({
       id: workflowExecution.id,
       status: workflowExecution.status,
+      currentStepId: workflowExecution.currentStepId,
     })
     .from(workflowExecution)
     .where(
@@ -139,7 +141,7 @@ async function handleTrigger(job: Extract<WorkflowJob, { type: "trigger" }>) {
     await failExecution(
       executions[0].id,
       "Trigger failed after SQS retries exhausted",
-      "trigger",
+      executions[0].currentStepId ?? "trigger",
       job.organizationId
     );
     return;
@@ -222,7 +224,7 @@ async function failExecution(
   stepId: string,
   organizationId: string
 ): Promise<void> {
-  await db.transaction(async (tx) => {
+  const failed = await db.transaction(async (tx) => {
     const [execution] = await tx
       .update(workflowExecution)
       .set({
@@ -265,8 +267,18 @@ async function failExecution(
         error,
         stepId,
       });
-    } else {
-      log.warn("DLQ: failExecution returned no rows", { executionId });
+      return { workflowId: execution.workflowId };
     }
+    log.warn("DLQ: failExecution returned no rows", { executionId });
+    return null;
   });
+
+  if (failed) {
+    await notifyWorkflowExecutionFailed({
+      organizationId,
+      workflowId: failed.workflowId,
+      executionId,
+      error,
+    });
+  }
 }

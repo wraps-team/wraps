@@ -58,6 +58,7 @@ export async function runReaper(db: DrizzleDB): Promise<void> {
     .select({
       id: workflowExecution.id,
       organizationId: workflowExecution.organizationId,
+      currentStepId: workflowExecution.currentStepId,
       nextStepScheduledAt: workflowExecution.nextStepScheduledAt,
     })
     .from(workflowExecution)
@@ -92,12 +93,12 @@ export async function runReaper(db: DrizzleDB): Promise<void> {
     log.info("[workflow-reaper] Failing paused stuck executions", {
       count: pausedStuck.length,
     });
-    for (const { id, organizationId } of pausedStuck) {
+    for (const { id, organizationId, currentStepId } of pausedStuck) {
       try {
         await failExecution(
           id,
           "execution stuck: paused step not delivered",
-          "unknown",
+          currentStepId ?? "unknown",
           organizationId
         );
         log.info("[workflow-reaper] Failed paused stuck execution", {
@@ -131,6 +132,7 @@ export async function runReaper(db: DrizzleDB): Promise<void> {
     .select({
       id: workflowExecution.id,
       organizationId: workflowExecution.organizationId,
+      currentStepId: workflowExecution.currentStepId,
       waitTimeoutAt: workflowExecution.waitTimeoutAt,
     })
     .from(workflowExecution)
@@ -161,12 +163,12 @@ export async function runReaper(db: DrizzleDB): Promise<void> {
     log.info("[workflow-reaper] Failing waiting expired executions", {
       count: waitingExpired.length,
     });
-    for (const { id, organizationId } of waitingExpired) {
+    for (const { id, organizationId, currentStepId } of waitingExpired) {
       try {
         await failExecution(
           id,
           "execution stuck: waiting timeout expired",
-          "unknown",
+          currentStepId ?? "unknown",
           organizationId
         );
         log.info("[workflow-reaper] Failed waiting expired execution", {

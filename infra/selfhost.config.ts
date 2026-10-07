@@ -294,18 +294,21 @@ export default $config({
       });
     }
 
-    // Alarm: messages visible in the Batch DLQ
+    // Alarm: DLQ arrivals. This DLQ has a Lambda consumer that drains it in
+    // seconds, so the visible-count never reads >= 1. Every arrival is
+    // received by the consumer exactly once, so Sum(NumberOfMessagesReceived)
+    // counts them (NumberOfMessagesSent skips redrive-policy moves).
     new aws.cloudwatch.MetricAlarm("SelfhostBatchDlqAlarm", {
       name: $interpolate`wraps-selfhost-batch-dlq-${$app.stage}`,
       alarmDescription:
         "One or more batch jobs landed in the dead-letter queue",
       namespace: "AWS/SQS",
-      metricName: "ApproximateNumberOfMessagesVisible",
+      metricName: "NumberOfMessagesReceived",
       dimensions: {
         QueueName: batchDlq.nodes.queue.name,
       },
-      statistic: "Maximum",
-      period: 60,
+      statistic: "Sum",
+      period: 300,
       evaluationPeriods: 1,
       threshold: 1,
       comparisonOperator: "GreaterThanOrEqualToThreshold",
@@ -346,18 +349,21 @@ export default $config({
       },
     });
 
-    // Alarm: messages visible in the Workflow DLQ
+    // Alarm: DLQ arrivals. This DLQ has a Lambda consumer that drains it in
+    // seconds, so the visible-count never reads >= 1. Every arrival is
+    // received by the consumer exactly once, so Sum(NumberOfMessagesReceived)
+    // counts them (NumberOfMessagesSent skips redrive-policy moves).
     new aws.cloudwatch.MetricAlarm("SelfhostWorkflowDlqAlarm", {
       name: $interpolate`wraps-selfhost-workflow-dlq-${$app.stage}`,
       alarmDescription:
         "One or more workflow jobs landed in the dead-letter queue",
       namespace: "AWS/SQS",
-      metricName: "ApproximateNumberOfMessagesVisible",
+      metricName: "NumberOfMessagesReceived",
       dimensions: {
         QueueName: workflowDlq.nodes.queue.name,
       },
-      statistic: "Maximum",
-      period: 60,
+      statistic: "Sum",
+      period: 300,
       evaluationPeriods: 1,
       threshold: 1,
       comparisonOperator: "GreaterThanOrEqualToThreshold",

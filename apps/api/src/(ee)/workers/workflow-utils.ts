@@ -13,6 +13,19 @@ import { Agent } from "undici";
 
 import { log } from "../../lib/logger";
 
+/** A failed execution can only be retried from a step its definition still has.
+ *  Pre-snapshot executions (snapshot null) fall back to the live definition in
+ *  processStep, so they are not judged here. */
+export function isRetryableStep(
+  snapshot: { steps: { id: string }[] } | null,
+  stepId: string
+): boolean {
+  if (!snapshot) {
+    return true;
+  }
+  return snapshot.steps.some((s) => s.id === stepId);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════

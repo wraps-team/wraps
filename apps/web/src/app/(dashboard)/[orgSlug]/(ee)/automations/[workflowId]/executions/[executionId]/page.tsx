@@ -42,6 +42,7 @@ function getExecutionStatusBadgeVariant(status: string): BadgeVariant {
 import { CancelButton } from "./components/cancel-button";
 import { RetryButton } from "./components/retry-button";
 import { StepTrace } from "./components/step-trace";
+import { canOfferRetry } from "./retry-eligibility";
 
 const CANCELLABLE_STATUSES = new Set([
   "pending",
@@ -61,12 +62,6 @@ function getErrorStepType(
     return;
   }
   return steps.find((s) => s.id === errorStepId)?.type;
-}
-
-// Offer Retry only for failed executions that haven't exhausted the ceiling —
-// past it the API rejects the retry, so showing the button would just dead-end.
-function canOfferRetry(status: string, retryCount: number | null): boolean {
-  return status === "failed" && (retryCount ?? 0) < MAX_WORKFLOW_RETRIES;
 }
 
 type ExecutionDetailPageProps = {
@@ -151,7 +146,13 @@ export default async function ExecutionDetailPage({
           </div>
           <p className="text-muted-foreground">{contactName}</p>
         </div>
-        {canOfferRetry(execution.status, execution.retryCount) && (
+        {canOfferRetry(
+          execution.status,
+          execution.retryCount,
+          execution.errorStepId,
+          snapshotSteps,
+          MAX_WORKFLOW_RETRIES
+        ) && (
           <RetryButton
             contactEmail={contactEmail}
             errorStepType={errorStepType}
