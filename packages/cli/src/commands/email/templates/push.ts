@@ -11,6 +11,10 @@ import {
   loadWrapsConfig,
   transformVariablesForSes,
 } from "../../../utils/email/template-compiler.js";
+import {
+  isTemplateUnchanged,
+  nextTemplateEntry,
+} from "../../../utils/email/template-push-state.js";
 import { renderTemplateWithProxy } from "../../../utils/email/template-render.js";
 import {
   type ApiTarget,
@@ -120,6 +124,7 @@ export async function templatesPush(options: TemplatesPushOptions) {
   const compiled: CompiledTemplate[] = [];
   const unchanged: string[] = [];
   const compileErrors: Array<{ slug: string; error: string }> = [];
+  const dashboardConfigured = checkApiTarget(target).ok;
 
   for (const file of templateFiles) {
     const slug = file.replace(/\.tsx?$/, "");
@@ -130,11 +135,19 @@ export async function templatesPush(options: TemplatesPushOptions) {
     // Check lockfile for change detection
     // --force bypasses both local change detection AND dashboard conflict detection
     // Also check if template exists remotely - if deleted from dashboard, re-push it
-    const localHashMatches = lockfile.templates[slug]?.localHash === sourceHash;
+    // When a dashboard is configured, a failed dashboard sync is retried (remoteHash mismatch)
     const existsRemotely =
       remoteTemplateSlugs === null || remoteTemplateSlugs.has(slug);
 
-    if (!options.force && localHashMatches && existsRemotely) {
+    if (
+      isTemplateUnchanged({
+        entry: lockfile.templates[slug],
+        sourceHash,
+        existsRemotely,
+        dashboardConfigured,
+        force: options.force === true,
+      })
+    ) {
       unchanged.push(slug);
       continue;
     }
@@ -224,18 +237,18 @@ export async function templatesPush(options: TemplatesPushOptions) {
   // Only update lockfile for templates that succeeded in at least one target.
   // SES-failed templates won't appear in apiResults (skipped above),
   // so both sesOk and apiOk will be false — lockfile stays unchanged.
+  // remoteHash and id only advance when the dashboard accepted the template.
   for (const t of compiled) {
-    const sesOk = sesResults.find((r) => r.slug === t.slug)?.success;
-    const apiResult = apiResults.find((r) => r.slug === t.slug);
-    const apiOk = apiResult?.success;
-    if (sesOk || apiOk) {
-      lockfile.templates[t.slug] = {
-        id: apiResult?.id,
-        localHash: t.sourceHash,
-        remoteHash: t.sourceHash,
-        sesTemplateName: t.sesTemplateName,
-        lastPushed: new Date().toISOString(),
-      };
+    const entry = nextTemplateEntry({
+      previous: lockfile.templates[t.slug],
+      sourceHash: t.sourceHash,
+      sesTemplateName: t.sesTemplateName,
+      sesOk: sesResults.find((r) => r.slug === t.slug)?.success === true,
+      apiResult: apiResults.find((r) => r.slug === t.slug),
+      now: new Date().toISOString(),
+    });
+    if (entry) {
+      lockfile.templates[t.slug] = entry;
     }
   }
   lockfile.lastSync = new Date().toISOString();
