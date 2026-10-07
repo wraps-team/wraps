@@ -493,6 +493,12 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
     title: "Inbound Email",
     rows: [
       {
+        code: "INVALID_FLAG_USAGE",
+        message: "--root and --subdomain cannot be used together",
+        solution:
+          "Also raised for an unexpected argument, such as a value after a flag that takes none (--root wraps.dev). Use --domain for the parent domain or --subdomain <label> for the label.",
+      },
+      {
         code: "INBOUND_REGION_NOT_SUPPORTED",
         message: "SES email receiving is not supported in <region>",
         solution: "Deploy in us-east-1, us-west-2, or eu-west-1",

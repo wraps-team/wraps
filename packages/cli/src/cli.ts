@@ -457,7 +457,7 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 const parsedCli = parseCliArgs(process.argv);
 // biome-ignore lint/suspicious/noExplicitAny: legacy-compat loose shape — see note above
 const flags: Record<string, any> = parsedCli.flags;
-const { sub } = parsedCli;
+const { sub, extraPositionals } = parsedCli;
 const [primaryCommand, subCommand] = sub;
 
 // Enable JSON output mode globally when --json flag is passed
@@ -671,6 +671,15 @@ async function run() {
   }
 
   try {
+    // Nothing reads positionals past index 3, so any here means the invocation
+    // was misunderstood (usually a value given to a valueless boolean flag).
+    if (extraPositionals.length > 0) {
+      throw errors.invalidFlagUsage(
+        `Unrecognized argument${extraPositionals.length > 1 ? "s" : ""}: ${extraPositionals.join(" ")}`,
+        "A boolean flag (such as --root or --json) takes no value, so a value after it is discarded. Check the flags before these arguments, or run the command with --help."
+      );
+    }
+
     // Handle service-specific subcommands (e.g., wraps email init)
     if (primaryCommand === "email" && subCommand) {
       switch (subCommand) {
@@ -826,6 +835,7 @@ async function run() {
                 yes: flags.yes,
                 preview: flags.preview,
                 json: flags.json,
+                unexpectedArg: sub[3],
               });
               break;
 
@@ -868,6 +878,7 @@ async function run() {
                 domain: flags.domain,
                 yes: flags.yes,
                 json: flags.json,
+                unexpectedArg: sub[3],
               });
               break;
 

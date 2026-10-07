@@ -347,26 +347,66 @@ describe("inboundAdd receiving domain resolution", () => {
     );
   });
 
-  // NOTE: characterization only — `root` silently overrides `subdomain` today.
-  // Plan 311 makes this combination an error. Update this test when it lands.
-  it("--root silently overrides --subdomain when both are passed", async () => {
+  it("errors when --root and --subdomain are both passed, before any AWS or DNS call", async () => {
     const { createInboundDNSRecordsForProvider } = await import(
       "../../../utils/dns/index.js"
     );
+    const { validateAWSCredentials } = await import(
+      "../../../utils/shared/aws.js"
+    );
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
 
-    await inboundAdd({
-      subdomain: "support",
-      root: true,
-      domain: "example.com",
-      yes: true,
+    await expect(
+      inboundAdd({
+        subdomain: "support",
+        root: true,
+        domain: "example.com",
+        yes: true,
+      })
+    ).rejects.toMatchObject({
+      name: "WrapsError",
+      code: "INVALID_FLAG_USAGE",
+      message: expect.stringContaining("cannot be used together"),
     });
 
-    expect(vi.mocked(createInboundDNSRecordsForProvider)).toHaveBeenCalledWith(
-      expect.anything(),
-      "example.com",
-      "us-east-1",
-      "example.com"
+    expect(vi.mocked(validateAWSCredentials)).not.toHaveBeenCalled();
+    expect(vi.mocked(loadConnectionMetadata)).not.toHaveBeenCalled();
+    expect(
+      vi.mocked(createInboundDNSRecordsForProvider)
+    ).not.toHaveBeenCalled();
+  });
+
+  it("errors on a stray argument (--root wraps.dev), before any AWS or DNS call", async () => {
+    const { createInboundDNSRecordsForProvider } = await import(
+      "../../../utils/dns/index.js"
     );
+    const { validateAWSCredentials } = await import(
+      "../../../utils/shared/aws.js"
+    );
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+
+    await expect(
+      inboundAdd({
+        root: true,
+        domain: "example.com",
+        yes: true,
+        unexpectedArg: "wraps.dev",
+      })
+    ).rejects.toMatchObject({
+      name: "WrapsError",
+      code: "INVALID_FLAG_USAGE",
+      message: "Unexpected argument: wraps.dev",
+    });
+
+    expect(vi.mocked(validateAWSCredentials)).not.toHaveBeenCalled();
+    expect(vi.mocked(loadConnectionMetadata)).not.toHaveBeenCalled();
+    expect(
+      vi.mocked(createInboundDNSRecordsForProvider)
+    ).not.toHaveBeenCalled();
   });
 });
 
@@ -670,6 +710,64 @@ describe("inboundInit non-interactive guard", () => {
       name: "WrapsError",
       code: "NON_INTERACTIVE_INPUT",
     });
+  });
+
+  it("errors when --root and a subdomain are both passed, before any AWS call", async () => {
+    const { validateAWSCredentials } = await import(
+      "../../../utils/shared/aws.js"
+    );
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+
+    await expect(
+      inboundInit({ root: true, subdomain: "support", yes: true })
+    ).rejects.toMatchObject({
+      name: "WrapsError",
+      code: "INVALID_FLAG_USAGE",
+      message: expect.stringContaining("cannot be used together"),
+    });
+
+    expect(vi.mocked(validateAWSCredentials)).not.toHaveBeenCalled();
+    expect(vi.mocked(loadConnectionMetadata)).not.toHaveBeenCalled();
+  });
+
+  it("errors on a stray argument (--root wraps.dev), before any AWS call", async () => {
+    const { validateAWSCredentials } = await import(
+      "../../../utils/shared/aws.js"
+    );
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+
+    await expect(
+      inboundInit({ root: true, yes: true, unexpectedArg: "wraps.dev" })
+    ).rejects.toMatchObject({
+      name: "WrapsError",
+      code: "INVALID_FLAG_USAGE",
+      message: "Unexpected argument: wraps.dev",
+    });
+
+    expect(vi.mocked(validateAWSCredentials)).not.toHaveBeenCalled();
+    expect(vi.mocked(loadConnectionMetadata)).not.toHaveBeenCalled();
+  });
+
+  it("--root alone resolves the receiving domain to the parent domain", async () => {
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+    vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+
+    await inboundInit({ root: true, yes: true });
+
+    const { log } = await import("@clack/prompts");
+    const receiving = vi
+      .mocked(log.info)
+      .mock.calls.map(([msg]) => String(msg))
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: strip ANSI colour codes
+      .map((msg) => msg.replace(/\u001b\[[0-9;]*m/g, ""))
+      .filter((msg) => msg.startsWith("Receiving domain:"));
+    expect(receiving).toEqual(["Receiving domain: example.com"]);
   });
 
   it("resolves without prompting when --root --yes --json are all set", async () => {

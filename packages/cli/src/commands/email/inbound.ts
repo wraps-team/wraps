@@ -174,12 +174,34 @@ function reportInboundDNSCleanup(
   }
 }
 
+// Fail fast on flag misuse, before any AWS call.
+function assertValidInboundFlags(options: {
+  unexpectedArg?: string;
+  root?: boolean;
+  subdomain?: string;
+}): void {
+  if (options.unexpectedArg) {
+    throw errors.invalidFlagUsage(
+      `Unexpected argument: ${options.unexpectedArg}`,
+      `--root takes no value: "--root ${options.unexpectedArg}" (or "--root=${options.unexpectedArg}") sets --root and discards "${options.unexpectedArg}". To name the parent domain use --domain (inbound add); to pick the label use --subdomain <label> (inbound add) or --domain <label> (inbound init).`
+    );
+  }
+  if (options.root && options.subdomain) {
+    throw errors.invalidFlagUsage(
+      "--root and --subdomain cannot be used together",
+      "--root receives mail on the parent domain itself; --subdomain <label> receives mail on <label>.<parent>. Pick one."
+    );
+  }
+}
+
 /**
  * Inbound Init command - Deploy inbound email infrastructure
  */
 export async function inboundInit(
   options: EmailInboundInitOptions
 ): Promise<void> {
+  assertValidInboundFlags(options);
+
   if (!isJsonMode()) {
     clack.intro(
       pc.bold(
@@ -1388,6 +1410,8 @@ export async function inboundTest(
 export async function inboundAdd(
   options: EmailInboundAddOptions
 ): Promise<void> {
+  assertValidInboundFlags(options);
+
   if (!isJsonMode()) {
     clack.intro(pc.bold("Add Inbound Receiving Domain"));
   }

@@ -143,6 +143,12 @@ export type ParsedCli = {
    * subcommand, etc. — matches the legacy `args.sub` shape.
    */
   sub: string[];
+  /**
+   * Positionals at index 4 and beyond. Nothing in the dispatch reads these, so
+   * their presence means the user's invocation was misunderstood — most often a
+   * value passed to a valueless boolean flag, which mri re-emits as a positional.
+   */
+  extraPositionals: string[];
 };
 
 /**
@@ -381,5 +387,6 @@ export function parseCliArgs(argv: string[]): ParsedCli {
   return {
     flags,
     sub: parsed._ as string[],
+    extraPositionals: (parsed._ as string[]).slice(4),
   };
 }

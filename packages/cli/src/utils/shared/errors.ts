@@ -806,6 +806,14 @@ export const errors = {
       "https://wraps.dev/docs/cli-reference"
     ),
 
+  invalidFlagUsage: (message: string, suggestion: string) =>
+    new WrapsError(
+      message,
+      "INVALID_FLAG_USAGE",
+      suggestion,
+      "https://wraps.dev/docs/cli-reference"
+    ),
+
   pulumiError: (message: string) =>
     new WrapsError(
       `Infrastructure deployment failed: ${message}`,

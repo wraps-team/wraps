@@ -533,6 +533,7 @@ export type EmailInboundInitOptions = {
   yes?: boolean;
   preview?: boolean;
   json?: boolean;
+  unexpectedArg?: string;
 };
 
 /**
@@ -572,6 +573,7 @@ export type EmailInboundAddOptions = {
   domain?: string; // parent domain
   yes?: boolean;
   json?: boolean;
+  unexpectedArg?: string;
 };
 
 /**

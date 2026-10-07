@@ -174,3 +174,53 @@ describe("resolveNegatableFlag", () => {
     ).toBeUndefined();
   });
 });
+
+describe("parseCliArgs — values given to valueless boolean flags", () => {
+  const argv = (...rest: string[]) => ["node", "wraps", ...rest];
+
+  it("--root wraps.dev sets root and re-emits the value as a positional", () => {
+    const { flags, sub, extraPositionals } = parseCliArgs(
+      argv("email", "inbound", "add", "--root", "wraps.dev")
+    );
+    expect(flags.root).toBe(true);
+    expect(sub).toEqual(["email", "inbound", "add", "wraps.dev"]);
+    expect(extraPositionals).toEqual([]);
+  });
+
+  it("--root=wraps.dev parses identically to --root wraps.dev", () => {
+    const spaced = parseCliArgs(
+      argv("email", "inbound", "add", "--root", "wraps.dev")
+    );
+    const attached = parseCliArgs(
+      argv("email", "inbound", "add", "--root=wraps.dev")
+    );
+    expect(attached).toEqual(spaced);
+    expect(attached.flags.root).toBe(true);
+    expect(attached.sub).toEqual(["email", "inbound", "add", "wraps.dev"]);
+  });
+
+  it("surfaces positionals at index 4 and beyond", () => {
+    const { extraPositionals } = parseCliArgs(
+      argv("email", "status", "--json", "a", "b", "c")
+    );
+    expect(extraPositionals).toEqual(["c"]);
+  });
+
+  it("a bare --root parses cleanly with no stray positionals", () => {
+    const { flags, sub, extraPositionals } = parseCliArgs(
+      argv("email", "inbound", "add", "--root")
+    );
+    expect(flags.root).toBe(true);
+    expect(sub).toHaveLength(3);
+    expect(extraPositionals).toEqual([]);
+  });
+
+  it("keeps root a boolean flag and does not swallow --subdomain's value", () => {
+    const { flags, sub } = parseCliArgs(
+      argv("email", "inbound", "add", "--subdomain", "support", "--root")
+    );
+    expect(flags.root).toBe(true);
+    expect(flags.subdomain).toBe("support");
+    expect(sub).toEqual(["email", "inbound", "add"]);
+  });
+});
