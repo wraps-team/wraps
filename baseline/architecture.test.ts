@@ -2740,3 +2740,54 @@ describe("cloudformation route53 auto-setup", () => {
     ).toHaveLength(3);
   });
 });
+
+describe("api route auth coverage", () => {
+  // Routes that are INTENTIONALLY public or self-authenticating (token/secret),
+  // NOT built via createAuthenticatedRoutes. Adding a file here is a deliberate,
+  // reviewable decision: confirm the route exposes no org-scoped data without
+  // its own auth (signed token, webhook secret, or genuinely public).
+  const PUBLIC_API_ROUTES = new Set([
+    "apps/api/src/routes/health.ts",
+    "apps/api/src/routes/tools.ts",
+    "apps/api/src/routes/well-known.ts",
+    "apps/api/src/routes/unsubscribe.ts",
+    "apps/api/src/routes/preference-events.ts",
+    "apps/api/src/routes/webhooks.ts",
+    "apps/api/src/routes/agents-webhook.ts",
+  ]);
+
+  test("every route group is auth-wrapped or explicitly allow-listed public", () => {
+    const files = findFiles("apps/api/src/routes/**/*.ts")
+      .concat(findFiles("apps/api/src/(ee)/routes/**/*.ts"))
+      .filter((f) => !(f.includes("__tests__") || f.includes(".test.")));
+
+    const violations: string[] = [];
+    for (const file of files) {
+      if (PUBLIC_API_ROUTES.has(file)) {
+        continue;
+      }
+      const content = readFile(file);
+      // Match the export, not the bare name: an import or a comment that
+      // mentions createAuthenticatedRoutes must not count as wrapped.
+      if (!/^export const \w+ = createAuthenticatedRoutes\(/m.test(content)) {
+        violations.push(
+          `${file} — not built via createAuthenticatedRoutes and not in PUBLIC_API_ROUTES. ` +
+            "If this route serves org-scoped data, wrap it with createAuthenticatedRoutes(). " +
+            "If it is intentionally public/token-authed, add it to PUBLIC_API_ROUTES in this test."
+        );
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  test("PUBLIC_API_ROUTES has no stale entries", () => {
+    const existing = new Set(
+      findFiles("apps/api/src/routes/**/*.ts").concat(
+        findFiles("apps/api/src/(ee)/routes/**/*.ts")
+      )
+    );
+    const stale = [...PUBLIC_API_ROUTES].filter((f) => !existing.has(f));
+    expect(stale).toEqual([]); // remove deleted/renamed files from the allow-list
+  });
+});
