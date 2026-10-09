@@ -30,7 +30,6 @@ and except `packages/observability` has its own CLAUDE.md.
 | `packages/mail-audit` | Mailbox auditing |
 | `packages/pulumi` | Pulumi provider for email infra (mirrors `cdk`) |
 | `packages/template-render` | React Email → HTML rendering |
-| `packages/tui` | Terminal UI components for the CLI |
 | `packages/ui` | Shared React component library |
 | `packages/unsubscribe-token` | Signed unsubscribe token mint/verify |
 

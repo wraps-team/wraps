@@ -33,7 +33,6 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "cli": "node packages/cli/dist/cli.js",
     "cli:dev": "WRAPS_API_URL=https://api.wraps.localhost WRAPS_APP_URL=https://web.wraps.localhost node packages/cli/dist/cli.js",
-    "tui": "pnpm -F=tui tui",
     "sst:dev": "dotenv -e apps/web/.env.local -- sst dev",
     "sst:deploy": "sst deploy",
     "sst:remove": "sst remove",

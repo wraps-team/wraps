@@ -76,10 +76,6 @@ const config: KnipConfig = {
       entry: ["src/App.tsx", "src/main.tsx"],
       project: ["src/**/*.{ts,tsx}"],
     },
-    "packages/tui": {
-      entry: ["src/index.tsx"],
-      project: ["src/**/*.{ts,tsx}"],
-    },
     "packages/email-check": {
       project: ["src/**/*.ts"],
     },
