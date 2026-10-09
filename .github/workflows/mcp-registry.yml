@@ -31,9 +31,20 @@ jobs:
           fi
 
       - name: Install mcp-publisher
+        env:
+          # Pinned to one release and verified against the checksums file that
+          # ships with it. The "latest" release URL names whatever release is
+          # newest, so the binary this job runs with MCP_DNS_PRIVATE_KEY in its
+          # environment could change without a change in this repository.
+          MCP_PUBLISHER_VERSION: "1.8.1"
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" \
-            | tar xz mcp-publisher
+          BASE="https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}"
+          curl -fsSL -o mcp-publisher_linux_amd64.tar.gz \
+            "${BASE}/mcp-publisher_linux_amd64.tar.gz"
+          curl -fsSL -o mcp-publisher_checksums.txt \
+            "${BASE}/registry_${MCP_PUBLISHER_VERSION}_checksums.txt"
+          grep ' mcp-publisher_linux_amd64.tar.gz$' mcp-publisher_checksums.txt | sha256sum -c -
+          tar xzf mcp-publisher_linux_amd64.tar.gz mcp-publisher
           sudo mv mcp-publisher /usr/local/bin/
 
       - name: Publish to MCP Registry
