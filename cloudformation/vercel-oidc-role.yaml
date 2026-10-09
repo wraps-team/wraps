@@ -13,10 +13,11 @@ Parameters:
     Description: "Your Vercel Team ID (found in Team Settings, e.g., 'team_xxxxx')"
     MinLength: 1
 
-  VercelProjectId:
+  VercelProjectName:
     Type: String
-    Description: "Your Vercel Project ID (found in Project Settings, e.g., 'prj_xxxxx')"
+    Description: "Your Vercel Project Name (from the project URL or Project Settings, e.g., 'wraps-web')"
     MinLength: 1
+    Default: "wraps-web"
 
 Resources:
   # OIDC Identity Provider for Vercel (Team Mode)
@@ -54,10 +55,10 @@ Resources:
                 # Audience uses team slug (not team ID)
                 "oidc.vercel.com/wraps:aud": !Sub "https://vercel.com/${VercelTeamSlug}"
               StringLike:
-                # Subject uses owner:teamSlug with wildcards for any project/environment
-                "oidc.vercel.com/wraps:sub":
-                  - !Sub "owner:${VercelTeamSlug}:project:*:environment:preview"
-                  - !Sub "owner:${VercelTeamSlug}:project:*:environment:production"
+                # Subject is owner:<team-slug>:project:<project-name>:environment:<environment>.
+                # Scope to this single project and to the production environment only:
+                # a preview deployment of any project in the team must not assume this role.
+                "oidc.vercel.com/wraps:sub": !Sub "owner:${VercelTeamSlug}:project:${VercelProjectName}:environment:production"
       ManagedPolicyArns:
         - !Ref VercelBackendPolicy
       Tags:
