@@ -14,29 +14,29 @@ Instead of storing long-lived AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_
 ## Prerequisites
 
 - Wraps AWS account (905130073023)
-- Vercel Team ID and Project ID
+- Vercel Team slug and Project name
 - AWS CLI configured with Wraps account credentials
 
-## Step 1: Get Vercel IDs
+## Step 1: Get Vercel identifiers
 
 ### Get Team ID
 1. Go to https://vercel.com/account
 2. Click on your team settings
 3. Copy the Team ID (format: `team_xxxxx`)
 
-### Get Project ID
+### Get Project Name
 1. Go to your Vercel project settings
-2. Navigate to "General" tab
-3. Copy the Project ID (format: `prj_xxxxx`)
+2. Navigate to the "General" tab
+3. Copy the Project Name (for example, `wraps-web`)
 
 ## Step 2: Deploy CloudFormation Stack
 
 Deploy the OIDC provider and IAM role to your Wraps AWS account:
 
 ```bash
-# Set your Vercel IDs
+# Set your Vercel identifiers
 VERCEL_TEAM_ID="team_xxxxx"
-VERCEL_PROJECT_ID="prj_xxxxx"
+VERCEL_PROJECT_NAME="wraps-web"
 
 # Deploy the stack
 AWS_PROFILE=wraps aws cloudformation create-stack \
@@ -44,7 +44,7 @@ AWS_PROFILE=wraps aws cloudformation create-stack \
   --template-body file://cloudformation/vercel-oidc-role.yaml \
   --parameters \
     ParameterKey=VercelTeamId,ParameterValue=${VERCEL_TEAM_ID} \
-    ParameterKey=VercelProjectId,ParameterValue=${VERCEL_PROJECT_ID} \
+    ParameterKey=VercelProjectName,ParameterValue=${VERCEL_PROJECT_NAME} \
   --capabilities CAPABILITY_NAMED_IAM \
   --region us-east-1
 
@@ -117,8 +117,8 @@ Call STS AssumeRoleWithWebIdentity
 Vercel OIDC Provider validates token
     ↓
 Check trust policy conditions:
-  - aud = "vercel"
-  - sub = "team:xxx:project:xxx:environment:production"
+  - aud = "https://vercel.com/<team-slug>"
+  - sub = "owner:<team-slug>:project:<project-name>:environment:production"
     ↓
 Return temporary credentials (valid ~1 hour)
     ↓
@@ -151,7 +151,7 @@ After deployment, check that OIDC is working:
 
 **Cause**: Trust policy doesn't match your Vercel team/project.
 
-**Fix**: Verify the Team ID and Project ID in the CloudFormation parameters:
+**Fix**: Verify the team slug and project name in the CloudFormation parameters:
 ```bash
 AWS_PROFILE=wraps aws cloudformation describe-stacks \
   --stack-name wraps-vercel-oidc \
