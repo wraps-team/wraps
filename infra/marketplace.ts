@@ -23,6 +23,9 @@ import { axiomToken, sentryEnv } from "./secrets";
 export const marketplaceDlq = new sst.aws.Queue("MarketplaceEventsDlq", {
   transform: {
     queue: {
+      // Consumer timeout is 60s; visibility timeout must exceed that or a
+      // batch still being processed is redelivered mid-flight.
+      visibilityTimeoutSeconds: 70,
       messageRetentionSeconds: 1_209_600, // 14 days
       tags: { ManagedBy: "sst", Service: "wraps-api" },
     },
@@ -133,6 +136,40 @@ marketplaceQueue.subscribe(
     batch: {
       size: 10,
       partialResponses: true,
+    },
+  }
+);
+
+// Subscribe the DLQ consumer. Both sibling DLQs (batch, workflow) have one, and
+// without it a dead-lettered agreement event is never read: it sits until the
+// 14-day retention deletes it and the buyer's registration silently never
+// completes. The consumer marks the affected subscription `failed` rather than
+// re-enqueuing, so a deterministic failure cannot loop between the queue and
+// the DLQ. See apps/api/src/workers/marketplace-dlq-consumer.ts.
+marketplaceDlq.subscribe(
+  {
+    handler: "apps/api/src/workers/marketplace-dlq-consumer.handler",
+    runtime: "nodejs24.x",
+    timeout: "1 minute",
+    memory: "256 MB",
+    environment: {
+      NODE_ENV: "production",
+      DATABASE_URL: process.env.DATABASE_URL ?? "",
+      AXIOM_TOKEN: axiomToken.value,
+      AXIOM_DATASET: "wraps",
+      // This is the last handler in the chain: a record it cannot process has
+      // no further retry. A thrown error would loop with no DLQ-of-DLQ.
+      ...sentryEnv,
+    },
+    nodejs: {
+      // PostgreSQL driver for Drizzle; @sentry/profiling-node ships native
+      // binaries esbuild cannot bundle, so it stays external.
+      install: ["pg", "@sentry/profiling-node"],
+    },
+  },
+  {
+    batch: {
+      size: 10,
     },
   }
 );
