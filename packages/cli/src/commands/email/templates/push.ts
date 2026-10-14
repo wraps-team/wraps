@@ -14,6 +14,9 @@ import {
 import {
   isTemplateUnchanged,
   nextTemplateEntry,
+  summarizeTemplatePush,
+  type TemplateApiResult,
+  templatesForSes,
 } from "../../../utils/email/template-push-state.js";
 import { renderTemplateWithProxy } from "../../../utils/email/template-render.js";
 import {
@@ -22,7 +25,11 @@ import {
   resolveApiTarget,
 } from "../../../utils/shared/api-target.js";
 import { errors } from "../../../utils/shared/errors.js";
-import { isJsonMode, jsonSuccess } from "../../../utils/shared/json-output.js";
+import {
+  isJsonMode,
+  jsonError,
+  jsonSuccess,
+} from "../../../utils/shared/json-output.js";
 import { loadLockfile, saveLockfile } from "../../../utils/shared/lockfile.js";
 import { DeploymentProgress } from "../../../utils/shared/output.js";
 import { resolvePushOrg } from "../../../utils/shared/push-org.js";
@@ -219,25 +226,42 @@ export async function templatesPush(options: TemplatesPushOptions) {
     return;
   }
 
-  // Push to SES
-  const sesResults = await pushToSES(compiled, progress);
+  // Resolve SES first: without AWS credentials nothing is pushed anywhere,
+  // so the dashboard never shows a template SES does not have.
+  const sesRegion = await resolveSesRegion(progress);
+  if (sesRegion === null) {
+    if (isJsonMode()) {
+      jsonError("email.templates.push", {
+        code: "NO_AWS_CREDENTIALS",
+        message: "No AWS credentials found. Nothing was pushed.",
+      });
+    } else {
+      clack.log.error("No AWS credentials found. Nothing was pushed.");
+    }
+    process.exitCode = 1;
+    return;
+  }
 
-  // Only sync templates to dashboard that succeeded in SES
-  const sesFailed = new Set(
-    sesResults.filter((r) => !r.success).map((r) => r.slug)
+  // Dashboard first: a template edited on the dashboard comes back as a
+  // conflict and is not sent to SES.
+  const apiResults = await pushToAPI(
+    compiled,
+    target,
+    progress,
+    options.force,
+    org?.id
   );
-  const sesSucceeded = compiled.filter((t) => !sesFailed.has(t.slug));
-
-  // Push to API (target already resolved above)
-  const apiResults =
-    sesSucceeded.length > 0
-      ? await pushToAPI(sesSucceeded, target, progress, options.force, org?.id)
+  const sesTargets = templatesForSes(compiled, apiResults);
+  const sesResults =
+    sesTargets.length > 0
+      ? await pushToSES(sesTargets, sesRegion, progress)
       : [];
 
   // Only update lockfile for templates that succeeded in at least one target.
-  // SES-failed templates won't appear in apiResults (skipped above),
-  // so both sesOk and apiOk will be false — lockfile stays unchanged.
-  // remoteHash and id only advance when the dashboard accepted the template.
+  // A conflicted template never reaches SES and the dashboard refused it,
+  // so both sesOk and apiOk are false — its lockfile entry stays unchanged.
+  // remoteHash and id only advance when the dashboard accepted the template;
+  // localHash only when SES did.
   for (const t of compiled) {
     const entry = nextTemplateEntry({
       previous: lockfile.templates[t.slug],
@@ -255,26 +279,59 @@ export async function templatesPush(options: TemplatesPushOptions) {
   lockfile.org = org?.slug ?? config.org;
   await saveLockfile(wrapsDir, lockfile);
 
+  const summary = summarizeTemplatePush({
+    compiledSlugs: compiled.map((t) => t.slug),
+    sesResults,
+    apiResults,
+  });
+  const failedCount = summary.failed.length + compileErrors.length;
+
   // Output results
   if (isJsonMode()) {
-    jsonSuccess("email.templates.push", {
-      pushed: compiled.map((t) => ({
-        slug: t.slug,
-        id: apiResults.find((r) => r.slug === t.slug)?.id,
-        sesTemplateName: t.sesTemplateName,
-      })),
-      unchanged,
-      errors: compileErrors,
-    });
+    if (summary.conflicts.length === 0 && failedCount === 0) {
+      jsonSuccess("email.templates.push", {
+        pushed: summary.pushed.map((slug) => ({
+          slug,
+          id: apiResults.find((r) => r.slug === slug)?.id,
+          sesTemplateName: compiled.find((t) => t.slug === slug)
+            ?.sesTemplateName,
+        })),
+        unchanged,
+        errors: [],
+      });
+    } else if (summary.conflicts.length > 0) {
+      jsonError("email.templates.push", {
+        code: "CONFLICT",
+        message: `${summary.conflicts.length} template(s) were edited on the dashboard since the last push: ${summary.conflicts.join(", ")}`,
+      });
+    } else {
+      jsonError("email.templates.push", {
+        code: "PUSH_FAILED",
+        message: `${failedCount} template(s) failed: ${[...summary.failed, ...compileErrors.map((e) => e.slug)].join(", ")}`,
+      });
+    }
   } else {
     console.log();
-    clack.log.success(
-      pc.green(
-        `${compiled.length} template${compiled.length === 1 ? "" : "s"} pushed`
-      )
-    );
+    if (summary.pushed.length > 0) {
+      clack.log.success(
+        pc.green(
+          `${summary.pushed.length} template${summary.pushed.length === 1 ? "" : "s"} pushed`
+        )
+      );
+    }
     if (unchanged.length > 0) {
       clack.log.info(`${unchanged.length} unchanged (use --force to re-push)`);
+    }
+    if (summary.conflicts.length > 0) {
+      clack.log.error(
+        `${summary.conflicts.length} template(s) skipped due to dashboard edits. Use --force to overwrite.`
+      );
+      for (const slug of summary.conflicts) {
+        console.log(`  ${pc.yellow("!")} ${pc.cyan(slug)}`);
+      }
+    }
+    if (summary.failed.length > 0) {
+      clack.log.error(`${summary.failed.length} template(s) failed to push`);
     }
     if (compileErrors.length > 0) {
       clack.log.error(`${compileErrors.length} failed to compile`);
@@ -283,12 +340,16 @@ export async function templatesPush(options: TemplatesPushOptions) {
   }
 
   trackCommand("email:templates:push", {
-    success: compileErrors.length === 0,
+    success: summary.conflicts.length === 0 && failedCount === 0,
     duration_ms: Date.now() - startTime,
-    pushed_count: compiled.length,
+    pushed_count: summary.pushed.length,
     unchanged_count: unchanged.length,
-    error_count: compileErrors.length,
+    error_count: failedCount,
   });
+
+  if (summary.conflicts.length > 0 || failedCount > 0) {
+    process.exitCode = 1;
+  }
 }
 
 // ── Config Loading & Template Discovery ──
@@ -466,12 +527,10 @@ function mergeVariables(
 
 // ── SES Push ──
 
-async function pushToSES(
-  templates: CompiledTemplate[],
+/** Region to write SES templates to, or null when no AWS credentials are available. */
+async function resolveSesRegion(
   progress: DeploymentProgress
-): Promise<Array<{ slug: string; success: boolean }>> {
-  const results: Array<{ slug: string; success: boolean }> = [];
-
+): Promise<string | null> {
   // Validate AWS credentials. Missing creds is a soft skip; any other error
   // (including REGION_REQUIRED from the resolver below) must surface so the
   // user can act on it instead of seeing a misleading "no credentials" skip.
@@ -487,7 +546,7 @@ async function pushToSES(
     // baseline:allow-next-line no-swallowed-errors — no credentials means skip SES push
   } catch {
     progress.info("No AWS credentials — skipping SES push");
-    return templates.map((t) => ({ slug: t.slug, success: false }));
+    return null;
   }
 
   // Resolve region via option → env → saved email metadata. Never silent-
@@ -496,11 +555,19 @@ async function pushToSES(
   const { resolveRegionForCommand } = await import(
     "../../../utils/shared/region-resolver.js"
   );
-  const region = await resolveRegionForCommand({
+  return resolveRegionForCommand({
     accountId: identity.accountId,
     service: "email",
     label: "email deployment",
   });
+}
+
+async function pushToSES(
+  templates: CompiledTemplate[],
+  region: string,
+  progress: DeploymentProgress
+): Promise<Array<{ slug: string; success: boolean }>> {
+  const results: Array<{ slug: string; success: boolean }> = [];
 
   // Use SESv2 client (JSON protocol) — avoids XML entity expansion limits in v1
   const {
@@ -631,29 +698,27 @@ async function fetchRemoteTemplateSlugs(
 
 // ── API Push ──
 
-type APIPushResult = {
-  slug: string;
-  id?: string;
-  success: boolean;
-};
-
 async function pushToAPI(
   templates: CompiledTemplate[],
   target: ApiTarget,
   progress: DeploymentProgress,
   force?: boolean,
   orgId?: string
-): Promise<APIPushResult[]> {
+): Promise<TemplateApiResult[]> {
   const check = checkApiTarget(target);
   if (!check.ok) {
     progress.info(
       `${check.reason} — skipping dashboard sync. ${check.suggestion}`
     );
-    return templates.map((t) => ({ slug: t.slug, success: false }));
+    return templates.map((t) => ({
+      slug: t.slug,
+      success: false,
+      skipped: true,
+    }));
   }
   const { apiBase, token } = check.target;
 
-  const results: APIPushResult[] = [];
+  const results: TemplateApiResult[] = [];
 
   // Use batch endpoint if multiple templates
   if (templates.length > 1) {
@@ -691,7 +756,7 @@ async function pushToAPI(
         };
         // Handle conflicts
         for (const c of data.conflicts ?? []) {
-          results.push({ slug: c.slug, success: false });
+          results.push({ slug: c.slug, success: false, conflict: true });
         }
         // Handle successes
         for (const r of data.results ?? []) {
@@ -765,7 +830,7 @@ async function pushToAPI(
       });
 
       if (Number(resp.status) === 409) {
-        results.push({ slug: t.slug, success: false });
+        results.push({ slug: t.slug, success: false, conflict: true });
         progress.fail(
           `${pc.cyan(t.slug)} was edited on the dashboard since your last push. Use ${pc.bold("--force")} to overwrite.`
         );

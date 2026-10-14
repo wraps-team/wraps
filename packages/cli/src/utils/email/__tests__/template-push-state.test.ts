@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import {
   isTemplateUnchanged,
   nextTemplateEntry,
+  summarizeTemplatePush,
+  templatesForSes,
 } from "../template-push-state.js";
 
 const entry = (over: Record<string, unknown> = {}) => ({
@@ -120,5 +122,87 @@ describe("nextTemplateEntry", () => {
         apiResult: undefined,
       })
     ).toBeUndefined();
+  });
+
+  it("T10: dashboard accepted but SES failed keeps localHash, so SES is retried next push", () => {
+    const next = nextTemplateEntry({
+      ...common,
+      previous: entry(),
+      sesOk: false,
+      apiResult: { success: true, id: "tpl_1" },
+    });
+    expect(next?.localHash).toBe("h1");
+    expect(next?.remoteHash).toBe("h2");
+    expect(
+      isTemplateUnchanged({
+        entry: next,
+        sourceHash: "h2",
+        existsRemotely: true,
+        dashboardConfigured: true,
+        force: false,
+      })
+    ).toBe(false);
+  });
+
+  it("T11: dashboard accepted, SES failed, no previous entry leaves localHash empty", () => {
+    const next = nextTemplateEntry({
+      ...common,
+      previous: undefined,
+      sesOk: false,
+      apiResult: { success: true, id: "tpl_1" },
+    });
+    expect(next?.localHash).toBe("");
+  });
+});
+
+describe("templatesForSes", () => {
+  it("T12: drops templates the dashboard refused as conflicts", () => {
+    expect(
+      templatesForSes(
+        [{ slug: "a" }, { slug: "b" }],
+        [
+          { slug: "a", success: false, conflict: true },
+          { slug: "b", success: true },
+        ]
+      )
+    ).toEqual([{ slug: "b" }]);
+  });
+
+  it("T13b: only a conflict keeps a template out of SES (no dashboard, expired session)", () => {
+    expect(
+      templatesForSes(
+        [{ slug: "a" }, { slug: "b" }],
+        [
+          { slug: "a", success: false, skipped: true },
+          { slug: "b", success: false },
+        ]
+      )
+    ).toEqual([{ slug: "a" }, { slug: "b" }]);
+  });
+});
+
+describe("summarizeTemplatePush", () => {
+  it("T13: sorts each template into pushed, conflicts or failed", () => {
+    const summary = summarizeTemplatePush({
+      compiledSlugs: ["a", "b", "c", "d", "e"],
+      sesResults: [
+        { slug: "a", success: true },
+        { slug: "c", success: true },
+        { slug: "d", success: false },
+        { slug: "e", success: true },
+      ],
+      apiResults: [
+        { slug: "a", success: true },
+        { slug: "b", success: false, conflict: true },
+        { slug: "c", success: false },
+        { slug: "d", success: true },
+        { slug: "e", success: false, skipped: true },
+      ],
+    });
+    expect(summary).toEqual({
+      pushed: ["a", "e"],
+      conflicts: ["b"],
+      failed: ["c", "d"],
+    });
   });
 });
