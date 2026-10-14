@@ -1,5 +1,12 @@
 import { auth } from "@wraps/auth";
-import { auditLog, awsAccount, db, template, templateVersion } from "@wraps/db";
+import {
+  auditLog,
+  awsAccount,
+  db,
+  editsPushOwnedTemplateField,
+  template,
+  templateVersion,
+} from "@wraps/db";
 import { deleteSESTemplate } from "@wraps/email";
 import { and, desc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
@@ -203,6 +210,12 @@ export async function PUT(request: Request, context: RouteContext) {
     }
     if (brandKitId !== undefined) {
       updateData.brandKitId = brandKitId;
+    }
+
+    // A templates push refuses to overwrite a dashboard edit only when it is
+    // marked (apps/api/src/routes/templates-sync.ts).
+    if (editsPushOwnedTemplateField(updateData)) {
+      updateData.lastEditedFrom = "dashboard";
     }
 
     const auditCtx = await getAuditContext();

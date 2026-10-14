@@ -623,6 +623,74 @@ describe("Templates API - PUT /api/[orgSlug]/emails/templates/[id]", () => {
     expect(response.status).toBe(404);
     expect(data.error).toBe("Template not found");
   });
+
+  it("marks a subject edit as a dashboard edit so a push will not overwrite it", async () => {
+    await db.insert(template).values({
+      id: "test-template-put-marks-subject",
+      organizationId: testOrganization.id,
+      name: "Marks Subject",
+      content: { type: "doc", content: [] },
+      createdBy: testUser.id,
+      status: "DRAFT",
+      lastEditedFrom: "cli",
+    });
+
+    const { PUT } = await import("../[orgSlug]/emails/templates/[id]/route");
+
+    const response = await PUT(
+      new Request(
+        `http://localhost/api/${testOrganization.slug}/emails/templates/test-template-put-marks-subject`,
+        { method: "PUT", body: JSON.stringify({ subject: "New" }) }
+      ),
+      {
+        params: Promise.resolve({
+          orgSlug: testOrganization.slug,
+          id: "test-template-put-marks-subject",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(200);
+    const stored = await db.query.template.findFirst({
+      where: eq(template.id, "test-template-put-marks-subject"),
+    });
+    expect(stored?.subject).toBe("New");
+    expect(stored?.lastEditedFrom).toBe("dashboard");
+  });
+
+  it("leaves lastEditedFrom alone on a rename", async () => {
+    await db.insert(template).values({
+      id: "test-template-put-rename-unmarked",
+      organizationId: testOrganization.id,
+      name: "Original",
+      content: { type: "doc", content: [] },
+      createdBy: testUser.id,
+      status: "DRAFT",
+      lastEditedFrom: "cli",
+    });
+
+    const { PUT } = await import("../[orgSlug]/emails/templates/[id]/route");
+
+    const response = await PUT(
+      new Request(
+        `http://localhost/api/${testOrganization.slug}/emails/templates/test-template-put-rename-unmarked`,
+        { method: "PUT", body: JSON.stringify({ name: "Renamed" }) }
+      ),
+      {
+        params: Promise.resolve({
+          orgSlug: testOrganization.slug,
+          id: "test-template-put-rename-unmarked",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(200);
+    const stored = await db.query.template.findFirst({
+      where: eq(template.id, "test-template-put-rename-unmarked"),
+    });
+    expect(stored?.name).toBe("Renamed");
+    expect(stored?.lastEditedFrom).toBe("cli");
+  });
 });
 
 describe("Templates API - DELETE /api/[orgSlug]/emails/templates/[id]", () => {
@@ -1197,6 +1265,59 @@ describe("Templates API - GET /api/[orgSlug]/emails/templates/[id]/versions/[ver
 
     expect(response.status).toBe(404);
     expect(data.error).toBe("Version not found");
+  });
+});
+
+describe("Templates API - POST …/versions/[versionId] (restore)", () => {
+  it("marks a restore as a dashboard edit so a push will not overwrite it", async () => {
+    await db.insert(template).values({
+      id: "test-template-restore-marks",
+      organizationId: testOrganization.id,
+      name: "Restore Marks",
+      content: { type: "doc", content: [] },
+      source: "export default function Current() { return null; }",
+      createdBy: testUser.id,
+      status: "DRAFT",
+      lastEditedFrom: "cli",
+    });
+
+    const [version] = await db
+      .insert(templateVersion)
+      .values({
+        templateId: "test-template-restore-marks",
+        content: { type: "doc", content: [{ type: "paragraph" }] },
+        source: "export default function Old() { return null; }",
+        version: 1,
+        createdBy: testUser.id,
+      })
+      .returning();
+
+    const { POST } = await import(
+      "../[orgSlug]/emails/templates/[id]/versions/[versionId]/route"
+    );
+
+    const response = await POST(
+      new Request(
+        `http://localhost/api/${testOrganization.slug}/emails/templates/test-template-restore-marks/versions/${version.id}`,
+        { method: "POST" }
+      ),
+      {
+        params: Promise.resolve({
+          orgSlug: testOrganization.slug,
+          id: "test-template-restore-marks",
+          versionId: version.id,
+        }),
+      }
+    );
+
+    expect(response.status).toBe(200);
+    const stored = await db.query.template.findFirst({
+      where: eq(template.id, "test-template-restore-marks"),
+    });
+    expect(stored?.source).toBe(
+      "export default function Old() { return null; }"
+    );
+    expect(stored?.lastEditedFrom).toBe("dashboard");
   });
 });
 

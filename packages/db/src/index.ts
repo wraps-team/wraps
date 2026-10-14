@@ -133,3 +133,8 @@ export {
   buildConditionSQL,
   buildFilterSQL,
 } from "./segment-filter";
+// Re-export the template fields a CLI push owns
+export {
+  editsPushOwnedTemplateField,
+  TEMPLATE_PUSH_OWNED_FIELDS,
+} from "./template-edit-origin";

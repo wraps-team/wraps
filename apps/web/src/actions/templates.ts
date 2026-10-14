@@ -435,6 +435,7 @@ export const bulkUpdateTemplateType = orgAction(
           .update(template)
           .set({
             emailType,
+            lastEditedFrom: "dashboard",
             updatedAt: new Date(),
           })
           .where(

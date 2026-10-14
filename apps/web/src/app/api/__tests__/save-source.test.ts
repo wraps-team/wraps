@@ -1,5 +1,5 @@
-import { db, member, organization, template, user } from "@wraps/db";
-import { eq } from "drizzle-orm";
+import { auditLog, db, member, organization, template, user } from "@wraps/db";
+import { and, eq } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,
@@ -113,12 +113,18 @@ beforeAll(async () => {
 // Clean up templates before each test
 beforeEach(async () => {
   await db
+    .delete(auditLog)
+    .where(eq(auditLog.organizationId, testOrganization.id));
+  await db
     .delete(template)
     .where(eq(template.organizationId, testOrganization.id));
 });
 
 // Clean up after all tests
 afterAll(async () => {
+  await db
+    .delete(auditLog)
+    .where(eq(auditLog.organizationId, testOrganization.id));
   await db
     .delete(template)
     .where(eq(template.organizationId, testOrganization.id));
@@ -185,6 +191,54 @@ describe("Save Source API - POST /api/[orgSlug]/emails/templates/[id]/save-sourc
       .where(eq(template.id, "test-savesrc-tmpl-1"));
     expect(saved.lastEditedFrom).toBe("dashboard");
     expect(saved.lastEditedBy).toBe(testUser.id);
+  });
+
+  it("should write exactly one template.updated audit row per save", async () => {
+    await db.insert(template).values({
+      id: "test-savesrc-tmpl-audit",
+      organizationId: testOrganization.id,
+      name: "SaveSource Audit Test",
+      content: {},
+      status: "PUBLISHED",
+      createdBy: testUser.id,
+      sourceFormat: "react-email",
+      source: "// original source",
+      lastEditedFrom: "cli",
+    });
+
+    const { POST } = await import(
+      "../[orgSlug]/emails/templates/[id]/save-source/route"
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/save-source", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: "// edited source",
+          compiledHtml: "<html></html>",
+        }),
+      }),
+      {
+        params: Promise.resolve({
+          orgSlug: testOrganization.slug,
+          id: "test-savesrc-tmpl-audit",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(200);
+    const rows = await db
+      .select()
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.organizationId, testOrganization.id),
+          eq(auditLog.action, "template.updated")
+        )
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].resourceId).toBe("test-savesrc-tmpl-audit");
   });
 
   it("should reject non-react-email templates", async () => {

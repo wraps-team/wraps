@@ -183,6 +183,7 @@ export async function POST(_request: Request, context: RouteContext) {
           compiledHtml: versionToRestore.compiledHtml,
           updatedAt: new Date(),
           lastEditedBy: session.user.id,
+          lastEditedFrom: "dashboard",
         })
         .where(
           and(

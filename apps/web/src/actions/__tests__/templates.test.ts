@@ -429,6 +429,27 @@ describe("Template Bulk Actions", () => {
       expect(updated.every((t) => t.emailType === "marketing")).toBe(true);
     });
 
+    it("marks the templates as dashboard edits so a push will not overwrite them", async () => {
+      const id1 = await createTestTemplate({
+        name: "Type Mark 1",
+        emailType: "transactional",
+        lastEditedFrom: "cli",
+      });
+
+      const result = await bulkUpdateTemplateType(
+        testOrganization.id,
+        [id1],
+        "marketing"
+      );
+
+      expect(result.success).toBe(true);
+      const stored = await db.query.template.findFirst({
+        where: eq(template.id, id1),
+      });
+      expect(stored?.emailType).toBe("marketing");
+      expect(stored?.lastEditedFrom).toBe("dashboard");
+    });
+
     it("should update multiple templates to transactional type", async () => {
       const id1 = await createTestTemplate({
         name: "Type Change 1",

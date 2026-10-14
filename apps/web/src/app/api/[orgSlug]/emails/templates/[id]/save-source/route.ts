@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import { auth } from "@wraps/auth";
-import { db, template, templateVersion } from "@wraps/db";
+import { auditLog, db, template, templateVersion } from "@wraps/db";
 import { and, desc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRoutePermission } from "@/app/api/shared/route-permission";
+import { auditLogEntry, getAuditContext } from "@/lib/audit";
 import { createRequestLogger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
@@ -114,47 +115,74 @@ export async function POST(request: Request, context: RouteContext) {
     // Compute source hash
     const sourceHash = createHash("sha256").update(source).digest("hex");
 
-    // Update template
-    const now = new Date();
-    const [updated] = await db
-      .update(template)
-      .set({
-        source,
-        sourceHash,
-        compiledHtml,
-        compiledText,
-        variables: variables as Record<string, unknown>[],
-        testData,
-        lastEditedFrom: "dashboard",
-        lastEditedBy: session.user.id,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(template.id, id),
-          eq(template.organizationId, orgWithMembership.id)
-        )
-      )
-      .returning();
+    const auditCtx = await getAuditContext();
 
-    // Auto-create version if source changed from last version
-    const latestVersion = await db.query.templateVersion.findFirst({
-      where: eq(templateVersion.templateId, id),
-      orderBy: [desc(templateVersion.version)],
-      columns: { version: true, source: true },
+    // Update template, version and audit row in one transaction
+    const now = new Date();
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(template)
+        .set({
+          source,
+          sourceHash,
+          compiledHtml,
+          compiledText,
+          variables: variables as Record<string, unknown>[],
+          testData,
+          lastEditedFrom: "dashboard",
+          lastEditedBy: session.user.id,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(template.id, id),
+            eq(template.organizationId, orgWithMembership.id)
+          )
+        )
+        .returning();
+
+      if (!row) return;
+
+      // Auto-create version if source changed from last version
+      const latestVersion = await tx.query.templateVersion.findFirst({
+        where: eq(templateVersion.templateId, id),
+        orderBy: [desc(templateVersion.version)],
+        columns: { version: true, source: true },
+      });
+
+      if (!latestVersion || latestVersion.source !== source) {
+        const nextVersion = latestVersion ? latestVersion.version + 1 : 1;
+        await tx.insert(templateVersion).values({
+          templateId: id,
+          content: row.content,
+          source,
+          compiledHtml,
+          version: nextVersion,
+          createdBy: session.user.id,
+          changeNote: null,
+        });
+      }
+
+      await tx.insert(auditLog).values(
+        auditLogEntry(auditCtx, {
+          organizationId: orgWithMembership.id,
+          actorId: session.user.id,
+          actorEmail: session.user.email,
+          action: "template.updated",
+          resource: "template",
+          resourceId: id,
+          metadata: { templateId: id, name: row.name, via: "code-editor" },
+        })
+      );
+
+      return row;
     });
 
-    if (!latestVersion || latestVersion.source !== source) {
-      const nextVersion = latestVersion ? latestVersion.version + 1 : 1;
-      await db.insert(templateVersion).values({
-        templateId: id,
-        content: updated.content,
-        source,
-        compiledHtml,
-        version: nextVersion,
-        createdBy: session.user.id,
-        changeNote: null,
-      });
+    if (!updated) {
+      return NextResponse.json(
+        { error: "Template not found" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({
