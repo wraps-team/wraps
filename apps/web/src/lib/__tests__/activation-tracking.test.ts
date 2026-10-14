@@ -111,6 +111,9 @@ vi.mock("@wraps/db", () => ({
       },
     },
   },
+  claimFirstEmailMilestone: vi.fn(() =>
+    Promise.resolve(mockClaimResult().length > 0)
+  ),
   awsAccount: { organizationId: "organizationId", isVerified: "isVerified" },
   contact: { organizationId: "organizationId" },
   template: { organizationId: "organizationId" },

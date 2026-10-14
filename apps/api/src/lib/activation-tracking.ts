@@ -1,14 +1,14 @@
 import {
   awsAccount,
+  claimFirstEmailMilestone,
   db,
-  organizationExtension,
   template,
   user,
   workflow,
 } from "@wraps/db";
 import { member } from "@wraps/db/schema/auth";
 import { createPlatformClient } from "@wraps.dev/client";
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { log } from "./logger";
 import { getPostHogClient } from "./posthog";
 
@@ -36,45 +36,6 @@ async function emit(
 }
 
 /**
- * Atomically claim the one-time "first email sent" activation for an org.
- * Returns true for exactly one caller per org — the winner emits
- * `activation_first_email_sent`; every later/concurrent caller gets false.
- * Upserts the extension row so orgs without one are still handled, and the
- * `IS NULL` setWhere makes the claim a real single-shot guard (no count
- * window that re-opens on every send).
- */
-async function claimFirstEmailTracked(
-  organizationId: string
-): Promise<boolean> {
-  // Cheap PK read first: this runs on every Delivery webhook, so once the org
-  // is tracked every later call short-circuits here with no write and no row
-  // lock on organization_extension.
-  const [existing] = await db
-    .select({ trackedAt: organizationExtension.activationFirstEmailTrackedAt })
-    .from(organizationExtension)
-    .where(eq(organizationExtension.organizationId, organizationId))
-    .limit(1);
-  if (existing?.trackedAt) {
-    return false;
-  }
-
-  // First-time path: atomic claim. The `IS NULL` setWhere makes concurrent
-  // first-fires safe — two callers both read null above, but exactly one wins
-  // the upsert.
-  const now = new Date();
-  const claimed = await db
-    .insert(organizationExtension)
-    .values({ organizationId, activationFirstEmailTrackedAt: now })
-    .onConflictDoUpdate({
-      target: organizationExtension.organizationId,
-      set: { activationFirstEmailTrackedAt: now, updatedAt: now },
-      setWhere: isNull(organizationExtension.activationFirstEmailTrackedAt),
-    })
-    .returning({ organizationId: organizationExtension.organizationId });
-  return claimed.length > 0;
-}
-
-/**
  * Track first email sent for an organization.
  * Called after messageSend records are inserted with status "sent".
  * MUST be awaited in Lambda — fire-and-forget = dead code.
@@ -87,7 +48,7 @@ export async function trackFirstEmailSent(
     // Fire exactly once per org. The atomic claim replaces the old
     // `count(status='sent') BETWEEN 1 AND 50` window, which re-fired on every
     // workflow run because workflow sends never land as status='sent'.
-    if (!(await claimFirstEmailTracked(organizationId))) {
+    if (!(await claimFirstEmailMilestone(organizationId))) {
       return;
     }
 
@@ -141,7 +102,7 @@ export async function trackFirstEmailDelivered(
     // Shares the same one-time claim as trackFirstEmailSent, so platform sends
     // already tracked there won't double-fire here, and pure SDK sends (no
     // messageSend records) still get caught from the webhook.
-    if (!(await claimFirstEmailTracked(organizationId))) {
+    if (!(await claimFirstEmailMilestone(organizationId))) {
       return;
     }
 

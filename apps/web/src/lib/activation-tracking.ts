@@ -2,6 +2,7 @@ import {
   apiKey,
   awsAccount,
   batchSend,
+  claimFirstEmailMilestone,
   contact,
   db,
   invitation,
@@ -11,7 +12,7 @@ import {
 } from "@wraps/db";
 import { member, user } from "@wraps/db/schema/auth";
 import { createPlatformClient } from "@wraps.dev/client";
-import { and, count, eq, isNull, ne } from "drizzle-orm";
+import { and, count, eq, ne } from "drizzle-orm";
 import { logger } from "./logger";
 import { getPostHogClient } from "./posthog-server";
 
@@ -275,41 +276,6 @@ async function countInvitations(organizationId: string): Promise<number> {
   return r?.count ?? 0;
 }
 
-/**
- * Atomically claim the one-time "first email sent" activation for an org.
- * Returns true for exactly one caller per org — the winner emits
- * `activation_first_email_sent`. Shares the `activation_first_email_tracked_at`
- * flag with the API so web broadcasts, workflow sends, and SDK deliveries all
- * fire the milestone exactly once per org. Upserts the extension row.
- */
-async function claimFirstEmailTracked(
-  organizationId: string
-): Promise<boolean> {
-  // Cheap PK read first: once the org is tracked, later calls short-circuit
-  // here with no write and no row lock on organization_extension.
-  const [existing] = await db
-    .select({ trackedAt: organizationExtension.activationFirstEmailTrackedAt })
-    .from(organizationExtension)
-    .where(eq(organizationExtension.organizationId, organizationId));
-  if (existing?.trackedAt) {
-    return false;
-  }
-
-  // First-time path: atomic claim. The `IS NULL` setWhere makes concurrent
-  // first-fires safe — exactly one upsert wins.
-  const now = new Date();
-  const claimed = await db
-    .insert(organizationExtension)
-    .values({ organizationId, activationFirstEmailTrackedAt: now })
-    .onConflictDoUpdate({
-      target: organizationExtension.organizationId,
-      set: { activationFirstEmailTrackedAt: now, updatedAt: now },
-      setWhere: isNull(organizationExtension.activationFirstEmailTrackedAt),
-    })
-    .returning({ organizationId: organizationExtension.organizationId });
-  return claimed.length > 0;
-}
-
 // ─── Tracking Helpers ────────────────────────────────────────────────────────
 // Each helper is wrapped in try/catch so it never throws.
 // Callers should await these to ensure events are emitted before the context exits.
@@ -451,7 +417,7 @@ export async function trackFirstEmailSent(
   }
 ) {
   try {
-    const isFirst = await claimFirstEmailTracked(organizationId);
+    const isFirst = await claimFirstEmailMilestone(organizationId);
     if (isFirst) {
       const props = {
         organization_id: organizationId,

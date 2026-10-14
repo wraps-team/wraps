@@ -10,6 +10,7 @@ const {
   mockPlatformPatch,
   mockSelectResults,
   mockInsertResults,
+  mockClaimFirstEmail,
 } = vi.hoisted(() => ({
   mockCapture: vi.fn(),
   mockGroupIdentify: vi.fn(),
@@ -18,6 +19,7 @@ const {
   mockPlatformPatch: vi.fn(),
   mockSelectResults: [] as MockRow[][],
   mockInsertResults: [] as MockRow[][],
+  mockClaimFirstEmail: vi.fn(),
 }));
 
 vi.mock("@wraps/db", () => ({
@@ -52,6 +54,7 @@ vi.mock("@wraps/db", () => ({
       })),
     })),
   },
+  claimFirstEmailMilestone: mockClaimFirstEmail,
   awsAccount: {
     organizationId: "aws_account.organization_id",
   },
@@ -114,24 +117,20 @@ function queueSelectResults(...results: MockRow[][]) {
 }
 
 /**
- * Queue the result of the first-email claim. The helper reads the flag first,
- * then attempts the atomic upsert only when it's still null.
- * - won: flag read returns null → upsert wins.
- * - lost: flag read returns a timestamp → short-circuits before any upsert.
+ * Queue the result of the first-email claim. The claim itself lives in
+ * `@wraps/db` (covered by its real-DB test), so here it is a plain boolean:
+ * - won: this caller is the one that emits the milestone.
+ * - lost: the org was already tracked.
  */
 function queueClaim(won: boolean) {
-  if (won) {
-    mockSelectResults.push([{ trackedAt: null }]);
-    mockInsertResults.push([{ organizationId: "claimed" }]);
-  } else {
-    mockSelectResults.push([{ trackedAt: new Date() }]);
-  }
+  mockClaimFirstEmail.mockResolvedValueOnce(won);
 }
 
 describe("activation tracking", () => {
   beforeEach(() => {
     mockSelectResults.length = 0;
     mockInsertResults.length = 0;
+    mockClaimFirstEmail.mockReset();
     mockCapture.mockReset();
     mockGroupIdentify.mockReset();
     mockPlatformPost.mockReset();
