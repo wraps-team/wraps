@@ -3,7 +3,9 @@
  *
  * Pins the behaviours that make the dead-letter path safe: a dead-lettered
  * lifecycle event marks its subscription `failed` (terminal and visible, so it
- * no longer expires silently), anything without a row or without an actionable
+ * no longer expires silently), a row that already left `pending` keeps its
+ * status (a whole-batch timeout dead-letters records that were applied on an
+ * earlier attempt), anything without a row or without an actionable
  * detail type is surfaced but writes nothing, and the handler never throws —
  * a DLQ consumer has no DLQ of its own to catch it.
  */
@@ -11,6 +13,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const updateSet = vi.fn();
+const updateWhere = vi.fn();
+const updateReturning = vi.fn();
 const selectWhere = vi.fn();
 const captureException = vi.fn();
 
@@ -50,11 +54,12 @@ vi.mock("@wraps/db", () => ({
     }),
     update: () => ({
       set: (v: unknown) => ({
-        where: () => {
+        where: (w: unknown) => {
           updateSet(v);
+          updateWhere(w);
           const result = Promise.resolve([]);
           return Object.assign(result, {
-            returning: () => Promise.resolve([]),
+            returning: () => Promise.resolve(updateReturning()),
           });
         },
       }),
@@ -99,9 +104,12 @@ const matchedRow = {
 describe("marketplace DLQ consumer", () => {
   beforeEach(() => {
     updateSet.mockReset();
+    updateWhere.mockReset();
+    updateReturning.mockReset();
     selectWhere.mockReset();
     captureException.mockReset();
     selectWhere.mockReturnValue([matchedRow]);
+    updateReturning.mockReturnValue([{ id: matchedRow.id }]);
   });
 
   it("marks a correlated subscription failed", async () => {
@@ -114,6 +122,37 @@ describe("marketplace DLQ consumer", () => {
     expect(updateSet).toHaveBeenCalledTimes(1);
     expect(updateSet.mock.calls[0][0]).toMatchObject({ status: "failed" });
     expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it("only fails a row that is still pending", async () => {
+    await invoke(
+      sqsEvent("License Updated - Manufacturer", {
+        license: { arn: LICENSE_ARN },
+      })
+    );
+
+    expect(updateWhere).toHaveBeenCalledWith({
+      and: [{ eq: ["id", "row-1"] }, { eq: ["status", "pending"] }],
+    });
+  });
+
+  it("leaves an already-settled row alone but still surfaces it", async () => {
+    // A batch timeout redelivers records that were already applied; after the
+    // retries they dead-letter alongside the one that actually failed.
+    selectWhere.mockReturnValue([{ ...matchedRow, status: "active" }]);
+    updateReturning.mockReturnValue([]);
+
+    await invoke(
+      sqsEvent("Purchase Agreement Ended - Manufacturer", {
+        agreement: { id: "agr-1" },
+      })
+    );
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException.mock.calls[0][1]).toMatchObject({
+      tags: { stage: "settled" },
+      extra: { subscriptionId: "row-1", status: "active" },
+    });
   });
 
   it("marks failed for a deactivation event too", async () => {

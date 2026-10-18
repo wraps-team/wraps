@@ -11,7 +11,11 @@
  * This consumer gives each dead-lettered event a terminal, visible outcome: it
  * correlates the event to its `aws_marketplace_subscription` row and moves it
  * to `failed` — the status the schema documents for exactly this case — so the
- * subscription surfaces for a human instead of silently expiring. It does not
+ * subscription surfaces for a human instead of silently expiring. Only a row
+ * still `pending` is failed: the main worker swallows per-record errors, so
+ * what reaches this queue is usually a whole batch whose Lambda timed out or
+ * crashed, and records earlier in that batch may already have been applied.
+ * Overwriting those would fail a live subscription. It does not
  * re-enqueue: the main handler already exhausts its retries before a message
  * lands here, and replaying the event would risk a queue/DLQ loop on a record
  * that fails deterministically.
@@ -23,7 +27,7 @@
 import "../lib/sentry";
 
 import { captureException, wrapHandler } from "@sentry/aws-serverless";
-import { awsMarketplaceSubscription, db, eq } from "@wraps/db";
+import { and, awsMarketplaceSubscription, db, eq } from "@wraps/db";
 import type { SQSEvent, SQSHandler } from "aws-lambda";
 
 import { flushLogger, log } from "../lib/logger";
@@ -120,10 +124,39 @@ async function handleDeadLettered(
     return;
   }
 
-  await db
+  // Guarded in the WHERE, not on `row.status`, so a delivery that lands
+  // between the select and the update cannot be overwritten either.
+  const [failed] = await db
     .update(awsMarketplaceSubscription)
     .set({ status: "failed", updatedAt: new Date() })
-    .where(eq(awsMarketplaceSubscription.id, row.id));
+    .where(
+      and(
+        eq(awsMarketplaceSubscription.id, row.id),
+        eq(awsMarketplaceSubscription.status, "pending")
+      )
+    )
+    .returning({ id: awsMarketplaceSubscription.id });
+
+  if (!failed) {
+    // The row already left `pending`, so its status is left alone. The event
+    // still exhausted its retries — a dead-lettered deactivation on an
+    // `active` row means a buyer who left still has access — so raise it.
+    log.error("marketplace.dlq.subscription_settled", undefined, {
+      ...context,
+      subscriptionId: row.id,
+      status: row.status,
+    });
+    captureException(
+      new Error(
+        `AWS Marketplace ${detailType} exhausted SQS retries for settled subscription ${row.id}`
+      ),
+      {
+        tags: { worker: "marketplace-dlq-consumer", stage: "settled" },
+        extra: { ...context, subscriptionId: row.id, status: row.status },
+      }
+    );
+    return;
+  }
 
   log.error("marketplace.dlq.subscription_failed", undefined, {
     ...context,
