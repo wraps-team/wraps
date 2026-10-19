@@ -19,8 +19,12 @@
  *      and `acceptor.accountId`. Correlation therefore falls back through
  *      licence -> agreement -> (buyer account + product code).
  *
- * This handler must never throw. Its DLQ is the only retry, and a record it
- * cannot process leaves a buyer stuck at `pending` with nothing to notice.
+ * This handler must never throw: a throw fails the whole batch, including
+ * records that were already applied. A record it cannot process is instead
+ * reported as a batch item failure, so SQS retries just that record and, once
+ * the retries are spent, dead-letters it to the consumer that marks the buyer's
+ * subscription `failed`. Swallowing the error would delete the message and
+ * leave the buyer stuck at `pending` with nothing to notice.
  */
 
 // Initialize Sentry before all other imports
@@ -32,7 +36,7 @@ import {
   generateMarketplaceLinkToken,
   sendMarketplaceWelcomeEmail,
 } from "@wraps/email";
-import type { SQSEvent, SQSHandler } from "aws-lambda";
+import type { SQSBatchItemFailure, SQSEvent, SQSHandler } from "aws-lambda";
 
 import { flushLogger, log } from "../lib/logger";
 
@@ -48,13 +52,17 @@ import {
 export { licenseKey } from "../services/marketplace-event";
 
 export const handler: SQSHandler = wrapHandler(async (event: SQSEvent) => {
+  const batchItemFailures: SQSBatchItemFailure[] = [];
+
   for (const record of event.Records) {
     try {
       const parsed = JSON.parse(record.body) as MarketplaceEvent;
       await handleEvent(parsed);
     } catch (error) {
-      // Never throw: the DLQ is the only retry, and a dropped record leaves a
-      // paying buyer stuck at `pending`.
+      // Report rather than throw, so only this record is retried. Every write
+      // in handleEvent is idempotent under redelivery: the status update is
+      // guarded on the event timestamp and the welcome email on its claim.
+      batchItemFailures.push({ itemIdentifier: record.messageId });
       captureException(error, {
         tags: { worker: "marketplace-events", stage: "record" },
         extra: { messageId: record.messageId },
@@ -69,6 +77,8 @@ export const handler: SQSHandler = wrapHandler(async (event: SQSEvent) => {
   await flushLogger().catch(() => {
     // Log flushing is best-effort; a failure here must not fail the batch.
   });
+
+  return { batchItemFailures };
 });
 
 async function handleEvent(event: MarketplaceEvent): Promise<void> {
