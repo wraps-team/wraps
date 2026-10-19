@@ -173,7 +173,12 @@ beforeEach(() => {
   currentSearchParams = new URLSearchParams();
 });
 
-afterEach(cleanup);
+// Radix FocusScope dispatches its unmount event from a setTimeout(0). Let it
+// fire before vitest tears down jsdom, or it lands as an unhandled error.
+afterEach(async () => {
+  cleanup();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});
 
 describe("filter changed", () => {
   it("captures the email-status control with from/to on change", async () => {
