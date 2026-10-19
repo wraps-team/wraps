@@ -241,7 +241,7 @@ describe("marketplace events consumer", () => {
     expect(updateSet).not.toHaveBeenCalled();
   });
 
-  it("swallows a malformed record rather than throwing — the DLQ is the only retry", async () => {
+  it("reports a malformed record as a batch item failure rather than throwing", async () => {
     const bad = {
       Records: [{ messageId: "m-bad", body: "not json" }],
       // biome-ignore lint/suspicious/noExplicitAny: minimal SQS shape
@@ -250,8 +250,51 @@ describe("marketplace events consumer", () => {
     await expect(
       // biome-ignore lint/suspicious/noExplicitAny: unused lambda callback
       handler(bad, {} as never, undefined as any)
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ batchItemFailures: [{ itemIdentifier: "m-bad" }] });
     expect(updateSet).not.toHaveBeenCalled();
+  });
+
+  it("retries only the record that failed, not the rest of the batch", async () => {
+    // A swallowed error deletes the message, so a transient DB failure would
+    // never reach the retries or the DLQ and the buyer would stay `pending`.
+    selectWhere
+      .mockImplementationOnce(() => {
+        throw new Error("connection terminated");
+      })
+      .mockReturnValue([existingRow]);
+    const ok = sqsEvent("License Updated - Manufacturer", {
+      license: { arn: LICENSE_ARN },
+    }).Records[0];
+    const batch = {
+      Records: [
+        { ...ok, messageId: "m-fails" },
+        { ...ok, messageId: "m-ok" },
+      ],
+      // biome-ignore lint/suspicious/noExplicitAny: minimal SQS shape
+    } as any;
+
+    await expect(
+      // biome-ignore lint/suspicious/noExplicitAny: unused lambda callback
+      handler(batch, {} as never, undefined as any)
+    ).resolves.toEqual({ batchItemFailures: [{ itemIdentifier: "m-fails" }] });
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "active" })
+    );
+  });
+
+  it("reports no failures for a batch that applied cleanly", async () => {
+    selectWhere.mockReturnValue([existingRow]);
+
+    await expect(
+      handler(
+        sqsEvent("License Updated - Manufacturer", {
+          license: { arn: LICENSE_ARN },
+        }),
+        {} as never,
+        // biome-ignore lint/suspicious/noExplicitAny: unused lambda callback
+        undefined as any
+      )
+    ).resolves.toEqual({ batchItemFailures: [] });
   });
 
   it("emails the buyer once on activation", async () => {
