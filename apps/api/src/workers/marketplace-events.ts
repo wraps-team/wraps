@@ -19,91 +19,50 @@
  *      and `acceptor.accountId`. Correlation therefore falls back through
  *      licence -> agreement -> (buyer account + product code).
  *
- * This handler must never throw. Its DLQ is the only retry, and a record it
- * cannot process leaves a buyer stuck at `pending` with nothing to notice.
+ * This handler must never throw: a throw fails the whole batch, including
+ * records that were already applied. A record it cannot process is instead
+ * reported as a batch item failure, so SQS retries just that record and, once
+ * the retries are spent, dead-letters it to the consumer that marks the buyer's
+ * subscription `failed`. Swallowing the error would delete the message and
+ * leave the buyer stuck at `pending` with nothing to notice.
  */
 
 // Initialize Sentry before all other imports
 import "../lib/sentry";
 
 import { captureException, wrapHandler } from "@sentry/aws-serverless";
-import {
-  and,
-  awsMarketplaceSubscription,
-  db,
-  desc,
-  eq,
-  ilike,
-  isNull,
-} from "@wraps/db";
+import { and, awsMarketplaceSubscription, db, eq, isNull } from "@wraps/db";
 import {
   generateMarketplaceLinkToken,
   sendMarketplaceWelcomeEmail,
 } from "@wraps/email";
-import type { SQSEvent, SQSHandler } from "aws-lambda";
+import type { SQSBatchItemFailure, SQSEvent, SQSHandler } from "aws-lambda";
 
 import { flushLogger, log } from "../lib/logger";
 
-type MarketplaceEvent = {
-  id?: string;
-  "detail-type"?: string;
-  source?: string;
-  time?: string;
-  detail?: {
-    agreement?: { id?: string; status?: string };
-    product?: { code?: string; id?: string };
-    license?: { arn?: string };
-    acceptor?: { accountId?: string };
-    offer?: { id?: string };
-  };
-};
+import {
+  ACTIVATING,
+  ADVISORY,
+  DEACTIVATING,
+  findSubscription,
+  type MarketplaceEvent,
+} from "../services/marketplace-event";
 
-/**
- * Detail types this worker acts on. Everything else is acknowledged and
- * dropped — the rule is deliberately broader than this map so a new event
- * type shows up in logs instead of vanishing.
- *
- * `Purchase Agreement Created` doubles as the activation signal because it is
- * unverified whether a Free-pricing product emits `License Updated` at all
- * (entitlements are a contract-pricing concept). Whichever arrives first wins;
- * the second is a no-op.
- */
-const ACTIVATING = new Set([
-  "License Updated - Manufacturer",
-  "Purchase Agreement Created - Proposer",
-  "Purchase Agreement Created - Manufacturer",
-]);
-
-const DEACTIVATING = new Set([
-  "License Deprovisioned - Manufacturer",
-  "Purchase Agreement Ended - Proposer",
-  "Purchase Agreement Ended - Manufacturer",
-]);
-
-const ADVISORY = new Set(["Purchase Agreement Advisory Issued - Manufacturer"]);
-
-/**
- * AWS's own documentation prints licence ARNs inconsistently — the License
- * event example omits the leading `arn:` that ResolveCustomer returns. Compare
- * on the licence id (`l-…`) so a formatting difference cannot silently prevent
- * every correlation.
- */
-export function licenseKey(arn: string | undefined): string | null {
-  if (!arn) {
-    return null;
-  }
-  const match = arn.match(/l-[0-9a-f]+/i);
-  return match ? match[0].toLowerCase() : arn.toLowerCase();
-}
+// Re-exported for callers that still import it from this module.
+export { licenseKey } from "../services/marketplace-event";
 
 export const handler: SQSHandler = wrapHandler(async (event: SQSEvent) => {
+  const batchItemFailures: SQSBatchItemFailure[] = [];
+
   for (const record of event.Records) {
     try {
       const parsed = JSON.parse(record.body) as MarketplaceEvent;
       await handleEvent(parsed);
     } catch (error) {
-      // Never throw: the DLQ is the only retry, and a dropped record leaves a
-      // paying buyer stuck at `pending`.
+      // Report rather than throw, so only this record is retried. Every write
+      // in handleEvent is idempotent under redelivery: the status update is
+      // guarded on the event timestamp and the welcome email on its claim.
+      batchItemFailures.push({ itemIdentifier: record.messageId });
       captureException(error, {
         tags: { worker: "marketplace-events", stage: "record" },
         extra: { messageId: record.messageId },
@@ -118,6 +77,8 @@ export const handler: SQSHandler = wrapHandler(async (event: SQSEvent) => {
   await flushLogger().catch(() => {
     // Log flushing is best-effort; a failure here must not fail the batch.
   });
+
+  return { batchItemFailures };
 });
 
 async function handleEvent(event: MarketplaceEvent): Promise<void> {
@@ -279,73 +240,4 @@ async function sendWelcomeEmailOnce(row: {
     });
     log.error("marketplace.welcome.failed", error, { subscriptionId: row.id });
   }
-}
-
-/**
- * Correlation, most specific first. Licence ARN is the only truly unique key
- * under Concurrent Agreements; account + product is a last resort that can
- * legitimately match several rows, so it takes the newest deliberately rather
- * than whichever Postgres happens to return.
- */
-async function findSubscription(keys: {
-  arn?: string;
-  agreementId?: string;
-  accountId?: string;
-  productCode?: string;
-}) {
-  if (keys.arn) {
-    // Exact hit on the unique index covers the normal case.
-    const [exact] = await db
-      .select()
-      .from(awsMarketplaceSubscription)
-      .where(eq(awsMarketplaceSubscription.licenseArn, keys.arn))
-      .limit(1);
-    if (exact) {
-      return exact;
-    }
-
-    // Formatting mismatch fallback — match on the `l-…` id alone. Bounded by
-    // LIMIT rather than loading the table into memory.
-    const key = licenseKey(keys.arn);
-    if (key?.startsWith("l-")) {
-      const [suffix] = await db
-        .select()
-        .from(awsMarketplaceSubscription)
-        .where(ilike(awsMarketplaceSubscription.licenseArn, `%${key}%`))
-        .limit(1);
-      if (suffix) {
-        return suffix;
-      }
-    }
-  }
-
-  if (keys.agreementId) {
-    const [byAgreement] = await db
-      .select()
-      .from(awsMarketplaceSubscription)
-      .where(eq(awsMarketplaceSubscription.agreementId, keys.agreementId))
-      .limit(1);
-    if (byAgreement) {
-      return byAgreement;
-    }
-  }
-
-  if (keys.accountId && keys.productCode) {
-    const [byAccount] = await db
-      .select()
-      .from(awsMarketplaceSubscription)
-      .where(
-        and(
-          eq(awsMarketplaceSubscription.customerAwsAccountId, keys.accountId),
-          eq(awsMarketplaceSubscription.productCode, keys.productCode)
-        )
-      )
-      .orderBy(desc(awsMarketplaceSubscription.resolvedAt))
-      .limit(1);
-    if (byAccount) {
-      return byAccount;
-    }
-  }
-
-  return null;
 }
