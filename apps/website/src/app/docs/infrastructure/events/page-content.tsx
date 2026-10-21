@@ -1562,7 +1562,7 @@ export default function InfrastructureEventsPageContent() {
                             Email subject line
                           </td>
                         </tr>
-                        <tr>
+                        <tr className="border-b">
                           <td className="p-3">
                             <code className="rounded bg-muted px-1 py-0.5">
                               detail.receivedAt
@@ -1570,6 +1570,41 @@ export default function InfrastructureEventsPageContent() {
                           </td>
                           <td className="p-3 text-muted-foreground">
                             When the inbound email was received
+                          </td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-3">
+                            <code className="rounded bg-muted px-1 py-0.5">
+                              detail.rawS3Key
+                            </code>
+                          </td>
+                          <td className="p-3 text-muted-foreground">
+                            S3 key of the raw MIME message in your inbound
+                            bucket
+                          </td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-3">
+                            <code className="rounded bg-muted px-1 py-0.5">
+                              detail.truncated
+                            </code>
+                          </td>
+                          <td className="p-3 text-muted-foreground">
+                            Present and <code>true</code> only when large fields
+                            were dropped to fit the EventBridge size limit;{" "}
+                            <code>detail.truncatedFields</code> lists them
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="p-3">
+                            <code className="rounded bg-muted px-1 py-0.5">
+                              detail.parsedS3Key
+                            </code>
+                          </td>
+                          <td className="p-3 text-muted-foreground">
+                            Set on truncated events: S3 key of the full parsed
+                            email JSON, in the same bucket as{" "}
+                            <code>rawS3Key</code>
                           </td>
                         </tr>
                       </tbody>
@@ -1581,6 +1616,71 @@ export default function InfrastructureEventsPageContent() {
                 code={inboundPayload}
                 filename="inbound-event.json"
               />
+              <p className="text-muted-foreground text-sm">
+                The full parsed email is always stored in your bucket at{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  parsed/{"{emailId}"}.json
+                </code>
+                . If it would exceed the EventBridge PutEvents size limit (1 MB,
+                or 256 KB in Regions without the 1 MB increase), the event is
+                trimmed: the largest of{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">html</code>,{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">text</code> and{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">headers</code>{" "}
+                is dropped first, then the others, then{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  attachments
+                </code>
+                , until it fits, and the detail gains{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  truncated: true
+                </code>
+                ,{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  truncatedFields
+                </code>{" "}
+                and{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  parsedS3Key
+                </code>
+                . When{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  truncated
+                </code>{" "}
+                is set, read the full email from{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  parsedS3Key
+                </code>{" "}
+                (or the raw MIME from{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">rawS3Key</code>
+                ). If that is still too large,{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">to</code>/
+                <code className="rounded bg-muted px-1.5 py-0.5">cc</code> are
+                replaced by{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">toCount</code>/
+                <code className="rounded bg-muted px-1.5 py-0.5">ccCount</code>{" "}
+                and the subject is cut to 1,000 characters; as a last resort the
+                detail holds only{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">emailId</code>,{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">rawS3Key</code>
+                ,{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  parsedS3Key
+                </code>
+                ,{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  receivedAt
+                </code>
+                ,{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  replyToken
+                </code>{" "}
+                and{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  autoReply
+                </code>
+                .
+              </p>
               <p className="text-muted-foreground text-sm">
                 When replying to a signed message,{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">

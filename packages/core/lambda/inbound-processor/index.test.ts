@@ -18,6 +18,7 @@ const ebMock = mockClient(EventBridgeClient);
 const ssmMock = mockClient(SSMClient);
 
 const PARSED_BUCKET = "parsed-bucket";
+const INTERNAL_FAILURE = /InternalFailure/;
 
 type EmailFixture = {
   to?: Array<{ address: string }>;
@@ -25,6 +26,8 @@ type EmailFixture = {
   from?: { address: string; name?: string };
   headers?: [string, unknown][];
   subject?: string;
+  html?: string;
+  text?: string;
 };
 
 const parsedState: { queue: EmailFixture[] } = { queue: [] };
@@ -48,8 +51,8 @@ function parseFromFixture(fx: EmailFixture) {
       ccValue.length > 0
         ? { value: ccValue, text: ccValue.map((t) => t.address).join(", ") }
         : undefined,
-    html: "<p>hi</p>",
-    text: "hi",
+    html: fx.html ?? "<p>hi</p>",
+    text: fx.text ?? "hi",
     headers,
     attachments: [],
     date: new Date("2026-01-01T00:00:00Z"),
@@ -83,6 +86,8 @@ function makeCtx(): Context {
 
 async function capturedPut(idx = 0): Promise<{
   source?: string;
+  detailType?: string;
+  rawDetail: string;
   detail: Record<string, unknown>;
 }> {
   const calls = ebMock.commandCalls(PutEventsCommand);
@@ -92,7 +97,22 @@ async function capturedPut(idx = 0): Promise<{
   const entry = calls[idx].args[0].input.Entries?.[0];
   return {
     source: entry?.Source,
+    detailType: entry?.DetailType,
+    rawDetail: entry?.Detail ?? "",
     detail: JSON.parse(entry?.Detail ?? "{}") as Record<string, unknown>,
+  };
+}
+
+function capturedParsedObject(): { key: string; body: string } {
+  const call = s3Mock
+    .commandCalls(PutObjectCommand)
+    .find((c) => c.args[0].input.Key?.startsWith("parsed/"));
+  if (!call) {
+    throw new Error("no parsed/ PutObject call");
+  }
+  return {
+    key: call.args[0].input.Key as string,
+    body: call.args[0].input.Body as string,
   };
 }
 
@@ -118,6 +138,8 @@ beforeEach(() => {
   process.env.BUCKET_NAME = PARSED_BUCKET;
   // biome-ignore lint/performance/noDelete: process.env coerces `= undefined` to the string "undefined" (truthy). Actual key removal is required so `Boolean(process.env.REPLY_SECRET_PARAMETER_PREFIX)` is false in the feature-disabled tests.
   delete process.env.REPLY_SECRET_PARAMETER_PREFIX;
+  // A 1 MB-limit Region; tests that need the 256 KB limit override it.
+  process.env.AWS_REGION = "eu-west-1";
 
   // Fresh module — re-initializes the module-scope domainSecretCache per test.
   vi.resetModules();
@@ -572,5 +594,252 @@ describe("inbound-processor — feature-disabled path", () => {
     const ev = await capturedPut();
     expect(ev.detail.replyToken).toBeNull();
     expect(ssmMock.commandCalls(GetParameterCommand).length).toBe(0);
+  });
+});
+
+describe("inbound-processor — EventBridge entry size", () => {
+  const MB = 1024 * 1024;
+
+  async function entryBytes(): Promise<number> {
+    const { putEventsEntrySize } = await import("./index.ts");
+    const ev = await capturedPut();
+    return putEventsEntrySize({
+      Source: ev.source ?? "",
+      DetailType: ev.detailType ?? "",
+      Detail: ev.rawDetail,
+    });
+  }
+
+  it("sends a small mail unchanged: detail equals the parsed JSON in S3", async () => {
+    parsedState.queue = [
+      {
+        from: { address: "sender@external.com" },
+        to: [{ address: "inbox@support.foo.com" }],
+        subject: "hello",
+      },
+    ];
+
+    await runHandler();
+
+    const ev = await capturedPut();
+    expect(ev.rawDetail).toBe(capturedParsedObject().body);
+    expect(ev.detail.truncated).toBeUndefined();
+    expect(ev.detail.parsedS3Key).toBeUndefined();
+    expect(ev.detail.html).toBe("<p>hi</p>");
+    expect(ev.detail.text).toBe("hi");
+  });
+
+  it("trims a huge text body under the limit and points at the parsed JSON", async () => {
+    const hugeText = "x".repeat(2 * MB);
+    parsedState.queue = [
+      {
+        from: { address: "sender@external.com" },
+        to: [{ address: "inbox@support.foo.com" }],
+        cc: [{ address: "cc@support.foo.com" }],
+        subject: "big one",
+        text: hugeText,
+        headers: [["x-ses-spam-verdict", "PASS"]],
+      },
+    ];
+
+    await runHandler(singleS3Event("raw/big"));
+
+    const { maxEventEntryBytes } = await import("./index.ts");
+    const ev = await capturedPut();
+    const parsedObject = capturedParsedObject();
+    expect(await entryBytes()).toBeLessThanOrEqual(maxEventEntryBytes());
+    expect(maxEventEntryBytes()).toBeLessThan(MB);
+    expect(ev.detail.truncated).toBe(true);
+    expect(ev.detail.parsedS3Key).toBe(parsedObject.key);
+    expect(ev.detail.parsedS3Key).toBe(`parsed/${ev.detail.emailId}.json`);
+    // Only the oversized field goes; the small html stays inline.
+    expect(ev.detail.truncatedFields).toEqual(["text"]);
+    expect(ev.detail.text).toBeNull();
+    expect(ev.detail.html).toBe("<p>hi</p>");
+    expect(ev.detail.htmlTruncated).toBe(false);
+    // Identifying fields survive.
+    expect(ev.detail.rawS3Key).toBe("raw/big");
+    expect(ev.detail.subject).toBe("big one");
+    expect(ev.detail.from).toEqual({
+      address: "sender@external.com",
+      name: "",
+    });
+    expect(ev.detail.to).toEqual([
+      { address: "inbox@support.foo.com", name: "" },
+    ]);
+    expect(ev.detail.cc).toEqual([{ address: "cc@support.foo.com", name: "" }]);
+    expect(ev.detail.spamVerdict).toBe("PASS");
+    expect(ev.detail.headers).toEqual({ "x-ses-spam-verdict": "PASS" });
+    expect(ev.detail.replyToken).toBeNull();
+    expect(ev.detail.autoReply).toBe(false);
+    // S3 keeps the full email.
+    expect(JSON.parse(parsedObject.body).text).toBe(hugeText);
+  });
+
+  it("counts UTF-8 bytes, not characters", async () => {
+    // 400k CJK chars: under 1 MB in characters, 1.2 MB in UTF-8 bytes.
+    const cjkText = "中".repeat(400_000);
+    parsedState.queue = [
+      {
+        from: { address: "sender@external.com" },
+        to: [{ address: "inbox@support.foo.com" }],
+        text: cjkText,
+      },
+    ];
+
+    await runHandler();
+
+    const { maxEventEntryBytes } = await import("./index.ts");
+    const ev = await capturedPut();
+    expect(cjkText.length).toBeLessThan(maxEventEntryBytes());
+    expect(ev.detail.truncated).toBe(true);
+    expect(ev.detail.text).toBeNull();
+    expect(await entryBytes()).toBeLessThanOrEqual(maxEventEntryBytes());
+  });
+
+  it("uses the 256 KB limit in Regions without the 1 MB increase, dropping the largest body field", async () => {
+    process.env.AWS_REGION = "mx-central-1";
+    parsedState.queue = [
+      {
+        from: { address: "sender@external.com" },
+        to: [{ address: "inbox@support.foo.com" }],
+        html: `<p>${"y".repeat(160 * 1024)}</p>`,
+        text: "z".repeat(150 * 1024),
+      },
+    ];
+
+    await runHandler();
+
+    const { maxEventEntryBytes } = await import("./index.ts");
+    const ev = await capturedPut();
+    expect(maxEventEntryBytes()).toBeLessThan(256 * 1024);
+    expect(await entryBytes()).toBeLessThanOrEqual(maxEventEntryBytes());
+    expect(ev.detail.truncatedFields).toEqual(["html"]);
+    expect(ev.detail.html).toBeNull();
+    expect(ev.detail.text).toBe("z".repeat(150 * 1024));
+  });
+
+  it("keeps a ~300 KB mail inline in a 1 MB Region", async () => {
+    parsedState.queue = [
+      {
+        from: { address: "sender@external.com" },
+        to: [{ address: "inbox@support.foo.com" }],
+        html: `<p>${"y".repeat(150 * 1024)}</p>`,
+        text: "z".repeat(150 * 1024),
+      },
+    ];
+
+    await runHandler();
+
+    const ev = await capturedPut();
+    expect(ev.detail.truncated).toBeUndefined();
+    expect(ev.rawDetail).toBe(capturedParsedObject().body);
+  });
+
+  it("throws when PutEvents reports a failed entry, so the Lambda retries", async () => {
+    ebMock.reset();
+    ebMock.on(PutEventsCommand).resolves({
+      FailedEntryCount: 1,
+      Entries: [
+        {
+          ErrorCode: "InternalFailure",
+          ErrorMessage: "Internal Service Failure",
+        },
+      ],
+    });
+    parsedState.queue = [
+      {
+        from: { address: "sender@external.com" },
+        to: [{ address: "inbox@support.foo.com" }],
+      },
+    ];
+
+    await expect(runHandler()).rejects.toThrow(INTERNAL_FAILURE);
+  });
+});
+
+describe("buildEventDetail", () => {
+  const base = {
+    emailId: "inb_1",
+    messageId: "<m@x>",
+    receivingDomain: "x.com",
+    from: { address: "a@x.com", name: "" },
+    to: [{ address: "b@x.com", name: "" }],
+    cc: [],
+    subject: "s",
+    date: "2026-01-01T00:00:00.000Z",
+    html: null,
+    htmlTruncated: false,
+    text: null,
+    headers: {},
+    attachments: [],
+    spamVerdict: null,
+    virusVerdict: null,
+    rawS3Key: "raw/1",
+    receivedAt: "2026-01-01T00:00:00.000Z",
+    replyToken: null,
+    autoReply: false,
+  };
+
+  it("drops attachments after the body fields, keeping their count", async () => {
+    const { buildEventDetail } = await import("./index.ts");
+    const attachments = Array.from({ length: 2000 }, (_, i) => ({
+      id: `att_${i}`,
+      filename: `file-${i}-${"n".repeat(100)}.pdf`,
+      contentType: "application/pdf",
+      size: 1,
+      s3Key: `attachments/inb_1/att_${i}-file.pdf`,
+      contentDisposition: "attachment",
+      cid: null,
+    }));
+    const { detail, truncatedFields } = buildEventDetail(
+      { ...base, text: "t".repeat(1000), attachments },
+      "parsed/inb_1.json",
+      "wraps.inbound",
+      64 * 1024
+    );
+    const parsed = JSON.parse(detail);
+    // html and headers were already empty, so they are not listed.
+    expect(truncatedFields).toEqual(["text", "attachments"]);
+    expect(parsed.htmlTruncated).toBe(false);
+    expect(parsed.attachments).toEqual([]);
+    expect(parsed.attachmentCount).toBe(2000);
+    expect(parsed.to).toEqual(base.to);
+    expect(parsed.parsedS3Key).toBe("parsed/inb_1.json");
+  });
+});
+
+describe("inbound-processor — envelope fallback", () => {
+  it("sends a bounded envelope when an unbounded field like from.name is huge", async () => {
+    process.env.AWS_REGION = "eu-west-1";
+    parsedState.queue = [
+      {
+        from: {
+          address: "sender@external.com",
+          name: "n".repeat(2 * 1024 * 1024),
+        },
+        to: [{ address: "inbox@support.foo.com" }],
+      },
+    ];
+
+    await runHandler(singleS3Event("raw/huge-name"));
+
+    const { maxEventEntryBytes, putEventsEntrySize } = await import(
+      "./index.ts"
+    );
+    const ev = await capturedPut();
+    expect(
+      putEventsEntrySize({
+        Source: ev.source ?? "",
+        DetailType: ev.detailType ?? "",
+        Detail: ev.rawDetail,
+      })
+    ).toBeLessThanOrEqual(maxEventEntryBytes());
+    expect(ev.detail.truncated).toBe(true);
+    expect(ev.detail.rawS3Key).toBe("raw/huge-name");
+    expect(ev.detail.parsedS3Key).toBe(capturedParsedObject().key);
+    expect(ev.detail.from).toBeUndefined();
+    expect(ev.detail.replyToken).toBeNull();
+    expect((ev.detail.truncatedFields as string[]).at(-1)).toBe("envelope");
   });
 });
