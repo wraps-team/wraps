@@ -687,6 +687,36 @@ TTL: 300`,
           .
         </p>
 
+        <p className="mb-4 text-muted-foreground text-sm">
+          Very large emails are trimmed to fit the EventBridge size limit: the
+          event then has{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            truncated: true
+          </code>
+          , drops <code className="rounded bg-muted px-1.5 py-0.5">html</code>,{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">text</code>,{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">headers</code> or{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">attachments</code>{" "}
+          (listed in{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            truncatedFields
+          </code>
+          ), and gives the full parsed email's S3 key in{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">parsedS3Key</code>.
+          Sender, recipients, subject and verdicts are kept unless they alone
+          are too large; then{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">to</code>/
+          <code className="rounded bg-muted px-1.5 py-0.5">cc</code> are
+          replaced by counts and the subject is cut, and as a last resort only{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">emailId</code>,{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">rawS3Key</code>,{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">parsedS3Key</code>,{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">receivedAt</code>,{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">replyToken</code> and{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">autoReply</code> are
+          sent.
+        </p>
+
         <p className="mb-2 font-medium text-sm">Example Lambda Handler</p>
         <CodeBlock
           className="h-auto"

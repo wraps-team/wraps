@@ -113,11 +113,18 @@ These resolve to the pre-bundled Lambda code location for Pulumi/CDK to deploy.
 - Uses `mailparser` to parse raw MIME
 - Extracts headers, body (max 200KB HTML), attachments
 - Uploads attachments to S3 with sanitized filenames
-- Publishes EventBridge event `email.received`
+- Stores the full parsed email at `parsed/{emailId}.json`
+- Publishes EventBridge event `email.received` on the default bus. If the entry
+  would exceed the PutEvents limit (1 MB; 256 KB in the Regions listed in
+  `LEGACY_LIMIT_REGIONS` and GovCloud), `buildEventDetail` drops `html`/`text`/`headers`
+  (largest first), then `attachments`, then `to`/`cc` (and cuts the subject),
+  and as a last resort sends a bounded envelope; it adds `truncated: true`,
+  `truncatedFields` and `parsedS3Key`. Small mail is sent unchanged.
+- Throws when PutEvents returns `FailedEntryCount > 0`
 - Extracts SES spam/virus verdicts from headers
 - **Re-throws errors** (unlike other processors) to trigger retry/DLQ
 
-**Env vars**: `PARSED_BUCKET`, `EVENT_BUS_NAME`, `WRAPS_ACCOUNT_ID`, `AWS_REGION`
+**Env vars**: `BUCKET_NAME`, `INBOUND_EVENT_SOURCE` (default `wraps.inbound`), `REPLY_SECRET_PARAMETER_PREFIX` (optional), `AWS_REGION`
 
 ## Lambda Loading Priority (in CLI)
 
