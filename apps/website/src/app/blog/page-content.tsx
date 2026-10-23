@@ -18,6 +18,7 @@ import {
   Send,
   Server,
   Shield,
+  ShieldCheck,
   Unlock,
   Zap,
 } from "lucide-react";
@@ -40,6 +41,17 @@ type BlogPost = {
 };
 
 const posts: BlogPost[] = [
+  {
+    slug: "no-stored-aws-keys",
+    title: "We Don't Hold Your AWS Keys",
+    description:
+      "How Wraps reaches your SES through OIDC and one-hour role sessions, the trust policy you can copy, and the places a static key still exists.",
+    category: "Security",
+    date: "October 2026",
+    readTime: "6 min read",
+    author: "Wraps Team",
+    icon: <ShieldCheck className="h-6 w-6" />,
+  },
   {
     slug: "why-email-providers-cost-more-than-ses",
     title:

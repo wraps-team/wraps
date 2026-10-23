@@ -299,6 +299,18 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
       "Interactive checklists and request templates target the single highest-friction moment in adopting SES — production access approval — which reference_yc_s26_targeting identifies as the real pain point over pricing.",
   },
   {
+    route: "/blog/no-stored-aws-keys",
+    primaryQuery: "send ses email from vercel without access keys",
+    secondaryQueries: [
+      "vercel oidc aws ses",
+      "aws assumerolewithwebidentity vercel trust policy",
+      "replace aws access keys with oidc",
+    ],
+    audience: "stranger-with-problem",
+    rationale:
+      "Gives a developer holding a static AWS key in their Vercel env the exact project-scoped trust policy that replaces it, written the week a supply-chain stealer harvested AWS keys from environments.",
+  },
+  {
     route: "/blog/signed-reply-threading",
     primaryQuery: "signed reply to email threading for agents",
     secondaryQueries: [

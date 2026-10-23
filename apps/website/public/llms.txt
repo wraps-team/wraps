@@ -560,6 +560,7 @@ Wraps publishes Claude Code skills at `https://wraps.dev/.well-known/skills/`:
 - [Get Out of SES Sandbox](https://wraps.dev/blog/ses-sandbox-guide)
 - [SPF Record Guide](https://wraps.dev/blog/spf-guide)
 - [Supabase Email Guide](https://wraps.dev/blog/supabase-email-guide)
+- [We Don't Hold Your AWS Keys](https://wraps.dev/blog/no-stored-aws-keys)
 - [Why Email Providers Cost More Than SES](https://wraps.dev/blog/why-email-providers-cost-more-than-ses)
 - [Your DMARC Policy Is Useless](https://wraps.dev/blog/your-dmarc-policy-is-useless)
 - [At 100K Emails a Month, the Send Rate Is the Small Number](https://wraps.dev/blog/reduce-transactional-email-costs)
