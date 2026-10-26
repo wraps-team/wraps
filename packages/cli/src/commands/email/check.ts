@@ -725,12 +725,9 @@ function displayBlacklistResult(
     return;
   }
 
-  const mark =
-    summary.state === "listed"
-      ? pc.red("✗")
-      : summary.state === "incomplete"
-        ? pc.yellow("⚠")
-        : pc.green("✓");
+  // Nothing listed is a pass. Lists that did not answer are shown as their own
+  // lines below, not as a warning on the whole check.
+  const mark = summary.state === "listed" ? pc.red("✗") : pc.green("✓");
   console.log(`  ${mark} ${label}       ${summary.headline}`);
 
   for (const listing of [
@@ -744,10 +741,8 @@ function displayBlacklistResult(
   if (summary.detail) {
     console.log(`${indent}${pc.dim(summary.detail)}`);
   }
-  if (summary.unansweredLists.length > 0) {
-    console.log(
-      `${indent}${pc.dim(`Did not answer: ${summary.unansweredLists.join(", ")}`)}`
-    );
+  for (const { list, reason } of summary.unansweredDetails) {
+    console.log(`${indent}${pc.dim(`○ ${list}: did not answer (${reason})`)}`);
   }
 
   console.log();
