@@ -247,7 +247,7 @@ export function HeroSurvivalPanel() {
           ))}
           <span className="inline-flex items-center gap-1.5">
             <span className="text-success">✓</span>
-            Blacklists clean on 206/206 lists
+            Blacklists clean on 50+ lists
           </span>
         </div>
       </div>
