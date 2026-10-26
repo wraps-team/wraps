@@ -91,8 +91,8 @@ export function AcceptInvitationForm({
   return (
     <Card className="w-full max-w-lg shadow-xl">
       <CardHeader className="space-y-4 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
-          <Mail className="h-8 w-8 text-white" />
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand/10">
+          <Mail className="h-8 w-8 text-brand" />
         </div>
         <div>
           <CardTitle className="text-2xl">You're Invited!</CardTitle>

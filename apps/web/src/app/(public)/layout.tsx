@@ -21,7 +21,7 @@ export default function PublicLayout({
       <main className="pb-16">{children}</main>
       <footer className="fixed right-0 bottom-0 left-0 py-4 text-center">
         <a
-          className="text-gray-400 text-xs transition-colors hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400"
+          className="text-muted-foreground text-xs transition-colors hover:text-foreground"
           href="https://wraps.dev"
           rel="noopener noreferrer"
           target="_blank"

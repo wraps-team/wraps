@@ -112,8 +112,8 @@ const roleConfig = {
   },
   member: {
     icon: Users,
-    color: "text-gray-600 dark:text-gray-400",
-    bgColor: "bg-gray-100 dark:bg-gray-900",
+    color: "text-muted-foreground",
+    bgColor: "bg-muted",
     label: "Member",
     variant: "secondary" as BadgeVariant,
   },
@@ -126,8 +126,8 @@ const roleConfig = {
   },
   "read-only": {
     icon: Eye,
-    color: "text-gray-500 dark:text-gray-400",
-    bgColor: "bg-gray-100 dark:bg-gray-900",
+    color: "text-muted-foreground",
+    bgColor: "bg-muted",
     label: "Read Only",
     variant: "secondary" as BadgeVariant,
   },
