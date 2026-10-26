@@ -186,53 +186,52 @@ async function checkIpBlacklists(
   // Filter to IPv4 only for now (IPv6 blacklist queries are more complex)
   const ipv4Ips = ips.filter(isIpv4);
 
-  for (const ip of ipv4Ips) {
+  // One pool across every (IP, list) pair, not one batch per IP in turn. Each
+  // batch waits for its slowest lookup (up to the DNS timeout), so querying IPs
+  // one after another made the worst case grow with the number of mail servers.
+  const checks = ipv4Ips.flatMap((ip) => {
     const reversedIp = reverseIp(ip);
-    const checks = blacklists.map((bl) => ({
+    return blacklists.map((bl) => ({
       blacklist: bl,
       query: `${reversedIp}.${bl.zone}`,
       ip,
     }));
+  });
 
-    await batchDnsQuery(
-      checks,
-      async (check) => {
-        result.ipChecks.checked++;
-        try {
-          const records = await resolveARecords(check.query);
-          const firstRecord = records[0];
-          // Filter out test responses
-          if (
-            records.length > 0 &&
-            firstRecord &&
-            !isTestResponse(firstRecord)
-          ) {
-            const listing = createListing(
-              check.blacklist,
-              "ip",
-              check.ip,
-              firstRecord
-            );
-            result.ipChecks.listed.push(listing);
-            result.overallClean = false;
-          } else {
-            result.ipChecks.clean.push(check.blacklist.name);
-          }
-        } catch (error: any) {
-          if (error.message?.includes("timed out")) {
-            result.ipChecks.timeouts.push(check.blacklist.name);
-          } else if (error.code !== "ENOTFOUND" && error.code !== "ENODATA") {
-            result.ipChecks.errors.push(
-              `${check.blacklist.name}: ${error.message}`
-            );
-          } else {
-            result.ipChecks.clean.push(check.blacklist.name);
-          }
+  await batchDnsQuery(
+    checks,
+    async (check) => {
+      result.ipChecks.checked++;
+      try {
+        const records = await resolveARecords(check.query);
+        const firstRecord = records[0];
+        // Filter out test responses
+        if (records.length > 0 && firstRecord && !isTestResponse(firstRecord)) {
+          const listing = createListing(
+            check.blacklist,
+            "ip",
+            check.ip,
+            firstRecord
+          );
+          result.ipChecks.listed.push(listing);
+          result.overallClean = false;
+        } else {
+          result.ipChecks.clean.push(check.blacklist.name);
         }
-      },
-      BLACKLIST_BATCH_SIZE
-    );
-  }
+      } catch (error: any) {
+        if (error.message?.includes("timed out")) {
+          result.ipChecks.timeouts.push(check.blacklist.name);
+        } else if (error.code !== "ENOTFOUND" && error.code !== "ENODATA") {
+          result.ipChecks.errors.push(
+            `${check.blacklist.name}: ${error.message}`
+          );
+        } else {
+          result.ipChecks.clean.push(check.blacklist.name);
+        }
+      }
+    },
+    BLACKLIST_BATCH_SIZE
+  );
 }
 
 /**
