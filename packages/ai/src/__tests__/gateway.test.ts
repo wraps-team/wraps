@@ -65,7 +65,9 @@ describe("gateway provider — provider options", () => {
 
   it("requires zero data retention even when nothing else is sent", async () => {
     const resolved = await getAIModel({ model: "grok-code-fast" }, {});
-    expect(resolved.providerOptions).toEqual({ gateway: { zeroDataRetention: true } });
+    expect(resolved.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
+    });
   });
 
   it("sends NO anthropic options when routed to xai — the bug this fixes", async () => {
@@ -75,7 +77,9 @@ describe("gateway provider — provider options", () => {
       { model: "grok-code-fast", reasoning: { effort: "medium" } },
       {}
     );
-    expect(resolved.providerOptions).toEqual({ gateway: { zeroDataRetention: true } });
+    expect(resolved.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
+    });
   });
 
   it("derives the option namespace from the routed upstream, not the provider", () => {
@@ -97,7 +101,9 @@ describe("gateway provider — provider options", () => {
       { AI_MODEL: "openai/gpt-4o" }
     );
     expect(resolved.catalogued).toBe(false);
-    expect(resolved.providerOptions).toEqual({ gateway: { zeroDataRetention: true } });
+    expect(resolved.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
+    });
   });
 
   it("still grants reasoning to an uncatalogued claude slug", async () => {
@@ -127,7 +133,9 @@ describe("gateway provider — provider options", () => {
 
   it("omits reasoning options when the caller did not ask for reasoning", async () => {
     const resolved = await getAIModel({}, {});
-    expect(resolved.providerOptions).toEqual({ gateway: { zeroDataRetention: true } });
+    expect(resolved.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
+    });
   });
 
   it("offers an anthropic cache breakpoint but none for xai", async () => {
