@@ -44,7 +44,7 @@ const READOUT: Line[] = [
   },
   {
     tone: "muted",
-    text: "                   Did not answer: SURBL Multi",
+    text: "                   ○ SURBL Multi: did not answer (SERVFAIL)",
   },
   { tone: "plain", text: "" },
   { tone: "head", text: "ISSUES (0 critical, 1 warnings)" },
