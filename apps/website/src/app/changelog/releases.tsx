@@ -113,6 +113,58 @@ export const Code = ({ children }: { children: ReactNode }) => (
 
 export const releases: Release[] = [
   {
+    slug: "push-respects-dashboard-edits",
+    versions: [
+      "CLI v3.17.0",
+      "CLI v3.17.1",
+      "CLI v3.17.2",
+      "CLI v3.17.3",
+      "CLI v3.17.4",
+    ],
+    date: "2026-10-26",
+    icon: Terminal,
+    title: "Templates and workflows push that respects dashboard edits",
+    tags: ["cli", "dashboard", "api"],
+    summary:
+      "Push templates and workflows from the CLI without overwriting what a teammate changed in the dashboard, and see a non-zero exit code when a push does not go through.",
+    items: [
+      <>
+        Run <Code>wraps email templates push</Code> and it checks the dashboard
+        first. A template edited there since your last push is skipped and
+        listed, and the command exits 1. Add <Code>--force</Code> to overwrite
+        it. A dashboard sync that failed is retried on the next push
+      </>,
+      <>
+        <Code>wraps email workflows push</Code> keeps a paused workflow paused
+        and leaves its AWS account alone. Both <Code>push</Code> and{" "}
+        <Code>validate</Code> now exit non-zero on failure, so CI stops where it
+        should
+      </>,
+      <>
+        Pass an organization with <Code>--org</Code> or set it in{" "}
+        <Code>wraps.config.ts</Code>, and push writes to that organization
+        instead of the one active in the dashboard. Without either, the CLI asks
+      </>,
+      <>
+        If a scheduled workflow you pushed showed as enabled but never ran,
+        upgrade to v3.17.1: push now registers its schedule. When registration
+        fails, the workflow is left as a draft and the CLI says why. Run{" "}
+        <Code>wraps email workflows push onboarding</Code> to push only that
+        workflow. New workflows past your plan&apos;s limit are refused, as they
+        are in the dashboard
+      </>,
+    ],
+    docs: "/docs/guides/template-handoff",
+    alsoFixed: [
+      "Inbound email too large for one EventBridge event now arrives as an email.received event with truncated, truncatedFields and parsedS3Key set, and the full parsed message in S3. Before, the Lambda failed and the message never reached your consumer.",
+      "A retried inbound Lambda invocation no longer creates a duplicate parsed message or a second email.received event.",
+      "Segment entry and exit workflow triggers now fire only when a contact joins or leaves a segment, not on every update of a contact already in it.",
+      "wraps email inbound init and add reject --root combined with --subdomain, instead of writing MX records to the apex domain.",
+      "Agent policy flags passed on the command line are no longer ignored.",
+      "The dashboard no longer crashes when the browser translates the page.",
+    ],
+  },
+  {
     slug: "tracking-for-domains-added-in-the-dashboard",
     versions: ["CLI v3.16.0"],
     date: "2026-09-30",
