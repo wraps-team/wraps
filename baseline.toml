@@ -222,10 +222,10 @@ type = "ratchet"
 severity = "error"
 pattern = "(?:bg|text|border|ring|outline|shadow|accent|caret|fill|stroke|decoration|from|to|via)-(?:white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\\d{2,3})"
 regex = true
-max_count = 988
+max_count = 583
 glob = "apps/web/src/**/*.tsx"
 exclude_glob = ["**/components/ui/**"]
-message = "Migrate raw color utilities to theme tokens or add dark: variants (988 remaining, ratchet down)"
+message = "Migrate raw color utilities to theme tokens; dark: variants count too, so only tokens lower this (583 remaining, ratchet down)"
 
 # Ratchet: raw Tailwind colors that should be semantic tokens
 [[rule]]
@@ -234,10 +234,10 @@ type = "ratchet"
 severity = "error"
 pattern = "(?:bg|text|border)-(?:white|black|(?:gray|slate)-(?:50|100|200|300|400|500|600|700|800|900|950))"
 regex = true
-max_count = 71
+max_count = 29
 glob = "apps/web/src/**/*.tsx"
 exclude_glob = ["**/components/ui/**"]
-message = "Use semantic tokens (bg-background, text-foreground, border-border) instead of raw colors (69 remaining, ratchet down)"
+message = "Use semantic tokens (bg-background, text-foreground, border-border) instead of raw colors (29 remaining, ratchet down)"
 
 # Ratchet: reduce `as any` type assertions (baselined at 95)
 [[rule]]
@@ -245,7 +245,7 @@ id = "ratchet-as-any"
 type = "ratchet"
 severity = "error"
 pattern = "as any"
-max_count = 93
+max_count = 92
 glob = "**/*.{ts,tsx}"
 # blog page files excluded: substring pattern false-positives on marketing prose
 # (e.g. "as any verified identity" in agent-mailboxes/page.tsx), not TS assertions.
@@ -257,7 +257,7 @@ exclude_glob = [
   "**/app/blog/**/page.tsx",
   "**/app/blog/**/page-content.tsx",
 ]
-message = "Reduce 'as any' assertions — use proper types or 'as unknown' (93 remaining, ratchet down)"
+message = "Reduce 'as any' assertions — use proper types or 'as unknown' (92 remaining, ratchet down)"
 
 
 # ══════════════════════════════════════════════
