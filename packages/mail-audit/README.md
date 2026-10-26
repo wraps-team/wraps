@@ -99,7 +99,7 @@ npx mail-audit spf example.com
 | Mail server TLS | STARTTLS support and negotiated version per MX host |
 | Reverse DNS | PTR records for mail server IPs |
 | IPv6 | AAAA on MX hosts and matching SPF coverage |
-| Blacklists | Mail server IPs against 38 public DNSBLs, plus the domain against 16 domain blocklists |
+| Blacklists | Mail server IPs against 38 public DNSBLs, plus the domain against 15 domain blocklists |
 | Domain age | Registration date (young domains are treated with suspicion by receivers) |
 
 ## CI usage
