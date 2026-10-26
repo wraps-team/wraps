@@ -79,13 +79,10 @@ export function OrganizationProvider({
     if (!activeOrgData) {
       return;
     }
-    const orgData = (activeOrgData as any).organization || activeOrgData;
-    if (orgData?.id) {
-      posthog.group("organization", orgData.id, {
-        name: orgData.name,
-        slug: orgData.slug,
-      });
-    }
+    posthog.group("organization", activeOrgData.id, {
+      name: activeOrgData.name,
+      slug: activeOrgData.slug,
+    });
   }, [activeOrgData]);
 
   // Auto-set active org from URL when session has no active org
@@ -116,9 +113,7 @@ export function OrganizationProvider({
 
   // Prefer live client data; fall back to server-rendered initial data so the
   // switcher paints real content on first load instead of a skeleton.
-  const liveActiveOrg = activeOrgData
-    ? mapOrg((activeOrgData as any).organization || activeOrgData)
-    : null;
+  const liveActiveOrg = activeOrgData ? mapOrg(activeOrgData) : null;
   const activeOrg = liveActiveOrg ?? initialActiveOrganization;
 
   // better-auth's getFullOrganization payload has no top-level `role` — the
@@ -128,9 +123,8 @@ export function OrganizationProvider({
   const { data: sessionData } = authClient.useSession();
   const currentUserId = sessionData?.user?.id;
   const derivedRole =
-    (activeOrgData as any)?.members?.find(
-      (m: { userId?: string }) => m.userId === currentUserId
-    )?.role ?? null;
+    activeOrgData?.members?.find((m) => m.userId === currentUserId)?.role ??
+    null;
 
   const value: OrganizationContextValue = {
     activeOrganization: activeOrg,

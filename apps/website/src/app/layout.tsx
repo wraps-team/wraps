@@ -137,7 +137,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script suppressHydrationWarning>{themeScript}</script>
+        {/* Must block render to avoid a theme flash, so not next/script */}
+        <script suppressHydrationWarning /* baseline:allow-no-sync-scripts */>
+          {themeScript}
+        </script>
         <link
           href="/llms.txt"
           rel="alternate"

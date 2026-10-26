@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@wraps/ui/components/ui/button";
+import Link from "next/link";
 import { CodeTabs } from "@/components/ui/shadcn-io/code-tabs";
 import { Github } from "@/components/ui/svgs/brand-icons";
 import { SectionKicker } from "./section-kicker";
@@ -57,7 +58,7 @@ export function CodeSampleSection() {
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Button asChild className="cursor-pointer" variant="brand">
-              <a href="/docs/sdk-reference">Read the docs</a>
+              <Link href="/docs/sdk-reference">Read the docs</Link>
             </Button>
             <Button asChild className="cursor-pointer" variant="outline">
               <a

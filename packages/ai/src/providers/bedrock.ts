@@ -1,5 +1,5 @@
 import { cacheBreakpoint, reasoningOptions } from "../call-options";
-import { DEFAULT_MODEL_KEY } from "../catalog";
+import { DEFAULT_BEDROCK_MODEL_KEY } from "../catalog";
 import { fail, ok, type ProviderSpec } from "../registry";
 import { resolveModelId, unwrapModelResolution } from "../resolve-model";
 import type { AIProvider } from "../types";
@@ -128,7 +128,7 @@ export const bedrockSpec: ProviderSpec<AIProvider> = {
       const check = resolveModelId({
         providerId: "bedrock",
         requested: override,
-        fallback: DEFAULT_MODEL_KEY,
+        fallback: DEFAULT_BEDROCK_MODEL_KEY,
       });
       if (!check.ok) {
         return fail(check.issue);
@@ -160,7 +160,7 @@ export const bedrockSpec: ProviderSpec<AIProvider> = {
                 providerId: "bedrock",
                 requested: override,
                 preferred: request.model,
-                fallback: DEFAULT_MODEL_KEY,
+                fallback: DEFAULT_BEDROCK_MODEL_KEY,
               })
             );
           const nativeId = applyInferenceProfile(modelId, region, catalogued);
@@ -176,7 +176,11 @@ export const bedrockSpec: ProviderSpec<AIProvider> = {
             // The `bedrock` namespace, NOT `anthropic` — Bedrock silently
             // ignores an anthropic block and reasoning just stops appearing.
             providerOptions: capabilities.has("reasoning")
-              ? reasoningOptions("bedrock", request.reasoning?.effort)
+              ? reasoningOptions(
+                  "bedrock",
+                  request.reasoning?.effort,
+                  capabilities.has("adaptive-reasoning")
+                )
               : undefined,
             cache: {
               breakpoint: capabilities.has("prompt-caching")

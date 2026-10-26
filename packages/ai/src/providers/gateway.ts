@@ -1,6 +1,7 @@
 import { gateway } from "@ai-sdk/gateway";
 import {
   cacheBreakpoint,
+  mergeProviderOptions,
   type OptionNamespace,
   reasoningOptions,
 } from "../call-options";
@@ -81,9 +82,19 @@ export const gatewaySpec: ProviderSpec<AIProvider> = {
             capabilities,
             catalogued,
             degradedFrom,
-            providerOptions: capabilities.has("reasoning")
-              ? reasoningOptions(namespace, request.reasoning?.effort)
-              : undefined,
+            // Customer content goes through these prompts, so the gateway may
+            // only route to upstreams with a verified zero-retention agreement.
+            // With none available the request fails; it never falls back.
+            providerOptions: mergeProviderOptions(
+              { gateway: { zeroDataRetention: true } },
+              capabilities.has("reasoning")
+                ? reasoningOptions(
+                    namespace,
+                    request.reasoning?.effort,
+                    capabilities.has("adaptive-reasoning")
+                  )
+                : undefined
+            ),
             cache: {
               breakpoint: capabilities.has("prompt-caching")
                 ? cacheBreakpoint(namespace)

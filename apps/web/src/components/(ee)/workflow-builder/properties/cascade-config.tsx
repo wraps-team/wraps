@@ -371,8 +371,8 @@ export function CascadeConfig({
             Contact engaged with a channel
           </li>
           <li>
-            <span className="font-medium text-gray-600">Exhausted</span> — All
-            channels tried without engagement
+            <span className="font-medium text-muted-foreground">Exhausted</span>{" "}
+            — All channels tried without engagement
           </li>
         </ul>
       </div>

@@ -140,7 +140,7 @@ function DeviceFlow() {
 
       if (approveError) {
         const errorMsg =
-          (approveError as any).error === "expired_token"
+          approveError.error === "expired_token"
             ? "This code has expired. Please run `wraps auth login` again."
             : "Failed to approve. The code may be invalid or expired.";
         setError(errorMsg);

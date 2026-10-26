@@ -11,11 +11,11 @@ beforeEach(() => {
 });
 
 describe("gateway provider — model resolution", () => {
-  it("defaults to the catalog's claude-sonnet-4 gateway slug", async () => {
+  it("defaults to the catalog's claude-sonnet-5.5 gateway slug", async () => {
     const resolved = await getAIModel({}, {});
     expect(resolved.providerId).toBe("gateway");
-    expect(resolved.modelId).toBe("anthropic/claude-sonnet-4");
-    expect(resolved.modelKey).toBe("claude-sonnet-4");
+    expect(resolved.modelId).toBe("anthropic/claude-sonnet-5.5");
+    expect(resolved.modelKey).toBe("claude-sonnet-5.5");
     expect(resolved.catalogued).toBe(true);
   });
 
@@ -52,10 +52,21 @@ describe("gateway provider — model resolution", () => {
 });
 
 describe("gateway provider — provider options", () => {
-  it("sends anthropic thinking when routed to an anthropic model", async () => {
+  it("sends adaptive anthropic thinking when routed to a 4.6+ claude model", async () => {
     const resolved = await getAIModel({ reasoning: { effort: "medium" } }, {});
     expect(resolved.providerOptions).toEqual({
-      anthropic: { thinking: { type: "enabled", budgetTokens: 10_000 } },
+      gateway: { zeroDataRetention: true },
+      anthropic: {
+        thinking: { type: "adaptive", display: "summarized" },
+        effort: "medium",
+      },
+    });
+  });
+
+  it("requires zero data retention even when nothing else is sent", async () => {
+    const resolved = await getAIModel({ model: "grok-code-fast" }, {});
+    expect(resolved.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
     });
   });
 
@@ -66,7 +77,9 @@ describe("gateway provider — provider options", () => {
       { model: "grok-code-fast", reasoning: { effort: "medium" } },
       {}
     );
-    expect(resolved.providerOptions).toBeUndefined();
+    expect(resolved.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
+    });
   });
 
   it("derives the option namespace from the routed upstream, not the provider", () => {
@@ -88,7 +101,9 @@ describe("gateway provider — provider options", () => {
       { AI_MODEL: "openai/gpt-4o" }
     );
     expect(resolved.catalogued).toBe(false);
-    expect(resolved.providerOptions).toBeUndefined();
+    expect(resolved.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
+    });
   });
 
   it("still grants reasoning to an uncatalogued claude slug", async () => {
@@ -97,13 +112,30 @@ describe("gateway provider — provider options", () => {
       { AI_MODEL: "anthropic/claude-opus-4-1" }
     );
     expect(resolved.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
       anthropic: { thinking: { type: "enabled", budgetTokens: 4000 } },
+    });
+  });
+
+  it("sends adaptive thinking, never a budget, to an uncatalogued 4.6+ claude slug", async () => {
+    const resolved = await getAIModel(
+      { reasoning: { effort: "low" } },
+      { AI_MODEL: "anthropic/claude-opus-5.5" }
+    );
+    expect(resolved.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
+      anthropic: {
+        thinking: { type: "adaptive", display: "summarized" },
+        effort: "low",
+      },
     });
   });
 
   it("omits reasoning options when the caller did not ask for reasoning", async () => {
     const resolved = await getAIModel({}, {});
-    expect(resolved.providerOptions).toBeUndefined();
+    expect(resolved.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
+    });
   });
 
   it("offers an anthropic cache breakpoint but none for xai", async () => {

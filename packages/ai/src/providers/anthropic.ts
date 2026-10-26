@@ -67,7 +67,11 @@ export const anthropicSpec: ProviderSpec<AIProvider> = {
             catalogued,
             degradedFrom,
             providerOptions: capabilities.has("reasoning")
-              ? reasoningOptions("anthropic", request.reasoning?.effort)
+              ? reasoningOptions(
+                  "anthropic",
+                  request.reasoning?.effort,
+                  capabilities.has("adaptive-reasoning")
+                )
               : undefined,
             cache: {
               breakpoint: capabilities.has("prompt-caching")

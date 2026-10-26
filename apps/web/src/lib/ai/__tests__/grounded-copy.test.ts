@@ -1,20 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-type GenerateObjectFn = typeof import("ai").generateObject;
+type GenerateTextFn = typeof import("ai").generateText;
 
-const { mockGenerateObject, hoisted } = vi.hoisted(() => ({
-  mockGenerateObject: vi.fn(),
-  hoisted: { actualGenerateObject: undefined as unknown },
+const { mockGenerateText, hoisted } = vi.hoisted(() => ({
+  mockGenerateText: vi.fn(),
+  hoisted: { actualGenerateText: undefined as unknown },
 }));
 
 vi.mock("ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("ai")>();
-  hoisted.actualGenerateObject = actual.generateObject;
+  hoisted.actualGenerateText = actual.generateText;
   return {
     ...actual,
-    generateObject: (...args: Parameters<GenerateObjectFn>) =>
-      mockGenerateObject(...args),
+    generateText: (...args: Parameters<GenerateTextFn>) =>
+      mockGenerateText(...args),
   };
 });
 
@@ -36,9 +36,9 @@ describe("generateGroundedCopy", () => {
   beforeEach(() => {
     originalProvider = process.env.WRAPS_AI_PROVIDER;
     process.env.WRAPS_AI_PROVIDER = "noop";
-    mockGenerateObject.mockReset();
-    mockGenerateObject.mockImplementation(
-      hoisted.actualGenerateObject as GenerateObjectFn
+    mockGenerateText.mockReset();
+    mockGenerateText.mockImplementation(
+      hoisted.actualGenerateText as GenerateTextFn
     );
   });
 
@@ -63,7 +63,7 @@ describe("generateGroundedCopy", () => {
   });
 
   it("falls back when the model returns a shape the schema rejects", async () => {
-    mockGenerateObject.mockRejectedValueOnce(
+    mockGenerateText.mockRejectedValueOnce(
       new Error("AI_NoObjectGeneratedError: response did not match schema")
     );
 
@@ -83,8 +83,8 @@ describe("generateGroundedCopy", () => {
       title: "Bounce rate at 6.0%",
       description: "This is above the 5% threshold. Clean your list.",
     };
-    mockGenerateObject.mockResolvedValueOnce({
-      object: generated,
+    mockGenerateText.mockResolvedValueOnce({
+      output: generated,
       usage: { inputTokens: 10, outputTokens: 20, totalTokens: 30 },
     });
 
@@ -109,7 +109,7 @@ describe("generateGroundedCopy", () => {
 
   it("falls back when generation exceeds the timeout", async () => {
     vi.useFakeTimers();
-    mockGenerateObject.mockImplementationOnce(() => new Promise(() => {}));
+    mockGenerateText.mockImplementationOnce(() => new Promise(() => {}));
 
     const promise = generateGroundedCopy({
       schema: testSchema,

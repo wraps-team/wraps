@@ -12,8 +12,7 @@ packages:
 minimumReleaseAgeExclude:
   - better-inbox
   - '@wraps.dev/better-auth'
-  - '@wraps.dev/client@0.10.1'
-  - '@wraps.dev/email@0.13.0'
+  - '@wraps.dev/email@0.15.1'
   - '@wraps.dev/sms@0.2.0'
   - cn@0.2.4
   - '@shadcn/lint@0.1.0'
@@ -29,7 +28,7 @@ overrides:
   'path-to-regexp@6': ^6.3.0
   tar: ^7.5.11
   '@smithy/types': ^4.12.0
-  '@aws-sdk/util-dynamodb': 3.996.5
+  '@aws-sdk/util-dynamodb': 3.996.9
   fast-xml-parser: ^5.3.8
   '@isaacs/brace-expansion': ^5.0.1
   'brace-expansion@<2': ^1.1.21
@@ -49,8 +48,8 @@ overrides:
   'zod@>=4': 4.6.7
   deepmerge-ts: ^8.0.2
   '@better-fetch/fetch': 1.3.2
-  better-call: 1.4.0
-  '@better-auth/utils': 0.4.2
+  better-call: 1.4.2
+  '@better-auth/utils': 0.5.0
   react-router: ^7.18.2
   undici: ^7.30.1
   'diff@<5': ^4.0.4
@@ -87,39 +86,39 @@ overrides:
   '@ai-sdk/provider-utils@<4': ^3.0.30
 
 catalog:
-  '@aws-sdk/client-acm': 3.1074.0
-  '@aws-sdk/client-cloudformation': 3.1074.0
-  '@aws-sdk/client-cloudfront': 3.1074.0
-  '@aws-sdk/client-cloudwatch': 3.1074.0
-  '@aws-sdk/client-cloudwatch-logs': 3.1074.0
-  '@aws-sdk/client-dynamodb': 3.1074.0
-  '@aws-sdk/client-eventbridge': 3.1074.0
-  '@aws-sdk/client-iam': 3.1074.0
-  '@aws-sdk/client-lambda': 3.1074.0
-  '@aws-sdk/client-mailmanager': 3.1074.0
-  '@aws-sdk/client-marketplace-metering': 3.1074.0
-  '@aws-sdk/client-pinpoint-sms-voice-v2': 3.1074.0
-  '@aws-sdk/client-route-53': 3.1074.0
-  '@aws-sdk/client-s3': 3.1074.0
-  '@aws-sdk/client-scheduler': 3.1074.0
-  '@aws-sdk/client-ses': 3.1074.0
-  '@aws-sdk/client-sesv2': 3.1091.0
-  '@aws-sdk/client-sns': 3.1074.0
-  '@aws-sdk/client-sqs': 3.1074.0
-  '@aws-sdk/client-ssm': 3.1074.0
-  '@aws-sdk/client-sts': 3.1074.0
-  '@aws-sdk/credential-providers': 3.1074.0
-  '@aws-sdk/lib-dynamodb': 3.1074.0
-  '@aws-sdk/s3-request-presigner': 3.1074.0
-  '@aws-sdk/util-dynamodb': 3.996.5
+  '@aws-sdk/client-acm': 3.1152.0
+  '@aws-sdk/client-cloudformation': 3.1152.0
+  '@aws-sdk/client-cloudfront': 3.1152.0
+  '@aws-sdk/client-cloudwatch': 3.1152.0
+  '@aws-sdk/client-cloudwatch-logs': 3.1152.0
+  '@aws-sdk/client-dynamodb': 3.1152.0
+  '@aws-sdk/client-eventbridge': 3.1152.0
+  '@aws-sdk/client-iam': 3.1152.0
+  '@aws-sdk/client-lambda': 3.1152.0
+  '@aws-sdk/client-mailmanager': 3.1152.0
+  '@aws-sdk/client-marketplace-metering': 3.1152.0
+  '@aws-sdk/client-pinpoint-sms-voice-v2': 3.1152.0
+  '@aws-sdk/client-route-53': 3.1152.0
+  '@aws-sdk/client-s3': 3.1152.0
+  '@aws-sdk/client-scheduler': 3.1152.0
+  '@aws-sdk/client-ses': 3.1152.0
+  '@aws-sdk/client-sesv2': 3.1152.0
+  '@aws-sdk/client-sns': 3.1152.0
+  '@aws-sdk/client-sqs': 3.1152.0
+  '@aws-sdk/client-ssm': 3.1152.0
+  '@aws-sdk/client-sts': 3.1152.0
+  '@aws-sdk/credential-providers': 3.1152.0
+  '@aws-sdk/lib-dynamodb': 3.1152.0
+  '@aws-sdk/s3-request-presigner': 3.1152.0
+  '@aws-sdk/util-dynamodb': 3.996.9
   '@react-email/components': 1.0.12
   '@react-email/render': 2.1.0
   '@types/node': 24.10.0
   '@types/pg': ^8.20.0
   '@vitest/coverage-v8': 4.1.11
   '@vitest/ui': 4.1.11
-  better-auth: 1.7.5
-  better-inbox: 0.3.1
+  better-auth: 1.7.11
+  better-inbox: 0.5.0
   dotenv: ^17.4.2
   drizzle-orm: ^0.45.2
   handlebars: 4.7.10
@@ -137,8 +136,8 @@ strictDepBuilds: true
 allowBuilds:
   '@posthog/cli': true
   '@pulumi/command': true
-  '@sentry-internal/node-cpu-profiler': true
   '@sentry/cli': true
+  '@sentry/node-cpu-profiler': true
   core-js: true
   es5-ext: true
   esbuild: true

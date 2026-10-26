@@ -56,7 +56,7 @@ describe("anthropic provider — model resolution", () => {
   it("maps the catalog default to the bare API id, not a gateway slug", async () => {
     const resolved = await getAIModel({}, ANTHROPIC_ENV);
     expect(resolved.providerId).toBe("anthropic");
-    expect(resolved.modelId).toBe("claude-sonnet-4-20250514");
+    expect(resolved.modelId).toBe("claude-sonnet-5-5");
     // The namespaced form is a gateway concept and would 404 against the API.
     expect(resolved.modelId).not.toContain("/");
   });
@@ -85,10 +85,23 @@ describe("anthropic provider — model resolution", () => {
 });
 
 describe("anthropic provider — call options", () => {
-  it("sends the thinking block with a token budget", async () => {
+  it("sends adaptive thinking plus effort to the 4.6+ default", async () => {
     const resolved = await getAIModel(
       { reasoning: { effort: "medium" } },
       ANTHROPIC_ENV
+    );
+    expect(resolved.providerOptions).toEqual({
+      anthropic: {
+        thinking: { type: "adaptive", display: "summarized" },
+        effort: "medium",
+      },
+    });
+  });
+
+  it("keeps the token budget for a pre-4.6 model pinned via AI_MODEL", async () => {
+    const resolved = await getAIModel(
+      { reasoning: { effort: "medium" } },
+      { ...ANTHROPIC_ENV, AI_MODEL: "claude-sonnet-4" }
     );
     expect(resolved.providerOptions).toEqual({
       anthropic: { thinking: { type: "enabled", budgetTokens: 10_000 } },
@@ -114,7 +127,7 @@ describe("provider isolation", () => {
     const viaGateway = await getAIModel({}, {});
 
     expect(direct.modelKey).toBe(viaGateway.modelKey);
-    expect(direct.modelId).toBe("claude-sonnet-4-20250514");
-    expect(viaGateway.modelId).toBe("anthropic/claude-sonnet-4");
+    expect(direct.modelId).toBe("claude-sonnet-5-5");
+    expect(viaGateway.modelId).toBe("anthropic/claude-sonnet-5.5");
   });
 });

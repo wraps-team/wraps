@@ -9,8 +9,8 @@
     "@email-lint/react-email": "0.2.1",
     "@react-email/components": "catalog:",
     "@types/react": "19.2.4",
-    "@wraps.dev/client": "0.8.1",
-    "@wraps.dev/email": "0.12.1",
+    "@wraps.dev/client": "0.12.1",
+    "@wraps.dev/email": "0.15.1",
     "react": "19.2.8"
   }
 }

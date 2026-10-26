@@ -1,5 +1,5 @@
 import { getAIModel } from "@wraps/ai";
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import type { z } from "zod";
 import { aiEnv } from "@/lib/ai/env";
 import { logger, serializeError } from "@/lib/logger";
@@ -34,15 +34,17 @@ export async function generateGroundedCopy<T>(args: {
   const { schema, system, facts, fallback, onUsage } = args;
 
   try {
+    // A two-line rephrase of established facts: the smallest model is enough,
+    // and providers that cannot serve it fall back to their default.
     const { model, modelId, providerOptions } = await getAIModel(
-      { reasoning: { effort: "low" } },
+      { model: "claude-haiku-5.5", reasoning: { effort: "low" } },
       aiEnv()
     );
 
-    const generation = generateObject({
+    const generation = generateText({
       model,
-      schema,
-      system,
+      output: Output.object({ schema }),
+      instructions: system,
       prompt: JSON.stringify(facts),
       maxOutputTokens: 300,
       providerOptions,
@@ -63,7 +65,7 @@ export async function generateGroundedCopy<T>(args: {
       model: modelId,
     });
 
-    return { value: result.object, generated: true };
+    return { value: result.output, generated: true };
   } catch (error) {
     logger.warn(
       { event: "ai.grounded_copy_failed", err: serializeError(error) },

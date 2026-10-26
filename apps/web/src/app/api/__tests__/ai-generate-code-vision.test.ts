@@ -135,7 +135,7 @@ describe("generate-code — image handling degrades on models without vision", (
     const content = sentUserContent();
     expect(Array.isArray(content)).toBe(true);
     expect(content).toContainEqual(
-      expect.objectContaining({ type: "image", mediaType: "image/png" })
+      expect.objectContaining({ type: "file", mediaType: "image/png" })
     );
     expect(promptGotImageReference()).toBe(true);
   });
@@ -159,6 +159,7 @@ describe("generate-code — image handling degrades on models without vision", (
     await postWithImage();
 
     expect(lastStreamTextArgs()?.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
       anthropic: { thinking: { type: "enabled", budgetTokens: 10_000 } },
     });
   });
@@ -168,6 +169,8 @@ describe("generate-code — image handling degrades on models without vision", (
 
     await postWithImage();
 
-    expect(lastStreamTextArgs()?.providerOptions).toBeUndefined();
+    expect(lastStreamTextArgs()?.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
+    });
   });
 });

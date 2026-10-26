@@ -158,6 +158,7 @@ describe("gateway routing to openai picks up the same rule", () => {
     );
     expect(resolved.providerId).toBe("gateway");
     expect(resolved.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
       openai: { reasoningEffort: "medium" },
     });
   });

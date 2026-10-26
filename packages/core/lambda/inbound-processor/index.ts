@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   EventBridgeClient,
   PutEventsCommand,
@@ -450,6 +450,10 @@ export async function handler(event: S3Event, context: Context) {
   for (const record of event.Records) {
     const s3Key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
     const bucket = record.s3.bucket.name;
+    // S3 event time is identical across retries; new Date() would differ per attempt.
+    const receivedAt = record.eventTime
+      ? new Date(record.eventTime).toISOString()
+      : new Date().toISOString();
 
     try {
       log("Processing raw email", { bucket, key: s3Key });
@@ -466,8 +470,9 @@ export async function handler(event: S3Event, context: Context) {
       // 2. Parse MIME
       const parsed = await simpleParser(rawBody);
 
-      // Generate email ID
-      const emailId = `inb_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
+      // Deterministic per raw object: a Lambda retry re-processes the same S3 key,
+      // so it must produce the same id (parsed JSON, attachments, event all key off it).
+      const emailId = `inb_${createHash("sha256").update(s3Key).digest("hex").slice(0, 16)}`;
 
       // 3. Extract headers as key-value pairs
       // mailparser returns most headers as strings, but some (list, received,
@@ -662,7 +667,7 @@ export async function handler(event: S3Event, context: Context) {
         to: toAddresses,
         cc: ccAddresses,
         subject: parsed.subject || "",
-        date: parsed.date?.toISOString() || new Date().toISOString(),
+        date: parsed.date?.toISOString() || receivedAt,
         html,
         htmlTruncated,
         text: parsed.text || null,
@@ -671,7 +676,7 @@ export async function handler(event: S3Event, context: Context) {
         spamVerdict,
         virusVerdict,
         rawS3Key: s3Key,
-        receivedAt: new Date().toISOString(),
+        receivedAt,
         replyToken,
         autoReply,
       };

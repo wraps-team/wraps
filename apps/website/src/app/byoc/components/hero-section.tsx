@@ -1,5 +1,6 @@
 import { DotPattern } from "@wraps/ui/components/dot-pattern";
 import { Button } from "@wraps/ui/components/ui/button";
+import Link from "next/link";
 
 export function ByocHeroSection() {
   return (
@@ -30,7 +31,7 @@ export function ByocHeroSection() {
               <a href="https://app.wraps.dev/auth?mode=signup">Start sending</a>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <a href="/docs/quickstart/email">Read the docs</a>
+              <Link href="/docs/quickstart/email">Read the docs</Link>
             </Button>
           </div>
         </div>

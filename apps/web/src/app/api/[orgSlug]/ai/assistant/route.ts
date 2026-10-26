@@ -1,7 +1,7 @@
 import { getAIModel, isProviderConfigError } from "@wraps/ai";
 import {
   convertToModelMessages,
-  stepCountIs,
+  isStepCount,
   streamText,
   type UIMessage,
 } from "ai";
@@ -49,7 +49,7 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const modelMessages = convertToModelMessages(
+    const modelMessages = await convertToModelMessages(
       parsed.data.messages as UIMessage[]
     );
 
@@ -66,22 +66,22 @@ export async function POST(request: Request, context: RouteContext) {
 
     const result = streamText({
       model,
-      system: ASSISTANT_SYSTEM_PROMPT,
+      instructions: ASSISTANT_SYSTEM_PROMPT,
       messages: modelMessages,
       tools,
-      stopWhen: stepCountIs(5),
+      stopWhen: isStepCount(5),
       maxOutputTokens: 4000,
       providerOptions,
-      onFinish: async ({ totalUsage }) => {
+      onEnd: async ({ usage }) => {
         try {
           await trackAiRequest({
             organizationId: org.id,
             userId,
             featureType: "ai_assistant",
-            inputTokens: totalUsage.inputTokens,
-            cachedInputTokens: totalUsage.cachedInputTokens,
-            outputTokens: totalUsage.outputTokens,
-            totalTokens: totalUsage.totalTokens,
+            inputTokens: usage.inputTokens,
+            cachedInputTokens: usage.inputTokenDetails.cacheReadTokens,
+            outputTokens: usage.outputTokens,
+            totalTokens: usage.totalTokens,
             model: MODEL_ID,
           });
         } catch (err) {

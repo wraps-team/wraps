@@ -56,7 +56,7 @@ export function AsciinemaPlayer({
 
       // Clean up existing player
       if (playerRef.current) {
-        containerRef.current.innerHTML = "";
+        containerRef.current.replaceChildren();
       }
 
       playerRef.current = AsciinemaPlayerLib.create(src, containerRef.current, {
@@ -82,7 +82,7 @@ export function AsciinemaPlayer({
     return () => {
       mounted = false;
       if (containerRef.current) {
-        containerRef.current.innerHTML = "";
+        containerRef.current.replaceChildren();
       }
     };
   }, [

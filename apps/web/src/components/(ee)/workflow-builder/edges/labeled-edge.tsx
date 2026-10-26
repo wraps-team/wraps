@@ -93,8 +93,7 @@ export function LabeledEdge({
       "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400";
   } else if (sourceHandleId === "exhausted") {
     label = "Exhausted";
-    labelColor =
-      "bg-gray-100 text-gray-700 dark:bg-gray-900/50 dark:text-gray-400";
+    labelColor = "bg-muted text-muted-foreground";
   }
 
   // Determine stroke color
