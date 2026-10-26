@@ -457,7 +457,7 @@ type = "banned-pattern"
 severity = "warning"
 pattern = "<img\\s"
 regex = true
-glob = "**/*.tsx"
+glob = "**/*.{tsx,jsx}"
 exclude_glob = [
   "**/opengraph-image.tsx",
   "**/twitter-image.tsx",
