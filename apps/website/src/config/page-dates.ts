@@ -93,7 +93,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/docs/guides/production-access": "2026-09-18T16:14:52-06:00",
   "/docs/guides/reply-threading": "2026-09-15T08:41:41-06:00",
   "/docs/guides/reputation": "2026-09-15T08:41:41-06:00",
-  "/docs/guides/self-hosted": "2026-09-15T08:41:41-06:00",
+  "/docs/guides/self-hosted": "2026-10-26T11:55:59-06:00",
   "/docs/guides/smtp": "2026-09-15T08:41:41-06:00",
   "/docs/guides/suppression-lists": "2026-09-15T08:41:41-06:00",
   "/docs/guides/template-handoff": "2026-09-15T08:41:41-06:00",
