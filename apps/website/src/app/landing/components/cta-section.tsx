@@ -1,4 +1,5 @@
 import { Code, CreditCard, Server } from "lucide-react";
+import { CopyCommand } from "./copy-command";
 import { CTAButtons } from "./cta-buttons";
 import { SectionKicker } from "./section-kicker";
 
@@ -17,6 +18,13 @@ export function CTASection() {
           touched. Cancel whenever — the infrastructure is yours and keeps
           sending.
         </p>
+
+        <div className="mb-6">
+          <CopyCommand
+            command="npx @wraps.dev/cli email init"
+            location="footer_cta"
+          />
+        </div>
 
         <CTAButtons />
 

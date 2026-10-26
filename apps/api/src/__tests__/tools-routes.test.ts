@@ -27,9 +27,17 @@ vi.mock("@aws-sdk/client-dynamodb", () => {
   };
 });
 
-vi.mock("@wraps.dev/email-check", () => ({
-  runEmailCheck: mockRunEmailCheck,
-}));
+// Only the DNS-running entry point is mocked. The summary the route reports is
+// the library's own, so a test that mocked it would just restate itself.
+vi.mock("@wraps.dev/email-check", async () => {
+  const actual = await vi.importActual<typeof import("@wraps.dev/email-check")>(
+    "@wraps.dev/email-check"
+  );
+  return {
+    runEmailCheck: mockRunEmailCheck,
+    describeBlacklistCoverage: actual.describeBlacklistCoverage,
+  };
+});
 
 vi.mock("../middleware/public-rate-limit", () => ({
   publicRateLimitMiddleware: new Elysia({ name: "public-rate-limit" }),
@@ -373,5 +381,183 @@ describe("toolsRoutes", () => {
       skipTls: true,
     });
     expect(mockDynamoSend).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("email-check blacklists", () => {
+  beforeEach(() => {
+    mockDynamoSend.mockReset();
+    mockDynamoSend.mockResolvedValue({});
+    mockRunEmailCheck.mockReset();
+  });
+
+  async function post(body: Record<string, unknown>) {
+    const app = createApp();
+    return app.handle(
+      new Request("http://localhost/tools/email-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+    );
+  }
+
+  function withBlacklist(blacklist: Record<string, unknown>): EmailCheckResult {
+    const result = createEmailCheckResult();
+    return {
+      ...result,
+      blacklist: { ...result.blacklist, ...blacklist },
+    } as unknown as EmailCheckResult;
+  }
+
+  it("still skips blacklists in quick mode unless the caller asks otherwise", async () => {
+    mockRunEmailCheck.mockResolvedValueOnce(createEmailCheckResult());
+
+    await post({ domain: "example.com" });
+
+    expect(mockRunEmailCheck).toHaveBeenCalledWith("example.com", {
+      quick: true,
+      skipBlacklists: true,
+      skipTls: true,
+      dkimSelectors: undefined,
+    });
+    expect(getDynamoCommand(0).input.Key?.pk?.S).toBe(
+      "cache:email-check:example.com:quick"
+    );
+  });
+
+  it("runs the quick blacklist set when skipBlacklists is false, under its own cache key", async () => {
+    mockRunEmailCheck.mockResolvedValueOnce(createEmailCheckResult());
+
+    await post({ domain: "example.com", quick: true, skipBlacklists: false });
+
+    expect(mockRunEmailCheck).toHaveBeenCalledWith("example.com", {
+      quick: true,
+      skipBlacklists: false,
+      skipTls: true,
+      dkimSelectors: undefined,
+    });
+    // A cached "blacklists skipped" result must not answer this request.
+    expect(getDynamoCommand(0).input.Key?.pk?.S).toBe(
+      "cache:email-check:example.com:quick:blacklists"
+    );
+  });
+
+  it("keys an explicit skip in full mode separately from a full check", async () => {
+    mockRunEmailCheck.mockResolvedValueOnce(createEmailCheckResult());
+
+    await post({ domain: "example.com", quick: false, skipBlacklists: true });
+
+    expect(getDynamoCommand(0).input.Key?.pk?.S).toBe(
+      "cache:email-check:example.com:full:no-blacklists"
+    );
+  });
+
+  it("reports a quick check that ran as checked, with what it covered", async () => {
+    mockRunEmailCheck.mockResolvedValueOnce(
+      withBlacklist({
+        quickMode: true,
+        skipped: false,
+        coverage: { domainLists: 5, ipLists: 10, ipAddresses: 2 },
+        domainChecks: {
+          checked: 5,
+          listed: [],
+          clean: [],
+          errors: [],
+          timeouts: [],
+        },
+        ipChecks: {
+          checked: 20,
+          listed: [],
+          clean: [],
+          errors: [],
+          timeouts: [],
+        },
+      })
+    );
+
+    const json = await (
+      await post({ domain: "example.com", quick: true, skipBlacklists: false })
+    ).json();
+
+    // The old `checked: !quickMode` reported false here and hid a real result.
+    expect(json.blacklist).toMatchObject({
+      checked: true,
+      quickMode: true,
+      summary: {
+        state: "clean",
+        lists: 15,
+        headline: "Clean on all 15 lists (quick mode)",
+      },
+    });
+  });
+
+  it("does not report clean when lookups did not answer", async () => {
+    mockRunEmailCheck.mockResolvedValueOnce(
+      withBlacklist({
+        quickMode: false,
+        skipped: false,
+        overallClean: true,
+        coverage: { domainLists: 15, ipLists: 38, ipAddresses: 1 },
+        domainChecks: {
+          checked: 15,
+          listed: [],
+          clean: [],
+          errors: [],
+          timeouts: [],
+        },
+        ipChecks: {
+          checked: 38,
+          listed: [],
+          clean: [],
+          errors: ["WPBL: queryA ESERVFAIL 1.2.0.192.db.wpbl.info"],
+          timeouts: [],
+        },
+      })
+    );
+
+    const json = await (
+      await post({ domain: "example.com", quick: false })
+    ).json();
+
+    expect(json.blacklist.overallClean).toBe(true); // no listing found
+    expect(json.blacklist.summary).toMatchObject({
+      state: "incomplete",
+      unanswered: 1,
+      unansweredLists: ["WPBL"],
+      unansweredDetails: [{ list: "WPBL", reason: "SERVFAIL" }],
+      headline: "No listings found on 52 of 53 lists",
+    });
+    expect(json.blacklist.summary.headline).not.toMatch(/clean/i);
+  });
+
+  it("reports a skipped check as not checked, not as clean", async () => {
+    mockRunEmailCheck.mockResolvedValueOnce(
+      withBlacklist({
+        quickMode: true,
+        skipped: true,
+        overallClean: true,
+        coverage: { domainLists: 0, ipLists: 0, ipAddresses: 0 },
+        domainChecks: {
+          checked: 0,
+          listed: [],
+          clean: [],
+          errors: [],
+          timeouts: [],
+        },
+        ipChecks: {
+          checked: 0,
+          listed: [],
+          clean: [],
+          errors: [],
+          timeouts: [],
+        },
+      })
+    );
+
+    const json = await (await post({ domain: "example.com" })).json();
+
+    expect(json.blacklist.checked).toBe(false);
+    expect(json.blacklist.summary.state).toBe("skipped");
   });
 });

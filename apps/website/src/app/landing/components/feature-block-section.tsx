@@ -1,9 +1,15 @@
-import { Lock, Mail, ShieldCheck, TerminalSquare } from "lucide-react";
+import {
+  Database,
+  type LucideIcon,
+  Mail,
+  ShieldCheck,
+  TerminalSquare,
+} from "lucide-react";
 import type * as React from "react";
 import { SectionKicker } from "./section-kicker";
 
 type Check = {
-  icon: typeof Lock;
+  icon: LucideIcon;
   title: string;
   description: React.ReactNode;
 };
@@ -15,9 +21,21 @@ const checks: Check[] = [
     description: (
       <>
         Run <code>wraps email init</code> and the full stack is production-ready
-        in under two minutes.
+        in about two minutes.
       </>
     ),
+  },
+  {
+    icon: ShieldCheck,
+    title: "Nothing you have gets touched",
+    description:
+      "Every resource is new and prefixed wraps-email-. What is already in the account is left alone.",
+  },
+  {
+    icon: Database,
+    title: "Events land in tables you own",
+    description:
+      "Sends, deliveries, opens and clicks stream into DynamoDB in your account. Query them yourself, or watch them in the dashboard.",
   },
   {
     icon: Mail,
@@ -28,18 +46,6 @@ const checks: Check[] = [
         wrappers.
       </>
     ),
-  },
-  {
-    icon: ShieldCheck,
-    title: "Reputation protection",
-    description:
-      "Bounce and complaint rates drawn against the lines AWS reviews and pauses at, swept hourly. Suppression is wired on from the first send.",
-  },
-  {
-    icon: Lock,
-    title: "Zero stored credentials",
-    description:
-      "Access is an OIDC-federated IAM role. Your AWS keys never leave your account.",
   },
 ];
 
@@ -85,14 +91,13 @@ export function FeatureBlockSection() {
     <section className="border-border border-b py-20 md:py-24" id="features">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="mb-12 max-w-[620px]">
-          <SectionKicker>The platform</SectionKicker>
+          <SectionKicker>The first step</SectionKicker>
           <h2 className="font-heading font-semibold text-3xl text-foreground leading-none tracking-tight md:text-4xl">
             One command stands up the whole sending stack.
           </h2>
           <p className="mt-4 max-w-[52ch] text-lg text-muted-foreground leading-relaxed">
             Wraps deploys SES, DynamoDB, Lambda, EventBridge, and scoped IAM
-            roles into your AWS account. Every event streams to tables you own —
-            query them yourself, or watch them in the dashboard.
+            roles into your AWS account.
           </p>
         </div>
 

@@ -1,4 +1,5 @@
 import {
+  describeBlacklistCoverage,
   type EmailCheckResult,
   formatSpfLookupTree,
   getExitCode,
@@ -81,7 +82,7 @@ export function displayResults(
   console.log(pc.bold("REPUTATION"));
   console.log();
 
-  displayBlacklistResult(blacklist, flags.quick);
+  displayBlacklistResult(blacklist);
   displayDomainAgeResult(result);
 
   // Security section
@@ -505,37 +506,44 @@ function displayIpv6Result(result: EmailCheckResult): void {
   console.log();
 }
 
+/**
+ * Display blacklist result.
+ *
+ * What was covered comes from describeBlacklistCoverage(), not from the raw
+ * lookup counts: those count list x IP and include lookups that never answered,
+ * so "Clean on N/N lists" overstated both.
+ */
 function displayBlacklistResult(
-  blacklist: EmailCheckResult["blacklist"],
-  quick?: boolean
+  blacklist: EmailCheckResult["blacklist"]
 ): void {
-  const totalListed =
-    blacklist.domainChecks.listed.length + blacklist.ipChecks.listed.length;
-  const totalChecked =
-    blacklist.domainChecks.checked + blacklist.ipChecks.checked;
+  const summary = describeBlacklistCoverage(blacklist);
+  const label = pc.dim("Blacklists");
+  const indent = "                     ";
 
-  if (totalListed === 0) {
-    const mode = quick ? " (quick mode)" : "";
+  if (summary.state === "skipped") {
+    console.log(`  ${pc.dim("○")} ${label}       ${pc.dim(summary.headline)}`);
+    console.log();
+    return;
+  }
+
+  // Nothing listed is a pass. Lists that did not answer are shown as their own
+  // lines below, not as a warning on the whole check.
+  const mark = summary.state === "listed" ? pc.red("✗") : pc.green("✓");
+  console.log(`  ${mark} ${label}       ${summary.headline}`);
+
+  for (const listing of [
+    ...blacklist.domainChecks.listed,
+    ...blacklist.ipChecks.listed,
+  ]) {
     console.log(
-      `  ${pc.green("✓")} ${pc.dim("Blacklists")}       Clean on ${totalChecked}/${totalChecked} lists${mode}`
+      `${indent}${pc.red("•")} ${listing.blacklist}: ${listing.meaning}`
     );
-    const domainClean = blacklist.domainChecks.clean.length;
-    const ipClean = blacklist.ipChecks.clean.length;
-    console.log(
-      `                     ${pc.dim(`Domain: ${domainClean}/${blacklist.domainChecks.checked} clean • IPs: ${ipClean}/${blacklist.ipChecks.checked} clean`)}`
-    );
-  } else {
-    console.log(
-      `  ${pc.red("✗")} ${pc.dim("Blacklists")}       Listed on ${totalListed} list${totalListed !== 1 ? "s" : ""}`
-    );
-    for (const listing of [
-      ...blacklist.domainChecks.listed,
-      ...blacklist.ipChecks.listed,
-    ]) {
-      console.log(
-        `                     ${pc.red("•")} ${listing.blacklist}: ${listing.meaning}`
-      );
-    }
+  }
+  if (summary.detail) {
+    console.log(`${indent}${pc.dim(summary.detail)}`);
+  }
+  for (const { list, reason } of summary.unansweredDetails) {
+    console.log(`${indent}${pc.dim(`○ ${list}: did not answer (${reason})`)}`);
   }
 
   console.log();

@@ -48,7 +48,10 @@ function isTestResponse(returnCode: string): boolean {
 }
 
 export type BlacklistCheckOptions = {
-  /** Use quick mode (top 10 blacklists only) */
+  /**
+   * Use the reduced list set: the first 5 of QUICK_BLACKLISTS for the domain
+   * and all 10 for each IPv4 address.
+   */
   quick?: boolean;
   /** Skip blacklist checks entirely */
   skip?: boolean;
@@ -86,6 +89,8 @@ export async function checkBlacklist(
   };
 
   if (skip) {
+    result.skipped = true;
+    result.coverage = { domainLists: 0, ipLists: 0, ipAddresses: 0 };
     return result;
   }
 
@@ -94,6 +99,15 @@ export async function checkBlacklist(
     ? QUICK_BLACKLISTS.slice(0, 5)
     : DOMAIN_BLACKLISTS;
   const ipBlacklists = quick ? QUICK_BLACKLISTS : IP_BLACKLISTS;
+
+  // IPv6 is not queried (see checkIpBlacklists), so only IPv4 addresses count.
+  const ipv4Count = ips.filter(isIpv4).length;
+  result.skipped = false;
+  result.coverage = {
+    domainLists: domainBlacklists.length,
+    ipLists: ipv4Count > 0 ? ipBlacklists.length : 0,
+    ipAddresses: ipv4Count,
+  };
 
   // Check domain blacklists
   await checkDomainBlacklists(domain, domainBlacklists, result);
@@ -172,53 +186,52 @@ async function checkIpBlacklists(
   // Filter to IPv4 only for now (IPv6 blacklist queries are more complex)
   const ipv4Ips = ips.filter(isIpv4);
 
-  for (const ip of ipv4Ips) {
+  // One pool across every (IP, list) pair, not one batch per IP in turn. Each
+  // batch waits for its slowest lookup (up to the DNS timeout), so querying IPs
+  // one after another made the worst case grow with the number of mail servers.
+  const checks = ipv4Ips.flatMap((ip) => {
     const reversedIp = reverseIp(ip);
-    const checks = blacklists.map((bl) => ({
+    return blacklists.map((bl) => ({
       blacklist: bl,
       query: `${reversedIp}.${bl.zone}`,
       ip,
     }));
+  });
 
-    await batchDnsQuery(
-      checks,
-      async (check) => {
-        result.ipChecks.checked++;
-        try {
-          const records = await resolveARecords(check.query);
-          const firstRecord = records[0];
-          // Filter out test responses
-          if (
-            records.length > 0 &&
-            firstRecord &&
-            !isTestResponse(firstRecord)
-          ) {
-            const listing = createListing(
-              check.blacklist,
-              "ip",
-              check.ip,
-              firstRecord
-            );
-            result.ipChecks.listed.push(listing);
-            result.overallClean = false;
-          } else {
-            result.ipChecks.clean.push(check.blacklist.name);
-          }
-        } catch (error: any) {
-          if (error.message?.includes("timed out")) {
-            result.ipChecks.timeouts.push(check.blacklist.name);
-          } else if (error.code !== "ENOTFOUND" && error.code !== "ENODATA") {
-            result.ipChecks.errors.push(
-              `${check.blacklist.name}: ${error.message}`
-            );
-          } else {
-            result.ipChecks.clean.push(check.blacklist.name);
-          }
+  await batchDnsQuery(
+    checks,
+    async (check) => {
+      result.ipChecks.checked++;
+      try {
+        const records = await resolveARecords(check.query);
+        const firstRecord = records[0];
+        // Filter out test responses
+        if (records.length > 0 && firstRecord && !isTestResponse(firstRecord)) {
+          const listing = createListing(
+            check.blacklist,
+            "ip",
+            check.ip,
+            firstRecord
+          );
+          result.ipChecks.listed.push(listing);
+          result.overallClean = false;
+        } else {
+          result.ipChecks.clean.push(check.blacklist.name);
         }
-      },
-      BLACKLIST_BATCH_SIZE
-    );
-  }
+      } catch (error: any) {
+        if (error.message?.includes("timed out")) {
+          result.ipChecks.timeouts.push(check.blacklist.name);
+        } else if (error.code !== "ENOTFOUND" && error.code !== "ENODATA") {
+          result.ipChecks.errors.push(
+            `${check.blacklist.name}: ${error.message}`
+          );
+        } else {
+          result.ipChecks.clean.push(check.blacklist.name);
+        }
+      }
+    },
+    BLACKLIST_BATCH_SIZE
+  );
 }
 
 /**
@@ -280,25 +293,180 @@ function getDelistUrl(zone: string): string | null {
   return delistUrls[zone] || null;
 }
 
+export type BlacklistSummary = {
+  /**
+   * - skipped: nothing was looked up
+   * - listed: at least one listing was found
+   * - incomplete: nothing listed, but some lookups did not answer
+   * - clean: nothing listed and every lookup answered
+   */
+  state: "skipped" | "listed" | "incomplete" | "clean";
+  listings: number;
+  /** Lookups attempted: one per list for the domain, plus one per list per IPv4 address. */
+  lookups: number;
+  /** Lookups that errored or timed out. */
+  unanswered: number;
+  /** The lists behind those lookups, once each, in the order they were met. */
+  unansweredLists: string[];
+  /** The same lists with why each did not answer, one entry per list per kind (domain or IP). */
+  unansweredDetails: { list: string; reason: string }[];
+  /** Lists consulted, or null when the result predates `coverage`. */
+  lists: number | null;
+  /** One line, safe to show next to a check or cross. Never says "clean" unless it is. */
+  headline: string;
+  /** Second line: what the lists were run against. Null when there is nothing to add. */
+  detail: string | null;
+};
+
+/** A short, human reason from a DNS error message. */
+function reasonFrom(message: string): string {
+  if (/timed out/i.test(message)) {
+    return "timed out";
+  }
+  const code = message.match(/\bE[A-Z]{3,}\b/)?.[0];
+  if (code === "ESERVFAIL") {
+    return "SERVFAIL";
+  }
+  if (code === "EREFUSED") {
+    return "refused";
+  }
+  return code ? code.slice(1).toLowerCase() : "no answer";
+}
+
+function plural(n: number, noun: string, many = `${noun}s`): string {
+  return `${n} ${n === 1 ? noun : many}`;
+}
+
+/**
+ * Say what a blacklist check actually covered.
+ *
+ * `checked` counts lookups (list x target), not lists, and it includes lookups
+ * that never got an answer. Printing it as "clean on N lists" claims more than
+ * was established, and the number changes with how many mail server IPs a
+ * domain has. Callers render this instead and add their own colour.
+ */
+export function describeBlacklistCoverage(
+  result: BlacklistResult
+): BlacklistSummary {
+  // Tolerate results that lack the arrays (hand-built or from older callers):
+  // an absent array is an empty one.
+  const domain = result.domainChecks;
+  const ip = result.ipChecks;
+  const listings = (domain.listed?.length ?? 0) + (ip.listed?.length ?? 0);
+  const lookups = (domain.checked ?? 0) + (ip.checked ?? 0);
+
+  // Errors are "List name: message"; timeouts are the bare list name. A list is
+  // counted once per kind (domain or IP), however many addresses it failed on.
+  const unansweredByKey = new Map<string, { list: string; reason: string }>();
+  let unanswered = 0;
+  const note = (
+    kind: "domain" | "ip",
+    entries: string[],
+    timedOut: boolean
+  ) => {
+    for (const entry of entries) {
+      unanswered++;
+      const [name = entry, ...rest] = entry.split(":");
+      const list = name.trim();
+      const key = `${kind}:${list}`;
+      if (!unansweredByKey.has(key)) {
+        unansweredByKey.set(key, {
+          list,
+          reason: timedOut ? "timed out" : reasonFrom(rest.join(":")),
+        });
+      }
+    }
+  };
+  note("domain", domain.errors ?? [], false);
+  note("ip", ip.errors ?? [], false);
+  note("domain", domain.timeouts ?? [], true);
+  note("ip", ip.timeouts ?? [], true);
+  const unansweredDetails = [...unansweredByKey.values()];
+  const unansweredLists = [...new Set(unansweredDetails.map((d) => d.list))];
+  const coverage = result.coverage;
+  const lists = coverage ? coverage.domainLists + coverage.ipLists : null;
+  const mode = result.quickMode ? " (quick mode)" : "";
+
+  let detail: string | null = null;
+  if (coverage && lists) {
+    detail =
+      coverage.ipAddresses > 0
+        ? `Domain: ${plural(coverage.domainLists, "list")} • Mail servers: ${plural(coverage.ipLists, "list")} on ${plural(coverage.ipAddresses, "IPv4 address", "IPv4 addresses")}`
+        : `Domain: ${plural(coverage.domainLists, "list")} • No IPv4 mail server addresses to check`;
+  }
+
+  if (result.skipped === true || lookups === 0) {
+    return {
+      state: "skipped",
+      listings: 0,
+      lookups,
+      unanswered,
+      unansweredLists,
+      unansweredDetails,
+      lists,
+      headline: "Skipped",
+      detail: null,
+    };
+  }
+
+  if (listings > 0) {
+    return {
+      state: "listed",
+      listings,
+      lookups,
+      unanswered,
+      unansweredLists,
+      unansweredDetails,
+      lists,
+      headline: `Listed on ${plural(listings, "list")}`,
+      detail,
+    };
+  }
+
+  if (unanswered > 0) {
+    return {
+      state: "incomplete",
+      listings,
+      lookups,
+      unanswered,
+      unansweredLists,
+      unansweredDetails,
+      lists,
+      headline:
+        lists === null
+          ? `No listings found; ${unanswered} of ${plural(lookups, "lookup")} did not answer`
+          : `No listings found on ${Math.max(lists - unansweredByKey.size, 0)} of ${plural(lists, "list")}`,
+      detail,
+    };
+  }
+
+  return {
+    state: "clean",
+    listings,
+    lookups,
+    unanswered,
+    unansweredLists,
+    unansweredDetails,
+    lists,
+    headline:
+      lists === null
+        ? `Clean on every list checked${mode}`
+        : `Clean on all ${plural(lists, "list")}${mode}`,
+    detail,
+  };
+}
+
 /**
  * Format blacklist results for display
  */
 export function formatBlacklistResults(result: BlacklistResult): string {
-  const domainListed = result.domainChecks.listed.length;
-  const ipListed = result.ipChecks.listed.length;
-  const totalListed = domainListed + ipListed;
+  const summary = describeBlacklistCoverage(result);
 
-  const domainChecked = result.domainChecks.checked;
-  const ipChecked = result.ipChecks.checked;
-
-  if (totalListed === 0) {
-    const mode = result.quickMode ? "(quick mode)" : "";
-    return `Clean on all ${domainChecked + ipChecked} lists ${mode}`.trim();
+  if (summary.state !== "listed") {
+    return summary.headline;
   }
 
-  const lines: string[] = [
-    `Listed on ${totalListed} blacklist${totalListed !== 1 ? "s" : ""}`,
-  ];
+  const lines: string[] = [summary.headline];
 
   // Show domain listings
   for (const listing of result.domainChecks.listed) {

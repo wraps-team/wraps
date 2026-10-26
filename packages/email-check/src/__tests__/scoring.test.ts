@@ -217,6 +217,14 @@ describe("calculateScore", () => {
     checks.dmarc.alignmentDkim = "strict";
     checks.mx.hasRedundancy = true;
     checks.blacklist.overallClean = true;
+    checks.blacklist.skipped = false;
+    checks.blacklist.coverage = {
+      domainLists: 15,
+      ipLists: 38,
+      ipAddresses: 1,
+    };
+    checks.blacklist.domainChecks.checked = 15;
+    checks.blacklist.ipChecks.checked = 38;
     checks.mtaSts.configured = true;
     checks.mtaSts.policy = {
       version: "STSv1",
@@ -447,6 +455,54 @@ describe("calculateScore", () => {
           deduction.reason === "Listed on Spamhaus DBL"
       )
     ).toBe(true);
+  });
+});
+
+describe("blacklist bonus", () => {
+  const blacklistBonus = (checks: AllCheckResults) =>
+    calculateScore(checks).bonuses.filter((b) => b.check === "blacklist");
+
+  function ran(checks: AllCheckResults) {
+    checks.blacklist.overallClean = true;
+    checks.blacklist.skipped = false;
+    checks.blacklist.coverage = {
+      domainLists: 15,
+      ipLists: 38,
+      ipAddresses: 1,
+    };
+    checks.blacklist.domainChecks.checked = 15;
+    checks.blacklist.ipChecks.checked = 38;
+  }
+
+  it("is earned when the check ran and every lookup answered", () => {
+    const checks = createBaseChecks();
+    ran(checks);
+    expect(blacklistBonus(checks)).toEqual([
+      { check: "blacklist", points: 1, reason: "Clean on all blacklists" },
+    ]);
+  });
+
+  it("is not earned when the check was skipped, even though overallClean is true", () => {
+    const checks = createBaseChecks();
+    ran(checks);
+    checks.blacklist.skipped = true;
+    checks.blacklist.domainChecks.checked = 0;
+    checks.blacklist.ipChecks.checked = 0;
+    expect(blacklistBonus(checks)).toEqual([]);
+  });
+
+  it("is not earned when lookups timed out, so nothing was established", () => {
+    const checks = createBaseChecks();
+    ran(checks);
+    checks.blacklist.ipChecks.timeouts = ["Spamhaus ZEN", "Barracuda"];
+    expect(blacklistBonus(checks)).toEqual([]);
+  });
+
+  it("is not earned when lookups errored", () => {
+    const checks = createBaseChecks();
+    ran(checks);
+    checks.blacklist.domainChecks.errors = ["SURBL Multi: SERVFAIL"];
+    expect(blacklistBonus(checks)).toEqual([]);
   });
 });
 

@@ -77,6 +77,13 @@ export const faqItems: FaqItem[] = [
     ),
   },
   {
+    value: "item-1c",
+    question:
+      "What happens when my bounce or complaint rate crosses an AWS line?",
+    answer:
+      "An hourly sweep reads your account's SES reputation metrics. When a rate reaches AWS's review lines (5% bounce, 0.1% complaint), your organization's owners and admins are notified, and an ongoing episode notifies once a day rather than every hour. If the account is paused or reaches AWS's pause lines (10% bounce, 0.5% complaint), Wraps also holds scheduled broadcasts back instead of queueing more mail behind it. Wraps cannot lift an AWS review or pause, because that is AWS's decision about your account. It tells you early and shows you what to clean up.",
+  },
+  {
     value: "item-2",
     question: "What are the costs for running Wraps?",
     answer:

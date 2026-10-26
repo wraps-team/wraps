@@ -86,13 +86,26 @@ export async function setCache<T>(
  */
 export function getEmailCheckCacheKey(
   domain: string,
-  options: { quick?: boolean; dkimSelectors?: string[] }
+  options: {
+    quick?: boolean;
+    dkimSelectors?: string[];
+    /**
+     * Pass only when it differs from the default for the mode (quick skips
+     * blacklists, full runs them). A result that skipped them must never be
+     * served to a request that asked for them, or the reverse.
+     */
+    blacklists?: "on" | "off";
+  }
 ): string {
   const parts = [
     "email-check",
     domain.toLowerCase(),
     options.quick ? "quick" : "full",
   ];
+
+  if (options.blacklists) {
+    parts.push(options.blacklists === "on" ? "blacklists" : "no-blacklists");
+  }
 
   if (options.dkimSelectors?.length) {
     parts.push(`dkim:${options.dkimSelectors.sort().join(",")}`);

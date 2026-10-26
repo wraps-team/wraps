@@ -1,8 +1,15 @@
-import { Bot, Cloud, Code2, ShieldCheck, Users } from "lucide-react";
+import {
+  Bot,
+  Code2,
+  GitBranch,
+  type LucideIcon,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 
 type Principle = {
-  icon: typeof Cloud;
+  icon: LucideIcon;
   title: string;
   description: string;
   href?: string;
@@ -28,10 +35,10 @@ const principles: Principle[] = [
       "Engineers own the code, marketers own the content, both ship through one pipeline.",
   },
   {
-    icon: Cloud,
-    title: "Runs in your account",
+    icon: GitBranch,
+    title: "Open source",
     description:
-      "Your SES, your DynamoDB, your domain reputation. The bill comes from AWS, not us.",
+      "AGPL-3.0. Read the code that touches your AWS account before it does.",
   },
   {
     icon: Bot,
