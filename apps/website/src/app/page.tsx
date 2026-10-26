@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
-import { AccountSurvivalSection } from "./landing/components/account-survival-section";
 import { ApproachesTeaserSection } from "./landing/components/approaches-teaser-section";
 import { ArchitectureByocSection } from "./landing/components/architecture-byoc-section";
 import { CodeSampleSection } from "./landing/components/code-sample-section";
-import { CompareSection } from "./landing/components/compare-section";
 import { CTASection } from "./landing/components/cta-section";
+import { DeliverabilityAuditSection } from "./landing/components/deliverability-audit-section";
 import { FaqSection } from "./landing/components/faq-section";
 import { FeatureBlockSection } from "./landing/components/feature-block-section";
 import { LandingFooter } from "./landing/components/footer";
 import { HeroSection } from "./landing/components/hero-section";
 import { LandingNavbar } from "./landing/components/navbar";
+import { OperationsCompareSection } from "./landing/components/operations-compare-section";
 import { PricingSection } from "./landing/components/pricing-section";
 import { PrinciplesSection } from "./landing/components/principles-section";
 import { ProductShowcaseSection } from "./landing/components/product-showcase-section";
@@ -152,13 +152,13 @@ export default function LandingPage() {
           */}
           <HeroSection />
           <ApproachesTeaserSection />
-          <AccountSurvivalSection />
+          <OperationsCompareSection />
+          <DeliverabilityAuditSection />
           <ArchitectureByocSection />
           <PrinciplesSection />
           <FeatureBlockSection />
           <CodeSampleSection />
           <ProductShowcaseSection />
-          <CompareSection />
           <PricingSection />
           <FaqSection />
           <CTASection />

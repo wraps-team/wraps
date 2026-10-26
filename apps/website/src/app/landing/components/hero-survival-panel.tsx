@@ -1,6 +1,5 @@
 import { Bell } from "lucide-react";
 import type * as React from "react";
-import { geometry } from "./survival-meters";
 
 /*
  * The account survival card at product-shot scale, playing the one moment the
@@ -15,9 +14,25 @@ import { geometry } from "./survival-meters";
  * The dashboard draws the current rate only, with no history, so this does not
  * draw a chart either. The readings are an example and the caption says so.
  *
+ * The lines are AWS's: review at 5% bounce / 0.1% complaint, pause at 10% /
+ * 0.5%, mirroring SES_THRESHOLDS in apps/api/src/lib/ses-health.ts.
+ *
  * Motion is CSS only (globals.css, .hero-*). The un-animated styles below are
  * the resting frame: the bounce rate already past the review line.
  */
+
+const SCALE_HEADROOM = 1.25;
+
+/** Lays a rate out against its review and pause lines, as the dashboard does. */
+function geometry(value: number, review: number, pause: number) {
+  const scaleMax = pause * SCALE_HEADROOM;
+  const along = (n: number) => Math.min(100, Math.max(0, (n / scaleMax) * 100));
+  return {
+    valuePct: along(value),
+    reviewPct: along(review),
+    pausePct: along(pause),
+  } as const;
+}
 
 const BOUNCE = { from: 1.2, to: 6.8, review: 5, pause: 10 } as const;
 const COMPLAINT = { value: 0.04, review: 0.1, pause: 0.5 } as const;
@@ -76,7 +91,10 @@ function BounceMeter() {
     <div>
       <p className="text-muted-foreground text-sm">Bounce rate</p>
       <p className="mt-2 grid font-mono font-semibold text-4xl tabular-nums tracking-tight sm:text-3xl lg:text-5xl">
-        <span className="hero-swap-out col-start-1 row-start-1 text-foreground">
+        <span
+          aria-hidden="true"
+          className="hero-swap-out col-start-1 row-start-1 text-foreground"
+        >
           {BOUNCE.from.toFixed(2)}%
         </span>
         <span
@@ -171,7 +189,10 @@ function QuotaMeter() {
 function StatusPill() {
   return (
     <span className="inline-grid font-mono text-2xs uppercase tracking-widest">
-      <span className="hero-swap-out col-start-1 row-start-1 inline-flex items-center gap-1.5 justify-self-end rounded border border-success/40 bg-success/10 px-2.5 py-1 text-success">
+      <span
+        aria-hidden="true"
+        className="hero-swap-out col-start-1 row-start-1 inline-flex items-center gap-1.5 justify-self-end rounded border border-success/40 bg-success/10 px-2.5 py-1 text-success"
+      >
         <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
         All systems healthy
       </span>

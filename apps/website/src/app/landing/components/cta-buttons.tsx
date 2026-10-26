@@ -18,7 +18,7 @@ export function CTAButtons() {
             })
           }
         >
-          Sign up
+          Start building
         </a>
       </Button>
       <Button

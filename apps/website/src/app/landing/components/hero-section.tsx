@@ -1,6 +1,6 @@
+import { CopyCommand } from "./copy-command";
 import { HeroAnimatedCTA } from "./hero-cta";
 import { HeroDotField } from "./hero-dot-field";
-import { HeroInstallCommand } from "./hero-install-command";
 import { HeroSurvivalPanel } from "./hero-survival-panel";
 
 // The rate used to sit in this row. It moved to the pricing section on
@@ -51,7 +51,10 @@ export function HeroSection() {
           </div>
 
           <div className="mt-4">
-            <HeroInstallCommand />
+            <CopyCommand
+              command="npx @wraps.dev/cli email init"
+              location="hero"
+            />
           </div>
         </div>
 

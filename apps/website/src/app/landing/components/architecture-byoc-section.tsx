@@ -13,10 +13,10 @@ const caption = (
 
 export function ArchitectureByocSection() {
   return (
-    <section className="py-24">
+    <section className="border-border border-b py-20 md:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="mb-10 max-w-2xl">
-          <SectionKicker>How Wraps deploys</SectionKicker>
+          <SectionKicker>Who holds what</SectionKicker>
           <h2 className="mb-4 font-heading font-semibold text-3xl tracking-tight md:text-4xl">
             Your email sends through your AWS, not ours.
           </h2>

@@ -35,7 +35,7 @@ export function ApproachesTeaserSection() {
               <span className="font-mono text-brand text-[11px]">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <h3 className="mt-2 font-semibold text-[15px] text-foreground">
+              <h3 className="mt-2 font-semibold text-[15px] text-foreground lg:min-h-[2.75rem]">
                 {approach.label}
               </h3>
               <p className="mt-1 text-muted-foreground text-xs">
