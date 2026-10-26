@@ -128,7 +128,7 @@ const email = new WrapsEmail(stack, "Email", { /* ... */ });
 
 // Create a Lambda function
 const myFunction = new lambda.Function(stack, "MyFunction", {
-  runtime: lambda.Runtime.NODEJS_20_X,
+  runtime: lambda.Runtime.NODEJS_24_X,
   handler: "index.handler",
   code: lambda.Code.fromAsset("./lambda"),
 });

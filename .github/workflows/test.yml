@@ -79,7 +79,7 @@ jobs:
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
-        if: matrix.node-version == '22.x'
+        if: matrix.node-version == '24.x'
         with:
           files: ./packages/cli/coverage/coverage-final.json
           flags: cli
@@ -97,10 +97,10 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - name: Setup Node.js 22.x
+      - name: Setup Node.js 24.x
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -131,10 +131,10 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - name: Setup Node.js 22.x
+      - name: Setup Node.js 24.x
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -171,10 +171,10 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - name: Setup Node.js 22.x
+      - name: Setup Node.js 24.x
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -209,10 +209,10 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - name: Setup Node.js 22.x
+      - name: Setup Node.js 24.x
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -255,10 +255,10 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - name: Setup Node.js 22.x
+      - name: Setup Node.js 24.x
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -308,10 +308,10 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - name: Setup Node.js 22.x
+      - name: Setup Node.js 24.x
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -353,7 +353,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22.x
+          node-version: 24.x
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -386,7 +386,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -418,7 +418,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           cache: 'pnpm'
 
       - name: Install dependencies (frozen, as CI deploys do)
