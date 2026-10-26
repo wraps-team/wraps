@@ -66,9 +66,14 @@ vi.mock("mailparser", () => ({
   }),
 }));
 
-function singleS3Event(key = "raw/abc"): S3Event {
+function singleS3Event(key = "raw/abc", eventTime?: string): S3Event {
   return {
-    Records: [{ s3: { bucket: { name: "raw-bucket" }, object: { key } } }],
+    Records: [
+      {
+        ...(eventTime ? { eventTime } : {}),
+        s3: { bucket: { name: "raw-bucket" }, object: { key } },
+      },
+    ],
   } as unknown as S3Event;
 }
 
@@ -841,5 +846,91 @@ describe("inbound-processor — envelope fallback", () => {
     expect(ev.detail.from).toBeUndefined();
     expect(ev.detail.replyToken).toBeNull();
     expect((ev.detail.truncatedFields as string[]).at(-1)).toBe("envelope");
+  });
+});
+
+describe("inbound-processor — retry-stable ids and timestamps", () => {
+  const FIXTURE: EmailFixture = {
+    from: { address: "sender@external.com" },
+    to: [{ address: "inbox@support.foo.com" }],
+    headers: [],
+  };
+  const EMAIL_ID_SHAPE = /^inb_[0-9a-f]{16}$/;
+  const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+  // Runs the handler once and returns what it wrote, then clears call history
+  // so the next invocation (a simulated retry) is read in isolation.
+  async function invokeAndCapture(event: S3Event) {
+    parsedState.queue = [{ ...FIXTURE }];
+    await runHandler(event);
+    const parsedObject = capturedParsedObject();
+    const ev = await capturedPut();
+    s3Mock.resetHistory();
+    ebMock.resetHistory();
+    return {
+      parsedKey: parsedObject.key,
+      parsedBody: JSON.parse(parsedObject.body) as Record<string, unknown>,
+      eventDetail: ev.detail,
+    };
+  }
+
+  it("derives the same emailId and parsed key when the same raw object is retried", async () => {
+    const first = await invokeAndCapture(singleS3Event("raw/retry-me"));
+    const second = await invokeAndCapture(singleS3Event("raw/retry-me"));
+
+    expect(second.parsedBody.emailId).toBe(first.parsedBody.emailId);
+    expect(second.parsedKey).toBe(first.parsedKey);
+    expect(first.parsedKey).toBe(`parsed/${first.parsedBody.emailId}.json`);
+    expect(second.eventDetail.emailId).toBe(first.eventDetail.emailId);
+    expect(first.eventDetail.emailId).toBe(first.parsedBody.emailId);
+  });
+
+  it("derives different emailIds for different raw objects", async () => {
+    const a = await invokeAndCapture(singleS3Event("raw/one"));
+    const b = await invokeAndCapture(singleS3Event("raw/two"));
+
+    expect(a.parsedBody.emailId).not.toBe(b.parsedBody.emailId);
+    expect(a.parsedKey).not.toBe(b.parsedKey);
+  });
+
+  it("emits an emailId of the form inb_ plus 16 hex chars", async () => {
+    const { parsedBody, eventDetail } = await invokeAndCapture(
+      singleS3Event("raw/shape")
+    );
+
+    expect(parsedBody.emailId).toMatch(EMAIL_ID_SHAPE);
+    expect(eventDetail.emailId).toMatch(EMAIL_ID_SHAPE);
+  });
+
+  it("uses the S3 record eventTime as receivedAt on every attempt", async () => {
+    const eventTime = "2026-01-02T03:04:05.678Z";
+    const first = await invokeAndCapture(singleS3Event("raw/timed", eventTime));
+    const second = await invokeAndCapture(
+      singleS3Event("raw/timed", eventTime)
+    );
+
+    expect(first.parsedBody.receivedAt).toBe(eventTime);
+    expect(second.parsedBody.receivedAt).toBe(eventTime);
+    expect(first.eventDetail.receivedAt).toBe(eventTime);
+    expect(second.eventDetail.receivedAt).toBe(eventTime);
+  });
+
+  it("normalises a non-canonical eventTime to UTC ISO-8601", async () => {
+    const { parsedBody } = await invokeAndCapture(
+      singleS3Event("raw/offset", "2026-01-02T04:04:05.678+01:00")
+    );
+
+    expect(parsedBody.receivedAt).toBe("2026-01-02T03:04:05.678Z");
+  });
+
+  it("falls back to a valid ISO receivedAt when the record has no eventTime", async () => {
+    const before = Date.now();
+    const { parsedBody } = await invokeAndCapture(singleS3Event("raw/untimed"));
+    const after = Date.now();
+
+    const receivedAt = parsedBody.receivedAt as string;
+    expect(receivedAt).toMatch(ISO_UTC);
+    expect(Date.parse(receivedAt)).toBeGreaterThanOrEqual(before);
+    expect(Date.parse(receivedAt)).toBeLessThanOrEqual(after);
   });
 });
