@@ -113,7 +113,7 @@ export function DeliverabilityAuditSection() {
                   wraps email check example.com
                 </span>
               </div>
-              <pre className="overflow-x-auto p-5 lg:overflow-visible font-mono text-xs leading-relaxed md:text-[13px]">
+              <pre className="overflow-x-auto p-5 lg:overflow-visible font-mono text-xs leading-relaxed">
                 <code>
                   {READOUT.map((line, i) => (
                     <span

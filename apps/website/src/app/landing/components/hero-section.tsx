@@ -34,7 +34,7 @@ export function HeroSection() {
             The operations layer for Amazon SES
           </span>
 
-          <h1 className="text-balance font-heading font-semibold text-5xl text-foreground leading-[0.98] tracking-tight md:text-6xl lg:text-7xl">
+          <h1 className="text-balance font-heading font-semibold text-5xl text-foreground leading-none tracking-tight md:text-6xl lg:text-7xl">
             Run Amazon SES without getting paused.
           </h1>
 

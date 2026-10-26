@@ -30,7 +30,7 @@ type Step = {
   place: string;
 };
 
-const mono = "font-mono text-[0.92em] text-foreground";
+const mono = "font-mono text-foreground";
 
 const STEPS: Step[] = [
   {
@@ -217,7 +217,7 @@ export function HowItWorksSection() {
                       {ZONE_TAG[step.zone]}
                     </span>
                   </div>
-                  <p className="mt-1.5 pl-[1.65rem] text-muted-foreground text-xs leading-relaxed">
+                  <p className="mt-1.5 pl-7 text-muted-foreground text-xs leading-relaxed">
                     {step.caption}
                   </p>
                 </li>
