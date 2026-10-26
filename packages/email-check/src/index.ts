@@ -25,7 +25,12 @@ import type {
 import { isValidDomain, toAsciiDomain } from "./utils/domain.js";
 
 export { checkBimi } from "./checks/bimi.js";
-export { checkBlacklist, formatBlacklistResults } from "./checks/blacklist.js";
+export type { BlacklistSummary } from "./checks/blacklist.js";
+export {
+  checkBlacklist,
+  describeBlacklistCoverage,
+  formatBlacklistResults,
+} from "./checks/blacklist.js";
 export { checkDkim, formatDkimResults } from "./checks/dkim.js";
 export { checkDmarc, formatDmarcResult } from "./checks/dmarc.js";
 export { checkMx, formatMxResults } from "./checks/mx.js";

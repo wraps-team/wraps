@@ -12,6 +12,7 @@
  *   F (0-34)   — Missing all, +all, or blacklisted on Spamhaus
  */
 
+import { describeBlacklistCoverage } from "./checks/blacklist.js";
 import type {
   BimiResult,
   BlacklistResult,
@@ -536,7 +537,9 @@ function collectInfraIssues(
       });
     }
   }
-  if (checks.blacklist.overallClean) {
+  // Earned only when the check ran and every lookup answered. `overallClean`
+  // alone is true for a skipped check and for one where nothing answered.
+  if (describeBlacklistCoverage(checks.blacklist).state === "clean") {
     bonuses.push({
       check: "blacklist",
       points: 1,

@@ -278,8 +278,29 @@ export type BlacklistResult = {
     errors: string[];
     timeouts: string[];
   };
+  /**
+   * True when no listing was found. This does NOT mean every lookup answered
+   * or that anything was checked at all: read `skipped`, the `errors` and
+   * `timeouts` arrays, or `describeBlacklistCoverage()` before saying "clean".
+   */
   overallClean: boolean;
-  quickMode: boolean; // True if only top 10 checked
+  /** True when the reduced list set was used (see QUICK_BLACKLISTS). */
+  quickMode: boolean;
+  /** True when the blacklist step was not run at all. */
+  skipped?: boolean;
+  /**
+   * What was actually consulted. Lists, not lookups: each list is queried once
+   * for the domain and once per IPv4 address. Absent on results produced before
+   * this field existed (cached API responses, old `--json` output).
+   */
+  coverage?: {
+    /** Domain lists the domain was checked against. */
+    domainLists: number;
+    /** IP lists each IPv4 address was checked against. */
+    ipLists: number;
+    /** IPv4 addresses queried. IPv6 is not checked. */
+    ipAddresses: number;
+  };
 };
 
 export type BlacklistListing = {

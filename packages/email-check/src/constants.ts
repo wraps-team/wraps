@@ -296,7 +296,6 @@ export const DOMAIN_BLACKLISTS: BlacklistConfig[] = [
   { name: "URIBL Multi", zone: "multi.uribl.com", priority: "high" },
   { name: "Spamcop URI", zone: "bl.spamcop.net", priority: "high" },
   { name: "DBL Abuse.ch", zone: "dbl.abuse.ch", priority: "medium" },
-  { name: "FRESH URI", zone: "fresh.spameatingmonkey.net", priority: "low" },
   { name: "Mailspike Z", zone: "z.mailspike.net", priority: "medium" },
   { name: "SEM Fresh", zone: "fresh.spameatingmonkey.net", priority: "low" },
   { name: "SEM URI", zone: "uribl.spameatingmonkey.net", priority: "medium" },
