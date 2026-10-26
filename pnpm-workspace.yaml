@@ -12,8 +12,7 @@ packages:
 minimumReleaseAgeExclude:
   - better-inbox
   - '@wraps.dev/better-auth'
-  - '@wraps.dev/client@0.10.1'
-  - '@wraps.dev/email@0.13.0'
+  - '@wraps.dev/email@0.15.1'
   - '@wraps.dev/sms@0.2.0'
   - cn@0.2.4
   - '@shadcn/lint@0.1.0'
@@ -119,7 +118,7 @@ catalog:
   '@vitest/coverage-v8': 4.1.11
   '@vitest/ui': 4.1.11
   better-auth: 1.7.11
-  better-inbox: 0.3.1
+  better-inbox: 0.5.0
   dotenv: ^17.4.2
   drizzle-orm: ^0.45.2
   handlebars: 4.7.10

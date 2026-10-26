@@ -100,8 +100,8 @@ catalogs:
       specifier: 1.7.11
       version: 1.7.11
     better-inbox:
-      specifier: 0.3.1
-      version: 0.3.1
+      specifier: 0.5.0
+      version: 0.5.0
     dotenv:
       specifier: ^17.4.2
       version: 17.4.2
@@ -344,8 +344,8 @@ importers:
         specifier: ^4.9.11
         version: 4.9.11
       '@wraps.dev/client':
-        specifier: 0.10.1
-        version: 0.10.1
+        specifier: 0.12.1
+        version: 0.12.1
       '@wraps.dev/email-check':
         specifier: workspace:*
         version: link:../../packages/email-check
@@ -612,11 +612,11 @@ importers:
         specifier: 1.3.1
         version: 1.3.1(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       '@wraps.dev/client':
-        specifier: 0.10.1
-        version: 0.10.1
+        specifier: 0.12.1
+        version: 0.12.1
       '@wraps.dev/email':
-        specifier: 0.13.0
-        version: 0.13.0(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+        specifier: 0.15.1
+        version: 0.15.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       '@wraps.dev/email-check':
         specifier: workspace:*
         version: link:../../packages/email-check
@@ -661,7 +661,7 @@ importers:
         version: 1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11)
       better-inbox:
         specifier: 'catalog:'
-        version: 0.3.1(better-auth@1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11))(react@19.2.8)
+        version: 0.5.0(better-auth@1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11))(react@19.2.8)
       chrono-node:
         specifier: 2.9.1
         version: 2.9.1
@@ -961,8 +961,8 @@ importers:
         specifier: 1.3.1
         version: 1.3.1(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       '@wraps.dev/client':
-        specifier: 0.10.1
-        version: 0.10.1
+        specifier: 0.12.1
+        version: 0.12.1
       '@wraps/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -1156,14 +1156,14 @@ importers:
         specifier: 3.0.4
         version: 3.0.4
       '@wraps.dev/better-auth':
-        specifier: ^0.2.1
-        version: 0.2.1(@wraps.dev/email@0.13.0(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8))(better-auth@1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11))
+        specifier: ^0.4.0
+        version: 0.4.0(@wraps.dev/email@0.15.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8))(better-auth@1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11))
       '@wraps.dev/client':
-        specifier: 0.10.1
-        version: 0.10.1
+        specifier: 0.12.1
+        version: 0.12.1
       '@wraps.dev/email':
-        specifier: ^0.13.0
-        version: 0.13.0(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+        specifier: ^0.15.1
+        version: 0.15.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       '@wraps.dev/sms':
         specifier: ^0.2.0
         version: 0.2.0
@@ -1181,7 +1181,7 @@ importers:
         version: 1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11)
       better-inbox:
         specifier: 'catalog:'
-        version: 0.3.1(better-auth@1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11))(react@19.2.8)
+        version: 0.5.0(better-auth@1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11))(react@19.2.8)
       dotenv:
         specifier: 'catalog:'
         version: 17.4.2
@@ -1607,8 +1607,8 @@ importers:
         specifier: 3.0.4
         version: 3.0.4
       '@wraps.dev/email':
-        specifier: ^0.13.0
-        version: 0.13.0(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+        specifier: ^0.15.1
+        version: 0.15.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       '@wraps/db':
         specifier: workspace:*
         version: link:../db
@@ -1938,11 +1938,11 @@ importers:
         specifier: 19.2.4
         version: 19.2.4
       '@wraps.dev/client':
-        specifier: 0.8.1
-        version: 0.8.1
-      '@wraps.dev/email':
         specifier: 0.12.1
-        version: 0.12.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+        version: 0.12.1
+      '@wraps.dev/email':
+        specifier: 0.15.1
+        version: 0.15.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -2033,23 +2033,6 @@ packages:
       - jsonschema
       - semver
 
-  '@aws-crypto/sha256-browser@5.2.0':
-    resolution: {integrity: sha512-AXfN/lGotSQwu6HNcEsIASo7kWXZ5HYWvfOmSNKDsEqC4OashTp8alTmaz+F7TC2L083SFv5RdB+qU3Vs1kZqw==}
-
-  '@aws-crypto/sha256-js@5.2.0':
-    resolution: {integrity: sha512-FFQQyu7edu4ufvIZ+OadFpHHOt+eSTBaYaki44c+akjg7qZg9oOQeLlk77F6tSYqjDAFClrHJk9tMf0HdVyOvA==}
-    engines: {node: '>=16.0.0'}
-
-  '@aws-crypto/supports-web-crypto@5.2.0':
-    resolution: {integrity: sha512-iAvUotm021kM33eCdNfwIN//F77/IADDSs58i+MDaOqFrVjZo9bAal0NK7HurRuWLLpF1iLX7gbWrjHjeo+YFg==}
-
-  '@aws-crypto/util@5.2.0':
-    resolution: {integrity: sha512-4RkU9EsI6ZpBve5fseQlGNUWKMa1RLPQ1dnjnQoe07ldfIzcsGb5hC5W0Dm7u423KWzawlrpbjXBrXCEv9zazQ==}
-
-  '@aws-sdk/checksums@3.1000.20':
-    resolution: {integrity: sha512-uc5PMNcLcs+UBSLGsRjbMZKi3mgnPSalXpABw9Xjo0DMrv4gjIa/E4a02yJsuU4FF6Tmvis/JgGdKNIOoN4DQw==}
-    engines: {node: '>=20.0.0'}
-
   '@aws-sdk/checksums@3.1001.5':
     resolution: {integrity: sha512-6erto9nK2OZO/woEgmFIaPh5gChgdNd7nL6jgAf8TAXz3/QHC8Pan2TFe9GYp3IxOIKCCGWPylSjtOHKfNzQlw==}
     engines: {node: '>=20.0.0'}
@@ -2072,10 +2055,6 @@ packages:
 
   '@aws-sdk/client-cloudwatch@3.1152.0':
     resolution: {integrity: sha512-ame++euxZ5vKIiF57pXj/SftvrSlhtxKVMPkOUdZAYr6rUEhFHNCYEBTPQpW2260s5G5rEGdppTv3wnHIOQ6mQ==}
-    engines: {node: '>=20.0.0'}
-
-  '@aws-sdk/client-dynamodb@3.1074.0':
-    resolution: {integrity: sha512-mFInRv2H7FqeyXnsBIgnO8VV+KGuC4bZZOSSSsOt2TW5eLT2AYEtNcSrZFDzz/qG2NvA7qk3mMTD9Zby547YOQ==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-dynamodb@3.1152.0':
@@ -2110,10 +2089,6 @@ packages:
     resolution: {integrity: sha512-4VqvR8UKDArms1V4VrKKvmH8jgb4bFWQk4JY8UOXFyij+pOioyRHPMkcg09V3OP07HWRQ8ZJJ/UX9uqvf7NR7A==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/client-s3@3.1095.0':
-    resolution: {integrity: sha512-eeobm3TKci47CTTHIxc5s5UDjLL0gTKfjlcyzKU+NMoeIJ3flKPq51Fhi2nUDiMNbzsY5HAynM3bHAQFHxRTUw==}
-    engines: {node: '>=20.0.0'}
-
   '@aws-sdk/client-s3@3.1152.0':
     resolution: {integrity: sha512-oI1+ZaM6pSOwZazu4nAb7rL8ug7LSjg31tDoJqRB9MooRqqWCf/qvkIZqne1mRA3xK3slg6K0RNWXaJYHbWLvg==}
     engines: {node: '>=20.0.0'}
@@ -2122,16 +2097,8 @@ packages:
     resolution: {integrity: sha512-WBHe/x71Q4VNco6p60QfSi3iwRSWTW4yrkBzrPw8pNWKKafPpa/TJfcKw2CbtpoS+/dCp04J7otAHbXQu0sARQ==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/client-ses@3.1095.0':
-    resolution: {integrity: sha512-SHggF3KqHggbz8U1EAEIxl/+K5YTpt6E6O0SaXJLk8QV/ph6NRREFQXcWIe9R0BBEb0sTEM/RCj6yjlDzcEG2g==}
-    engines: {node: '>=20.0.0'}
-
   '@aws-sdk/client-ses@3.1152.0':
     resolution: {integrity: sha512-iafV/J0KAbj5oB98NeSVBPl7yNrvNdReO3PUQ1icCwdCQvModFpW3kCEjUcRlxyIuQbtVJ3V6XSY7sxOaYN5jg==}
-    engines: {node: '>=20.0.0'}
-
-  '@aws-sdk/client-sesv2@3.1091.0':
-    resolution: {integrity: sha512-xunAMMahjklaOSAlm5xG+up5uK3HcIjJlzRS763rFnUUMM6m0F/swjLwD7+ikU78RljY0+1UL5ZiXCJZ8jGnpg==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-sesv2@3.1152.0':
@@ -2144,10 +2111,6 @@ packages:
 
   '@aws-sdk/client-sqs@3.1152.0':
     resolution: {integrity: sha512-nBNYS/GK0kzvX3PHJVOMF9xBhgwFvwi3G/XaAyahR16vA1d+qq5IJlxGUlBfIRCjsFLKWtrnnJ59yeD+PMMb3w==}
-    engines: {node: '>=20.0.0'}
-
-  '@aws-sdk/client-ssm@3.1074.0':
-    resolution: {integrity: sha512-bn++WuYcT3J8p/VtZe7F3i93xJvrl+k494skgL/37BcRTkBMXngtxcwpm1chO6ZJ62YWZm5yRKmYtB+k7/k1fw==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-ssm@3.1152.0':
@@ -2249,10 +2212,6 @@ packages:
     resolution: {integrity: sha512-j2qq994vFJdetdqYmCf17GbXc7A1rrNptifJZIgAnipg6XUxUTqCpgJTd8sFSKxZfdtLF9WUxdz+r0Hney4QhQ==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/dynamodb-codec@3.973.35':
-    resolution: {integrity: sha512-h4l4YbioeEW2vM4OkelGkQ+pboFnTEaRAt8uH/b6oklm0p3NhISHXdbTk8x3/UOvLUNW+5ItU+B5JHTP9QfJBw==}
-    engines: {node: '>=20.0.0'}
-
   '@aws-sdk/dynamodb-codec@3.973.50':
     resolution: {integrity: sha512-1jn3q2Ik/qUjPw1su5Abu6nzeDutzYbNUYKt+AqUh+45rb+MVWhgP1QWarTuxrm4MJKcSLVHLCrvi0rY5jmJZw==}
     engines: {node: '>=20.0.0'}
@@ -2261,25 +2220,11 @@ packages:
     resolution: {integrity: sha512-8q1ICxcDjHId3bBryuu/j+1L9y5/3uQnwzLDt5j2ElcjZSoWmFtymdJy7OjLrluSMe0Z4mq5bcH4fxBXvlEHfw==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/endpoint-cache@3.972.9':
-    resolution: {integrity: sha512-LFvdgq8SriaskUcjpBMDE7J2c9RmuT5v3gU36/znV71EU5DKUis4FmGFjCMelKCCViFeVrQADBAlIiOYRhEx6Q==}
-    engines: {node: '>=20.0.0'}
-
-  '@aws-sdk/lib-dynamodb@3.1074.0':
-    resolution: {integrity: sha512-4fgy1aQSKPD1DYyv9pniIze2i+PJe2R/tCNSd3+E+/pYQr1NC6a2F/noKiRuG1wUz1rkKiIPFP1cqJOB2qzMfA==}
-    engines: {node: '>=20.0.0'}
-    peerDependencies:
-      '@aws-sdk/client-dynamodb': ^3.1074.0
-
   '@aws-sdk/lib-dynamodb@3.1152.0':
     resolution: {integrity: sha512-M6VMgmjPKPVwHIJGNMddlsOpQz7U1cvIjT7sVByVfwAKZ4k1qZj1amLGgmkwxZpW9yJOJt6zJTX0Q0zNEFF11Q==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@aws-sdk/client-dynamodb': ^3.1152.0
-
-  '@aws-sdk/middleware-endpoint-discovery@3.972.26':
-    resolution: {integrity: sha512-suOMAYAM43aSyC3cLBvvJIuNyg96nUsPvYQUrq4G+8Prt2qTpFETgaiXX7JP1gIcK5FF0Z2IdyEsPXseZATOPw==}
-    engines: {node: '>=20.0.0'}
 
   '@aws-sdk/middleware-endpoint-discovery@3.972.34':
     resolution: {integrity: sha512-hwPWSvttg+bEpcM9e8HdVJF/oz79xInjnou23+GdsbDv75DVDLGhn2XhIbuNghp5SqyjtngXEI+K22Vq3VvSxw==}
@@ -2287,10 +2232,6 @@ packages:
 
   '@aws-sdk/middleware-sdk-route53@3.972.28':
     resolution: {integrity: sha512-93l3lB5ngw0XQDGvuK/R9R3UAN4+xeYgLOW8E6nzldlNhu0E8vfkYMTlh5km643i9F193b5ZO21wOWWT47RxHw==}
-    engines: {node: '>=20.0.0'}
-
-  '@aws-sdk/middleware-sdk-s3@3.972.66':
-    resolution: {integrity: sha512-sTZKP1+SvyzWc/3alO8AM/PUiEzDCmn2P/KOcFFSk2UKzKZkB5ZxXdlHVtACE7DHaMFvx6DY0bognwHa1qTv4g==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/middleware-sdk-s3@3.972.81':
@@ -2307,10 +2248,6 @@ packages:
 
   '@aws-sdk/nested-clients@3.997.50':
     resolution: {integrity: sha512-nKb8qu4QsnpZTq/6JIXc72mzuzfh7BK4sUQkpQznPec2z4W7Ob2xYkcM4i5e1yGTBnbJVeFv/0sf3jcz85hclA==}
-    engines: {node: '>=20.0.0'}
-
-  '@aws-sdk/s3-request-presigner@3.1095.0':
-    resolution: {integrity: sha512-Xhzt3Okc8UrxOnOR8zE2/aG12g8A9I9f8DVF4LX9k3QVKt0c7d9wT4VcM5/6gfFRhtsflFMGdo49pEqawiAS2Q==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/s3-request-presigner@3.1152.0':
@@ -2346,10 +2283,6 @@ packages:
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@aws-sdk/client-dynamodb': ^3.1111.0
-
-  '@aws-sdk/util-locate-window@3.965.8':
-    resolution: {integrity: sha512-uUbMs1cBZPafD0ohUj6EwNf0fPZ534NvBxHox4hjX+0Rxq5paSYUem7+hi833pYrzrcnBATKIYpR02MDXT5M9g==}
-    engines: {node: '>=20.0.0'}
 
   '@aws-sdk/xml-builder@3.972.37':
     resolution: {integrity: sha512-zKq4HQum8JwDyEuyfuI4bbiAcU0KxP6qy+9PR/IsR92IyE/DaBAikzAS50tjxip4bqIIANpCcG+Yyj6CVhXupg==}
@@ -3682,18 +3615,21 @@ packages:
   '@opentelemetry/sdk-trace-base@2.10.0':
     resolution: {integrity: sha512-GuYQQT7QD2EeO8lcZLRQzcbOyhqAzL+6WWTKTU9mSUBYBazkEDl+VrQcXQhbB08OWM9anD1aHleVadzulpOaUQ==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': 1.9.0
 
   '@opentelemetry/sdk-trace-base@2.2.0':
     resolution: {integrity: sha512-xWQgL0Bmctsalg6PaXExmzdedSp3gyKV8mQBwK/j9VGdCDu2fmXIb2gAehBKbkXCpJ4HPkgv3QfoJWRT4dHWbw==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': 1.9.0
 
   '@opentelemetry/sdk-trace-node@2.10.0':
     resolution: {integrity: sha512-GZK/G6oZyBLGlH1pUgeDch7D91KoHd2uotUGIkWCPi9GI5T9X0p4L7nNAMDR1BQjkRYoDqo+ddfVx9t5Uhys+Q==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': 1.9.0
 
@@ -6411,10 +6347,6 @@ packages:
     resolution: {integrity: sha512-ycSJu3tFAQ4v04CBB0agqFMVsSQ1iG3yw+SpgxRqKfaURpQD4CZ8Wn0zPMmSnOuTpTh65Vz+EA0rMrw089wvkA==}
     engines: {node: '>=18.0.0'}
 
-  '@smithy/is-array-buffer@2.2.0':
-    resolution: {integrity: sha512-GGP3O9QFD24uGeAXYUjwSTXARoqpZykHadOmA8G5vfJPK0/DC67qa//0qvqrJzL1xc8WQWX7/yc7fwudjPHPhA==}
-    engines: {node: '>=14.0.0'}
-
   '@smithy/middleware-compression@4.6.2':
     resolution: {integrity: sha512-Q9d+luiRjyHT6kCL/9NyGpdZJgodh4vtvfHC6H8SqoVKrV2k9RoyI9/IloVfdCYks3/2DIi7BsYYLcda5KZS0A==}
     engines: {node: '>=18.0.0'}
@@ -6438,14 +6370,6 @@ packages:
   '@smithy/types@4.16.1':
     resolution: {integrity: sha512-0JFs3V2y2M9tKW5na/qxe69Zv+uxLMO7QBbhxF/FHu/Gp2NFZAAL9tWl9PU02xxo07pb3G9FTyjNc6D5uZrJIg==}
     engines: {node: '>=18.0.0'}
-
-  '@smithy/util-buffer-from@2.2.0':
-    resolution: {integrity: sha512-IJdWBbTcMQ6DA0gdNhh/BwrLkDR+ADW5Kr1aZmd4k3DIF6ezMV4R2NIAmT08wQJ3yUK82thHWmC/TnK/wpMMIA==}
-    engines: {node: '>=14.0.0'}
-
-  '@smithy/util-utf8@2.3.0':
-    resolution: {integrity: sha512-R8Rdn8Hy72KKcebgLiv8jQcQkXoLMOGGv5uI1/k0l+snqkOzQ1R0ChUBCxWMlBsFMekWjq0wRudIweFs7sKT5A==}
-    engines: {node: '>=14.0.0'}
 
   '@smithy/util-utf8@4.4.14':
     resolution: {integrity: sha512-zpHIvgr2NWASkgWgv1O0zPPX7VFdkHKa9NxxjGseGvSY2DRZgRsnoXuEcjETwPeqP92blsINwfbIJz0F0/0Skg==}
@@ -7374,8 +7298,8 @@ packages:
   '@webassemblyjs/wast-printer@1.14.1':
     resolution: {integrity: sha512-kPSSXE6De1XOR820C90RIo2ogvZG+c3KiHzqUoO/F34Y2shGzesfqv7o57xrxovZJH/MetF5UjroJ/R/3isoiw==}
 
-  '@wraps.dev/better-auth@0.2.1':
-    resolution: {integrity: sha512-BFCwxRkm5iYGOxnfAfHWMr1Ui8WFVqJkbpjUxTJ1xkOyL3B83DeIQVF+5iLsSjRdL0sZ+PJi19GdSwbsAqsvxA==}
+  '@wraps.dev/better-auth@0.4.0':
+    resolution: {integrity: sha512-xQ/zJzdfY4wRqHIX0OHk/BaY4eORNR7swvhlWusi383FkFErPtvgKDCeuDHfT8CkfnreH/t3MujRmITAWoi05w==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@wraps.dev/email': '>=0.12.0'
@@ -7388,24 +7312,12 @@ packages:
     resolution: {integrity: sha512-ElHSkeyqB46LmgNXEUhJupqMhpV9zHLU36ZZ7IX7lCBCXS24+/nVACJvsQogCKhSBFv1WlDNjCxADai1dMXYjQ==}
     engines: {node: '>=20.0.0'}
 
-  '@wraps.dev/client@0.8.1':
-    resolution: {integrity: sha512-0Jr8ZXWu1mUI3gkuTvwZFnOhXcps30HLMjHvcHqoK+NKcVDWX+qKYtmnizwOJmCUSkuVEOWuo+0YqIJDBjYZTg==}
+  '@wraps.dev/client@0.12.1':
+    resolution: {integrity: sha512-RrhJqYZbL6IsZz/qY7yQvPwKmxQShqWN3xUoPD45J2x79ZuxT2TsL3RQrMkAI09KyuNBpHIy2XSMV3rUqp1VAw==}
     engines: {node: '>=20.0.0'}
 
-  '@wraps.dev/email@0.12.1':
-    resolution: {integrity: sha512-7Xxh3z2ZtDxjfV+k4mIz1zwQoBUBk2PnQKoMaG4yry9fx7kyB6tEUwop6REAw832DnMHbLHjCvp68Cec4ZSEFw==}
-    engines: {node: '>=20.0.0'}
-    peerDependencies:
-      '@react-email/components': '>=0.0.25'
-      react: ^18.0.0 || ^19.0.0
-    peerDependenciesMeta:
-      '@react-email/components':
-        optional: true
-      react:
-        optional: true
-
-  '@wraps.dev/email@0.13.0':
-    resolution: {integrity: sha512-sadt1BwVRY0AImXM+yeVb84MPiuf9n1tOBXqMt6P6A71YciJloQEKrEbgQROFr81ZddxvAG8A9P8LzQ97OihDA==}
+  '@wraps.dev/email@0.15.1':
+    resolution: {integrity: sha512-tgf32lplCHtA8mUIUz7bdIxlUvxrqm6DoKQ7MMnJjZrcF4jlFVZykykt3gP1uw9vlg1lkBM1FAIQvUpNkbj2UA==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@react-email/components': '>=0.0.25'
@@ -7912,8 +7824,9 @@ packages:
       zod:
         optional: true
 
-  better-inbox@0.3.1:
-    resolution: {integrity: sha512-QD8yTdVRnRbM6gPejo6bAlR9qIrR1Zx9jmrYKWwrkUtMeHvJ+jDPgOEEA/3796LCgvJqVbKOoqfm14KKDBjgsQ==}
+  better-inbox@0.5.0:
+    resolution: {integrity: sha512-j3AtPY7LmUZOAvQsIpYud5Ehac6vpn7+4w99ict3mlZ0EeHv/K/MXgaLEPQzQdqIt3mZK2A7cXSlv8h0Lycw0w==}
+    deprecated: 'Moved to @byo-oss/notifications: same API, change your imports'
     peerDependencies:
       better-auth: ^1.6.23
       react: '>=18'
@@ -10647,11 +10560,17 @@ packages:
   openapi-fetch@0.14.1:
     resolution: {integrity: sha512-l7RarRHxlEZYjMLd/PR0slfMVse2/vvIAGm75/F7J6MlQ8/b9uUQmUF2kCPrQhJqMXSxmYWObVgeYXbFYzZR+A==}
 
+  openapi-fetch@0.17.0:
+    resolution: {integrity: sha512-PsbZR1wAPcG91eEthKhN+Zn92FMHxv+/faECIwjXdxfTODGSGegYv0sc1Olz+HYPvKOuoXfp+0pA2XVt2cI0Ig==}
+
   openapi-types@12.1.3:
     resolution: {integrity: sha512-N4YtSYJqghVu4iek2ZUvcN/0aqH1kRDuNqzcycDxhOUpg7GdvLa2F3DgS6yBNhInhv2r/6I0Flkn7CqL8+nIcw==}
 
   openapi-typescript-helpers@0.0.15:
     resolution: {integrity: sha512-opyTPaunsklCBpTK8JGef6mfPhLSnyy5a0IN9vKtx3+4aExf+KxEqYwIy3hqkedXIB97u357uLMJsOnm3GVjsw==}
+
+  openapi-typescript-helpers@0.1.0:
+    resolution: {integrity: sha512-OKTGPthhivLw/fHz6c3OPtg72vi86qaMlqbJuVJ23qOvQ+53uw1n7HdmkJFibloF7QEjDrDkzJiOJuockM/ljw==}
 
   opener@1.5.2:
     resolution: {integrity: sha512-ur5UIdyw5Y7yEj9wLzhqXiy6GZ3Mwx0yGI+5sMn2r0N0v3cKJvUmFH5yPP+WXh9e0xfyzyJX95D8l088DNFj7A==}
@@ -12802,40 +12721,6 @@ snapshots:
 
   '@aws-cdk/cloud-assembly-schema@54.14.0': {}
 
-  '@aws-crypto/sha256-browser@5.2.0':
-    dependencies:
-      '@aws-crypto/sha256-js': 5.2.0
-      '@aws-crypto/supports-web-crypto': 5.2.0
-      '@aws-crypto/util': 5.2.0
-      '@aws-sdk/types': 3.974.2
-      '@aws-sdk/util-locate-window': 3.965.8
-      '@smithy/util-utf8': 2.3.0
-      tslib: 2.8.1
-
-  '@aws-crypto/sha256-js@5.2.0':
-    dependencies:
-      '@aws-crypto/util': 5.2.0
-      '@aws-sdk/types': 3.974.2
-      tslib: 2.8.1
-
-  '@aws-crypto/supports-web-crypto@5.2.0':
-    dependencies:
-      tslib: 2.8.1
-
-  '@aws-crypto/util@5.2.0':
-    dependencies:
-      '@aws-sdk/types': 3.974.2
-      '@smithy/util-utf8': 2.3.0
-      tslib: 2.8.1
-
-  '@aws-sdk/checksums@3.1000.20':
-    dependencies:
-      '@aws-sdk/core': 3.977.1
-      '@aws-sdk/types': 3.974.2
-      '@smithy/core': 3.30.0
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
   '@aws-sdk/checksums@3.1001.5':
     dependencies:
       '@aws-sdk/core': 3.978.5
@@ -12897,21 +12782,6 @@ snapshots:
       '@smithy/fetch-http-handler': 5.8.0
       '@smithy/middleware-compression': 4.6.2
       '@smithy/node-http-handler': 4.12.1
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
-  '@aws-sdk/client-dynamodb@3.1074.0':
-    dependencies:
-      '@aws-crypto/sha256-browser': 5.2.0
-      '@aws-crypto/sha256-js': 5.2.0
-      '@aws-sdk/core': 3.977.1
-      '@aws-sdk/credential-provider-node': 3.972.72
-      '@aws-sdk/dynamodb-codec': 3.973.35
-      '@aws-sdk/middleware-endpoint-discovery': 3.972.26
-      '@aws-sdk/types': 3.974.2
-      '@smithy/core': 3.30.0
-      '@smithy/fetch-http-handler': 5.6.11
-      '@smithy/node-http-handler': 4.9.11
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
@@ -13007,20 +12877,6 @@ snapshots:
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
-  '@aws-sdk/client-s3@3.1095.0':
-    dependencies:
-      '@aws-sdk/checksums': 3.1000.20
-      '@aws-sdk/core': 3.977.1
-      '@aws-sdk/credential-provider-node': 3.972.72
-      '@aws-sdk/middleware-sdk-s3': 3.972.66
-      '@aws-sdk/signature-v4-multi-region': 3.996.42
-      '@aws-sdk/types': 3.974.2
-      '@smithy/core': 3.30.0
-      '@smithy/fetch-http-handler': 5.6.11
-      '@smithy/node-http-handler': 4.9.11
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
   '@aws-sdk/client-s3@3.1152.0':
     dependencies:
       '@aws-sdk/checksums': 3.1001.5
@@ -13046,17 +12902,6 @@ snapshots:
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
-  '@aws-sdk/client-ses@3.1095.0':
-    dependencies:
-      '@aws-sdk/core': 3.977.1
-      '@aws-sdk/credential-provider-node': 3.972.72
-      '@aws-sdk/types': 3.974.2
-      '@smithy/core': 3.30.0
-      '@smithy/fetch-http-handler': 5.6.11
-      '@smithy/node-http-handler': 4.9.11
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
   '@aws-sdk/client-ses@3.1152.0':
     dependencies:
       '@aws-sdk/core': 3.978.5
@@ -13065,18 +12910,6 @@ snapshots:
       '@smithy/core': 3.36.2
       '@smithy/fetch-http-handler': 5.8.0
       '@smithy/node-http-handler': 4.12.1
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
-  '@aws-sdk/client-sesv2@3.1091.0':
-    dependencies:
-      '@aws-sdk/core': 3.977.1
-      '@aws-sdk/credential-provider-node': 3.972.72
-      '@aws-sdk/signature-v4-multi-region': 3.996.42
-      '@aws-sdk/types': 3.974.2
-      '@smithy/core': 3.30.0
-      '@smithy/fetch-http-handler': 5.6.11
-      '@smithy/node-http-handler': 4.9.11
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
@@ -13112,19 +12945,6 @@ snapshots:
       '@smithy/core': 3.36.2
       '@smithy/fetch-http-handler': 5.8.0
       '@smithy/node-http-handler': 4.12.1
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
-  '@aws-sdk/client-ssm@3.1074.0':
-    dependencies:
-      '@aws-crypto/sha256-browser': 5.2.0
-      '@aws-crypto/sha256-js': 5.2.0
-      '@aws-sdk/core': 3.977.1
-      '@aws-sdk/credential-provider-node': 3.972.72
-      '@aws-sdk/types': 3.974.2
-      '@smithy/core': 3.30.0
-      '@smithy/fetch-http-handler': 5.6.11
-      '@smithy/node-http-handler': 4.9.11
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
@@ -13395,13 +13215,6 @@ snapshots:
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
-  '@aws-sdk/dynamodb-codec@3.973.35':
-    dependencies:
-      '@aws-sdk/core': 3.977.1
-      '@smithy/core': 3.30.0
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
   '@aws-sdk/dynamodb-codec@3.973.50':
     dependencies:
       '@aws-sdk/core': 3.978.5
@@ -13414,34 +13227,12 @@ snapshots:
       mnemonist: 0.38.3
       tslib: 2.8.1
 
-  '@aws-sdk/endpoint-cache@3.972.9':
-    dependencies:
-      mnemonist: 0.38.3
-      tslib: 2.8.1
-
-  '@aws-sdk/lib-dynamodb@3.1074.0(@aws-sdk/client-dynamodb@3.1074.0)':
-    dependencies:
-      '@aws-sdk/client-dynamodb': 3.1074.0
-      '@aws-sdk/core': 3.977.1
-      '@aws-sdk/util-dynamodb': 3.996.9(@aws-sdk/client-dynamodb@3.1074.0)
-      '@smithy/core': 3.30.0
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
   '@aws-sdk/lib-dynamodb@3.1152.0(@aws-sdk/client-dynamodb@3.1152.0)':
     dependencies:
       '@aws-sdk/client-dynamodb': 3.1152.0
       '@aws-sdk/core': 3.978.5
       '@aws-sdk/util-dynamodb': 3.996.9(@aws-sdk/client-dynamodb@3.1152.0)
       '@smithy/core': 3.36.2
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
-  '@aws-sdk/middleware-endpoint-discovery@3.972.26':
-    dependencies:
-      '@aws-sdk/endpoint-cache': 3.972.9
-      '@aws-sdk/types': 3.974.2
-      '@smithy/core': 3.30.0
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
@@ -13456,15 +13247,6 @@ snapshots:
   '@aws-sdk/middleware-sdk-route53@3.972.28':
     dependencies:
       '@aws-sdk/types': 3.975.0
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
-  '@aws-sdk/middleware-sdk-s3@3.972.66':
-    dependencies:
-      '@aws-sdk/core': 3.977.1
-      '@aws-sdk/signature-v4-multi-region': 3.996.42
-      '@aws-sdk/types': 3.974.2
-      '@smithy/core': 3.30.0
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
@@ -13503,15 +13285,6 @@ snapshots:
       '@smithy/core': 3.36.2
       '@smithy/fetch-http-handler': 5.8.0
       '@smithy/node-http-handler': 4.12.1
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
-  '@aws-sdk/s3-request-presigner@3.1095.0':
-    dependencies:
-      '@aws-sdk/core': 3.977.1
-      '@aws-sdk/signature-v4-multi-region': 3.996.42
-      '@aws-sdk/types': 3.974.2
-      '@smithy/core': 3.30.0
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
@@ -13566,18 +13339,9 @@ snapshots:
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
-  '@aws-sdk/util-dynamodb@3.996.9(@aws-sdk/client-dynamodb@3.1074.0)':
-    dependencies:
-      '@aws-sdk/client-dynamodb': 3.1074.0
-      tslib: 2.8.1
-
   '@aws-sdk/util-dynamodb@3.996.9(@aws-sdk/client-dynamodb@3.1152.0)':
     dependencies:
       '@aws-sdk/client-dynamodb': 3.1152.0
-      tslib: 2.8.1
-
-  '@aws-sdk/util-locate-window@3.965.8':
-    dependencies:
       tslib: 2.8.1
 
   '@aws-sdk/xml-builder@3.972.37':
@@ -17687,10 +17451,6 @@ snapshots:
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
-  '@smithy/is-array-buffer@2.2.0':
-    dependencies:
-      tslib: 2.8.1
-
   '@smithy/middleware-compression@4.6.2':
     dependencies:
       '@smithy/core': 3.36.2
@@ -17724,16 +17484,6 @@ snapshots:
 
   '@smithy/types@4.16.1':
     dependencies:
-      tslib: 2.8.1
-
-  '@smithy/util-buffer-from@2.2.0':
-    dependencies:
-      '@smithy/is-array-buffer': 2.2.0
-      tslib: 2.8.1
-
-  '@smithy/util-utf8@2.3.0':
-    dependencies:
-      '@smithy/util-buffer-from': 2.2.0
       tslib: 2.8.1
 
   '@smithy/util-utf8@4.4.14':
@@ -18697,47 +18447,31 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
 
-  '@wraps.dev/better-auth@0.2.1(@wraps.dev/email@0.13.0(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8))(better-auth@1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11))':
+  '@wraps.dev/better-auth@0.4.0(@wraps.dev/email@0.15.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8))(better-auth@1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11))':
     dependencies:
       '@wraps.dev/client': 0.10.1
       better-auth: 1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11)
     optionalDependencies:
-      '@wraps.dev/email': 0.13.0(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+      '@wraps.dev/email': 0.15.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
 
   '@wraps.dev/client@0.10.1':
     dependencies:
       openapi-fetch: 0.14.1
 
-  '@wraps.dev/client@0.8.1':
+  '@wraps.dev/client@0.12.1':
     dependencies:
-      openapi-fetch: 0.14.1
+      openapi-fetch: 0.17.0
 
-  '@wraps.dev/email@0.12.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
-    dependencies:
-      '@aws-sdk/client-dynamodb': 3.1074.0
-      '@aws-sdk/client-s3': 3.1095.0
-      '@aws-sdk/client-ses': 3.1095.0
-      '@aws-sdk/client-sesv2': 3.1091.0
-      '@aws-sdk/client-ssm': 3.1074.0
-      '@aws-sdk/credential-providers': 3.1095.0
-      '@aws-sdk/lib-dynamodb': 3.1074.0(@aws-sdk/client-dynamodb@3.1074.0)
-      '@aws-sdk/s3-request-presigner': 3.1095.0
-      aws4fetch: 1.0.20
-      zod: 4.6.7
-    optionalDependencies:
-      '@react-email/components': 1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      react: 19.2.8
-
-  '@wraps.dev/email@0.13.0(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
+  '@wraps.dev/email@0.15.1(@react-email/components@1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@aws-sdk/client-dynamodb': 3.1152.0
       '@aws-sdk/client-s3': 3.1152.0
       '@aws-sdk/client-ses': 3.1152.0
       '@aws-sdk/client-sesv2': 3.1152.0
-      '@aws-sdk/client-ssm': 3.1074.0
-      '@aws-sdk/credential-providers': 3.1095.0
+      '@aws-sdk/client-ssm': 3.1152.0
+      '@aws-sdk/credential-providers': 3.1152.0
       '@aws-sdk/lib-dynamodb': 3.1152.0(@aws-sdk/client-dynamodb@3.1152.0)
-      '@aws-sdk/s3-request-presigner': 3.1095.0
+      '@aws-sdk/s3-request-presigner': 3.1152.0
       aws4fetch: 1.0.20
       zod: 4.6.7
     optionalDependencies:
@@ -19157,7 +18891,7 @@ snapshots:
     optionalDependencies:
       zod: 4.6.7
 
-  better-inbox@0.3.1(better-auth@1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11))(react@19.2.8):
+  better-inbox@0.5.0(better-auth@1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11))(react@19.2.8):
     dependencies:
       better-auth: 1.7.11(@opentelemetry/api@1.9.0)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0))(mongodb@7.1.0(@aws-sdk/credential-providers@3.1152.0)(socks@2.8.9))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.0)(@types/node@24.10.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@4.1.11)
       zod: 4.6.7
@@ -22169,9 +21903,15 @@ snapshots:
     dependencies:
       openapi-typescript-helpers: 0.0.15
 
+  openapi-fetch@0.17.0:
+    dependencies:
+      openapi-typescript-helpers: 0.1.0
+
   openapi-types@12.1.3: {}
 
   openapi-typescript-helpers@0.0.15: {}
+
+  openapi-typescript-helpers@0.1.0: {}
 
   opener@1.5.2: {}
 
