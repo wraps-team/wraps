@@ -244,10 +244,11 @@ message = "Use semantic tokens (bg-background, text-foreground, border-border) i
 id = "ratchet-as-any"
 type = "ratchet"
 severity = "error"
-pattern = "as any"
-max_count = 92
+pattern = "\\bas any\\b"
+regex = true
+max_count = 0
 glob = "**/*.{ts,tsx}"
-# blog page files excluded: substring pattern false-positives on marketing prose
+# blog page files excluded: the pattern still matches marketing prose
 # (e.g. "as any verified identity" in agent-mailboxes/page.tsx), not TS assertions.
 # Scoped to prose-bearing page files only — other blog code (charts, OG images) stays covered.
 exclude_glob = [
@@ -256,8 +257,10 @@ exclude_glob = [
   "**/*.config.*",
   "**/app/blog/**/page.tsx",
   "**/app/blog/**/page-content.tsx",
+  # vendored shadcn-io components, excluded like the color ratchets
+  "**/components/ui/**",
 ]
-message = "Reduce 'as any' assertions — use proper types or 'as unknown' (92 remaining, ratchet down)"
+message = "No 'as any' — use the real type, or a narrow cast to it"
 
 
 # ══════════════════════════════════════════════

@@ -514,8 +514,7 @@ export async function handleSubscriptionUpdated(
 }> {
   // Check if the plan changed
   const currentPriceId = subscription.items.data[0]?.price.id;
-  const previousPriceId = (previousAttributes?.items?.data as any)?.[0]?.price
-    ?.id;
+  const previousPriceId = previousAttributes?.items?.data?.[0]?.price?.id;
 
   // If no price change, skip
   if (!previousPriceId || currentPriceId === previousPriceId) {
@@ -550,7 +549,7 @@ export async function handleSubscriptionUpdated(
 
   // Determine if upgrade or downgrade based on price amount
   const currentAmount = subscription.items.data[0]?.price.unit_amount || 0;
-  const previousItem = (previousAttributes?.items?.data as any)?.[0];
+  const previousItem = previousAttributes?.items?.data?.[0];
   const previousAmount = previousItem?.price?.unit_amount || 0;
 
   const isUpgrade = currentAmount > previousAmount;

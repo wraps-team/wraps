@@ -224,7 +224,7 @@ export async function acceptInvitation(
         .where(
           and(eq(invitation.id, invitationId), eq(invitation.status, "pending"))
         );
-      if ((result as any)?.rowCount === 0) return "already_used";
+      if (result.rowCount === 0) return "already_used";
 
       await tx.insert(member).values({
         id: crypto.randomUUID(),

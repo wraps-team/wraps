@@ -65,8 +65,8 @@ export default function UpgradePage() {
     enabled: !!organization?.id,
   });
 
-  const activeSubscription = (subscriptions as any)?.data?.find(
-    (sub: any) => sub.status === "active" || sub.status === "trialing"
+  const activeSubscription = subscriptions?.data?.find(
+    (sub) => sub.status === "active" || sub.status === "trialing"
   );
 
   // If user has an active subscription, redirect to dashboard

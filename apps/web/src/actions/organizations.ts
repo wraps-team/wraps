@@ -225,7 +225,7 @@ export type UpdateOrganizationResult =
   | {
       success: false;
       error: string;
-      field?: string;
+      field?: keyof UpdateOrganizationInput;
     };
 
 export async function updateOrganizationAction(
@@ -273,7 +273,7 @@ export async function updateOrganizationAction(
       return {
         success: false,
         error: firstError.message,
-        field: firstError.path[0]?.toString(),
+        field: firstError.path[0] as keyof UpdateOrganizationInput | undefined,
       };
     }
 
