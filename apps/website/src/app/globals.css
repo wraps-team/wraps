@@ -340,3 +340,112 @@ html {
     stroke-dashoffset: -20;
   }
 }
+
+/* Homepage hero: the account survival panel plays once, then rests.
+   The un-animated styles are the resting frame, so reduced-motion, no-JS and
+   a slow first paint all show the finished state with no layout shift. */
+.hero-rise {
+  animation: fade-in-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+.hero-bounce-fill {
+  animation:
+    hero-fill 1.3s cubic-bezier(0.22, 1, 0.36, 1) 0.9s both,
+    hero-tone 1.3s linear 0.9s both;
+}
+
+.hero-swap-out {
+  opacity: 0;
+  animation: hero-out 0.35s ease 1.3s both;
+}
+
+.hero-swap-in {
+  animation: hero-in 0.35s ease 1.3s both;
+}
+
+.hero-toast {
+  animation: hero-toast 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.9s both;
+}
+
+@keyframes hero-fill {
+  from {
+    width: var(--from);
+  }
+}
+
+@keyframes hero-tone {
+  0%,
+  20% {
+    background-color: var(--foreground);
+  }
+  35%,
+  100% {
+    background-color: var(--warning);
+  }
+}
+
+@keyframes hero-out {
+  from {
+    opacity: 1;
+  }
+}
+
+@keyframes hero-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes hero-toast {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-rise,
+  .hero-bounce-fill,
+  .hero-swap-out,
+  .hero-swap-in,
+  .hero-toast {
+    animation: none;
+  }
+}
+
+/* Homepage hero pixel grid. The tile must match PITCH/DOT in hero-dot-field.tsx.
+   The mask thins the grid behind the headline and fades it out toward the
+   bottom, so the panel stays the focal point. */
+.hero-dots {
+  background-color: var(--color-muted-foreground);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='2' height='2'/%3E%3C/svg%3E");
+  mask-size: 16px 16px;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='2' height='2'/%3E%3C/svg%3E");
+  -webkit-mask-size: 16px 16px;
+}
+
+.hero-dots-mask {
+  mask-image:
+    radial-gradient(ellipse 55% 42% at 50% 30%, rgb(0 0 0 / 0.3), black 90%),
+    linear-gradient(to bottom, black 55%, transparent 100%);
+  mask-composite: intersect;
+  -webkit-mask-image:
+    radial-gradient(ellipse 55% 42% at 50% 30%, rgb(0 0 0 / 0.3), black 90%),
+    linear-gradient(to bottom, black 55%, transparent 100%);
+  -webkit-mask-composite: source-in;
+}
+
+/* The pulse is the one thing allowed to reach the bottom of the hero; it only
+   thins behind the headline and subhead so the copy stays readable. */
+.hero-pulse-mask {
+  mask-image: radial-gradient(
+    ellipse 40% 34% at 50% 28%,
+    rgb(0 0 0 / 0.2),
+    black 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse 40% 34% at 50% 28%,
+    rgb(0 0 0 / 0.2),
+    black 100%
+  );
+}
