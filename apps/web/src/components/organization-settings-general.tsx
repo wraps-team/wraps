@@ -108,7 +108,7 @@ export function OrganizationSettingsGeneral({
         } else {
           setError(result.error);
           if (result.field) {
-            form.setFieldMeta(result.field as any, (meta) => ({
+            form.setFieldMeta(result.field, (meta) => ({
               ...meta,
               errorMap: {
                 onChange: result.error,

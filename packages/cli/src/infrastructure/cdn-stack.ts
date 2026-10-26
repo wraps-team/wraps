@@ -11,6 +11,7 @@ import {
   createCdnDistribution,
 } from "./resources/s3-cdn.js";
 import { createServiceIAMRole } from "./shared/iam.js";
+import type { ProgramOutputs } from "./shared/program-outputs.js";
 import { createVercelOIDC } from "./vercel-oidc.js";
 
 /**
@@ -82,7 +83,7 @@ async function createCdnIAMRole(config: CdnIAMConfig): Promise<aws.iam.Role> {
  */
 export async function deployCdnStack(
   config: CdnStackConfig
-): Promise<CdnStackOutputs> {
+): Promise<ProgramOutputs<CdnStackOutputs>> {
   // Use account ID from config (already validated by CLI)
   const accountId = config.accountId;
 
@@ -187,12 +188,12 @@ export async function deployCdnStack(
 
   // Return outputs
   return {
-    roleArn: role.arn as any as string,
-    bucketName: bucketResources.bucketName as any as string,
-    bucketArn: bucketResources.bucketArn as any as string,
+    roleArn: role.arn,
+    bucketName: bucketResources.bucketName,
+    bucketArn: bucketResources.bucketArn,
     region: config.region,
-    distributionId: cdnResources?.distributionId as any as string | undefined,
-    distributionDomain: cdnResources?.domainName as any as string | undefined,
+    distributionId: cdnResources?.distributionId,
+    distributionDomain: cdnResources?.domainName,
     // Report custom domain if it's actually configured on CloudFront (auto or manual validation)
     customDomain: customDomainActive
       ? config.cdnConfig.cdn.customDomain
@@ -201,12 +202,8 @@ export async function deployCdnStack(
     customDomainPending: customDomainPending
       ? config.cdnConfig.cdn.customDomain
       : undefined,
-    acmCertificateArn: acmResources?.certificate.arn as any as
-      | string
-      | undefined,
-    acmCertificateValidationRecords: acmResources?.validationRecords as any as
-      | Array<{ name: string; type: string; value: string }>
-      | undefined,
+    acmCertificateArn: acmResources?.certificate.arn,
+    acmCertificateValidationRecords: acmResources?.validationRecords,
     versioning: config.cdnConfig.versioning ?? false,
     retention: config.cdnConfig.retention,
   };
@@ -218,7 +215,7 @@ export async function deployCdnStack(
 export async function runCdnPulumiProgram(
   stackName: string,
   region: string,
-  program: () => Promise<CdnStackOutputs>
+  program: () => Promise<ProgramOutputs<CdnStackOutputs>>
 ): Promise<CdnStackOutputs> {
   const stack = await pulumi.automation.LocalWorkspace.createOrSelectStack(
     {
@@ -259,7 +256,7 @@ export async function runCdnPulumiProgram(
       | Array<{ name: string; type: string; value: string }>
       | undefined,
     versioning: outputs.versioning?.value as boolean,
-    retention: outputs.retention?.value as any,
+    retention: outputs.retention?.value as CdnStackOutputs["retention"],
   };
 }
 
@@ -269,7 +266,7 @@ export async function runCdnPulumiProgram(
 export async function previewCdnStack(
   stackName: string,
   region: string,
-  program: () => Promise<CdnStackOutputs>
+  program: () => Promise<ProgramOutputs<CdnStackOutputs>>
 ): Promise<pulumi.automation.PreviewResult> {
   const stack = await pulumi.automation.LocalWorkspace.createOrSelectStack(
     {

@@ -1,4 +1,5 @@
 import * as aws from "@pulumi/aws";
+import type * as pulumi from "@pulumi/pulumi";
 import {
   ALL_EVENT_TYPES,
   DEFAULT_CONFIG_SET_NAME,
@@ -241,9 +242,9 @@ async function emailIdentityExists(
  */
 export type SESResources = {
   configSet: aws.sesv2.ConfigurationSet;
-  eventBus: aws.cloudwatch.EventBus;
+  eventBus: pulumi.Output<aws.cloudwatch.GetEventBusResult>;
   domainIdentity?: aws.sesv2.EmailIdentity;
-  dkimTokens?: string[];
+  dkimTokens?: pulumi.Output<string[]>;
   dnsAutoCreated?: boolean;
   customTrackingDomain?: string;
   mailFromDomain?: string;
@@ -384,7 +385,7 @@ export async function createSESResources(
 
   // Optional: Verify domain if provided
   let domainIdentity: aws.sesv2.EmailIdentity | undefined;
-  let dkimTokens: string[] | undefined;
+  let dkimTokens: pulumi.Output<string[]> | undefined;
   let mailFromDomain: string | undefined;
 
   if (config.domain) {
@@ -428,7 +429,7 @@ export async function createSESResources(
     // Extract DKIM tokens for DNS configuration
     dkimTokens = domainIdentity.dkimSigningAttributes.apply(
       (attrs) => attrs?.tokens || []
-    ) as any;
+    );
 
     // Configure MAIL FROM domain for better DMARC alignment (only if explicitly configured)
     if (config.mailFromDomain) {
@@ -452,7 +453,7 @@ export async function createSESResources(
 
   return {
     configSet,
-    eventBus: defaultEventBus as any, // Return default bus reference
+    eventBus: defaultEventBus, // Return default bus reference
     domainIdentity,
     dkimTokens,
     dnsAutoCreated: false, // Will be set after deployment

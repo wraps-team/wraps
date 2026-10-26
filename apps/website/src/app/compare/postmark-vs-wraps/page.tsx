@@ -878,7 +878,7 @@ export default function PostmarkVsWrapsPage() {
                   3. Verify your domain &amp; import suppressions
                 </h3>
                 <p className="text-muted-foreground text-sm">
-                  Add DKIM/SPF records for your domain (same as any provider
+                  Add DKIM/SPF records for your domain (as with any provider
                   switch). Export your Postmark suppression list via their API
                   and import to SES so you do not re-send to bad addresses. Then
                   run{" "}

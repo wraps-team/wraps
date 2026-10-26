@@ -787,8 +787,9 @@ export default function BrandKitEditPage() {
               {/* Button preview */}
               <div>
                 <p className="mb-2 text-muted-foreground text-xs">Button</p>
+                {/* White label on the kit's own primary color, as the email renders it */}
                 <button
-                  className="w-full px-4 py-2 font-medium text-white"
+                  className="w-full px-4 py-2 font-medium text-white" // baseline:allow-ratchet-white-black-web baseline:allow-ratchet-theme-tokens-web baseline:allow-ratchet-dark-mode-web
                   style={{
                     backgroundColor: formData.primaryColor,
                     borderRadius:

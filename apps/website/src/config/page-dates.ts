@@ -6,7 +6,7 @@
 // <lastmod>, which cannot be derived at build time: see the script header.
 
 export const PAGE_DATES: Record<string, string> = {
-  "/": "2026-10-06T14:55:07-06:00",
+  "/": "2026-10-26T11:55:03-06:00",
   "/about": "2026-09-15T08:41:41-06:00",
   "/agents": "2026-09-15T08:41:41-06:00",
   "/alternatives": "2026-09-15T08:41:41-06:00",
@@ -49,7 +49,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/blog/why-email-providers-cost-more-than-ses": "2026-09-03T13:19:49-06:00",
   "/blog/yc-w26-email-security-audit": "2026-09-15T08:41:41-06:00",
   "/blog/your-dmarc-policy-is-useless": "2026-09-18T08:52:25-06:00",
-  "/byoc": "2026-09-29T23:29:15-06:00",
+  "/byoc": "2026-10-26T11:55:03-06:00",
   "/changelog": "2026-10-26T10:15:40-06:00",
   "/cli": "2026-09-15T08:41:41-06:00",
   "/compare": "2026-09-15T10:04:17-06:00",
@@ -57,7 +57,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/compare/customer-io-vs-wraps": "2026-09-15T09:59:02-06:00",
   "/compare/klaviyo-vs-wraps": "2026-09-15T10:04:17-06:00",
   "/compare/mailgun-vs-wraps": "2026-09-15T09:42:21-06:00",
-  "/compare/postmark-vs-wraps": "2026-09-15T10:04:17-06:00",
+  "/compare/postmark-vs-wraps": "2026-10-26T11:55:04-06:00",
   "/compare/resend-vs-wraps": "2026-09-15T09:42:21-06:00",
   "/compare/sendgrid-vs-wraps": "2026-09-15T09:59:02-06:00",
   "/compare/ses-bounce-handling-hand-rolled-vs-wraps":
@@ -108,7 +108,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/docs/infrastructure/sms": "2026-04-14T13:00:57-06:00",
   "/docs/mcp-reference": "2026-09-15T08:41:41-06:00",
   "/docs/pulumi-reference": "2026-09-28T14:32:44-06:00",
-  "/docs/python-sdk-reference": "2026-07-13T14:30:24-06:00",
+  "/docs/python-sdk-reference": "2026-10-26T11:55:03-06:00",
   "/docs/quickstart": "2026-09-15T08:41:41-06:00",
   "/docs/quickstart/cdn": "2026-07-30T14:41:55-06:00",
   "/docs/quickstart/email": "2026-07-30T14:41:55-06:00",

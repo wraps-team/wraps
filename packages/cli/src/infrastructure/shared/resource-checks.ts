@@ -9,6 +9,9 @@
  * region and Pulumi will duplicate the resource.
  */
 
+/** IAM's XML protocol can surface the error code on `Code` or `Error.Code`. */
+type IamXmlError = Error & { Code?: string; Error?: { Code?: string } };
+
 /**
  * Check if an IAM role exists by name.
  * IAM is global; region on the client is cosmetic, so we pin to us-east-1.
@@ -24,8 +27,8 @@ export async function roleExists(roleName: string): Promise<boolean> {
     if (
       error instanceof Error &&
       (error.name === "NoSuchEntityException" ||
-        (error as any).Code === "NoSuchEntity" ||
-        (error as any).Error?.Code === "NoSuchEntity")
+        (error as IamXmlError).Code === "NoSuchEntity" ||
+        (error as IamXmlError).Error?.Code === "NoSuchEntity")
     ) {
       return false;
     }

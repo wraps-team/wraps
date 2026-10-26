@@ -1,4 +1,5 @@
 import * as aws from "@pulumi/aws";
+import * as pulumi from "@pulumi/pulumi";
 import { DEFAULT_SUPPRESSION_REASONS, retentionToDays } from "@wraps/core";
 import type { EmailStackConfig, StackOutputs } from "../types/index.js";
 import { domainToConfigSetName } from "../utils/email/config-set-slug.js";
@@ -11,6 +12,7 @@ import { deployLambdaFunctions } from "./resources/lambda.js";
 import { createSESResources, eventDestinationExists } from "./resources/ses.js";
 import { createSMTPCredentials } from "./resources/smtp-credentials.js";
 import { createSQSResources } from "./resources/sqs.js";
+import type { ProgramOutputs } from "./shared/program-outputs.js";
 import { createVercelOIDC } from "./vercel-oidc.js";
 
 /**
@@ -18,7 +20,7 @@ import { createVercelOIDC } from "./vercel-oidc.js";
  */
 export async function deployEmailStack(
   config: EmailStackConfig
-): Promise<StackOutputs> {
+): Promise<ProgramOutputs<StackOutputs>> {
   // Get current AWS account
   const identity = await aws.getCallerIdentity();
   const accountId = identity.accountId;
@@ -482,30 +484,24 @@ export async function deployEmailStack(
 
   // Return outputs
   return {
-    roleArn: role.arn as any as string,
-    configSetName: sesResources?.configSet.configurationSetName as any as
-      | string
-      | undefined,
-    tableName: dynamoTables?.emailHistory.name as any as string | undefined,
+    roleArn: role.arn,
+    configSetName: sesResources?.configSet.configurationSetName,
+    tableName: dynamoTables?.emailHistory.name,
     region: config.region,
     lambdaFunctions: lambdaFunctions
-      ? [lambdaFunctions.eventProcessor.arn as any as string]
+      ? pulumi.output([lambdaFunctions.eventProcessor.arn])
       : undefined,
     domain: emailConfig.domain,
-    dkimTokens: sesResources?.dkimTokens as any as string[] | undefined,
+    dkimTokens: sesResources?.dkimTokens,
     dnsAutoCreated: sesResources?.dnsAutoCreated,
-    eventBusName: sesResources?.eventBus.name as any as string | undefined,
-    queueUrl: sqsResources?.queue.url as any as string | undefined,
-    dlqUrl: sqsResources?.dlq.url as any as string | undefined,
+    eventBusName: sesResources?.eventBus.name,
+    queueUrl: sqsResources?.queue.url,
+    dlqUrl: sqsResources?.dlq.url,
     customTrackingDomain: sesResources?.customTrackingDomain,
     httpsTrackingEnabled: emailConfig.tracking?.httpsEnabled,
     httpsTrackingPending: skipCloudFront, // True if HTTPS requested but cert not validated yet
-    cloudFrontDomain: cloudFrontResources?.domainName as any as
-      | string
-      | undefined,
-    acmCertificateValidationRecords: acmResources?.validationRecords as any as
-      | Array<{ name: string; type: string; value: string }>
-      | undefined,
+    cloudFrontDomain: cloudFrontResources?.domainName,
+    acmCertificateValidationRecords: acmResources?.validationRecords,
     mailFromDomain: sesResources?.mailFromDomain,
     archiveArn: archiveResources?.archiveArn,
     archivingEnabled: emailConfig.emailArchiving?.enabled,
@@ -513,19 +509,19 @@ export async function deployEmailStack(
       ? emailConfig.emailArchiving.retention
       : undefined,
     // SMTP credentials (shown once, not stored)
-    smtpUserArn: smtpResources?.iamUser.arn as any as string | undefined,
-    smtpUsername: smtpResources?.accessKey.id as any as string | undefined,
-    smtpPassword: smtpResources?.smtpPassword as any as string | undefined,
+    smtpUserArn: smtpResources?.iamUser.arn,
+    smtpUsername: smtpResources?.accessKey.id,
+    smtpPassword: smtpResources?.smtpPassword,
     smtpEndpoint: smtpResources
       ? `email-smtp.${config.region}.amazonaws.com`
       : undefined,
     // Alerting outputs
     alertsEnabled: emailConfig.alerts?.enabled,
-    alertTopicArn: alertingResources?.topic.arn as any as string | undefined,
+    alertTopicArn: alertingResources?.topic.arn,
     // Inbound email outputs
     inboundBucketName: inboundResources?.bucketName,
-    inboundBucketArn: inboundResources?.bucketArn as any as string | undefined,
-    inboundLambdaArn: inboundResources?.lambdaArn as any as string | undefined,
+    inboundBucketArn: inboundResources?.bucketArn,
+    inboundLambdaArn: inboundResources?.lambdaArn,
     inboundReceivingDomain: emailConfig.inbound?.receivingDomain,
     // User webhook outputs
     userWebhookUrl: emailConfig.userWebhook?.enabled
@@ -535,8 +531,7 @@ export async function deployEmailStack(
       ? emailConfig.userWebhook.secret
       : undefined,
     // Reply-threading: per-domain SSM parameter ARNs. Pulumi `Output<string>`
-    // values are unwrapped at the stack-output boundary (mirrors the existing
-    // `as any as string` pattern used throughout this file).
+    // values are unwrapped at the stack-output boundary.
     replySecrets: replySecretsOutput
       ? (Object.fromEntries(
           Object.entries(replySecretsOutput).map(

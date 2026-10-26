@@ -65,9 +65,9 @@ export function SuccessCelebration({
         {/* Animated checkmark circle */}
         <div className="relative">
           {/* Outer ring animation */}
-          <div className="absolute inset-0 animate-ping rounded-full bg-green-400 opacity-25" />
+          <div className="absolute inset-0 animate-ping rounded-full bg-success opacity-25" />
           {/* Success circle */}
-          <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-green-500 text-white">
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-success text-success-foreground">
             <Check
               className="h-10 w-10 animate-in zoom-in-0 duration-300"
               strokeWidth={3}
@@ -76,7 +76,7 @@ export function SuccessCelebration({
         </div>
 
         {/* Message */}
-        <p className="animate-in fade-in-0 slide-in-from-bottom-2 font-semibold text-gray-900 text-lg duration-300">
+        <p className="animate-in fade-in-0 slide-in-from-bottom-2 font-semibold text-foreground text-lg duration-300">
           {message}
         </p>
 

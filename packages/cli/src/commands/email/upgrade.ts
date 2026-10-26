@@ -4,7 +4,12 @@ import { ALL_EVENT_TYPES } from "@wraps/core";
 import pc from "picocolors";
 import { deployEmailStack } from "../../infrastructure/email-stack.js";
 import { trackError, trackServiceUpgrade } from "../../telemetry/events.js";
-import type { UpgradeOptions, WrapsEmailConfig } from "../../types/index.js";
+import type {
+  ArchiveRetention,
+  EmailConfigPreset,
+  UpgradeOptions,
+  WrapsEmailConfig,
+} from "../../types/index.js";
 import {
   buildEmailDNSRecords,
   createDNSRecordsForProvider,
@@ -361,7 +366,8 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   }
 
   let updatedConfig: WrapsEmailConfig = { ...config };
-  let newPreset: string | undefined = metadata.services.email?.preset;
+  let newPreset: EmailConfigPreset | undefined =
+    metadata.services.email?.preset;
 
   // 7. Handle upgrade action
   switch (upgradeAction) {
@@ -419,11 +425,11 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       }
 
       // Get preset config but preserve user-customized fields from existing config
-      const presetConfig = getPreset(selectedPreset as any)!;
+      const presetConfig = getPreset(selectedPreset as EmailConfigPreset)!;
 
       // Apply preset updates to existing config (preserves user customizations)
       updatedConfig = applyConfigUpdates(config, presetConfig);
-      newPreset = selectedPreset as string;
+      newPreset = selectedPreset as EmailConfigPreset;
       break;
     }
 
@@ -472,7 +478,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           };
         } else {
           // Change retention
-          const retention = await clack.select({
+          const retention = await clack.select<ArchiveRetention>({
             message: "Email archive retention period:",
             options: [
               {
@@ -518,7 +524,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
             ...config,
             emailArchiving: {
               enabled: true,
-              retention: retention as any,
+              retention,
             },
           };
         }
@@ -540,7 +546,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           process.exit(0);
         }
 
-        const retention = await clack.select({
+        const retention = await clack.select<ArchiveRetention>({
           message: "Email archive retention period:",
           options: [
             {
@@ -597,7 +603,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           ...config,
           emailArchiving: {
             enabled: true,
-            retention: retention as any,
+            retention,
           },
         };
       }
@@ -787,7 +793,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     }
 
     case "retention": {
-      const retention = await clack.select({
+      const retention = await clack.select<ArchiveRetention>({
         message: "Email history retention period (event data in DynamoDB):",
         options: [
           { value: "7days", label: "7 days", hint: "Minimal storage cost" },
@@ -834,7 +840,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
           ...config.eventTracking,
           enabled: true,
           dynamoDBHistory: true,
-          archiveRetention: retention as any,
+          archiveRetention: retention,
         },
       };
       newPreset = undefined; // Custom config
@@ -2282,7 +2288,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   // 14. Update metadata
   updateEmailConfig(metadata, updatedConfig);
   if (metadata.services.email) {
-    metadata.services.email.preset = newPreset as any;
+    metadata.services.email.preset = newPreset;
   }
   await saveConnectionMetadata(metadata);
 

@@ -144,7 +144,7 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
               ...(hasFeatures && {
                 emailEnabled: hasEmailFeature,
                 smsEnabled: hasSmsFeature,
-                features: features as any,
+                features,
               }),
               updatedAt: new Date(),
             })
