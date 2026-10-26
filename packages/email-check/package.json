@@ -1,6 +1,6 @@
 {
   "name": "@wraps.dev/email-check",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Email deliverability auditing library. Checks SPF, DKIM, DMARC, MX, blacklists, TLS, and domain age. Zero dependencies — pure Node.js built-ins.",
   "type": "module",
   "main": "./dist/index.js",
