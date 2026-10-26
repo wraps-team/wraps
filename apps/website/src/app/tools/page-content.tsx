@@ -147,8 +147,21 @@ type EmailCheckResult = {
     count: number;
   };
   blacklist: {
+    /** True when the blacklist step ran at all. */
     checked: boolean;
+    /** True when no listing was found. Not the same as "every lookup answered". */
     overallClean: boolean;
+    quickMode?: boolean;
+    /** Absent on responses cached before it existed. */
+    summary?: {
+      state: "skipped" | "listed" | "incomplete" | "clean";
+      headline: string;
+      detail: string | null;
+      lists: number | null;
+      lookups: number;
+      unanswered: number;
+      unansweredLists: string[];
+    };
     domainListings: Array<{
       blacklist: string;
       priority: string;
@@ -356,6 +369,10 @@ export default function ToolsPageContent({
         body: JSON.stringify({
           domain: checkDomain.trim(),
           quick: true,
+          // The API skips blacklists in quick mode unless asked, and this page
+          // advertises them. Quick mode: the domain against 5 lists, each IPv4
+          // mail server against 10.
+          skipBlacklists: false,
           turnstileToken: token,
           ...(checkDkim.trim() && {
             dkimSelectors: checkDkim
@@ -656,9 +673,17 @@ export default function ToolsPageContent({
               <div className="flex items-center justify-between p-4">
                 <StatusBadge
                   label="Blacklists"
-                  status={result.blacklist.overallClean ? "pass" : "fail"}
+                  status={
+                    result.blacklist.summary?.state === "incomplete"
+                      ? "warn"
+                      : result.blacklist.overallClean
+                        ? "pass"
+                        : "fail"
+                  }
                 />
-                {result.blacklist.overallClean ? (
+                {result.blacklist.summary?.state === "incomplete" ? (
+                  <Badge variant="outline">Incomplete</Badge>
+                ) : result.blacklist.overallClean ? (
                   <Badge variant="outline">Clean</Badge>
                 ) : (
                   <span className="text-destructive text-sm">
@@ -668,6 +693,20 @@ export default function ToolsPageContent({
                   </span>
                 )}
               </div>
+              {result.blacklist.summary && (
+                <div className="space-y-1 border-t px-4 py-3 text-muted-foreground text-xs">
+                  <p>{result.blacklist.summary.headline}</p>
+                  {result.blacklist.summary.detail && (
+                    <p>{result.blacklist.summary.detail}</p>
+                  )}
+                  {result.blacklist.summary.unansweredLists.length > 0 && (
+                    <p>
+                      Did not answer:{" "}
+                      {result.blacklist.summary.unansweredLists.join(", ")}
+                    </p>
+                  )}
+                </div>
+              )}
               {!result.blacklist.overallClean && (
                 <div className="border-t bg-muted/30 p-4">
                   <div className="space-y-2">

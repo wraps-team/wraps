@@ -3,7 +3,11 @@
  * Free email deliverability tools - no authentication required
  */
 
-import { type EmailCheckResult, runEmailCheck } from "@wraps.dev/email-check";
+import {
+  describeBlacklistCoverage,
+  type EmailCheckResult,
+  runEmailCheck,
+} from "@wraps.dev/email-check";
 import { Elysia, t } from "elysia";
 
 import { publicRateLimitMiddleware } from "../middleware/public-rate-limit";
@@ -114,8 +118,23 @@ const emailCheckResponseSchema = t.Object({
   ),
   blacklist: t.Optional(
     t.Object({
+      /** True when the blacklist step ran at all. */
       checked: t.Boolean(),
+      /** True when no listing was found. Not the same as "every lookup answered". */
       overallClean: t.Boolean(),
+      quickMode: t.Optional(t.Boolean()),
+      /** What was covered, and whether it is safe to call it clean. */
+      summary: t.Optional(
+        t.Object({
+          state: t.String(),
+          headline: t.String(),
+          detail: t.Union([t.String(), t.Null()]),
+          lists: t.Union([t.Number(), t.Null()]),
+          lookups: t.Number(),
+          unanswered: t.Number(),
+          unansweredLists: t.Array(t.String()),
+        })
+      ),
       domainListings: t.Array(
         t.Object({
           blacklist: t.String(),
@@ -159,6 +178,8 @@ const emailCheckResponseSchema = t.Object({
  * Transform EmailCheckResult to API response format
  */
 function formatEmailCheckResult(result: EmailCheckResult) {
+  const blacklistSummary = describeBlacklistCoverage(result.blacklist);
+
   return {
     success: true,
     domain: result.domain,
@@ -241,8 +262,21 @@ function formatEmailCheckResult(result: EmailCheckResult) {
       count: result.reverseDns.results.length,
     },
     blacklist: {
-      checked: !result.blacklist.quickMode,
+      // Whether the step ran. This used to be `!quickMode`, which hid the
+      // result of a quick check that did run and reported a full check as run
+      // even if it had been skipped.
+      checked: blacklistSummary.state !== "skipped",
       overallClean: result.blacklist.overallClean,
+      quickMode: result.blacklist.quickMode,
+      summary: {
+        state: blacklistSummary.state,
+        headline: blacklistSummary.headline,
+        detail: blacklistSummary.detail,
+        lists: blacklistSummary.lists,
+        lookups: blacklistSummary.lookups,
+        unanswered: blacklistSummary.unanswered,
+        unansweredLists: blacklistSummary.unansweredLists,
+      },
       domainListings: result.blacklist.domainChecks.listed.map((l) => ({
         blacklist: l.blacklist,
         priority: l.priority,
@@ -277,6 +311,10 @@ export const toolsRoutes = new Elysia({ prefix: "/tools" })
     "/email-check",
     async ({ body, set }) => {
       const { domain, quick = true, dkimSelector, dkimSelectors } = body;
+      // `quick` selects the smaller set of DKIM selectors and blacklists, and
+      // by default skips blacklists for speed (the documented behaviour). A
+      // caller that wants the quick blacklist set asks for it explicitly.
+      const skipBlacklists = body.skipBlacklists ?? quick;
 
       // Validate domain format
       if (!/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(domain)) {
@@ -298,6 +336,9 @@ export const toolsRoutes = new Elysia({ prefix: "/tools" })
       const cacheKey = getEmailCheckCacheKey(domain, {
         quick,
         dkimSelectors: selectors,
+        ...(skipBlacklists !== quick && {
+          blacklists: skipBlacklists ? "off" : "on",
+        }),
       });
       const cached =
         await getCached<ReturnType<typeof formatEmailCheckResult>>(cacheKey);
@@ -309,7 +350,7 @@ export const toolsRoutes = new Elysia({ prefix: "/tools" })
       try {
         const result = await runEmailCheck(domain, {
           quick,
-          skipBlacklists: quick, // Skip blacklists in quick mode for speed
+          skipBlacklists,
           skipTls: true, // Skip TLS checks (port 25 often blocked)
           dkimSelectors: selectors, // Custom DKIM selectors (useful for AWS SES)
         });
@@ -339,7 +380,16 @@ export const toolsRoutes = new Elysia({ prefix: "/tools" })
           description: "Domain to check",
         }),
         quick: t.Optional(
-          t.Boolean({ description: "Quick mode (skip blacklist checks)" })
+          t.Boolean({
+            description:
+              "Quick mode: fewer DKIM selectors and the 10-list blacklist set. Skips blacklists unless skipBlacklists is false.",
+          })
+        ),
+        skipBlacklists: t.Optional(
+          t.Boolean({
+            description:
+              "Skip blacklist checks. Defaults to the value of quick. Send false with quick to check the domain against 5 lists and its IPv4 mail servers against 10.",
+          })
         ),
         dkimSelector: t.Optional(
           t.String({
