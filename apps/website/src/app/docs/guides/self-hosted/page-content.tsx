@@ -1712,29 +1712,40 @@ pnpm install`,
         <p className="mb-4 text-muted-foreground">
           You do not have to pick one.{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">AI_MODEL</code> is
-          optional for every provider, and each one has a sensible default:
-          Claude Sonnet 4 for the gateway, Anthropic, and Bedrock; GPT-5 for
-          OpenAI.
+          optional for every provider, and each one has a default: Claude Sonnet
+          5.5 for the gateway and Anthropic, Claude Sonnet 4 for Bedrock, and
+          GPT-5 for OpenAI. Bedrock stays on Sonnet 4 because every model has to
+          be enabled in your AWS account before it can serve a request.
         </p>
         <p className="mb-4 text-muted-foreground">
-          To override it, pass{" "}
+          Gateway requests ask for zero data retention at the model provider.
+          The gateway only routes them to providers with a zero-retention
+          agreement, and fails the request if none is available rather than
+          sending your email content somewhere that keeps it.
+        </p>
+        <p className="mb-4 text-muted-foreground">
+          To override the default, pass{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">--ai-model</code>{" "}
-          with either a catalog key —{" "}
+          with a catalog key or a raw provider-native id. Catalog keys are
+          translated to whatever id your provider expects:{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">
-            claude-sonnet-4
-          </code>{" "}
-          or <code className="rounded bg-muted px-1.5 py-0.5">gpt-5</code>,
-          translated automatically to whatever id your provider expects — or a
-          raw provider-native id, which is passed through untouched. Raw ids are
-          the escape hatch for models newer than this release:{" "}
+            claude-sonnet-5.5
+          </code>
+          ,{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">
-            claude-opus-4-1-20250805
+            claude-haiku-5.5
+          </code>
+          , or <code className="rounded bg-muted px-1.5 py-0.5">gpt-5</code>.
+          Raw ids are passed through untouched, which is how you reach a model
+          newer than this release:{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            claude-opus-5-5
           </code>{" "}
           for Anthropic,{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">
-            anthropic/claude-sonnet-4
+            anthropic/claude-opus-5.5
           </code>{" "}
-          for the gateway (gateway ids must be namespaced), a full inference
+          for the gateway (gateway ids must be namespaced), or a full inference
           profile ARN for Bedrock.
         </p>
         <div className="mb-6 rounded-lg border-primary border-l-4 bg-primary/10 p-4">
@@ -1754,6 +1765,27 @@ pnpm install`,
             — naming the variable to fix — instead of leaving you to discover it
             when someone clicks Generate. The rest of the dashboard keeps
             working either way.
+          </p>
+        </div>
+        <div className="mb-6 rounded-lg border-primary border-l-4 bg-primary/10 p-4">
+          <p className="font-medium text-sm">
+            If you set AI_MODEL=claude-sonnet-4 with the gateway
+          </p>
+          <p className="mt-2 text-muted-foreground text-sm">
+            The AI Gateway no longer serves Claude Sonnet 4, so that pin makes
+            every AI request fail. Run{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">
+              pnpm selfhost:upgrade --ai-model claude-sonnet-5.5
+            </code>
+            , or delete the{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">AI_MODEL</code>{" "}
+            line from{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">
+              .env.selfhost
+            </code>{" "}
+            and re-run the upgrade to use the default. Passing{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">--ai-model</code>{" "}
+            replaces a pin but cannot clear one.
           </p>
         </div>
 
@@ -2188,20 +2220,25 @@ pnpm install`,
                 <td className="p-3 pr-4 align-top">Optional</td>
                 <td className="p-3 align-top">
                   Override the model used for AI features. Accepts a catalog
-                  key, which is translated for whichever provider is active —{" "}
+                  key, which is translated for whichever provider is active (
                   <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                    claude-sonnet-4
-                  </code>{" "}
-                  or{" "}
+                    claude-sonnet-5.5
+                  </code>
+                  ,{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                    claude-haiku-5.5
+                  </code>
+                  , or{" "}
                   <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
                     gpt-5
-                  </code>{" "}
-                  — or a raw provider-native id, which is passed through
+                  </code>
+                  ), or a raw provider-native id, which is passed through
                   unchanged. Gateway ids must be namespaced (
                   <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                    anthropic/claude-sonnet-4
+                    anthropic/claude-opus-5.5
                   </code>
-                  ); a bare model name is only valid as a catalog key
+                  ); a bare model name is only valid as a catalog key. Unset
+                  uses Claude Sonnet 5.5, or Claude Sonnet 4 on Bedrock
                 </td>
               </tr>
               <tr>
