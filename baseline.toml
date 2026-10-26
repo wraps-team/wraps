@@ -485,26 +485,26 @@ exclude_glob = [
 ]
 message = "Insecure http:// URL — use https:// instead"
 
-# Override security preset: dangerouslySetInnerHTML used legitimately for
-# code syntax highlighting (docs/blog), email preview, and JSON-LD
+# Override security preset: the only dangerouslySetInnerHTML left is shiki
+# output inside vendored shadcn-io components, excluded like the color ratchets
 [[rule]]
 id = "no-dangerous-html"
 type = "ratchet"
 severity = "error"
 pattern = "dangerouslySetInnerHTML"
-max_count = 4
+max_count = 0
 glob = "**/*.{ts,tsx}"
-exclude_glob = ["**/node_modules/**"]
-message = "Reduce dangerouslySetInnerHTML usage — sanitize content or use safe alternatives (4 remaining, ratchet down)"
+exclude_glob = ["**/node_modules/**", "**/components/ui/**"]
+message = "No dangerouslySetInnerHTML — sanitize content or use safe alternatives"
 
-# Override security preset: innerHTML used for asciinema cleanup and GTM injection
+# Override security preset: innerHTML is fully removed; keep it out
 [[rule]]
 id = "no-innerhtml"
 type = "ratchet"
 severity = "error"
 pattern = "\\.innerHTML"
 regex = true
-max_count = 4
+max_count = 0
 glob = "**/*.{ts,tsx}"
 exclude_glob = ["**/node_modules/**"]
-message = "Reduce innerHTML usage — use textContent or a sanitizer (4 remaining, ratchet down)"
+message = "No innerHTML — use textContent, replaceChildren(), or a sanitizer"
