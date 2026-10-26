@@ -4,7 +4,7 @@ import type { NextConfig } from "next";
 import { MAX_IMPORT_PAYLOAD_BYTES } from "./src/lib/csv-parse";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["web.wraps.localhost", "*.wraps.localhost"],
+  allowedDevOrigins: ["web.wraps.localhost", "*.wraps.localhost", "127.0.0.1"],
 
   // Required for PostHog error tracking to symbolicate stack traces
   productionBrowserSourceMaps: true,
