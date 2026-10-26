@@ -308,6 +308,8 @@ export type BlacklistSummary = {
   unanswered: number;
   /** The lists behind those lookups, once each, in the order they were met. */
   unansweredLists: string[];
+  /** The same lists with why each did not answer, one entry per list per kind (domain or IP). */
+  unansweredDetails: { list: string; reason: string }[];
   /** Lists consulted, or null when the result predates `coverage`. */
   lists: number | null;
   /** One line, safe to show next to a check or cross. Never says "clean" unless it is. */
@@ -315,6 +317,21 @@ export type BlacklistSummary = {
   /** Second line: what the lists were run against. Null when there is nothing to add. */
   detail: string | null;
 };
+
+/** A short, human reason from a DNS error message. */
+function reasonFrom(message: string): string {
+  if (/timed out/i.test(message)) {
+    return "timed out";
+  }
+  const code = message.match(/\bE[A-Z]{3,}\b/)?.[0];
+  if (code === "ESERVFAIL") {
+    return "SERVFAIL";
+  }
+  if (code === "EREFUSED") {
+    return "refused";
+  }
+  return code ? code.slice(1).toLowerCase() : "no answer";
+}
 
 function plural(n: number, noun: string, many = `${noun}s`): string {
   return `${n} ${n === 1 ? noun : many}`;
@@ -335,21 +352,37 @@ export function describeBlacklistCoverage(
   // an absent array is an empty one.
   const domain = result.domainChecks;
   const ip = result.ipChecks;
-  const unansweredEntries = [
-    ...(domain.errors ?? []),
-    ...(ip.errors ?? []),
-    ...(domain.timeouts ?? []),
-    ...(ip.timeouts ?? []),
-  ];
   const listings = (domain.listed?.length ?? 0) + (ip.listed?.length ?? 0);
   const lookups = (domain.checked ?? 0) + (ip.checked ?? 0);
-  const unanswered = unansweredEntries.length;
-  // Errors are "List name: message"; timeouts are the bare list name.
-  const unansweredLists = [
-    ...new Set(
-      unansweredEntries.map((entry) => entry.split(":")[0]?.trim() ?? entry)
-    ),
-  ];
+
+  // Errors are "List name: message"; timeouts are the bare list name. A list is
+  // counted once per kind (domain or IP), however many addresses it failed on.
+  const unansweredByKey = new Map<string, { list: string; reason: string }>();
+  let unanswered = 0;
+  const note = (
+    kind: "domain" | "ip",
+    entries: string[],
+    timedOut: boolean
+  ) => {
+    for (const entry of entries) {
+      unanswered++;
+      const [name = entry, ...rest] = entry.split(":");
+      const list = name.trim();
+      const key = `${kind}:${list}`;
+      if (!unansweredByKey.has(key)) {
+        unansweredByKey.set(key, {
+          list,
+          reason: timedOut ? "timed out" : reasonFrom(rest.join(":")),
+        });
+      }
+    }
+  };
+  note("domain", domain.errors ?? [], false);
+  note("ip", ip.errors ?? [], false);
+  note("domain", domain.timeouts ?? [], true);
+  note("ip", ip.timeouts ?? [], true);
+  const unansweredDetails = [...unansweredByKey.values()];
+  const unansweredLists = [...new Set(unansweredDetails.map((d) => d.list))];
   const coverage = result.coverage;
   const lists = coverage ? coverage.domainLists + coverage.ipLists : null;
   const mode = result.quickMode ? " (quick mode)" : "";
@@ -369,6 +402,7 @@ export function describeBlacklistCoverage(
       lookups,
       unanswered,
       unansweredLists,
+      unansweredDetails,
       lists,
       headline: "Skipped",
       detail: null,
@@ -382,6 +416,7 @@ export function describeBlacklistCoverage(
       lookups,
       unanswered,
       unansweredLists,
+      unansweredDetails,
       lists,
       headline: `Listed on ${plural(listings, "list")}`,
       detail,
@@ -395,8 +430,12 @@ export function describeBlacklistCoverage(
       lookups,
       unanswered,
       unansweredLists,
+      unansweredDetails,
       lists,
-      headline: `No listings found; ${unanswered} of ${plural(lookups, "lookup")} did not answer`,
+      headline:
+        lists === null
+          ? `No listings found; ${unanswered} of ${plural(lookups, "lookup")} did not answer`
+          : `No listings found on ${Math.max(lists - unansweredByKey.size, 0)} of ${plural(lists, "list")}`,
       detail,
     };
   }
@@ -407,6 +446,7 @@ export function describeBlacklistCoverage(
     lookups,
     unanswered,
     unansweredLists,
+    unansweredDetails,
     lists,
     headline:
       lists === null

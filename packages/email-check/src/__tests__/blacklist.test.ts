@@ -233,10 +233,12 @@ describe("describeBlacklistCoverage", () => {
     expect(summary.state).toBe("incomplete");
     expect(summary.unanswered).toBe(1);
     expect(summary.unansweredLists).toEqual(["Spamhaus ZEN"]);
-    expect(summary.headline).toBe(
-      "No listings found; 1 of 53 lookups did not answer"
-    );
-    expect(summary.headline).not.toMatch(/clean/i);
+    // Counts lists that answered, not lookups, and does not alarm.
+    expect(summary.headline).toBe("No listings found on 52 of 53 lists");
+    expect(summary.headline).not.toMatch(/clean|incomplete|warn/i);
+    expect(summary.unansweredDetails).toEqual([
+      { list: "Spamhaus ZEN", reason: "timed out" },
+    ]);
   });
 
   it("names each list that did not answer once, however many IPs it failed on", () => {
@@ -254,6 +256,26 @@ describe("describeBlacklistCoverage", () => {
     const summary = describeBlacklistCoverage(result);
     expect(summary.unanswered).toBe(4);
     expect(summary.unansweredLists).toEqual(["WPBL", "SURBL Multi"]);
+    expect(summary.unansweredDetails).toEqual([
+      { list: "WPBL", reason: "SERVFAIL" },
+      { list: "SURBL Multi", reason: "timed out" },
+    ]);
+  });
+
+  it("gives a reason per list, whatever the error", () => {
+    const result = emptyResult({
+      coverage: { domainLists: 15, ipLists: 38, ipAddresses: 1 },
+    });
+    result.domainChecks.checked = 15;
+    result.ipChecks.checked = 38;
+    result.ipChecks.errors = [
+      "A: queryA EREFUSED 1.0.0.127.a.example",
+      "B: something odd",
+    ];
+    expect(describeBlacklistCoverage(result).unansweredDetails).toEqual([
+      { list: "A", reason: "refused" },
+      { list: "B", reason: "no answer" },
+    ]);
   });
 
   it("reports a listing before anything else", () => {
