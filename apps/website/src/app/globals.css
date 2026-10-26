@@ -449,3 +449,29 @@ html {
     black 100%
   );
 }
+
+/* "How it works" diagram. One bounce lights the path in order, once, when it
+   scrolls into view (FlowStage sets data-play). The un-played state only dims
+   things when motion is allowed, so reduced-motion and no-JS read as finished. */
+@media (prefers-reduced-motion: no-preference) {
+  .flow-stage:not([data-play]) .flow-node {
+    opacity: 0.4;
+  }
+
+  .flow-stage[data-play] .flow-node {
+    animation: flow-lit 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0s) both;
+  }
+}
+
+@keyframes flow-lit {
+  from {
+    opacity: 0.4;
+  }
+  35% {
+    opacity: 1;
+    border-color: var(--color-brand);
+  }
+  to {
+    opacity: 1;
+  }
+}
