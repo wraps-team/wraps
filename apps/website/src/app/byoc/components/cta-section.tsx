@@ -1,4 +1,5 @@
 import { Button } from "@wraps/ui/components/ui/button";
+import Link from "next/link";
 
 export function ByocCtaSection() {
   return (
@@ -28,7 +29,7 @@ export function ByocCtaSection() {
               size="lg"
               variant="outline"
             >
-              <a href="/docs/quickstart">Read the docs</a>
+              <Link href="/docs/quickstart">Read the docs</Link>
             </Button>
           </div>
         </div>

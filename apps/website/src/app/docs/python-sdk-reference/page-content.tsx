@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@wraps/ui/components/ui/card";
 import { ArrowRight, Info } from "lucide-react";
+import Link from "next/link";
 import { CopyForAIButton } from "@/components/docs/copy-for-ai-button";
 import { SectionHeading } from "@/components/docs/section-heading";
 import { DocsLayout } from "@/components/docs-layout";
@@ -574,10 +575,10 @@ export default function PythonSDKReferencePageContent() {
                 event tracking.
               </p>
               <Button asChild variant="outline">
-                <a href="/docs/sdk-reference">
+                <Link href="/docs/sdk-reference">
                   Email SDK Reference
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </a>
+                </Link>
               </Button>
             </CardContent>
           </Card>
@@ -591,10 +592,10 @@ export default function PythonSDKReferencePageContent() {
                 Gmail and Yahoo.
               </p>
               <Button asChild variant="outline">
-                <a href="/docs/guides/domain-verification">
+                <Link href="/docs/guides/domain-verification">
                   Verify a Domain
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </a>
+                </Link>
               </Button>
             </CardContent>
           </Card>

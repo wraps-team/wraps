@@ -423,6 +423,8 @@ exclude_glob = [
   "packages/cdk/**",
   "packages/console/**",
   "packages/pulumi/**",
+  "packages/mail-audit/**",
+  "infra/**",
   "**/scripts/**",
   "**/*.config.*",
   "**/*.test.*",
@@ -434,8 +436,27 @@ exclude_glob = [
   "apps/website/src/app/blog/**",
   "apps/website/src/app/inbound/**",
   "apps/website/src/app/landing/**",
+  # code samples inside markdown strings served to agents
+  "apps/website/src/lib/agent-content.ts",
 ]
 message = "Remove console.log before deploying — use a proper logger or remove debug output"
+
+# Override preset: OG/Twitter image routes render through ImageResponse
+# (satori), where next/image does not work; docs pages hold <img> in code samples
+[[rule]]
+id = "use-next-image"
+type = "banned-pattern"
+severity = "warning"
+pattern = "<img\\s"
+regex = true
+glob = "**/*.tsx"
+exclude_glob = [
+  "**/opengraph-image.tsx",
+  "**/twitter-image.tsx",
+  "apps/website/src/app/docs/**",
+]
+message = "Use next/image instead of <img> for automatic optimization"
+suggest = "Import Image from 'next/image' and use <Image> component"
 
 # Override security preset: http:// URLs are legitimate in SVGs (xmlns),
 # DNSBL lookups, docs code examples, and localhost dev fallbacks
