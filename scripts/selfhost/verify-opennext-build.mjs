@@ -99,8 +99,8 @@ export function resolveOpenNextCommand({
  * table and fails until someone adds it.
  */
 export const VERIFIED_NEXT_CEILING = {
-  // 16.3: built and served by selfhost:build on next 16.3.6 (PR #188). Not yet deployed.
-  "3.9.14": "16.3",
+  // 16.4: built and served by selfhost:build on next 16.4.3 (security bump off 16.3.6). Not yet deployed.
+  "3.9.14": "16.4",
 };
 
 /** Fails when `nextVersion` is a newer major.minor than `openNextVersion` is verified for. */
