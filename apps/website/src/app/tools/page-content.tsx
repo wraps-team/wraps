@@ -161,6 +161,7 @@ type EmailCheckResult = {
       lookups: number;
       unanswered: number;
       unansweredLists: string[];
+      unansweredDetails: Array<{ list: string; reason: string }>;
     };
     domainListings: Array<{
       blacklist: string;
@@ -673,16 +674,10 @@ export default function ToolsPageContent({
               <div className="flex items-center justify-between p-4">
                 <StatusBadge
                   label="Blacklists"
-                  status={
-                    result.blacklist.summary?.state === "incomplete"
-                      ? "warn"
-                      : result.blacklist.overallClean
-                        ? "pass"
-                        : "fail"
-                  }
+                  status={result.blacklist.overallClean ? "pass" : "fail"}
                 />
                 {result.blacklist.summary?.state === "incomplete" ? (
-                  <Badge variant="outline">Incomplete</Badge>
+                  <Badge variant="outline">No listings</Badge>
                 ) : result.blacklist.overallClean ? (
                   <Badge variant="outline">Clean</Badge>
                 ) : (
@@ -699,12 +694,11 @@ export default function ToolsPageContent({
                   {result.blacklist.summary.detail && (
                     <p>{result.blacklist.summary.detail}</p>
                   )}
-                  {result.blacklist.summary.unansweredLists.length > 0 && (
-                    <p>
-                      Did not answer:{" "}
-                      {result.blacklist.summary.unansweredLists.join(", ")}
+                  {result.blacklist.summary.unansweredDetails?.map((d) => (
+                    <p key={`${d.list}-${d.reason}`}>
+                      ○ {d.list}: did not answer ({d.reason})
                     </p>
-                  )}
+                  ))}
                 </div>
               )}
               {!result.blacklist.overallClean && (

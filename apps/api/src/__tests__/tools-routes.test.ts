@@ -525,6 +525,8 @@ describe("email-check blacklists", () => {
       state: "incomplete",
       unanswered: 1,
       unansweredLists: ["WPBL"],
+      unansweredDetails: [{ list: "WPBL", reason: "SERVFAIL" }],
+      headline: "No listings found on 52 of 53 lists",
     });
     expect(json.blacklist.summary.headline).not.toMatch(/clean/i);
   });

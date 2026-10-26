@@ -133,6 +133,9 @@ const emailCheckResponseSchema = t.Object({
           lookups: t.Number(),
           unanswered: t.Number(),
           unansweredLists: t.Array(t.String()),
+          unansweredDetails: t.Array(
+            t.Object({ list: t.String(), reason: t.String() })
+          ),
         })
       ),
       domainListings: t.Array(
@@ -276,6 +279,7 @@ function formatEmailCheckResult(result: EmailCheckResult) {
         lookups: blacklistSummary.lookups,
         unanswered: blacklistSummary.unanswered,
         unansweredLists: blacklistSummary.unansweredLists,
+        unansweredDetails: blacklistSummary.unansweredDetails,
       },
       domainListings: result.blacklist.domainChecks.listed.map((l) => ({
         blacklist: l.blacklist,
