@@ -1,6 +1,8 @@
 import { Lightbulb } from "lucide-react";
-import { releases } from "../releases";
+import { tagOptions } from "../filter";
+import { releases, TAG_LABELS } from "../releases";
 import { EntryCard } from "./entry-card";
+import { ReleasesFilter } from "./releases-filter";
 
 export function ChangelogReleasesSection() {
   const ordered = [...releases].sort((a, b) => b.date.localeCompare(a.date));
@@ -9,16 +11,14 @@ export function ChangelogReleasesSection() {
     <section className="py-12 pb-24">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <div className="relative">
-          {/* Releases with timeline */}
-          <div className="relative">
-            {/* Timeline line - contained to releases section */}
-            <div className="absolute top-0 bottom-0 left-[24px] w-[1.5px] bg-border" />
-
-            <div className="space-y-12">
-              {ordered.map((release, index) => {
-                const Icon = release.icon;
-                return (
-                  <div className="relative pl-16" key={release.slug}>
+          <ReleasesFilter
+            entries={ordered.map((release, index) => {
+              const Icon = release.icon;
+              return {
+                slug: release.slug,
+                tags: release.tags,
+                node: (
+                  <div className="relative pl-16">
                     {/* Timeline dot - outer circle */}
                     <div className="absolute left-0 flex size-12 items-center justify-center rounded-full bg-background">
                       {/* Inner node — orange only marks the latest release */}
@@ -40,10 +40,11 @@ export function ChangelogReleasesSection() {
                       release={release}
                     />
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                ),
+              };
+            })}
+            options={tagOptions(TAG_LABELS, releases)}
+          />
 
           {/* Origin card - where it all began */}
           <div className="relative mt-12 pl-16">
