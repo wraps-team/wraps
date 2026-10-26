@@ -32,10 +32,15 @@ const EFFORT_BUDGET_TOKENS: Record<ReasoningEffort, number> = {
  * Both mismatches fail SILENTLY. Bedrock ignores an `anthropic` namespace and
  * OpenAI ignores `budgetTokens`; reasoning simply stops appearing, with no
  * error and nothing in the logs.
+ *
+ * `adaptive` is the opposite failure: Claude 4.6+ answers a budget with a 400,
+ * so those models get adaptive thinking plus effort instead. `summarized`
+ * because the default display is omitted, and the routes stream reasoning.
  */
 export function reasoningOptions(
   namespace: OptionNamespace | undefined,
-  effort: ReasoningEffort | undefined
+  effort: ReasoningEffort | undefined,
+  adaptive = false
 ): ProviderOptions | undefined {
   if (!(namespace && effort)) {
     return;
@@ -43,11 +48,26 @@ export function reasoningOptions(
   const budgetTokens = EFFORT_BUDGET_TOKENS[effort];
   switch (namespace) {
     case "anthropic":
-      return { anthropic: { thinking: { type: "enabled", budgetTokens } } };
+      return adaptive
+        ? {
+            anthropic: {
+              thinking: { type: "adaptive", display: "summarized" },
+              effort,
+            },
+          }
+        : { anthropic: { thinking: { type: "enabled", budgetTokens } } };
     case "bedrock":
-      return {
-        bedrock: { reasoningConfig: { type: "enabled", budgetTokens } },
-      };
+      return adaptive
+        ? {
+            bedrock: {
+              reasoningConfig: {
+                type: "adaptive",
+                maxReasoningEffort: effort,
+                display: "summarized",
+              },
+            },
+          }
+        : { bedrock: { reasoningConfig: { type: "enabled", budgetTokens } } };
     case "openai":
       return { openai: { reasoningEffort: effort } };
     default:

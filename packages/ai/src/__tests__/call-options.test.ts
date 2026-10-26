@@ -29,6 +29,28 @@ describe("reasoningOptions", () => {
     });
   });
 
+  it("sends adaptive thinking and never a budget to 4.6+ models", () => {
+    // Claude 4.6+ answers a thinking budget with a 400.
+    const anthropic = reasoningOptions("anthropic", "high", true);
+    const bedrock = reasoningOptions("bedrock", "high", true);
+    expect(anthropic).toEqual({
+      anthropic: {
+        thinking: { type: "adaptive", display: "summarized" },
+        effort: "high",
+      },
+    });
+    expect(bedrock).toEqual({
+      bedrock: {
+        reasoningConfig: {
+          type: "adaptive",
+          maxReasoningEffort: "high",
+          display: "summarized",
+        },
+      },
+    });
+    expect(JSON.stringify([anthropic, bedrock])).not.toContain("budgetTokens");
+  });
+
   it("sends effort and never a token budget to OpenAI", () => {
     const options = reasoningOptions("openai", "high");
     expect(options).toEqual({ openai: { reasoningEffort: "high" } });

@@ -34,8 +34,10 @@ export async function generateGroundedCopy<T>(args: {
   const { schema, system, facts, fallback, onUsage } = args;
 
   try {
+    // A two-line rephrase of established facts: the smallest model is enough,
+    // and providers that cannot serve it fall back to their default.
     const { model, modelId, providerOptions } = await getAIModel(
-      { reasoning: { effort: "low" } },
+      { model: "claude-haiku-5.5", reasoning: { effort: "low" } },
       aiEnv()
     );
 

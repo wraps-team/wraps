@@ -6,7 +6,15 @@ import type { LanguageModel } from "ai";
 
 export type { ProviderOptions } from "@ai-sdk/provider-utils";
 
-export type AICapability = "vision" | "reasoning" | "prompt-caching";
+/**
+ * `adaptive-reasoning` marks Claude 4.6+ models, which take adaptive thinking
+ * plus an effort level and reject a thinking token budget with a 400.
+ */
+export type AICapability =
+  | "vision"
+  | "reasoning"
+  | "adaptive-reasoning"
+  | "prompt-caching";
 
 export type ReasoningEffort = "low" | "medium" | "high";
 

@@ -44,7 +44,7 @@ const DIRECT_PROVIDERS = [
   {
     name: "anthropic",
     env: { WRAPS_AI_PROVIDER: "anthropic", ANTHROPIC_API_KEY: "k" },
-    expectedModelId: "claude-sonnet-4-20250514",
+    expectedModelId: "claude-sonnet-5-5",
   },
   {
     name: "openai",
@@ -86,7 +86,7 @@ describe("a route's preferred model degrades instead of failing the request", ()
   });
 
   it("substitutes the capabilities of the model actually used, not the one asked for", async () => {
-    // Grok has none; claude-sonnet-4 has all three. Reporting Grok's empty set
+    // Grok has none; claude-sonnet-5.5 has them all. Reporting Grok's empty set
     // here would suppress reasoning and caching on a model that supports both.
     const resolved = await getAIModel(
       CHAT_ROUTE_REQUEST,
@@ -94,7 +94,10 @@ describe("a route's preferred model degrades instead of failing the request", ()
     );
     expect(resolved.capabilities.has("reasoning")).toBe(true);
     expect(resolved.providerOptions).toEqual({
-      anthropic: { thinking: { type: "enabled", budgetTokens: 10_000 } },
+      anthropic: {
+        thinking: { type: "adaptive", display: "summarized" },
+        effort: "medium",
+      },
     });
   });
 

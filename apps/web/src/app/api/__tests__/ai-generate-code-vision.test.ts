@@ -159,6 +159,7 @@ describe("generate-code — image handling degrades on models without vision", (
     await postWithImage();
 
     expect(lastStreamTextArgs()?.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
       anthropic: { thinking: { type: "enabled", budgetTokens: 10_000 } },
     });
   });
@@ -168,6 +169,8 @@ describe("generate-code — image handling degrades on models without vision", (
 
     await postWithImage();
 
-    expect(lastStreamTextArgs()?.providerOptions).toBeUndefined();
+    expect(lastStreamTextArgs()?.providerOptions).toEqual({
+      gateway: { zeroDataRetention: true },
+    });
   });
 });

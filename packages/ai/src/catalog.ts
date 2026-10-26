@@ -21,7 +21,31 @@ const CLAUDE_CAPABILITIES = [
   "prompt-caching",
 ] as const satisfies readonly AICapability[];
 
+const ADAPTIVE_CLAUDE_CAPABILITIES = [
+  ...CLAUDE_CAPABILITIES,
+  "adaptive-reasoning",
+] as const satisfies readonly AICapability[];
+
 export const MODEL_CATALOG = {
+  /**
+   * No bedrock id: Bedrock deployments keep DEFAULT_BEDROCK_MODEL_KEY until
+   * the Converse id is verified against an account with model access enabled.
+   */
+  "claude-sonnet-5.5": {
+    capabilities: ADAPTIVE_CLAUDE_CAPABILITIES,
+    ids: {
+      gateway: "anthropic/claude-sonnet-5.5",
+      anthropic: "claude-sonnet-5-5",
+    },
+  },
+  "claude-haiku-5.5": {
+    capabilities: ADAPTIVE_CLAUDE_CAPABILITIES,
+    ids: {
+      gateway: "anthropic/claude-haiku-5.5",
+      anthropic: "claude-haiku-5-5",
+    },
+  },
+  /** The AI Gateway stopped serving this slug; kept for AI_MODEL pins and Bedrock. */
   "claude-sonnet-4": {
     capabilities: CLAUDE_CAPABILITIES,
     ids: {
@@ -46,11 +70,17 @@ export const MODEL_CATALOG = {
 
 export type ModelKey = keyof typeof MODEL_CATALOG;
 
-export const DEFAULT_MODEL_KEY: ModelKey = "claude-sonnet-4";
+export const DEFAULT_MODEL_KEY: ModelKey = "claude-sonnet-5.5";
+
+/**
+ * Bedrock needs model access enabled per AWS account, so moving its default is
+ * a release-noted change for self-hosters, not a catalog edit.
+ */
+export const DEFAULT_BEDROCK_MODEL_KEY: ModelKey = "claude-sonnet-4";
 
 /**
  * Used when WRAPS_AI_PROVIDER=openai and nothing else is specified, because the
- * cross-provider default (claude-sonnet-4) has no OpenAI equivalent.
+ * cross-provider default (claude-sonnet-5.5) has no OpenAI equivalent.
  *
  * The catalog is only a convenience — any OpenAI model id works via AI_MODEL
  * passthrough, and capabilities are inferred with the SDK's own rule. Confirm
@@ -89,7 +119,9 @@ export function isOpenAIReasoningModel(modelId: string): boolean {
 export function inferCapabilities(modelId: string): readonly AICapability[] {
   const id = modelId.toLowerCase();
   if (/claude|sonnet|opus|haiku/.test(id)) {
-    return CLAUDE_CAPABILITIES;
+    return /(?:opus|sonnet|haiku|fable|mythos)-(?:4[.-][6-9]|[5-9])/.test(id)
+      ? ADAPTIVE_CLAUDE_CAPABILITIES
+      : CLAUDE_CAPABILITIES;
   }
   if (/^(openai\/)?(gpt-|o1|o3|o4-)/.test(id)) {
     // OpenAI caches implicitly for prompts over ~1024 tokens, so every model
