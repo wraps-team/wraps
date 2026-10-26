@@ -17,21 +17,22 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { ResendForgeNotice } from "@/components/resend-forge-notice";
 
 export const metadata: Metadata = {
   title: "Resend vs Wraps - Compare Email Infrastructure Approaches",
   description:
-    "Resend runs Amazon SES for you. Wraps sets SES up in your own AWS account and runs it day to day. Compare setup, operations, pricing, data retention, and infrastructure ownership side by side.",
+    "Resend runs the sending infrastructure for you: Amazon SES historically, its own Forge MTA since October 2026. Wraps sets SES up in your own AWS account and runs it day to day. Compare setup, operations, pricing, data retention, and infrastructure ownership side by side.",
   openGraph: {
     title: "Resend vs Wraps | Wraps",
     description:
-      "Resend runs Amazon SES for you. Wraps sets SES up in your own AWS account and runs it day to day. Compare setup, operations, pricing, data retention, and ownership.",
+      "Resend runs the sending infrastructure for you: Amazon SES historically, its own Forge MTA since October 2026. Wraps sets SES up in your own AWS account. Compare setup, operations, pricing, data retention, and ownership.",
     url: "https://wraps.dev/compare/resend-vs-wraps",
   },
   twitter: {
     title: "Resend vs Wraps | Wraps",
     description:
-      "Resend runs Amazon SES for you. Wraps sets SES up in your own AWS account and runs it day to day. Compare setup, operations, pricing, data retention, and ownership.",
+      "Resend runs the sending infrastructure for you: Amazon SES historically, its own Forge MTA since October 2026. Wraps sets SES up in your own AWS account. Compare setup, operations, pricing, data retention, and ownership.",
   },
   alternates: {
     canonical: "https://wraps.dev/compare/resend-vs-wraps",
@@ -71,12 +72,12 @@ const tldrComparison = [
   },
   {
     dimension: "Day-to-day operations",
-    resend: "Resend runs SES on their account",
+    resend: "Resend runs it on their side (SES, or Forge)",
     wraps: "Wraps control plane runs SES on yours",
   },
   {
     dimension: "Infrastructure",
-    resend: "Resend's AWS account",
+    resend: "Resend's AWS account or Forge MTA",
     wraps: "Your AWS account",
   },
   {
@@ -170,7 +171,7 @@ const featureComparison = [
         wraps: "One command into your AWS account",
       },
       {
-        name: "Whose SES account and reputation",
+        name: "Whose sending account and reputation",
         resend: "Resend's",
         wraps: "Yours",
       },
@@ -326,9 +327,9 @@ const articleSchema = {
   "@type": "Article",
   headline: "Resend vs Wraps",
   description:
-    "Resend runs Amazon SES for you. Wraps sets SES up in your own AWS account and runs it day to day. Compare setup, operations, pricing, data retention, and infrastructure ownership side by side.",
+    "Resend runs the sending infrastructure for you: Amazon SES historically, its own Forge MTA since October 2026. Wraps sets SES up in your own AWS account and runs it day to day. Compare setup, operations, pricing, data retention, and infrastructure ownership side by side.",
   datePublished: "2026-03-01T00:00:00.000Z",
-  dateModified: "2026-09-15T00:00:00.000Z",
+  dateModified: "2026-10-26T00:00:00.000Z",
   author: {
     "@type": "Organization",
     name: "Wraps",
@@ -403,9 +404,11 @@ export default function ResendVsWrapsPage() {
             </h1>
             <p className="mb-4 max-w-2xl text-lg text-muted-foreground">
               <strong className="text-foreground">Resend</strong> is a managed
-              email API built on top of Amazon SES. The developer experience is
-              genuinely excellent and you are sending within minutes. It runs in
-              Resend&apos;s AWS account, on Resend&apos;s sending reputation.
+              email API. It was built on top of Amazon SES, and since October
+              2026 domains can move to Resend Forge, Resend&apos;s own mail
+              engine. The developer experience is genuinely excellent and you
+              are sending within minutes. Either way it runs on Resend&apos;s
+              infrastructure and Resend&apos;s sending reputation.
             </p>
             <p className="mb-4 max-w-2xl text-lg text-muted-foreground">
               <strong className="text-foreground">Wraps</strong> sets the same
@@ -418,6 +421,7 @@ export default function ResendVsWrapsPage() {
               reach for a hosted API because they do not want to deal with SES.
               Dealing with SES is the part Wraps does.
             </p>
+            <ResendForgeNotice className="mt-8 max-w-2xl" />
           </section>
 
           {/*
@@ -634,8 +638,9 @@ export default function ResendVsWrapsPage() {
               The architectural difference
             </h2>
             <p className="mb-6 text-muted-foreground">
-              Resend and Wraps both use AWS SES to deliver email. The difference
-              is where the infrastructure lives and who controls it.
+              Wraps delivers through AWS SES. Resend historically did too, and
+              domains can now opt into its own Forge MTA instead. The
+              difference is where the infrastructure lives and who controls it.
             </p>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -891,8 +896,11 @@ export default function ResendVsWrapsPage() {
               Switching from Resend
             </h2>
             <p className="mb-6 text-muted-foreground">
-              Both Resend and Wraps use SES underneath. React Email templates
-              work unchanged. The migration is an SDK swap and DNS update.
+              React Email templates work unchanged. The migration is an SDK swap
+              and DNS update. If your domain is still on Resend&apos;s
+              SES-backed path, expect the SPF include to be close to what you
+              need. If you have activated Resend Forge, check your SPF and DKIM
+              records instead of assuming they carry over.
             </p>
 
             <CodeComparison

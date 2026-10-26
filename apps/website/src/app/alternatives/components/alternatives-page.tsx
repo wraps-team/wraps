@@ -8,6 +8,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { ResendForgeNotice } from "@/components/resend-forge-notice";
 import {
   type AlternativesPage,
   PRICES_VERIFIED,
@@ -44,6 +45,7 @@ export function AlternativesPageLayout({ page }: { page: AlternativesPage }) {
               {page.intro}
             </p>
             <Disclosure incumbent={page.incumbent} />
+            {page.forgeNotice && <ResendForgeNotice className="mt-6" />}
           </section>
 
           <section className="mb-16">

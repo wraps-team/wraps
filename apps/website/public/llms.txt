@@ -481,8 +481,9 @@ stated catch on every entry including ours, and the incumbent kept on the list.
   transactional and broadcast disappears; inbound parsing becomes raw MIME in
   S3; server-side Handlebars templates have no bulk export.
 - [Migrate from Resend to Amazon SES](https://wraps.dev/migrate/resend): The
-  shortest of the four, because Resend already sends through SES — the SPF
-  include is usually already correct and React Email templates move unedited.
+  shortest of the four, because Resend has historically sent through SES — for
+  domains not on its new Forge MTA (announced Oct 23, 2026) the SPF include is
+  usually already correct, and React Email templates move unedited.
   Under about 100,000 a month Resend is usually cheaper. The reasons that still
   hold are 30-day log purging below Enterprise, a 2-request-per-second API cap,
   and suspension risk during spikes.
@@ -599,7 +600,7 @@ Comparisons between two other vendors, with published prices and a straight answ
 - [Brevo vs Klaviyo](https://wraps.dev/versus/brevo-vs-klaviyo): Klaviyo is built for ecommerce and bills every profile you store. Brevo is a generalist that bills what you send. The billing unit is not a detail here — it is the whole decision.
 - [Brevo vs SendGrid](https://wraps.dev/versus/brevo-vs-sendgrid): A European all-in-one priced on sends against the American enterprise standard that sells marketing as a separate plan. Data residency, invoice shape, and the tier where the feature you assumed actually lives.
 - [Customer.io vs Loops](https://wraps.dev/versus/customer-io-vs-loops): A programmable behavioural messaging platform against an opinionated product built for small SaaS. The price floor filters most of the decision before the features get a vote.
-- [Amazon SES vs Resend](https://wraps.dev/versus/amazon-ses-vs-resend): Resend sends through Amazon SES, so this is not an argument about whose delivery network is better. It is an argument about who owns the account, the reputation and the event history — and what the layer on top is worth.
+- [Amazon SES vs Resend](https://wraps.dev/versus/amazon-ses-vs-resend): Resend was built on Amazon SES and, since October 2026, can also send through its own Forge MTA, so this is not mainly an argument about whose delivery network is better. It is an argument about who owns the account, the reputation and the event history — and what the layer on top is worth.
 - [Amazon SES vs Self-hosted (Postal, Listmonk, or your own MTA)](https://wraps.dev/versus/amazon-ses-vs-self-hosted): You have decided not to pay a per-message platform fee. The remaining question is whether you rent delivery from AWS or run the mail server yourself — and what the second option costs in hours rather than invoices.
 - [Amazon SES vs Cloudflare Email Routing](https://wraps.dev/versus/amazon-ses-vs-cloudflare-email): Both let an application receive mail and run code on it. One is a receipt-rule engine wired into the rest of AWS; the other is a free forwarder that hands a raw message to a Worker and does not send at all.
 - [Courier vs Knock](https://wraps.dev/versus/courier-vs-knock): Two notification layers that sit above your email, push and SMS providers rather than replacing them. The difference that decides it is not features — it is whether you are buying a platform with a floor or a meter with none.

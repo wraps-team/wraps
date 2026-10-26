@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { ResendForgeNotice } from "@/components/resend-forge-notice";
 import {
   ALTERNATIVES_PAGES,
   PRICES_VERIFIED,
@@ -321,6 +322,7 @@ export function VersusArticle({ page }: { page: VersusPage }) {
               {page.title}
             </h1>
             <p className="text-lg text-muted-foreground">{page.description}</p>
+            {page.forgeNotice && <ResendForgeNotice className="mt-6" />}
           </div>
         </header>
 

@@ -12,6 +12,7 @@ import Script from "next/script";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
+import { ResendForgeNotice } from "@/components/resend-forge-notice";
 
 export const metadata: Metadata = {
   title: "Compare Wraps to Email Platforms — Resend, SendGrid, SES & More",
@@ -56,9 +57,9 @@ const comparisons = [
   {
     competitor: "Resend",
     href: "/compare/resend-vs-wraps",
-    tagline: "Their AWS account, or yours",
+    tagline: "Their infrastructure, or yours",
     description:
-      "Resend sends from their AWS account. Wraps deploys to yours. Compare data retention (Resend purges after 30 days; with Wraps the raw events land in your own DynamoDB and stay there), overage pricing ($0.90/1K vs $0.10/1K à la carte), and what happens when you cancel.",
+      "Resend sends from its own infrastructure (Amazon SES historically, its Forge MTA for domains that opt in). Wraps deploys to your AWS account. Compare data retention (Resend purges after 30 days; with Wraps the raw events land in your own DynamoDB and stay there), overage pricing ($0.90/1K vs $0.10/1K à la carte), and what happens when you cancel.",
   },
   {
     competitor: "Amazon SES",
@@ -192,6 +193,9 @@ export default function ComparePage() {
                         <span className="text-muted-foreground text-sm">
                           {c.tagline}
                         </span>
+                        {c.competitor === "Resend" && (
+                          <ResendForgeNotice variant="inline" />
+                        )}
                       </div>
                       <p className="text-muted-foreground text-sm">
                         {c.description}

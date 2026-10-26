@@ -95,6 +95,8 @@ export type AlternativesPage = {
   incumbent: string;
   title: string;
   description: string;
+  /** Set when the copy was revised for Resend Forge (Oct 2026); renders the dated notice. */
+  forgeNotice?: boolean;
   /** Hero paragraph: who is reading this and what they are deciding. */
   intro: string;
   /** Sourced, specific reasons people move off the incumbent. */
@@ -147,7 +149,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
   resend: {
     id: "resend",
     name: "Resend",
-    category: "Developer-first email API built on SES",
+    category: "Developer-first email API (built on SES, now with its own Forge MTA)",
     pricing:
       "Free 3,000/mo (100/day). Pro $20 at 50K and $35 at 100K. Scale starts at $90 for the same 100K and runs to $350 at 500K. Overage $0.65–0.90 per 1,000. Marketing contacts billed separately at $40/mo per 5,000.",
     bestFor:
@@ -432,6 +434,7 @@ const RESEND_PAGE: AlternativesPage = {
   compareHref: "/compare/resend-vs-wraps",
   incumbent: "Resend",
   title: "Resend Alternatives",
+  forgeNotice: true,
   description:
     "Twelve real alternatives to Resend, ranked, with published prices and the catch on each one. Postmark, Amazon SES, Loops, AhaSend, and where Wraps actually fits.",
   intro:
@@ -477,7 +480,7 @@ const RESEND_PAGE: AlternativesPage = {
     {
       vendor: "amazon-ses",
       verdict:
-        "Resend runs on SES, so this is removing the layer rather than replacing it. At 100K a month you go from $35 to about $10, and at 500K from $350 to about $50. What that money was buying comes back to you as work: the dashboard, the template rendering, the suppression list, the retry logic, and an EventBridge pipeline to store the events Resend was keeping for 30 days. Budget an engineer-week or two, and know that production access is an application AWS can refuse and that new accounts start sandboxed.",
+        "Resend was built on SES and, for domains that have not opted into its new Forge MTA, still runs on it, so this is removing the layer rather than replacing it. At 100K a month you go from $35 to about $10, and at 500K from $350 to about $50. What that money was buying comes back to you as work: the dashboard, the template rendering, the suppression list, the retry logic, and an EventBridge pipeline to store the events Resend was keeping for 30 days. Budget an engineer-week or two, and know that production access is an application AWS can refuse and that new accounts start sandboxed.",
     },
     {
       vendor: "loops",

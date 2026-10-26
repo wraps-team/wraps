@@ -7,6 +7,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { ResendForgeNotice } from "@/components/resend-forge-notice";
 
 const TITLE = "Migrate to Amazon SES";
 const DESCRIPTION =
@@ -69,7 +70,7 @@ const guides: {
     from: "Resend",
     hardestPart: "Knowing whether to bother",
     summary:
-      "Resend already runs on SES, so SPF often needs no change and React Email templates move unedited. Under about a hundred thousand a month, staying is usually cheaper.",
+      "Resend has historically run on SES, so SPF often needs no change (check first if you activated its new Forge MTA) and React Email templates move unedited. Under about a hundred thousand a month, staying is usually cheaper.",
   },
   {
     href: "/migrate/amazon-pinpoint",
@@ -177,6 +178,9 @@ export default function MigrateHubPage() {
                         <span className="inline-block whitespace-nowrap rounded bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
                           Hardest part: {guide.hardestPart}
                         </span>
+                        {guide.from === "Resend" && (
+                          <ResendForgeNotice variant="inline" />
+                        )}
                       </div>
                       <p className="text-muted-foreground text-sm leading-relaxed">
                         {guide.summary}

@@ -78,6 +78,8 @@ export type VersusPage = {
   b: VendorId;
   title: string;
   description: string;
+  /** Set when the copy was revised for Resend Forge (Oct 2026); renders the dated notice. */
+  forgeNotice?: boolean;
   /** Feeds the generated `search-intent.ts` entry for this route. */
   search: VersusSearchIntent;
   /** Unique, 60-100 words. Names the real tension, not a summary of both. */
@@ -134,6 +136,7 @@ const POSTMARK_VS_RESEND: VersusPage = {
   a: "postmark",
   b: "resend",
   title: "Postmark vs Resend",
+  forgeNotice: true,
   description:
     "Postmark sells inbox placement and a decade of operating its own mail infrastructure. Resend sells the twenty minutes between an empty project and a sent email. Which of those you are short of decides this.",
   search: {
@@ -156,7 +159,7 @@ const POSTMARK_VS_RESEND: VersusPage = {
     {
       heading: "What each company actually operates",
       a: "Postmark runs its own sending infrastructure and treats deliverability as the product rather than a feature of it. Transactional and broadcast traffic are split into separate message streams by the product itself, not left to you to remember, so a newsletter cannot quietly poison the reputation your password resets depend on. That separation is the most consequential design decision in the product.",
-      b: "Resend is a developer experience layered over Amazon SES. That is not a criticism: the deliverability floor underneath you is AWS's, which is a high floor, and it frees Resend to spend its engineering on the parts you touch. It does mean the thing you are buying is the API, the dashboard and React Email, rather than a mail operation the company runs itself.",
+      b: "Resend is a developer experience that was built over Amazon SES, and since October 2026 it also runs its own mail engine, Resend Forge, which domains can opt into. The SES path is not a criticism: the deliverability floor underneath you was AWS's, which is a high floor, and it freed Resend to spend its engineering on the parts you touch. Forge changes who operates the mail layer for opted-in domains, and the gain it claims in speed and deliverability comes from Resend's own announcement, without independent numbers yet. The thing you are buying is still the API, the dashboard and React Email.",
     },
     {
       heading: "How the bill behaves as you grow",
@@ -181,7 +184,7 @@ const POSTMARK_VS_RESEND: VersusPage = {
     {
       heading: "Getting your traffic out again",
       a: "Postmark's API is its own, so leaving is a code change at every send site plus re-verifying your domains. The expensive parts are the ones nobody counts up front: the suppression list, the message streams you configured, and every webhook consumer written against their event shapes.",
-      b: "Resend sits on SES, which tempts people into thinking the account travels with them. It does not, because the account is Resend's. Leaving still means re-verifying domains elsewhere and rebuilding reputation that accrued to their IPs. The SDK surface is small enough that the code change really is cheaper than most, but the infrastructure underneath is no more portable than anyone else's.",
+      b: "Resend historically sat on SES, which tempts people into thinking the account travels with them. It does not, because the account is Resend's, and domains on Resend Forge send from Resend's own IP blocks instead. Leaving still means re-verifying domains elsewhere and rebuilding reputation that accrued to their IPs. The SDK surface is small enough that the code change really is cheaper than most, but the infrastructure underneath is no more portable than anyone else's.",
     },
     {
       heading: "What it looks like when sending stops",
@@ -250,7 +253,7 @@ const POSTMARK_VS_RESEND: VersusPage = {
     {
       question: "Is Resend just a wrapper around Amazon SES?",
       answer:
-        "Substantially yes, and Resend has never hidden it. What you are buying is the layer on top: the SDKs, the dashboard, React Email, domain verification that finishes in minutes. The consequence worth understanding is not quality, because SES has a high deliverability floor. It is that the AWS account belongs to Resend, so reputation and event history accrue to them rather than to you.",
+        "It was, and Resend never hid it. Since October 2026 that is no longer the whole picture: Resend Forge is its own mail engine on its own IP blocks, and domains can opt into it. What you are buying is the layer on top: the SDKs, the dashboard, React Email, domain verification that finishes in minutes. The consequence worth understanding is not quality, because SES has a high deliverability floor and Forge's claims are Resend's own so far. It is that the sending infrastructure belongs to Resend either way, so reputation and event history accrue to them rather than to you.",
     },
     {
       question: "Which one actually has better deliverability?",
@@ -1485,8 +1488,9 @@ const AMAZON_SES_VS_RESEND: VersusPage = {
   a: "amazon-ses",
   b: "resend",
   title: "Amazon SES vs Resend",
+  forgeNotice: true,
   description:
-    "Resend sends through Amazon SES, so this is not an argument about whose delivery network is better. It is an argument about who owns the account, the reputation and the event history — and what the layer on top is worth.",
+    "Resend was built on Amazon SES and, since October 2026, can also send through its own Forge MTA, so this is not mainly an argument about whose delivery network is better. It is an argument about who owns the account, the reputation and the event history — and what the layer on top is worth.",
   search: {
     primaryQuery: "should i use amazon ses directly or resend",
     secondaryQueries: [
@@ -1499,10 +1503,10 @@ const AMAZON_SES_VS_RESEND: VersusPage = {
       "requesting an ses sending rate increase",
     ],
     rationale:
-      "Almost every result for this comparison is published by one of the two parties, and neither leads with the fact that decides it: they share a delivery substrate, so the real trade is ownership and tooling rather than inbox placement.",
+      "Almost every result for this comparison is published by one of the two parties, and neither leads with the fact that decides it: the real trade is ownership and tooling rather than inbox placement, and that holds whether a Resend domain sends through SES or through its newer Forge MTA.",
   },
   intro:
-    "These are not two competing delivery networks. Resend sends through Amazon SES, so the packets leaving for Gmail take substantially the same path either way, and most arguments about whose deliverability is better are arguing about the wrong thing. The real axis is ownership. On SES the account, the reputation, the quota and the event stream are yours, and so is every operational feature you decline to build. On Resend all of that belongs to Resend, and what you get in exchange is a product that works this afternoon.",
+    "These used to be two doors into one delivery network. Resend was built on Amazon SES, and since October 2026 it also runs Resend Forge, its own mail engine, for domains that opt in. Whichever path your mail leaves by, the real axis is ownership. On SES the account, the reputation, the quota and the event stream are yours, and so is every operational feature you decline to build. On Resend all of that belongs to Resend, and what you get in exchange is a product that works this afternoon.",
   dimensions: [
     {
       heading: "What signing up actually gets you",
@@ -1512,7 +1516,7 @@ const AMAZON_SES_VS_RESEND: VersusPage = {
     {
       heading: "The approval that is not in your control",
       a: "Every new SES account starts in a sandbox that only delivers to addresses you have verified, and leaving it is an application a human at AWS reads. Most clear within a day or two; some come back asking you to explain your list practices and bounce handling in more detail, and some are refused. It is the most common reason an SES launch date slips, and no amount of engineering removes it.",
-      b: "Resend has already been through that. Its sending account is out of the sandbox, warmed and operating, and you inherit the result the moment your domain verifies. This is the strongest practical argument for the layered model and it deserves to be stated plainly: you are renting a completed AWS approval along with the reputation that has accumulated behind it.",
+      b: "Resend has already been through that. Its sending is out of the sandbox, warmed and operating, and you inherit the result the moment your domain verifies. On Forge the same holds, except domains are onboarded after DNS verification and a sender-reputation check. This is the strongest practical argument for the layered model and it deserves to be stated plainly: you are renting a completed approval along with the reputation that has accumulated behind it.",
     },
     {
       heading: "Whose reputation is on the line",
@@ -1542,7 +1546,7 @@ const AMAZON_SES_VS_RESEND: VersusPage = {
     {
       heading: "What leaving costs, in each direction",
       a: "Moving off SES is mostly a code change, because the verified domains and the accumulated reputation are attached to an account you keep. You can run a second provider from a separate subdomain and shift traffic across gradually, which is about the least dramatic migration available anywhere in this field.",
-      b: "Moving off Resend means re-verifying domains elsewhere and starting reputation from nothing, because the warmed account was never yours. The code change is small since the SDK surface is deliberately minimal, but the infrastructure underneath does not travel with you, and the thirty-day window means you leave without your history.",
+      b: "Moving off Resend means re-verifying domains elsewhere and starting reputation from nothing, because the warmed account, or on Forge the IP blocks, was never yours. The code change is small since the SDK surface is deliberately minimal, but the infrastructure underneath does not travel with you, and the thirty-day window means you leave without your history.",
     },
   ],
   pickA: [
@@ -1606,7 +1610,7 @@ const AMAZON_SES_VS_RESEND: VersusPage = {
     {
       question: "Is Resend really just Amazon SES underneath?",
       answer:
-        "Substantially, and Resend has never pretended otherwise. What differs is everything above the send call: SDKs, domain verification, the dashboard, React Email, webhooks with a sane shape. Because the substrate is shared, a claim that one of these two delivers to the inbox and the other does not is almost always describing a reputation difference between two accounts rather than a difference between two products.",
+        "Historically, and Resend never pretended otherwise. Since October 2026 domains can opt into Resend Forge, its own mail engine on its own IP blocks, so that is no longer true for every domain. What differs from raw SES is everything above the send call: SDKs, domain verification, the dashboard, React Email, webhooks with a sane shape. On the SES path the substrate is shared, so a claim that one of these two delivers to the inbox and the other does not is almost always describing a reputation difference between two accounts. On Forge, Resend's claims of faster delivery and better deliverability are its own and unverified by third parties so far.",
     },
     {
       question: "Will my inbox placement get worse if I move to raw SES?",
@@ -4604,6 +4608,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
   a: "mailgun",
   b: "resend",
   title: "Mailgun vs Resend",
+  forgeNotice: true,
   description:
     "Fifteen years of routing, validation and log search against four years of getting one developer to a sent email faster than anyone else. The gap between them is capability against ergonomics, and which of those is scarce for you.",
   search: {
@@ -4743,7 +4748,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
     {
       question: "Which is better for deliverability?",
       answer:
-        "The honest answer is that this is decided by your own sending behaviour rather than by the choice. Both run shared pools, both will deliver well for a sender with clean lists and correct authentication, and both have public complaints about suspension. Mailgun has a longer operating history and its own network; Resend rides on Amazon SES. Neither of those facts predicts your placement as strongly as your bounce rate and your engagement do.",
+        "The honest answer is that this is decided by your own sending behaviour rather than by the choice. Both run shared pools, both will deliver well for a sender with clean lists and correct authentication, and both have public complaints about suspension. Mailgun has a longer operating history and its own network; Resend rode on Amazon SES until it launched its own Forge MTA in October 2026, which domains can opt into. Neither of those facts predicts your placement as strongly as your bounce rate and your engagement do.",
     },
     {
       question: "Can I export my Mailgun logs before I leave?",
@@ -6310,6 +6315,7 @@ const MAILERSEND_VS_RESEND: VersusPage = {
   a: "mailersend",
   b: "resend",
   title: "MailerSend vs Resend",
+  forgeNotice: true,
   description:
     "Two modern transactional APIs that look alike from the outside and were built for opposite people. One assumes a marketer will open the template. The other assumes nobody but an engineer ever will.",
   search: {
@@ -6357,7 +6363,7 @@ const MAILERSEND_VS_RESEND: VersusPage = {
     {
       heading: "Whose sending operation is underneath",
       a: "MailerSend sits inside the same company as MailerLite and sends on infrastructure that company runs, with its own IP pools and its own abuse posture. The practical consequence is that the vendor you complain to is also the vendor that can fix it, and that the shared pool you sit in is populated by that company's other customers rather than by a hyperscaler's entire customer base.",
-      b: "Resend is a layer over Amazon SES, which it has never hidden. The deliverability floor underneath is AWS's and it is a high floor. It also means the AWS account is Resend's: the reputation you build accrues to their identities, and a policy decision made by AWS about their account is a policy decision about your sending.",
+      b: "Resend is a layer over Amazon SES, which it has never hidden, and since October 2026 domains can opt into Resend Forge, its own mail engine on its own IP blocks. On the SES path the deliverability floor underneath is AWS's and it is a high floor. It also means the AWS account is Resend's: the reputation you build accrues to their identities, and a policy decision made by AWS about their account is a policy decision about your sending. On Forge the same ownership holds, minus the AWS dependency.",
     },
     {
       heading: "Channels other than email",
@@ -6445,7 +6451,7 @@ const MAILERSEND_VS_RESEND: VersusPage = {
     {
       question: "Which of these has better deliverability?",
       answer:
-        "There is no honest general answer, and anybody giving you one is selling something. Resend inherits a high floor from AWS; MailerSend runs its own pools with its own abuse controls. Both are shared reputation, so your neighbours matter and you cannot audit them. What actually decides your placement is under your control anyway: authenticated domains with a DMARC policy, a separate subdomain for bulk mail, prompt suppression handling, and not sending to addresses that never asked.",
+        "There is no honest general answer, and anybody giving you one is selling something. Resend inherited a high floor from AWS and now also offers its own Forge MTA, whose claimed gains are not yet independently measured; MailerSend runs its own pools with its own abuse controls. Both are shared reputation, so your neighbours matter and you cannot audit them. What actually decides your placement is under your control anyway: authenticated domains with a DMARC policy, a separate subdomain for bulk mail, prompt suppression handling, and not sending to addresses that never asked.",
     },
     {
       question:
@@ -6486,6 +6492,7 @@ const RESEND_VS_SMTP2GO: VersusPage = {
   a: "resend",
   b: "smtp2go",
   title: "Resend vs SMTP2GO",
+  forgeNotice: true,
   description:
     "An API for code you are writing against a relay for systems you cannot change. The question is not which is more modern. It is whether the thing sending your mail is something you are allowed to rewrite.",
   search: {
@@ -6532,12 +6539,12 @@ const RESEND_VS_SMTP2GO: VersusPage = {
     },
     {
       heading: "Dedicated addresses and the unlock point",
-      a: "Resend sits on shared AWS reputation by default and dedicated sending is an upper-tier conversation rather than a self-serve toggle. For most senders on this platform shared is correct — the pool is enormous and well managed — but it does mean isolation is not a lever you can pull on a bad week.",
+      a: "Resend sits on shared reputation by default (AWS's historically, its own Forge IP blocks for domains that opt in) and dedicated sending is an upper-tier conversation rather than a self-serve toggle. For most senders on this platform shared is correct — the pool is enormous and well managed — but it does mean isolation is not a lever you can pull on a bad week.",
       b: "Dedicated IPs unlock at the Professional tier, alongside inbound parsing, which makes that tier a capability step rather than a volume step. Below it you are on a shared pool, and the blacklist monitoring in the reporting is partly there so you find out about a neighbour's problem the same day rather than from a customer.",
     },
     {
       heading: "Where the mail is processed",
-      a: "On AWS, in the regions Resend operates, with the account boundary belonging to Resend. If your compliance answer needs to name a processor and a region, you are naming a company that is itself a customer of another company, and the questionnaire gets longer than it looks.",
+      a: "In the regions Resend operates, with the account boundary belonging to Resend. Historically that meant AWS, so your compliance answer named a company that is itself a customer of another company; for domains on the new Forge MTA the chain may be shorter, and Resend has not published where Forge runs, so ask before you write it into a questionnaire.",
       b: "SMTP2GO runs relay endpoints in multiple regions and will pin your account's processing to one, which is a shorter answer to a data-residency question than most vendors in this category can give. For an EU or APAC organisation whose lawyer asks where the message body physically goes, having a single supplier with a single answer is worth more than a feature comparison.",
     },
     {
@@ -6661,6 +6668,7 @@ const MANDRILL_VS_RESEND: VersusPage = {
   a: "mandrill",
   b: "resend",
   title: "Mailchimp Transactional (Mandrill) vs Resend",
+  forgeNotice: true,
   description:
     "Almost nobody picks between these from a blank page. You are on Mandrill, you are wondering whether to leave, and Resend is the name that keeps coming up. That is a migration question wearing a comparison's clothes.",
   search: {
@@ -6713,7 +6721,7 @@ const MANDRILL_VS_RESEND: VersusPage = {
     {
       heading: "Who actually operates the sending",
       a: "Mailchimp's own infrastructure, inside a large company with its own abuse posture and its own IP pools. Your neighbours in that pool are Mailchimp's transactional customers. The account relationship is shared with the marketing side, which matters in the direction people do not expect: an account problem originating in campaigns is an account problem for your receipts.",
-      b: "Amazon SES with Resend's engineering on top. The deliverability floor is AWS's and it is high. The account is Resend's, so reputation accrues to their identities rather than yours, and the dependency chain has one more link in it than the comparison suggests.",
+      b: "Amazon SES with Resend's engineering on top, or since October 2026 Resend's own Forge MTA for domains that opt in. On the SES path the deliverability floor is AWS's and it is high. Either way the account and IPs are Resend's, so reputation accrues to their identities rather than yours, and on the SES path the dependency chain has one more link in it than the comparison suggests.",
     },
     {
       heading: "What you can look up afterwards",

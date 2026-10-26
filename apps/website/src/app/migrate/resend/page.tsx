@@ -7,11 +7,12 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { ResendForgeNotice } from "@/components/resend-forge-notice";
 import { VENDORS } from "@/config/alternatives";
 
 const TITLE = "Migrate from Resend to Amazon SES";
 const DESCRIPTION =
-  "Resend runs on SES, so this is the shortest migration of the four: the SPF include is often already right and React Email templates move unchanged. Under about 100K a month, Resend is usually the cheaper answer — here is where that stops being true.";
+  "Resend has historically run on SES, so this is the shortest migration of the four: for domains not on its new Forge MTA the SPF include is often already right, and React Email templates move unchanged. Under about 100K a month, Resend is usually the cheaper answer — here is where that stops being true.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -86,8 +87,9 @@ const steps: { title: string; body: React.ReactNode; plain: string }[] = [
       "Verify the domain in your own AWS account, publish the new DKIM CNAMEs, and file the SES production access request.",
     body: (
       <>
-        You are already sending through SES; you are just doing it through
-        Resend's account. Verifying in your own account gives you a fresh set of
+        If your domain has not moved to Resend Forge, you are already sending
+        through SES; you are just doing it through Resend's account. Either way,
+        verifying in your own account gives you a fresh set of
         DKIM CNAMEs, and a sandbox to get out of. File the production access
         request the day you verify. Our{" "}
         <Link className="text-primary underline" href="/blog/ses-sandbox-guide">
@@ -105,14 +107,17 @@ const steps: { title: string; body: React.ReactNode; plain: string }[] = [
     ),
   },
   {
-    title: "Leave SPF alone and add the DKIM records",
+    title: "Check SPF, then add the DKIM records",
     plain:
-      "Resend and your own SES both authorise amazonses.com in SPF, so SPF usually needs no change. Add the new DKIM CNAMEs alongside the old ones.",
+      "On Resend's SES-backed path, Resend and your own SES both authorise amazonses.com in SPF, so SPF usually needs no change. If you activated Resend Forge, check your current records first. Add the new DKIM CNAMEs alongside the old ones.",
     body: (
       <>
-        This is the part that surprises people. Resend sends through SES, so
-        your SPF record already contains <code>include:amazonses.com</code> and
-        usually needs no edit at all. DKIM keys are per account, so you publish
+        This is the part that surprises people. If your domain is still on
+        Resend's SES-backed path, your SPF record already contains{" "}
+        <code>include:amazonses.com</code> and usually needs no edit at all. If
+        you activated Resend Forge, which asks for its own CNAME in DNS, read
+        what your records say today rather than assuming that holds. DKIM keys
+        are per account, so you publish
         the three new CNAMEs next to the Resend ones and remove the old set
         after cutover. DMARC is untouched. Fewer DNS moving parts than any other
         migration in this cluster.
@@ -169,7 +174,7 @@ const faqs = [
   },
   {
     q: "How long does this take?",
-    a: "An afternoon of code, plus the production access wait — AWS usually answers within 24 hours, longer if it asks for more detail — plus a week of parallel running if you are careful. It is the shortest of the four migrations on this site, because you are already on SES underneath.",
+    a: "An afternoon of code, plus the production access wait — AWS usually answers within 24 hours, longer if it asks for more detail — plus a week of parallel running if you are careful. It is the shortest of the four migrations on this site for domains still on Resend's SES-backed path, because you are already on SES underneath. A domain on Resend Forge needs its DNS checked first, so allow a little longer.",
   },
 ];
 
@@ -249,9 +254,11 @@ export default function MigrateFromResendPage() {
               Migrate from Resend to Amazon SES
             </h1>
             <p className="mb-4 max-w-2xl text-lg text-muted-foreground">
-              Resend sends through SES. That single fact makes this the easiest
-              migration on the site — the SPF record often needs no change at
-              all, and React Email templates move without an edit.
+              Resend has historically sent through SES. That single fact makes
+              this the easiest migration on the site — the SPF record often
+              needs no change at all, and React Email templates move without an
+              edit. Domains that have opted into Resend Forge, its new in-house
+              mail engine, need their DNS checked first.
             </p>
             <p className="max-w-2xl text-lg text-muted-foreground">
               It also means the honest opening is a warning: under roughly a
@@ -272,6 +279,7 @@ export default function MigrateFromResendPage() {
                 </Link>
               </Button>
             </div>
+            <ResendForgeNotice className="mt-8 max-w-2xl" />
           </section>
 
           <section className="mb-16">

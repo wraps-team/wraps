@@ -719,7 +719,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     ],
     audience: "stranger-with-problem",
     rationale:
-      "Resend runs on SES, so the SPF include is usually already correct and React Email templates move unedited — two specific facts that make this migration shorter than every guide currently ranking, and the page also states the volume below which staying on Resend is cheaper.",
+      "Resend has historically run on SES, so for domains not on its new Forge MTA the SPF include is usually already correct, and React Email templates move unedited — two specific facts that make this migration shorter than every guide currently ranking, and the page also states the volume below which staying on Resend is cheaper.",
   },
   {
     route: "/migrate/amazon-pinpoint",
