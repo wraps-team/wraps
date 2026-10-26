@@ -50,7 +50,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     // Convert UI messages to model messages for the AI SDK
-    const modelMessages = convertToModelMessages(messages);
+    const modelMessages = await convertToModelMessages(messages);
 
     // Fetch organization context for the AI
     const [templates, segments, topics] = await Promise.all([
@@ -123,11 +123,11 @@ export async function POST(request: Request, context: RouteContext) {
 
     const result = streamText({
       model,
-      system: systemPrompt,
+      instructions: systemPrompt,
       messages: modelMessages,
       maxOutputTokens: 8000,
       providerOptions,
-      onFinish: async ({ usage }) => {
+      onEnd: async ({ usage }) => {
         // Awaited, not fire-and-forget: the serverless function can be frozen
         // the moment the stream ends, dropping an un-awaited write.
         await trackAiRequest({
@@ -136,7 +136,7 @@ export async function POST(request: Request, context: RouteContext) {
           featureType: "workflow_ai",
           templateId: workflowId, // Repurpose field for workflowId
           inputTokens: usage?.inputTokens,
-          cachedInputTokens: usage?.cachedInputTokens,
+          cachedInputTokens: usage.inputTokenDetails.cacheReadTokens,
           outputTokens: usage?.outputTokens,
           totalTokens: usage?.totalTokens,
           model: MODEL_ID,

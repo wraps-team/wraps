@@ -135,7 +135,7 @@ describe("generate-code — image handling degrades on models without vision", (
     const content = sentUserContent();
     expect(Array.isArray(content)).toBe(true);
     expect(content).toContainEqual(
-      expect.objectContaining({ type: "image", mediaType: "image/png" })
+      expect.objectContaining({ type: "file", mediaType: "image/png" })
     );
     expect(promptGotImageReference()).toBe(true);
   });

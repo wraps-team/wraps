@@ -62,17 +62,20 @@ vi.mock("@wraps/ai", async (importOriginal) => {
 type StreamTextArgs = {
   tools?: Record<string, unknown>;
   stopWhen?: unknown;
-  onFinish?: (result: {
-    totalUsage: {
+  onEnd?: (result: {
+    usage: {
       inputTokens?: number;
-      cachedInputTokens?: number;
+      inputTokenDetails: { cacheReadTokens?: number };
       outputTokens?: number;
       totalTokens?: number;
     };
-    usage: {
-      inputTokens?: number;
-      outputTokens?: number;
-      totalTokens?: number;
+    finalStep: {
+      usage: {
+        inputTokens?: number;
+        inputTokenDetails: { cacheReadTokens?: number };
+        outputTokens?: number;
+        totalTokens?: number;
+      };
     };
   }) => Promise<void> | void;
 };
@@ -141,11 +144,23 @@ describe("assistant route", () => {
   it("records total usage across every step, not the last step's", async () => {
     await postAssistant();
 
-    const onFinish = lastStreamTextArgs()?.onFinish;
-    expect(onFinish).toBeDefined();
-    await onFinish!({
-      totalUsage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
-      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    const onEnd = lastStreamTextArgs()?.onEnd;
+    expect(onEnd).toBeDefined();
+    await onEnd!({
+      usage: {
+        inputTokens: 100,
+        inputTokenDetails: { cacheReadTokens: 0 },
+        outputTokens: 20,
+        totalTokens: 120,
+      },
+      finalStep: {
+        usage: {
+          inputTokens: 1,
+          inputTokenDetails: { cacheReadTokens: 0 },
+          outputTokens: 1,
+          totalTokens: 2,
+        },
+      },
     });
 
     expect(trackAiRequestMock).toHaveBeenCalledWith(

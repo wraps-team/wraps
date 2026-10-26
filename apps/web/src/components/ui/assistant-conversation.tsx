@@ -1,7 +1,12 @@
 "use client";
 
 import { Avatar, AvatarFallback } from "@wraps/ui/components/ui/avatar";
-import { getToolName, isToolUIPart, type ToolUIPart, type UIMessage } from "ai";
+import {
+  getStaticToolName,
+  isStaticToolUIPart,
+  type ToolUIPart,
+  type UIMessage,
+} from "ai";
 import { AlertCircle, Bot, Check, Loader2, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -62,7 +67,7 @@ function getMessageText(message: UIMessage) {
 // not guaranteed to be safe to paint into the page, so an unregistered tool
 // degrades to a status line rather than a JSON dump.
 function ToolPartFallback({ part }: { part: ToolUIPart }) {
-  const name = getToolName(part);
+  const name = getStaticToolName(part);
 
   if (part.state === "output-error") {
     return (
@@ -187,9 +192,9 @@ export function AssistantConversation({
                               );
                             }
 
-                            if (isToolUIPart(part)) {
+                            if (isStaticToolUIPart(part)) {
                               const renderer =
-                                toolRenderers?.[getToolName(part)];
+                                toolRenderers?.[getStaticToolName(part)];
                               return (
                                 <div
                                   className="w-full"

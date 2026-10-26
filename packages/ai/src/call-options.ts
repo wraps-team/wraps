@@ -60,7 +60,7 @@ export function reasoningOptions(
  *
  * OpenAI returns undefined on purpose: it caches implicitly for prompts over
  * ~1024 tokens with no marker at all. Explicit OpenAI breakpoints exist only in
- * `@ai-sdk/openai@4.0.11`+, which is the AI SDK v6 line this repo cannot use.
+ * `@ai-sdk/openai@4.0.11`+; this repo is on that line now but has not wired them up.
  */
 export function cacheBreakpoint(
   namespace: OptionNamespace | undefined

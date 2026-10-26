@@ -14,8 +14,8 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@ai-sdk/gateway": "2.0.18",
-    "@ai-sdk/react": "2.0.109",
+    "@ai-sdk/gateway": "4.0.116",
+    "@ai-sdk/react": "4.0.147",
     "@aws-sdk/client-cloudformation": "catalog:",
     "@aws-sdk/client-cloudwatch": "catalog:",
     "@aws-sdk/client-dynamodb": "catalog:",
@@ -91,7 +91,7 @@
     "@wraps/ui": "workspace:*",
     "@wraps/unsubscribe-token": "workspace:*",
     "@xyflow/react": "12.10.2",
-    "ai": "5.0.108",
+    "ai": "7.0.143",
     "better-auth": "catalog:",
     "better-inbox": "catalog:",
     "chrono-node": "2.9.1",

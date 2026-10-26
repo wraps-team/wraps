@@ -1,5 +1,5 @@
 import { getAIModel } from "@wraps/ai";
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import type { z } from "zod";
 import { aiEnv } from "@/lib/ai/env";
 import { logger, serializeError } from "@/lib/logger";
@@ -39,10 +39,10 @@ export async function generateGroundedCopy<T>(args: {
       aiEnv()
     );
 
-    const generation = generateObject({
+    const generation = generateText({
       model,
-      schema,
-      system,
+      output: Output.object({ schema }),
+      instructions: system,
       prompt: JSON.stringify(facts),
       maxOutputTokens: 300,
       providerOptions,
@@ -63,7 +63,7 @@ export async function generateGroundedCopy<T>(args: {
       model: modelId,
     });
 
-    return { value: result.object, generated: true };
+    return { value: result.output, generated: true };
   } catch (error) {
     logger.warn(
       { event: "ai.grounded_copy_failed", err: serializeError(error) },

@@ -72,7 +72,7 @@ export async function POST(request: Request, context: RouteContext) {
     };
 
     // Convert UI messages to model messages for the AI SDK
-    const modelMessages = convertToModelMessages(messages);
+    const modelMessages = await convertToModelMessages(messages);
 
     // Resolved before the image block and the system prompt because both
     // depend on whether the configured provider can actually see images.
@@ -134,8 +134,8 @@ export async function POST(request: Request, context: RouteContext) {
 
           const newContent: UserContent = [
             {
-              type: "image",
-              image: base64,
+              type: "file",
+              data: base64,
               mediaType,
             },
             {
@@ -194,11 +194,11 @@ export async function POST(request: Request, context: RouteContext) {
 
     const result = streamText({
       model,
-      system: systemPrompt,
+      instructions: systemPrompt,
       messages: modelMessages,
       maxOutputTokens: 16_000,
       providerOptions,
-      onFinish: async ({ text, usage }) => {
+      onEnd: async ({ text, usage }) => {
         // Append assistant response so full conversation is saved
         const messagesWithResponse: UIMessage[] = [
           ...messages,
@@ -218,7 +218,7 @@ export async function POST(request: Request, context: RouteContext) {
             featureType: "ai_chat",
             templateId,
             inputTokens: usage?.inputTokens,
-            cachedInputTokens: usage?.cachedInputTokens,
+            cachedInputTokens: usage.inputTokenDetails.cacheReadTokens,
             outputTokens: usage?.outputTokens,
             totalTokens: usage?.totalTokens,
             model: MODEL_ID,
