@@ -8,7 +8,7 @@ import { HeroSurvivalPanel } from "./hero-survival-panel";
 // SES wrappers it is an argument we lose. See ops/sops/positioning.md.
 const proofStats: { n: string; k: string }[] = [
   { n: "5% / 0.1%", k: "AWS bounce and complaint review lines" },
-  { n: "50+", k: "blacklists checked per audit" },
+  { n: "40+", k: "blacklists checked per audit" },
   { n: "0", k: "credentials we store" },
 ];
 

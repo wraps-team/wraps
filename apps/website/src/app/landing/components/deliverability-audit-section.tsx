@@ -38,6 +38,14 @@ const READOUT: Line[] = [
     tone: "plain",
     text: "                   • ZapBL RHSBL: Listed as spam source",
   },
+  {
+    tone: "muted",
+    text: "                   Domain: 15 lists • No IPv4 mail server addresses to check",
+  },
+  {
+    tone: "muted",
+    text: "                   Did not answer: SURBL Multi",
+  },
   { tone: "plain", text: "" },
   { tone: "head", text: "ISSUES (0 critical, 1 warnings)" },
   { tone: "plain", text: "  1. No valid DKIM record" },

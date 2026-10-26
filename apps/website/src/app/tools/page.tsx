@@ -176,7 +176,8 @@ export default function ToolsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-muted-foreground text-sm">
-                  Query your domain and mail server IPs against 10 blocklists.{" "}
+                  Query your domain against 5 blocklists and your mail server
+                  IPs against 10.{" "}
                   <a
                     className="text-brand underline underline-offset-2 hover:text-brand"
                     href="/tools/blacklist-check"

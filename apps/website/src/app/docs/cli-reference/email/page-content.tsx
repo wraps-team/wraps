@@ -1732,7 +1732,9 @@ export default function CLIReferenceEmailPageContent() {
               <div>
                 <code className="rounded bg-muted px-2 py-1">-q, --quick</code>
                 <p className="mt-2 text-muted-foreground text-sm">
-                  Quick mode: check fewer DKIM selectors and only top blacklists
+                  Quick mode: check fewer DKIM selectors and a smaller blacklist
+                  set (the domain against 5 lists, each IPv4 mail server against
+                  10)
                 </p>
               </div>
               <div>
@@ -1794,7 +1796,11 @@ export default function CLIReferenceEmailPageContent() {
               <li>SPF alignment and record validity</li>
               <li>DMARC policy strength and configuration</li>
               <li>MX record TLS support</li>
-              <li>Blacklist presence across major providers</li>
+              <li>
+                Blacklists: the domain against 15 lists and each IPv4 mail
+                server against 38. If some lookups do not answer, the report
+                says so instead of calling the run clean
+              </li>
               <li>Overall deliverability score with recommendations</li>
             </ul>
           </CardContent>
