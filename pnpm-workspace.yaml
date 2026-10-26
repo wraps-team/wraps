@@ -29,7 +29,7 @@ overrides:
   'path-to-regexp@6': ^6.3.0
   tar: ^7.5.11
   '@smithy/types': ^4.12.0
-  '@aws-sdk/util-dynamodb': 3.996.5
+  '@aws-sdk/util-dynamodb': 3.996.9
   fast-xml-parser: ^5.3.8
   '@isaacs/brace-expansion': ^5.0.1
   'brace-expansion@<2': ^1.1.21
@@ -87,31 +87,31 @@ overrides:
   '@ai-sdk/provider-utils@<4': ^3.0.30
 
 catalog:
-  '@aws-sdk/client-acm': 3.1074.0
-  '@aws-sdk/client-cloudformation': 3.1074.0
-  '@aws-sdk/client-cloudfront': 3.1074.0
-  '@aws-sdk/client-cloudwatch': 3.1074.0
-  '@aws-sdk/client-cloudwatch-logs': 3.1074.0
-  '@aws-sdk/client-dynamodb': 3.1074.0
-  '@aws-sdk/client-eventbridge': 3.1074.0
-  '@aws-sdk/client-iam': 3.1074.0
-  '@aws-sdk/client-lambda': 3.1074.0
-  '@aws-sdk/client-mailmanager': 3.1074.0
-  '@aws-sdk/client-marketplace-metering': 3.1074.0
-  '@aws-sdk/client-pinpoint-sms-voice-v2': 3.1074.0
-  '@aws-sdk/client-route-53': 3.1074.0
-  '@aws-sdk/client-s3': 3.1074.0
-  '@aws-sdk/client-scheduler': 3.1074.0
-  '@aws-sdk/client-ses': 3.1074.0
-  '@aws-sdk/client-sesv2': 3.1091.0
-  '@aws-sdk/client-sns': 3.1074.0
-  '@aws-sdk/client-sqs': 3.1074.0
-  '@aws-sdk/client-ssm': 3.1074.0
-  '@aws-sdk/client-sts': 3.1074.0
-  '@aws-sdk/credential-providers': 3.1074.0
-  '@aws-sdk/lib-dynamodb': 3.1074.0
-  '@aws-sdk/s3-request-presigner': 3.1074.0
-  '@aws-sdk/util-dynamodb': 3.996.5
+  '@aws-sdk/client-acm': 3.1152.0
+  '@aws-sdk/client-cloudformation': 3.1152.0
+  '@aws-sdk/client-cloudfront': 3.1152.0
+  '@aws-sdk/client-cloudwatch': 3.1152.0
+  '@aws-sdk/client-cloudwatch-logs': 3.1152.0
+  '@aws-sdk/client-dynamodb': 3.1152.0
+  '@aws-sdk/client-eventbridge': 3.1152.0
+  '@aws-sdk/client-iam': 3.1152.0
+  '@aws-sdk/client-lambda': 3.1152.0
+  '@aws-sdk/client-mailmanager': 3.1152.0
+  '@aws-sdk/client-marketplace-metering': 3.1152.0
+  '@aws-sdk/client-pinpoint-sms-voice-v2': 3.1152.0
+  '@aws-sdk/client-route-53': 3.1152.0
+  '@aws-sdk/client-s3': 3.1152.0
+  '@aws-sdk/client-scheduler': 3.1152.0
+  '@aws-sdk/client-ses': 3.1152.0
+  '@aws-sdk/client-sesv2': 3.1152.0
+  '@aws-sdk/client-sns': 3.1152.0
+  '@aws-sdk/client-sqs': 3.1152.0
+  '@aws-sdk/client-ssm': 3.1152.0
+  '@aws-sdk/client-sts': 3.1152.0
+  '@aws-sdk/credential-providers': 3.1152.0
+  '@aws-sdk/lib-dynamodb': 3.1152.0
+  '@aws-sdk/s3-request-presigner': 3.1152.0
+  '@aws-sdk/util-dynamodb': 3.996.9
   '@react-email/components': 1.0.12
   '@react-email/render': 2.1.0
   '@types/node': 24.10.0
@@ -137,8 +137,8 @@ strictDepBuilds: true
 allowBuilds:
   '@posthog/cli': true
   '@pulumi/command': true
-  '@sentry-internal/node-cpu-profiler': true
   '@sentry/cli': true
+  '@sentry/node-cpu-profiler': true
   core-js: true
   es5-ext: true
   esbuild: true
