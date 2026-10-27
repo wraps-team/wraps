@@ -6,7 +6,7 @@
 // <lastmod>, which cannot be derived at build time: see the script header.
 
 export const PAGE_DATES: Record<string, string> = {
-  "/": "2026-10-26T13:05:56-06:00",
+  "/": "2026-10-27T08:21:51-06:00",
   "/about": "2026-09-15T08:41:41-06:00",
   "/agents": "2026-09-15T08:41:41-06:00",
   "/alternatives": "2026-10-26T14:37:41-06:00",
@@ -58,7 +58,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/compare/klaviyo-vs-wraps": "2026-09-15T10:04:17-06:00",
   "/compare/mailgun-vs-wraps": "2026-09-15T09:42:21-06:00",
   "/compare/postmark-vs-wraps": "2026-10-26T12:08:00-06:00",
-  "/compare/resend-vs-wraps": "2026-10-26T14:37:41-06:00",
+  "/compare/resend-vs-wraps": "2026-10-27T08:21:50-06:00",
   "/compare/sendgrid-vs-wraps": "2026-09-15T09:59:02-06:00",
   "/compare/ses-bounce-handling-hand-rolled-vs-wraps":
     "2026-09-15T09:42:21-06:00",
@@ -173,7 +173,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/migrate/amazon-pinpoint": "2026-09-15T08:41:41-06:00",
   "/migrate/mailgun": "2026-09-15T08:41:41-06:00",
   "/migrate/postmark": "2026-09-15T08:41:41-06:00",
-  "/migrate/resend": "2026-10-26T14:37:41-06:00",
+  "/migrate/resend": "2026-10-27T08:21:50-06:00",
   "/migrate/sendgrid": "2026-09-15T08:41:41-06:00",
   "/platform": "2026-10-06T14:55:07-06:00",
   "/privacy": "2026-08-28T11:14:02-06:00",
