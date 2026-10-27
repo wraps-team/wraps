@@ -912,7 +912,30 @@ export default function CLIReferenceEmailPageContent() {
                     -d, --domain &lt;domain&gt;
                   </code>{" "}
                   <span className="text-muted-foreground">
-                    Domain to receive emails at
+                    Parent domain to receive on (must be a domain Wraps tracks
+                    for email), as for <code>inbound add</code>
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --subdomain &lt;name&gt;
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Subdomain label (default: inbound), so{" "}
+                    <code>--domain example.com --subdomain support</code>{" "}
+                    receives on support.example.com
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">--root</code>{" "}
+                  <span className="text-muted-foreground">
+                    Receive on the parent domain itself instead of a subdomain
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">--preview</code>{" "}
+                  <span className="text-muted-foreground">
+                    Show the planned infrastructure changes without deploying
                   </span>
                 </li>
                 <li>

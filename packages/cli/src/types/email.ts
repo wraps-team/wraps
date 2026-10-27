@@ -527,6 +527,8 @@ export type EmailRestoreOptions = {
  */
 export type EmailInboundInitOptions = {
   region?: string;
+  /** Tracked parent domain to receive on, as for `inbound add`. */
+  domain?: string;
   subdomain?: string;
   root?: boolean;
   webhookUrl?: string;

@@ -183,7 +183,7 @@ function assertValidInboundFlags(options: {
   if (options.unexpectedArg) {
     throw errors.invalidFlagUsage(
       `Unexpected argument: ${options.unexpectedArg}`,
-      `--root takes no value: "--root ${options.unexpectedArg}" (or "--root=${options.unexpectedArg}") sets --root and discards "${options.unexpectedArg}". To name the parent domain use --domain (inbound add); to pick the label use --subdomain <label> (inbound add) or --domain <label> (inbound init).`
+      `--root takes no value: "--root ${options.unexpectedArg}" (or "--root=${options.unexpectedArg}") sets --root and discards "${options.unexpectedArg}". To name the parent domain use --domain <domain>; to pick the label use --subdomain <label>.`
     );
   }
   if (options.root && options.subdomain) {
@@ -198,8 +198,20 @@ function assertValidInboundFlags(options: {
  * Inbound Init command - Deploy inbound email infrastructure
  */
 export async function inboundInit(
-  options: EmailInboundInitOptions
+  rawOptions: EmailInboundInitOptions
 ): Promise<void> {
+  // Earlier versions took `init --domain` as the subdomain label. A dotless value can't
+  // be a parent domain, so keep honouring that spelling, with a warning.
+  const legacyLabel = Boolean(
+    rawOptions.domain &&
+      !rawOptions.domain.includes(".") &&
+      !rawOptions.subdomain &&
+      !rawOptions.root
+  );
+  const options: EmailInboundInitOptions = legacyLabel
+    ? { ...rawOptions, domain: undefined, subdomain: rawOptions.domain }
+    : rawOptions;
+
   assertValidInboundFlags(options);
 
   if (!isJsonMode()) {
@@ -251,7 +263,15 @@ export async function inboundInit(
   }
 
   let domain: string;
-  if (trackedDomains.length === 1) {
+  if (options.domain) {
+    if (!trackedDomains.some((d) => d.domain === options.domain)) {
+      throw errors.invalidFlagUsage(
+        `--domain ${options.domain} is not a domain Wraps tracks for email`,
+        `Tracked domains: ${trackedDomains.map((d) => d.domain).join(", ")}. --domain names the parent domain; use --subdomain <label> for the label (--subdomain support under example.com receives on support.example.com).`
+      );
+    }
+    domain = options.domain;
+  } else if (trackedDomains.length === 1) {
     domain = trackedDomains[0].domain;
   } else if (options.yes || isJsonMode()) {
     const primaryTrackedDomain =
@@ -288,6 +308,11 @@ export async function inboundInit(
   const receivingDomain = subdomain ? `${subdomain}.${domain}` : domain;
 
   clack.log.info(`Receiving domain: ${pc.cyan(receivingDomain)}`);
+  if (legacyLabel) {
+    clack.log.warn(
+      `--domain ${pc.cyan(rawOptions.domain as string)} was read as the subdomain label, as in earlier versions. Use ${pc.cyan(`--subdomain ${rawOptions.domain}`)}; --domain now names the parent domain.`
+    );
+  }
 
   // 7. Prompt for webhook URL
   const webhookUrl =
@@ -352,8 +377,7 @@ export async function inboundInit(
     emailConfig: updatedEmailConfig,
   });
 
-  // 13. Deploy Pulumi stack
-  await progress.execute("Deploying inbound email infrastructure", async () => {
+  const createStack = async () => {
     const stack = await pulumi.automation.LocalWorkspace.createOrSelectStack(
       {
         stackName,
@@ -369,6 +393,32 @@ export async function inboundInit(
     );
 
     await stack.setConfig("aws:region", { value: region });
+    return stack;
+  };
+
+  // 13. Preview mode: show the planned stack changes and stop before any
+  // deploy, receipt-rule, DNS or metadata write.
+  if (options.preview) {
+    const previewResult = await progress.execute(
+      "Generating infrastructure preview",
+      async () =>
+        previewWithResourceChanges(await createStack(), { diff: true })
+    );
+    displayPreview({
+      changeSummary: previewResult.changeSummary,
+      resourceChanges: previewResult.resourceChanges,
+      commandName: "wraps email inbound init",
+    });
+    clack.log.info(
+      `Not covered by the preview: the SES receipt rule for ${pc.cyan(receivingDomain)} and its DNS records.`
+    );
+    clack.outro(pc.green("Preview complete. Run without --preview to deploy."));
+    return;
+  }
+
+  // 14. Deploy Pulumi stack
+  await progress.execute("Deploying inbound email infrastructure", async () => {
+    const stack = await createStack();
 
     const pulumiOutput: string[] = [];
     await withLockRetry(
@@ -394,7 +444,7 @@ export async function inboundInit(
     );
   });
 
-  // 14. Create SES Receipt Rules via AWS SDK
+  // 15. Create SES Receipt Rules via AWS SDK
   await progress.execute("Creating SES receipt rules", async () => {
     await createReceiptRuleSet(region);
     await createReceiptRule(

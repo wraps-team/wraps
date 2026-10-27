@@ -830,7 +830,8 @@ async function run() {
             case "init":
               await inboundInit({
                 region: flags.region,
-                subdomain: flags.domain, // reuse --domain flag for subdomain
+                domain: flags.domain,
+                subdomain: flags.subdomain,
                 root: flags.root,
                 yes: flags.yes,
                 preview: flags.preview,
