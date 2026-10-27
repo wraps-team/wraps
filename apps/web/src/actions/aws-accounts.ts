@@ -20,13 +20,8 @@ import {
   SESv2Client,
 } from "@aws-sdk/client-sesv2";
 import { createServerValidate } from "@tanstack/react-form-nextjs";
-import {
-  auditLog,
-  awsAccount,
-  db,
-  notifyOrg,
-  writeIdentitySnapshot,
-} from "@wraps/db";
+import { notifyOrg } from "@wraps/auth/notify";
+import { auditLog, awsAccount, db, writeIdentitySnapshot } from "@wraps/db";
 import { scanWrapsIdentities } from "@wraps/email";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";

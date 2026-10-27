@@ -1,11 +1,12 @@
 import { captureException } from "@sentry/nextjs";
 import { getPostHogClient } from "@wraps/analytics";
-import { db, eq, notifyOrg } from "@wraps/db";
+import { db, eq } from "@wraps/db";
 import * as schema from "@wraps/db/schema/auth";
 import { getWrapsClient } from "@wraps/email";
 import { createPlatformClient } from "@wraps.dev/client";
 import type Stripe from "stripe";
 import { stripeClient } from "./index";
+import { notifyOrg } from "./notify";
 
 const structuredLog = (msg: string, data?: Record<string, unknown>) =>
   console.info(JSON.stringify({ msg, ...data }));

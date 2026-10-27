@@ -20,6 +20,10 @@ vi.mock("@wraps/email", () => ({
   ),
 }));
 
+vi.mock("../notify", () => ({
+  notifyOrg: vi.fn(() => Promise.resolve([])),
+}));
+
 vi.mock("@wraps.dev/client", () => ({
   createPlatformClient: vi.fn(() => ({
     POST: vi.fn(() => Promise.resolve({ error: null })),

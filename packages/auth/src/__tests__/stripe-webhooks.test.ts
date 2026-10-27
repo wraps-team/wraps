@@ -38,6 +38,11 @@ vi.mock("@wraps/email", () => ({
   ),
 }));
 
+// Mock the notification helper (stripe-webhooks imports it from ../notify)
+vi.mock("../notify", () => ({
+  notifyOrg: vi.fn(() => Promise.resolve([])),
+}));
+
 // Mock the platform client
 vi.mock("@wraps.dev/client", () => ({
   createPlatformClient: vi.fn(() => ({

@@ -1,13 +1,7 @@
 "use server";
 
-import {
-  awsAccount,
-  contact,
-  db,
-  messageSend,
-  notifyUser,
-  template,
-} from "@wraps/db";
+import { notifyUser } from "@wraps/auth/notify";
+import { awsAccount, contact, db, messageSend, template } from "@wraps/db";
 import { invitation, member, user } from "@wraps/db/schema/auth";
 import { sendInvitationEmail } from "@wraps/email/emails/invitation";
 import { resolveAppUrl } from "@wraps/email/lib/app-url";
