@@ -220,7 +220,6 @@ export const PRICING_TIERS: PricingTier[] = [
     limits: TIER_LIMITS.business,
     features: [
       "Everything in Pro",
-      "Behavioral segments",
       "Unlimited AWS accounts",
       "1,000 AI generations/mo",
       "1-year history",
@@ -458,12 +457,6 @@ export const FEATURE_COMPARISON: FeatureComparison[] = [
     free: "5,000/mo",
     pro: "Unlimited",
     business: "Unlimited",
-  },
-  {
-    name: "Behavioral segments",
-    free: false,
-    pro: false,
-    business: true,
   },
   {
     name: "SSO + SCIM",

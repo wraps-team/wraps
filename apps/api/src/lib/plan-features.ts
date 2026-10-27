@@ -18,7 +18,7 @@ export const FEATURE_PLANS = {
   campaigns: "pro", // Scheduling a broadcast
   workflows: "free", // All tiers (quantity limited by tier)
   events: "free", // All tiers — Free is metered at 5K/mo, not gated
-  advancedSegments: "business",
+  advancedSegments: "pro",
   customRetention: "business",
   prioritySLA: "business",
   sso: "business",

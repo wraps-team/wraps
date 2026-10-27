@@ -46,7 +46,7 @@ describe("plan gating on broadcasts", { session: "owner" }, () => {
     ).toBeVisible();
   });
 
-  test("billing lists broadcasts under Free, segments under Pro, behavioral segments under Business", async ({
+  test("billing lists broadcasts under Free, and topics, segments and scheduling under Pro", async ({
     app,
     browser,
     screen,
@@ -59,7 +59,7 @@ describe("plan gating on broadcasts", { session: "owner" }, () => {
     await expect(
       screen.getByText("Broadcasts to topics & segments, scheduling").first()
     ).toBeVisible();
-    await expect(screen.getByText("Behavioral segments").first()).toBeVisible();
+    await expect(screen.getByText("Behavioral segments")).toHaveCount(0);
     await expect(screen.getByText("Segmentation")).toHaveCount(0);
   });
 });

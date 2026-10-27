@@ -110,7 +110,6 @@ These appear on your AWS bill, not your Wraps bill. You keep AWS volume discount
 | Scheduled broadcasts | — | Yes | Yes |
 | Cross-channel cascades | — | Yes | Yes |
 | Custom events | 5,000/mo | Unlimited | Unlimited |
-| Behavioral segments | — | — | Yes |
 | SSO + SCIM | — | — | Yes |
 | Audit log | — | — | Yes |
 | Audit log export | — | — | Yes |

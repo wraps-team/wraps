@@ -2592,7 +2592,6 @@ describe("apps/api plan allowances match apps/web", () => {
     "Topics & preferences": "topics",
     "Segments & targeting": "segments",
     "Scheduled broadcasts": "campaigns",
-    "Behavioral segments": "advancedSegments",
     "SSO + SCIM": "sso",
     "Audit log": "auditLog",
     "Audit log export": "auditLogExport",

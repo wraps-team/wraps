@@ -81,12 +81,6 @@ const comparisonFeatures = [
     business: true,
   },
   {
-    feature: "Behavioral segments",
-    free: false,
-    pro: false,
-    business: true,
-  },
-  {
     feature: "AWS accounts",
     free: "1",
     pro: "3",

@@ -232,7 +232,6 @@ export default function CLIReferencePlatformPageContent() {
               <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
                 <li>Everything in Pro</li>
                 <li>AI workflow generation</li>
-                <li>Behavioral segments</li>
                 <li>1,000 AI generations/mo</li>
                 <li>Unlimited AWS accounts</li>
                 <li>SSO + SCIM, 1-year history</li>

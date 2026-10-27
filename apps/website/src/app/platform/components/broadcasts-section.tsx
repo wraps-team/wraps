@@ -125,8 +125,7 @@ export function DashboardBroadcastsSection() {
                   Business ($199/mo):
                 </span>{" "}
                 <span className="text-muted-foreground">
-                  Everything in Pro plus behavioral segments, unlimited AWS
-                  accounts and SSO + SCIM
+                  Everything in Pro plus unlimited AWS accounts and SSO + SCIM
                 </span>
               </p>
             </div>

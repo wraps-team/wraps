@@ -52,7 +52,7 @@ export type PlanFeature =
   | "campaigns" // Pro+: Scheduled broadcasts
   | "workflows" // All tiers: Visual automation builder (2/unlimited by tier)
   | "events" // Pro+: Behavioral tracking
-  | "advancedSegments" // Business+: Behavioral segments
+  | "advancedSegments" // Pro+: Event-based segment filters
   | "customRetention" // Enterprise+: Custom data retention
   | "prioritySLA" // Business+: Priority support SLA
   | "sso" // Business+: SSO + SCIM provisioning
@@ -201,7 +201,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       campaigns: true, // Scheduled broadcasts
       workflows: true, // Unlimited workflows
       events: true, // Custom event tracking
-      advancedSegments: false, // Business only
+      advancedSegments: true, // Event-based segment filters
       customRetention: false,
       prioritySLA: false,
       sso: false,
@@ -278,7 +278,6 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     // Display
     featureList: [
       "Everything in Pro",
-      "Behavioral segments",
       "Unlimited AWS accounts",
       "1,000 AI generations",
       "1-year history",
@@ -332,7 +331,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       campaigns: true, // Scheduled broadcasts
       workflows: true, // Unlimited workflows
       events: true, // Custom event tracking
-      advancedSegments: false, // Business only
+      advancedSegments: true, // Event-based segment filters
       customRetention: false,
       prioritySLA: false,
       sso: false,
