@@ -113,7 +113,7 @@ const notifyOrgMock = vi.fn().mockResolvedValue(undefined);
 const hasRecentNotificationMock = vi.fn().mockResolvedValue(false);
 const countBroadcastRecipientsMock = vi.fn().mockResolvedValue(2);
 
-// notifyOrg now comes from @wraps/auth/notify (the better-inbox plugin
+// notifyOrg now comes from @wraps/auth/notify (the @byo-oss/notifications plugin
 // path), not @wraps/db, so it is stubbed on its own module.
 vi.mock("@wraps/auth/notify", () => ({
   notifyOrg: (...args: unknown[]) => notifyOrgMock(...args),

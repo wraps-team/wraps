@@ -1,6 +1,7 @@
 import { passkeyClient } from "@better-auth/passkey/client";
 import { ssoClient } from "@better-auth/sso/client";
 import { stripeClient } from "@better-auth/stripe/client";
+import { inboxClient } from "@byo-oss/notifications/client";
 import {
   deviceAuthorizationClient,
   lastLoginMethodClient,
@@ -8,7 +9,6 @@ import {
   twoFactorClient,
 } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
-import { inboxClient } from "@byo-oss/notifications/client";
 
 export const authClient = createAuthClient({
   baseURL:

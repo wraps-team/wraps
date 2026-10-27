@@ -157,8 +157,18 @@ describe("Repository: notifications", () => {
 
   it("deleteNotificationsForOrg removes only the given types for the org", async () => {
     await db.insert(notification).values([
-      { userId: ownerId, organizationId: orgA, type: "test.fanout", title: "A" },
-      { userId: memberId, organizationId: orgA, type: "test.single", title: "B" },
+      {
+        userId: ownerId,
+        organizationId: orgA,
+        type: "test.fanout",
+        title: "A",
+      },
+      {
+        userId: memberId,
+        organizationId: orgA,
+        type: "test.single",
+        title: "B",
+      },
     ]);
 
     await deleteNotificationsForOrg(orgA, ["test.fanout"]);
