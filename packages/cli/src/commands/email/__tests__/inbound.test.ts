@@ -770,6 +770,109 @@ describe("inboundInit non-interactive guard", () => {
     expect(receiving).toEqual(["Receiving domain: example.com"]);
   });
 
+  function receivingDomainsLogged(log: { info: unknown }): string[] {
+    return (
+      vi
+        .mocked(log.info as (m: unknown) => void)
+        .mock.calls.map(([msg]) => String(msg))
+        // biome-ignore lint/suspicious/noControlCharactersInRegex: strip ANSI colour codes
+        .map((msg) => msg.replace(/\u001b\[[0-9;]*m/g, ""))
+        .filter((msg) => msg.startsWith("Receiving domain:"))
+    );
+  }
+
+  it("--domain is the parent and --subdomain the label, as for inbound add", async () => {
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+    vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+
+    await inboundInit({
+      domain: "example.com",
+      subdomain: "support",
+      yes: true,
+    });
+
+    const { log } = await import("@clack/prompts");
+    expect(receivingDomainsLogged(log)).toEqual([
+      "Receiving domain: support.example.com",
+    ]);
+  });
+
+  it("rejects a --domain Wraps does not track, before any deploy", async () => {
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+    vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+    const pulumi = await import("@pulumi/pulumi");
+
+    await expect(
+      inboundInit({ domain: "other.com", subdomain: "support", yes: true })
+    ).rejects.toMatchObject({
+      name: "WrapsError",
+      code: "INVALID_FLAG_USAGE",
+    });
+    expect(
+      vi.mocked(pulumi.automation.LocalWorkspace.createOrSelectStack)
+    ).not.toHaveBeenCalled();
+  });
+
+  it("still reads a dotless --domain as the subdomain label, with a warning", async () => {
+    const { loadConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+    vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+
+    await inboundInit({ domain: "support", yes: true });
+
+    const { log } = await import("@clack/prompts");
+    expect(receivingDomainsLogged(log)).toEqual([
+      "Receiving domain: support.example.com",
+    ]);
+    expect(vi.mocked(log.warn)).toHaveBeenCalledWith(
+      expect.stringContaining("--subdomain support")
+    );
+  });
+
+  it("--preview shows the plan and writes nothing: no stack.up, receipt rule, DNS or metadata", async () => {
+    const { loadConnectionMetadata, saveConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+    vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+    const pulumiUtils = await import("../../../utils/shared/pulumi.js");
+    vi.mocked(pulumiUtils.previewWithResourceChanges).mockResolvedValue({
+      changeSummary: { create: 4 },
+      resourceChanges: [],
+    } as never);
+    const pulumi = await import("@pulumi/pulumi");
+    const stack = {
+      setConfig: vi.fn().mockResolvedValue(undefined),
+      up: vi.fn(),
+    };
+    vi.mocked(
+      pulumi.automation.LocalWorkspace.createOrSelectStack
+    ).mockResolvedValueOnce(stack as never);
+    const receiptRules = await import("../../../utils/email/receipt-rules.js");
+    const dns = await import("../../../utils/dns/index.js");
+
+    await inboundInit({
+      domain: "example.com",
+      subdomain: "support",
+      yes: true,
+      preview: true,
+    });
+
+    expect(pulumiUtils.previewWithResourceChanges).toHaveBeenCalledWith(stack, {
+      diff: true,
+    });
+    expect(stack.up).not.toHaveBeenCalled();
+    expect(receiptRules.createReceiptRuleSet).not.toHaveBeenCalled();
+    expect(receiptRules.createReceiptRule).not.toHaveBeenCalled();
+    expect(receiptRules.setActiveReceiptRuleSet).not.toHaveBeenCalled();
+    expect(dns.createInboundDNSRecordsForProvider).not.toHaveBeenCalled();
+    expect(saveConnectionMetadata).not.toHaveBeenCalled();
+  });
+
   it("resolves without prompting when --root --yes --json are all set", async () => {
     const { loadConnectionMetadata } = await import(
       "../../../utils/shared/metadata.js"
