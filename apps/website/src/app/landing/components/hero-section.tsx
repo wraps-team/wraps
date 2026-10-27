@@ -33,7 +33,8 @@ export function HeroSection() {
 
             <p className="mt-5 max-w-[44rem] text-balance text-base text-muted-foreground leading-relaxed sm:text-lg md:text-xl">
               One command deploys Amazon SES into your AWS account. Then send,
-              broadcast and automate, from your app or your agent.
+              broadcast and automate from the Wraps dashboard, or let your agent
+              do it through the platform.
             </p>
 
             <div className="mt-6 w-full sm:mt-7 sm:w-auto">
