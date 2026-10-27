@@ -1,19 +1,12 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
-import { ApproachesTeaserSection } from "./landing/components/approaches-teaser-section";
-import { CodeSampleSection } from "./landing/components/code-sample-section";
 import { CTASection } from "./landing/components/cta-section";
-import { DeliverabilityAuditSection } from "./landing/components/deliverability-audit-section";
 import { FaqSection } from "./landing/components/faq-section";
-import { FeatureBlockSection } from "./landing/components/feature-block-section";
 import { LandingFooter } from "./landing/components/footer";
 import { HeroSection } from "./landing/components/hero-section";
-import { HowItWorksSection } from "./landing/components/how-it-works-section";
 import { LandingNavbar } from "./landing/components/navbar";
-import { OperationsCompareSection } from "./landing/components/operations-compare-section";
 import { PricingSection } from "./landing/components/pricing-section";
-import { PrinciplesSection } from "./landing/components/principles-section";
-import { ProductShowcaseSection } from "./landing/components/product-showcase-section";
+import { WhatItDoesSection } from "./landing/components/what-it-does-section";
 
 export const metadata: Metadata = {
   alternates: {
@@ -144,21 +137,12 @@ export default function LandingPage() {
         {/* Main Content */}
         <main>
           {/*
-            Narrative order follows the sales pitch storyboard in
-            ~/Obsidian/ops/sops/positioning.md: insight, then the alternatives
-            rubric, then the one thing the other approaches do not do, and only
-            then the product tour. Price sits below the product on purpose —
-            it is the third value theme, not the argument.
+            Show what Wraps does, then price it. One line and one visual per
+            beat; anything that needs a paragraph lives on its own page
+            (/platform, /compare, /approaches, /why-wraps).
           */}
           <HeroSection />
-          <HowItWorksSection />
-          <DeliverabilityAuditSection />
-          <ApproachesTeaserSection />
-          <OperationsCompareSection />
-          <PrinciplesSection />
-          <FeatureBlockSection />
-          <CodeSampleSection />
-          <ProductShowcaseSection />
+          <WhatItDoesSection />
           <PricingSection />
           <FaqSection />
           <CTASection />
