@@ -25,7 +25,7 @@ import {
   twoFactor,
 } from "better-auth/plugins";
 import { userAc } from "better-auth/plugins/admin/access";
-import { inbox } from "better-inbox";
+import { inbox } from "@byo-oss/notifications";
 import { desc } from "drizzle-orm";
 import Stripe from "stripe";
 import { ac, roles } from "./access";
@@ -226,7 +226,7 @@ async function isNewDeviceOrIp(
  * Failures are silently swallowed so a DB issue never breaks login.
  */
 /**
- * Insert an in-app "new sign-in" notification (better-inbox row).
+ * Insert an in-app "new sign-in" notification (@byo-oss/notifications row).
  * Direct row insert — `auth` does not exist inside its own config, and a
  * notification is just a row. Fire-and-forget like the audit log.
  */

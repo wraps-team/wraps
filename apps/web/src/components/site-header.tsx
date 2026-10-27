@@ -1,7 +1,7 @@
 "use client";
 
 import { Separator } from "@wraps/ui/components/ui/separator";
-import { InboxButton } from "better-inbox/react";
+import { InboxButton } from "@byo-oss/notifications/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CommandSearch, SearchTrigger } from "@/components/command-search";
