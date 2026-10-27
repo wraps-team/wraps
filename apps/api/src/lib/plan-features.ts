@@ -14,7 +14,7 @@ import { isPlanId, type PlanId } from "./plan-ids";
 export const FEATURE_PLANS = {
   batch: "free", // Broadcasts to all contacts; audience and scheduling are gated below
   topics: "pro", // Sending to a topic
-  segments: "business", // Segmentation, including segment broadcasts and triggers
+  segments: "pro", // Segmentation, including segment broadcasts and triggers
   campaigns: "pro", // Scheduling a broadcast
   workflows: "free", // All tiers (quantity limited by tier)
   events: "free", // All tiers — Free is metered at 5K/mo, not gated
@@ -67,8 +67,8 @@ const BROADCAST_DENIAL: Partial<Record<Feature, string>> = {
 
 /**
  * What a broadcast needs from the plan: sending to all contacts is open to
- * every plan; a topic audience needs Pro, a segment audience needs Business,
- * and a scheduled send needs Pro. The first unmet requirement is reported.
+ * every plan; a topic audience, a segment audience and a scheduled send each
+ * need Pro. The first unmet requirement is reported.
  * Keep in step with checkBroadcastEntitlements in apps/web/src/lib/plans.ts.
  */
 export function checkBroadcastEntitlements(
@@ -113,7 +113,7 @@ export type WorkflowTriggerEntitlementResult =
 
 /**
  * Whether a plan may use these workflow triggers. Segment entry and exit
- * triggers need the segments feature (Business and up); every other trigger is
+ * triggers need the segments feature (Pro and up); every other trigger is
  * open. Keep in step with workflowTriggerFeature in apps/web/src/lib/plans.ts.
  */
 export function checkWorkflowTriggerEntitlements(

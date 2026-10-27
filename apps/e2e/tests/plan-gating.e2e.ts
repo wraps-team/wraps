@@ -3,8 +3,8 @@ import { expect } from "e2e";
 import { openInWorkspace } from "./workspace.ts";
 
 // What a Free workspace is told about broadcasts, topics, scheduling and
-// segments. Free can send a broadcast to all contacts; topics and scheduling
-// start at Pro, segmentation at Business.
+// segments. Free can send a broadcast to all contacts; topics, segments and
+// scheduling start at Pro.
 //
 // The e2e owner has no AWS account, so the composer stops at its first step
 // and the Audience and Schedule locks are not reachable here. Those, and the
@@ -24,30 +24,29 @@ describe("plan gating on broadcasts", { session: "owner" }, () => {
     await expect(screen.getByText("Something went wrong")).toHaveCount(0);
   });
 
-  test("Free is sent to Business, not Pro, for segments", async ({
-    app,
-    browser,
-    screen,
-  }) => {
+  test("Free is sent to Pro for segments", async ({ app, browser, screen }) => {
     await openInWorkspace(app, browser, "/segments");
 
     await expect(screen.getByText("Required:")).toBeVisible();
-    await expect(screen.getByRole("link", "Upgrade to Business")).toBeVisible();
-    await expect(screen.getByRole("link", "Upgrade to Pro")).toHaveCount(0);
+    await expect(screen.getByRole("link", "Upgrade to Pro")).toBeVisible();
+    await expect(screen.getByRole("link", "Upgrade to Business")).toHaveCount(
+      0
+    );
   });
 
-  test("the sidebar nudge offers topics and scheduling, not segments", async ({
+  test("the sidebar nudge offers topics, segments and scheduling", async ({
     app,
     browser,
     screen,
   }) => {
     await openInWorkspace(app, browser, "/emails");
 
-    await expect(screen.getByText("Unlock Topics & scheduling")).toBeVisible();
-    await expect(screen.getByText("Unlock Audience Segments")).toHaveCount(0);
+    await expect(
+      screen.getByText("Unlock Topics, segments & scheduling")
+    ).toBeVisible();
   });
 
-  test("billing lists broadcasts under Free, scheduling under Pro, segmentation under Business", async ({
+  test("billing lists broadcasts under Free, topics, segments and scheduling under Pro", async ({
     app,
     browser,
     screen,
@@ -58,8 +57,7 @@ describe("plan gating on broadcasts", { session: "owner" }, () => {
       screen.getByText("Broadcasts to all contacts").first()
     ).toBeVisible();
     await expect(
-      screen.getByText("Topics & scheduled broadcasts").first()
+      screen.getByText("Broadcasts to topics & segments, scheduling").first()
     ).toBeVisible();
-    await expect(screen.getByText("Segmentation").first()).toBeVisible();
   });
 });

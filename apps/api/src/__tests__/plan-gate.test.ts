@@ -24,10 +24,10 @@ describe("FEATURE_PLANS", () => {
     expect(FEATURE_PLANS.batch).toBe("free");
   });
 
-  it("maps topics and scheduling to pro, segments to business", () => {
+  it("maps topics, segments and scheduling to pro", () => {
     expect(FEATURE_PLANS.topics).toBe("pro");
     expect(FEATURE_PLANS.campaigns).toBe("pro");
-    expect(FEATURE_PLANS.segments).toBe("business");
+    expect(FEATURE_PLANS.segments).toBe("pro");
   });
 });
 
@@ -55,24 +55,25 @@ describe("checkBroadcastEntitlements", () => {
     }
   });
 
-  it("requires pro for topics and scheduling, business for segments", () => {
+  it("requires pro for topics, segments and scheduling", () => {
     expect(ok("free", "topic", false)).toBe(false);
     expect(ok("pro", "topic", false)).toBe(true);
     expect(ok("free", "all", true)).toBe(false);
     expect(ok("pro", "all", true)).toBe(true);
-    expect(ok("pro", "segment", false)).toBe(false);
+    expect(ok("free", "segment", false)).toBe(false);
+    expect(ok("pro", "segment", false)).toBe(true);
     expect(ok("business", "segment", false)).toBe(true);
   });
 
   it("applies every requirement of a combined request", () => {
-    expect(ok("pro", "segment", true)).toBe(false);
-    expect(ok("business", "segment", true)).toBe(true);
+    expect(ok("free", "segment", true)).toBe(false);
+    expect(ok("pro", "segment", true)).toBe(true);
     expect(ok("free", "topic", true)).toBe(false);
   });
 
   it("ranks legacy plans with their successors (starter=pro, growth/scale=business)", () => {
     expect(ok("starter", "topic", true)).toBe(true);
-    expect(ok("starter", "segment", false)).toBe(false);
+    expect(ok("starter", "segment", false)).toBe(true);
     expect(ok("growth", "segment", true)).toBe(true);
     expect(ok("scale", "segment", true)).toBe(true);
   });
@@ -94,15 +95,15 @@ describe("checkBroadcastEntitlements", () => {
       expect(scheduled.requiredPlan).toBe("pro");
       expect(scheduled.message).toMatch(/scheduling/i);
     }
-    const seg = checkBroadcastEntitlements("pro", {
+    const seg = checkBroadcastEntitlements("free", {
       audienceType: "segment",
       scheduled: false,
     });
     expect(seg.ok).toBe(false);
     if (!seg.ok) {
       expect(seg.feature).toBe("segments");
-      expect(seg.requiredPlan).toBe("business");
-      expect(seg.message).toMatch(/business/i);
+      expect(seg.requiredPlan).toBe("pro");
+      expect(seg.message).toMatch(/pro/i);
     }
     const both = checkBroadcastEntitlements("free", {
       audienceType: "segment",
@@ -153,9 +154,9 @@ describe("planGateMiddleware (real middleware, no DB)", () => {
     expect(await gateStatus("batch", "free")).toBe(200);
   });
 
-  it("a pro org is refused the segments gate; a business org passes it", async () => {
-    expect(await gateStatus("segments", "pro")).toBe(403);
-    expect(await gateStatus("segments", "business")).toBe(200);
+  it("a free org is refused the segments gate; a pro org passes it", async () => {
+    expect(await gateStatus("segments", "free")).toBe(403);
+    expect(await gateStatus("segments", "pro")).toBe(200);
   });
 
   it("a business org passes the sso gate", async () => {
@@ -251,11 +252,11 @@ describe("checkWorkflowTriggerEntitlements", () => {
     expect(ok(null, ["event"])).toBe(true);
   });
 
-  it("requires Business for segment_entry and segment_exit", () => {
+  it("requires Pro for segment_entry and segment_exit", () => {
     for (const trigger of ["segment_entry", "segment_exit"]) {
       expect(ok("free", [trigger])).toBe(false);
-      expect(ok("pro", [trigger])).toBe(false);
-      expect(ok("starter", [trigger])).toBe(false);
+      expect(ok("pro", [trigger])).toBe(true);
+      expect(ok("starter", [trigger])).toBe(true);
       expect(ok("business", [trigger])).toBe(true);
       expect(ok("growth", [trigger])).toBe(true);
       expect(ok("scale", [trigger])).toBe(true);
@@ -263,8 +264,8 @@ describe("checkWorkflowTriggerEntitlements", () => {
   });
 
   it("refuses a batch when any workflow in it needs a higher plan", () => {
-    expect(ok("pro", ["event", "segment_entry"])).toBe(false);
-    expect(ok("business", ["event", "segment_entry"])).toBe(true);
+    expect(ok("free", ["event", "segment_entry"])).toBe(false);
+    expect(ok("pro", ["event", "segment_entry"])).toBe(true);
   });
 
   it("denies unknown or missing plans", () => {
@@ -273,12 +274,12 @@ describe("checkWorkflowTriggerEntitlements", () => {
   });
 
   it("says which plan unlocks it", () => {
-    const r = checkWorkflowTriggerEntitlements("pro", ["segment_entry"]);
+    const r = checkWorkflowTriggerEntitlements("free", ["segment_entry"]);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.requiredPlan).toBe("business");
+      expect(r.requiredPlan).toBe("pro");
       expect(r.message).toMatch(/segment/i);
-      expect(r.message).toMatch(/business/i);
+      expect(r.message).toMatch(/pro/i);
     }
   });
 });

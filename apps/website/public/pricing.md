@@ -106,7 +106,7 @@ These appear on your AWS bill, not your Wraps bill. You keep AWS volume discount
 | Team members | Unlimited | Unlimited | Unlimited |
 | Broadcasts to all contacts | Yes | Yes | Yes |
 | Topics & preferences | — | Yes | Yes |
-| Segments & targeting | — | — | Yes |
+| Segments & targeting | — | Yes | Yes |
 | Scheduled broadcasts | — | Yes | Yes |
 | Cross-channel cascades | — | Yes | Yes |
 | Custom events | 5,000/mo | Unlimited | Unlimited |

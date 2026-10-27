@@ -60,7 +60,7 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
         return { error: "workflow_limit", message: limitCheck.message };
       }
 
-      // Segment entry/exit triggers need the segments feature (Business and up).
+      // Segment entry/exit triggers need the segments feature (Pro and up).
       const triggerCheck = checkWorkflowTriggerEntitlements(
         authContext.planId,
         [body.triggerType]
@@ -213,7 +213,7 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
         return { error: "workflow_limit", message: limitCheck.message };
       }
 
-      // Segment entry/exit triggers need the segments feature (Business and up).
+      // Segment entry/exit triggers need the segments feature (Pro and up).
       const triggerCheck = checkWorkflowTriggerEntitlements(
         authContext.planId,
         body.workflows.map((w) => w.triggerType)

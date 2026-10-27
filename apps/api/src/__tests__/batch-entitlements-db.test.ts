@@ -134,7 +134,6 @@ const ALL_PLANS: Plan[] = [
   "scale",
 ];
 const PRO_UP: Plan[] = ["pro", "business", "starter", "growth", "scale"];
-const BUSINESS_UP: Plan[] = ["business", "growth", "scale"];
 
 describe("POST /v1/batch: all contacts", () => {
   it.each(ALL_PLANS)("%s plan can broadcast to all contacts", async (plan) => {
@@ -165,33 +164,27 @@ describe("POST /v1/batch: topic audience (Pro and up)", () => {
   });
 });
 
-describe("POST /v1/batch: segment audience (Business and up)", () => {
-  it.each(["free", "pro", "starter"] as Plan[])(
-    "%s plan is refused, and nothing is created or queued",
-    async (plan) => {
-      const res = await createBroadcast(plan, { audienceType: "segment" });
-
-      expect(res.status).toBe(403);
-      expect(await broadcastCount()).toBe(0);
-      expect(mockEnqueueJob).not.toHaveBeenCalled();
-    }
-  );
-
-  it("names Business as the plan that unlocks segments", async () => {
-    const res = await createBroadcast("pro", { audienceType: "segment" });
+describe("POST /v1/batch: segment audience (Pro and up)", () => {
+  it("free plan is refused, and nothing is created or queued", async () => {
+    const res = await createBroadcast("free", { audienceType: "segment" });
 
     expect(res.status).toBe(403);
-    expect(await res.text()).toMatch(/business/i);
+    expect(await broadcastCount()).toBe(0);
+    expect(mockEnqueueJob).not.toHaveBeenCalled();
   });
 
-  it.each(BUSINESS_UP)(
-    "%s plan clears the segment entitlement",
-    async (plan) => {
-      const res = await createBroadcast(plan, { audienceType: "segment" });
+  it("names Pro as the plan that unlocks segments", async () => {
+    const res = await createBroadcast("free", { audienceType: "segment" });
 
-      expect(res.status).not.toBe(403);
-    }
-  );
+    expect(res.status).toBe(403);
+    expect(await res.text()).toMatch(/pro/i);
+  });
+
+  it.each(PRO_UP)("%s plan clears the segment entitlement", async (plan) => {
+    const res = await createBroadcast(plan, { audienceType: "segment" });
+
+    expect(res.status).not.toBe(403);
+  });
 });
 
 describe("POST /v1/batch: scheduling (Pro and up)", () => {
@@ -220,8 +213,8 @@ describe("POST /v1/batch: scheduling (Pro and up)", () => {
     }
   );
 
-  it("a Pro plan scheduling to a segment is refused for the segment", async () => {
-    const res = await createBroadcast("pro", {
+  it("a Free plan scheduling to a segment is refused for the segment", async () => {
+    const res = await createBroadcast("free", {
       audienceType: "segment",
       scheduled: true,
     });
@@ -266,10 +259,10 @@ describe("POST /v1/batch/:id/send (promote a draft)", () => {
     );
   }
 
-  it("a Pro plan cannot promote a draft that targets a segment", async () => {
+  it("a Free plan cannot promote a draft that targets a segment", async () => {
     const id = await seedDraft("segment");
 
-    const res = await promote("pro", id);
+    const res = await promote("free", id);
 
     expect(res.status).toBe(403);
     const [row] = await db
@@ -278,6 +271,14 @@ describe("POST /v1/batch/:id/send (promote a draft)", () => {
       .where(eq(batchSend.id, id));
     expect(row?.status).toBe("draft");
     expect(mockEnqueueJob).not.toHaveBeenCalled();
+  });
+
+  it("a Pro plan can promote a draft that targets a segment", async () => {
+    const id = await seedDraft("segment");
+
+    const res = await promote("pro", id);
+
+    expect(res.status).not.toBe(403);
   });
 
   it("a Free plan can promote a draft that targets all contacts", async () => {

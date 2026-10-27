@@ -1,7 +1,7 @@
 /**
  * `wraps email workflows push` and segment triggers (real DB).
  *
- * Segment entry and exit triggers need the segments feature (Business and up).
+ * Segment entry and exit triggers need the segments feature (Pro and up).
  * The push endpoints refuse them below that, create nothing, and leave every
  * other trigger alone. In a batch, one workflow that needs a higher plan
  * refuses the whole batch.
@@ -129,22 +129,22 @@ afterAll(async () => {
 
 describe("POST /v1/workflows/push", () => {
   it.each(["segment_entry", "segment_exit"])(
-    "refuses a %s trigger on Pro and creates nothing",
+    "refuses a %s trigger on Free and creates nothing",
     async (trigger) => {
-      mockAuth.planId = "pro";
+      mockAuth.planId = "free";
 
       const res = await post("/push", pushBody("seg-wf", trigger));
 
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body.error).toBe("plan_required");
-      expect(body.message).toMatch(/business/i);
+      expect(body.message).toMatch(/pro/i);
       expect(await workflowCount()).toBe(0);
     }
   );
 
-  it("refuses a segment trigger on Free", async () => {
-    mockAuth.planId = "free";
+  it("refuses a segment trigger when the org has no plan", async () => {
+    mockAuth.planId = null;
 
     const res = await post("/push", pushBody("seg-wf", "segment_entry"));
 
@@ -152,7 +152,7 @@ describe("POST /v1/workflows/push", () => {
     expect(await workflowCount()).toBe(0);
   });
 
-  it.each(["business", "growth", "scale"])(
+  it.each(["pro", "starter", "business", "growth", "scale"])(
     "accepts a segment trigger on the %s plan",
     async (plan) => {
       mockAuth.planId = plan;
@@ -163,10 +163,12 @@ describe("POST /v1/workflows/push", () => {
     }
   );
 
-  it("still accepts every other trigger on Pro", async () => {
-    mockAuth.planId = "pro";
+  it("still accepts every other trigger on Free", async () => {
+    mockAuth.planId = "free";
 
-    for (const trigger of ["event", "api", "contact_created"]) {
+    // Two, not three: Free holds 2 workflows, and a third push is refused by
+    // the workflow limit rather than by the trigger gate.
+    for (const trigger of ["event", "contact_created"]) {
       const res = await post("/push", pushBody(`wf-${trigger}`, trigger));
       expect(res.status).not.toBe(403);
     }
@@ -175,7 +177,7 @@ describe("POST /v1/workflows/push", () => {
 
 describe("POST /v1/workflows/push/batch", () => {
   it("refuses the whole batch when one workflow needs segmentation", async () => {
-    mockAuth.planId = "pro";
+    mockAuth.planId = "free";
 
     const res = await post("/push/batch", {
       workflows: [
@@ -189,8 +191,8 @@ describe("POST /v1/workflows/push/batch", () => {
     expect(await workflowCount()).toBe(0);
   });
 
-  it("accepts the same batch on Business", async () => {
-    mockAuth.planId = "business";
+  it("accepts the same batch on Pro", async () => {
+    mockAuth.planId = "pro";
 
     const res = await post("/push/batch", {
       workflows: [

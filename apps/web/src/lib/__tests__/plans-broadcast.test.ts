@@ -38,11 +38,15 @@ describe("broadcast plan flags", () => {
     }
   });
 
-  it("segments start at Business; legacy plans rank with their successor", () => {
+  it("segments start at Pro; legacy plans rank with their successor", () => {
     expect(hasFeature("free", "segments")).toBe(false);
-    expect(hasFeature("pro", "segments")).toBe(false);
-    expect(hasFeature("starter", "segments")).toBe(false);
-    for (const plan of ["business", "growth", "scale"] as const) {
+    for (const plan of [
+      "pro",
+      "starter",
+      "business",
+      "growth",
+      "scale",
+    ] as const) {
       expect(hasFeature(plan, "segments")).toBe(true);
     }
   });
@@ -62,20 +66,21 @@ describe("evaluateBroadcastEntitlements", () => {
     }
   });
 
-  it("requires Pro for topics and scheduling, Business for segments", () => {
+  it("requires Pro for topics, segments and scheduling", () => {
     expect(ok("free", "topic", false)).toBe(false);
     expect(ok("pro", "topic", false)).toBe(true);
     expect(ok("free", "all", true)).toBe(false);
     expect(ok("pro", "all", true)).toBe(true);
-    expect(ok("pro", "segment", false)).toBe(false);
+    expect(ok("free", "segment", false)).toBe(false);
+    expect(ok("pro", "segment", false)).toBe(true);
     expect(ok("business", "segment", false)).toBe(true);
   });
 
   it("applies every requirement of a combined request", () => {
-    expect(ok("pro", "segment", true)).toBe(false);
-    expect(ok("business", "segment", true)).toBe(true);
+    expect(ok("free", "segment", true)).toBe(false);
+    expect(ok("pro", "segment", true)).toBe(true);
     expect(ok("starter", "topic", true)).toBe(true);
-    expect(ok("starter", "segment", true)).toBe(false);
+    expect(ok("starter", "segment", true)).toBe(true);
   });
 
   it("names the unmet feature and the plan that unlocks it", () => {
@@ -88,14 +93,14 @@ describe("evaluateBroadcastEntitlements", () => {
     expect(scheduled.requiredPlan).toBe("pro");
     expect(scheduled.message).toMatch(/scheduling/i);
 
-    const segment = evaluateBroadcastEntitlements("pro", {
+    const segment = evaluateBroadcastEntitlements("free", {
       audienceType: "segment",
       scheduled: false,
     });
     expect(segment.allowed).toBe(false);
     expect(segment.feature).toBe("segments");
-    expect(segment.requiredPlan).toBe("business");
-    expect(segment.message).toMatch(/business/i);
+    expect(segment.requiredPlan).toBe("pro");
+    expect(segment.message).toMatch(/pro/i);
   });
 
   it("reports the segment gap first when several are unmet", () => {
@@ -129,10 +134,10 @@ describe("workflowTriggerFeature", () => {
     }
   });
 
-  it("resolves to the Business plan for Free and Pro", () => {
+  it("is refused on Free and open from Pro up", () => {
     const feature = workflowTriggerFeature("segment_entry");
     expect(feature && hasFeature("free", feature)).toBe(false);
-    expect(feature && hasFeature("pro", feature)).toBe(false);
+    expect(feature && hasFeature("pro", feature)).toBe(true);
     expect(feature && hasFeature("business", feature)).toBe(true);
   });
 });

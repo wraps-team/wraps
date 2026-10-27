@@ -199,7 +199,7 @@ describe("requiredPlanName", () => {
   it.each([
     ["topics", "Pro"],
     ["campaigns", "Pro"],
-    ["segments", "Business"],
+    ["segments", "Pro"],
   ] as const)("%s unlocks on %s", (feature, plan) => {
     expect(requiredPlanName(feature)).toBe(plan);
   });

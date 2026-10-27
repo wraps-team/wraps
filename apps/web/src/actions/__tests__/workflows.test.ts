@@ -2273,8 +2273,8 @@ describe("Workflows Server Actions", () => {
 describe("Workflow segment triggers need segmentation", () => {
   const denied = {
     allowed: false,
-    requiredPlan: "business" as const,
-    message: "Segment entry and exit triggers require the Business plan.",
+    requiredPlan: "pro" as const,
+    message: "Segment entry and exit triggers require the Pro plan.",
   };
 
   async function makeWorkflow(triggerType: "event" | "segment_entry") {
@@ -2317,7 +2317,7 @@ describe("Workflow segment triggers need segmentation", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toMatch(/business/i);
+      expect(result.error).toMatch(/pro/i);
     }
     expect(checkWorkflowTriggerAccess).toHaveBeenCalledWith(
       testOrganization.id,
@@ -2345,7 +2345,7 @@ describe("Workflow segment triggers need segmentation", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toMatch(/business/i);
+      expect(result.error).toMatch(/pro/i);
     }
     expect(checkWorkflowTriggerAccess).toHaveBeenCalledWith(
       testOrganization.id,
@@ -2365,7 +2365,7 @@ describe("Workflow segment triggers need segmentation", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toMatch(/business/i);
+      expect(result.error).toMatch(/pro/i);
     }
   });
 

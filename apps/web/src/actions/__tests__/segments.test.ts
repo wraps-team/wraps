@@ -121,12 +121,12 @@ beforeAll(async () => {
       set: { updatedAt: new Date() },
     });
 
-  // Set up a Business plan subscription (segments need Business and up)
+  // Set up Starter plan subscription (required for segments feature)
   await db
     .insert(subscription)
     .values({
       id: `sub_test_${testOrganization.id}`,
-      plan: "business",
+      plan: "starter",
       referenceId: testOrganization.id,
       status: "active",
       createdAt: new Date(),
@@ -134,7 +134,7 @@ beforeAll(async () => {
     })
     .onConflictDoUpdate({
       target: subscription.id,
-      set: { plan: "business", status: "active" },
+      set: { plan: "growth", status: "active" },
     });
 
   // Insert test member

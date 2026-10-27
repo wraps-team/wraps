@@ -139,8 +139,8 @@ afterAll(async () => {
   await cleanupBaseOrg(PREFIX);
 });
 
-const NO_SEGMENTS = ["free", "pro", "starter"];
-const WITH_SEGMENTS = ["business", "growth", "scale"];
+const NO_SEGMENTS = ["free"];
+const WITH_SEGMENTS = ["pro", "starter", "business", "growth", "scale"];
 
 describe("segment_entry trigger", () => {
   it.each(NO_SEGMENTS)("does not fire on the %s plan", async (plan) => {
@@ -170,7 +170,7 @@ describe("segment_entry trigger", () => {
   });
 
   it("treats an org with a cancelled subscription as Free", async () => {
-    await setPlan("business", "canceled");
+    await setPlan("pro", "canceled");
 
     const result = await checkSegmentEntry({
       contactId: ids.contact,
@@ -181,14 +181,14 @@ describe("segment_entry trigger", () => {
     expect(result).toEqual({ workflowsTriggered: 0 });
   });
 
-  it("starts firing again as soon as the org is on Business", async () => {
-    await setPlan("pro");
+  it("starts firing again as soon as the org is on Pro", async () => {
+    await setPlan("free");
     const blocked = await checkSegmentEntry({
       contactId: ids.contact,
       organizationId: ids.org,
       previousSegmentIds: [],
     });
-    await setPlan("business");
+    await setPlan("pro");
     const allowed = await checkSegmentEntry({
       contactId: ids.contact,
       organizationId: ids.org,
@@ -230,7 +230,7 @@ describe("segment_exit trigger", () => {
 
 describe("getSegmentMembership", () => {
   it("reports no memberships for an org without segments", async () => {
-    await setPlan("pro");
+    await setPlan("free");
 
     expect(
       await getSegmentMembership({
@@ -240,8 +240,8 @@ describe("getSegmentMembership", () => {
     ).toEqual([]);
   });
 
-  it("reports the contact's segments for a Business org", async () => {
-    await setPlan("business");
+  it("reports the contact's segments for a Pro org", async () => {
+    await setPlan("pro");
 
     expect(
       await getSegmentMembership({

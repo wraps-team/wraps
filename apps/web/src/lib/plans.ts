@@ -48,7 +48,7 @@ export type PlanId = PublicPlanId | LegacyPlanId;
 export type PlanFeature =
   | "batch" // All plans: Broadcast to all contacts
   | "topics" // Pro+: Subscription management, and broadcasting to a topic
-  | "segments" // Business+: Segmentation (segment broadcasts and segment workflow triggers)
+  | "segments" // Pro+: Segmentation (segment broadcasts and segment workflow triggers)
   | "campaigns" // Pro+: Scheduled broadcasts
   | "workflows" // All tiers: Visual automation builder (2/unlimited by tier)
   | "events" // Pro+: Behavioral tracking
@@ -197,7 +197,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     features: {
       batch: true, // Send to all contacts
       topics: true, // Subscription management
-      segments: false, // Business+: Segmentation
+      segments: true, // Property-based targeting
       campaigns: true, // Scheduled broadcasts
       workflows: true, // Unlimited workflows
       events: true, // Custom event tracking
@@ -222,7 +222,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       "Everything in Free",
       "Unlimited workflows",
       "Unlimited custom events",
-      "Broadcasts to topics, scheduled sends",
+      "Broadcasts to topics & segments, scheduling",
       "250 AI generations",
       "90-day history",
     ],
@@ -278,7 +278,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     // Display
     featureList: [
       "Everything in Pro",
-      "Broadcasts to segments",
+      "Behavioral segments",
       "Unlimited AWS accounts",
       "1,000 AI generations",
       "1-year history",
@@ -328,7 +328,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     features: {
       batch: true, // Send to all contacts
       topics: true, // Subscription management
-      segments: false, // Business+: Segmentation (legacy starter ranks with Pro)
+      segments: true, // Property-based targeting
       campaigns: true, // Scheduled broadcasts
       workflows: true, // Unlimited workflows
       events: true, // Custom event tracking
@@ -350,7 +350,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     featureList: [
       "Unlimited sends, domains & contacts",
       "Unlimited workflows",
-      "Broadcasts to topics, scheduled sends",
+      "Broadcasts to topics & segments, scheduling",
       "3 AWS accounts",
       "250 AI generations",
       "90-day history",
@@ -809,8 +809,8 @@ const BROADCAST_DENIAL: Partial<Record<PlanFeature, string>> = {
 
 /**
  * What a broadcast needs from the plan. Sending to all contacts is open to
- * every plan; a topic audience needs Pro, a segment audience needs Business,
- * and a scheduled send needs Pro. The first unmet requirement is reported.
+ * every plan; a topic audience, a segment audience and a scheduled send each
+ * need Pro. The first unmet requirement is reported.
  * Keep in step with checkBroadcastEntitlements in
  * apps/api/src/lib/plan-features.ts.
  */

@@ -202,7 +202,7 @@ export const PRICING_TIERS: PricingTier[] = [
       "Everything in Free",
       "Unlimited workflows",
       "Unlimited custom events",
-      "Broadcasts to topics, scheduled sends",
+      "Broadcasts to topics & segments, scheduling",
       "250 AI generations/mo",
       "90-day history",
     ],
@@ -220,7 +220,7 @@ export const PRICING_TIERS: PricingTier[] = [
     limits: TIER_LIMITS.business,
     features: [
       "Everything in Pro",
-      "Broadcasts to segments",
+      "Behavioral segments",
       "Unlimited AWS accounts",
       "1,000 AI generations/mo",
       "1-year history",
@@ -438,7 +438,7 @@ export const FEATURE_COMPARISON: FeatureComparison[] = [
   {
     name: "Segments & targeting",
     free: false,
-    pro: false,
+    pro: true,
     business: true,
   },
   {
@@ -522,5 +522,5 @@ export const PRICING_COPY = {
     "No credit card. No time limit. Your AWS account, your data.",
   paidTiersHeadline: "Outgrowing the free tier?",
   paidTiersSubline:
-    "Topics, scheduled broadcasts, event tracking, unlimited workflows, and team access — starting at $29/mo.",
+    "Topics, segments, scheduled broadcasts, event tracking, unlimited workflows, and team access — starting at $29/mo.",
 } as const;

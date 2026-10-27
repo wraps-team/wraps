@@ -440,7 +440,7 @@ export async function checkSegmentEntry(params: {
     return { workflowsTriggered: 0 };
   }
 
-  // Segment triggers need the segments feature (Business and up). An org that
+  // Segment triggers need the segments feature (Pro and up). An org that
   // no longer has it keeps its workflows but they stop firing on membership.
   if (!(await orgHasFeature(params.organizationId, "segments"))) {
     log.warn("Skipping segment trigger: plan does not include segments", {
@@ -567,7 +567,7 @@ export async function checkSegmentExit(params: {
     return { workflowsTriggered: 0 };
   }
 
-  // Segment triggers need the segments feature (Business and up). An org that
+  // Segment triggers need the segments feature (Pro and up). An org that
   // no longer has it keeps its workflows but they stop firing on membership.
   if (!(await orgHasFeature(params.organizationId, "segments"))) {
     log.warn("Skipping segment trigger: plan does not include segments", {

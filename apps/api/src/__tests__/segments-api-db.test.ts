@@ -44,7 +44,7 @@ let ids: Awaited<ReturnType<typeof seedBaseOrg>>["ids"];
 function appFor(
   organizationId: string,
   userId: string,
-  planId: string | null = "business"
+  planId: string | null = "pro"
 ) {
   const { app } = createErrorHarness();
   return app
@@ -521,15 +521,13 @@ describe("plan gate", () => {
   ];
 
   it.each(gatedCases)(
-    "free, pro and starter orgs get 403 on %s, naming the Business plan",
+    "a free org gets 403 on %s, naming the required plan",
     async (_label, buildRequest) => {
-      for (const plan of ["free", "pro", "starter"]) {
-        const app = appFor(ids.org, ids.user, plan);
-        const res = await app.handle(buildRequest());
-        expect(res.status).toBe(403);
-        const body = await res.json();
-        expect(String(body.error ?? body.message)).toMatch(/business/i);
-      }
+      const app = appFor(ids.org, ids.user, "free");
+      const res = await app.handle(buildRequest());
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(String(body.error ?? body.message)).toMatch(/pro/i);
     }
   );
 
@@ -539,7 +537,7 @@ describe("plan gate", () => {
     expect(res.status).toBe(403);
   });
 
-  it.each(["business", "growth", "scale"])(
+  it.each(["pro", "business", "starter", "growth", "scale"])(
     "a %s org gets a non-403 status on GET /",
     async (planId) => {
       const app = appFor(ids.org, ids.user, planId);
