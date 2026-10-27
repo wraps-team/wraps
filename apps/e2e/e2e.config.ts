@@ -1,13 +1,16 @@
 import { randomBytes } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 import { web } from "@e2e-dev/web";
 import { gateway } from "ai";
 import type { E2EConfig } from "e2e";
 
-// The dashboard's .env.local already holds the AI Gateway key the agent steps need.
-const webEnv = parseEnv(readFileSync("../web/.env.local", "utf8"));
-process.env.AI_GATEWAY_API_KEY ??= webEnv.AI_GATEWAY_API_KEY;
+// Locally, the dashboard's .env.local already holds the AI Gateway key the
+// agent steps need. CI has no .env.local and passes the key as a secret.
+if (existsSync("../web/.env.local")) {
+  const webEnv = parseEnv(readFileSync("../web/.env.local", "utf8"));
+  process.env.AI_GATEWAY_API_KEY ??= webEnv.AI_GATEWAY_API_KEY;
+}
 
 let signupPassword: string | undefined;
 
@@ -33,6 +36,11 @@ export default {
             "{port}",
           ],
           cwd: "../web",
+          // Next reads everything else from .env.local, which CI doesn't have.
+          // Never inherit locally: a shell DATABASE_URL would beat .env.local.
+          inheritEnv: process.env.CI
+            ? ["DATABASE_URL", "BETTER_AUTH_SECRET"]
+            : [],
           env: {
             BETTER_AUTH_URL: "http://127.0.0.1:{port}",
             NEXT_PUBLIC_APP_URL: "http://127.0.0.1:{port}",
@@ -66,6 +74,9 @@ export default {
     },
   },
   timeout: 180_000,
+  // next dev compiles each route on its first visit; on a cold CI runner that
+  // alone outlasts the 5s default.
+  assertionTimeout: 30_000,
   workers: 1,
   video: "retain-on-failure",
 } satisfies E2EConfig;

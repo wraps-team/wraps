@@ -48,3 +48,16 @@ gh run list --workflow=test.yml --limit 5 --json headBranch,startedAt,conclusion
 
 On 2026-09-09 four runs started within 135 seconds and all four failed; the next run, with
 the database to itself, passed on unchanged code.
+
+## `e2e.yml` replays committed recordings
+
+The E2E workflow runs `apps/e2e` against a `next dev` it starts on the runner, on the
+same Neon branch as `test-web` (`TEST_DATABASE_URL`). Each run inserts one throwaway
+owner and org (`@e2e.wraps.test`), so it can't delete a fixture `test-web` reads.
+
+Agent steps replay from `apps/e2e/.e2e/cache`, which is committed. CI only reads it.
+A step whose recording no longer matches the UI falls back to the live agent, so the
+run still passes but every run pays for model calls (`AI_GATEWAY_API_KEY` secret)
+until someone records it again: run `pnpm test:e2e` locally and commit the changed
+`.e2e/cache` files with the UI change. A recording stores paths, so anything that
+differs per run, like the workspace slug, goes into the step as `unique(value)`.

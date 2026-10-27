@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "trace-1",
+  "createdAt": "2026-10-26T22:23:26.496Z",
+  "payload": {
+    "actions": [
+      {
+        "name": "tap",
+        "summary": "tap button \"Continue with Free\"",
+        "target": {
+          "role": "button",
+          "name": "Continue with Free"
+        }
+      },
+      {
+        "name": "tap",
+        "summary": "tap button \"Skip — I'll do this later\"",
+        "target": {
+          "role": "button",
+          "name": "Skip — I'll do this later"
+        }
+      },
+      {
+        "name": "tap",
+        "summary": "tap button \"Explore Wraps!\"",
+        "target": {
+          "role": "button",
+          "name": "Explore Wraps!"
+        }
+      }
+    ],
+    "executor": {
+      "name": "e2e-default-agent",
+      "version": "2"
+    },
+    "recordedFor": {
+      "testId": "setup::tests/owner.setup.e2e.ts::sign%20up%20an%20owner%20and%20finish%20onboarding",
+      "targetId": "chromium",
+      "instructionDigest": "5d728735aa146f5627d602e77ff130ed09e7b20f98c9e731cead39313b0c4420",
+      "paramsDigest": "2997de528b02418f42e800c42b09f4472648eeb1c058f4c50b40a065e1b33deb",
+      "callIndex": 0,
+      "agent": "default"
+    },
+    "recordedBy": {
+      "provider": "gateway",
+      "model": "anthropic/claude-sonnet-5.5"
+    },
+    "summary": "Chose Free (\"Continue with Free\"), skipped the team invite, and chose \"Explore Wraps!\" without connecting AWS. The dashboard opened at /e2e-mvptoww7 with the heading \"Welcome to E2E Workspace\".",
+    "startPath": "/{{param:/workspace}}/onboarding?interval=monthly",
+    "endPath": "/{{param:/workspace}}",
+    "endAnchors": [
+      {
+        "role": "status",
+        "name": "Connect your AWS account to start sending emails. Get Started Dismiss banner"
+      },
+      {
+        "text": "EW"
+      },
+      {
+        "text": "E2E Workspace"
+      },
+      {
+        "text": "owner"
+      },
+      {
+        "text": "Overview"
+      },
+      {
+        "text": "Audience"
+      },
+      {
+        "text": "Email"
+      },
+      {
+        "text": "SMS"
+      }
+    ],
+    "goneAnchors": [
+      {
+        "text": "Step 1 of 5, Choose Plan, current"
+      },
+      {
+        "text": "Choose Plan"
+      },
+      {
+        "text": "Step 2 of 5, Invite Team"
+      },
+      {
+        "text": "Invite Team"
+      },
+      {
+        "text": "Step 3 of 5, Choose Path"
+      },
+      {
+        "text": "Choose Path"
+      },
+      {
+        "text": "Step 4 of 5, Deploy & Connect"
+      },
+      {
+        "text": "Deploy & Connect"
+      }
+    ],
+    "endWaitMs": 15776,
+    "keyedBy": {
+      "cacheSchema": "trace-1",
+      "policyVersion": "conservative/6",
+      "project": "6270d378e32b1181044da35433df046bd2ea7bbc8b700e3a614fe441981c5456",
+      "platform": "web",
+      "engineName": "web",
+      "engineSpiVersion": 1,
+      "appIdentity": "f9f49ed79c2662c7f6e0522da33af26cd0588919fce8b674530ba7c83e5d217c",
+      "agentContextDigest": "d436824420520e934fb52613db21890f6152750d6c044528fbf9cb9ed5b0ab6d"
+    }
+  }
+}
