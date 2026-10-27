@@ -102,7 +102,7 @@ export default async function SendPage({
             <EmptyTitle>Broadcasts</EmptyTitle>
             <EmptyDescription>
               {canManage
-                ? "Send targeted email campaigns to your contacts. Pick a template, choose an audience, and send — all at AWS pricing."
+                ? "Send targeted broadcasts to your contacts. Pick a template, choose an audience, and send — all at AWS pricing."
                 : "No broadcasts yet. Ask an owner or admin to create one."}
             </EmptyDescription>
           </EmptyHeader>

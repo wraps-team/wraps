@@ -28,7 +28,11 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { trackWorkflowCreated } from "@/lib/activation-tracking";
 import { createActionLogger } from "@/lib/logger";
-import { checkFeatureAccess, checkWorkflowLimit } from "@/lib/plan-limits";
+import {
+  checkFeatureAccess,
+  checkWorkflowLimit,
+  checkWorkflowTriggerAccess,
+} from "@/lib/plan-limits";
 import { orgAction } from "../shared/org-action";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -566,6 +570,23 @@ export const updateWorkflow = orgAction(
       return { success: false, error: "Workflow not found" };
     }
 
+    // Setting or changing a segment trigger needs segmentation. Other edits to
+    // a workflow that already has one (a rename, the steps) stay allowed.
+    if (data.triggerType !== undefined || data.triggerConfig !== undefined) {
+      const triggerCheck = await checkWorkflowTriggerAccess(
+        organizationId,
+        data.triggerType ?? existing.triggerType
+      );
+      if (!triggerCheck.allowed) {
+        return {
+          success: false,
+          error:
+            triggerCheck.message ??
+            "This trigger is not available on your plan.",
+        };
+      }
+    }
+
     // Validate steps/transitions if provided
     if (data.steps !== undefined || data.transitions !== undefined) {
       const steps = data.steps ?? (existing.steps as WorkflowStep[]);
@@ -904,6 +925,18 @@ export const enableWorkflow = orgAction(
       return { success: false, error: "Workflow not found" };
     }
 
+    const triggerCheck = await checkWorkflowTriggerAccess(
+      organizationId,
+      existing.triggerType
+    );
+    if (!triggerCheck.allowed) {
+      return {
+        success: false,
+        error:
+          triggerCheck.message ?? "This trigger is not available on your plan.",
+      };
+    }
+
     // Require AWS account to be configured
     if (!existing.awsAccountId) {
       return {
@@ -1226,6 +1259,18 @@ export const duplicateWorkflow = orgAction(
 
     if (!original) {
       return { success: false, error: "Workflow not found" };
+    }
+
+    const triggerCheck = await checkWorkflowTriggerAccess(
+      organizationId,
+      original.triggerType
+    );
+    if (!triggerCheck.allowed) {
+      return {
+        success: false,
+        error:
+          triggerCheck.message ?? "This trigger is not available on your plan.",
+      };
     }
 
     // Generate new IDs for steps and update transitions

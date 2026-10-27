@@ -24,6 +24,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { checkWorkflowTriggerAccess } from "@/lib/plan-limits";
 import {
   createWorkflow,
   deleteWorkflow,
@@ -197,6 +198,7 @@ vi.mock("@wraps/auth", () => ({
 // Mock plan-limits to allow workflows feature and workflow creation
 vi.mock("@/lib/plan-limits", () => ({
   checkFeatureAccess: vi.fn(async () => ({ allowed: true })),
+  checkWorkflowTriggerAccess: vi.fn(async () => ({ allowed: true })),
   checkWorkflowLimit: vi.fn(async () => ({
     allowed: true,
     current: 0,
@@ -2265,5 +2267,113 @@ describe("Workflows Server Actions", () => {
         expect(result.error).toBe("Workflow not found");
       }
     });
+  });
+});
+
+describe("Workflow segment triggers need segmentation", () => {
+  const denied = {
+    allowed: false,
+    requiredPlan: "pro" as const,
+    message: "Segment entry and exit triggers require the Pro plan.",
+  };
+
+  async function makeWorkflow(triggerType: "event" | "segment_entry") {
+    const created = await createWorkflow(testOrganization.id, {
+      name: `Segment gate ${crypto.randomUUID().slice(0, 6)}`,
+    });
+    if (!created.success) {
+      throw new Error("fixture workflow was not created");
+    }
+    await db
+      .update(workflow)
+      .set({
+        triggerType,
+        triggerConfig:
+          triggerType === "segment_entry" ? { segmentId: "seg-1" } : {},
+      })
+      .where(eq(workflow.id, created.workflow.id));
+    return created.workflow.id;
+  }
+
+  async function triggerOf(id: string) {
+    const row = await db.query.workflow.findFirst({
+      where: eq(workflow.id, id),
+    });
+    return row?.triggerType;
+  }
+
+  beforeEach(() => {
+    vi.mocked(checkWorkflowTriggerAccess).mockClear();
+  });
+
+  it("updateWorkflow refuses switching to a segment trigger, and leaves the trigger alone", async () => {
+    const id = await makeWorkflow("event");
+    vi.mocked(checkWorkflowTriggerAccess).mockResolvedValueOnce(denied);
+
+    const result = await updateWorkflow(id, testOrganization.id, {
+      triggerType: "segment_entry",
+      triggerConfig: { segmentId: "seg-1" },
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/pro/i);
+    }
+    expect(checkWorkflowTriggerAccess).toHaveBeenCalledWith(
+      testOrganization.id,
+      "segment_entry"
+    );
+    expect(await triggerOf(id)).toBe("event");
+  });
+
+  it("updateWorkflow does not check the trigger when only the name changes", async () => {
+    const id = await makeWorkflow("segment_entry");
+
+    const result = await updateWorkflow(id, testOrganization.id, {
+      name: "Renamed",
+    });
+
+    expect(result.success).toBe(true);
+    expect(checkWorkflowTriggerAccess).not.toHaveBeenCalled();
+  });
+
+  it("enableWorkflow refuses a segment-triggered workflow, and it stays off", async () => {
+    const id = await makeWorkflow("segment_entry");
+    vi.mocked(checkWorkflowTriggerAccess).mockResolvedValueOnce(denied);
+
+    const result = await enableWorkflow(id, testOrganization.id);
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/pro/i);
+    }
+    expect(checkWorkflowTriggerAccess).toHaveBeenCalledWith(
+      testOrganization.id,
+      "segment_entry"
+    );
+    const row = await db.query.workflow.findFirst({
+      where: eq(workflow.id, id),
+    });
+    expect(row?.status).not.toBe("enabled");
+  });
+
+  it("duplicateWorkflow refuses to copy a segment-triggered workflow", async () => {
+    const id = await makeWorkflow("segment_entry");
+    vi.mocked(checkWorkflowTriggerAccess).mockResolvedValueOnce(denied);
+
+    const result = await duplicateWorkflow(id, testOrganization.id);
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/pro/i);
+    }
+  });
+
+  it("a non-segment workflow is never held back by the trigger check", async () => {
+    const id = await makeWorkflow("event");
+
+    const result = await duplicateWorkflow(id, testOrganization.id);
+
+    expect(result.success).toBe(true);
   });
 });

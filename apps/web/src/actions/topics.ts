@@ -204,7 +204,7 @@ export const createTopic = orgAction(
     organizationId: string,
     data: CreateTopicData
   ): Promise<CreateTopicResult> => {
-    // Check if topics feature is available for this plan (Starter+)
+    // Check if topics feature is available for this plan (Pro+)
     const featureCheck = await checkFeatureAccess(organizationId, "topics");
     if (!featureCheck.allowed) {
       return {

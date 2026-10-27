@@ -22,7 +22,7 @@ import {
   promoteBroadcast,
 } from "@wraps/db";
 import { t } from "elysia";
-
+import { checkBroadcastEntitlements } from "../lib/plan-features";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import { planGateMiddleware } from "../middleware/plan-gate";
 import { rateLimitMiddleware } from "../middleware/rate-limit";
@@ -243,6 +243,17 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
         throw new Error(schedule.error);
       }
       const { scheduledFor, isScheduled } = schedule;
+
+      // The route gate only proves the plan can broadcast at all. Topic and
+      // segment audiences and scheduled sends are separate entitlements.
+      const entitlement = checkBroadcastEntitlements(authContext.planId, {
+        audienceType: body.audienceType,
+        scheduled: isScheduled,
+      });
+      if (!entitlement.ok) {
+        set.status = 403;
+        throw new Error(entitlement.message);
+      }
 
       const batch = await createBroadcast({
         organizationId: authContext.organizationId,
@@ -687,6 +698,20 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
         throw new Error(schedule.error);
       }
       const { scheduledFor, isScheduled } = schedule;
+
+      // Same entitlements as create, on the audience the draft will be sent to.
+      const entitlement = checkBroadcastEntitlements(authContext.planId, {
+        audienceType: (body.audienceType ?? existing.audienceType) as
+          | "all"
+          | "topic"
+          | "segment"
+          | undefined,
+        scheduled: isScheduled,
+      });
+      if (!entitlement.ok) {
+        set.status = 403;
+        throw new Error(entitlement.message);
+      }
 
       const channel = body.channel ?? existing.channel ?? "email";
 

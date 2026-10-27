@@ -80,8 +80,9 @@ export function DashboardBroadcastsSection() {
           {/* Content */}
           <div className="space-y-8">
             <p className="text-lg text-muted-foreground">
-              Send newsletters, announcements, and marketing campaigns.
-              Segments, topics, and scheduling included in Pro.
+              Send newsletters, announcements, and marketing campaigns. Free
+              sends to all contacts; segments, topics, and scheduling are on
+              Pro.
             </p>
 
             {/* Features as list */}
@@ -116,7 +117,7 @@ export function DashboardBroadcastsSection() {
                   Pro ($29/mo):
                 </span>{" "}
                 <span className="text-muted-foreground">
-                  Broadcasts, segments, scheduling, and topics
+                  Segments, topics, and scheduling
                 </span>
               </p>
               <p className="mt-1 text-sm">

@@ -14,6 +14,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeMockContext } from "./__helpers__/lambda-context";
 
+// Every command the SES client is asked to send, so a test can assert on the
+// real payload (headers and template data) a recipient would get.
+const { sesCommands } = vi.hoisted(() => ({
+  sesCommands: [] as Array<Record<string, unknown>>,
+}));
+
 const generateUnsubscribeTokenMock = vi.fn(
   async (
     _contactId: string,
@@ -31,7 +37,8 @@ vi.mock("@aws-sdk/client-sesv2", () => {
   }
   return {
     SESv2Client: class {
-      send() {
+      send(command: Record<string, unknown>) {
+        sesCommands.push(command);
         return Promise.resolve({
           SendQuota: { MaxSendRate: 14 },
           BulkEmailEntryResults: [
@@ -228,7 +235,10 @@ function makeSQSEvent() {
   };
 }
 
-function setupSelects(batch: Record<string, unknown>) {
+function setupSelects(
+  batch: Record<string, unknown>,
+  emailType: "marketing" | "transactional" = "marketing"
+) {
   const contacts = makeContacts();
   mockClaimReturning = contacts.map((c) => ({ contactId: c.id }));
 
@@ -237,7 +247,7 @@ function setupSelects(batch: Record<string, unknown>) {
     {
       sesTemplateName: "wraps-tmpl-1",
       compiledHtml: "<p>Hi</p>",
-      emailType: "marketing",
+      emailType,
     },
   ];
   const org = [{ name: "Test Org" }];
@@ -288,6 +298,7 @@ describe("Batch sender unsubscribe token scope", () => {
     vi.clearAllMocks();
     generateUnsubscribeTokenMock.mockClear();
     selectCallIndex = 0;
+    sesCommands.length = 0;
     selectResults = [];
     mockClaimReturning = [];
     countBroadcastRecipientsMock.mockClear();
@@ -330,6 +341,92 @@ describe("Batch sender unsubscribe token scope", () => {
     expect(generateUnsubscribeTokenMock).toHaveBeenCalled();
     for (const call of generateUnsubscribeTokenMock.mock.calls) {
       expect(call[2]).toBeUndefined();
+    }
+  });
+});
+
+type BulkEntry = {
+  Destination: { ToAddresses: string[] };
+  ReplacementHeaders?: Array<{ Name: string; Value: string }>;
+  ReplacementEmailContent?: {
+    ReplacementTemplate?: { ReplacementTemplateData?: string };
+  };
+};
+
+function sentEntries(): BulkEntry[] {
+  return sesCommands.flatMap(
+    (c) => (c.BulkEmailEntries as BulkEntry[] | undefined) ?? []
+  );
+}
+
+describe("every broadcast carries an unsubscribe", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    generateUnsubscribeTokenMock.mockClear();
+    selectCallIndex = 0;
+    sesCommands.length = 0;
+    selectResults = [];
+    mockClaimReturning = [];
+    countBroadcastRecipientsMock.mockClear();
+    countBroadcastRecipientsMock.mockResolvedValue(2);
+  });
+
+  function expectOneClickUnsubscribe(entry: BulkEntry) {
+    const headers = entry.ReplacementHeaders ?? [];
+    const listUnsubscribe = headers.find((h) => h.Name === "List-Unsubscribe");
+    const post = headers.find((h) => h.Name === "List-Unsubscribe-Post");
+
+    expect(listUnsubscribe?.Value).toBe(
+      "<https://api.test.local/unsubscribe/mock-token>"
+    );
+    expect(post?.Value).toBe("List-Unsubscribe=One-Click");
+
+    const data = JSON.parse(
+      entry.ReplacementEmailContent?.ReplacementTemplate
+        ?.ReplacementTemplateData ?? "{}"
+    );
+    expect(data.unsubscribeUrl).toBe(
+      "https://api.test.local/unsubscribe/mock-token"
+    );
+    expect(String(data.preferencesUrl)).toContain("/preferences/mock-token");
+  }
+
+  it("an all-contacts broadcast gives every recipient a one-click unsubscribe and link variables", async () => {
+    setupSelects(makeBatch({ audienceType: "all", topicId: null }));
+
+    await handler(makeSQSEvent(), makeMockContext(), vi.fn());
+
+    const entries = sentEntries();
+    expect(entries).toHaveLength(2);
+    for (const entry of entries) {
+      expectOneClickUnsubscribe(entry);
+    }
+  });
+
+  it("the token is global for an all-contacts broadcast, so it removes the contact from everything", async () => {
+    setupSelects(makeBatch({ audienceType: "all", topicId: null }));
+
+    await handler(makeSQSEvent(), makeMockContext(), vi.fn());
+
+    expect(generateUnsubscribeTokenMock).toHaveBeenCalledTimes(2);
+    for (const call of generateUnsubscribeTokenMock.mock.calls) {
+      expect(call[1]).toBe("org-1");
+      expect(call[2]).toBeUndefined();
+    }
+  });
+
+  it("a template typed transactional still gets an unsubscribe when it is broadcast", async () => {
+    setupSelects(
+      makeBatch({ audienceType: "all", topicId: null }),
+      "transactional"
+    );
+
+    await handler(makeSQSEvent(), makeMockContext(), vi.fn());
+
+    const entries = sentEntries();
+    expect(entries).toHaveLength(2);
+    for (const entry of entries) {
+      expectOneClickUnsubscribe(entry);
     }
   });
 });

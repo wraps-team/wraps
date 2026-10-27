@@ -540,7 +540,7 @@ describe("Plan Limits", () => {
         updatedAt: new Date(),
       });
 
-      const result = await checkFeatureAccess(testOrgId, "advancedSegments");
+      const result = await checkFeatureAccess(testOrgId, "sso");
 
       expect(result.allowed).toBe(false);
       expect(result.requiredPlan).toBe("business");

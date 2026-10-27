@@ -50,7 +50,7 @@ export default function DocsPage() {
         <ul>
           <li>Email SDK - Send email, manage templates, track events</li>
           <li>SMS SDK - Send SMS, manage opt-outs, verify numbers</li>
-          <li>Platform SDK - Contacts, batches, workflows, segments</li>
+          <li>Platform SDK - Contacts, broadcasts, workflows, segments</li>
         </ul>
         <h3>Deploy</h3>
         <ul>

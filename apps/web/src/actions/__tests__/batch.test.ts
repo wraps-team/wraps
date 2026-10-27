@@ -23,7 +23,7 @@ import {
 } from "vitest";
 import { exportAllBroadcasts } from "@/actions/export";
 import { publishTemplateToSES } from "@/actions/templates";
-import { checkFeatureAccess } from "@/lib/plan-limits";
+import { checkBroadcastAccess } from "@/lib/plan-limits";
 import {
   deleteDraftBatchSend,
   duplicateBatchSend,
@@ -196,6 +196,7 @@ vi.mock("@wraps/auth", () => ({
 // plan-limits: default to allow. Individual tests override via mocked import.
 vi.mock("@/lib/plan-limits", () => ({
   checkFeatureAccess: vi.fn(async () => ({ allowed: true })),
+  checkBroadcastAccess: vi.fn(async () => ({ allowed: true })),
 }));
 
 // listBroadcastRecipients / listBroadcasts: passthrough to the real (real-DB)
@@ -443,8 +444,8 @@ describe("saveDraftBatchSend", () => {
     expect(rowsAfter[0]?.count ?? 0).toBe(0);
   });
 
-  it("rejects when checkFeatureAccess('batch') denies", async () => {
-    vi.mocked(checkFeatureAccess).mockResolvedValueOnce({
+  it("rejects when checkBroadcastAccess denies", async () => {
+    vi.mocked(checkBroadcastAccess).mockResolvedValueOnce({
       allowed: false,
       requiredPlan: "starter",
       message: "Upgrade to send broadcasts",

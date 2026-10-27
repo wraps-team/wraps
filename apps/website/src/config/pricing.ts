@@ -176,6 +176,7 @@ export const PRICING_TIERS: PricingTier[] = [
     limits: TIER_LIMITS.free,
     features: [
       "Unlimited sends, domains & contacts",
+      "Broadcasts to all contacts",
       "Unlimited team members",
       "5,000 custom events/mo",
       "1 AWS account",
@@ -201,7 +202,7 @@ export const PRICING_TIERS: PricingTier[] = [
       "Everything in Free",
       "Unlimited workflows",
       "Unlimited custom events",
-      "Topics, segments, batch & campaigns",
+      "Broadcasts to topics & segments, scheduling",
       "250 AI generations/mo",
       "90-day history",
     ],
@@ -422,8 +423,8 @@ export const FEATURE_COMPARISON: FeatureComparison[] = [
     business: "Unlimited",
   },
   {
-    name: "Batch sending",
-    free: false,
+    name: "Broadcasts to all contacts",
+    free: true,
     pro: true,
     business: true,
   },
@@ -440,7 +441,7 @@ export const FEATURE_COMPARISON: FeatureComparison[] = [
     business: true,
   },
   {
-    name: "Campaigns",
+    name: "Scheduled broadcasts",
     free: false,
     pro: true,
     business: true,
@@ -456,12 +457,6 @@ export const FEATURE_COMPARISON: FeatureComparison[] = [
     free: "5,000/mo",
     pro: "Unlimited",
     business: "Unlimited",
-  },
-  {
-    name: "Behavioral segments",
-    free: false,
-    pro: false,
-    business: true,
   },
   {
     name: "SSO + SCIM",
@@ -520,5 +515,5 @@ export const PRICING_COPY = {
     "No credit card. No time limit. Your AWS account, your data.",
   paidTiersHeadline: "Outgrowing the free tier?",
   paidTiersSubline:
-    "Event tracking, segments, broadcasts, unlimited workflows, and team access — starting at $29/mo.",
+    "Topics, segments, scheduled broadcasts, event tracking, unlimited workflows, and team access — starting at $29/mo.",
 } as const;
