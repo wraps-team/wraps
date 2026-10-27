@@ -2588,10 +2588,10 @@ describe("apps/api plan allowances match apps/web", () => {
   // happened, the feature could be gated on a tier the table never mentioned
   // at all.
   const COMPARISON_FEATURE_ROWS: Readonly<Record<string, string>> = {
-    "Batch sending": "batch",
+    "Broadcasts to all contacts": "batch",
     "Topics & preferences": "topics",
     "Segments & targeting": "segments",
-    Campaigns: "campaigns",
+    "Scheduled broadcasts": "campaigns",
     "Behavioral segments": "advancedSegments",
     "SSO + SCIM": "sso",
     "Audit log": "auditLog",

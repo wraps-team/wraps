@@ -1373,7 +1373,6 @@ async function processJob(
   let sesTemplateName: string | undefined;
   let templateHtml: string | undefined;
   let orgName: string | undefined;
-  let emailType: "marketing" | "transactional" = "marketing";
 
   if (batch.emailTemplateId) {
     const [[tmpl], [org]] = await Promise.all([
@@ -1381,7 +1380,6 @@ async function processJob(
         .select({
           sesTemplateName: template.sesTemplateName,
           compiledHtml: template.compiledHtml,
-          emailType: template.emailType,
         })
         .from(template)
         .where(
@@ -1399,7 +1397,6 @@ async function processJob(
     ]);
     sesTemplateName = tmpl?.sesTemplateName ?? undefined;
     templateHtml = tmpl?.compiledHtml ?? undefined;
-    emailType = tmpl?.emailType ?? "marketing";
     orgName = org?.name ?? undefined;
   }
 
@@ -1503,7 +1500,11 @@ async function processJob(
   }
 
   const chunkProcessedRecipients = emailContacts.length;
-  const isMarketing = emailType === "marketing";
+  // Every broadcast is bulk mail to a contact list, so every recipient gets a
+  // one-click unsubscribe and the link variables, whatever the template's
+  // emailType says. That typing is for one-to-one sends; honouring it here let
+  // a broadcast to all contacts go out with no way to opt out.
+  const isMarketing = true;
 
   // Resolve sender: batch.from > org default > owner email domain > fail
   let fromAddress: string | null = batch.from;

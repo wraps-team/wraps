@@ -196,12 +196,13 @@ describe("mapBatchToCampaignData", () => {
 });
 
 describe("requiredPlanName", () => {
-  it.each(["topics", "segments", "campaigns"] as const)(
-    "%s unlocks on a current public plan",
-    (feature) => {
-      expect(requiredPlanName(feature)).toBe("Pro");
-    }
-  );
+  it.each([
+    ["topics", "Pro"],
+    ["campaigns", "Pro"],
+    ["segments", "Business"],
+  ] as const)("%s unlocks on %s", (feature, plan) => {
+    expect(requiredPlanName(feature)).toBe(plan);
+  });
 });
 
 describe("batch-form lock labels", () => {

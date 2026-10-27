@@ -8,7 +8,10 @@
 
 import { Elysia } from "elysia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { checkBroadcastEntitlements } from "../lib/plan-features";
+import {
+  checkBroadcastEntitlements,
+  checkWorkflowTriggerEntitlements,
+} from "../lib/plan-features";
 import type { AuthContext } from "../middleware/auth";
 import { FEATURE_PLANS, planGateMiddleware } from "../middleware/plan-gate";
 
@@ -216,5 +219,66 @@ describe("planGateMiddleware (real middleware, no DB)", () => {
 
   it("every plan passes the free-tier workflows gate", async () => {
     expect(await gateStatus("workflows", null)).toBe(200);
+  });
+});
+
+describe("checkWorkflowTriggerEntitlements", () => {
+  beforeEach(() => vi.stubEnv("WRAPS_LICENSE_KEY", ""));
+  afterEach(() => vi.unstubAllEnvs());
+
+  const ok = (plan: string | null, triggers: string[]) =>
+    checkWorkflowTriggerEntitlements(plan, triggers).ok;
+
+  it("lets every plan use non-segment triggers", () => {
+    for (const plan of [
+      "free",
+      "pro",
+      "business",
+      "starter",
+      "growth",
+      "scale",
+    ]) {
+      expect(
+        ok(plan, [
+          "event",
+          "api",
+          "schedule",
+          "contact_created",
+          "topic_subscribed",
+        ])
+      ).toBe(true);
+    }
+    expect(ok(null, ["event"])).toBe(true);
+  });
+
+  it("requires Business for segment_entry and segment_exit", () => {
+    for (const trigger of ["segment_entry", "segment_exit"]) {
+      expect(ok("free", [trigger])).toBe(false);
+      expect(ok("pro", [trigger])).toBe(false);
+      expect(ok("starter", [trigger])).toBe(false);
+      expect(ok("business", [trigger])).toBe(true);
+      expect(ok("growth", [trigger])).toBe(true);
+      expect(ok("scale", [trigger])).toBe(true);
+    }
+  });
+
+  it("refuses a batch when any workflow in it needs a higher plan", () => {
+    expect(ok("pro", ["event", "segment_entry"])).toBe(false);
+    expect(ok("business", ["event", "segment_entry"])).toBe(true);
+  });
+
+  it("denies unknown or missing plans", () => {
+    expect(ok(null, ["segment_entry"])).toBe(false);
+    expect(ok("constructor", ["segment_exit"])).toBe(false);
+  });
+
+  it("says which plan unlocks it", () => {
+    const r = checkWorkflowTriggerEntitlements("pro", ["segment_entry"]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.requiredPlan).toBe("business");
+      expect(r.message).toMatch(/segment/i);
+      expect(r.message).toMatch(/business/i);
+    }
   });
 });

@@ -30,6 +30,7 @@ import {
   PLANS,
   type PlanFeature,
   type PlanId,
+  workflowTriggerFeature,
 } from "../plans";
 
 // Duplicate of apps/api/src/(ee)/lib/license.ts — intentional to avoid
@@ -299,6 +300,32 @@ export async function checkFeatureAccess(
     message: allowed
       ? undefined
       : `${featureNames[feature]} requires a ${requiredPlan ? PLANS[requiredPlan].name : "higher"} plan.`,
+  };
+}
+
+/**
+ * Check a workflow trigger against an organization's plan. Segment entry and
+ * exit triggers need segmentation (Business and up); every other trigger is
+ * open to every plan.
+ */
+export async function checkWorkflowTriggerAccess(
+  organizationId: string,
+  triggerType: string | null | undefined
+): Promise<FeatureCheckResult> {
+  const feature = workflowTriggerFeature(triggerType);
+  if (!feature) {
+    return { allowed: true, requiredPlan: null };
+  }
+  const result = await checkFeatureAccess(organizationId, feature);
+  if (result.allowed) {
+    return result;
+  }
+  const planName = result.requiredPlan
+    ? PLANS[result.requiredPlan].name
+    : "a higher";
+  return {
+    ...result,
+    message: `Segment entry and exit triggers require the ${planName} plan.`,
   };
 }
 

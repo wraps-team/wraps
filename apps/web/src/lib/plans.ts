@@ -222,7 +222,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       "Everything in Free",
       "Unlimited workflows",
       "Unlimited custom events",
-      "Topics & scheduled broadcasts",
+      "Broadcasts to topics, scheduled sends",
       "250 AI generations",
       "90-day history",
     ],
@@ -278,7 +278,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     // Display
     featureList: [
       "Everything in Pro",
-      "Segmentation",
+      "Broadcasts to segments",
       "Unlimited AWS accounts",
       "1,000 AI generations",
       "1-year history",
@@ -350,7 +350,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     featureList: [
       "Unlimited sends, domains & contacts",
       "Unlimited workflows",
-      "Topics & scheduled broadcasts",
+      "Broadcasts to topics, scheduled sends",
       "3 AWS accounts",
       "250 AI generations",
       "90-day history",
@@ -766,6 +766,25 @@ export function getFeatureGateMessage(
 
   const requiredPlanConfig = PLANS[requiredPlan];
   return `${featureDisplayName} requires a ${requiredPlanConfig.name} plan ($${requiredPlanConfig.price}/mo).`;
+}
+
+/** Workflow triggers that fire off segment membership. */
+const SEGMENT_TRIGGER_TYPES: readonly string[] = [
+  "segment_entry",
+  "segment_exit",
+];
+
+/**
+ * The plan feature a workflow trigger needs, or null when it is open to every
+ * plan. Keep in step with checkWorkflowTriggerEntitlements in
+ * apps/api/src/lib/plan-features.ts.
+ */
+export function workflowTriggerFeature(
+  triggerType: string | null | undefined
+): PlanFeature | null {
+  return triggerType && SEGMENT_TRIGGER_TYPES.includes(triggerType)
+    ? "segments"
+    : null;
 }
 
 export type BroadcastAudience = "all" | "topic" | "segment";

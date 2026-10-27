@@ -25,6 +25,7 @@ import { asc, inArray, sql } from "drizzle-orm";
 import { t } from "elysia";
 import { trackFirstResourceCreated } from "../../lib/activation-tracking";
 import { log } from "../../lib/logger";
+import { checkWorkflowTriggerEntitlements } from "../../lib/plan-features";
 import type { AuthContext } from "../../middleware/auth";
 import { createAuthenticatedRoutes, getAuth } from "../../middleware/auth";
 import { checkWorkflowPushLimit } from "../lib/workflow-limit";
@@ -57,6 +58,16 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
       if (!limitCheck.allowed) {
         ctx.set.status = 403;
         return { error: "workflow_limit", message: limitCheck.message };
+      }
+
+      // Segment entry/exit triggers need the segments feature (Business and up).
+      const triggerCheck = checkWorkflowTriggerEntitlements(
+        authContext.planId,
+        [body.triggerType]
+      );
+      if (!triggerCheck.ok) {
+        ctx.set.status = 403;
+        return { error: "plan_required", message: triggerCheck.message };
       }
 
       // Resolve template slugs to IDs
@@ -200,6 +211,16 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
       if (!limitCheck.allowed) {
         ctx.set.status = 403;
         return { error: "workflow_limit", message: limitCheck.message };
+      }
+
+      // Segment entry/exit triggers need the segments feature (Business and up).
+      const triggerCheck = checkWorkflowTriggerEntitlements(
+        authContext.planId,
+        body.workflows.map((w) => w.triggerType)
+      );
+      if (!triggerCheck.ok) {
+        ctx.set.status = 403;
+        return { error: "plan_required", message: triggerCheck.message };
       }
 
       const written = await db.transaction(async (tx) => {

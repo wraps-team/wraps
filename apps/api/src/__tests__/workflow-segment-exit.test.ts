@@ -4,6 +4,11 @@ const mockDbSelect = vi.fn();
 const mockGetSegmentsByIds = vi.fn();
 const mockContactMatchesCondition = vi.fn();
 
+// The plan lookup is its own concern (see segment-trigger-entitlement-db.test.ts).
+vi.mock("../lib/org-features", () => ({
+  orgHasFeature: vi.fn(async () => true),
+}));
+
 vi.mock("../services/workflow-queue", () => ({
   enqueueWorkflowStep: vi.fn(),
   deleteScheduledStep: vi.fn(),

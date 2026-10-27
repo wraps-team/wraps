@@ -17,6 +17,7 @@ import {
 import { and, inArray, sql } from "drizzle-orm";
 
 import { log } from "../lib/logger";
+import { orgHasFeature } from "../lib/org-features";
 import {
   deleteScheduledStep,
   enqueueWorkflowStepBatch,
@@ -365,6 +366,13 @@ export async function getSegmentMembership(params: {
       )
     );
 
+  if (
+    segmentWorkflows.length === 0 ||
+    !(await orgHasFeature(params.organizationId, "segments"))
+  ) {
+    return [];
+  }
+
   const segmentIds = [
     ...new Set(
       segmentWorkflows
@@ -429,6 +437,16 @@ export async function checkSegmentEntry(params: {
     );
 
   if (segmentWorkflows.length === 0) {
+    return { workflowsTriggered: 0 };
+  }
+
+  // Segment triggers need the segments feature (Business and up). An org that
+  // no longer has it keeps its workflows but they stop firing on membership.
+  if (!(await orgHasFeature(params.organizationId, "segments"))) {
+    log.warn("Skipping segment trigger: plan does not include segments", {
+      organizationId: params.organizationId,
+      workflows: segmentWorkflows.length,
+    });
     return { workflowsTriggered: 0 };
   }
 
@@ -546,6 +564,16 @@ export async function checkSegmentExit(params: {
     );
 
   if (segmentWorkflows.length === 0) {
+    return { workflowsTriggered: 0 };
+  }
+
+  // Segment triggers need the segments feature (Business and up). An org that
+  // no longer has it keeps its workflows but they stop firing on membership.
+  if (!(await orgHasFeature(params.organizationId, "segments"))) {
+    log.warn("Skipping segment trigger: plan does not include segments", {
+      organizationId: params.organizationId,
+      workflows: segmentWorkflows.length,
+    });
     return { workflowsTriggered: 0 };
   }
 

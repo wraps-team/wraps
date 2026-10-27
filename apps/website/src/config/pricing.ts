@@ -202,7 +202,7 @@ export const PRICING_TIERS: PricingTier[] = [
       "Everything in Free",
       "Unlimited workflows",
       "Unlimited custom events",
-      "Topics & scheduled broadcasts",
+      "Broadcasts to topics, scheduled sends",
       "250 AI generations/mo",
       "90-day history",
     ],
@@ -220,7 +220,7 @@ export const PRICING_TIERS: PricingTier[] = [
     limits: TIER_LIMITS.business,
     features: [
       "Everything in Pro",
-      "Segmentation",
+      "Broadcasts to segments",
       "Unlimited AWS accounts",
       "1,000 AI generations/mo",
       "1-year history",

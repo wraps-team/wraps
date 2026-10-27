@@ -27,6 +27,11 @@ const enqueuedSteps: Array<{
 const batchEnqueueCalls: Array<Array<(typeof enqueuedSteps)[0]>> = [];
 
 // Mock enqueueWorkflowStep and enqueueWorkflowStepBatch
+// The plan lookup is its own concern (see segment-trigger-entitlement-db.test.ts).
+vi.mock("../../lib/org-features", () => ({
+  orgHasFeature: vi.fn(async () => true),
+}));
+
 vi.mock("../workflow-queue", () => ({
   enqueueWorkflowStep: vi.fn().mockImplementation((step) => {
     enqueuedSteps.push(step);
