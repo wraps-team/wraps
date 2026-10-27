@@ -8,15 +8,22 @@ type CopyCommandProps = {
   command: string;
   /** Where on the page this sits, for the click event. */
   location: string;
+  /** Extra event properties, for example which design variant this sits in. */
+  properties?: Record<string, unknown>;
 };
 
-export function CopyCommand({ command, location }: CopyCommandProps) {
+export function CopyCommand({
+  command,
+  location,
+  properties,
+}: CopyCommandProps) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
     trackEvent("cta_click", {
       location,
       cta_text: `Copy command: ${command}`,
+      ...properties,
     });
     try {
       await navigator.clipboard.writeText(command);

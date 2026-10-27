@@ -130,7 +130,7 @@ function ComplaintMeter() {
   const g = geometry(COMPLAINT.value, COMPLAINT.review, COMPLAINT.pause);
 
   return (
-    <div>
+    <div className="hidden sm:block">
       <p className="text-muted-foreground text-sm">Complaint rate</p>
       <p className="mt-2 font-mono font-semibold text-4xl text-foreground tabular-nums tracking-tight sm:text-3xl lg:text-5xl">
         {COMPLAINT.value.toFixed(2)}%
@@ -156,7 +156,7 @@ function QuotaMeter() {
   const ratio = QUOTA.sent / QUOTA.max;
 
   return (
-    <div>
+    <div className="hidden sm:block">
       <p className="text-muted-foreground text-sm">24h quota</p>
       <p className="mt-2 whitespace-nowrap font-mono font-semibold text-4xl text-foreground tabular-nums tracking-tight sm:text-3xl lg:text-5xl">
         {QUOTA.sent.toLocaleString("en-US")}
@@ -237,7 +237,7 @@ export function HeroSurvivalPanel() {
         </div>
 
         {/* Deliverability audit */}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-border border-t px-6 py-4 font-mono text-muted-foreground text-xs md:px-8">
+        <div className="hidden flex-wrap items-center gap-x-6 gap-y-2 border-border border-t px-6 py-4 font-mono text-muted-foreground text-xs sm:flex md:px-8">
           <span className="text-foreground">Deliverability audit</span>
           {AUDIT.map((name) => (
             <span className="inline-flex items-center gap-1.5" key={name}>
