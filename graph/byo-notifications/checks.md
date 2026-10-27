@@ -10,3 +10,4 @@
 | N3 | processDeliveries cron wired in infra/cron.ts | pass (unsynthesized) | NotificationDeliveries CronV2 rate(1 minute) prod-only, WRAPS_EMAIL_ROLE_ARN + sts:AssumeRole; apps/api handler + cron-monitors tests 20 pass; typecheck 14/14. NOT verified: sst synth, esbuild bundling of the worker |
 | N4 | no direct inserts into `notification` remain (per D1) | unresolved | not run |
 | N5 | typecheck, lint, tests no worse than baseline | unresolved | not run |
+| N4a | @wraps/auth/notify drop-in, same signatures, production-safe secret | pass | notify.test 12 + notifications-secret 5 (+24 earlier) = 41 pass; typecheck 14/14; architecture 150/150 |

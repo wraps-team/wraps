@@ -7,7 +7,7 @@
  * Mirrors index.ts's database setup. Import as `@wraps/auth/notifications`.
  */
 
-import type { SweepResult } from "@byo-oss/notifications";
+import type { Notification, SweepResult } from "@byo-oss/notifications";
 import { db } from "@wraps/db";
 import * as schema from "@wraps/db/schema/auth";
 import { betterAuth } from "better-auth";
@@ -22,7 +22,10 @@ import { notificationsPlugins } from "./notifications-config";
  */
 export type NotificationsAuth = {
   api: {
-    notify: (ctx: { body: NotifyBody }) => Promise<unknown>;
+    notify: (ctx: { body: NotifyBody }) => Promise<{
+      count: number;
+      notifications: Notification[];
+    }>;
     processDeliveries: (ctx: {
       body?: { limit?: number };
     }) => Promise<SweepResult>;
@@ -41,6 +44,21 @@ type NotifyBody = {
   data?: Record<string, unknown>;
 };
 
+/**
+ * better-auth requires a secret, and refuses its built-in default when
+ * NODE_ENV=production (API Lambdas). This instance never signs, verifies or
+ * hashes anything: nothing mounts its request handler (only the server-only
+ * `notify` and `processDeliveries` are called), it handles no session or
+ * cookie, and it authenticates no one. So the placeholder below is acceptable
+ * and no secret has to be provisioned for the Lambdas. When BETTER_AUTH_SECRET
+ * is set it is used anyway.
+ *
+ * It is 32+ characters, so better-auth's length check passes, and it is not
+ * better-auth's DEFAULT_SECRET, so its production check passes too.
+ */
+export const NOTIFICATIONS_ONLY_PLACEHOLDER_SECRET =
+  "notifications-only-placeholder-not-a-secret-never-used-to-sign";
+
 export function createNotificationsAuth(): NotificationsAuth {
   const database: ReturnType<typeof drizzleAdapter> = drizzleAdapter(db, {
     provider: "pg",
@@ -50,7 +68,8 @@ export function createNotificationsAuth(): NotificationsAuth {
   });
   const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_URL,
-    secret: process.env.BETTER_AUTH_SECRET,
+    secret:
+      process.env.BETTER_AUTH_SECRET || NOTIFICATIONS_ONLY_PLACEHOLDER_SECRET,
     database,
     // organization: notify({ organizationId }) requires it
     plugins: [organization(), ...notificationsPlugins()],
