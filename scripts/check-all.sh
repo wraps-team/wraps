@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 # check-all.sh — Agent-friendly CI check pipeline
 # Runs all checks, suppresses verbose output on success, surfaces errors clearly.
 # Usage: ./scripts/check-all.sh [--verbose]
@@ -14,7 +14,6 @@ trap 'rm -rf "$LOGDIR"' EXIT
 # Force turbo to use streaming output (TUI mode hangs when stdout is redirected)
 export TURBO_UI=stream
 
-typeset -a STEPS CMDS
 STEPS=(lint design migrations typecheck infra baseline deadcode build test scripts)
 CMDS=(
   "pnpm check:errors"
@@ -39,14 +38,16 @@ CMDS=(
   "pnpm test:scripts"
 )
 
-typeset -a RESULTS
+RESULTS=()
 PASS=0
 FAIL=0
 FAILED_STEP=""
+FAILED_CMD=""
 
-for i in {1..${#STEPS}}; do
+for i in "${!STEPS[@]}"; do
   step=${STEPS[$i]}
   cmd=${CMDS[$i]}
+  FAILED_CMD=$cmd
   logfile="$LOGDIR/$step.log"
 
   printf "%-12s " "$step"
@@ -95,14 +96,14 @@ if [[ $FAIL -gt 0 ]]; then
   case "$FAILED_STEP" in
     lint)
       # Collect all errors in github annotation format
-      local lint_tmp="$LOGDIR/lint-github.txt"
+      lint_tmp="$LOGDIR/lint-github.txt"
       pnpm dlx ultracite@latest check --diagnostic-level=error --reporter=github 2>&1 \
         | grep '^::error' \
         > "$lint_tmp" || true
 
       # Split into formatting vs lint errors
-      local fmt_tmp="$LOGDIR/lint-fmt.txt"
-      local rule_tmp="$LOGDIR/lint-rules.txt"
+      fmt_tmp="$LOGDIR/lint-fmt.txt"
+      rule_tmp="$LOGDIR/lint-rules.txt"
       grep 'title=format' "$lint_tmp" \
         | sed 's/^::error title=format,file=\([^,]*\),.*/  \1/' \
         > "$fmt_tmp" || true
@@ -133,7 +134,7 @@ if [[ $FAIL -gt 0 ]]; then
       # TypeScript errors: extract "error TS" lines
       echo "--- type errors ---"
       grep -E 'error TS[0-9]+' "$logfile" | head -40 || true
-      total=$(grep -cE 'error TS[0-9]+' "$logfile" 2>/dev/null || echo 0)
+      total=$(grep -cE 'error TS[0-9]+' "$logfile" 2>/dev/null || true)
       if [[ "$total" -gt 40 ]]; then
         echo "  ... and $((total - 40)) more"
       fi
@@ -155,7 +156,7 @@ if [[ $FAIL -gt 0 ]]; then
       # Test failures: extract FAIL lines and assertion errors
       echo "--- test failures ---"
       grep -E '(FAIL |✗|×|AssertionError|Error:|expect\()' "$logfile" | head -40 || true
-      total=$(grep -cE '(FAIL |✗|×)' "$logfile" 2>/dev/null || echo 0)
+      total=$(grep -cE '(FAIL |✗|×)' "$logfile" 2>/dev/null || true)
       if [[ "$total" -gt 40 ]]; then
         echo "  ... and $((total - 40)) more"
       fi
@@ -170,7 +171,7 @@ if [[ $FAIL -gt 0 ]]; then
 
   echo ""
   echo "--- end $FAILED_STEP output ---"
-  echo "Re-run with: ${CMDS[${STEPS[(i)$FAILED_STEP]}]}"
+  echo "Re-run with: $FAILED_CMD"
   exit 1
 fi
 
