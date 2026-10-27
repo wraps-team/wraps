@@ -28,6 +28,10 @@ you are working in.
   `docs/agents/local-dev.md`
 - **A Drizzle migration landed, or a worktree was removed** → `docs/agents/test-database.md`
 - **Editing CI workflows, or a red `test-api`/`test-web`** → `docs/agents/ci-and-deploy.md`
+- **Writing or running dashboard e2e tests** (`apps/e2e`, TesterArmy's `e2e`) →
+  `pnpm --filter @wraps/e2e exec e2e guide`. Run through `pnpm test:e2e [file]`, which
+  keeps e2e's telemetry off. Stop `pnpm dev` first: the runner starts its own `next dev`
+  with the env overrides in `apps/e2e/e2e.config.ts` `command.env`
 - **UI, visual, or marketing-copy work** → the `design-context` skill
 - **Using Wraps as a product** (CLI flags, SDK calls) → `apps/website/public/llms-full.txt`
 
