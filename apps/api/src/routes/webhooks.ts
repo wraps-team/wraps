@@ -5,6 +5,7 @@
  */
 
 import { timingSafeEqual } from "node:crypto";
+import { notifyOrg } from "@wraps/auth/notify";
 import {
   awsAccount,
   batchSend,
@@ -14,7 +15,6 @@ import {
   hasRecentNotification,
   messageSend,
   messageUsageMonthly,
-  notifyOrg,
   organization,
   workflow,
   workflowExecution,

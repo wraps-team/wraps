@@ -24,6 +24,7 @@ import {
   captureMessage,
   wrapHandler,
 } from "@sentry/aws-serverless";
+import { notifyOrg } from "@wraps/auth/notify";
 import {
   awsAccount,
   batchSend,
@@ -40,7 +41,6 @@ import {
   type MessageSendStatus,
   member,
   messageSend,
-  notifyOrg,
   organization,
   organizationExtension,
   segment,

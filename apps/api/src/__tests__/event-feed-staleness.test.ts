@@ -24,13 +24,15 @@ vi.mock("@wraps/email", () => ({
     mockSendEventFeedStaleEmail(...args),
 }));
 
-// Real notifyOrg resolves its own `db` via a relative import inside
-// packages/db, not via the "@wraps/db" specifier, so mocking db.select/update
-// above does not reach it — it would otherwise attempt a real network call
-// from this mocked-only test file. Mock it explicitly so alert-copy
-// assertions (below) are deterministic and so no unmocked network call
-// happens here.
+// The real notifyOrg (@wraps/auth/notify) runs the notifications plugin on its
+// own database instance, not the "@wraps/db" mock above, so it would otherwise
+// attempt a real database call from this mocked-only test file. Mock it
+// explicitly so alert-copy assertions (below) are deterministic and so no
+// unmocked call happens here.
 const mockNotifyOrg = vi.fn().mockResolvedValue([]);
+vi.mock("@wraps/auth/notify", () => ({
+  notifyOrg: (...args: unknown[]) => mockNotifyOrg(...args),
+}));
 vi.mock("@wraps/db", async () => {
   const actual = await vi.importActual<typeof import("@wraps/db")>("@wraps/db");
   return {
@@ -39,7 +41,6 @@ vi.mock("@wraps/db", async () => {
       select: (...args: unknown[]) => mockDbSelect(...args),
       update: (...args: unknown[]) => mockDbUpdate(...args),
     },
-    notifyOrg: (...args: unknown[]) => mockNotifyOrg(...args),
   };
 });
 

@@ -56,12 +56,12 @@ import {
   withMonitor,
   wrapHandler,
 } from "@sentry/aws-serverless";
+import { notifyOrg } from "@wraps/auth/notify";
 import {
   awsAccount,
   closeDbConnection,
   db,
   hasRecentNotification,
-  notifyOrg,
   organization,
   subscription,
 } from "@wraps/db";
@@ -155,15 +155,35 @@ async function notifyOnce(params: {
   if (already) {
     return false;
   }
-  await notifyOrg({
-    organizationId: params.account.organizationId,
-    roles: ["owner", "admin"],
-    type: params.type,
-    title: params.title,
-    body: params.body,
-    href: params.href,
-    data: { awsAccountId: params.account.id, ...params.data },
-  });
+  // Guarded: notifyOrg can now throw (an org over the fan-out cap), and a throw
+  // here would abort this account's remaining checks, the reputation and
+  // verdict writes included. The old direct insert could not fail that way.
+  try {
+    await notifyOrg({
+      organizationId: params.account.organizationId,
+      roles: ["owner", "admin"],
+      type: params.type,
+      title: params.title,
+      body: params.body,
+      href: params.href,
+      data: { awsAccountId: params.account.id, ...params.data },
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { worker: "account-health", stage: "notify-inbox" },
+      extra: {
+        accountId: params.account.id,
+        organizationId: params.account.organizationId,
+        type: params.type,
+      },
+    });
+    log.error("[account-health] Failed to write inbox notification", error, {
+      accountId: params.account.id,
+      organizationId: params.account.organizationId,
+      type: params.type,
+    });
+    return false;
+  }
   return true;
 }
 
