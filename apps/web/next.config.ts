@@ -6,6 +6,10 @@ import { MAX_IMPORT_PAYLOAD_BYTES } from "./src/lib/csv-parse";
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["web.wraps.localhost", "*.wraps.localhost", "127.0.0.1"],
 
+  // `next dev` run by an AI agent otherwise writes its own AGENTS.md beside
+  // this file. The repo root AGENTS.md already carries the Next.js guidance.
+  agentRules: false,
+
   // Required for PostHog error tracking to symbolicate stack traces
   productionBrowserSourceMaps: true,
 
