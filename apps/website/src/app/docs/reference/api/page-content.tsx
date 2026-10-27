@@ -351,7 +351,7 @@ API keys are created in the Wraps dashboard under Settings > API Keys.`,
 | Connections | AWS account connection management | Yes |
 | Domains | Sending identity (domain) verification state, read live from SES | Yes |
 | Templates | Email/SMS template CRUD, publish to SES, and CLI sync | Yes |
-| Segments | Audience segment CRUD and condition preview (Pro plan required) | Yes |
+| Segments | Audience segment CRUD and condition preview (Business plan required) | Yes |
 | Agents | Leashed agent (addressable sender) management: create, kill switch, and approval queue | Yes |
 | Webhooks | Receive SES delivery events | Secret-based |
 | Unsubscribe | RFC 8058 one-click unsubscribe | Token-based |
@@ -563,7 +563,7 @@ The API does **not** compile TSX -- \`compiledHtml\`/\`compiledText\` must be su
 
   segments: `## Segments
 
-Every \`/v1/segments\` route requires the Pro plan or above -- including reads. This is stricter than the dashboard, which only gates creating a segment: a Free org gets 403 on every verb here, so a downgraded org's only path to its own segments is the dashboard.
+Every \`/v1/segments\` route requires the Business plan or above -- including reads. This is stricter than the dashboard, which only gates creating a segment: a Free or Pro org gets 403 on every verb here, so a downgraded org's only path to its own segments is the dashboard.
 
 A segment is a saved audience filter used for broadcast targeting and workflow entry/exit. The \`condition\` field is the same filter-condition tree the dashboard's segment builder produces -- a tree of AND/OR groups, each holding one or more \`{ field, operator, value }\` filters, with optional nesting via \`group.nested\`. This reference does not re-list every field and operator (that list lives in the dashboard's segment builder, and changes there); \`POST /v1/segments/preview\` is the fastest way to check whether a condition you constructed is valid before saving it.
 
@@ -720,7 +720,7 @@ const endpointGroups = [
   {
     name: "Segments",
     description:
-      "Audience segment CRUD and condition preview (Pro plan required)",
+      "Audience segment CRUD and condition preview (Business plan required)",
     auth: true,
     methods: ["GET", "POST", "PATCH", "DELETE"],
   },
@@ -2268,13 +2268,13 @@ export default function PageContent() {
         />
         <div className="mb-4 rounded-lg border-warning border-l-4 bg-warning/10 p-4">
           <p className="font-medium text-sm">
-            Every /v1/segments route requires the Pro plan or above
+            Every /v1/segments route requires the Business plan or above
           </p>
           <p className="mt-2 text-muted-foreground text-sm">
-            This includes reads — a Free org gets 403 on every verb here, not
-            just create. Stricter than the dashboard, which only gates creating
-            a segment. A downgraded org's only path to its own segments is the
-            dashboard.
+            This includes reads — a Free or Pro org gets 403 on every verb here,
+            not just create. Stricter than the dashboard, which only gates
+            creating a segment. A downgraded org's only path to its own segments
+            is the dashboard.
           </p>
         </div>
         <p className="mb-4 text-muted-foreground">

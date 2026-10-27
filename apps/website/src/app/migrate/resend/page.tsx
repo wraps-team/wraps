@@ -89,9 +89,9 @@ const steps: { title: string; body: React.ReactNode; plain: string }[] = [
       <>
         If your domain has not moved to Resend Forge, you are already sending
         through SES; you are just doing it through Resend's account. Either way,
-        verifying in your own account gives you a fresh set of
-        DKIM CNAMEs, and a sandbox to get out of. File the production access
-        request the day you verify. Our{" "}
+        verifying in your own account gives you a fresh set of DKIM CNAMEs, and
+        a sandbox to get out of. File the production access request the day you
+        verify. Our{" "}
         <Link className="text-primary underline" href="/blog/ses-sandbox-guide">
           sandbox guide
         </Link>{" "}
@@ -117,10 +117,9 @@ const steps: { title: string; body: React.ReactNode; plain: string }[] = [
         <code>include:amazonses.com</code> and usually needs no edit at all. If
         you activated Resend Forge, which asks for its own CNAME in DNS, read
         what your records say today rather than assuming that holds. DKIM keys
-        are per account, so you publish
-        the three new CNAMEs next to the Resend ones and remove the old set
-        after cutover. DMARC is untouched. Fewer DNS moving parts than any other
-        migration in this cluster.
+        are per account, so you publish the three new CNAMEs next to the Resend
+        ones and remove the old set after cutover. DMARC is untouched. Fewer DNS
+        moving parts than any other migration in this cluster.
       </>
     ),
   },

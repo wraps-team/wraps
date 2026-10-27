@@ -22,6 +22,8 @@ import {
 } from "@wraps/db";
 import { count } from "drizzle-orm";
 import {
+  type BroadcastEntitlementInput,
+  evaluateBroadcastEntitlements,
   getNextPlan,
   getRequiredPlan,
   hasFeature,
@@ -277,10 +279,10 @@ export async function checkFeatureAccess(
   const requiredPlan = getRequiredPlan(feature);
 
   const featureNames: Record<PlanFeature, string> = {
-    batch: "Batch sending",
+    batch: "Broadcasts",
     topics: "Topics (subscription management)",
     segments: "Segments",
-    campaigns: "Campaigns",
+    campaigns: "Scheduled broadcasts",
     workflows: "Workflows",
     events: "Event tracking",
     advancedSegments: "Advanced segments",
@@ -297,6 +299,26 @@ export async function checkFeatureAccess(
     message: allowed
       ? undefined
       : `${featureNames[feature]} requires a ${requiredPlan ? PLANS[requiredPlan].name : "higher"} plan.`,
+  };
+}
+
+/**
+ * Check a broadcast against an organization's plan: the audience it targets
+ * (all contacts, a topic, a segment) and whether it is scheduled.
+ */
+export async function checkBroadcastAccess(
+  organizationId: string,
+  input: BroadcastEntitlementInput
+): Promise<FeatureCheckResult> {
+  if (isSelfHosted()) {
+    return { allowed: true, requiredPlan: null };
+  }
+  const planId = await getOrganizationPlan(organizationId);
+  const result = evaluateBroadcastEntitlements(planId, input);
+  return {
+    allowed: result.allowed,
+    requiredPlan: result.requiredPlan ?? null,
+    message: result.message,
   };
 }
 

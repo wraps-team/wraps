@@ -32,8 +32,11 @@ export function SidebarUpgrade() {
   // Determine what features they're missing
   const missingFeatures: string[] = [];
 
-  if (!(planFeatures.topics && planFeatures.segments)) {
-    missingFeatures.push("Audience Segments");
+  // Topics and scheduling start at Pro; segmentation starts at Business.
+  if (!planFeatures.topics) {
+    missingFeatures.push("Topics & scheduling");
+  } else if (!planFeatures.segments) {
+    missingFeatures.push("Segmentation");
   }
   if (!planFeatures.workflows) {
     missingFeatures.push("Automations");

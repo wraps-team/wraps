@@ -639,8 +639,8 @@ export default function ResendVsWrapsPage() {
             </h2>
             <p className="mb-6 text-muted-foreground">
               Wraps delivers through AWS SES. Resend historically did too, and
-              domains can now opt into its own Forge MTA instead. The
-              difference is where the infrastructure lives and who controls it.
+              domains can now opt into its own Forge MTA instead. The difference
+              is where the infrastructure lives and who controls it.
             </p>
 
             <div className="grid gap-4 sm:grid-cols-2">

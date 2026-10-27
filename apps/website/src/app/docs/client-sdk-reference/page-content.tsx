@@ -389,9 +389,9 @@ ${updateContactCode}
 ${deleteContactCode}
 \`\`\``,
 
-  batch: `## Batch Sends API
+  batch: `## Broadcasts API
 
-Create and manage batch email sends.
+Create and manage broadcasts. The endpoints live under \`/v1/batch\`.
 
 ### Create Batch Send
 \`\`\`typescript

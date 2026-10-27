@@ -149,7 +149,8 @@ export const VENDORS: Record<VendorId, Vendor> = {
   resend: {
     id: "resend",
     name: "Resend",
-    category: "Developer-first email API (built on SES, now with its own Forge MTA)",
+    category:
+      "Developer-first email API (built on SES, now with its own Forge MTA)",
     pricing:
       "Free 3,000/mo (100/day). Pro $20 at 50K and $35 at 100K. Scale starts at $90 for the same 100K and runs to $350 at 500K. Overage $0.65–0.90 per 1,000. Marketing contacts billed separately at $40/mo per 5,000.",
     bestFor:

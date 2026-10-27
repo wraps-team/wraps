@@ -13,7 +13,7 @@ const features = [
     icon: Filter,
     title: "Segments",
     description: "Target by properties like plan or location",
-    badge: "Pro",
+    badge: "Business",
   },
   {
     icon: Calendar,
@@ -80,8 +80,9 @@ export function DashboardBroadcastsSection() {
           {/* Content */}
           <div className="space-y-8">
             <p className="text-lg text-muted-foreground">
-              Send newsletters, announcements, and marketing campaigns.
-              Segments, topics, and scheduling included in Pro.
+              Send newsletters, announcements, and marketing campaigns. Free
+              sends to all contacts; topics and scheduling are on Pro, and
+              segments are on Business.
             </p>
 
             {/* Features as list */}
@@ -116,7 +117,7 @@ export function DashboardBroadcastsSection() {
                   Pro ($29/mo):
                 </span>{" "}
                 <span className="text-muted-foreground">
-                  Broadcasts, segments, scheduling, and topics
+                  Scheduling and topic broadcasts
                 </span>
               </p>
               <p className="mt-1 text-sm">
@@ -124,7 +125,8 @@ export function DashboardBroadcastsSection() {
                   Business ($199/mo):
                 </span>{" "}
                 <span className="text-muted-foreground">
-                  Everything in Pro plus unlimited AWS accounts and SSO + SCIM
+                  Everything in Pro plus segments, unlimited AWS accounts and
+                  SSO + SCIM
                 </span>
               </p>
             </div>

@@ -6,35 +6,16 @@
 
 import { Elysia } from "elysia";
 import { isSelfHosted } from "../(ee)/lib/license";
-import { isPlanId, type PlanId } from "../lib/plan-ids";
+import {
+  FEATURE_PLANS,
+  type Feature,
+  PLAN_HIERARCHY,
+} from "../lib/plan-features";
+
+export { FEATURE_PLANS } from "../lib/plan-features";
+
+import { isPlanId } from "../lib/plan-ids";
 import { getAuthOptional } from "./auth";
-
-// Feature to minimum plan mapping (aligned with apps/web/src/lib/plans.ts)
-export const FEATURE_PLANS = {
-  batch: "pro",
-  topics: "pro",
-  segments: "pro",
-  campaigns: "pro",
-  workflows: "free", // All tiers (quantity limited by tier)
-  events: "free", // All tiers — Free is metered at 5K/mo, not gated
-  advancedSegments: "business",
-  customRetention: "business",
-  prioritySLA: "business",
-  sso: "business",
-} as const;
-
-type Feature = keyof typeof FEATURE_PLANS;
-
-// Legacy names keep their old rank so a grandfathered subscription clears the
-// same gates it always did — see plans/208.
-const PLAN_HIERARCHY = {
-  free: 0,
-  pro: 1,
-  business: 2,
-  starter: 1, // legacy → pro
-  growth: 2, // legacy → business
-  scale: 2, // legacy → business
-} as const satisfies Record<PlanId, number>;
 
 export function planGateMiddleware(feature: Feature) {
   return new Elysia({ name: `plan-gate:${feature}` }).derive(

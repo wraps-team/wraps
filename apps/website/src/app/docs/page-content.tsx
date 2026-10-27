@@ -219,7 +219,7 @@ export default function DocsPageContent() {
               title="SMS SDK"
             />
             <LinkCard
-              description="Contacts, batches, workflows, segments"
+              description="Contacts, broadcasts, workflows, segments"
               href="/docs/client-sdk-reference"
               icon={Blocks}
               title="Platform SDK"
