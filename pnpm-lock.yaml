@@ -428,12 +428,18 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.10.0
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.20.0
       ai:
         specifier: 7.0.143
         version: 7.0.143(zod@4.6.7)
       e2e:
         specifier: 0.21.2
         version: 0.21.2(@ai-sdk/anthropic@4.0.82(zod@4.6.7))(@ai-sdk/openai@4.0.96(zod@4.6.7))(ai@7.0.143(zod@4.6.7))
+      pg:
+        specifier: 'catalog:'
+        version: 8.22.0
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

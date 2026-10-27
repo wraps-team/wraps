@@ -15,11 +15,14 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Hoisted mocks — must use vi.hoisted so they're initialized before vi.mock factories run
-const { mockUseSession, mockPush, mockReplace } = vi.hoisted(() => ({
-  mockUseSession: vi.fn(),
-  mockPush: vi.fn(),
-  mockReplace: vi.fn(),
-}));
+const { mockUseSession, mockPush, mockReplace, mockSearchParams } = vi.hoisted(
+  () => ({
+    mockUseSession: vi.fn(),
+    mockPush: vi.fn(),
+    mockReplace: vi.fn(),
+    mockSearchParams: {} as Record<string, string>,
+  })
+);
 
 vi.mock("@/lib/auth-client", () => ({
   authClient: {
@@ -37,7 +40,7 @@ vi.mock("@/lib/auth-client", () => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
   useSearchParams: () => ({
-    get: (_key: string) => null,
+    get: (key: string) => mockSearchParams[key] ?? null,
   }),
 }));
 
@@ -133,7 +136,8 @@ vi.mock("@/components/ui/input", () => ({
 
 vi.mock("@/lib/utils", () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
-  toSafeRedirectPath: (_path: unknown, fallback: string) => fallback,
+  toSafeRedirectPath: (path: unknown, fallback: string) =>
+    typeof path === "string" ? path : fallback,
 }));
 
 import posthog from "posthog-js";
@@ -329,5 +333,41 @@ describe("SignUpForm - analytics on successful signup", () => {
       "user_signed_up",
       expect.anything()
     );
+  });
+});
+
+describe("SignUpForm - invited email", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseSession.mockReturnValue({ isPending: false, data: null });
+  });
+
+  afterEach(() => {
+    for (const key of Object.keys(mockSearchParams)) {
+      delete mockSearchParams[key];
+    }
+    cleanup();
+  });
+
+  it("prefills and locks the email when arriving from an invitation", () => {
+    mockSearchParams.email = "invitee@example.com";
+    mockSearchParams.redirect = "/invitations/inv-1/accept";
+
+    render(<SignUpForm onSwitchToSignIn={vi.fn()} />);
+
+    const emailInput = screen.getByPlaceholderText(/m@example\.com/i);
+    expect(emailInput).toHaveValue("invitee@example.com");
+    expect(emailInput).toHaveAttribute("readonly");
+  });
+
+  it("leaves the email editable when the redirect is not an invitation", () => {
+    mockSearchParams.email = "someone@example.com";
+    mockSearchParams.redirect = "/device";
+
+    render(<SignUpForm onSwitchToSignIn={vi.fn()} />);
+
+    const emailInput = screen.getByPlaceholderText(/m@example\.com/i);
+    expect(emailInput).toHaveValue("");
+    expect(emailInput).not.toHaveAttribute("readonly");
   });
 });

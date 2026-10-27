@@ -36,6 +36,8 @@ export type GetInvitationResult =
       invitation: InvitationDetails;
       isExpired: boolean;
       isAlreadyMember: boolean;
+      /** Whether the invited email already has a Wraps account. */
+      hasAccount: boolean;
     }
   | {
       success: false;
@@ -121,6 +123,7 @@ export async function getInvitation(
       },
       isExpired,
       isAlreadyMember,
+      hasAccount: !!existingUser,
     };
   } catch (error) {
     const log = createActionLogger("getInvitation", {});
@@ -129,6 +132,52 @@ export async function getInvitation(
       success: false,
       error: "Failed to fetch invitation details",
     };
+  }
+}
+
+/**
+ * The slug of the organization an accepted invitation belongs to, but only for
+ * a signed-in viewer who is a member of it. Accepting revalidates the open
+ * invitation page, which then sees "accepted"; this lets that page send the new
+ * member to their organization instead of an error. `getInvitation` leaves the
+ * slug out because it answers without a session.
+ */
+export async function getJoinedOrganizationSlug(
+  invitationId: string
+): Promise<string | null> {
+  try {
+    const session = await auth.api.getSession({
+      headers: await import("next/headers").then((mod) => mod.headers()),
+    });
+    if (!session?.user) {
+      return null;
+    }
+
+    const inv = await db.query.invitation.findFirst({
+      where: eq(invitation.id, invitationId),
+    });
+    if (inv?.status !== "accepted") {
+      return null;
+    }
+
+    const existingMember = await db.query.member.findFirst({
+      where: and(
+        eq(member.organizationId, inv.organizationId),
+        eq(member.userId, session.user.id)
+      ),
+    });
+    if (!existingMember) {
+      return null;
+    }
+
+    const org = await db.query.organization.findFirst({
+      where: eq(organization.id, inv.organizationId),
+    });
+    return org?.slug ?? null;
+  } catch (error) {
+    const log = createActionLogger("getJoinedOrganizationSlug", {});
+    log.error({ err: error, invitationId }, "Failed to resolve organization");
+    return null;
   }
 }
 

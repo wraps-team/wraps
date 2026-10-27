@@ -10,8 +10,10 @@
   "devDependencies": {
     "@e2e-dev/web": "0.15.2",
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
     "ai": "7.0.143",
     "e2e": "0.21.2",
+    "pg": "catalog:",
     "typescript": "catalog:"
   }
 }

@@ -10,7 +10,11 @@
 import { db, invitation, member, organization, user } from "@wraps/db";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { declineInvitation, getInvitation } from "../invitations";
+import {
+  declineInvitation,
+  getInvitation,
+  getJoinedOrganizationSlug,
+} from "../invitations";
 
 // --- Test fixtures ---
 
@@ -240,6 +244,15 @@ describe("getInvitation — PII exposure", () => {
     }
   });
 
+  it("reports whether the invited email already has an account", async () => {
+    const result = await getInvitation(pendingInvitation.id);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.hasAccount).toBe(true);
+    }
+  });
+
   it("does not expose org slug or org id (cross-tenant data leak)", async () => {
     const result = await getInvitation(pendingInvitation.id);
 
@@ -253,5 +266,69 @@ describe("getInvitation — PII exposure", () => {
       // Org ID is an internal identifier — must not be exposed without auth
       expect("id" in org).toBe(false);
     }
+  });
+});
+
+describe("getJoinedOrganizationSlug", () => {
+  const inviteeMember = {
+    id: "inv-sec-member-2",
+    organizationId: testOrg.id,
+    userId: inviteeUser.id,
+    role: "member" as const,
+    createdAt: new Date(),
+  };
+  const asInvitee = {
+    user: { id: inviteeUser.id, email: inviteeUser.email },
+  };
+
+  async function seedInvitation(status: string) {
+    await db.delete(invitation).where(eq(invitation.id, pendingInvitation.id));
+    await db.insert(invitation).values({ ...pendingInvitation, status });
+  }
+
+  beforeAll(async () => {
+    await db
+      .insert(member)
+      .values(inviteeMember)
+      .onConflictDoUpdate({
+        target: member.id,
+        set: { role: inviteeMember.role },
+      });
+  });
+
+  afterAll(async () => {
+    await db.delete(member).where(eq(member.id, inviteeMember.id));
+  });
+
+  it("returns the org slug to a member viewing an accepted invitation", async () => {
+    await seedInvitation("accepted");
+    mockGetSession.mockResolvedValueOnce(asInvitee);
+
+    expect(await getJoinedOrganizationSlug(pendingInvitation.id)).toBe(
+      testOrg.slug
+    );
+  });
+
+  it("returns null without a session", async () => {
+    await seedInvitation("accepted");
+    mockGetSession.mockResolvedValueOnce(null);
+
+    expect(await getJoinedOrganizationSlug(pendingInvitation.id)).toBeNull();
+  });
+
+  it("returns null for a signed-in user who is not a member of the org", async () => {
+    await seedInvitation("accepted");
+    mockGetSession.mockResolvedValueOnce({
+      user: { id: anotherUser.id, email: anotherUser.email },
+    });
+
+    expect(await getJoinedOrganizationSlug(pendingInvitation.id)).toBeNull();
+  });
+
+  it("returns null while the invitation is still pending", async () => {
+    await seedInvitation("pending");
+    mockGetSession.mockResolvedValueOnce(asInvitee);
+
+    expect(await getJoinedOrganizationSlug(pendingInvitation.id)).toBeNull();
   });
 });

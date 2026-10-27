@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 import { authClient } from "@/lib/auth-client";
+import { getInvitedEmail } from "@/lib/invitation-auth";
 import { cn, toSafeRedirectPath } from "@/lib/utils";
 import Loader from "./loader";
 import { Button } from "./ui/button";
@@ -32,6 +33,7 @@ export default function SignInForm({
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = toSafeRedirectPath(searchParams.get("redirect"), "/");
+  const invitedEmail = getInvitedEmail(searchParams.get("email"), redirectTo);
   const { isPending, data: session } = authClient.useSession();
   const [show2FA, setShow2FA] = useState(false);
   const [twoFactorEmail, setTwoFactorEmail] = useState("");
@@ -59,7 +61,7 @@ export default function SignInForm({
 
   const form = useForm({
     defaultValues: {
-      email: "",
+      email: invitedEmail,
       password: "",
     },
     onSubmit: async ({ value }) => {

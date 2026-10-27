@@ -12,31 +12,66 @@ import { Separator } from "@wraps/ui/components/ui/separator";
 import { Building2, CheckCircle2, Mail, Shield, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import posthog from "posthog-js";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { InvitationDetails } from "@/actions/invitations";
 import { acceptInvitation } from "@/actions/invitations";
 import { Button } from "@/components/ui/button";
 import { authClient, useSession } from "@/lib/auth-client";
+import { buildInvitationAuthUrl } from "@/lib/invitation-auth";
 
 type AcceptInvitationFormProps = {
   invitation: InvitationDetails;
   invitationId: string;
+  hasAccount: boolean;
 };
 
 export function AcceptInvitationForm({
   invitation,
   invitationId,
+  hasAccount,
 }: AcceptInvitationFormProps) {
   const router = useRouter();
   const { data: session, isPending: isSessionLoading } = useSession();
   const [isAccepting, setIsAccepting] = useState(false);
+  const hasTrackedView = useRef(false);
+
+  const eventProps = {
+    organization_name: invitation.organization.name,
+    role: invitation.role || "member",
+    has_account: hasAccount,
+  };
+
+  // One view per page load, once the session has settled so is_signed_in is real
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fires once, when the session settles
+  useEffect(() => {
+    if (isSessionLoading || hasTrackedView.current) {
+      return;
+    }
+    hasTrackedView.current = true;
+    posthog.capture("invitation_viewed", {
+      ...eventProps,
+      is_signed_in: !!session?.user,
+      signed_in_email_matches: session?.user
+        ? session.user.email === invitation.email
+        : null,
+    });
+  }, [isSessionLoading]);
 
   const handleAccept = async () => {
     if (!session?.user) {
-      // Redirect to auth with return URL
-      const returnUrl = `/invitations/${invitationId}/accept`;
-      router.push(`/auth?redirect=${encodeURIComponent(returnUrl)}`);
+      const destination = hasAccount ? "signin" : "signup";
+      posthog.capture("invitation_auth_clicked", {
+        ...eventProps,
+        destination,
+      });
+      router.push(
+        buildInvitationAuthUrl({
+          invitationId,
+          email: invitation.email,
+          hasAccount,
+        })
+      );
       return;
     }
 
@@ -61,6 +96,10 @@ export function AcceptInvitationForm({
       toast.success(result.message);
       router.push(`/${result.organizationSlug}`);
     } else {
+      posthog.capture("invitation_accept_failed", {
+        ...eventProps,
+        error: result.error,
+      });
       toast.error(result.error);
       setIsAccepting(false);
     }
@@ -189,7 +228,9 @@ export function AcceptInvitationForm({
             ? "Accepting..."
             : session?.user
               ? "Accept Invitation"
-              : "Sign In to Accept"}
+              : hasAccount
+                ? "Sign In to Accept"
+                : "Create Account to Accept"}
         </Button>
         <Button
           className="w-full"

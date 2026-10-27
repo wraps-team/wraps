@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 import { authClient } from "@/lib/auth-client";
+import { getInvitedEmail } from "@/lib/invitation-auth";
 import { cn, toSafeRedirectPath } from "@/lib/utils";
 import Loader from "./loader";
 import { Button } from "./ui/button";
@@ -34,6 +35,7 @@ export default function SignUpForm({
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = toSafeRedirectPath(searchParams.get("redirect"), "");
+  const invitedEmail = getInvitedEmail(searchParams.get("email"), redirectTo);
   const plan = searchParams.get("plan");
   const interval = searchParams.get("interval") || "monthly";
   const { isPending, data: session } = authClient.useSession();
@@ -69,7 +71,7 @@ export default function SignUpForm({
   const form = useForm({
     defaultValues: {
       name: "",
-      email: "",
+      email: invitedEmail,
       password: "",
     },
     onSubmit: async ({ value }) => {
@@ -151,6 +153,7 @@ export default function SignUpForm({
         email: value.email,
         name: value.name,
         selected_plan: plan || null,
+        from_invitation: !!invitedEmail,
         billing_interval: interval,
         ...attribution,
       });
@@ -284,9 +287,15 @@ export default function SignUpForm({
                         onBlur={field.handleBlur}
                         onChange={(e) => field.handleChange(e.target.value)}
                         placeholder="m@example.com"
+                        readOnly={!!invitedEmail}
                         type="email"
                         value={field.state.value}
                       />
+                      {invitedEmail && (
+                        <p className="text-muted-foreground text-xs">
+                          Your invitation was sent to this address.
+                        </p>
+                      )}
                       {[
                         ...new Set(
                           field.state.meta.errors.map((error) =>

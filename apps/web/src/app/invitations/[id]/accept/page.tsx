@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
-import { getInvitation } from "@/actions/invitations";
+import {
+  getInvitation,
+  getJoinedOrganizationSlug,
+} from "@/actions/invitations";
 import { AcceptInvitationForm } from "@/components/invitations/accept-invitation-form";
 
 type AcceptInvitationPageProps = {
@@ -22,10 +25,15 @@ export default async function AcceptInvitationPage({
     );
   }
 
-  const { invitation, isExpired, isAlreadyMember } = result;
+  const { invitation, isExpired, isAlreadyMember, hasAccount } = result;
 
   // Handle different states
   if (invitation.status === "accepted") {
+    // Accepting revalidates this page, so the new member lands here too
+    const orgSlug = await getJoinedOrganizationSlug(id);
+    if (orgSlug) {
+      redirect(`/${orgSlug}`);
+    }
     redirect(
       `/invitations/${id}/error?message=${encodeURIComponent("This invitation has already been accepted")}`
     );
@@ -51,7 +59,11 @@ export default async function AcceptInvitationPage({
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-4">
-      <AcceptInvitationForm invitation={invitation} invitationId={id} />
+      <AcceptInvitationForm
+        hasAccount={hasAccount}
+        invitation={invitation}
+        invitationId={id}
+      />
     </div>
   );
 }
