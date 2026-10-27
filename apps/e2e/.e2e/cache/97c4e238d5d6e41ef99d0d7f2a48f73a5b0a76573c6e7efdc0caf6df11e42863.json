@@ -1,0 +1,126 @@
+{
+  "schemaVersion": "trace-1",
+  "createdAt": "2026-10-26T22:23:38.093Z",
+  "payload": {
+    "actions": [
+      {
+        "name": "tap",
+        "summary": "tap button \"Create API Key\" (1 of 2)",
+        "target": {
+          "role": "button",
+          "name": "Create API Key",
+          "position": {
+            "index": 0,
+            "of": 2
+          }
+        }
+      },
+      {
+        "name": "type",
+        "summary": "type \"CI deploys\" into textbox \"Name\" in \"Create API Key\"",
+        "target": {
+          "role": "textbox",
+          "name": "Name",
+          "placeholder": "Production API Key",
+          "within": "Create API Key"
+        },
+        "value": "CI deploys"
+      },
+      {
+        "name": "tap",
+        "summary": "tap button \"Create API Key\"",
+        "target": {
+          "role": "button",
+          "name": "Create API Key"
+        }
+      }
+    ],
+    "executor": {
+      "name": "e2e-default-agent",
+      "version": "2"
+    },
+    "recordedFor": {
+      "testId": "tests/api-keys.e2e.ts::the%20owner%20creates%20an%20API%20key",
+      "targetId": "chromium",
+      "instructionDigest": "9327f197ffea6ccc67a6e73c2df3106fa154431622ca38770e0f14f444f6f3cf",
+      "paramsDigest": "cd767e925690ff4596425f8639c9b2c6994503d8e49e70972502a0c2ec2bd1a7",
+      "callIndex": 0,
+      "agent": "default"
+    },
+    "recordedBy": {
+      "provider": "gateway",
+      "model": "anthropic/claude-sonnet-5.5"
+    },
+    "summary": "Created API key \"CI deploys\" in e2e-mvptoww7; \"API key created\" toast and \"API Key Created\" dialog (showing the key once) appeared.",
+    "startPath": "/{{param:/workspace}}/settings/api-keys",
+    "endPath": "/{{param:/workspace}}/settings/api-keys",
+    "endAnchors": [
+      {
+        "role": "alert",
+        "name": "Important This is the only time you'll see this API key. Make sure to copy it and store it securely."
+      },
+      {
+        "text": "API key created"
+      },
+      {
+        "role": "heading",
+        "name": "API Key Created"
+      },
+      {
+        "text": "Copy your API key now. You won't be able to see it again!"
+      },
+      {
+        "text": "Important"
+      },
+      {
+        "text": "This is the only time you'll see this API key. Make sure to copy it and store it securely."
+      },
+      {
+        "text": "Your API Key"
+      },
+      {
+        "role": "button",
+        "name": "Toggle visibility"
+      }
+    ],
+    "goneAnchors": [
+      {
+        "role": "status",
+        "name": "Connect your AWS account to start sending emails. Get Started Dismiss banner"
+      },
+      {
+        "role": "image",
+        "name": "Wraps Logo"
+      },
+      {
+        "text": "EW"
+      },
+      {
+        "text": "E2E Workspace"
+      },
+      {
+        "text": "owner"
+      },
+      {
+        "text": "Overview"
+      },
+      {
+        "text": "Audience"
+      },
+      {
+        "text": "Email"
+      }
+    ],
+    "endWaitMs": 12560,
+    "keyedBy": {
+      "cacheSchema": "trace-1",
+      "policyVersion": "conservative/6",
+      "project": "6270d378e32b1181044da35433df046bd2ea7bbc8b700e3a614fe441981c5456",
+      "platform": "web",
+      "engineName": "web",
+      "engineSpiVersion": 1,
+      "appIdentity": "f9f49ed79c2662c7f6e0522da33af26cd0588919fce8b674530ba7c83e5d217c",
+      "agentContextDigest": "d436824420520e934fb52613db21890f6152750d6c044528fbf9cb9ed5b0ab6d"
+    }
+  }
+}

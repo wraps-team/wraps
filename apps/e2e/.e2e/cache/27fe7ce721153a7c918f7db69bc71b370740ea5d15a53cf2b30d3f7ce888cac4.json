@@ -1,0 +1,130 @@
+{
+  "schemaVersion": "trace-1",
+  "createdAt": "2026-10-26T22:23:49.470Z",
+  "payload": {
+    "actions": [
+      {
+        "name": "tap",
+        "summary": "tap button \"Add contact\"",
+        "target": {
+          "role": "button",
+          "name": "Add contact"
+        }
+      },
+      {
+        "name": "type",
+        "summary": "type \"ada@e2e.wraps.test\" into textbox \"Email address\"",
+        "target": {
+          "role": "textbox",
+          "name": "Email address",
+          "placeholder": "contact@example.com"
+        },
+        "value": "ada@e2e.wraps.test"
+      },
+      {
+        "name": "type",
+        "summary": "type \"Ada\" into textbox \"First name\"",
+        "target": {
+          "role": "textbox",
+          "name": "First name",
+          "placeholder": "John"
+        },
+        "value": "Ada"
+      },
+      {
+        "name": "tap",
+        "summary": "tap button \"Add Contact\"",
+        "target": {
+          "role": "button",
+          "name": "Add Contact"
+        }
+      }
+    ],
+    "executor": {
+      "name": "e2e-default-agent",
+      "version": "2"
+    },
+    "recordedFor": {
+      "testId": "tests/contacts.e2e.ts::the%20owner%20adds%20a%20contact%20by%20hand",
+      "targetId": "chromium",
+      "instructionDigest": "d3c053047e2ff27bc94b503e153507dc99fa0f21807a3dc6a70f39e6f259d3e6",
+      "paramsDigest": "5679c80a86c6abe433c50bd869592ed746923f8d80af15173107576b023b6c4f",
+      "callIndex": 0,
+      "agent": "default"
+    },
+    "recordedBy": {
+      "provider": "gateway",
+      "model": "anthropic/claude-sonnet-5.5"
+    },
+    "summary": "In e2e-mvptoww7 contacts, added a contact with email ada@e2e.wraps.test and first name Ada. A \"Contact created\" toast appeared. The contacts list now shows ada@e2e.wraps.test as Active, \"Showing 1-1 of 1 contacts\".",
+    "startPath": "/{{param:/workspace}}/contacts",
+    "endPath": "/{{param:/workspace}}/contacts",
+    "endAnchors": [
+      {
+        "role": "heading",
+        "name": "Contact Growth"
+      },
+      {
+        "text": "New contacts added over time"
+      },
+      {
+        "role": "button",
+        "name": "Refresh contact growth"
+      },
+      {
+        "text": "+1"
+      },
+      {
+        "text": "+100%"
+      },
+      {
+        "role": "button",
+        "name": "What these figures cover"
+      },
+      {
+        "text": "Whole organization, not the filtered list below"
+      },
+      {
+        "text": "Engagement"
+      }
+    ],
+    "goneAnchors": [
+      {
+        "role": "heading",
+        "name": "No contacts yet"
+      },
+      {
+        "text": "Add contacts manually, import a CSV, or use the Platform SDK to manage contacts programmatically."
+      },
+      {
+        "text": "create-contact.ts"
+      },
+      {
+        "text": "import { createClient } from '@wraps.dev/platform'; const client = createClient({ organizationId: 'org_...', apiKey: process.env.WRAPS_API_KEY, }); const { data } = await client.POST('/v1/contacts/', { body: { email: 'user@example.com', firstName: 'Jane', lastName: 'Doe', }, });"
+      },
+      {
+        "role": "link",
+        "name": "Read the docs"
+      },
+      {
+        "role": "button",
+        "name": "Import CSV"
+      },
+      {
+        "role": "button",
+        "name": "Add contact"
+      }
+    ],
+    "endWaitMs": 14472,
+    "keyedBy": {
+      "cacheSchema": "trace-1",
+      "policyVersion": "conservative/6",
+      "project": "6270d378e32b1181044da35433df046bd2ea7bbc8b700e3a614fe441981c5456",
+      "platform": "web",
+      "engineName": "web",
+      "engineSpiVersion": 1,
+      "appIdentity": "f9f49ed79c2662c7f6e0522da33af26cd0588919fce8b674530ba7c83e5d217c",
+      "agentContextDigest": "d436824420520e934fb52613db21890f6152750d6c044528fbf9cb9ed5b0ab6d"
+    }
+  }
+}
