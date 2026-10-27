@@ -46,13 +46,13 @@ export type LegacyPlanId = "starter" | "growth" | "scale";
 export type PlanId = PublicPlanId | LegacyPlanId;
 
 export type PlanFeature =
-  | "batch" // Pro+: Send to all contacts
-  | "topics" // Pro+: Subscription management
-  | "segments" // Pro+: Property-based targeting
-  | "campaigns" // Pro+: Scheduled, targeted sends
+  | "batch" // All plans: Broadcast to all contacts
+  | "topics" // Pro+: Subscription management, and broadcasting to a topic
+  | "segments" // Pro+: Segmentation (segment broadcasts and segment workflow triggers)
+  | "campaigns" // Pro+: Scheduled broadcasts
   | "workflows" // All tiers: Visual automation builder (2/unlimited by tier)
   | "events" // Pro+: Behavioral tracking
-  | "advancedSegments" // Business+: Behavioral segments
+  | "advancedSegments" // Pro+: Event-based segment filters
   | "customRetention" // Enterprise+: Custom data retention
   | "prioritySLA" // Business+: Priority support SLA
   | "sso" // Business+: SSO + SCIM provisioning
@@ -136,7 +136,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 
     // Feature Access
     features: {
-      batch: false, // Batch sending requires Pro+
+      batch: true, // Broadcast to all contacts; topics, segments and scheduling are gated separately
       topics: false,
       segments: false,
       campaigns: false,
@@ -159,6 +159,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     // Display
     featureList: [
       "Unlimited sends, domains & contacts",
+      "Broadcasts to all contacts",
       "Unlimited team members",
       "5,000 custom events/mo",
       "1 AWS account",
@@ -200,7 +201,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       campaigns: true, // Scheduled broadcasts
       workflows: true, // Unlimited workflows
       events: true, // Custom event tracking
-      advancedSegments: false, // Business only
+      advancedSegments: true, // Event-based segment filters
       customRetention: false,
       prioritySLA: false,
       sso: false,
@@ -221,7 +222,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       "Everything in Free",
       "Unlimited workflows",
       "Unlimited custom events",
-      "Topics, segments, batch & campaigns",
+      "Broadcasts to topics & segments, scheduling",
       "250 AI generations",
       "90-day history",
     ],
@@ -330,7 +331,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       campaigns: true, // Scheduled broadcasts
       workflows: true, // Unlimited workflows
       events: true, // Custom event tracking
-      advancedSegments: false, // Business only
+      advancedSegments: true, // Event-based segment filters
       customRetention: false,
       prioritySLA: false,
       sso: false,
@@ -348,7 +349,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     featureList: [
       "Unlimited sends, domains & contacts",
       "Unlimited workflows",
-      "Topics, segments, batch & campaigns",
+      "Broadcasts to topics & segments, scheduling",
       "3 AWS accounts",
       "250 AI generations",
       "90-day history",
@@ -764,6 +765,87 @@ export function getFeatureGateMessage(
 
   const requiredPlanConfig = PLANS[requiredPlan];
   return `${featureDisplayName} requires a ${requiredPlanConfig.name} plan ($${requiredPlanConfig.price}/mo).`;
+}
+
+/** Workflow triggers that fire off segment membership. */
+const SEGMENT_TRIGGER_TYPES: readonly string[] = [
+  "segment_entry",
+  "segment_exit",
+];
+
+/**
+ * The plan feature a workflow trigger needs, or null when it is open to every
+ * plan. Keep in step with checkWorkflowTriggerEntitlements in
+ * apps/api/src/lib/plan-features.ts.
+ */
+export function workflowTriggerFeature(
+  triggerType: string | null | undefined
+): PlanFeature | null {
+  return triggerType && SEGMENT_TRIGGER_TYPES.includes(triggerType)
+    ? "segments"
+    : null;
+}
+
+export type BroadcastAudience = "all" | "topic" | "segment";
+
+export type BroadcastEntitlementInput = {
+  audienceType?: BroadcastAudience;
+  scheduled: boolean;
+};
+
+export type BroadcastEntitlementResult = {
+  allowed: boolean;
+  feature?: PlanFeature;
+  requiredPlan?: PlanId;
+  message?: string;
+};
+
+const BROADCAST_DENIAL: Partial<Record<PlanFeature, string>> = {
+  topics: "Sending a broadcast to a topic",
+  segments: "Sending a broadcast to a segment",
+  campaigns: "Scheduling a broadcast",
+};
+
+/**
+ * What a broadcast needs from the plan. Sending to all contacts is open to
+ * every plan; a topic audience, a segment audience and a scheduled send each
+ * need Pro. The first unmet requirement is reported.
+ * Keep in step with checkBroadcastEntitlements in
+ * apps/api/src/lib/plan-features.ts.
+ */
+export function evaluateBroadcastEntitlements(
+  planId: PlanId | string,
+  input: BroadcastEntitlementInput
+): BroadcastEntitlementResult {
+  // An unknown plan is treated as Free. hasFeature alone would read a
+  // prototype key ("constructor") as a plan.
+  const plan: PlanId = isPlanId(planId) ? planId : "free";
+
+  const required: PlanFeature[] = ["batch"];
+  if (input.audienceType === "topic") {
+    required.push("topics");
+  }
+  if (input.audienceType === "segment") {
+    required.push("segments");
+  }
+  if (input.scheduled) {
+    required.push("campaigns");
+  }
+
+  for (const feature of required) {
+    if (!hasFeature(plan, feature)) {
+      const requiredPlan = getRequiredPlan(feature) ?? undefined;
+      const what = BROADCAST_DENIAL[feature] ?? "Broadcasts";
+      const planName = requiredPlan ? PLANS[requiredPlan].name : "a higher";
+      return {
+        allowed: false,
+        feature,
+        requiredPlan,
+        message: `${what} requires the ${planName} plan.`,
+      };
+    }
+  }
+  return { allowed: true };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

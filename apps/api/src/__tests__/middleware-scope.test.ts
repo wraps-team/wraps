@@ -56,9 +56,9 @@ beforeEach(() => {
 });
 
 describe("planGateMiddleware applies to the consumer's routes", () => {
-  it("blocks a free-plan org from a starter-gated feature", async () => {
+  it("blocks a free-plan org from a paid feature", async () => {
     const app = withAuth("free")
-      .use(planGateMiddleware("batch"))
+      .use(planGateMiddleware("topics"))
       .get("/v1/batch", () => ({ ok: true }));
 
     const res = await app.handle(new Request("http://localhost/v1/batch"));
@@ -69,7 +69,7 @@ describe("planGateMiddleware applies to the consumer's routes", () => {
   it("skips the gate entirely for licensed self-hosted deployments", async () => {
     mockIsSelfHosted.mockReturnValue(true);
     const app = withAuth("free")
-      .use(planGateMiddleware("batch"))
+      .use(planGateMiddleware("topics"))
       .get("/v1/batch", () => ({ ok: true }));
 
     const res = await app.handle(new Request("http://localhost/v1/batch"));
@@ -79,7 +79,7 @@ describe("planGateMiddleware applies to the consumer's routes", () => {
 
   it("lets a paid org through", async () => {
     const app = withAuth("scale")
-      .use(planGateMiddleware("batch"))
+      .use(planGateMiddleware("topics"))
       .get("/v1/batch", () => ({ ok: true }));
 
     const res = await app.handle(new Request("http://localhost/v1/batch"));

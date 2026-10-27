@@ -104,13 +104,12 @@ These appear on your AWS bill, not your Wraps bill. You keep AWS volume discount
 | AI generations | 10/mo | 250/mo | 1,000/mo |
 | AWS accounts | 1 | 1 | Unlimited |
 | Team members | Unlimited | Unlimited | Unlimited |
-| Batch sending | — | Yes | Yes |
+| Broadcasts to all contacts | Yes | Yes | Yes |
 | Topics & preferences | — | Yes | Yes |
 | Segments & targeting | — | Yes | Yes |
-| Campaigns | — | Yes | Yes |
+| Scheduled broadcasts | — | Yes | Yes |
 | Cross-channel cascades | — | Yes | Yes |
 | Custom events | 5,000/mo | Unlimited | Unlimited |
-| Behavioral segments | — | — | Yes |
 | SSO + SCIM | — | — | Yes |
 | Audit log | — | — | Yes |
 | Audit log export | — | — | Yes |

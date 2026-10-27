@@ -80,8 +80,8 @@ await sms.send({
 ### Platform (app.wraps.dev)
 Visual dashboard with progressive feature unlocks:
 
-**Free ($0/mo):** Unlimited sends, domains, contacts and team members; 5,000 custom events/mo; 1 AWS account; 2 workflows; 30-day history
-**Pro ($29/mo, $299/yr):** Everything in Free, plus unlimited workflows and custom events; topics, segments, batch and campaigns; 250 AI generations/mo; 90-day history
+**Free ($0/mo):** Unlimited sends, domains, contacts and team members; broadcasts to all contacts; 5,000 custom events/mo; 1 AWS account; 2 workflows; 30-day history
+**Pro ($29/mo, $299/yr):** Everything in Free, plus unlimited workflows and custom events; broadcasts to topics and segments, scheduling; 250 AI generations/mo; 90-day history
 **Business ($199/mo, $1,999/yr):** Everything in Pro, plus unlimited AWS accounts; 1,000 AI generations/mo; 1-year history; SSO, SCIM and audit logs; priority support
 
 ## Key Differentiators

@@ -46,8 +46,8 @@ export function MarketingCtaSection() {
         </div>
 
         <p className="mt-6 text-muted-foreground text-sm">
-          Broadcasts, segments, topics, and scheduling start at $29 a month.
-          Sending is billed by AWS directly, at SES rates.
+          Broadcasts to all contacts are free. Segments, topics, and scheduling
+          start at $29 a month. Sending is billed by AWS directly, at SES rates.
         </p>
       </div>
     </section>

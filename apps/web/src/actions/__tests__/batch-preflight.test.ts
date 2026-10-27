@@ -212,6 +212,7 @@ vi.mock("@wraps/auth", () => ({
 
 vi.mock("@/lib/plan-limits", () => ({
   checkFeatureAccess: vi.fn(async () => ({ allowed: true })),
+  checkBroadcastAccess: vi.fn(async () => ({ allowed: true })),
 }));
 
 vi.mock("@/actions/templates", () => ({

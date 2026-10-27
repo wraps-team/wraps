@@ -69,7 +69,7 @@ import {
   HANDLEBARS_KEYWORDS,
 } from "@/lib/handlebars";
 import { createActionLogger } from "@/lib/logger";
-import { checkFeatureAccess } from "@/lib/plan-limits";
+import { checkBroadcastAccess, checkFeatureAccess } from "@/lib/plan-limits";
 import { orgAction } from "./shared/org-action";
 import { publishTemplateToSES } from "./templates";
 
@@ -853,28 +853,19 @@ async function validateAndPrepareSend(
   organizationId: string,
   data: PrepareSendData
 ): Promise<PrepareSendResult> {
-  const featureCheck = await checkFeatureAccess(organizationId, "batch");
+  // Sending to all contacts is open to every plan. A topic or segment
+  // audience and a scheduled send are separate entitlements, checked here
+  // because the UI lock alone is not a gate.
+  const featureCheck = await checkBroadcastAccess(organizationId, {
+    audienceType: data.recipientFilter?.audienceType,
+    scheduled: Boolean(data.scheduledFor),
+  });
   if (!featureCheck.allowed) {
     return {
       ok: false,
       error:
-        featureCheck.message ?? "Batch sending is not available on your plan.",
+        featureCheck.message ?? "This broadcast is not available on your plan.",
     };
-  }
-
-  if (data.scheduledFor) {
-    const schedulingCheck = await checkFeatureAccess(
-      organizationId,
-      "campaigns"
-    );
-    if (!schedulingCheck.allowed) {
-      return {
-        ok: false,
-        error:
-          schedulingCheck.message ??
-          "Scheduling broadcasts requires a paid plan.",
-      };
-    }
   }
 
   const awsAccountRow = await findAwsAccountForOrg(
@@ -1260,13 +1251,16 @@ export const saveDraftBatchSend = orgAction(
     organizationId: string,
     data: CreateDraftBatchInput
   ): Promise<SaveDraftBatchResult> => {
-    const featureCheck = await checkFeatureAccess(organizationId, "batch");
+    const featureCheck = await checkBroadcastAccess(organizationId, {
+      audienceType: data.recipientFilter?.audienceType,
+      scheduled: Boolean(data.scheduledFor),
+    });
     if (!featureCheck.allowed) {
       return {
         success: false,
         error:
           featureCheck.message ??
-          "Batch sending is not available on your plan.",
+          "This broadcast is not available on your plan.",
       };
     }
 
@@ -1415,6 +1409,22 @@ export const updateDraftBatchSend = orgAction(
         success: false,
         error: `Cannot edit: broadcast is already ${existing.status}`,
       };
+    }
+
+    // Only the audience and schedule are plan-gated; check what this edit sets.
+    if (data.recipientFilter !== undefined || data.scheduledFor) {
+      const featureCheck = await checkBroadcastAccess(organizationId, {
+        audienceType: data.recipientFilter?.audienceType,
+        scheduled: Boolean(data.scheduledFor),
+      });
+      if (!featureCheck.allowed) {
+        return {
+          success: false,
+          error:
+            featureCheck.message ??
+            "This broadcast is not available on your plan.",
+        };
+      }
     }
 
     const updateData: Parameters<typeof updateDraftBroadcast>[2] = {};
@@ -1727,8 +1737,7 @@ export const duplicateBatchSend = orgAction(
       return {
         success: false,
         error:
-          featureCheck.message ??
-          "Batch sending is not available on your plan.",
+          featureCheck.message ?? "Broadcasts are not available on your plan.",
       };
     }
 

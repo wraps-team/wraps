@@ -185,7 +185,7 @@ export const createSegment = orgAction(
       trackMembership?: boolean;
     }
   ): Promise<CreateSegmentResult> => {
-    // Check if segments feature is available for this plan (Starter+)
+    // Check if segments feature is available for this plan (Pro+)
     const featureCheck = await checkFeatureAccess(organizationId, "segments");
     if (!featureCheck.allowed) {
       return {

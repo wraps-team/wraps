@@ -125,6 +125,7 @@ vi.mock("@wraps/auth", () => ({
 
 vi.mock("@/lib/plan-limits", () => ({
   checkFeatureAccess: vi.fn(async () => ({ allowed: true })),
+  checkWorkflowTriggerAccess: vi.fn(async () => ({ allowed: true })),
   checkWorkflowLimit: vi.fn(async () => ({
     allowed: true,
     current: 0,

@@ -212,7 +212,7 @@ export function ExploreFirstDashboard({
               <ActivityCard
                 ctaHref={`/${orgSlug}/settings/members`}
                 ctaLabel="Invite Members"
-                description="Collaborate on templates and campaigns."
+                description="Collaborate on templates and broadcasts."
                 highlight={memberCount === 1}
                 icon={<UserPlusIcon className="h-5 w-5" />}
                 isComplete={memberCount > 1}

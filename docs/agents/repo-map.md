@@ -10,6 +10,7 @@ and except `packages/observability` has its own CLAUDE.md.
 | `apps/web` | Dashboard (Next.js App Router) — `app.wraps.dev` |
 | `apps/website` | Marketing site + docs — `wraps.dev` |
 | `apps/api` | Elysia API on AWS Lambda — `api.wraps.dev` |
+| `apps/e2e` | Agentic end-to-end tests for `apps/web` (TesterArmy `e2e`); starts its own `next dev` |
 
 **Packages**
 

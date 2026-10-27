@@ -10,6 +10,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Mock @wraps/db — single combined mock
 const mockDbWhere = vi.fn();
 
+// The plan lookup is its own concern (see segment-trigger-entitlement-db.test.ts).
+vi.mock("../../lib/org-features", () => ({
+  orgHasFeature: vi.fn(async () => true),
+}));
+
 vi.mock("@wraps/db", () => {
   const mockDbLimit = vi.fn();
   const mockWhere = (...args: unknown[]) => {

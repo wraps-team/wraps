@@ -14,6 +14,7 @@
     "test": "VITEST_MAX_WORKERS=4 turbo run test",
     "test:ee": "turbo run test:ee",
     "test:integration": "turbo run test:integration",
+    "test:e2e": "pnpm --filter @wraps/e2e test:e2e",
     "test:coverage": "turbo run test:coverage --filter=@wraps.dev/cli",
     "typecheck": "turbo run typecheck",
     "typecheck:infra": "tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution bundler --resolveJsonModule --esModuleInterop --allowSyntheticDefaultImports sst.config.ts infra/selfhost.config.ts",
