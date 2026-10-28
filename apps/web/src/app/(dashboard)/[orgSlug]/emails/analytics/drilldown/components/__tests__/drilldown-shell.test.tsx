@@ -12,6 +12,10 @@ import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DrilldownSendsResponse } from "../../hooks/use-drilldown-sends";
 import { DrilldownShell } from "../drilldown-shell";
+import addressesTab from "../../tabs/addresses-tab";
+import reasonsTab from "../../tabs/reasons-tab";
+import sendsTab from "../../tabs/sends-tab";
+import timelineTab from "../../tabs/timeline-tab";
 
 const mockUseSends = vi.fn();
 vi.mock("../../hooks/use-drilldown-sends", () => ({
@@ -119,23 +123,23 @@ afterEach(() => {
 });
 
 describe("DrilldownShell", () => {
-  it("renders only the tabs whose enabled flag is true", () => {
+  it("renders exactly the tabs whose enabled flag is true", () => {
     renderShell();
-    expect(screen.getByRole("tab", { name: "Sends" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("tab", { name: "Reasons" })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("tab", { name: "Addresses" })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("tab", { name: "Timeline" })
-    ).not.toBeInTheDocument();
+    // Driven by each tab module's own flag, so it holds as tabs are enabled.
+    for (const tab of [sendsTab, reasonsTab, addressesTab, timelineTab]) {
+      const query = screen.queryByRole("tab", { name: tab.label });
+      if (tab.enabled) {
+        expect(query).toBeInTheDocument();
+      } else {
+        expect(query).not.toBeInTheDocument();
+      }
+    }
+    expect(sendsTab.enabled).toBe(true);
     expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
   });
 
   it("falls back to the first enabled tab for an absent or disabled tab param", () => {
-    renderShell("?tab=timeline");
+    renderShell("?tab=no-such-tab");
     expect(screen.getByRole("tab", { name: "Sends" })).toHaveAttribute(
       "data-state",
       "active"
