@@ -286,6 +286,9 @@ importers:
       turbo:
         specifier: ^2.10.7
         version: 2.10.7
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
       ultracite:
         specifier: 6.3.2
         version: 6.3.2(typescript@5.9.3)

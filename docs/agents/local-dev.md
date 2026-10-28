@@ -17,10 +17,12 @@ defaults (`http://localhost:3001` / `:3000`), which portless leaves unserved.
 ## `pnpm check:all` in a fresh checkout
 
 `pnpm install` is **not** enough for `check:all` in a tree nobody has built in — a fresh
-clone, a CI runner, or an isolated git worktree. Its `typecheck:infra` step is a bare
-`tsc` over `sst.config.ts` and `infra/selfhost.config.ts`, and both files open with
+clone, a CI runner, or an isolated git worktree. Its `typecheck:infra` step
+(`scripts/typecheck-infra.sh`) runs the root `tsc` over `sst.config.ts` and
+`infra/selfhost.config.ts`, and both files open with
 `/// <reference path="./.sst/platform/config.d.ts" />`. That file is *generated*, never
-built, so no amount of `turbo run build` produces it. Bootstrap it:
+built, so no amount of `turbo run build` produces it. The script checks for both
+directories first and prints these commands when one is missing. Bootstrap it:
 
 ```bash
 pnpm install
