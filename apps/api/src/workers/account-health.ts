@@ -25,6 +25,11 @@
  *
  * Each alert is deduped per account per 24h via hasRecentNotification, so
  * an ongoing episode notifies once per day rather than once per hour.
+ * `aws.role_unreachable` is the exception: it notifies once per episode. A
+ * customer who removed the role on purpose will not repair it, and a daily
+ * email for a state they chose is noise. The episode starts at the last good
+ * check (roleLastReachableAt only moves forward on success), so a role that
+ * recovers and breaks again alerts again.
  * Per-account errors are logged and skipped — one broken role must not
  * abort the sweep.
  *
@@ -143,8 +148,10 @@ async function notifyOnce(params: {
   body: string;
   href: string;
   data?: Record<string, unknown>;
+  /** Dedupe window start; defaults to the last 24h. */
+  since?: Date;
 }): Promise<boolean> {
-  const since = new Date(Date.now() - DEDUPE_WINDOW_MS);
+  const since = params.since ?? new Date(Date.now() - DEDUPE_WINDOW_MS);
   const already = await hasRecentNotification({
     organizationId: params.account.organizationId,
     type: params.type,
@@ -383,6 +390,7 @@ async function checkAccount(account: AccountRow): Promise<void> {
       body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) cannot be assumed or is missing SES permissions. Sending uses this same role, so email is blocked until it is repaired — and health checks (sending paused, reputation, and quota alerts) are not running either. Open this account in Wraps and open Connection → Role access for the steps: update your CloudFormation stack if you deployed one, or run \`wraps platform update-role\` if you connected with the CLI (\`wraps platform connect\` if the role was deleted).`,
       href: connectionHref,
       data: { reason, lastReachableAt },
+      since: account.roleLastReachableAt,
     });
     log.warn("[account-health] Customer role unusable, skipping account", {
       accountId: account.id,

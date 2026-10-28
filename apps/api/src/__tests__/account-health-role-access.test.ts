@@ -434,6 +434,22 @@ describe("account-health with an unusable customer role", () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  it("alerts once per unreachable episode, not once per day", async () => {
+    // A customer who removed the role on purpose (or an abandoned account) is
+    // not going to repair it, and a daily "can no longer reach your AWS
+    // account" email to them is noise. The episode starts at the last good
+    // check, so a role that recovers and breaks again alerts again.
+    ACCOUNT_ROW.roleLastReachableAt = new Date("2026-07-01T00:00:00Z");
+    mockStsSend.mockRejectedValue(accessDeniedError());
+
+    await invoke();
+
+    const dedupe = mockHasRecentNotification.mock.calls.find(
+      (call) => call[0].type === "aws.role_unreachable"
+    )?.[0];
+    expect(dedupe?.since).toEqual(new Date("2026-07-01T00:00:00Z"));
+  });
+
   it("still reports unexpected failures to Sentry", async () => {
     mockStsSend.mockRejectedValue(
       Object.assign(new TypeError("cannot read property of undefined"), {

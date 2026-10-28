@@ -30,6 +30,7 @@ vi.mock("@pulumi/pulumi", () => ({
 }));
 vi.mock("@clack/prompts");
 vi.mock("../../utils/shared/aws.js");
+vi.mock("../../utils/shared/config.js");
 vi.mock("../../utils/shared/fs.js");
 vi.mock("../../utils/shared/metadata.js");
 vi.mock("../../utils/shared/pulumi.js");
@@ -41,6 +42,7 @@ vi.mock("../../infrastructure/email-stack.js");
 import * as prompts from "@clack/prompts";
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "../../utils/shared/aws.js";
+import * as config from "../../utils/shared/config.js";
 import * as fsUtils from "../../utils/shared/fs.js";
 import * as jsonOutput from "../../utils/shared/json-output.js";
 import * as metadata from "../../utils/shared/metadata.js";
@@ -80,8 +82,20 @@ function connectedMetadata(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const SAAS_API = "https://api.wraps.dev";
+
+/** A platform-connected account: the connection id is aws_account.id on the server. */
+function platformConnectedMetadata() {
+  return {
+    ...connectedMetadata(),
+    platform: { externalId: "ext-abc", connectionId: "conn-abc" },
+  } as any;
+}
+
 let capturedOverrides: Record<string, unknown> | undefined;
 let savedMetadata: any;
+let fetchMock: ReturnType<typeof vi.fn>;
+let events: string[];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -90,6 +104,21 @@ beforeEach(() => {
   iamMock.on(DeleteRoleCommand).resolves({});
   capturedOverrides = undefined;
   savedMetadata = undefined;
+  events = [];
+
+  fetchMock = vi.fn(async () => {
+    events.push("api-delete");
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  vi.mocked(config.getApiBaseUrl).mockReturnValue(SAAS_API);
+  vi.mocked(config.resolveTokenAsync).mockResolvedValue("saas-token");
+  vi.mocked(config.readAuthConfig).mockResolvedValue({
+    auth: {
+      token: "saas-token",
+      organizations: [{ id: "org-1", name: "One", slug: "one" }],
+    },
+  } as any);
 
   const mockSpinner = { start: vi.fn(), stop: vi.fn(), message: vi.fn() };
   vi.mocked(prompts.spinner).mockReturnValue(mockSpinner as never);
@@ -256,5 +285,176 @@ describe("platform disconnect", () => {
     expect(
       pulumi.automation.LocalWorkspace.createOrSelectStack
     ).not.toHaveBeenCalled();
+  });
+});
+
+describe("platform disconnect — server-side record", () => {
+  // Without this the dashboard keeps `webhook_secret` set, and account-health
+  // (which sweeps every account holding one) emails the owner a daily
+  // "Wraps can no longer reach your AWS account" for a role they deleted on purpose.
+
+  it("tells the platform to drop the connection after the target is gone and before the role is deleted", async () => {
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(
+      platformConnectedMetadata()
+    );
+    vi.mocked(
+      pulumi.automation.LocalWorkspace.createOrSelectStack
+    ).mockResolvedValue({
+      setConfig: vi.fn().mockResolvedValue(undefined),
+      refresh: vi.fn().mockResolvedValue(undefined),
+      exportStack: vi.fn().mockResolvedValue({ deployment: { resources: [] } }),
+      up: vi.fn(async () => {
+        events.push("stack-up");
+        return {};
+      }),
+    } as any);
+    iamMock.on(DeleteRoleCommand).callsFake(async () => {
+      events.push("role-deleted");
+      return {};
+    });
+
+    await disconnect({ force: true });
+
+    // Role deletion is what starts role_unreachable, so the record must be
+    // cleared first; and only once the target is gone, so no in-flight event
+    // meets a nulled secret.
+    expect(events).toEqual(["stack-up", "api-delete", "role-deleted"]);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${SAAS_API}/v1/connections/conn-abc`);
+    expect(init.method).toBe("DELETE");
+    expect(init.headers.Authorization).toBe("Bearer saas-token");
+    expect(init.headers["X-Organization-Id"]).toBe("org-1");
+  });
+
+  it("targets the SaaS plane even when signed in to a self-hosted instance", async () => {
+    // resolveApiTarget() would follow activeInstance here and null the secret
+    // on the customer's own control plane — the one they are keeping.
+    vi.mocked(config.readAuthConfig).mockResolvedValue({
+      auth: {
+        token: "saas-token",
+        organizations: [{ id: "org-1", name: "One", slug: "one" }],
+      },
+      activeInstance: "https://selfhost.example.com",
+      selfhost: {
+        "https://selfhost.example.com": {
+          token: "selfhost-token",
+          apiUrl: "https://selfhost-api.example.com",
+        },
+      },
+    } as any);
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(
+      platformConnectedMetadata()
+    );
+
+    await disconnect({ force: true });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${SAAS_API}/v1/connections/conn-abc`);
+    expect(init.headers.Authorization).toBe("Bearer saas-token");
+  });
+
+  it("tries the next organization when the first does not own the connection", async () => {
+    vi.mocked(config.readAuthConfig).mockResolvedValue({
+      auth: {
+        token: "saas-token",
+        organizations: [
+          { id: "org-1", name: "One", slug: "one" },
+          { id: "org-2", name: "Two", slug: "two" },
+        ],
+      },
+    } as any);
+    fetchMock
+      .mockResolvedValueOnce(new Response("{}", { status: 404 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(
+      platformConnectedMetadata()
+    );
+
+    await disconnect({ force: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1].headers["X-Organization-Id"]).toBe(
+      "org-2"
+    );
+    expect(savedMetadata.platform).toBeUndefined();
+  });
+
+  it("still finishes the AWS teardown, keeps the connection id and says so when the platform call fails", async () => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 401 }));
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(
+      platformConnectedMetadata()
+    );
+
+    await expect(disconnect({ force: true })).resolves.toBeUndefined();
+
+    expect(iamMock.commandCalls(DeleteRoleCommand)).toHaveLength(1);
+    // Kept so a re-run can finish the server-side half.
+    expect(savedMetadata.platform?.connectionId).toBe("conn-abc");
+    expect(prompts.log.warn).toHaveBeenCalledWith(
+      expect.stringContaining("still lists this account as connected")
+    );
+    expect(prompts.log.success).not.toHaveBeenCalledWith(
+      expect.stringContaining("Disconnected from the Wraps Platform")
+    );
+  });
+
+  it("reports platformRecordCleared in JSON mode", async () => {
+    vi.mocked(jsonOutput.isJsonMode).mockReturnValue(true);
+    fetchMock.mockResolvedValue(new Response("{}", { status: 500 }));
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(
+      platformConnectedMetadata()
+    );
+
+    await disconnect({ force: true });
+
+    expect(jsonOutput.jsonSuccess).toHaveBeenCalledWith(
+      "platform.disconnect",
+      expect.objectContaining({
+        disconnected: true,
+        platformRecordCleared: false,
+      })
+    );
+  });
+
+  it("warns instead of calling the API when there is no connection id (manual-paste connect)", async () => {
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(
+      connectedMetadata() as any
+    );
+
+    await disconnect({ force: true });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(prompts.log.warn).toHaveBeenCalledWith(
+      expect.stringContaining("still lists this account as connected")
+    );
+  });
+
+  it("warns instead of calling the API when not signed in", async () => {
+    vi.mocked(config.resolveTokenAsync).mockResolvedValue(null);
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(
+      platformConnectedMetadata()
+    );
+
+    await disconnect({ force: true });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(savedMetadata.platform?.connectionId).toBe("conn-abc");
+  });
+
+  it("finishes the server-side half on a re-run after an earlier partial disconnect", async () => {
+    // Local secret already cleared, but the connection id survived because the
+    // platform call failed last time.
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue({
+      ...connectedMetadata({ webhookSecret: undefined }),
+      platform: { externalId: "ext-abc", connectionId: "conn-abc" },
+    } as any);
+
+    await disconnect({ force: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      pulumi.automation.LocalWorkspace.createOrSelectStack
+    ).not.toHaveBeenCalled();
+    expect(savedMetadata.platform).toBeUndefined();
   });
 });

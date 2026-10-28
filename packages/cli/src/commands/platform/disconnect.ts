@@ -20,6 +20,13 @@
  *   the email stack. This command is not a teardown; `wraps email destroy` is,
  *   and it removes shared infrastructure the self-hosted plane still needs.
  *
+ * It also tells the platform. The AWS-side teardown alone leaves the dashboard
+ * holding a `webhook_secret` for the account, and account-health sweeps every
+ * account that holds one — so with the console role gone it emails the owner a
+ * daily "Wraps can no longer reach your AWS account" for a role they removed on
+ * purpose. `DELETE /v1/connections/:id` clears the secret and takes the account
+ * out of that sweep.
+ *
  * Sending is entirely unaffected either way — mail flows from the customer's
  * own SES with their own credentials, and Wraps is never in that path.
  */
@@ -36,6 +43,11 @@ import pc from "picocolors";
 import { deployEmailStack } from "../../infrastructure/email-stack.js";
 import type { PlatformDisconnectOptions } from "../../types/index.js";
 import { validateAWSCredentials } from "../../utils/shared/aws.js";
+import {
+  getApiBaseUrl,
+  readAuthConfig,
+  resolveTokenAsync,
+} from "../../utils/shared/config.js";
 import { isAWSNotFoundError } from "../../utils/shared/errors.js";
 import {
   ensurePulumiWorkDir,
@@ -99,6 +111,127 @@ async function removeConsoleAccessRole(region: string): Promise<boolean> {
     }
     throw error;
   }
+}
+
+type PlatformRecordResult =
+  | { cleared: true }
+  | { cleared: false; reason: string };
+
+/** One DELETE attempt; resolves to the HTTP status, rejects on a network failure. */
+async function deleteConnection(
+  connectionId: string,
+  token: string,
+  orgId: string | undefined
+): Promise<number> {
+  const response = await fetch(
+    `${getApiBaseUrl()}/v1/connections/${encodeURIComponent(connectionId)}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(orgId ? { "X-Organization-Id": orgId } : {}),
+      },
+    }
+  );
+  return response.status;
+}
+
+/**
+ * The organizations to try the DELETE under. A session token resolves to its
+ * active organization unless told which one, and a mismatch is a 404, not an
+ * error. The connection's org isn't stored in metadata, so try each one the
+ * token belongs to; with none known, send no header and let the server decide.
+ */
+async function organizationAttempts(): Promise<Array<string | undefined>> {
+  const config = await readAuthConfig();
+  const orgIds = config?.auth?.organizations?.map((org) => org.id) ?? [];
+  return orgIds.length ? orgIds : [undefined];
+}
+
+/**
+ * Ask the Wraps platform to forget this connection (clears its webhook secret).
+ *
+ * Deliberately NOT `resolveApiTarget()`: that follows `activeInstance`, and this
+ * command's main caller is a customer who also runs a self-hosted control plane
+ * — so it could aim the DELETE at their own plane and null the secret of the
+ * one they are keeping. This command only ever concerns the SaaS plane, so it
+ * pairs `getApiBaseUrl()` with the SaaS-slot token, as `platform connect` does.
+ *
+ * Never throws: by the time this runs the AWS side is already torn down, so a
+ * failure here must be reported, not allowed to abort the rest of the command.
+ */
+async function clearPlatformRecord(
+  connectionId: string | undefined
+): Promise<PlatformRecordResult> {
+  if (!connectionId) {
+    return {
+      cleared: false,
+      reason: "no connection id is recorded for it (it was connected manually)",
+    };
+  }
+
+  const token = await resolveTokenAsync();
+  if (!token) {
+    return { cleared: false, reason: "you are not signed in to Wraps" };
+  }
+
+  const attempts = await organizationAttempts();
+
+  let status = 0;
+  for (const orgId of attempts) {
+    try {
+      status = await deleteConnection(connectionId, token, orgId);
+    } catch (error) {
+      return {
+        cleared: false,
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
+    if (status >= 200 && status < 300) {
+      return { cleared: true };
+    }
+    if (status !== 404) {
+      break;
+    }
+  }
+
+  return {
+    cleared: false,
+    reason:
+      status === 404
+        ? "none of your organizations owns that connection"
+        : `the platform answered HTTP ${status}`,
+  };
+}
+
+/**
+ * `clearPlatformRecord` with a spinner that ends on the real outcome.
+ * `progress.execute` would tick green on a `{ cleared: false }` result, since
+ * that is a return value, not a throw.
+ */
+async function removePlatformRecord(
+  progress: DeploymentProgress,
+  connectionId: string | undefined
+): Promise<PlatformRecordResult> {
+  progress.start("Removing platform record");
+  const record = await clearPlatformRecord(connectionId);
+  if (record.cleared) {
+    progress.succeed("Platform record removed");
+  } else {
+    progress.fail("Platform record not removed");
+  }
+  return record;
+}
+
+/** Loud, because a quiet failure here is exactly what produces the daily emails. */
+function warnPlatformRecordNotCleared(reason: string): void {
+  log.warn(
+    [
+      `Wraps still lists this account as connected (${reason}).`,
+      'Until that is cleared you will keep getting "Wraps can no longer reach your AWS account" emails.',
+      `Clear it in the dashboard (Settings → AWS accounts → this account → ${pc.cyan("Disconnect streaming")}), or fix the above and re-run ${pc.cyan("wraps platform disconnect")}.`,
+    ].join("\n  ")
+  );
 }
 
 export async function disconnect(
@@ -166,6 +299,39 @@ export async function disconnect(
     // Already disconnected is success, not failure — this command is the kind
     // of thing people run twice, and re-running a Pulumi up to remove nothing
     // is a slow way to say "nothing to do".
+    //
+    // Unless an earlier run couldn't reach the platform: it keeps
+    // `platform.connectionId` in that case, and finishing that half is all a
+    // re-run has left to do.
+    if (!emailService.webhookSecret && metadata.platform?.connectionId) {
+      const record = await removePlatformRecord(
+        progress,
+        metadata.platform.connectionId
+      );
+      if (record.cleared) {
+        metadata.platform = undefined;
+        await saveConnectionMetadata(metadata);
+      }
+      if (json) {
+        jsonSuccess("platform.disconnect", {
+          accountId: identity.accountId,
+          region,
+          disconnected: false,
+          reason: "not connected",
+          platformRecordCleared: record.cleared,
+        });
+        return;
+      }
+      if (record.cleared) {
+        log.success("Wraps no longer lists this account as connected.");
+        outro("Done");
+      } else {
+        warnPlatformRecordNotCleared(record.reason);
+        outro("Platform record not cleared");
+      }
+      return;
+    }
+
     if (!emailService.webhookSecret) {
       progress.stop();
       if (json) {
@@ -183,6 +349,8 @@ export async function disconnect(
     }
 
     const stillSelfhosted = !!emailService.selfhostWebhook;
+    // Read now: `metadata.platform` is cleared before the end of this command.
+    const connectionId = metadata.platform?.connectionId;
 
     if (!(options.force || options.yes || json)) {
       progress.stop();
@@ -293,6 +461,11 @@ export async function disconnect(
 
     progress.succeed("Platform event target removed");
 
+    // Before the role goes: deleting it is what makes account-health start
+    // reporting the account unreachable, so the record has to be cleared first.
+    // After `stack.up`, so no event still in flight meets a cleared secret.
+    const record = await removePlatformRecord(progress, connectionId);
+
     // Revoke cross-account access last: if this fails the event target is
     // already gone, so the customer is disconnected in the sense that matters
     // and can re-run to finish the job. Doing it first would leave the reverse
@@ -305,8 +478,12 @@ export async function disconnect(
 
     // The platform issued this externalId for a connection that no longer
     // exists. Leaving it behind would let a later connect reuse a stale id.
-    metadata.platform = undefined;
-    await saveConnectionMetadata(metadata);
+    // Unless the platform still lists the connection: then the id is the only
+    // handle a re-run has to finish the job.
+    if (record.cleared) {
+      metadata.platform = undefined;
+      await saveConnectionMetadata(metadata);
+    }
 
     if (json) {
       jsonSuccess("platform.disconnect", {
@@ -315,12 +492,18 @@ export async function disconnect(
         disconnected: true,
         selfhostWebhookRetained: stillSelfhosted,
         consoleAccessRoleRemoved: roleRemoved,
+        platformRecordCleared: record.cleared,
       });
       return;
     }
 
     console.log();
-    log.success("Disconnected from the Wraps Platform.");
+    if (record.cleared) {
+      log.success("Disconnected from the Wraps Platform.");
+    } else {
+      log.warn("Disconnected on AWS, but not yet on the Wraps Platform.");
+      warnPlatformRecordNotCleared(record.reason);
+    }
     console.log();
     console.log(
       `  SES events from ${pc.cyan(identity.accountId)} no longer reach app.wraps.dev.`
