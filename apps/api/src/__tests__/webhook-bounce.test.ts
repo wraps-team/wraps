@@ -38,6 +38,15 @@ vi.mock("@wraps/db", async () => {
     db: {
       select: mockDbSelect,
       update: mockDbUpdate,
+      // processBounce / processComplaint write the receiver diagnostic.
+      insert: () => ({
+        values: () => ({
+          onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+          onConflictDoNothing: () => ({
+            returning: vi.fn().mockResolvedValue([{ id: "msg-send-1" }]),
+          }),
+        }),
+      }),
     },
   };
 });

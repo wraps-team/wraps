@@ -7,6 +7,7 @@ export * from "./contacts";
 export * from "./domain-auth";
 export * from "./events";
 export * from "./message-metrics";
+export * from "./message-send-diagnostics";
 export * from "./message-sends";
 export * from "./notifications";
 export * from "./segments";
