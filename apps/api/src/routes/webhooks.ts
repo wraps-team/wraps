@@ -13,9 +13,11 @@ import {
   db,
   eq,
   hasRecentNotification,
+  type MessageSendDiagnosticInput,
   messageSend,
   messageUsageMonthly,
   organization,
+  recordMessageSendDiagnostic,
   workflow,
   workflowExecution,
 } from "@wraps/db";
@@ -23,6 +25,11 @@ import { and, inArray, isNull, lt, ne, notInArray, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { isSelfHosted } from "../(ee)/lib/license";
 import { trackFirstEmailDelivered } from "../lib/activation-tracking";
+import {
+  type BounceDiagnostic,
+  extractBounceDiagnostic,
+  normalizeFeedbackType,
+} from "../lib/bounce-diagnostics";
 import { recordSendingIdentity } from "../lib/identity-backstop";
 import { log } from "../lib/logger";
 import { logNonHomeRegionEvent } from "../lib/region-mismatch";
@@ -86,7 +93,13 @@ type EventBridgeEvent = {
       bounceType: string;
       bounceSubType: string;
       timestamp: string;
-      bouncedRecipients: Array<{ emailAddress: string }>;
+      // status and diagnosticCode are the receiver's SMTP diagnostic. SES sends
+      // them per recipient; they are read here and stored as a diagnostic row.
+      bouncedRecipients: Array<{
+        emailAddress: string;
+        status?: string;
+        diagnosticCode?: string;
+      }>;
     };
     complaint?: {
       timestamp: string;
@@ -332,6 +345,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
         contactId: messageSend.contactId,
         openedAt: messageSend.openedAt,
         clickedAt: messageSend.clickedAt,
+        recipient: messageSend.recipient,
       })
       .from(messageSend)
       .where(
@@ -352,6 +366,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
       const recipient = mail.destination?.[0];
       const lifecycle = sdkLogLifecycleFields(eventType, event.detail);
       let insertedRow = false;
+      let insertedId: string | undefined;
       if (recipient && lifecycle) {
         const inserted = await db
           .insert(messageSend)
@@ -373,6 +388,35 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
           .onConflictDoNothing()
           .returning({ id: messageSend.id });
         insertedRow = inserted.length > 0;
+        insertedId = inserted[0]?.id;
+      }
+      // Only the event that created the row records its diagnostic. A duplicate
+      // lifecycle event inserts nothing and so records nothing new. This runs
+      // outside the try below, so a failed write is returned as 500 here.
+      if (recipient && insertedId) {
+        const sdkDiagnostic = sdkDiagnosticFor(
+          eventType,
+          event.detail,
+          recipient
+        );
+        if (sdkDiagnostic) {
+          try {
+            await recordMessageSendDiagnostic(
+              {
+                organizationId: account.organizationId,
+                messageSendId: insertedId,
+                ...sdkDiagnostic,
+              },
+              db
+            );
+          } catch (error) {
+            log.error("Webhook: SDK diagnostic write failed", error, {
+              messageId,
+            });
+            set.status = 500;
+            return { error: "Failed to process event" };
+          }
+        }
       }
       // Count delivery and track activation in parallel. Billing must only
       // fire when this call actually created the row — a duplicate SDK
@@ -455,7 +499,11 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
             account.organizationId,
             event.detail.bounce?.bounceType,
             event.detail.bounce?.bounceSubType,
-            event.detail.bounce?.timestamp
+            event.detail.bounce?.timestamp,
+            extractBounceDiagnostic(
+              event.detail.bounce?.bouncedRecipients,
+              message.recipient
+            )
           );
           break;
 
@@ -464,7 +512,8 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
             message,
             messageId,
             account.organizationId,
-            event.detail.complaint?.timestamp
+            event.detail.complaint?.timestamp,
+            normalizeFeedbackType(event.detail.complaint?.complaintFeedbackType)
           );
           break;
 
@@ -556,6 +605,41 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
   }
 );
 
+/**
+ * The diagnostic an SDK-path Bounce or Complaint stores when its event creates
+ * the messageSend row. Null for every other event, and for suppression subtypes:
+ * those are not recorded as bounces (see processBounce).
+ */
+function sdkDiagnosticFor(
+  eventType: SesEventType,
+  detail: EventBridgeEvent["detail"],
+  recipient: string
+): Omit<MessageSendDiagnosticInput, "organizationId" | "messageSendId"> | null {
+  if (eventType === "Bounce") {
+    const subType = detail.bounce?.bounceSubType;
+    if (subType === "Suppressed" || subType === "EmailValidationSuppressed") {
+      return null;
+    }
+    return {
+      eventType: "bounce",
+      ...extractBounceDiagnostic(detail.bounce?.bouncedRecipients, recipient),
+      feedbackType: null,
+    };
+  }
+  if (eventType === "Complaint") {
+    return {
+      eventType: "complaint",
+      enhancedStatus: null,
+      diagnosticCode: null,
+      reasonKey: null,
+      feedbackType: normalizeFeedbackType(
+        detail.complaint?.complaintFeedbackType
+      ),
+    };
+  }
+  return null;
+}
+
 // Helper types
 type MessageRecord = {
   id: string;
@@ -564,6 +648,8 @@ type MessageRecord = {
   contactId: string | null;
   openedAt: Date | null;
   clickedAt: Date | null;
+  // Optional: the existing mocks omit it, and the code tolerates undefined.
+  recipient?: string | null;
 };
 
 async function processDelivery(
@@ -794,7 +880,12 @@ async function processBounce(
   organizationId: string,
   bounceType?: string,
   bounceSubType?: string,
-  timestamp?: string
+  timestamp?: string,
+  diagnostic: BounceDiagnostic = {
+    enhancedStatus: null,
+    diagnosticCode: null,
+    reasonKey: null,
+  }
 ): Promise<void> {
   // Auto Validation (SES Pro/Enterprise, or an add-on elsewhere) drops the
   // send before any delivery attempt is made, on the strength of a validation
@@ -816,6 +907,21 @@ async function processBounce(
     }
     return;
   }
+
+  // Record the receiver diagnostic before the transition, so a retry after a
+  // later failure still stores it. A duplicate event leaves the stored values
+  // in place (COALESCE in recordMessageSendDiagnostic) and does not change the
+  // status or the counters below.
+  await recordMessageSendDiagnostic(
+    {
+      organizationId,
+      messageSendId: message.id,
+      eventType: "bounce",
+      ...diagnostic,
+      feedbackType: null,
+    },
+    db
+  );
 
   const bouncedAt = timestamp ? new Date(timestamp) : new Date();
 
@@ -886,9 +992,25 @@ async function processComplaint(
   message: MessageRecord,
   messageId: string,
   organizationId: string,
-  timestamp?: string
+  timestamp?: string,
+  feedbackType: string | null = null
 ): Promise<void> {
   const complainedAt = timestamp ? new Date(timestamp) : new Date();
+
+  // Record the feedback type before the transition, as processBounce does for
+  // its diagnostic. Complaints carry no per-recipient SMTP fields.
+  await recordMessageSendDiagnostic(
+    {
+      organizationId,
+      messageSendId: message.id,
+      eventType: "complaint",
+      enhancedStatus: null,
+      diagnosticCode: null,
+      reasonKey: null,
+      feedbackType,
+    },
+    db
+  );
 
   // Update messageSend status — guarded on a genuine transition (WHERE status
   // <> 'complained') so a duplicate Complaint event does not re-count.
