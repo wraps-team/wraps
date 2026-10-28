@@ -1,5 +1,6 @@
 "use client";
 
+import { describeEventDiagnostics } from "@wraps/core/email-diagnostics";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
   Bot,
@@ -15,7 +16,6 @@ import {
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { isBotOpen } from "@/lib/email-bot-detection";
-import { describeEventDiagnostics } from "@/lib/email-diagnostics";
 import {
   formatFullTimestamp,
   formatShortTimestamp,
