@@ -13,7 +13,7 @@
   "type": "module",
   "scripts": {
     "build": "tsdown",
-    "dev": "stripe listen --forward-to https://web.wraps.localhost/api/auth/stripe/webhook",
+    "dev": "stripe listen --all-snapshot --forward-to https://web.wraps.localhost/api/auth/stripe/webhook",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
