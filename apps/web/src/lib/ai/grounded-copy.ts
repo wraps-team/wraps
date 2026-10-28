@@ -36,8 +36,15 @@ export async function generateGroundedCopy<T>(args: {
   try {
     // A two-line rephrase of established facts: the smallest model is enough,
     // and providers that cannot serve it fall back to their default.
+    //
+    // No `reasoning` here. Thinking tokens count against `maxOutputTokens`,
+    // which is tuned for the two-line answer below, so enabling thinking made
+    // the model spend the budget before the JSON was complete. Every response
+    // came back truncated (finish_reason "length"), structured-output parsing
+    // threw, and every call fell back to the static copy. The copy routes that
+    // do want reasoning pair it with a far larger cap.
     const { model, modelId, providerOptions } = await getAIModel(
-      { model: "claude-haiku-5.5", reasoning: { effort: "low" } },
+      { model: "claude-haiku-5.5" },
       aiEnv()
     );
 
