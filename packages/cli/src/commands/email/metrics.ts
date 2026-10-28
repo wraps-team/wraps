@@ -161,7 +161,7 @@ function classifyHttpStatus(status: number, message: string): Failure {
   }
   if (status === 401) {
     return {
-      code: "UNAUTHORIZED",
+      code: "NOT_AUTHENTICATED",
       message,
       suggestion:
         "The API key was rejected. Check WRAPS_API_KEY or --token, or sign in again with `wraps auth login`.",

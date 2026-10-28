@@ -210,7 +210,7 @@ describe("emailMetrics", () => {
     });
 
     it.each([
-      [401, "UNAUTHORIZED"],
+      [401, "NOT_AUTHENTICATED"],
       [403, "FORBIDDEN"],
       [404, "NOT_FOUND"],
       [429, "RATE_LIMITED"],
