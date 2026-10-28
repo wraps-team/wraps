@@ -1,10 +1,10 @@
 "use client";
 
-import { Badge } from "@wraps/ui/components/ui/badge";
 import type {
   DiagnosticSeverity,
   EventDiagnostics,
-} from "@/lib/email-diagnostics";
+} from "@wraps/core/email-diagnostics";
+import { Badge } from "@wraps/ui/components/ui/badge";
 
 const SEVERITY_VARIANT: Record<
   DiagnosticSeverity,
