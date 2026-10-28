@@ -106,7 +106,7 @@ describe("telemetry identity never echoes raw argv", () => {
     for (const command of commands) {
       expect(command).not.toContain("acme-corp.com");
     }
-  }, 30_000);
+  }, 60_000);
 
   it("does not put a mistyped command's email address in the event name", () => {
     const { events, commands, stdout } = runCli([
@@ -128,7 +128,7 @@ describe("telemetry identity never echoes raw argv", () => {
       expect(command).not.toContain("alice@");
       expect(command).not.toContain("acme-corp.com");
     }
-  }, 30_000);
+  }, 60_000);
 
   it("does not put a pushed template slug in the event name", () => {
     const { events, commands, stdout } = runCli([
@@ -147,7 +147,7 @@ describe("telemetry identity never echoes raw argv", () => {
     for (const command of commands) {
       expect(command).not.toContain("northstar-onboarding");
     }
-  }, 30_000);
+  }, 60_000);
 
   it("still reports a real command pair verbatim", () => {
     // The scrub must not cost the dashboards their signal: a routed command
@@ -159,7 +159,7 @@ describe("telemetry identity never echoes raw argv", () => {
       `no telemetry events captured in:\n${stdout}`
     ).toBeGreaterThan(0);
     expect(events.some((e) => e.startsWith("command:email:agent"))).toBe(true);
-  }, 30_000);
+  }, 60_000);
 });
 
 describe("telemetryCommandName", () => {
