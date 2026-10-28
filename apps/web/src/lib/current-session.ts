@@ -16,6 +16,6 @@ import { cache } from "react";
  * Route handlers that call the session once per request can keep calling
  * `auth.api.getSession` directly; caching changes nothing there.
  */
-export const getCurrentSession = cache(async () => {
-  return auth.api.getSession({ headers: await headers() });
-});
+export const getCurrentSession = cache(async () =>
+  auth.api.getSession({ headers: await headers() })
+);
