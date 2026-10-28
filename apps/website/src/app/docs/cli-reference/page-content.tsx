@@ -38,6 +38,9 @@ type DataCommandGroup = {
 const CONTACT_FIELDS =
   "id, externalId, email, phone, firstName, lastName, company, jobTitle, emailStatus, smsStatus, preferredChannel, properties, emailsSent, emailsOpened, emailsClicked, smsSent, smsClicked, createdAt, updatedAt";
 
+const TOPIC_FIELDS =
+  "id, name, slug, description, public, doubleOptIn, subscriberCount, sendableCount, pendingCount, createdAt, updatedAt, createdBy";
+
 const SEGMENT_FIELDS =
   "id, name, description, condition, trackMembership, memberCount, lastComputedAt, createdAt, updatedAt";
 
@@ -86,6 +89,33 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
         flags: "--yes (required), --dry-run",
         data: "id, deleted, dryRun",
       },
+      {
+        command: "contacts import --file <path>",
+        summary: "Import a CSV or JSON file of up to 10,000 rows in one call.",
+        flags:
+          "--format (csv or json), --duplicate-strategy (skip or update), --topic-ids, --validate with --aws-account-id and --yes, --dry-run",
+        data: "dryRun, file, format, rows, created, updated, skipped, invalid, errors, duplicates, duplicateStrategy, topicIds, sesValidation",
+        notes:
+          "A row that matches an existing contact by email or phone is skipped by default. update fills blank fields and merges properties, and never overwrites consent. Split a longer file into parts of at most 10,000 rows, each with the header row. --validate checks addresses with SES and AWS bills per address, so it needs --yes.",
+      },
+      {
+        command: "contacts export",
+        summary: "Export up to 50,000 contacts, newest first.",
+        flags:
+          "--format (json or csv), --output <path>, --search, --email-status, --topic-id, --yes (to overwrite --output)",
+        data: "format, output, exported, total, truncated, hint, overwritten (without --output, the rows are in contacts)",
+        notes:
+          "The file is written only after the API answers. An existing file is not overwritten unless --yes is given. CSV in --json mode needs --output.",
+      },
+      {
+        command: "contacts validate",
+        summary: "Check up to 100 addresses with SES Email Address Insights.",
+        flags:
+          "--emails <a@x.com,b@y.com> or --file <path> (one address per line), --aws-account-id (from email health), --yes, --dry-run",
+        data: "requested, awsAccountId, verdicts",
+        notes:
+          "Needs an AWS account whose SES plan is PRO or ENTERPRISE. Reads no contacts and writes nothing. --yes is required because AWS bills per address.",
+      },
     ],
   },
   {
@@ -132,6 +162,85 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
     ],
   },
   {
+    title: "Topics",
+    commands: [
+      {
+        command: "topics list",
+        summary: "List topics with live subscriber counts. Pro plan.",
+        flags: "--limit (1-100, default 20), --cursor (an offset)",
+        data: "topics, total, limit, offset, nextCursor",
+        notes:
+          "The route returns every topic, so the CLI pages the list itself.",
+      },
+      {
+        command: "topics get <id>",
+        summary: "Show one topic with its audience counts.",
+        data: TOPIC_FIELDS,
+      },
+      {
+        command: "topics create",
+        summary: "Create a topic. Needs --name.",
+        flags:
+          "--name (required), --description, --slug, --public (true or false), --double-opt-in (true or false)",
+        data: TOPIC_FIELDS,
+        notes:
+          "The slug is generated from the name unless you pass one. An existing slug returns CONFLICT.",
+      },
+      {
+        command: "topics update <id>",
+        summary:
+          "Change a topic's name, slug, description, public or double opt-in.",
+        flags:
+          "--name, --description, --slug, --public, --double-opt-in (at least one required)",
+        data: TOPIC_FIELDS,
+      },
+      {
+        command: "topics delete <id>",
+        summary: "Delete a topic and every subscription to it.",
+        flags: "--yes (required), --dry-run",
+        data: "id, deleted, dryRun",
+      },
+      {
+        command: "topics subscribers <id>",
+        summary: "List a topic's subscribers.",
+        flags:
+          "--status (subscribed, pending or unsubscribed), --limit (1-100, default 50), --cursor (a page number, starting at 1)",
+        data: "topicId, subscribers (contactId, email, status, subscribedAt, unsubscribedAt), total, page, pageSize, nextCursor",
+        notes:
+          "pending covers double opt-in contacts who have not confirmed yet.",
+      },
+    ],
+  },
+  {
+    title: "Events",
+    commands: [
+      {
+        command: "events list",
+        summary: "List contact events, newest first.",
+        flags:
+          "--limit (1-100, default 50), --cursor (a page number, default 1), --event-name, --search, --contact-email, --date-from, --date-to (ISO 8601)",
+        data: "events, total, page, pageSize, nextCursor",
+        notes: "Read-only.",
+      },
+      {
+        command: "events analytics",
+        summary: "Show event totals and daily counts.",
+        flags: "--days (7 or 30, default 30), --timezone",
+        data: "days, totalEvents, eventsThisPeriod, activeContacts, avgEventsPerContact, dailyEvents, topEventNames",
+      },
+      {
+        command: "events names",
+        summary: "List the distinct event names.",
+        data: "eventNames, count",
+      },
+      {
+        command: "events get <id>",
+        summary: "Show one event.",
+        data: "id, eventName, eventData, createdAt, contactId, contactEmail, contactFirstName, contactLastName",
+      },
+    ],
+  },
+  {
     title: "Broadcasts",
     commands: [
       {
@@ -169,6 +278,31 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
         flags: "--yes (required), --from-chunk-index",
         data: "id, resumed, fromChunkIndex",
         notes: "Can return RESUME_DISABLED.",
+      },
+      {
+        command: "broadcasts cancel <id>",
+        summary:
+          "Cancel a scheduled, queued or processing broadcast. It calls the existing DELETE /v1/batch/{id}.",
+        flags: "--yes (required), --dry-run",
+        data: "id, status, cancelled, dryRun",
+        notes:
+          "Other statuses return NOT_CANCELLABLE. There is no cancel route, so this command uses the existing delete route.",
+      },
+      {
+        command: "broadcasts duplicate <id>",
+        summary: "Copy any broadcast into a new draft.",
+        data: "id, status, name, sourceId",
+        notes:
+          "The copy is named <name> (copy). It keeps the content, audience and sender, but not the schedule. No --yes needed.",
+      },
+      {
+        command: "broadcasts update <id>",
+        summary:
+          "Edit a draft. Takes the same content flags as broadcasts create, plus --clear-<field>.",
+        flags: "--clear-<field> unsets a nullable field",
+        data: "id, status, name, channel, subject, audienceType, topicId, segmentId, awsAccountId, scheduledFor, updatedFields",
+        notes:
+          "Only drafts can be edited. A broadcast that is not a draft returns CONFLICT with its status, and the error points to broadcasts duplicate.",
       },
     ],
   },
@@ -231,6 +365,29 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
     ],
   },
   {
+    title: "Email Suppressions",
+    commands: [
+      {
+        command: "email suppressions list",
+        summary: "List the SES suppression list.",
+        flags:
+          "--account <awsAccountId>, --reason (bounce or complaint), --limit, --cursor",
+        data: "entries (email, reason, awsAccountId, lastUpdated), nextCursor, hasMore, deniedAccountIds, unreachableAccountIds",
+        notes:
+          "Without --account it covers every connected AWS account. The cursor is opaque: repeat the same --account and --reason with it. A page can be empty while hasMore is true.",
+      },
+      {
+        command: "email suppressions remove <email>",
+        summary: "Remove one address from an AWS account's suppression list.",
+        flags:
+          "--account <awsAccountId> (required), --yes (required), --dry-run, --acknowledge-complaint",
+        data: "email, awsAccountId, dryRun, wasPresent",
+        notes:
+          "An address suppressed for a spam complaint also needs --acknowledge-complaint. The CLI sends that flag only when you pass it. Pass it only after you have confirmed that sending to the address is safe.",
+      },
+    ],
+  },
+  {
     title: "Agent Approvals",
     commands: [
       {
@@ -252,6 +409,35 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
         summary: "Reject a pending send.",
         flags: "--id (required), --yes (required)",
         data: APPROVAL_FIELDS,
+      },
+    ],
+  },
+  {
+    title: "Workflows",
+    commands: [
+      {
+        command: "workflows list",
+        summary: "List workflows, newest first.",
+        flags:
+          "--search (matches the name), --status (draft, enabled, paused or archived), --limit (1-100, default 50), --cursor (a page number)",
+        data: "workflows, total, page, pageSize, totalPages, nextCursor",
+      },
+      {
+        command: "workflows get <workflow-id>",
+        summary: "Show one workflow and its run counts.",
+        data: "id, name, description, status, triggerType, version, totalExecutions, activeExecutions, completedExecutions, failedExecutions, createdBy, createdAt, updatedAt",
+      },
+      {
+        command: "workflows executions <workflow-id>",
+        summary: "List a workflow's runs, newest first.",
+        flags:
+          "--status (pending, active, paused, waiting, completed, failed or cancelled), --limit (1-100, default 50), --cursor (a page number)",
+        data: "workflowId, executions (each with its contact), total, page, pageSize, totalPages, nextCursor",
+      },
+      {
+        command: "workflows execution <execution-id>",
+        summary: "Show one run with its step trace.",
+        data: "id, workflowId, contactId, status, currentStepId, startedAt, completedAt, createdAt, updatedAt, contact, workflowName, steps, stepEngagement",
       },
     ],
   },
@@ -289,6 +475,57 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
         summary: "Cancel an in-progress execution.",
         flags: "--yes (required)",
         data: "executionId, cancelled",
+      },
+    ],
+  },
+  {
+    title: "API Keys (session only)",
+    commands: [
+      {
+        command: "api-keys list",
+        summary: "List the organization's API keys. Metadata only.",
+        data: "apiKeys",
+        notes:
+          "Not paginated: there is no --cursor or --limit. Sign in with wraps auth login first. An API key cannot manage API keys, so --token and WRAPS_API_KEY are refused with SESSION_REQUIRED.",
+      },
+      {
+        command: "api-keys create --name <name>",
+        summary: "Create an API key.",
+        flags:
+          "--name (required), --type (live, test or restricted), --permissions (full, readonly or a comma-separated list), --expires-in-days (1-3650)",
+        data: "apiKey, secretKey",
+        notes:
+          "The secret is shown once, in secretKey. It cannot be shown again, so store it when the command returns. --org <id> picks the organization.",
+      },
+      {
+        command: "api-keys revoke <id>",
+        summary: "Revoke an API key permanently.",
+        flags: "--yes (required), --dry-run",
+        data: "id, revoked, dryRun",
+        notes: "Any agent using the key stops working at once.",
+      },
+    ],
+  },
+  {
+    title: "Audit Log (owners and admins)",
+    commands: [
+      {
+        command: "audit-logs list",
+        summary: "List audit log entries, newest first.",
+        flags:
+          "--action, --actor (a user id), --from, --to, --limit (1-100, default 50), --cursor",
+        data: "data, nextCursor, retentionDays, canExtend",
+        notes:
+          "The cursor is opaque. --to is exclusive: --to 2026-10-08 stops before midnight UTC on October 8. Results are limited to the plan's history window.",
+      },
+      {
+        command: "audit-logs export",
+        summary: "Export audit log entries as JSON or CSV. Business plan.",
+        flags:
+          "--format (json or csv), --output <path>, --action, --actor, --from, --to, --yes (to overwrite --output)",
+        data: "format, output, total, truncated, bytes (without --output in JSON mode: logs, total, truncated)",
+        notes:
+          "Exports up to 50,000 rows. The file is written only after the API answers. An existing file is not overwritten unless --yes is given. Each export writes an audit_log.exported entry.",
       },
     ],
   },
@@ -464,9 +701,9 @@ export default function CLIReferencePageContent() {
         <h2 className="mb-6 font-bold text-2xl">Data Commands for Agents</h2>
         <p className="mb-6 text-muted-foreground">
           These commands read and change data in your Wraps organization:
-          contacts, segments, templates, broadcasts, workflow runs and
-          approvals. They use the Wraps API and do not deploy AWS
-          infrastructure.
+          contacts, topics, segments, templates, broadcasts, events, email
+          suppressions, workflows, approvals, API keys and the audit log. They
+          use the Wraps API and do not deploy AWS infrastructure.
         </p>
         <Card className="mb-6">
           <CardHeader>
@@ -481,7 +718,11 @@ export default function CLIReferencePageContent() {
                 over a stored session from wraps auth login. Self-hosted
                 instances follow wraps selfhost login.
               </li>
-              <li>Every command below takes --token and --json.</li>
+              <li>
+                Every command below takes --json. Every command except api-keys
+                takes --token. The api-keys commands refuse --token and
+                WRAPS_API_KEY.
+              </li>
               <li>
                 With --json, stdout is one JSON object with success, command,
                 and either data or error. The error object has code, message and
@@ -504,16 +745,20 @@ export default function CLIReferencePageContent() {
             <p className="mb-3 text-muted-foreground text-sm">
               These commands send email, make a live change or delete data.
               Without --yes they return CONFIRMATION_REQUIRED before making any
-              request: contacts delete, segments delete, email templates
-              publish, broadcasts create, broadcasts send, broadcasts resume,
-              workflows trigger, workflows enable, workflows retry, workflows
-              cancel, email agent approvals approve, and email agent approvals
-              reject.
+              request: contacts delete, contacts import with --validate,
+              contacts validate, segments delete, topics delete, email
+              suppressions remove, email templates publish, broadcasts create,
+              broadcasts send, broadcasts resume, broadcasts cancel, workflows
+              trigger, workflows enable, workflows retry, workflows cancel,
+              email agent approvals approve, email agent approvals reject, and
+              api-keys revoke.
             </p>
             <p className="text-muted-foreground text-sm">
               email templates pull fetches without --yes, but it refuses to
-              overwrite existing local files unless --yes is given. workflows
-              disable needs no --yes.
+              overwrite existing local files unless --yes is given. contacts
+              export --output and audit-logs export --output refuse to overwrite
+              an existing file in the same way. workflows disable needs no
+              --yes. broadcasts duplicate and broadcasts update need no --yes.
             </p>
           </CardContent>
         </Card>
@@ -525,9 +770,13 @@ export default function CLIReferencePageContent() {
             <p className="mb-3 text-muted-foreground text-sm">
               List commands take --limit and --cursor. Their data includes
               nextCursor, which is null when there are no more results. Pass it
-              back unchanged as --cursor and do not construct it yourself. email
-              agent approvals list has no --limit or --cursor, and email metrics
-              is not paginated.
+              back unchanged as --cursor and do not construct it yourself. The
+              cursor is a page number for contacts list, events list, topics
+              subscribers, workflows list and workflows executions. It is an
+              offset for topics list, segments list and broadcasts recipients.
+              It is opaque for email suppressions list and audit-logs list.
+              email agent approvals list, api-keys list and email metrics are
+              not paginated.
             </p>
           </CardContent>
         </Card>

@@ -4,7 +4,16 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as clack from "@clack/prompts";
 import pc from "picocolors";
+import {
+  apiKeysCreate,
+  apiKeysList,
+  apiKeysRevoke,
+} from "./commands/api-keys/api-keys.js";
 // Auth commands
+import {
+  auditLogsExport,
+  auditLogsList,
+} from "./commands/audit-logs/audit-logs.js";
 import { login as authLogin } from "./commands/auth/login.js";
 import { logout as authLogout } from "./commands/auth/logout.js";
 import { authStatus as authStatusCmd } from "./commands/auth/status.js";
@@ -18,6 +27,11 @@ import {
   broadcastsSend,
   broadcastsStatus,
 } from "./commands/broadcasts/broadcasts.js";
+import {
+  broadcastsCancel,
+  broadcastsDuplicate,
+  broadcastsUpdate,
+} from "./commands/broadcasts/lifecycle.js";
 // CDN commands
 import { cdnDestroy } from "./commands/cdn/destroy.js";
 import { init as cdnInit } from "./commands/cdn/init.js";
@@ -25,6 +39,11 @@ import { cdnStatus } from "./commands/cdn/status.js";
 import { cdnSync } from "./commands/cdn/sync.js";
 import { cdnUpgrade } from "./commands/cdn/upgrade.js";
 import { cdnVerify } from "./commands/cdn/verify.js";
+import {
+  contactsExport,
+  contactsImport,
+  contactsValidate,
+} from "./commands/contacts/bulk.js";
 import {
   contactsCreate,
   contactsDelete,
@@ -82,6 +101,10 @@ import {
 } from "./commands/email/reply.js";
 import { restore } from "./commands/email/restore.js";
 import { emailStatus } from "./commands/email/status.js";
+import {
+  suppressionsList,
+  suppressionsRemove,
+} from "./commands/email/suppressions.js";
 // Email commands
 import { templatesInit } from "./commands/email/templates/init.js";
 import { templatesPreview } from "./commands/email/templates/preview.js";
@@ -99,6 +122,12 @@ import { emailVdm } from "./commands/email/vdm.js";
 import { workflowsInit } from "./commands/email/workflows/init.js";
 import { workflowsPush } from "./commands/email/workflows/push.js";
 import { workflowsValidate } from "./commands/email/workflows/validate.js";
+import {
+  eventsAnalytics,
+  eventsGet,
+  eventsList,
+  eventsNames,
+} from "./commands/events/events.js";
 // License commands
 import { licenseGenerate } from "./commands/license/generate.js";
 // Info commands
@@ -143,8 +172,22 @@ import {
   telemetryEnable,
   telemetryStatus,
 } from "./commands/telemetry.js";
+import {
+  topicsCreate,
+  topicsDelete,
+  topicsGet,
+  topicsList,
+  topicsSubscribers,
+  topicsUpdate,
+} from "./commands/topics/topics.js";
 // Workflow commands
 import { workflowInit } from "./commands/workflow/init.js";
+import {
+  workflowsExecution,
+  workflowsExecutions,
+  workflowsGet,
+  workflowsList,
+} from "./commands/workflows/read.js";
 import {
   workflowsCancel,
   workflowsDisable,
@@ -310,6 +353,12 @@ function showHelp() {
     `  ${pc.cyan("email logs get")}          Show details for one message\n`
   );
   console.log(
+    `  ${pc.cyan("email suppressions list")}  List the SES suppression list (--account <awsAccountId>, --reason bounce|complaint, --limit, --cursor). A page can be empty while hasMore is true.`
+  );
+  console.log(
+    `  ${pc.cyan("email suppressions remove")}  Remove one address (needs --account and --yes; --dry-run previews; --acknowledge-complaint for complaint suppressions)\n`
+  );
+  console.log(
     `  ${pc.cyan("email metrics")}           Aggregate sends, opens, clicks, bounces and cost\n`
   );
   console.log(
@@ -456,6 +505,16 @@ function showHelp() {
     `  ${pc.cyan("contacts delete <id>")}      Delete a contact (needs --yes; --dry-run previews)`
   );
   console.log();
+  console.log(
+    `  ${pc.cyan("contacts import --file <path>")}  Import a CSV or JSON file (up to 10,000 rows; --dry-run checks it; --validate needs --yes)`
+  );
+  console.log(
+    `  ${pc.cyan("contacts export")}           Export contacts as JSON or CSV (--format, --output, --search, --email-status, --topic-id)`
+  );
+  console.log(
+    `  ${pc.cyan("contacts validate")}         Check addresses with SES (--emails or --file, --aws-account-id; needs --yes)`
+  );
+  console.log();
   console.log("Segment Commands:");
   console.log(
     `  ${pc.cyan("segments list")}              List segments with live member counts (Pro plan)`
@@ -475,6 +534,39 @@ function showHelp() {
   console.log(
     `  ${pc.cyan("segments preview <id>")}      Count and sample who a segment would reach (no changes)\n`
   );
+  console.log("Topic Commands:");
+  console.log(
+    `  ${pc.cyan("topics list")}                 List topics with live subscriber counts (Pro plan). --limit sets the page size (1-100, default 20); --cursor is an offset into the full list. The CLI pages the list itself: the route returns every topic.`
+  );
+  console.log(
+    `  ${pc.cyan("topics get <id>")}             Show one topic with its audience counts`
+  );
+  console.log(
+    `  ${pc.cyan("topics create")}               Create a topic: --name <name> [--description <text>] [--slug <slug>] [--public true|false] [--double-opt-in true|false]`
+  );
+  console.log(
+    `  ${pc.cyan("topics update <id>")}          Change a topic's name, slug, description, public or double opt-in (at least one flag)`
+  );
+  console.log(
+    `  ${pc.cyan("topics delete <id>")}          Delete a topic and its subscriptions (requires --yes; --dry-run to preview)`
+  );
+  console.log(
+    `  ${pc.cyan("topics subscribers <id>")}     List subscribers: --status subscribed|pending|unsubscribed; --limit is the page size (1-100, default 50); --cursor is the page number (starts at 1)\n`
+  );
+  console.log("Events:");
+  console.log(
+    `  ${pc.cyan("events list")}                List contact events, newest first (--limit, --cursor, --event-name, --search, --contact-email, --date-from, --date-to)`
+  );
+  console.log(
+    `${pc.dim("                                  --limit is the page size (1-100, default 50); --cursor is the page number (default 1)")}`
+  );
+  console.log(
+    `  ${pc.cyan("events analytics")}           Event totals and daily counts (--days 7 or 30, --timezone)`
+  );
+  console.log(
+    `  ${pc.cyan("events names")}               List distinct event names`
+  );
+  console.log(`  ${pc.cyan("events get <id>")}            Show one event\n`);
   console.log("Broadcasts:");
   console.log(
     `  ${pc.cyan("broadcasts create")}          Queue a broadcast; sends now unless --scheduled-for (needs --yes, --aws-account-id)`
@@ -489,7 +581,16 @@ function showHelp() {
     `  ${pc.cyan("broadcasts recipients <id>")} List recipients (--status, --limit, --cursor)`
   );
   console.log(
-    `  ${pc.cyan("broadcasts resume <id>")}    Resume a stopped broadcast (needs --yes)\n`
+    `  ${pc.cyan("broadcasts resume <id>")}    Resume a stopped broadcast (needs --yes)`
+  );
+  console.log(
+    `  ${pc.cyan("broadcasts cancel <id>")}    Cancel a scheduled, queued or processing broadcast (needs --yes; --dry-run to preview)`
+  );
+  console.log(
+    `  ${pc.cyan("broadcasts duplicate <id>")} Copy any broadcast into a new draft`
+  );
+  console.log(
+    `  ${pc.cyan("broadcasts update <id>")}    Edit a draft: create's flags, plus --clear-<field> to unset a field\n`
   );
   console.log(
     `  ${pc.dim("--aws-account-id is the AWS account row id; wraps email health lists each id.")}\n`
@@ -514,6 +615,44 @@ function showHelp() {
   );
   console.log(
     `  ${pc.dim("trigger, enable and disable take a workflow ID; retry and cancel take an execution ID. Not the same as email workflows push.")}\n`
+  );
+  console.log(
+    `  ${pc.cyan("workflows list")}                     List workflows (--search, --status, --limit, --cursor)`
+  );
+  console.log(
+    `  ${pc.cyan("workflows get <workflow-id>")}        Show one workflow and its run counts`
+  );
+  console.log(
+    `  ${pc.cyan("workflows executions <workflow-id>")} List a workflow's runs (--status, --limit, --cursor)`
+  );
+  console.log(
+    `  ${pc.cyan("workflows execution <execution-id>")} Show one run with its step trace`
+  );
+  console.log("");
+  console.log(
+    "API Key Commands (sign in with wraps auth login first; an API key cannot manage API keys):"
+  );
+  console.log(
+    `  ${pc.cyan("api-keys list")}                  List the organization's API keys (not paginated: no --cursor or --limit)`
+  );
+  console.log(
+    `  ${pc.cyan("api-keys create --name <name>")}  Create a key; the secret is shown once (--type, --permissions, --expires-in-days)`
+  );
+  console.log(
+    `  ${pc.cyan("api-keys revoke <id>")}          Revoke a key (needs --yes; --dry-run previews). Any agent using it stops working`
+  );
+  console.log(
+    `  ${pc.dim("--org <id> picks the organization. --token and WRAPS_API_KEY are refused for these commands.")}\n`
+  );
+  console.log("Audit Log (owners and admins only):");
+  console.log(
+    `  ${pc.cyan("audit-logs list")}           Newest first (--action, --actor, --from, --to, --limit, --cursor)`
+  );
+  console.log(
+    `  ${pc.cyan("audit-logs export")}         Export as JSON or CSV (--format, --output <path>, --yes to overwrite; Business plan)`
+  );
+  console.log(
+    `  ${pc.dim("--to is exclusive: --to 2026-10-08 stops before midnight UTC on Oct 8. History is limited to the plan's window.")}\n`
   );
   console.log("Platform:");
   console.log(
@@ -1471,6 +1610,45 @@ async function run() {
           });
           break;
         }
+        case "suppressions": {
+          const suppressionsSubCommand = sub[2];
+
+          switch (suppressionsSubCommand) {
+            case "list":
+              await suppressionsList({
+                account: flags.account,
+                reason: flags.reason,
+                limit: flags.limit,
+                cursor: flags.cursor,
+                json: flags.json,
+                token: flags.token,
+                region: flags.region,
+              });
+              break;
+
+            case "remove":
+              await suppressionsRemove({
+                email: sub[3],
+                account: flags.account,
+                acknowledgeComplaint: flags.acknowledgeComplaint,
+                yes: flags.yes,
+                dryRun: flags.dryRun,
+                json: flags.json,
+                token: flags.token,
+                region: flags.region,
+              });
+              break;
+
+            default:
+              throw errors.unknownCommand(
+                "suppressions command",
+                suppressionsSubCommand,
+                "Available commands: list, remove <email>"
+              );
+          }
+          break;
+        }
+
         case "logs": {
           const logsSubCommand = sub[2];
 
@@ -1854,6 +2032,66 @@ async function run() {
       return;
     }
 
+    // Bulk contacts commands (wraps contacts import|export|validate). They sit
+    // before the list/get/create/update/delete switch, which has no case for them.
+    if (primaryCommand === "contacts" && subCommand === "import") {
+      await contactsImport({
+        file: flags.file,
+        format: flags.format,
+        duplicateStrategy: flags.duplicateStrategy,
+        topicIds: flags.topicIds,
+        validate: flags.validate,
+        awsAccountId: flags.awsAccountId,
+        yes: flags.yes,
+        dryRun: flags.dryRun,
+        json: flags.json,
+        token: flags.token,
+        region: flags.region,
+      });
+      trackCommandFallback("contacts:import", {
+        success: process.exitCode !== 1,
+        duration_ms: Date.now() - startTime,
+        service: "contacts",
+      });
+      return;
+    }
+    if (primaryCommand === "contacts" && subCommand === "export") {
+      await contactsExport({
+        format: flags.format,
+        output: flags.output,
+        search: flags.search,
+        emailStatus: flags.emailStatus,
+        topicId: flags.topicId,
+        yes: flags.yes,
+        json: flags.json,
+        token: flags.token,
+        region: flags.region,
+      });
+      trackCommandFallback("contacts:export", {
+        success: process.exitCode !== 1,
+        duration_ms: Date.now() - startTime,
+        service: "contacts",
+      });
+      return;
+    }
+    if (primaryCommand === "contacts" && subCommand === "validate") {
+      await contactsValidate({
+        emails: flags.emails,
+        file: flags.file,
+        awsAccountId: flags.awsAccountId,
+        yes: flags.yes,
+        dryRun: flags.dryRun,
+        json: flags.json,
+        token: flags.token,
+        region: flags.region,
+      });
+      trackCommandFallback("contacts:validate", {
+        success: process.exitCode !== 1,
+        duration_ms: Date.now() - startTime,
+        service: "contacts",
+      });
+      return;
+    }
     // Handle contacts subcommands (wraps contacts list|get|create|update|delete)
     if (primaryCommand === "contacts" && subCommand) {
       switch (subCommand) {
@@ -1936,7 +2174,7 @@ async function run() {
           throw errors.unknownCommand(
             "contacts command",
             subCommand,
-            "Available commands: list, get <id>, create, update <id>, delete <id>"
+            "Available commands: list, get <id>, create, update <id>, delete <id>, import, export, validate"
           );
       }
       // Track contacts commands (they return early, so track here)
@@ -1945,6 +2183,67 @@ async function run() {
         success: process.exitCode !== 1,
         duration_ms: contactsDuration,
         service: "contacts",
+      });
+      return;
+    }
+    // Handle Events subcommands (contact events, read-only)
+    if (primaryCommand === "events" && subCommand) {
+      switch (subCommand) {
+        case "list":
+          await eventsList({
+            limit: flags.limit,
+            cursor: flags.cursor,
+            eventName: flags.eventName,
+            search: flags.search,
+            contactEmail: flags.contactEmail,
+            dateFrom: flags.dateFrom,
+            dateTo: flags.dateTo,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "analytics":
+          await eventsAnalytics({
+            days: flags.days,
+            timezone: flags.timezone,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "names":
+          await eventsNames({
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "get":
+          await eventsGet({
+            id: sub[2],
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        default:
+          throw errors.unknownCommand(
+            "events command",
+            subCommand,
+            "Available commands: list, analytics, names, get <event-id>\n\nRun wraps --help for more information."
+          );
+      }
+      // Track events commands
+      const eventsDuration = Date.now() - startTime;
+      trackCommandFallback(`events:${subCommand}`, {
+        success: process.exitCode !== 1,
+        duration_ms: eventsDuration,
+        service: "events",
       });
       return;
     }
@@ -2099,6 +2398,53 @@ async function run() {
           });
           break;
 
+        case "cancel":
+          await broadcastsCancel({
+            id: broadcastId,
+            yes: flags.yes,
+            dryRun: flags.dryRun,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "duplicate":
+          await broadcastsDuplicate({
+            id: broadcastId,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "update":
+          await broadcastsUpdate({
+            ...contentOptions,
+            id: broadcastId,
+            clear: {
+              name: flags.clearName,
+              subject: flags.clearSubject,
+              previewText: flags.clearPreviewText,
+              from: flags.clearFrom,
+              fromName: flags.clearFromName,
+              replyTo: flags.clearReplyTo,
+              templateId: flags.clearTemplateId,
+              htmlContent: flags.clearHtmlContent,
+              body: flags.clearBody,
+              senderId: flags.clearSenderId,
+              topicId: flags.clearTopicId,
+              segmentId: flags.clearSegmentId,
+              awsAccountId: flags.clearAwsAccountId,
+              scheduledFor: flags.clearScheduledFor,
+              variableMappings: flags.clearVariableMappings,
+            },
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
         case "resume":
           await broadcastsResume({
             id: broadcastId,
@@ -2114,7 +2460,7 @@ async function run() {
           throw errors.unknownCommand(
             "broadcasts command",
             subCommand,
-            "Available commands: create, send, status, recipients, resume"
+            "Available commands: create, send, status, recipients, resume, cancel, duplicate, update"
           );
       }
       const broadcastsDuration = Date.now() - startTime;
@@ -2125,7 +2471,7 @@ async function run() {
       });
       return;
     }
-    // Workflow runtime control (wraps workflows trigger|enable|disable|retry|cancel)
+    // Workflow runtime control (wraps workflows trigger|enable|disable|retry|cancel) and reads (list|get|executions|execution)
     if (primaryCommand === "workflows" && subCommand) {
       const workflowsTarget = sub[2];
       switch (subCommand) {
@@ -2174,6 +2520,48 @@ async function run() {
           });
           break;
 
+        case "list":
+          await workflowsList({
+            limit: flags.limit,
+            cursor: flags.cursor,
+            search: flags.search,
+            status: flags.status,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "get":
+          await workflowsGet({
+            workflowId: workflowsTarget,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "executions":
+          await workflowsExecutions({
+            workflowId: workflowsTarget,
+            limit: flags.limit,
+            cursor: flags.cursor,
+            status: flags.status,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "execution":
+          await workflowsExecution({
+            executionId: workflowsTarget,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
         case "cancel":
           await workflowsCancel({
             executionId: workflowsTarget,
@@ -2188,7 +2576,7 @@ async function run() {
           throw errors.unknownCommand(
             "workflows runtime command",
             subCommand,
-            "Available commands: trigger, enable, disable, retry, cancel\n\nRun wraps --help for more information."
+            "Available commands: trigger, enable, disable, retry, cancel, list, get, executions, execution\n\nRun wraps --help for more information."
           );
       }
       const workflowsRuntimeDuration = Date.now() - startTime;
@@ -2196,6 +2584,191 @@ async function run() {
         success: process.exitCode !== 1,
         duration_ms: workflowsRuntimeDuration,
         service: "workflows",
+      });
+      return;
+    }
+    // Handle Topics subcommands (subscription topics, Pro plan)
+    if (primaryCommand === "topics" && subCommand) {
+      switch (subCommand) {
+        case "list":
+          await topicsList({
+            limit: flags.limit,
+            cursor: flags.cursor,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "get":
+          await topicsGet({
+            id: sub[2],
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "create":
+          await topicsCreate({
+            name: flags.name,
+            description: flags.description,
+            slug: flags.slug,
+            public: flags.public,
+            doubleOptIn: flags.doubleOptIn,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "update":
+          await topicsUpdate({
+            id: sub[2],
+            name: flags.name,
+            description: flags.description,
+            slug: flags.slug,
+            public: flags.public,
+            doubleOptIn: flags.doubleOptIn,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "delete":
+          await topicsDelete({
+            id: sub[2],
+            yes: flags.yes,
+            dryRun: flags.dryRun,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "subscribers":
+          await topicsSubscribers({
+            id: sub[2],
+            status: flags.status,
+            limit: flags.limit,
+            cursor: flags.cursor,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        default:
+          throw errors.unknownCommand(
+            "topics command",
+            subCommand,
+            "Available commands: list, get, create, update, delete, subscribers\n\nRun wraps --help for more information."
+          );
+      }
+      const topicsDuration = Date.now() - startTime;
+      trackCommandFallback(`topics:${subCommand}`, {
+        success: process.exitCode !== 1,
+        duration_ms: topicsDuration,
+        service: "topics",
+      });
+      return;
+    }
+    // Handle API key subcommands (session-only: an API key cannot manage API keys)
+    if (primaryCommand === "api-keys" && subCommand) {
+      switch (subCommand) {
+        case "list":
+          await apiKeysList({
+            org: flags.org,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "create":
+          await apiKeysCreate({
+            name: flags.name,
+            type: flags.type,
+            permissions: flags.permissions,
+            expiresInDays: flags.expiresInDays,
+            org: flags.org,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "revoke":
+          await apiKeysRevoke({
+            id: sub[2],
+            yes: flags.yes,
+            dryRun: flags.dryRun,
+            org: flags.org,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        default:
+          throw errors.unknownCommand(
+            "api-keys command",
+            subCommand,
+            "Available commands: list, create, revoke\n\nRun wraps --help for more information."
+          );
+      }
+      const apiKeysDuration = Date.now() - startTime;
+      trackCommandFallback(`api-keys:${subCommand}`, {
+        success: process.exitCode !== 1,
+        duration_ms: apiKeysDuration,
+        service: "api-keys",
+      });
+      return;
+    }
+
+    // Handle Audit log subcommands (owners and admins; export needs the Business plan)
+    if (primaryCommand === "audit-logs" && subCommand) {
+      const auditLogsFilters = {
+        action: flags.action,
+        actor: flags.actor,
+        from: flags.from,
+        to: flags.to,
+        json: flags.json,
+        token: flags.token,
+        region: flags.region,
+      };
+      switch (subCommand) {
+        case "list":
+          await auditLogsList({
+            ...auditLogsFilters,
+            limit: flags.limit,
+            cursor: flags.cursor,
+            region: flags.region,
+          });
+          break;
+
+        case "export":
+          await auditLogsExport({
+            ...auditLogsFilters,
+            format: flags.format,
+            output: flags.output,
+            yes: flags.yes,
+            region: flags.region,
+          });
+          break;
+
+        default:
+          throw errors.unknownCommand(
+            "audit-logs command",
+            subCommand,
+            "Available commands: list, export\n\nRun wraps --help for more information."
+          );
+      }
+      trackCommandFallback(`audit-logs:${subCommand}`, {
+        success: process.exitCode !== 1,
+        duration_ms: Date.now() - startTime,
+        service: "audit-logs",
       });
       return;
     }
@@ -2425,7 +2998,10 @@ async function run() {
       case "cdn":
       case "aws":
       case "contacts":
+      case "api-keys":
       case "segments":
+      case "audit-logs":
+      case "events":
       case "broadcasts":
       case "workflows":
       case "workflow":

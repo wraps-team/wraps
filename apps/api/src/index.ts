@@ -11,6 +11,7 @@ import * as Sentry from "@sentry/aws-serverless";
 import { Elysia } from "elysia";
 import { workflowScheduleRoutes } from "./(ee)/routes/workflow-schedules";
 import { workflowsRoutes } from "./(ee)/routes/workflows";
+import { workflowsReadRoutes } from "./(ee)/routes/workflows-read";
 import { workflowsSyncRoutes } from "./(ee)/routes/workflows-sync";
 import { type ApiErrorSinks, handleApiError } from "./lib/error-handler";
 import { log } from "./lib/logger";
@@ -26,20 +27,27 @@ import { errorContract } from "./middleware/error-contract";
 import { accountRoutes } from "./routes/account";
 import { agentsRoutes } from "./routes/agents";
 import { agentsWebhookRoutes } from "./routes/agents-webhook";
+import { apiKeysRoutes } from "./routes/api-keys";
+import { auditLogsRoutes } from "./routes/audit-logs";
 import { batchRoutes } from "./routes/batch";
+import { batchLifecycleRoutes } from "./routes/batch-lifecycle";
 import { connectionsRoutes } from "./routes/connections";
 import { contactsRoutes } from "./routes/contacts";
+import { contactsBulkRoutes } from "./routes/contacts-bulk";
 import { contactsTopicsRoutes } from "./routes/contacts-topics";
 import { domainsRoutes } from "./routes/domains";
 import { emailLogsRoutes } from "./routes/email-logs";
 import { eventsRoutes } from "./routes/events";
+import { eventsReadRoutes } from "./routes/events-read";
 import { healthRoutes } from "./routes/health";
 import { metricsRoutes } from "./routes/metrics";
 import { preferenceEventsRoutes } from "./routes/preference-events";
 import { segmentsRoutes } from "./routes/segments";
+import { suppressionsRoutes } from "./routes/suppressions";
 import { templatesRoutes } from "./routes/templates";
 import { templatesSyncRoutes } from "./routes/templates-sync";
 import { toolsRoutes } from "./routes/tools";
+import { topicsRoutes } from "./routes/topics";
 import { unsubscribeRoutes } from "./routes/unsubscribe";
 import { webhooksRoutes } from "./routes/webhooks";
 import { wellKnownRoutes } from "./routes/well-known";
@@ -125,8 +133,28 @@ const openApiDocumentation = {
         "Audience segment CRUD and condition preview. Requires a Pro plan or higher.",
     },
     {
+      name: "api-keys",
+      description:
+        "API key list, create and revoke. Session-only: an API key cannot call these routes.",
+    },
+    {
+      name: "topics",
+      description:
+        "Subscription topic CRUD and subscriber lists. Requires a Pro plan or higher.",
+    },
+    {
       name: "email-logs",
       description: "Email delivery log inspection",
+    },
+    {
+      name: "audit-logs",
+      description:
+        "Read and export the organization's audit log. Owners and admins only; export requires the Business plan.",
+    },
+    {
+      name: "suppressions",
+      description:
+        "SES account-level suppression list. Listing reads the org's AWS accounts; removing an address requires confirm=true.",
     },
     {
       name: "webhooks",
@@ -263,10 +291,16 @@ export const app = new Elysia()
   .use(emailLogsRoutes)
   .use(metricsRoutes)
   .use(contactsRoutes)
+  .use(contactsBulkRoutes)
   .use(contactsTopicsRoutes)
   .use(batchRoutes)
+  .use(batchLifecycleRoutes)
   .use(segmentsRoutes)
+  .use(apiKeysRoutes)
+  .use(suppressionsRoutes)
+  .use(topicsRoutes)
   .use(eventsRoutes)
+  .use(eventsReadRoutes)
   .use(workflowsRoutes)
   .use(webhooksRoutes)
   .use(unsubscribeRoutes)
@@ -274,9 +308,11 @@ export const app = new Elysia()
   .use(templatesSyncRoutes)
   .use(templatesRoutes)
   .use(workflowsSyncRoutes)
+  .use(workflowsReadRoutes)
   .use(toolsRoutes)
   .use(workflowScheduleRoutes)
   .use(agentsRoutes)
+  .use(auditLogsRoutes)
   .use(agentsWebhookRoutes);
 
 // Export type for Eden Treaty client

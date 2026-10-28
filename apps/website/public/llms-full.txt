@@ -222,41 +222,45 @@ wraps email check [domain]    Deliverability audit (DKIM, SPF, DMARC, blacklists
 
 ## Data-plane CLI for agents
 
-These commands read and change data in your Wraps organization (contacts, segments, templates, broadcasts, workflow runs, approvals) through the Wraps API. They do not deploy AWS infrastructure. The sections below cover `wraps email logs` too, which was previously undocumented here.
+These commands read and change data in your Wraps organization (contacts, topics, segments, templates, broadcasts, events, email suppressions, workflow runs, approvals, API keys and the audit log) through the Wraps API. They do not deploy AWS infrastructure. The sections below cover `wraps email logs` too, which was previously undocumented here.
 
 ### Authentication
 
 - Pass `--token <key>` or set `WRAPS_API_KEY`. A token or key takes priority over a stored session from `wraps auth login`.
 - Self-hosted instances: the API target follows `wraps selfhost login`.
-- The commands in this section take `--token` and `--json`.
+- Most commands in this section take `--token` and `--json`. The exception is `wraps api-keys`, which refuses `--token` and `WRAPS_API_KEY`. See API keys below.
 
 ### Output and exit codes
 
 - With `--json`, stdout is one envelope per call: `{"success":true,"command":"contacts.list","data":{...}}` on success, or `{"success":false,"command":"contacts.delete","error":{"code":"CONFIRMATION_REQUIRED","message":"...","suggestion":"..."}}` on failure. Command names are dotted (`contacts.list`, `email.agent.approvals.approve`).
 - Every error sets exit code 1. In JSON mode the error envelope is printed to stdout, so read `error.code` and `error.suggestion`.
-- Error codes the commands emit include: `NOT_AUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `VALIDATION_FAILED`, `API_ERROR`, `SERVER_ERROR`, `CONFIRMATION_REQUIRED`, `MISSING_REQUIRED_FLAG`, `INVALID_FLAG_USAGE`, `INVALID_FLAG_VALUE`, `PLAN_REQUIRED`, `NOT_DRAFT`, `RESUME_DISABLED`, `WORKFLOW_REJECTED`.
+- Error codes the commands emit include: `NOT_AUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `VALIDATION_FAILED`, `API_ERROR`, `SERVER_ERROR`, `CONFIRMATION_REQUIRED`, `MISSING_REQUIRED_FLAG`, `INVALID_FLAG_USAGE`, `INVALID_FLAG_VALUE`, `PLAN_REQUIRED`, `NOT_DRAFT`, `RESUME_DISABLED`, `WORKFLOW_REJECTED`, `SESSION_REQUIRED`, `NOT_CANCELLABLE`, `WRITE_FAILED`.
 - Workflow routes can return HTTP 200 with `success: false`. The CLI turns that into an error envelope and exit code 1, so check the exit code or `success`, not only the HTTP status.
 
 ### The `--yes` rule
 
 Commands that send email, make a live change or delete data refuse to run without `--yes`. They return `CONFIRMATION_REQUIRED` before making any request:
 
-- `contacts delete`, `segments delete`
+- `contacts delete`, `contacts import --validate`, `contacts validate`, `segments delete`
+- `topics delete`, `email suppressions remove`, `api-keys revoke`
 - `email templates publish`
-- `broadcasts create`, `broadcasts send`, `broadcasts resume`
+- `broadcasts create`, `broadcasts send`, `broadcasts resume`, `broadcasts cancel`
 - `workflows trigger`, `workflows enable`, `workflows retry`, `workflows cancel`
 - `email agent approvals approve`, `email agent approvals reject`
 
-Two exceptions. `email templates pull` fetches without `--yes`, but refuses to overwrite existing local files unless `--yes` is given. `workflows disable` needs no `--yes` because it only stops future runs.
+Exceptions. `email templates pull` fetches without `--yes`, but refuses to overwrite existing local files unless `--yes` is given. `contacts export --output` and `audit-logs export --output` also refuse to overwrite an existing file unless `--yes` is given. `workflows disable` needs no `--yes` because it only stops future runs. `broadcasts duplicate` and `broadcasts update` are not destructive and need no `--yes`.
 
-`--dry-run` is supported on `contacts delete`, `segments delete`, `broadcasts create`, `workflows trigger` and `email templates pull`. A dry run makes no changes. `broadcasts create --dry-run` validates the payload locally and makes no request.
+`--dry-run` is supported on `contacts delete`, `contacts import`, `contacts validate`, `segments delete`, `topics delete`, `email suppressions remove`, `broadcasts create`, `broadcasts cancel`, `api-keys revoke`, `workflows trigger` and `email templates pull`. A dry run makes no changes. `broadcasts create --dry-run` validates the payload locally and makes no request.
 
 ### Pagination
 
 - List commands take `--limit` and `--cursor`. Their `data` includes `nextCursor`, which is `null` when there are no more results.
-- Pass `nextCursor` back unchanged as `--cursor`. Treat it as opaque. Do not construct it.
-- `--limit` ranges: contacts list 1-100; segments list 1-100 (default 20); templates list 1-100; broadcasts recipients 1-1000.
-- `email agent approvals list` has no `--limit` or `--cursor`. It returns the whole queue, and `nextCursor` is always `null`. `email metrics` is not paginated.
+- Pass `nextCursor` back unchanged as `--cursor`. Do not construct it. Its form depends on the command:
+  - Opaque: `email suppressions list` (repeat the same `--account` and `--reason` with it), `audit-logs list`.
+  - Page number (starts at 1): `contacts list`, `events list`, `topics subscribers`, `workflows list`, `workflows executions`.
+  - Offset: `topics list` (the route returns every topic, so the CLI pages the list itself), `segments list`, `broadcasts recipients`.
+- `--limit` ranges: contacts list 1-100; segments list 1-100 (default 20); templates list 1-100; broadcasts recipients 1-1000; topics list 1-100 (default 20); topics subscribers 1-100 (default 50); events list 1-100 (default 50); audit-logs list 1-100 (default 50).
+- `email agent approvals list` has no `--limit` or `--cursor`. It returns the whole queue, and `nextCursor` is always `null`. `api-keys list` is not paginated either. `email metrics` is not paginated. `contacts import` takes at most 10,000 rows per call, and `contacts export` returns at most 50,000 rows with no cursor.
 
 ### Contacts
 
@@ -267,6 +271,9 @@ Ids can be a contact UUID, an email or an `externalId`.
 - `wraps contacts create (--email <email> | --phone <phone>) [--first-name] [--last-name] [--company] [--job-title] [--external-id] [--email-status] [--sms-status] [--preferred-channel] [--topic-ids] [--properties <json>]`. Data: the contact fields plus `pendingTopics`. Returns `CONFLICT` if the contact already exists. Search with `contacts list --search` first.
 - `wraps contacts update <id> [the same field flags]`. Changes only the fields you pass. At least one field flag is required (`MISSING_REQUIRED_FLAG` otherwise). Data: the contact fields plus `pendingTopics`.
 - `wraps contacts delete <id> --yes [--dry-run]`. Data: `id`, `deleted`, `dryRun`.
+- `wraps contacts import --file <path> [--format csv|json] [--duplicate-strategy skip|update] [--topic-ids <ids>] [--validate --aws-account-id <id> --yes] [--dry-run]`. Imports a CSV or JSON file of up to 10,000 rows in one call. A row that matches an existing contact by email or phone is skipped by default. `--duplicate-strategy update` fills blank fields and merges properties, and never overwrites consent. A longer file must be split into parts of at most 10,000 rows, each with the header row. `--validate` checks addresses with SES Email Address Insights, which AWS bills per address, so it needs `--yes`. Data: `dryRun`, `file`, `format`, `rows`, `created`, `updated`, `skipped`, `invalid`, `errors`, `duplicates`, `duplicateStrategy`, `topicIds`, `sesValidation`.
+- `wraps contacts export [--format json|csv] [--output <path>] [--search <text>] [--email-status <s>] [--topic-id <id>] [--yes]`. Exports up to 50,000 contacts, newest first. `--email-status` is `active`, `unsubscribed`, `bounced`, `complained` or `suppressed`. CSV in `--json` mode needs `--output`. With `--output`, the file is written only after the API answers, and an existing file is not overwritten unless `--yes` is given. Data: `format`, `output`, `exported`, `total`, `truncated`, `hint`, `overwritten`. Without `--output`, the rows are in `contacts`.
+- `wraps contacts validate (--emails <a@x.com,b@y.com> | --file <path>) --aws-account-id <id> --yes [--dry-run]`. Checks up to 100 addresses per call with SES Email Address Insights, through an AWS account whose SES plan is PRO or ENTERPRISE. `--file` takes one address per line. It reads no contacts and writes nothing. `--yes` is required because AWS bills per address. Data: `requested`, `awsAccountId`, `verdicts`.
 
 Contact fields: `id`, `externalId`, `email`, `phone`, `firstName`, `lastName`, `company`, `jobTitle`, `emailStatus`, `smsStatus`, `preferredChannel`, `properties`, `emailsSent`, `emailsOpened`, `emailsClicked`, `smsSent`, `smsClicked`, `createdAt`, `updatedAt`.
 
@@ -308,10 +315,18 @@ Flags for `email logs` are not covered in this section.
 - `wraps broadcasts status <id>`. Data: `id`, `name`, `channel`, `status`, `totalRecipients`, `processedRecipients`, `sent`, `delivered`, `failed`, `opened`, `clicked`, `bounced`, `complained`, `suppressed`, `startedAt`, `completedAt`, `createdAt`.
 - `wraps broadcasts recipients <id> [--status <s>] [--limit <n>] [--cursor <c>]`. The cursor is an offset. Data: `id`, `recipients`, `total`, `limit`, `offset`, `nextCursor`.
 - `wraps broadcasts resume <id> --yes [--from-chunk-index <n>]`. Resumes a stopped broadcast. Data: `id`, `resumed`, `fromChunkIndex`. Can return `RESUME_DISABLED`.
+- `wraps broadcasts cancel <id> --yes [--dry-run]`. Cancels a scheduled, queued or processing broadcast. It calls the existing `DELETE /v1/batch/{id}`; there is no cancel route. Other statuses return `NOT_CANCELLABLE`. Data: `id`, `status`, `cancelled`, `dryRun`.
+- `wraps broadcasts duplicate <id>`. Copies any broadcast into a new draft named `<name> (copy)`. The copy keeps the content, audience and sender, but not the schedule. No `--yes` needed. Data: `id`, `status`, `name`, `sourceId`.
+- `wraps broadcasts update <id> [the content flags of broadcasts create] [--clear-<field>]`. Edits a draft only. A broadcast that is not a draft returns `CONFLICT` with its status, and the error points to `broadcasts duplicate`. `--clear-<field>` unsets a nullable field. Setting a topic or segment audience, or a schedule, needs the plan that allows it, as `create` does. Data: `id`, `status`, `name`, `channel`, `subject`, `audienceType`, `topicId`, `segmentId`, `awsAccountId`, `scheduledFor`, `updatedFields`.
 
 ### Workflow runs
 
-These commands run workflows that are already deployed. Author them with `wraps workflow init`. `wraps email workflows push` is a different command.
+These commands read and run workflows that are already deployed. Author them with `wraps workflow init`. `wraps email workflows push` is a different command.
+
+- `wraps workflows list [--search <text>] [--status draft|enabled|paused|archived] [--limit <n>] [--cursor <page>]`. Lists workflows, newest first. Data: `workflows`, `total`, `page`, `pageSize`, `totalPages`, `nextCursor`.
+- `wraps workflows get <workflow-id>`. Data: `id`, `name`, `description`, `status`, `triggerType`, `version`, `totalExecutions`, `activeExecutions`, `completedExecutions`, `failedExecutions`, `createdBy`, `createdAt`, `updatedAt`.
+- `wraps workflows executions <workflow-id> [--status <s>] [--limit <n>] [--cursor <page>]`. Lists one workflow's runs. `--status` is `pending`, `active`, `paused`, `waiting`, `completed`, `failed` or `cancelled`. Data: `workflowId`, `executions` (each with its `contact`), `total`, `page`, `pageSize`, `totalPages`, `nextCursor`.
+- `wraps workflows execution <execution-id>`. Shows one run with its step trace. Data: `id`, `workflowId`, `contactId`, `status`, `currentStepId`, `startedAt`, `completedAt`, `createdAt`, `updatedAt`, `contact`, `workflowName`, `steps`, `stepEngagement`.
 
 - `wraps workflows trigger <workflow-id> (--contact-id <id> | --contact-email <email>) [--data <json>] --yes [--dry-run]`. Triggers an API workflow for one contact. `--data` is a JSON object. Data: `workflowId`, `workflowName`, `contactId`, `contactEmail`, `data`, `dryRun`, `message`. Returns `WORKFLOW_REJECTED` if the route rejects the run.
 - `wraps workflows enable <workflow-id> --cron <expression> [--timezone <tz>] --yes`. Creates the next scheduled run. Data: `workflowId`, `scheduleName`, `cronExpression`, `timezone`.
@@ -319,7 +334,7 @@ These commands run workflows that are already deployed. Author them with `wraps 
 - `wraps workflows retry <execution-id> --yes`. Retries a failed execution. Data: `executionId`, `message`.
 - `wraps workflows cancel <execution-id> --yes`. Cancels an in-progress execution. Data: `executionId`, `cancelled`.
 
-`trigger`, `enable` and `disable` take a workflow ID. `retry` and `cancel` take an execution ID. There is no `workflows list`, `workflows get` or executions listing command.
+`trigger`, `enable`, `disable`, `list`, `get` and `executions` take a workflow ID. `retry`, `cancel` and `execution` take an execution ID.
 
 ### Approvals
 
@@ -328,6 +343,103 @@ These commands run workflows that are already deployed. Author them with `wraps 
 - `wraps email agent approvals reject --id <id> --yes`. Rejects a pending send.
 
 Approval fields: `id`, `agentId`, `organizationId`, `status`, `payload`, `reason`, `messageId`, `errorMessage`, `decidedAt`, `decidedBy`, `createdAt`, `updatedAt`.
+
+### Email suppressions
+
+- `wraps email suppressions list [--account <awsAccountId>] [--reason bounce|complaint] [--limit <n>] [--cursor <c>]`. Lists the SES suppression list. Without `--account` it covers every connected AWS account. `--account` takes the `id` that `wraps email health` lists, not the 12-digit AWS account number. The cursor is opaque, and a page can be empty while `hasMore` is true. Data: `entries` (each with `email`, `reason`, `awsAccountId`, `lastUpdated`), `nextCursor`, `hasMore`, `deniedAccountIds`, `unreachableAccountIds`.
+- `wraps email suppressions remove <email> --account <awsAccountId> --yes [--dry-run] [--acknowledge-complaint]`. Removes one address from that account's suppression list. An address suppressed for a spam complaint also needs `--acknowledge-complaint`, which the CLI sends only when you pass it. Pass it only after you have confirmed that sending to the address is safe. Data: `email`, `awsAccountId`, `dryRun`, `wasPresent`.
+
+### Topics (Pro plan)
+
+- `wraps topics list [--limit <n>] [--cursor <offset>]`. Lists topics with subscriber counts. `--limit` is 1-100 (default 20). Data: `topics`, `total`, `limit`, `offset`, `nextCursor`.
+- `wraps topics get <id>`. Data: `id`, `name`, `slug`, `description`, `public`, `doubleOptIn`, `subscriberCount`, `sendableCount`, `pendingCount`, `createdAt`, `updatedAt`, `createdBy`.
+- `wraps topics create --name <name> [--description <text>] [--slug <slug>] [--public true|false] [--double-opt-in true|false]`. The slug is generated from the name unless you pass one. A slug that already exists returns `CONFLICT`. Data: the same keys as `get`.
+- `wraps topics update <id> [the same flags as create]`. Changes only the flags you pass; at least one is required. Data: the same keys as `get`.
+- `wraps topics delete <id> --yes [--dry-run]`. Deletes the topic and every subscription to it. Data: `id`, `deleted`, `dryRun`.
+- `wraps topics subscribers <id> [--status subscribed|pending|unsubscribed] [--limit <n>] [--cursor <page>]`. `--limit` is 1-100 (default 50). `--cursor` is a page number starting at 1. `pending` covers double opt-in contacts who have not confirmed. Data: `topicId`, `subscribers` (each with `contactId`, `email`, `status`, `subscribedAt`, `unsubscribedAt`), `total`, `page`, `pageSize`, `nextCursor`.
+
+### Events
+
+Read-only. Events are the contact events recorded for the organization.
+
+- `wraps events list [--limit <n>] [--cursor <page>] [--event-name <name>] [--search <text>] [--contact-email <email>] [--date-from <ISO 8601>] [--date-to <ISO 8601>]`. Lists contact events, newest first. `--limit` is the page size, 1-100 (default 50). `--cursor` is a page number (default 1). Data: `events`, `total`, `page`, `pageSize`, `nextCursor`.
+- `wraps events analytics [--days 7|30] [--timezone <tz>]`. Totals and daily counts for the last 7 or 30 days (default 30). Data: `days`, `totalEvents`, `eventsThisPeriod`, `activeContacts`, `avgEventsPerContact`, `dailyEvents`, `topEventNames`.
+- `wraps events names`. Lists the distinct event names. Data: `eventNames`, `count`.
+- `wraps events get <id>`. Data: `id`, `eventName`, `eventData`, `createdAt`, `contactId`, `contactEmail`, `contactFirstName`, `contactLastName`.
+
+### API keys (session only)
+
+An API key cannot manage API keys. Sign in with `wraps auth login` first. `--token` and `WRAPS_API_KEY` are refused with `SESSION_REQUIRED` before any request is made. `--org <id>` picks the organization when your login belongs to more than one.
+
+- `wraps api-keys list`. Lists the organization's keys. Returns metadata only, and is not paginated. Data: `apiKeys`.
+- `wraps api-keys create --name <name> [--type live|test|restricted] [--permissions full|readonly|<list>] [--expires-in-days <1-3650>]`. The `--permissions` list is comma-separated from `contacts:read`, `contacts:write`, `topics:read`, `topics:write`, `segments:read`, `segments:write`, `campaigns:read`, `campaigns:write`, `workflows:read`, `workflows:write`, `analytics:read` and `send:email`. The secret is shown once, in `secretKey`. It cannot be shown again, so store it when the command returns. Data: `apiKey`, `secretKey`.
+- `wraps api-keys revoke <id> --yes [--dry-run]`. Revokes the key permanently. Any agent using it stops working at once. Data: `id`, `revoked`, `dryRun`.
+
+### Audit log (owners and admins)
+
+- `wraps audit-logs list [--action <name>] [--actor <userId>] [--from <date>] [--to <date>] [--limit <n>] [--cursor <c>]`. Lists entries, newest first. `--limit` is 1-100 (default 50). The cursor is opaque. `--to` is exclusive: `--to 2026-10-08` stops before midnight UTC on October 8. Results are limited to the plan's history window. Data: `data`, `nextCursor`, `retentionDays`, `canExtend`.
+- `wraps audit-logs export [--format json|csv] [--output <path>] [--action <name>] [--actor <userId>] [--from <date>] [--to <date>] [--yes]`. Business plan only. Exports up to 50,000 rows. With `--output`, the file is written only after the API answers, and an existing file is not overwritten unless `--yes` is given. Each export writes an `audit_log.exported` entry. Data: `format`, `output`, `total`, `truncated`, `bytes`. Without `--output` in JSON mode, the data is `logs`, `total` and `truncated`.
+
+## Data-plane REST API
+
+The CLI commands above call these routes on `https://api.wraps.dev` (`WRAPS_API_URL` overrides it). Send `Authorization: Bearer <api key>`. Where a route checks a permission, it is listed with the route. Ids that belong to another organization return 404.
+
+Destructive routes need `confirm=true` in the query string and return 400 without it. The CLI sends it only after `--yes`. `DELETE /v1/batch/{id}` takes no `confirm` parameter.
+
+Permissions are shown as `resource:action`. Plan requirements are stated per route.
+
+### Topics (Pro plan)
+
+- `GET /v1/topics`: list topics with subscriber, sendable and pending counts. Needs `topics:read`. Returns every topic in one response, with no paging.
+- `POST /v1/topics`: create a topic. Needs `topics:write`. A slug that already exists returns 409.
+- `GET /v1/topics/{id}`: one topic with its audience counts. Needs `topics:read`.
+- `PATCH /v1/topics/{id}`: change only the fields sent. Needs `topics:write`.
+- `DELETE /v1/topics/{id}?confirm=true`: delete the topic and every subscription to it. Needs `topics:delete`.
+- `GET /v1/topics/{id}/subscribers`: subscribers, filterable by `status` (`subscribed`, `pending`, `unsubscribed`). Query `page` and `pageSize`. Needs `topics:read`.
+
+### Email suppressions
+
+- `GET /v1/suppressions`: the SES suppression list. Query `awsAccountId`, `reason` (`BOUNCE` or `COMPLAINT`), `limit` (1-100) and `cursor`. Pass `nextCursor` back unchanged. Needs `awsAccounts:read`.
+- `DELETE /v1/suppressions/{email}?awsAccountId=<id>&confirm=true`: remove one address from that AWS account's suppression list. Percent-encode the email. An address suppressed for a complaint also needs `acknowledgedComplaint=true`, or the route returns 409. Needs `awsAccounts:write`.
+
+### Events
+
+- `GET /v1/events`: contact events, newest first. Query `page`, `pageSize` (1-100), `eventName`, `search`, `contactEmail`, `dateFrom` and `dateTo`. Needs `contacts:read`.
+- `GET /v1/events/analytics`: totals, a zero-filled daily series and top event names for the last 7 or 30 days. Query `days` and `timezone`. Needs `contacts:read`.
+- `GET /v1/events/names`: distinct event names, sorted. Needs `contacts:read`.
+- `GET /v1/events/{id}`: one event. Returns 404 when it is not in the organization. Needs `contacts:read`.
+
+### Contacts
+
+- `POST /v1/contacts/import`: import up to 10,000 contacts in one synchronous call. Returns counts (created, updated, skipped, invalid), per-row errors and duplicates. `duplicateStrategy` is `skip` or `update`. Optional `sesValidation` runs SES Email Address Insights. Returns 402 when the plan's contact limit is reached. Needs `contacts:import`.
+- `GET /v1/contacts/export`: matching contacts, newest first, capped at 50,000 rows. Query `search`, `emailStatus`, `topicId` and `format` (`json`, the default, or `csv`). The `x-export-total` and `x-export-truncated` headers report the real match count and whether it was cut. Needs `contacts:export`.
+- `POST /v1/contacts/validate`: check up to 100 addresses with SES Email Address Insights. Body `awsAccountId` and `emails`. The AWS account must have an SES plan of PRO or ENTERPRISE. Reads no contacts and writes nothing. Needs `contacts:import`.
+
+### Broadcasts
+
+- `DELETE /v1/batch/{id}`: cancel a scheduled, queued or processing broadcast. This is the existing route; there is no `/cancel` route.
+- `POST /v1/batch/{id}/duplicate`: copy any broadcast into a new draft with ` (copy)` added to its name. The schedule is not copied. Needs `broadcasts:write`.
+- `PATCH /v1/batch/{id}`: edit a draft. Only fields in the body change, and `null` clears a nullable field. A broadcast that is not a draft returns 409 with its status. Setting `audienceType` or `scheduledFor` applies the plan entitlements that creating a broadcast applies. Needs `broadcasts:write`.
+
+### Workflows
+
+- `GET /v1/workflows`: workflows, newest first. Query `page`, `pageSize`, `search` (matches the name) and `status`. Needs `workflows:read`.
+- `GET /v1/workflows/{workflowId}`: one workflow. Needs `workflows:read`.
+- `GET /v1/workflows/{workflowId}/executions`: one workflow's executions, newest first, each with its contact. Query `page`, `pageSize` and `status`. Needs `workflows:read`.
+- `GET /v1/workflows/executions/{executionId}`: one execution with its step trace, contact and per-step engagement. Needs `workflows:read`.
+
+### API keys (session only)
+
+These routes refuse API keys: a request authenticated with a `wraps_` key gets 403. Use a dashboard or device-login session. `X-Organization-Id` picks the organization when the session belongs to more than one.
+
+- `GET /v1/api-keys`: list keys. Metadata only; the secret and its hash are never returned.
+- `POST /v1/api-keys`: create a key. Returns the full secret once, in `secretKey`. Only the hash is stored.
+- `DELETE /v1/api-keys/{id}?confirm=true`: revoke a key. Requests that use it fail immediately.
+
+### Audit log (owners and admins)
+
+- `GET /v1/audit-logs`: newest first, keyset-paginated (`limit` 1-100, default 50; pass `nextCursor` back as `cursor`). Filters `action`, `actorId`, `dateFrom` and `dateTo`. Needs `orgSettings:read`. Results are limited to the plan's history window, which the response reports as `retentionDays`.
+- `GET /v1/audit-logs/export`: the same filters, `format` `json` (default) or `csv`, up to 50,000 rows. Needs `orgSettings:read` and the Business plan. Each export writes one `audit_log.exported` row.
 
 ## Email SDK Reference (@wraps.dev/email)
 

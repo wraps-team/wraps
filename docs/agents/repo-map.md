@@ -38,8 +38,9 @@ and except `packages/observability` has its own CLAUDE.md.
 
 `wraps <service> <command>`, all dispatched from `packages/cli/src/cli.ts`. Services are
 `email`, `sms`, `cdn`, `auth`, `aws`, `platform`, `selfhost`, `workflow`, and `license`,
-plus the API-backed data-plane services `contacts`, `segments`, `broadcasts`, and
-`workflows` (runtime control; `--json`, `--token`, `--yes` on sends and deletes),
+plus the API-backed data-plane services `contacts`, `segments`, `broadcasts`,
+`workflows` (runtime control), `topics`, `events`, `api-keys` (session login only), and
+`audit-logs` (all with `--json`, `--token`, `--yes` on sends and deletes),
 plus global commands (`status`, `doctor`, `destroy`, `console`, `permissions`,
 `completion`, `telemetry`, `update`, `news`, `support`). Adding or changing a command →
 the `cli-commands` skill.
