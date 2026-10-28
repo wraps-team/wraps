@@ -41,13 +41,13 @@ import {
 } from "@/lib/analytics-drilldown-window";
 import { SERIES_COLOR } from "@/lib/chart-series";
 import { useSuppressionData } from "../hooks/use-analytics";
-import { ViewCausesLink } from "./view-causes-link";
 import {
   ChangeMarkerList,
   ChangeMarkersToggle,
   markerLineProps,
   useChartChangeMarkers,
 } from "./change-marker-overlay";
+import { ViewCausesLink } from "./view-causes-link";
 
 const chartConfig = {
   suppressionRate: {
