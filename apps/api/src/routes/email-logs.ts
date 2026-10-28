@@ -1,5 +1,6 @@
 import { getEmailLogByMessageId, listEmailLogs } from "@wraps/db";
 import { t } from "elysia";
+import { parseCursorParam } from "../lib/cursor";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 
 export const emailLogsRoutes = createAuthenticatedRoutes("/v1/email/logs")
@@ -9,6 +10,8 @@ export const emailLogsRoutes = createAuthenticatedRoutes("/v1/email/logs")
     async (ctx) => {
       const authContext = getAuth(ctx);
       const { status, limit, cursor } = ctx.query;
+      // Reject a malformed cursor here; listEmailLogs would silently list page one.
+      parseCursorParam(cursor, ctx.set);
 
       const result = await listEmailLogs(authContext.organizationId, {
         status,
