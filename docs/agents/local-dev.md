@@ -14,6 +14,26 @@ ports, so `localhost:3000` is not listening:
 Run the CLI against them with `pnpm cli:dev`. Plain `pnpm cli` uses the CLI's own
 defaults (`http://localhost:3001` / `:3000`), which portless leaves unserved.
 
+## Test environment: `apps/web/.env.test`
+
+Every vitest config (`apps/web`, `apps/api`, `packages/auth`, `packages/db`) loads
+`apps/web/.env.test` and hands it to the test workers. It is gitignored, so a fresh
+checkout has none, and `pnpm test` then fails in ways that look unrelated (the auth
+Stripe-config tests want `STRIPE_*` keys). Create it from the template:
+
+```bash
+cp apps/web/.env.test.example apps/web/.env.test
+```
+
+The template's non-secret values mirror what `.github/workflows/test.yml` sets, so that
+alone makes auth, web and the CLI pass. `DATABASE_URL` is the one secret (CI's
+`TEST_DATABASE_URL`); until you add it, the database-backed tests in `apps/api` and
+`packages/db` fail with `SASL: client password must be a string`. Leave it **unset**
+rather than empty: several auth tests skip when it is undefined but try to connect when it
+is `""`. See `docs/agents/test-database.md` for how it becomes a per-checkout branch.
+
+If you keep the keys in `.env.local` instead, `vitest` does not read that file for tests.
+
 ## `pnpm check:all` in a fresh checkout
 
 `pnpm install` is **not** enough for `check:all` in a tree nobody has built in — a fresh
