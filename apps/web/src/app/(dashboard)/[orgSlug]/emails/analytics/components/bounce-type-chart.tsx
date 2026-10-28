@@ -42,6 +42,12 @@ import {
 import { SERIES_COLOR } from "@/lib/chart-series";
 import { useBounceData } from "../hooks/use-analytics";
 import { ViewCausesLink } from "./view-causes-link";
+import {
+  ChangeMarkerList,
+  ChangeMarkersToggle,
+  markerLineProps,
+  useChartChangeMarkers,
+} from "./change-marker-overlay";
 
 const chartConfig = {
   bounceRate: {
@@ -54,7 +60,13 @@ function formatPercentage(value: number) {
   return `${value.toFixed(1)}%`;
 }
 
-export function BounceTypeChart({ orgSlug }: { orgSlug: string }) {
+export function BounceTypeChart({
+  orgSlug,
+  showChangeMarkers = false,
+}: {
+  orgSlug: string;
+  showChangeMarkers?: boolean;
+}) {
   const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = React.useState("30d");
 
@@ -74,6 +86,14 @@ export function BounceTypeChart({ orgSlug }: { orgSlug: string }) {
   const { data: bounceData, isLoading, error } = useBounceData(orgSlug, days);
 
   const chartData = bounceData || [];
+  const [showMarkers, setShowMarkers] = React.useState(true);
+  const { overlayOn, markerLines, markers, listState } = useChartChangeMarkers({
+    orgSlug,
+    days,
+    enabled: showChangeMarkers,
+    showMarkers,
+    dates: chartData.map((d) => d.date),
+  });
 
   return (
     <Card className="@container/card">
@@ -87,6 +107,11 @@ export function BounceTypeChart({ orgSlug }: { orgSlug: string }) {
         </CardDescription>
         <CardAction className="self-center">
           <ViewCausesLink days={days} metric="bounce" orgSlug={orgSlug} />
+          <ChangeMarkersToggle
+            enabled={showChangeMarkers}
+            onPressedChange={setShowMarkers}
+            pressed={showMarkers}
+          />
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "90d"}
@@ -225,9 +250,21 @@ export function BounceTypeChart({ orgSlug }: { orgSlug: string }) {
                 strokeWidth={2}
                 type="monotone"
               />
+              {markerLines.map((line) => (
+                <ReferenceLine key={line.date} {...markerLineProps(line)} />
+              ))}
             </AreaChart>
           </ChartContainer>
         )}
+        <ChangeMarkerList
+          active={overlayOn}
+          days={days}
+          markers={markers}
+          metric="bounce"
+          orgSlug={orgSlug}
+          state={listState}
+          tz={tz}
+        />
       </CardContent>
     </Card>
   );

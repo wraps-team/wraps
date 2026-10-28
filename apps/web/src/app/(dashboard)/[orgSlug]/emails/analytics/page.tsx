@@ -102,7 +102,7 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
         {/* Main Charts */}
         <div className="grid gap-6 lg:grid-cols-2">
           <EmailVolumeChart orgSlug={orgSlug} />
-          <DeliverabilityChart orgSlug={orgSlug} />
+          <DeliverabilityChart orgSlug={orgSlug} showChangeMarkers />
         </div>
 
         {/* Engagement Section */}
@@ -110,9 +110,9 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
 
         {/* Reputation Monitoring */}
         <div className="grid gap-6 lg:grid-cols-3">
-          <BounceTypeChart orgSlug={orgSlug} />
-          <SuppressionChart orgSlug={orgSlug} />
-          <ComplaintChart orgSlug={orgSlug} />
+          <BounceTypeChart orgSlug={orgSlug} showChangeMarkers />
+          <SuppressionChart orgSlug={orgSlug} showChangeMarkers />
+          <ComplaintChart orgSlug={orgSlug} showChangeMarkers />
         </div>
 
         {/* Performance Metrics */}

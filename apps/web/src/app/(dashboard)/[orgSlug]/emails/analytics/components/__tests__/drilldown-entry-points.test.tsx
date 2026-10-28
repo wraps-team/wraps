@@ -52,6 +52,8 @@ const overview = {
 };
 
 vi.mock("../../hooks/use-analytics", () => ({
+  // Charts call this hook unconditionally. With the overlay off it sends no request.
+  useChangeMarkers: () => ({ data: undefined, isLoading: false, error: null }),
   useAnalyticsOverview: () => ({
     data: overview,
     isLoading: false,
