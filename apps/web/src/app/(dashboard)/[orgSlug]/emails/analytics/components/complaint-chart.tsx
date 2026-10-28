@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from "@wraps/ui/components/ui/select";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import {
@@ -42,6 +41,7 @@ import {
 } from "@/lib/analytics-drilldown-window";
 import { SERIES_COLOR } from "@/lib/chart-series";
 import { useComplaintData } from "../hooks/use-analytics";
+import { ViewCausesLink } from "./view-causes-link";
 
 const chartConfig = {
   complaintRate: {
@@ -90,16 +90,7 @@ export function ComplaintChart({ orgSlug }: { orgSlug: string }) {
           <span className="@[540px]/card:hidden">Complaint rate (%)</span>
         </CardDescription>
         <CardAction className="self-center">
-          <Link
-            className="self-center text-muted-foreground text-sm underline underline-offset-4 hover:text-foreground"
-            href={buildDrilldownHref(orgSlug, {
-              metric: "complaint",
-              days,
-              tz,
-            })}
-          >
-            View causes
-          </Link>
+          <ViewCausesLink days={days} metric="complaint" orgSlug={orgSlug} />
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "90d"}
