@@ -13,7 +13,9 @@ import {
 import { BOT_UA_KEYWORDS } from "../email-bot-detection";
 import { db } from "../index";
 import { awsAccount } from "../schema/app";
-import { messageSend } from "../schema/batch";
+import { batchSend, messageSend } from "../schema/batch";
+import { template } from "../schema/templates";
+import { workflow, workflowExecution } from "../schema/workflows";
 import type { DbClient } from "./api-keys";
 
 export type MetricsDimension =
@@ -529,4 +531,158 @@ export async function queryAccountMonthVolumes(
     .groupBy(messageSend.awsAccountId, billingMonthExpr());
 
   return rows as AccountMonthVolume[];
+}
+
+// ─── Bounce drill-down: attribution ─────────────────────────────────────────
+// Groups one window's email sends by a single attribution dimension. Appended
+// for the analytics drill-down. The counts are the AGGREGATE_FIELDS expressions
+// above, so the drill-down cannot drift from the charts.
+
+export type AttributionBy = "broadcast" | "workflow" | "template" | "from";
+
+export type AttributionQuery = {
+  organizationId: string;
+  startTime: Date;
+  endTime: Date;
+  timezone: string; // IANA, validated by assertValidTimezone
+  by: AttributionBy;
+  day?: string; // YYYY-MM-DD, a local date in `timezone`
+  maxRows?: number; // default 10_000
+};
+
+export type AttributionRow = {
+  key: string | null; // null = not attributed to this dimension
+  label: string | null; // batch/workflow/template name, or the from address
+  sourceTypes: (string | null)[]; // distinct source_type values in the group
+  sent: number;
+  bounced: number;
+  bouncedPermanent: number;
+  bouncedTransient: number;
+  bouncedUndetermined: number;
+  complained: number;
+  suppressed: number;
+};
+
+function attributionKey(by: AttributionBy): DimensionColumn {
+  switch (by) {
+    case "broadcast":
+      return messageSend.batchSendId;
+    case "workflow":
+      // Grouped by workflow, not execution: one execution per contact would
+      // give one row per contact.
+      return workflow.id;
+    case "template":
+      return messageSend.emailTemplateId;
+    default:
+      // Display-form "Name <addr>" from SDK sends reduces to the address; the
+      // domainExpr split_part would otherwise yield "b.com>". Literal regex
+      // text, not a bound parameter: a `$n` would differ between SELECT and
+      // GROUP BY and Postgres rejects the query.
+      return sql`lower(coalesce(substring(${messageSend.from} from '<([^>]+)>'), ${messageSend.from}))`;
+  }
+}
+
+function attributionLabel(by: AttributionBy, key: DimensionColumn): SQL {
+  switch (by) {
+    case "broadcast":
+      return sql`max(${batchSend.name})`;
+    case "workflow":
+      return sql`max(${workflow.name})`;
+    case "template":
+      return sql`max(${template.name})`;
+    default:
+      return sql`${key}`;
+  }
+}
+
+/**
+ * One aggregate row per group for the window, with the group's counts. Every
+ * send in the window lands in exactly one group, null included, so the sum of
+ * all rows equals the window totals.
+ *
+ * Org scoping: the WHERE carries organization_id, and every join repeats the
+ * org predicate in its ON clause. A joined name is taken only from a row that
+ * belongs to the requesting org. A predicate in WHERE would turn each LEFT JOIN
+ * into an inner join and drop the null group.
+ */
+export async function queryMessageAttributionRows(
+  query: AttributionQuery,
+  dbClient: DbClient = db
+): Promise<AttributionRow[]> {
+  const timezone = assertValidTimezone(query.timezone);
+  const maxRows = query.maxRows ?? DEFAULT_MAX_ROWS;
+  const tzLiteral = sql.raw(`'${timezone}'`);
+  const orgId = query.organizationId;
+
+  const conditions = buildWhereConditions({
+    organizationId: orgId,
+    startTime: query.startTime,
+    endTime: query.endTime,
+  });
+  if (query.day) {
+    // Same expression the daily chart buckets by, so a clicked day selects
+    // exactly the chart's bucket. The day is a bound parameter, in WHERE only.
+    conditions.push(sql`${periodExpr("daily", tzLiteral)} = ${query.day}`);
+  }
+
+  const key = attributionKey(query.by);
+  const label = attributionLabel(query.by, key);
+
+  const rows = await dbClient
+    .select({
+      key,
+      label,
+      sourceTypes: sql<
+        (string | null)[]
+      >`array_agg(distinct ${messageSend.sourceType}::text)`,
+      sent: AGGREGATE_FIELDS.sent,
+      bounced: AGGREGATE_FIELDS.bounced,
+      bouncedPermanent: AGGREGATE_FIELDS.bouncedPermanent,
+      bouncedTransient: AGGREGATE_FIELDS.bouncedTransient,
+      bouncedUndetermined: AGGREGATE_FIELDS.bouncedUndetermined,
+      complained: AGGREGATE_FIELDS.complained,
+      suppressed: AGGREGATE_FIELDS.suppressed,
+    })
+    .from(messageSend)
+    .leftJoin(
+      workflowExecution,
+      and(
+        eq(messageSend.workflowExecutionId, workflowExecution.id),
+        eq(workflowExecution.organizationId, orgId)
+      )
+    )
+    .leftJoin(
+      workflow,
+      and(
+        eq(workflowExecution.workflowId, workflow.id),
+        eq(workflow.organizationId, orgId)
+      )
+    )
+    .leftJoin(
+      batchSend,
+      and(
+        eq(messageSend.batchSendId, batchSend.id),
+        eq(batchSend.organizationId, orgId)
+      )
+    )
+    .leftJoin(
+      template,
+      and(
+        eq(messageSend.emailTemplateId, template.id),
+        eq(template.organizationId, orgId)
+      )
+    )
+    .where(and(...conditions))
+    .groupBy(key)
+    // LIMIT maxRows + 1 so the cap is enforced in SQL, as the bucket query does.
+    .limit(maxRows + 1);
+
+  if (rows.length > maxRows) {
+    throw new MetricsQueryError(
+      "row_cap_exceeded",
+      `Attribution query returned more than ${maxRows} groups; narrow the time window`
+    );
+  }
+
+  return rows as unknown as AttributionRow[];
 }
