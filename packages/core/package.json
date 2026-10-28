@@ -19,6 +19,10 @@
       "import": "./dist/config-set-name.js",
       "types": "./dist/config-set-name.d.ts"
     },
+    "./email-diagnostics": {
+      "import": "./dist/email-diagnostics.js",
+      "types": "./dist/email-diagnostics.d.ts"
+    },
     "./lambda": {
       "import": "./dist/lambda/index.js",
       "types": "./dist/lambda/index.d.ts"

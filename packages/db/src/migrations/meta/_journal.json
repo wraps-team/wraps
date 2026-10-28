@@ -666,6 +666,20 @@
       "when": 1793130876375,
       "tag": "0094_certain_hellfire_club",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1793205000590,
+      "tag": "0095_lazy_otto_octavius",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1793207085596,
+      "tag": "0096_smooth_shotgun",
+      "breakpoints": true
     }
   ]
 }

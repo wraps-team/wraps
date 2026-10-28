@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@wraps/ui/components/ui/select";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import {
   Area,
@@ -34,8 +35,19 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  browserTimeZone,
+  buildDrilldownHref,
+} from "@/lib/analytics-drilldown-window";
 import { SERIES_COLOR } from "@/lib/chart-series";
 import { useComplaintData } from "../hooks/use-analytics";
+import {
+  ChangeMarkerList,
+  ChangeMarkersToggle,
+  markerLineProps,
+  useChartChangeMarkers,
+} from "./change-marker-overlay";
+import { ViewCausesLink } from "./view-causes-link";
 
 const chartConfig = {
   complaintRate: {
@@ -48,7 +60,13 @@ function formatPercentage(value: number) {
   return `${value.toFixed(2)}%`;
 }
 
-export function ComplaintChart({ orgSlug }: { orgSlug: string }) {
+export function ComplaintChart({
+  orgSlug,
+  showChangeMarkers = false,
+}: {
+  orgSlug: string;
+  showChangeMarkers?: boolean;
+}) {
   const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = React.useState("30d");
 
@@ -59,6 +77,12 @@ export function ComplaintChart({ orgSlug }: { orgSlug: string }) {
   }, [isMobile]);
 
   const days = timeRange === "90d" ? 90 : timeRange === "30d" ? 30 : 7;
+  const router = useRouter();
+  // Set after mount: the server render must not carry the server's timezone.
+  const [tz, setTz] = React.useState("UTC");
+  React.useEffect(() => {
+    setTz(browserTimeZone());
+  }, []);
   const {
     data: complaintData,
     isLoading,
@@ -66,6 +90,14 @@ export function ComplaintChart({ orgSlug }: { orgSlug: string }) {
   } = useComplaintData(orgSlug, days);
 
   const chartData = complaintData || [];
+  const [showMarkers, setShowMarkers] = React.useState(true);
+  const { overlayOn, markerLines, markers, listState } = useChartChangeMarkers({
+    orgSlug,
+    days,
+    enabled: showChangeMarkers,
+    showMarkers,
+    dates: chartData.map((d) => d.date),
+  });
 
   return (
     <Card className="@container/card">
@@ -78,6 +110,12 @@ export function ComplaintChart({ orgSlug }: { orgSlug: string }) {
           <span className="@[540px]/card:hidden">Complaint rate (%)</span>
         </CardDescription>
         <CardAction className="self-center">
+          <ViewCausesLink days={days} metric="complaint" orgSlug={orgSlug} />
+          <ChangeMarkersToggle
+            enabled={showChangeMarkers}
+            onPressedChange={setShowMarkers}
+            pressed={showMarkers}
+          />
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "90d"}
@@ -136,7 +174,23 @@ export function ComplaintChart({ orgSlug }: { orgSlug: string }) {
             className="aspect-auto h-[300px] w-full"
             config={chartConfig}
           >
-            <AreaChart accessibilityLayer data={chartData}>
+            <AreaChart
+              accessibilityLayer
+              data={chartData}
+              onClick={(state) => {
+                const day = state?.activeLabel;
+                if (typeof day === "string") {
+                  router.push(
+                    buildDrilldownHref(orgSlug, {
+                      metric: "complaint",
+                      days,
+                      day,
+                      tz,
+                    })
+                  );
+                }
+              }}
+            >
               <defs>
                 <linearGradient
                   id="fillComplaintRate"
@@ -207,9 +261,21 @@ export function ComplaintChart({ orgSlug }: { orgSlug: string }) {
                 strokeWidth={2}
                 type="monotone"
               />
+              {markerLines.map((line) => (
+                <ReferenceLine key={line.date} {...markerLineProps(line)} />
+              ))}
             </AreaChart>
           </ChartContainer>
         )}
+        <ChangeMarkerList
+          active={overlayOn}
+          days={days}
+          markers={markers}
+          metric="complaint"
+          orgSlug={orgSlug}
+          state={listState}
+          tz={tz}
+        />
       </CardContent>
     </Card>
   );

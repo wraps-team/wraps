@@ -356,7 +356,8 @@ type ProviderPattern = {
   severity: DiagnosticSeverity;
 };
 
-const PROVIDER_PATTERNS: ProviderPattern[] = [
+// Exported read-only for the catalog uniqueness test; nothing else reads it.
+export const PROVIDER_PATTERNS: ProviderPattern[] = [
   {
     provider: "Gmail",
     match: ["does not exist"],
@@ -854,12 +855,37 @@ function mapRecipients(recipients: unknown[]): RecipientDiagnostic[] {
   return result;
 }
 
+export type BounceSubtypeDescription = {
+  title: string;
+  severity: DiagnosticSeverity;
+  suggestedAction?: string;
+};
+
+// Headline, severity and action for a SES bounce from its coarse category.
+// Falls back to the bounce-type headline and severity for an unmapped pair.
+export function describeBounceSubtype(input: {
+  bounceType?: string | null;
+  bounceSubType?: string | null;
+}): BounceSubtypeDescription {
+  const bounceType = asString(input.bounceType);
+  const bounceSubType = asString(input.bounceSubType);
+  const key = `${bounceType}/${bounceSubType}`;
+  const mapped = Object.hasOwn(BOUNCE_SUBTYPE_MAP, key)
+    ? BOUNCE_SUBTYPE_MAP[key]
+    : undefined;
+  return {
+    title: mapped?.headline ?? bounceTypeHeadline(bounceType),
+    severity: mapped?.severity ?? bounceTypeSeverity(bounceType),
+    suggestedAction: mapped?.action,
+  };
+}
+
 function describeBounce(metadata: Record<string, unknown>): EventDiagnostics {
   const bounceType = asString(metadata.bounceType);
   const bounceSubType = asString(metadata.bounceSubType);
-  const mapped = BOUNCE_SUBTYPE_MAP[`${bounceType}/${bounceSubType}`];
-  const severity = mapped?.severity ?? bounceTypeSeverity(bounceType);
-  const headline = mapped?.headline ?? bounceTypeHeadline(bounceType);
+  const described = describeBounceSubtype({ bounceType, bounceSubType });
+  const severity = described.severity;
+  const headline = described.title;
 
   const fields: EventDiagnostics["fields"] = [];
   if (bounceType) {
@@ -952,13 +978,36 @@ const GENERIC_COMPLAINT = {
   action: "Remove the address and review consent and list hygiene.",
 };
 
+export type ComplaintFeedbackDescription = {
+  title: string;
+  explanation: string;
+  severity: DiagnosticSeverity;
+  suggestedAction: string;
+};
+
+// Copy for a complaint feedback type. Null, unknown and prototype-named values
+// (for example "constructor") get the generic copy.
+export function describeComplaintFeedbackType(
+  feedbackType: string | null | undefined
+): ComplaintFeedbackDescription {
+  const key = asString(feedbackType);
+  const mapped =
+    key !== undefined && Object.hasOwn(COMPLAINT_FEEDBACK_TYPE_MAP, key)
+      ? COMPLAINT_FEEDBACK_TYPE_MAP[key]
+      : GENERIC_COMPLAINT;
+  return {
+    title: mapped.headline,
+    explanation: mapped.explanation,
+    severity: mapped.severity,
+    suggestedAction: mapped.action,
+  };
+}
+
 function describeComplaint(
   metadata: Record<string, unknown>
 ): EventDiagnostics {
   const feedbackType = asString(metadata.complaintFeedbackType);
-  const mapped =
-    (feedbackType && COMPLAINT_FEEDBACK_TYPE_MAP[feedbackType]) ||
-    GENERIC_COMPLAINT;
+  const described = describeComplaintFeedbackType(feedbackType);
   const fields: EventDiagnostics["fields"] = [];
   if (feedbackType) {
     fields.push({ label: "Feedback type", value: feedbackType });
@@ -968,8 +1017,8 @@ function describeComplaint(
     fields.push({ label: "Reported by", value: userAgent });
   }
   return {
-    headline: mapped.headline,
-    severity: mapped.severity,
+    headline: described.title,
+    severity: described.severity,
     fields,
     recipients: mapRecipients(asArray(metadata.complainedRecipients)),
   };

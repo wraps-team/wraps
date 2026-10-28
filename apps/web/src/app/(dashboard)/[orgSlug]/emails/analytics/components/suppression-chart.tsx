@@ -23,12 +23,31 @@ import {
   SelectValue,
 } from "@wraps/ui/components/ui/select";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
+import { useRouter } from "next/navigation";
 import * as React from "react";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ReferenceLine,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  browserTimeZone,
+  buildDrilldownHref,
+} from "@/lib/analytics-drilldown-window";
 import { SERIES_COLOR } from "@/lib/chart-series";
 import { useSuppressionData } from "../hooks/use-analytics";
+import {
+  ChangeMarkerList,
+  ChangeMarkersToggle,
+  markerLineProps,
+  useChartChangeMarkers,
+} from "./change-marker-overlay";
+import { ViewCausesLink } from "./view-causes-link";
 
 const chartConfig = {
   suppressionRate: {
@@ -41,7 +60,13 @@ function formatPercentage(value: number) {
   return `${value.toFixed(1)}%`;
 }
 
-export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
+export function SuppressionChart({
+  orgSlug,
+  showChangeMarkers = false,
+}: {
+  orgSlug: string;
+  showChangeMarkers?: boolean;
+}) {
   const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = React.useState("30d");
 
@@ -52,6 +77,12 @@ export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
   }, [isMobile]);
 
   const days = timeRange === "90d" ? 90 : timeRange === "30d" ? 30 : 7;
+  const router = useRouter();
+  // Set after mount: the server render must not carry the server's timezone.
+  const [tz, setTz] = React.useState("UTC");
+  React.useEffect(() => {
+    setTz(browserTimeZone());
+  }, []);
   const {
     data: suppressionData,
     isLoading,
@@ -59,6 +90,14 @@ export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
   } = useSuppressionData(orgSlug, days);
 
   const chartData = suppressionData || [];
+  const [showMarkers, setShowMarkers] = React.useState(true);
+  const { overlayOn, markerLines, markers, listState } = useChartChangeMarkers({
+    orgSlug,
+    days,
+    enabled: showChangeMarkers,
+    showMarkers,
+    dates: chartData.map((d) => d.date),
+  });
 
   return (
     <Card className="@container/card">
@@ -71,6 +110,12 @@ export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
           <span className="@[540px]/card:hidden">Suppression rate (%)</span>
         </CardDescription>
         <CardAction className="self-center">
+          <ViewCausesLink days={days} metric="suppression" orgSlug={orgSlug} />
+          <ChangeMarkersToggle
+            enabled={showChangeMarkers}
+            onPressedChange={setShowMarkers}
+            pressed={showMarkers}
+          />
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "90d"}
@@ -129,7 +174,23 @@ export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
             className="aspect-auto h-[300px] w-full"
             config={chartConfig}
           >
-            <AreaChart accessibilityLayer data={chartData}>
+            <AreaChart
+              accessibilityLayer
+              data={chartData}
+              onClick={(state) => {
+                const day = state?.activeLabel;
+                if (typeof day === "string") {
+                  router.push(
+                    buildDrilldownHref(orgSlug, {
+                      metric: "suppression",
+                      days,
+                      day,
+                      tz,
+                    })
+                  );
+                }
+              }}
+            >
               <defs>
                 <linearGradient
                   id="fillSuppressionRate"
@@ -192,9 +253,21 @@ export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
                 strokeWidth={2}
                 type="monotone"
               />
+              {markerLines.map((line) => (
+                <ReferenceLine key={line.date} {...markerLineProps(line)} />
+              ))}
             </AreaChart>
           </ChartContainer>
         )}
+        <ChangeMarkerList
+          active={overlayOn}
+          days={days}
+          markers={markers}
+          metric="suppression"
+          orgSlug={orgSlug}
+          state={listState}
+          tz={tz}
+        />
       </CardContent>
     </Card>
   );

@@ -283,6 +283,7 @@ export default async function SuppressionsPage({
           initialNextToken={page.nextToken}
           initialRows={rows}
           organizationId={orgWithMembership.id}
+          orgSlug={orgSlug}
         />
       )}
     </div>

@@ -1,10 +1,12 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   json,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -413,6 +415,69 @@ export const messageSend = pgTable(
       table.channel,
       table.sentAt
     ),
+    // Address drill-down: every send to one address within an org, matched
+    // case-insensitively. There is no index on recipient, and the trigram
+    // index serves fuzzy search (not org-scoped), so it cannot serve this.
+    // Created in production via packages/db/scripts/index-manifest.ts
+    // (CONCURRENTLY) — schema declared here as source of truth.
+    index("message_send_org_recipient_lower_idx").on(
+      table.organizationId,
+      sql`lower(${table.recipient})`,
+      table.createdAt
+    ),
+    // Address drill-down window scan over only the problem rows (bounced,
+    // complained or suppressed). The predicate matches the query's WHERE
+    // exactly, so the planner can use it. Created in production via
+    // packages/db/scripts/index-manifest.ts (CONCURRENTLY).
+    index("message_send_org_problem_sent_at_idx")
+      .on(table.organizationId, table.sentAt)
+      .where(
+        sql`channel = 'email' AND (bounced_at IS NOT NULL OR complained_at IS NOT NULL OR suppressed_at IS NOT NULL)`
+      ),
+  ]
+);
+
+/**
+ * Receiver diagnostic for a bounce or complaint on one message send.
+ *
+ * Kept off message_send: the receiver's SMTP text stays off the hot row, and
+ * web SQL never names a new column before its migration runs. A row here is the
+ * marker that the event was processed by the diagnostic-aware webhook, so a
+ * bounce with no row predates that. Written by
+ * repositories/message-send-diagnostics.ts, which keeps the first stored value
+ * of each column on a duplicate event.
+ */
+export const messageSendDiagnostic = pgTable(
+  "message_send_diagnostic",
+  {
+    messageSendId: text("message_send_id")
+      .references(() => messageSend.id, { onDelete: "cascade" })
+      .notNull(),
+
+    organizationId: text("organization_id")
+      .references(() => organization.id, { onDelete: "cascade" })
+      .notNull(),
+
+    eventType: text("event_type").$type<"bounce" | "complaint">().notNull(),
+
+    // SES bouncedRecipients[].status, validated (bounce rows only)
+    enhancedStatus: text("enhanced_status"),
+    // SES bouncedRecipients[].diagnosticCode, address-redacted and capped (bounce rows only)
+    diagnosticCode: text("diagnostic_code"),
+    // provider|code|title from translateDiagnosticCode, capped at 200 (bounce rows only)
+    reasonKey: text("reason_key"),
+    // SES complaint.complaintFeedbackType, lower-cased and validated (complaint rows only)
+    feedbackType: text("feedback_type"),
+
+    recordedAt: timestamp("recorded_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.messageSendId, table.eventType] }),
+    check(
+      "message_send_diagnostic_event_type_check",
+      sql`${table.eventType} IN ('bounce', 'complaint')`
+    ),
+    index("message_send_diagnostic_org_idx").on(table.organizationId),
   ]
 );
 
@@ -479,3 +544,7 @@ export type MessageSend = typeof messageSend.$inferSelect;
 export type NewMessageSend = typeof messageSend.$inferInsert;
 export type MessageSendStatus = MessageSend["status"];
 export type MessageSourceType = MessageSend["sourceType"];
+
+export type MessageSendDiagnostic = typeof messageSendDiagnostic.$inferSelect;
+export type NewMessageSendDiagnostic =
+  typeof messageSendDiagnostic.$inferInsert;

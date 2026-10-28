@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type { EmailChartMeta } from "@/lib/analytics-scope";
+import type { ChangeMarkersResponse } from "@/lib/change-markers";
 
 const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -269,5 +270,45 @@ export function useSuppressionData(orgSlug: string, days = 30) {
       return response.json();
     },
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Change markers for one window. Charts call it with withDeltas false, and the
+ * timeline tab with true. `tz` is the request timezone for the marker dates and
+ * defaults to the browser's. `enabled` is false until a chart shows the overlay,
+ * so an overlay-free chart sends no request.
+ */
+export function useChangeMarkers(
+  orgSlug: string,
+  days: number,
+  opts: { withDeltas: boolean; enabled: boolean; tz?: string }
+) {
+  const tz = opts.tz ?? browserTz;
+  return useQuery<ChangeMarkersResponse>({
+    queryKey: [
+      "analytics",
+      "change-markers",
+      orgSlug,
+      days,
+      opts.withDeltas,
+      tz,
+    ],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        days: String(days),
+        tz,
+        deltas: opts.withDeltas ? "1" : "0",
+      });
+      const response = await fetch(
+        `/api/${orgSlug}/analytics/change-markers?${params.toString()}`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch change markers");
+      }
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: opts.enabled,
   });
 }

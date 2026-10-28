@@ -13,7 +13,9 @@ import {
 import { BOT_UA_KEYWORDS } from "../email-bot-detection";
 import { db } from "../index";
 import { awsAccount } from "../schema/app";
-import { messageSend } from "../schema/batch";
+import { batchSend, messageSend, messageSendDiagnostic } from "../schema/batch";
+import { template } from "../schema/templates";
+import { workflow, workflowExecution } from "../schema/workflows";
 import type { DbClient } from "./api-keys";
 
 export type MetricsDimension =
@@ -529,4 +531,520 @@ export async function queryAccountMonthVolumes(
     .groupBy(messageSend.awsAccountId, billingMonthExpr());
 
   return rows as AccountMonthVolume[];
+}
+
+// ─── Bounce drill-down: attribution ─────────────────────────────────────────
+// Groups one window's email sends by a single attribution dimension. Appended
+// for the analytics drill-down. The counts are the AGGREGATE_FIELDS expressions
+// above, so the drill-down cannot drift from the charts.
+
+export type AttributionBy = "broadcast" | "workflow" | "template" | "from";
+
+export type AttributionQuery = {
+  organizationId: string;
+  startTime: Date;
+  endTime: Date;
+  timezone: string; // IANA, validated by assertValidTimezone
+  by: AttributionBy;
+  day?: string; // YYYY-MM-DD, a local date in `timezone`
+  maxRows?: number; // default 10_000
+};
+
+export type AttributionRow = {
+  key: string | null; // null = not attributed to this dimension
+  label: string | null; // batch/workflow/template name, or the from address
+  sourceTypes: (string | null)[]; // distinct source_type values in the group
+  sent: number;
+  bounced: number;
+  bouncedPermanent: number;
+  bouncedTransient: number;
+  bouncedUndetermined: number;
+  complained: number;
+  suppressed: number;
+};
+
+function attributionKey(by: AttributionBy): DimensionColumn {
+  switch (by) {
+    case "broadcast":
+      return messageSend.batchSendId;
+    case "workflow":
+      // Grouped by workflow, not execution: one execution per contact would
+      // give one row per contact.
+      return workflow.id;
+    case "template":
+      return messageSend.emailTemplateId;
+    default:
+      // Display-form "Name <addr>" from SDK sends reduces to the address; the
+      // domainExpr split_part would otherwise yield "b.com>". Literal regex
+      // text, not a bound parameter: a `$n` would differ between SELECT and
+      // GROUP BY and Postgres rejects the query.
+      return sql`lower(coalesce(substring(${messageSend.from} from '<([^>]+)>'), ${messageSend.from}))`;
+  }
+}
+
+function attributionLabel(by: AttributionBy, key: DimensionColumn): SQL {
+  switch (by) {
+    case "broadcast":
+      return sql`max(${batchSend.name})`;
+    case "workflow":
+      return sql`max(${workflow.name})`;
+    case "template":
+      return sql`max(${template.name})`;
+    default:
+      return sql`${key}`;
+  }
+}
+
+/**
+ * One aggregate row per group for the window, with the group's counts. Every
+ * send in the window lands in exactly one group, null included, so the sum of
+ * all rows equals the window totals.
+ *
+ * Org scoping: the WHERE carries organization_id, and every join repeats the
+ * org predicate in its ON clause. A joined name is taken only from a row that
+ * belongs to the requesting org. A predicate in WHERE would turn each LEFT JOIN
+ * into an inner join and drop the null group.
+ */
+export async function queryMessageAttributionRows(
+  query: AttributionQuery,
+  dbClient: DbClient = db
+): Promise<AttributionRow[]> {
+  const timezone = assertValidTimezone(query.timezone);
+  const maxRows = query.maxRows ?? DEFAULT_MAX_ROWS;
+  const tzLiteral = sql.raw(`'${timezone}'`);
+  const orgId = query.organizationId;
+
+  const conditions = buildWhereConditions({
+    organizationId: orgId,
+    startTime: query.startTime,
+    endTime: query.endTime,
+  });
+  if (query.day) {
+    // Same expression the daily chart buckets by, so a clicked day selects
+    // exactly the chart's bucket. The day is a bound parameter, in WHERE only.
+    conditions.push(sql`${periodExpr("daily", tzLiteral)} = ${query.day}`);
+  }
+
+  const key = attributionKey(query.by);
+  const label = attributionLabel(query.by, key);
+
+  const rows = await dbClient
+    .select({
+      key,
+      label,
+      sourceTypes: sql<
+        (string | null)[]
+      >`array_agg(distinct ${messageSend.sourceType}::text)`,
+      sent: AGGREGATE_FIELDS.sent,
+      bounced: AGGREGATE_FIELDS.bounced,
+      bouncedPermanent: AGGREGATE_FIELDS.bouncedPermanent,
+      bouncedTransient: AGGREGATE_FIELDS.bouncedTransient,
+      bouncedUndetermined: AGGREGATE_FIELDS.bouncedUndetermined,
+      complained: AGGREGATE_FIELDS.complained,
+      suppressed: AGGREGATE_FIELDS.suppressed,
+    })
+    .from(messageSend)
+    .leftJoin(
+      workflowExecution,
+      and(
+        eq(messageSend.workflowExecutionId, workflowExecution.id),
+        eq(workflowExecution.organizationId, orgId)
+      )
+    )
+    .leftJoin(
+      workflow,
+      and(
+        eq(workflowExecution.workflowId, workflow.id),
+        eq(workflow.organizationId, orgId)
+      )
+    )
+    .leftJoin(
+      batchSend,
+      and(
+        eq(messageSend.batchSendId, batchSend.id),
+        eq(batchSend.organizationId, orgId)
+      )
+    )
+    .leftJoin(
+      template,
+      and(
+        eq(messageSend.emailTemplateId, template.id),
+        eq(template.organizationId, orgId)
+      )
+    )
+    .where(and(...conditions))
+    .groupBy(key)
+    // LIMIT maxRows + 1 so the cap is enforced in SQL, as the bucket query does.
+    .limit(maxRows + 1);
+
+  if (rows.length > maxRows) {
+    throw new MetricsQueryError(
+      "row_cap_exceeded",
+      `Attribution query returned more than ${maxRows} groups; narrow the time window`
+    );
+  }
+
+  return rows as unknown as AttributionRow[];
+}
+
+// ─── Bounce and complaint reasons (drill-down "Reasons" tab) ────────────────
+// Appended for the drill-down reasons view. Every read starts from
+// buildWhereConditions, so its org and window predicates are the bounce and
+// complaint charts' own. message_send_diagnostic is LEFT JOINed on its primary
+// key (message_send_id, event_type), so the join cannot fan out, and a bounce
+// with no diagnostic row (pre-M1, or a best-effort write that failed) stays in
+// the result with has_detail = false.
+
+const REASON_GROUP_LIMIT = 500;
+const SUPPRESSION_SUBTYPES = ["Suppressed", "EmailValidationSuppressed"];
+
+export type ReasonsMetric = "bounce" | "complaint";
+
+export type ReasonsQuery = {
+  organizationId: string;
+  startTime: Date;
+  endTime: Date;
+  timezone: string; // IANA, validated by assertValidTimezone
+  day?: string | null; // YYYY-MM-DD, a local date in `timezone`; null = rolling
+};
+
+export type BounceReasonRow = {
+  receiverDomain: string;
+  reasonKey: string | null;
+  hasDetail: boolean;
+  bounceType: string | null;
+  bounceSubType: string | null;
+  sampleStatus: string | null;
+  sampleCode: string | null;
+  count: number;
+  distinctRecipients: number; // a count; no address is selected
+  firstSeen: Date | null;
+  lastSeen: Date | null;
+};
+
+export type ComplaintReasonRow = {
+  receiverDomain: string;
+  feedbackType: string | null;
+  hasDetail: boolean;
+  count: number;
+  distinctRecipients: number;
+  firstSeen: Date | null;
+  lastSeen: Date | null;
+};
+
+// Existing columns only. Used when the diagnostic table is not migrated yet.
+export type LegacyReasonRow = {
+  receiverDomain: string;
+  bounceType: string | null; // always null for complaints
+  bounceSubType: string | null; // always null for complaints
+  count: number;
+  distinctRecipients: number;
+  firstSeen: Date | null;
+  lastSeen: Date | null;
+};
+
+export type ReasonTotals = {
+  totalCount: number;
+  withoutDetail: number; // rows in the window with no diagnostic row
+};
+
+/**
+ * Receiver domain as written, lower-cased, with no collapsing of subdomains.
+ * The text is fixed: no bound parameter, so SELECT and GROUP BY match.
+ */
+function receiverDomainExpr(): SQL<string> {
+  return sql<string>`lower(btrim(split_part(${messageSend.recipient}, '@', 2)))`;
+}
+
+/** True when a diagnostic row exists for the bounce or complaint. */
+function hasDetailExpr(): SQL<boolean> {
+  return sql<boolean>`(${messageSendDiagnostic.messageSendId} IS NOT NULL)`;
+}
+
+function diagnosticJoinOn(metric: ReasonsMetric) {
+  return and(
+    eq(messageSendDiagnostic.messageSendId, messageSend.id),
+    eq(messageSendDiagnostic.eventType, metric),
+    eq(messageSendDiagnostic.organizationId, messageSend.organizationId)
+  );
+}
+
+/** Org and window predicates, plus the day filter in day mode. */
+function reasonWindowConditions(query: ReasonsQuery): SQL[] {
+  const timezone = assertValidTimezone(query.timezone);
+  const conditions = buildWhereConditions({
+    organizationId: query.organizationId,
+    startTime: query.startTime,
+    endTime: query.endTime,
+  });
+  if (query.day) {
+    // The same bucket the daily chart uses, so a clicked day selects its bucket.
+    const tzLiteral = sql.raw(`'${timezone}'`);
+    conditions.push(sql`${periodExpr("daily", tzLiteral)} = ${query.day}`);
+  }
+  return conditions;
+}
+
+/** Window plus the metric's own predicate. Bounces exclude suppression subtypes. */
+function reasonConditions(query: ReasonsQuery, metric: ReasonsMetric): SQL[] {
+  const conditions = reasonWindowConditions(query);
+  if (metric === "bounce") {
+    conditions.push(isNotNull(messageSend.bouncedAt));
+    // COALESCE: a bare NOT IN is NULL for a NULL subtype and would drop a real bounce.
+    conditions.push(
+      sql`COALESCE(${messageSend.bounceSubType}, '') NOT IN ('Suppressed', 'EmailValidationSuppressed')`
+    );
+  } else {
+    conditions.push(isNotNull(messageSend.complainedAt));
+  }
+  return conditions;
+}
+
+/**
+ * Bounce groups for the window, grouped by receiver domain, stored reason and
+ * subtype. Ordered by count, capped at 500 groups. The sample status and code
+ * come from the same row: both arrays are ordered by message_send.id, so
+ * element 1 of each is one row.
+ */
+export async function queryBounceReasonRows(
+  query: ReasonsQuery,
+  dbClient: DbClient = db
+): Promise<BounceReasonRow[]> {
+  const domain = receiverDomainExpr();
+  const rows = await dbClient
+    .select({
+      receiverDomain: domain,
+      reasonKey: messageSendDiagnostic.reasonKey,
+      hasDetail: hasDetailExpr(),
+      bounceType: messageSend.bounceType,
+      bounceSubType: messageSend.bounceSubType,
+      sampleStatus: sql<
+        string | null
+      >`(array_agg(${messageSendDiagnostic.enhancedStatus} ORDER BY ${messageSend.id}))[1]`,
+      sampleCode: sql<
+        string | null
+      >`(array_agg(${messageSendDiagnostic.diagnosticCode} ORDER BY ${messageSend.id}))[1]`,
+      count: sql<number>`count(*)::int`,
+      distinctRecipients: sql<number>`count(DISTINCT ${messageSend.recipient})::int`,
+      firstSeen: sql<Date | null>`min(${messageSend.bouncedAt})`.mapWith(
+        messageSend.bouncedAt
+      ),
+      lastSeen: sql<Date | null>`max(${messageSend.bouncedAt})`.mapWith(
+        messageSend.bouncedAt
+      ),
+    })
+    .from(messageSend)
+    .leftJoin(messageSendDiagnostic, diagnosticJoinOn("bounce"))
+    .where(and(...reasonConditions(query, "bounce")))
+    .groupBy(
+      domain,
+      messageSendDiagnostic.reasonKey,
+      hasDetailExpr(),
+      messageSend.bounceType,
+      messageSend.bounceSubType
+    )
+    .orderBy(
+      sql`count(*) DESC`,
+      domain,
+      messageSendDiagnostic.reasonKey,
+      messageSend.bounceType,
+      messageSend.bounceSubType
+    )
+    .limit(REASON_GROUP_LIMIT);
+
+  return rows as unknown as BounceReasonRow[];
+}
+
+/** Complaint groups, grouped by receiver domain and feedback type. */
+export async function queryComplaintReasonRows(
+  query: ReasonsQuery,
+  dbClient: DbClient = db
+): Promise<ComplaintReasonRow[]> {
+  const domain = receiverDomainExpr();
+  const rows = await dbClient
+    .select({
+      receiverDomain: domain,
+      feedbackType: messageSendDiagnostic.feedbackType,
+      hasDetail: hasDetailExpr(),
+      count: sql<number>`count(*)::int`,
+      distinctRecipients: sql<number>`count(DISTINCT ${messageSend.recipient})::int`,
+      firstSeen: sql<Date | null>`min(${messageSend.complainedAt})`.mapWith(
+        messageSend.complainedAt
+      ),
+      lastSeen: sql<Date | null>`max(${messageSend.complainedAt})`.mapWith(
+        messageSend.complainedAt
+      ),
+    })
+    .from(messageSend)
+    .leftJoin(messageSendDiagnostic, diagnosticJoinOn("complaint"))
+    .where(and(...reasonConditions(query, "complaint")))
+    .groupBy(domain, messageSendDiagnostic.feedbackType, hasDetailExpr())
+    .orderBy(sql`count(*) DESC`, domain, messageSendDiagnostic.feedbackType)
+    .limit(REASON_GROUP_LIMIT);
+
+  return rows as unknown as ComplaintReasonRow[];
+}
+
+/**
+ * Totals for the metric in the window, with the same predicates as the groups
+ * but no GROUP BY, so the total is not capped at 500 groups. The LEFT JOIN is on
+ * the primary key, so it does not change the count.
+ */
+export async function queryReasonTotals(
+  query: ReasonsQuery,
+  metric: ReasonsMetric,
+  dbClient: DbClient = db
+): Promise<ReasonTotals> {
+  const [row] = await dbClient
+    .select({
+      totalCount: sql<number>`count(*)::int`,
+      withoutDetail: sql<number>`count(*) filter (where ${messageSendDiagnostic.messageSendId} is null)::int`,
+    })
+    .from(messageSend)
+    .leftJoin(messageSendDiagnostic, diagnosticJoinOn(metric))
+    .where(and(...reasonConditions(query, metric)));
+
+  return {
+    totalCount: row?.totalCount ?? 0,
+    withoutDetail: row?.withoutDetail ?? 0,
+  };
+}
+
+/**
+ * The earliest event this org has with a stored diagnostic, across the whole
+ * org and not only the window. Suppression subtypes are excluded for bounces,
+ * so a suppression row cannot set the date the reasons view says it is
+ * recorded from.
+ */
+export async function queryReasonsFallbackSince(
+  organizationId: string,
+  metric: ReasonsMetric,
+  dbClient: DbClient = db
+): Promise<Date | null> {
+  const eventAt =
+    metric === "bounce" ? messageSend.bouncedAt : messageSend.complainedAt;
+  const conditions: SQL[] = [
+    eq(messageSend.organizationId, organizationId),
+    isNotNull(eventAt),
+  ];
+  if (metric === "bounce") {
+    conditions.push(
+      sql`COALESCE(${messageSend.bounceSubType}, '') NOT IN ('Suppressed', 'EmailValidationSuppressed')`
+    );
+  }
+
+  const [row] = await dbClient
+    .select({
+      since: sql<Date | null>`min(${eventAt})`.mapWith(eventAt),
+    })
+    .from(messageSend)
+    .innerJoin(messageSendDiagnostic, diagnosticJoinOn(metric))
+    .where(and(...conditions));
+
+  return row?.since ?? null;
+}
+
+/**
+ * Bounces in the window that the bounce chart counts and the reasons view
+ * excludes: SDK-path suppression rows (spec section 12, Q3). Bounce metric only.
+ */
+export async function queryReasonsSuppressionCount(
+  query: ReasonsQuery,
+  dbClient: DbClient = db
+): Promise<number> {
+  const conditions = [
+    ...reasonWindowConditions(query),
+    isNotNull(messageSend.bouncedAt),
+    inArray(messageSend.bounceSubType, SUPPRESSION_SUBTYPES),
+  ];
+
+  // biome-ignore lint/plugin: reasonWindowConditions always starts with eq(messageSend.organizationId, query.organizationId) — the plugin can't trace it through the `...conditions` spread.
+  const [row] = await dbClient
+    .select({ count: sql<number>`count(*)::int` })
+    .from(messageSend)
+    .where(and(...conditions));
+
+  return row?.count ?? 0;
+}
+
+/**
+ * Legacy reasons: existing columns only, so it still runs when the diagnostic
+ * table or its columns are missing. Bounces group by subtype; complaints by
+ * domain alone.
+ */
+export async function queryLegacyReasonRows(
+  query: ReasonsQuery,
+  metric: ReasonsMetric,
+  dbClient: DbClient = db
+): Promise<LegacyReasonRow[]> {
+  const domain = receiverDomainExpr();
+  const conditions = reasonConditions(query, metric);
+
+  if (metric === "bounce") {
+    // biome-ignore lint/plugin: reasonConditions always starts with eq(messageSend.organizationId, query.organizationId) — the plugin can't trace it through the `...conditions` spread.
+    const rows = await dbClient
+      .select({
+        receiverDomain: domain,
+        bounceType: messageSend.bounceType,
+        bounceSubType: messageSend.bounceSubType,
+        count: sql<number>`count(*)::int`,
+        distinctRecipients: sql<number>`count(DISTINCT ${messageSend.recipient})::int`,
+        firstSeen: sql<Date | null>`min(${messageSend.bouncedAt})`.mapWith(
+          messageSend.bouncedAt
+        ),
+        lastSeen: sql<Date | null>`max(${messageSend.bouncedAt})`.mapWith(
+          messageSend.bouncedAt
+        ),
+      })
+      .from(messageSend)
+      .where(and(...conditions))
+      .groupBy(domain, messageSend.bounceType, messageSend.bounceSubType)
+      .orderBy(
+        sql`count(*) DESC`,
+        domain,
+        messageSend.bounceType,
+        messageSend.bounceSubType
+      )
+      .limit(REASON_GROUP_LIMIT);
+    return rows as unknown as LegacyReasonRow[];
+  }
+
+  // biome-ignore lint/plugin: reasonConditions always starts with eq(messageSend.organizationId, query.organizationId) — the plugin can't trace it through the `...conditions` spread.
+  const rows = await dbClient
+    .select({
+      receiverDomain: domain,
+      bounceType: sql<string | null>`null`,
+      bounceSubType: sql<string | null>`null`,
+      count: sql<number>`count(*)::int`,
+      distinctRecipients: sql<number>`count(DISTINCT ${messageSend.recipient})::int`,
+      firstSeen: sql<Date | null>`min(${messageSend.complainedAt})`.mapWith(
+        messageSend.complainedAt
+      ),
+      lastSeen: sql<Date | null>`max(${messageSend.complainedAt})`.mapWith(
+        messageSend.complainedAt
+      ),
+    })
+    .from(messageSend)
+    .where(and(...conditions))
+    .groupBy(domain)
+    .orderBy(sql`count(*) DESC`, domain)
+    .limit(REASON_GROUP_LIMIT);
+  return rows as unknown as LegacyReasonRow[];
+}
+
+/** Legacy total: the same predicates, existing columns only. */
+export async function queryLegacyReasonTotals(
+  query: ReasonsQuery,
+  metric: ReasonsMetric,
+  dbClient: DbClient = db
+): Promise<number> {
+  const conditions = reasonConditions(query, metric);
+
+  // biome-ignore lint/plugin: reasonConditions always starts with eq(messageSend.organizationId, query.organizationId) — the plugin can't trace it through the `...conditions` spread.
+  const [row] = await dbClient
+    .select({ count: sql<number>`count(*)::int` })
+    .from(messageSend)
+    .where(and(...conditions));
+
+  return row?.count ?? 0;
 }

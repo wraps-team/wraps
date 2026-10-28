@@ -1,7 +1,12 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/ses-plans.ts", "src/config-set-name.ts"],
+  entry: [
+    "src/index.ts",
+    "src/ses-plans.ts",
+    "src/config-set-name.ts",
+    "src/email-diagnostics.ts",
+  ],
   format: ["esm"],
   dts: true,
   sourcemap: true,

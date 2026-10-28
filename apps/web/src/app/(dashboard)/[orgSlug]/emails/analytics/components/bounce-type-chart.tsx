@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@wraps/ui/components/ui/select";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import {
   Area,
@@ -34,8 +35,19 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  browserTimeZone,
+  buildDrilldownHref,
+} from "@/lib/analytics-drilldown-window";
 import { SERIES_COLOR } from "@/lib/chart-series";
 import { useBounceData } from "../hooks/use-analytics";
+import {
+  ChangeMarkerList,
+  ChangeMarkersToggle,
+  markerLineProps,
+  useChartChangeMarkers,
+} from "./change-marker-overlay";
+import { ViewCausesLink } from "./view-causes-link";
 
 const chartConfig = {
   bounceRate: {
@@ -48,7 +60,13 @@ function formatPercentage(value: number) {
   return `${value.toFixed(1)}%`;
 }
 
-export function BounceTypeChart({ orgSlug }: { orgSlug: string }) {
+export function BounceTypeChart({
+  orgSlug,
+  showChangeMarkers = false,
+}: {
+  orgSlug: string;
+  showChangeMarkers?: boolean;
+}) {
   const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = React.useState("30d");
 
@@ -59,9 +77,23 @@ export function BounceTypeChart({ orgSlug }: { orgSlug: string }) {
   }, [isMobile]);
 
   const days = timeRange === "90d" ? 90 : timeRange === "30d" ? 30 : 7;
+  const router = useRouter();
+  // Set after mount: the server render must not carry the server's timezone.
+  const [tz, setTz] = React.useState("UTC");
+  React.useEffect(() => {
+    setTz(browserTimeZone());
+  }, []);
   const { data: bounceData, isLoading, error } = useBounceData(orgSlug, days);
 
   const chartData = bounceData || [];
+  const [showMarkers, setShowMarkers] = React.useState(true);
+  const { overlayOn, markerLines, markers, listState } = useChartChangeMarkers({
+    orgSlug,
+    days,
+    enabled: showChangeMarkers,
+    showMarkers,
+    dates: chartData.map((d) => d.date),
+  });
 
   return (
     <Card className="@container/card">
@@ -74,6 +106,12 @@ export function BounceTypeChart({ orgSlug }: { orgSlug: string }) {
           <span className="@[540px]/card:hidden">Bounce rate (%)</span>
         </CardDescription>
         <CardAction className="self-center">
+          <ViewCausesLink days={days} metric="bounce" orgSlug={orgSlug} />
+          <ChangeMarkersToggle
+            enabled={showChangeMarkers}
+            onPressedChange={setShowMarkers}
+            pressed={showMarkers}
+          />
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "90d"}
@@ -132,7 +170,23 @@ export function BounceTypeChart({ orgSlug }: { orgSlug: string }) {
             className="aspect-auto h-[300px] w-full"
             config={chartConfig}
           >
-            <AreaChart accessibilityLayer data={chartData}>
+            <AreaChart
+              accessibilityLayer
+              data={chartData}
+              onClick={(state) => {
+                const day = state?.activeLabel;
+                if (typeof day === "string") {
+                  router.push(
+                    buildDrilldownHref(orgSlug, {
+                      metric: "bounce",
+                      days,
+                      day,
+                      tz,
+                    })
+                  );
+                }
+              }}
+            >
               <defs>
                 <linearGradient id="fillBounceRate" x1="0" x2="0" y1="0" y2="1">
                   <stop
@@ -196,9 +250,21 @@ export function BounceTypeChart({ orgSlug }: { orgSlug: string }) {
                 strokeWidth={2}
                 type="monotone"
               />
+              {markerLines.map((line) => (
+                <ReferenceLine key={line.date} {...markerLineProps(line)} />
+              ))}
             </AreaChart>
           </ChartContainer>
         )}
+        <ChangeMarkerList
+          active={overlayOn}
+          days={days}
+          markers={markers}
+          metric="bounce"
+          orgSlug={orgSlug}
+          state={listState}
+          tz={tz}
+        />
       </CardContent>
     </Card>
   );

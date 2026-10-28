@@ -1,8 +1,44 @@
 import { describe, expect, it } from "vitest";
 import {
+  type CodeTranslation,
+  describeBounceSubtype,
+  describeComplaintFeedbackType,
   describeEventDiagnostics,
+  PROVIDER_PATTERNS,
   translateDiagnosticCode,
-} from "../email-diagnostics";
+} from "./email-diagnostics";
+
+// The reason key written at ingest is provider|code|title (bounce-diagnostics).
+function reasonKey(t: CodeTranslation): string {
+  return `${t.provider ?? ""}|${t.code ?? ""}|${t.title}`;
+}
+
+function copyOf(t: CodeTranslation): string {
+  return JSON.stringify([
+    t.title,
+    t.explanation,
+    t.suggestedAction ?? null,
+    t.severity,
+    t.code ?? null,
+    t.provider ?? null,
+  ]);
+}
+
+// One key must never describe two different translations: if two translations
+// share a key, they must share every field, otherwise a stored key would show
+// the wrong copy for some rows.
+function expectOneCopyPerKey(translations: CodeTranslation[]): void {
+  const copyByKey = new Map<string, string>();
+  for (const t of translations) {
+    const key = reasonKey(t);
+    const copy = copyOf(t);
+    const prior = copyByKey.get(key);
+    if (prior !== undefined && prior !== copy) {
+      throw new Error(`reason key "${key}" maps to two different translations`);
+    }
+    copyByKey.set(key, copy);
+  }
+}
 
 describe("translateDiagnosticCode — enhanced status codes", () => {
   it("translates a clean status code 5.1.1 to bad-mailbox, permanent", () => {
@@ -322,5 +358,144 @@ describe("describeEventDiagnostics — reject and rendering failure", () => {
       label: "Error",
       value: "missing variable: firstName",
     });
+  });
+});
+
+describe("describeBounceSubtype", () => {
+  it("returns the mapped headline, severity and action for a known pair", () => {
+    const result = describeBounceSubtype({
+      bounceType: "Permanent",
+      bounceSubType: "General",
+    });
+    expect(result.title).toBe("Hard bounce — general failure");
+    expect(result.severity).toBe("permanent");
+    expect(result.suggestedAction).toContain("Remove the address");
+  });
+
+  it("describeBounceSubtype falls back to the bounce-type headline for an unmapped pair", () => {
+    expect(
+      describeBounceSubtype({
+        bounceType: "Permanent",
+        bounceSubType: "Unlisted",
+      })
+    ).toMatchObject({ title: "Hard bounce", severity: "permanent" });
+    expect(
+      describeBounceSubtype({
+        bounceType: "Transient",
+        bounceSubType: "Unlisted",
+      })
+    ).toMatchObject({ title: "Soft bounce", severity: "transient" });
+    expect(describeBounceSubtype({})).toMatchObject({
+      title: "Bounce",
+      severity: "unknown",
+    });
+  });
+});
+
+describe("describeComplaintFeedbackType", () => {
+  it("describeComplaintFeedbackType returns the generic copy for null and unknown types", () => {
+    for (const value of [
+      null,
+      undefined,
+      "",
+      "made-up-type",
+      "constructor",
+      "__proto__",
+      "toString",
+    ]) {
+      expect(describeComplaintFeedbackType(value).title).toBe("Spam complaint");
+    }
+  });
+
+  it("returns the registered copy for a known type", () => {
+    expect(describeComplaintFeedbackType("abuse")).toMatchObject({
+      title: "Spam complaint — marked as spam",
+      severity: "permanent",
+    });
+  });
+
+  it("treats a prototype-named feedback type as generic in describeEventDiagnostics", () => {
+    expect(
+      describeEventDiagnostics("complaint", {
+        complaintFeedbackType: "constructor",
+      })?.headline
+    ).toBe("Spam complaint");
+  });
+});
+
+// Every provider pattern, built the way matchProvider builds its result.
+function providerTranslations(): CodeTranslation[] {
+  return PROVIDER_PATTERNS.map((p) => ({
+    title: p.title,
+    explanation: p.explanation,
+    suggestedAction: p.action,
+    code: p.code,
+    provider: p.provider,
+    severity: p.severity,
+  }));
+}
+
+// Every RFC enhanced code the sweep reaches: classes 2, 4 and 5, subjects 0-9,
+// details 0-99. That covers every RFC_SUBJECT_DETAIL row and the class fallbacks.
+function rfcTranslations(): CodeTranslation[] {
+  const translations: CodeTranslation[] = [];
+  for (const cls of ["2", "4", "5"]) {
+    for (let subject = 0; subject <= 9; subject++) {
+      for (let detail = 0; detail <= 99; detail++) {
+        const t = translateDiagnosticCode({
+          status: `${cls}.${subject}.${detail}`,
+        });
+        if (t) {
+          translations.push(t);
+        }
+      }
+    }
+  }
+  return translations;
+}
+
+// The basic three-digit SMTP codes the catalog recognises.
+function basicTranslations(): CodeTranslation[] {
+  const translations: CodeTranslation[] = [];
+  for (const code of [
+    "421",
+    "450",
+    "451",
+    "452",
+    "550",
+    "551",
+    "552",
+    "553",
+    "554",
+  ]) {
+    const t = translateDiagnosticCode({ diagnosticCode: code });
+    if (t) {
+      translations.push(t);
+    }
+  }
+  return translations;
+}
+
+describe("reason key is unique per translation", () => {
+  it("reason key is unique per translation: provider translations", () => {
+    const translations = providerTranslations();
+    expect(translations.length).toBeGreaterThan(0);
+    expectOneCopyPerKey(translations);
+  });
+
+  it("reason key is unique per translation: RFC enhanced-code translations", () => {
+    const translations = rfcTranslations();
+    expect(translations.length).toBeGreaterThan(0);
+    expectOneCopyPerKey(translations);
+  });
+
+  it("basic SMTP, RFC enhanced and provider translations share one consistent key space", () => {
+    const translations = [
+      ...providerTranslations(),
+      ...rfcTranslations(),
+      ...basicTranslations(),
+    ];
+    expect(basicTranslations()).toHaveLength(9);
+    expectOneCopyPerKey(translations);
   });
 });
