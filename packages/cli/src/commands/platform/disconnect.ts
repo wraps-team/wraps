@@ -310,7 +310,8 @@ export async function disconnect(
       );
       if (record.cleared) {
         metadata.platform = undefined;
-        await saveConnectionMetadata(metadata);
+        // This path never deploys; it only drops an id the platform has forgotten.
+        await saveConnectionMetadata(metadata); // baseline:allow-early-save — no deployment on this path
       }
       if (json) {
         jsonSuccess("platform.disconnect", {
