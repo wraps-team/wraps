@@ -1,14 +1,19 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 import pg from "pg";
 
 // The dashboard under test runs against the dev database, so the invitation is
 // written straight to it rather than through "invite member", which would also
-// send a real email.
-const databaseUrl = parseEnv(
-  readFileSync("../web/.env.local", "utf8")
-).DATABASE_URL;
+// send a real email. Same precedence as the app: .env.local wins locally; CI
+// has none and passes DATABASE_URL. Read lazily: this module loads at
+// collection time, before any test needs the database.
+function resolveDatabaseUrl() {
+  if (existsSync("../web/.env.local")) {
+    return parseEnv(readFileSync("../web/.env.local", "utf8")).DATABASE_URL;
+  }
+  return process.env.DATABASE_URL;
+}
 
 export type SeededInvitation = {
   id: string;
@@ -27,8 +32,11 @@ export async function seedInvitation({
 }: {
   inviteeHasAccount: boolean;
 }) {
+  const databaseUrl = resolveDatabaseUrl();
   if (!databaseUrl) {
-    throw new Error("DATABASE_URL missing from apps/web/.env.local");
+    throw new Error(
+      "DATABASE_URL missing: set it in apps/web/.env.local or the environment"
+    );
   }
 
   const runId = randomUUID().slice(0, 8);
