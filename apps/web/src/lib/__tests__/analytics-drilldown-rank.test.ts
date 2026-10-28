@@ -212,17 +212,12 @@ describe("attributionRowToInput", () => {
       label: "Spring",
       sourceTypes: ["batch", null],
       sent: 10,
-      delivered: 9,
       bounced: 3,
       bouncedPermanent: 1,
       bouncedTransient: 1,
       bouncedUndetermined: 1,
       complained: 2,
       suppressed: 4,
-      opened: 0,
-      openedRaw: 0,
-      clicked: 0,
-      failed: 0,
     });
     expect(input).toEqual({
       key: "b1",
