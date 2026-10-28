@@ -26,7 +26,6 @@ import {
   and,
   awsAccount,
   db,
-  decodeCursor,
   desc,
   encodeCursor,
   eq,
@@ -45,6 +44,7 @@ import { normalizePlainTextForSes } from "@wraps/template-render";
 import { ilike, lt } from "drizzle-orm";
 import { t } from "elysia";
 import { trackFirstResourceCreated } from "../lib/activation-tracking";
+import { parseCursorParam } from "../lib/cursor";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import { rateLimitMiddleware } from "../middleware/rate-limit";
 import { getCredentials } from "../services/credentials";
@@ -354,7 +354,7 @@ export const templatesRoutes = createAuthenticatedRoutes("/v1/templates")
       if (search) {
         conditions.push(ilike(template.name, `%${escapeIlike(search)}%`));
       }
-      const decoded = cursor ? decodeCursor(cursor) : null;
+      const decoded = parseCursorParam(cursor, ctx.set);
       if (decoded) {
         const keyset = or(
           lt(template.updatedAt, decoded.createdAt),

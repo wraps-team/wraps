@@ -591,6 +591,106 @@ describe("GET /v1/templates/pull on the combined app", () => {
   });
 });
 
+describe("cursor validation on the template list routes", () => {
+  const b64 = (raw: string) => Buffer.from(raw).toString("base64url");
+  const malformedCursors = [
+    "not-a-real-cursor!!",
+    "%%%",
+    "",
+    b64('{"createdAt":"2026-05-20T10:00:00.000Z","id":"x"}'),
+    b64("5|abc"),
+    b64("2026-05-20T10:00:00Z|abc"),
+  ];
+
+  for (const path of ["/v1/templates", "/v1/templates/pull"]) {
+    it(`${path} rejects a malformed cursor with 400 BAD_REQUEST`, async () => {
+      await db.insert(template).values(
+        templateRow(`${PREFIX}-bad-cursor`, ids.org, {
+          slug: "bad-cursor",
+          source: "// bad",
+        })
+      );
+      const app = appFor(ids.org, ids.user);
+
+      for (const cursor of malformedCursors) {
+        const res = await app.handle(
+          new Request(
+            `http://localhost${path}?limit=1&cursor=${encodeURIComponent(cursor)}`
+          )
+        );
+        expect(res.status, `cursor=${JSON.stringify(cursor)}`).toBe(400);
+        const body = await res.json();
+        expect(body.code).toBe("BAD_REQUEST");
+        expect(body.error).toMatch(/cursor/i);
+      }
+    });
+  }
+
+  it("/v1/templates/pull rejects a malformed cursor with 400 even without limit", async () => {
+    const app = appFor(ids.org, ids.user);
+    for (const cursor of malformedCursors) {
+      const res = await app.handle(
+        new Request(
+          `http://localhost/v1/templates/pull?cursor=${encodeURIComponent(cursor)}`
+        )
+      );
+      expect(res.status, `cursor=${JSON.stringify(cursor)}`).toBe(400);
+      const body = await res.json();
+      expect(body.code).toBe("BAD_REQUEST");
+    }
+  });
+
+  it("/v1/templates/pull walks every page with limit=1 and no row repeats or drops", async () => {
+    const now = Date.now();
+    await db.insert(template).values([
+      templateRow(`${PREFIX}-walk-1`, ids.org, {
+        slug: "walk-1",
+        source: "// 1",
+        updatedAt: new Date(now - 3000),
+      }),
+      templateRow(`${PREFIX}-walk-2`, ids.org, {
+        slug: "walk-2",
+        source: "// 2",
+        updatedAt: new Date(now - 2000),
+      }),
+      templateRow(`${PREFIX}-walk-3`, ids.org, {
+        slug: "walk-3",
+        source: "// 3",
+        updatedAt: new Date(now - 1000),
+      }),
+    ]);
+
+    const app = appFor(ids.org, ids.user);
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 20; page++) {
+      const qs = cursor
+        ? `limit=1&cursor=${encodeURIComponent(cursor)}`
+        : "limit=1";
+      const res = await app.handle(
+        new Request(`http://localhost/v1/templates/pull?${qs}`)
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      for (const row of body.templates) {
+        if (row.id.startsWith(`${PREFIX}-walk-`)) {
+          seen.push(row.id);
+        }
+      }
+      cursor = body.nextCursor;
+      if (!cursor) {
+        break;
+      }
+    }
+
+    expect(seen).toEqual([
+      `${PREFIX}-walk-3`,
+      `${PREFIX}-walk-2`,
+      `${PREFIX}-walk-1`,
+    ]);
+  });
+});
+
 describe("POST /v1/templates/:id/duplicate", () => {
   it("copies channel and previewText, and resets slug/sesTemplateName/publishedAt/status", async () => {
     const id = `${PREFIX}-sms-original`;

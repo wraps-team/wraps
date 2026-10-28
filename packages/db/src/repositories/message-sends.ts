@@ -20,6 +20,11 @@ export function encodeCursor(createdAt: Date, id: string): string {
   return Buffer.from(`${createdAt.toISOString()}|${id}`).toString("base64url");
 }
 
+// Returns null for anything encodeCursor could not have produced. Accepting a
+// lookalike is worse than rejecting it: `new Date("5")` parses, so a lenient
+// decode turns "5|abc" into a 2001 keyset position, and a client following a
+// stale or corrupted cursor silently loops over the first page. Callers decide
+// what null means; the API routes answer 400.
 export function decodeCursor(
   cursor: string
 ): { createdAt: Date; id: string } | null {
@@ -31,6 +36,10 @@ export function decodeCursor(
   const createdAt = new Date(decoded.slice(0, sep));
   const id = decoded.slice(sep + 1);
   if (Number.isNaN(createdAt.getTime()) || !id) {
+    return null;
+  }
+  // Canonical-form check: re-encoding must reproduce the input exactly.
+  if (encodeCursor(createdAt, id) !== cursor) {
     return null;
   }
   return { createdAt, id };

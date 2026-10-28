@@ -230,6 +230,22 @@ describe("Repository: listEmailLogs", () => {
       id: "abc",
     });
   });
+
+  it("rejects base64 payloads that only look like a cursor", () => {
+    const b64 = (s: string) => Buffer.from(s).toString("base64url");
+    // JSON with no separator
+    expect(
+      decodeCursor(b64('{"createdAt":"2026-05-20T10:00:00.000Z","id":"abc"}'))
+    ).toBeNull();
+    // new Date("5") is a valid date, so a lenient parse would accept this
+    expect(decodeCursor(b64("5|abc"))).toBeNull();
+    // Parses, but is not the canonical form encodeCursor emits
+    expect(decodeCursor(b64("2026-05-20T10:00:00Z|abc"))).toBeNull();
+    // Empty id
+    expect(decodeCursor(b64("2026-05-20T10:00:00.000Z|"))).toBeNull();
+    // Not base64 at all
+    expect(decodeCursor("%%%")).toBeNull();
+  });
 });
 
 describe("Repository: getEmailLogByMessageId", () => {
