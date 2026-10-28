@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { parseEnv } from "node:util";
 import { web } from "@e2e-dev/web";
 import { gateway } from "ai";
@@ -24,10 +25,10 @@ export default {
         // Never reuse a running dev server: these overrides are what make a
         // throwaway signup safe. Empty strings beat .env.local in Next's loader.
         command: {
-          executable: "pnpm",
+          // Not `pnpm exec next`: the child env drops CI, so pnpm's pre-run
+          // dependency check tries to reinstall and aborts for want of a TTY.
+          executable: resolve("../web/node_modules/.bin/next"),
           args: [
-            "exec",
-            "next",
             "dev",
             "--turbopack",
             "--hostname",
