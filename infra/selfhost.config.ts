@@ -850,7 +850,8 @@ export default $config({
         handler: "../apps/api/src/workers/account-health.handler",
         runtime: "nodejs24.x",
         timeout: "10 minutes",
-        memory: "256 MB",
+        // Match infra/cron.ts: 256 MB leaves this sweep at its memory ceiling.
+        memory: "1024 MB",
         environment: {
           NODE_ENV: "production",
           ...dbEnv,
