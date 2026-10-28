@@ -372,7 +372,7 @@ describe("describeBounceSubtype", () => {
     expect(result.suggestedAction).toContain("Remove the address");
   });
 
-  it("falls back to the bounce-type headline for an unmapped pair", () => {
+  it("describeBounceSubtype falls back to the bounce-type headline for an unmapped pair", () => {
     expect(
       describeBounceSubtype({
         bounceType: "Permanent",
@@ -393,7 +393,7 @@ describe("describeBounceSubtype", () => {
 });
 
 describe("describeComplaintFeedbackType", () => {
-  it("returns the generic copy for null, undefined and unknown types", () => {
+  it("describeComplaintFeedbackType returns the generic copy for null and unknown types", () => {
     for (const value of [
       null,
       undefined,
@@ -423,57 +423,79 @@ describe("describeComplaintFeedbackType", () => {
   });
 });
 
-describe("reason key is unique per translation", () => {
-  it("no two different provider translations share a reason key", () => {
-    const translations: CodeTranslation[] = PROVIDER_PATTERNS.map((p) => ({
-      title: p.title,
-      explanation: p.explanation,
-      suggestedAction: p.action,
-      code: p.code,
-      provider: p.provider,
-      severity: p.severity,
-    }));
-    expect(translations.length).toBeGreaterThan(0);
-    expectOneCopyPerKey(translations);
-  });
+// Every provider pattern, built the way matchProvider builds its result.
+function providerTranslations(): CodeTranslation[] {
+  return PROVIDER_PATTERNS.map((p) => ({
+    title: p.title,
+    explanation: p.explanation,
+    suggestedAction: p.action,
+    code: p.code,
+    provider: p.provider,
+    severity: p.severity,
+  }));
+}
 
-  it("no two different RFC enhanced-code translations share a reason key", () => {
-    const translations: CodeTranslation[] = [];
-    for (const cls of ["2", "4", "5"]) {
-      for (let subject = 0; subject <= 9; subject++) {
-        for (let detail = 0; detail <= 99; detail++) {
-          const t = translateDiagnosticCode({
-            status: `${cls}.${subject}.${detail}`,
-          });
-          if (t) {
-            translations.push(t);
-          }
+// Every RFC enhanced code the sweep reaches: classes 2, 4 and 5, subjects 0-9,
+// details 0-99. That covers every RFC_SUBJECT_DETAIL row and the class fallbacks.
+function rfcTranslations(): CodeTranslation[] {
+  const translations: CodeTranslation[] = [];
+  for (const cls of ["2", "4", "5"]) {
+    for (let subject = 0; subject <= 9; subject++) {
+      for (let detail = 0; detail <= 99; detail++) {
+        const t = translateDiagnosticCode({
+          status: `${cls}.${subject}.${detail}`,
+        });
+        if (t) {
+          translations.push(t);
         }
       }
     }
+  }
+  return translations;
+}
+
+// The basic three-digit SMTP codes the catalog recognises.
+function basicTranslations(): CodeTranslation[] {
+  const translations: CodeTranslation[] = [];
+  for (const code of [
+    "421",
+    "450",
+    "451",
+    "452",
+    "550",
+    "551",
+    "552",
+    "553",
+    "554",
+  ]) {
+    const t = translateDiagnosticCode({ diagnosticCode: code });
+    if (t) {
+      translations.push(t);
+    }
+  }
+  return translations;
+}
+
+describe("reason key is unique per translation", () => {
+  it("reason key is unique per translation: provider translations", () => {
+    const translations = providerTranslations();
     expect(translations.length).toBeGreaterThan(0);
     expectOneCopyPerKey(translations);
   });
 
-  it("basic SMTP codes and provider translations share one consistent key space", () => {
-    const translations: CodeTranslation[] = [];
-    for (const code of [
-      "421",
-      "450",
-      "451",
-      "452",
-      "550",
-      "551",
-      "552",
-      "553",
-      "554",
-    ]) {
-      const t = translateDiagnosticCode({ diagnosticCode: code });
-      if (t) {
-        translations.push(t);
-      }
-    }
-    expect(translations.length).toBe(9);
+  it("reason key is unique per translation: RFC enhanced-code translations", () => {
+    const translations = rfcTranslations();
+    expect(translations.length).toBeGreaterThan(0);
+    expectOneCopyPerKey(translations);
+  });
+
+  it("basic SMTP, RFC enhanced and provider translations share one consistent key space", () => {
+    const translations = [
+      ...providerTranslations(),
+      ...rfcTranslations(),
+      ...basicTranslations(),
+    ];
+    expect(basicTranslations()).toHaveLength(9);
     expectOneCopyPerKey(translations);
   });
 });
