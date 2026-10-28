@@ -131,6 +131,55 @@ export type CliFlags = {
   filter?: string;
   source?: string;
 
+  // Agent-surface CLI (contacts, segments, broadcasts, workflows, metrics, health, approvals)
+  audienceType?: string;
+  awsAccountId?: string;
+  body?: string;
+  broadcastId?: string;
+  channel?: string;
+  company?: string;
+  condition?: string;
+  contactEmail?: string;
+  contactId?: string;
+  cron?: string;
+  data?: string;
+  description?: string;
+  dimensions?: string;
+  email?: string;
+  emailStatus?: string;
+  endDate?: string;
+  externalId?: string;
+  firstName?: string;
+  from?: string;
+  fromChunkIndex?: string;
+  fromName?: string;
+  granularity?: string;
+  htmlContent?: string;
+  id?: string;
+  jobTitle?: string;
+  lastName?: string;
+  outDir?: string;
+  phone?: string;
+  preferredChannel?: string;
+  previewText?: string;
+  properties?: string;
+  replyTo?: string;
+  scheduledFor?: string;
+  search?: string;
+  segmentId?: string;
+  senderId?: string;
+  smsStatus?: string;
+  startDate?: string;
+  subject?: string;
+  templateId?: string;
+  timezone?: string;
+  topicId?: string;
+  topicIds?: string;
+  totalRecipients?: string;
+  trackMembership?: boolean;
+  variableMappings?: string;
+  withoutSource?: boolean;
+
   // Help / version (informational; cli.ts short-circuits before parsing)
   help?: boolean;
   version?: boolean;
@@ -202,6 +251,51 @@ const STRING_FLAGS = [
   "filter",
   "source",
   "validation-threshold",
+  "audience-type",
+  "aws-account-id",
+  "body",
+  "broadcast-id",
+  "channel",
+  "company",
+  "condition",
+  "contact-email",
+  "contact-id",
+  "cron",
+  "data",
+  "description",
+  "dimensions",
+  "email",
+  "email-status",
+  "end-date",
+  "external-id",
+  "first-name",
+  "from",
+  "from-chunk-index",
+  "from-name",
+  "granularity",
+  "html-content",
+  "id",
+  "job-title",
+  "last-name",
+  "out-dir",
+  "phone",
+  "preferred-channel",
+  "preview-text",
+  "properties",
+  "reply-to",
+  "scheduled-for",
+  "search",
+  "segment-id",
+  "sender-id",
+  "sms-status",
+  "start-date",
+  "subject",
+  "template-id",
+  "timezone",
+  "topic-id",
+  "topic-ids",
+  "total-recipients",
+  "variable-mappings",
 ] as const;
 
 /**
@@ -252,6 +346,8 @@ const BOOLEAN_FLAGS = [
   "live",
   "platform",
   "request",
+  "track-membership",
+  "without-source",
 ] as const;
 
 /**

@@ -13,6 +13,87 @@ import Link from "next/link";
 import { CLICommand } from "@/components/docs/cli-command";
 import { DocsLayout } from "@/components/docs-layout";
 
+type EmailDataCommand = {
+  command: string;
+  summary: string;
+  flags?: string;
+  data?: string;
+  notes?: string;
+};
+
+const EMAIL_DATA_COMMANDS: EmailDataCommand[] = [
+  {
+    command: "email templates list",
+    summary: "List templates.",
+    flags:
+      "--limit (1-100), --cursor, --status (DRAFT, PUBLISHED or ARCHIVED), --channel (email or sms), --search",
+    data: "templates, nextCursor",
+  },
+  {
+    command: "email templates get <id>",
+    summary: "Show one template. The source is included by default.",
+    flags: "--without-source",
+    data: "id, name, slug, channel, emailType, status, subject, previewText, description, variables, source, sourceHash, compiledHtml, compiledText, lastEditedFrom, publishedAt, createdAt, updatedAt",
+  },
+  {
+    command: "email templates pull",
+    summary: "Write every template to <slug>.tsx files in a local folder.",
+    flags:
+      "--out-dir (default wraps/templates), --dry-run, --yes (needed to overwrite existing files)",
+    data: "outDir, dryRun, files (id, slug, path, exists, written), skipped",
+    notes: "Refuses to overwrite existing local files unless --yes is given.",
+  },
+  {
+    command: "email templates publish <id>",
+    summary: "Publish a template to SES. This makes it live.",
+    flags:
+      "--yes (required), --aws-account-id (required when the organization has more than one AWS account)",
+    data: "id, publishedAt, sesTemplateName, awsAccountId",
+  },
+  {
+    command: "email templates duplicate <id>",
+    summary: "Copy a template as a new draft.",
+    data: "The same keys as email templates get",
+    notes: "The copy is always a DRAFT.",
+  },
+  {
+    command: "email metrics",
+    summary:
+      "Aggregate sends, opens, clicks, bounces and cost for the organization.",
+    flags:
+      "--start-date, --end-date (ISO 8601), --timezone, --granularity (hourly, daily, weekly or monthly), --dimensions (period, domain, broadcast, template, source, account, region), --broadcast-id, --template-id, --aws-account-id",
+    data: "object, totals, data, meta",
+    notes:
+      "Not paginated. Errors: INVALID_DATE, INVALID_DATE_RANGE, INVALID_GRANULARITY.",
+  },
+  {
+    command: "email health",
+    summary:
+      "Check SES health per AWS account. Each account's id is the value for --aws-account-id.",
+    data: "status, checkedAt, accounts (each with id, accountNumber, region, status, checkedAt, sandbox, productionAccessEnabled, sendingEnabled, enforcementStatus, quota, reputation)",
+  },
+  {
+    command: "email agent approvals list",
+    summary: "List the approval queue.",
+    flags: "--status (PENDING, APPROVED, REJECTED, SENT or FAILED)",
+    data: "approvals, nextCursor",
+    notes:
+      "No --limit or --cursor. The whole queue is returned, and nextCursor is always null.",
+  },
+  {
+    command: "email agent approvals approve --id <id>",
+    summary: "Approve a pending send. This executes it.",
+    flags: "--id (required), --yes (required)",
+    data: "id, agentId, organizationId, status, payload, reason, messageId, errorMessage, decidedAt, decidedBy, createdAt, updatedAt",
+  },
+  {
+    command: "email agent approvals reject --id <id>",
+    summary: "Reject a pending send.",
+    flags: "--id (required), --yes (required)",
+    data: "id, agentId, organizationId, status, payload, reason, messageId, errorMessage, decidedAt, decidedBy, createdAt, updatedAt",
+  },
+];
+
 export default function CLIReferenceEmailPageContent() {
   return (
     <DocsLayout>
@@ -2089,6 +2170,65 @@ export default function CLIReferenceEmailPageContent() {
             </ul>
           </CardContent>
         </Card>
+      </section>
+
+      {/* Templates, metrics, health and approvals */}
+      <section className="mb-12">
+        <h2 className="mb-4 font-bold text-2xl">
+          Templates, Metrics, Health and Approvals
+        </h2>
+        <p className="mb-6 text-muted-foreground">
+          Read and manage email data in your organization over the Wraps API.
+          These commands take --token and --json. Every error sets exit code 1.
+          Commands that publish a template, send a queued email or approve a
+          send need --yes.
+        </p>
+        <div className="space-y-4">
+          {EMAIL_DATA_COMMANDS.map((doc) => (
+            <Card key={doc.command}>
+              <CardHeader>
+                <CardTitle className="font-mono text-base">
+                  {`wraps ${doc.command}`}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p className="text-muted-foreground">{doc.summary}</p>
+                {doc.flags ? (
+                  <p>
+                    <span className="font-medium">Flags:</span>{" "}
+                    <span className="text-muted-foreground">{doc.flags}</span>
+                  </p>
+                ) : null}
+                {doc.data ? (
+                  <p>
+                    <span className="font-medium">JSON data:</span>{" "}
+                    <span className="text-muted-foreground">{doc.data}</span>
+                  </p>
+                ) : null}
+                {doc.notes ? (
+                  <p>
+                    <span className="font-medium">Notes:</span>{" "}
+                    <span className="text-muted-foreground">{doc.notes}</span>
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          ))}
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-mono text-base">
+                wraps email logs
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p className="text-muted-foreground">
+                wraps email logs list lists recent email sends. wraps email logs
+                get shows the details for one message. Flags for these commands
+                are not covered on this page.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </section>
 
       {/* Navigation */}

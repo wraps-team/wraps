@@ -220,6 +220,115 @@ wraps email check [domain]    Deliverability audit (DKIM, SPF, DMARC, blacklists
 --verbose         Enable verbose output
 ```
 
+## Data-plane CLI for agents
+
+These commands read and change data in your Wraps organization (contacts, segments, templates, broadcasts, workflow runs, approvals) through the Wraps API. They do not deploy AWS infrastructure. The sections below cover `wraps email logs` too, which was previously undocumented here.
+
+### Authentication
+
+- Pass `--token <key>` or set `WRAPS_API_KEY`. A token or key takes priority over a stored session from `wraps auth login`.
+- Self-hosted instances: the API target follows `wraps selfhost login`.
+- The commands in this section take `--token` and `--json`.
+
+### Output and exit codes
+
+- With `--json`, stdout is one envelope per call: `{"success":true,"command":"contacts.list","data":{...}}` on success, or `{"success":false,"command":"contacts.delete","error":{"code":"CONFIRMATION_REQUIRED","message":"...","suggestion":"..."}}` on failure. Command names are dotted (`contacts.list`, `email.agent.approvals.approve`).
+- Every error sets exit code 1. In JSON mode the error envelope is printed to stdout, so read `error.code` and `error.suggestion`.
+- Error codes the commands emit include: `NOT_AUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `VALIDATION_FAILED`, `API_ERROR`, `SERVER_ERROR`, `CONFIRMATION_REQUIRED`, `MISSING_REQUIRED_FLAG`, `INVALID_FLAG_USAGE`, `INVALID_FLAG_VALUE`, `PLAN_REQUIRED`, `NOT_DRAFT`, `RESUME_DISABLED`, `WORKFLOW_REJECTED`.
+- Workflow routes can return HTTP 200 with `success: false`. The CLI turns that into an error envelope and exit code 1, so check the exit code or `success`, not only the HTTP status.
+
+### The `--yes` rule
+
+Commands that send email, make a live change or delete data refuse to run without `--yes`. They return `CONFIRMATION_REQUIRED` before making any request:
+
+- `contacts delete`, `segments delete`
+- `email templates publish`
+- `broadcasts create`, `broadcasts send`, `broadcasts resume`
+- `workflows trigger`, `workflows enable`, `workflows retry`, `workflows cancel`
+- `email agent approvals approve`, `email agent approvals reject`
+
+Two exceptions. `email templates pull` fetches without `--yes`, but refuses to overwrite existing local files unless `--yes` is given. `workflows disable` needs no `--yes` because it only stops future runs.
+
+`--dry-run` is supported on `contacts delete`, `segments delete`, `broadcasts create`, `workflows trigger` and `email templates pull`. A dry run makes no changes. `broadcasts create --dry-run` validates the payload locally and makes no request.
+
+### Pagination
+
+- List commands take `--limit` and `--cursor`. Their `data` includes `nextCursor`, which is `null` when there are no more results.
+- Pass `nextCursor` back unchanged as `--cursor`. Treat it as opaque. Do not construct it.
+- `--limit` ranges: contacts list 1-100; segments list 1-100 (default 20); templates list 1-100; broadcasts recipients 1-1000.
+- `email agent approvals list` has no `--limit` or `--cursor`. It returns the whole queue, and `nextCursor` is always `null`. `email metrics` is not paginated.
+
+### Contacts
+
+Ids can be a contact UUID, an email or an `externalId`.
+
+- `wraps contacts list [--search <text>] [--email-status <s>] [--sms-status <s>] [--preferred-channel <c>] [--limit <n>] [--cursor <c>]`. Data: `contacts`, `total`, `page`, `pageSize`, `totalPages`, `nextCursor`.
+- `wraps contacts get <id>`. Data: the contact fields plus `topics`.
+- `wraps contacts create (--email <email> | --phone <phone>) [--first-name] [--last-name] [--company] [--job-title] [--external-id] [--email-status] [--sms-status] [--preferred-channel] [--topic-ids] [--properties <json>]`. Data: the contact fields plus `pendingTopics`. Returns `CONFLICT` if the contact already exists. Search with `contacts list --search` first.
+- `wraps contacts update <id> [the same field flags]`. Changes only the fields you pass. At least one field flag is required (`MISSING_REQUIRED_FLAG` otherwise). Data: the contact fields plus `pendingTopics`.
+- `wraps contacts delete <id> --yes [--dry-run]`. Data: `id`, `deleted`, `dryRun`.
+
+Contact fields: `id`, `externalId`, `email`, `phone`, `firstName`, `lastName`, `company`, `jobTitle`, `emailStatus`, `smsStatus`, `preferredChannel`, `properties`, `emailsSent`, `emailsOpened`, `emailsClicked`, `smsSent`, `smsClicked`, `createdAt`, `updatedAt`.
+
+### Segments
+
+- `wraps segments list [--limit <n>] [--cursor <c>]`. Pro plan only (`PLAN_REQUIRED` otherwise). The cursor is an offset. Data: `segments`, `total`, `limit`, `offset`, `nextCursor`.
+- `wraps segments get <id>`. Data: `id`, `name`, `description`, `condition`, `trackMembership`, `memberCount`, `lastComputedAt`, `createdAt`, `updatedAt`.
+- `wraps segments create --name <name> --condition '<json>' [--description <text>] [--track-membership]`. Data: the same keys as `get`.
+- `wraps segments update <id> [--name] [--description] [--condition '<json>'] [--track-membership]`. At least one flag is required. Data: the same keys as `get`.
+- `wraps segments delete <id> --yes [--dry-run]`. Data: `id`, `deleted`, `dryRun`.
+- `wraps segments preview <id> [--limit <n>]`. Read-only. Counts and samples who the segment would reach. Data: `id`, `count`, `sample`.
+
+### Email templates
+
+- `wraps email templates list [--limit <n>] [--cursor <c>] [--status <s>] [--channel <c>] [--search <text>]`. `--status` is `DRAFT`, `PUBLISHED` or `ARCHIVED`. `--channel` is `email` or `sms`. Data: `templates`, `nextCursor`.
+- `wraps email templates get <id> [--without-source]`. The response includes the TSX source unless you pass `--without-source`. Data: `id`, `name`, `slug`, `channel`, `emailType`, `status`, `subject`, `previewText`, `description`, `variables`, `source`, `sourceHash`, `compiledHtml`, `compiledText`, `lastEditedFrom`, `publishedAt`, `createdAt`, `updatedAt`.
+- `wraps email templates pull [--out-dir <dir>] [--dry-run] [--yes]`. Writes `<slug>.tsx` for each template. `--out-dir` defaults to `wraps/templates` under the current directory. If any target file already exists, nothing is written unless `--yes` is given. Data: `outDir`, `dryRun`, `files` (each with `id`, `slug`, `path`, `exists`, `written`) and `skipped`.
+- `wraps email templates publish <id> --yes [--aws-account-id <id>]`. Publishes to SES and is LIVE. If the organization has exactly one AWS account it is used automatically. If it has several, pass `--aws-account-id`. Data: `id`, `publishedAt`, `sesTemplateName`, `awsAccountId`.
+- `wraps email templates duplicate <id>`. Creates a copy that is always a `DRAFT`. Data: the same keys as `get`.
+
+### Email metrics and health
+
+- `wraps email metrics [--start-date <date>] [--end-date <date>] [--timezone <tz>] [--granularity <g>] [--dimensions <d>] [--broadcast-id <id>] [--template-id <id>] [--aws-account-id <id>]`. Aggregate sends, opens, clicks, bounces and cost. `--granularity` is `hourly`, `daily`, `weekly` or `monthly`. `--dimensions` takes `period`, `domain`, `broadcast`, `template`, `source`, `account` or `region`. ID filters take up to 100 comma-separated values. Dates are ISO 8601. Data: `object`, `totals`, `data`, `meta`. Errors: `INVALID_DATE`, `INVALID_DATE_RANGE`, `INVALID_GRANULARITY`.
+- `wraps email health`. SES health for each AWS account connected to the organization. Data: `status`, `checkedAt`, `accounts`. Each account has `id`, `accountNumber`, `region`, `status` (`healthy`, `at_risk`, `in_danger` or `unknown`), `checkedAt`, `sandbox`, `productionAccessEnabled`, `sendingEnabled`, `enforcementStatus`, `quota` and `reputation`. The account `id` is the value for `--aws-account-id` on the other commands. It is not the 12-digit AWS account number.
+
+### Email logs
+
+- `wraps email logs list` lists recent email sends.
+- `wraps email logs get` shows the details for one message.
+
+Flags for `email logs` are not covered in this section.
+
+### Broadcasts
+
+`--aws-account-id` takes the account `id` that `wraps email health` lists.
+
+- `wraps broadcasts create --aws-account-id <id> --subject <text> [--channel email|sms] [--audience-type all|topic|segment] [--topic-id] [--segment-id] [--preview-text] [--from] [--from-name] [--reply-to] [--template-id] [--html-content] [--body] [--sender-id] [--variable-mappings] [--scheduled-for <ISO time>] --yes [--dry-run]`. Queues a broadcast. It sends immediately unless you pass `--scheduled-for`. Data: `id`, `status`, `channel`, `createdAt`, `totalRecipients`, `payload`, `dryRun`, `warning`.
+- `wraps broadcasts send <id> --aws-account-id <id> --total-recipients <n> --yes`. Sends a draft that was created in the dashboard. It does not send broadcasts created with `broadcasts create`, which are already queued or scheduled. Read `totalRecipients` from `broadcasts status`. Data: `id`, `status`, `warning`. Returns `NOT_DRAFT` for a broadcast that is not a draft.
+- `wraps broadcasts status <id>`. Data: `id`, `name`, `channel`, `status`, `totalRecipients`, `processedRecipients`, `sent`, `delivered`, `failed`, `opened`, `clicked`, `bounced`, `complained`, `suppressed`, `startedAt`, `completedAt`, `createdAt`.
+- `wraps broadcasts recipients <id> [--status <s>] [--limit <n>] [--cursor <c>]`. The cursor is an offset. Data: `id`, `recipients`, `total`, `limit`, `offset`, `nextCursor`.
+- `wraps broadcasts resume <id> --yes [--from-chunk-index <n>]`. Resumes a stopped broadcast. Data: `id`, `resumed`, `fromChunkIndex`. Can return `RESUME_DISABLED`.
+
+### Workflow runs
+
+These commands run workflows that are already deployed. Author them with `wraps workflow init`. `wraps email workflows push` is a different command.
+
+- `wraps workflows trigger <workflow-id> (--contact-id <id> | --contact-email <email>) [--data <json>] --yes [--dry-run]`. Triggers an API workflow for one contact. `--data` is a JSON object. Data: `workflowId`, `workflowName`, `contactId`, `contactEmail`, `data`, `dryRun`, `message`. Returns `WORKFLOW_REJECTED` if the route rejects the run.
+- `wraps workflows enable <workflow-id> --cron <expression> [--timezone <tz>] --yes`. Creates the next scheduled run. Data: `workflowId`, `scheduleName`, `cronExpression`, `timezone`.
+- `wraps workflows disable <workflow-id>`. Removes the pending scheduled run. No `--yes` needed. Data: `workflowId`, `disabled`.
+- `wraps workflows retry <execution-id> --yes`. Retries a failed execution. Data: `executionId`, `message`.
+- `wraps workflows cancel <execution-id> --yes`. Cancels an in-progress execution. Data: `executionId`, `cancelled`.
+
+`trigger`, `enable` and `disable` take a workflow ID. `retry` and `cancel` take an execution ID. There is no `workflows list`, `workflows get` or executions listing command.
+
+### Approvals
+
+- `wraps email agent approvals list [--status <s>]`. `--status` is `PENDING`, `APPROVED`, `REJECTED`, `SENT` or `FAILED`. Data: `approvals`, `nextCursor`.
+- `wraps email agent approvals approve --id <id> --yes`. Approves a pending send and executes it. Use `--id`, not a positional argument.
+- `wraps email agent approvals reject --id <id> --yes`. Rejects a pending send.
+
+Approval fields: `id`, `agentId`, `organizationId`, `status`, `payload`, `reason`, `messageId`, `errorMessage`, `decidedAt`, `decidedBy`, `createdAt`, `updatedAt`.
+
 ## Email SDK Reference (@wraps.dev/email)
 
 ### Constructor

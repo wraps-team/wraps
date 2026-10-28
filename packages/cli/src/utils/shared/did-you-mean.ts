@@ -16,9 +16,11 @@
 export const TOP_LEVEL_COMMANDS = [
   "auth",
   "aws",
+  "broadcasts",
   "cdn",
   "completion",
   "console",
+  "contacts",
   "destroy",
   "doctor",
   "email",
@@ -28,6 +30,7 @@ export const TOP_LEVEL_COMMANDS = [
   "permissions",
   "platform",
   "push",
+  "segments",
   "selfhost",
   "sms",
   "status",
@@ -35,6 +38,7 @@ export const TOP_LEVEL_COMMANDS = [
   "telemetry",
   "update",
   "workflow",
+  "workflows",
 ] as const;
 
 /** Levenshtein distance, iterative two-row form. */

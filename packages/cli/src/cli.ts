@@ -11,6 +11,13 @@ import { authStatus as authStatusCmd } from "./commands/auth/status.js";
 // AWS commands
 import { doctor as awsDoctor } from "./commands/aws/doctor.js";
 import { setup as awsSetup } from "./commands/aws/setup.js";
+import {
+  broadcastsCreate,
+  broadcastsRecipients,
+  broadcastsResume,
+  broadcastsSend,
+  broadcastsStatus,
+} from "./commands/broadcasts/broadcasts.js";
 // CDN commands
 import { cdnDestroy } from "./commands/cdn/destroy.js";
 import { init as cdnInit } from "./commands/cdn/init.js";
@@ -18,6 +25,13 @@ import { cdnStatus } from "./commands/cdn/status.js";
 import { cdnSync } from "./commands/cdn/sync.js";
 import { cdnUpgrade } from "./commands/cdn/upgrade.js";
 import { cdnVerify } from "./commands/cdn/verify.js";
+import {
+  contactsCreate,
+  contactsDelete,
+  contactsGet,
+  contactsList,
+  contactsUpdate,
+} from "./commands/contacts/contacts.js";
 // Aggregate diagnostics
 import { wrapsDoctor } from "./commands/doctor.js";
 import {
@@ -26,6 +40,11 @@ import {
   agentList,
   agentPolicy,
 } from "./commands/email/agent.js";
+import {
+  agentApprovalsApprove,
+  agentApprovalsList,
+  agentApprovalsReject,
+} from "./commands/email/agent-approvals.js";
 import { check } from "./commands/email/check.js";
 import { config } from "./commands/email/config.js";
 import { connect } from "./commands/email/connect.js";
@@ -39,6 +58,7 @@ import {
   removeDomain,
   verifyDomain,
 } from "./commands/email/domains.js";
+import { emailHealth } from "./commands/email/health.js";
 import {
   inboundAdd,
   inboundDestroy,
@@ -50,6 +70,7 @@ import {
 } from "./commands/email/inbound.js";
 import { init } from "./commands/email/init.js";
 import { emailLogsGet, emailLogsList } from "./commands/email/logs.js";
+import { emailMetrics } from "./commands/email/metrics.js";
 import { emailPlan } from "./commands/email/plan.js";
 import { emailProductionAccess } from "./commands/email/production-access.js";
 import {
@@ -65,6 +86,13 @@ import { emailStatus } from "./commands/email/status.js";
 import { templatesInit } from "./commands/email/templates/init.js";
 import { templatesPreview } from "./commands/email/templates/preview.js";
 import { templatesPush } from "./commands/email/templates/push.js";
+import {
+  templatesDuplicate,
+  templatesGet,
+  templatesList,
+  templatesPublish,
+  templatesPull,
+} from "./commands/email/templates/remote.js";
 import { emailTest } from "./commands/email/test.js";
 import { upgrade } from "./commands/email/upgrade.js";
 import { emailVdm } from "./commands/email/vdm.js";
@@ -81,6 +109,14 @@ import { connect as platformConnect } from "./commands/platform/connect.js";
 import { disconnect as platformDisconnect } from "./commands/platform/disconnect.js";
 import { platform as platformInfo } from "./commands/platform/index.js";
 import { updateRole } from "./commands/platform/update-role.js";
+import {
+  segmentsCreate,
+  segmentsDelete,
+  segmentsGet,
+  segmentsList,
+  segmentsPreview,
+  segmentsUpdate,
+} from "./commands/segments/segments.js";
 // Self-hosted commands
 import { selfhostEnv } from "./commands/selfhost/env.js";
 import { selfhostLogin } from "./commands/selfhost/login.js";
@@ -109,6 +145,13 @@ import {
 } from "./commands/telemetry.js";
 // Workflow commands
 import { workflowInit } from "./commands/workflow/init.js";
+import {
+  workflowsCancel,
+  workflowsDisable,
+  workflowsEnable,
+  workflowsRetry,
+  workflowsTrigger,
+} from "./commands/workflows/runtime.js";
 import { getTelemetryClient } from "./telemetry/client.js";
 import { telemetryCommandName } from "./telemetry/command-name.js";
 import { trackCommand, trackCommandFallback } from "./telemetry/events.js";
@@ -266,6 +309,13 @@ function showHelp() {
   console.log(
     `  ${pc.cyan("email logs get")}          Show details for one message\n`
   );
+  console.log(
+    `  ${pc.cyan("email metrics")}           Aggregate sends, opens, clicks, bounces and cost\n`
+  );
+  console.log(
+    `  ${pc.cyan("email health")}            Check SES health per AWS account, with the account ids for --aws-account-id`
+  );
+  console.log();
   console.log("Agent Commands:");
   console.log(
     `  ${pc.cyan("email agent create")}   Create a leashed agent mailbox`
@@ -275,9 +325,33 @@ function showHelp() {
     `  ${pc.cyan("email agent kill")}     Kill an agent (revoke sending)`
   );
   console.log(
-    `  ${pc.cyan("email agent policy")}   Change an agent's caps or allowlist\n`
+    `  ${pc.cyan("email agent policy")}   Change an agent's caps or allowlist`
+  );
+  console.log(
+    `  ${pc.cyan("email agent approvals list")}     List the approval queue (filter with --status)`
+  );
+  console.log(
+    `  ${pc.cyan("email agent approvals approve --id <id> --yes")}  Approve a pending send (executes it)`
+  );
+  console.log(
+    `  ${pc.cyan("email agent approvals reject --id <id> --yes")}   Reject a pending send\n`
   );
   console.log("Template Commands:");
+  console.log(
+    `  ${pc.cyan("email templates list")}  List templates (--limit, --cursor, --status, --channel, --search)`
+  );
+  console.log(
+    `  ${pc.cyan("email templates get")} <id>  Show one template (--without-source omits its source)`
+  );
+  console.log(
+    `  ${pc.cyan("email templates pull")}  Write templates to wraps/templates (--out-dir, --dry-run, --yes)`
+  );
+  console.log(
+    `  ${pc.cyan("email templates publish")} <id>  Publish to SES, LIVE (--yes, --aws-account-id)`
+  );
+  console.log(
+    `  ${pc.cyan("email templates duplicate")} <id>  Copy a template as a new draft`
+  );
   console.log(
     `  ${pc.cyan("email templates init")}  Initialize templates-as-code`
   );
@@ -364,6 +438,82 @@ function showHelp() {
   console.log("Local Development:");
   console.log(
     `  ${pc.cyan("console")}               Start local web console\n`
+  );
+  console.log("Contacts Commands:");
+  console.log(
+    `  ${pc.cyan("contacts list")}             List contacts (--search, --email-status; --cursor pages)`
+  );
+  console.log(
+    `  ${pc.cyan("contacts get <id>")}         Show a contact by id, email or externalId`
+  );
+  console.log(
+    `  ${pc.cyan("contacts create")}           Create a contact (needs --email or --phone)`
+  );
+  console.log(
+    `  ${pc.cyan("contacts update <id>")}      Change only the fields you pass`
+  );
+  console.log(
+    `  ${pc.cyan("contacts delete <id>")}      Delete a contact (needs --yes; --dry-run previews)`
+  );
+  console.log();
+  console.log("Segment Commands:");
+  console.log(
+    `  ${pc.cyan("segments list")}              List segments with live member counts (Pro plan)`
+  );
+  console.log(
+    `  ${pc.cyan("segments get <id>")}          Show one segment and its filter condition`
+  );
+  console.log(
+    `  ${pc.cyan("segments create")}            Create a segment: --name <name> --condition '<json>'`
+  );
+  console.log(
+    `  ${pc.cyan("segments update <id>")}       Change a segment's name, description, condition or tracking`
+  );
+  console.log(
+    `  ${pc.cyan("segments delete <id>")}       Delete a segment (requires --yes; --dry-run to preview)`
+  );
+  console.log(
+    `  ${pc.cyan("segments preview <id>")}      Count and sample who a segment would reach (no changes)\n`
+  );
+  console.log("Broadcasts:");
+  console.log(
+    `  ${pc.cyan("broadcasts create")}          Queue a broadcast; sends now unless --scheduled-for (needs --yes, --aws-account-id)`
+  );
+  console.log(
+    `  ${pc.cyan("broadcasts send <id>")}      Send a dashboard draft (needs --yes, --aws-account-id, --total-recipients)`
+  );
+  console.log(
+    `  ${pc.cyan("broadcasts status <id>")}    Show a broadcast's status and delivery counts`
+  );
+  console.log(
+    `  ${pc.cyan("broadcasts recipients <id>")} List recipients (--status, --limit, --cursor)`
+  );
+  console.log(
+    `  ${pc.cyan("broadcasts resume <id>")}    Resume a stopped broadcast (needs --yes)\n`
+  );
+  console.log(
+    `  ${pc.dim("--aws-account-id is the AWS account row id; wraps email health lists each id.")}\n`
+  );
+  console.log(
+    "Workflow Runtime (run workflows already deployed; author them with wraps workflow init):"
+  );
+  console.log(
+    `  ${pc.cyan("workflows trigger <workflow-id>")}  Trigger an API workflow for one contact (--contact-id or --contact-email, --data JSON, --dry-run, --yes)`
+  );
+  console.log(
+    `  ${pc.cyan("workflows enable <workflow-id>")}   Create the next scheduled run (--cron, --timezone, --yes)`
+  );
+  console.log(
+    `  ${pc.cyan("workflows disable <workflow-id>")}  Remove the pending scheduled run`
+  );
+  console.log(
+    `  ${pc.cyan("workflows retry <execution-id>")}   Retry a failed execution (--yes)`
+  );
+  console.log(
+    `  ${pc.cyan("workflows cancel <execution-id>")}  Cancel an in-progress execution (--yes)`
+  );
+  console.log(
+    `  ${pc.dim("trigger, enable and disable take a workflow ID; retry and cancel take an execution ID. Not the same as email workflows push.")}\n`
   );
   console.log("Platform:");
   console.log(
@@ -934,6 +1084,49 @@ async function run() {
               });
               break;
 
+            case "approvals": {
+              // wraps email agent approvals <list|approve|reject>; approve and reject take --id <id> --yes
+              const approvalsSubCommand = sub[3];
+
+              switch (approvalsSubCommand) {
+                case "list":
+                  await agentApprovalsList({
+                    status: flags.status,
+                    token: flags.token,
+                    json: flags.json,
+                    region: flags.region,
+                  });
+                  break;
+
+                case "approve":
+                  await agentApprovalsApprove({
+                    id: flags.id,
+                    yes: flags.yes,
+                    token: flags.token,
+                    json: flags.json,
+                    region: flags.region,
+                  });
+                  break;
+
+                case "reject":
+                  await agentApprovalsReject({
+                    id: flags.id,
+                    yes: flags.yes,
+                    token: flags.token,
+                    json: flags.json,
+                    region: flags.region,
+                  });
+                  break;
+
+                default:
+                  throw errors.unknownCommand(
+                    "agent approvals command",
+                    approvalsSubCommand,
+                    "Available commands: list, approve, reject"
+                  );
+              }
+              break;
+            }
             case "policy":
               await agentPolicy({
                 // baseline:allow-no-region — API-backed like agentList/agentKill, not direct AWS
@@ -952,7 +1145,7 @@ async function run() {
               throw errors.unknownCommand(
                 "agent command",
                 agentSubCommand,
-                "Available commands: create, list, kill, policy"
+                "Available commands: create, list, kill, policy, approvals"
               );
           }
           break;
@@ -1134,6 +1327,59 @@ async function run() {
               });
               break;
 
+            case "list":
+              await templatesList({
+                limit: flags.limit,
+                cursor: flags.cursor,
+                status: flags.status,
+                channel: flags.channel,
+                search: flags.search,
+                json: flags.json,
+                token: flags.token,
+                region: flags.region,
+              });
+              break;
+
+            case "get":
+              await templatesGet({
+                id: sub[3],
+                withoutSource: flags.withoutSource,
+                json: flags.json,
+                token: flags.token,
+                region: flags.region,
+              });
+              break;
+
+            case "pull":
+              await templatesPull({
+                outDir: flags.outDir,
+                dryRun: flags.dryRun,
+                yes: flags.yes,
+                json: flags.json,
+                token: flags.token,
+                region: flags.region,
+              });
+              break;
+
+            case "publish":
+              await templatesPublish({
+                id: sub[3],
+                awsAccountId: flags.awsAccountId,
+                yes: flags.yes,
+                json: flags.json,
+                token: flags.token,
+                region: flags.region,
+              });
+              break;
+
+            case "duplicate":
+              await templatesDuplicate({
+                id: sub[3],
+                json: flags.json,
+                token: flags.token,
+                region: flags.region,
+              });
+              break;
             case "preview":
               await templatesPreview({
                 port: flags.port,
@@ -1146,7 +1392,7 @@ async function run() {
               throw errors.unknownCommand(
                 "templates command",
                 templatesSubCommand,
-                "Available commands: init, push, preview"
+                "Available commands: init, push, preview, list, get, pull, publish, duplicate"
               );
           }
           break;
@@ -1200,6 +1446,31 @@ async function run() {
           break;
         }
 
+        case "metrics": {
+          await emailMetrics({
+            startDate: flags.startDate,
+            endDate: flags.endDate,
+            timezone: flags.timezone,
+            granularity: flags.granularity,
+            dimensions: flags.dimensions,
+            broadcastId: flags.broadcastId,
+            templateId: flags.templateId,
+            awsAccountId: flags.awsAccountId,
+            domain: flags.domain,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+        }
+        case "health": {
+          await emailHealth({
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+        }
         case "logs": {
           const logsSubCommand = sub[2];
 
@@ -1583,6 +1854,351 @@ async function run() {
       return;
     }
 
+    // Handle contacts subcommands (wraps contacts list|get|create|update|delete)
+    if (primaryCommand === "contacts" && subCommand) {
+      switch (subCommand) {
+        case "list":
+          await contactsList({
+            limit: flags.limit,
+            cursor: flags.cursor,
+            emailStatus: flags.emailStatus,
+            smsStatus: flags.smsStatus,
+            preferredChannel: flags.preferredChannel,
+            search: flags.search,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "get":
+          await contactsGet({
+            id: sub[2],
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "create":
+          await contactsCreate({
+            email: flags.email,
+            phone: flags.phone,
+            firstName: flags.firstName,
+            lastName: flags.lastName,
+            company: flags.company,
+            jobTitle: flags.jobTitle,
+            externalId: flags.externalId,
+            emailStatus: flags.emailStatus,
+            smsStatus: flags.smsStatus,
+            preferredChannel: flags.preferredChannel,
+            topicIds: flags.topicIds,
+            properties: flags.properties,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "update":
+          await contactsUpdate({
+            id: sub[2],
+            email: flags.email,
+            phone: flags.phone,
+            firstName: flags.firstName,
+            lastName: flags.lastName,
+            company: flags.company,
+            jobTitle: flags.jobTitle,
+            externalId: flags.externalId,
+            emailStatus: flags.emailStatus,
+            smsStatus: flags.smsStatus,
+            preferredChannel: flags.preferredChannel,
+            topicIds: flags.topicIds,
+            properties: flags.properties,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "delete":
+          await contactsDelete({
+            id: sub[2],
+            yes: flags.yes,
+            dryRun: flags.dryRun,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        default:
+          throw errors.unknownCommand(
+            "contacts command",
+            subCommand,
+            "Available commands: list, get <id>, create, update <id>, delete <id>"
+          );
+      }
+      // Track contacts commands (they return early, so track here)
+      const contactsDuration = Date.now() - startTime;
+      trackCommandFallback(`contacts:${subCommand}`, {
+        success: process.exitCode !== 1,
+        duration_ms: contactsDuration,
+        service: "contacts",
+      });
+      return;
+    }
+    // Handle Segments subcommands (audience segments, Pro plan)
+    if (primaryCommand === "segments" && subCommand) {
+      switch (subCommand) {
+        case "list":
+          await segmentsList({
+            limit: flags.limit,
+            cursor: flags.cursor,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "get":
+          await segmentsGet({
+            id: sub[2],
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "create":
+          await segmentsCreate({
+            name: flags.name,
+            description: flags.description,
+            condition: flags.condition,
+            trackMembership: flags.trackMembership,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "update":
+          await segmentsUpdate({
+            id: sub[2],
+            name: flags.name,
+            description: flags.description,
+            condition: flags.condition,
+            trackMembership: flags.trackMembership,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "delete":
+          await segmentsDelete({
+            id: sub[2],
+            yes: flags.yes,
+            dryRun: flags.dryRun,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "preview":
+          await segmentsPreview({
+            id: sub[2],
+            limit: flags.limit,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        default:
+          throw errors.unknownCommand(
+            "segments command",
+            subCommand,
+            "Available commands: list, get, create, update, delete, preview\n\nRun wraps --help for more information."
+          );
+      }
+      // Track segments commands
+      const segmentsDuration = Date.now() - startTime;
+      trackCommandFallback(`segments:${subCommand}`, {
+        success: process.exitCode !== 1,
+        duration_ms: segmentsDuration,
+        service: "segments",
+      });
+      return;
+    }
+    if (primaryCommand === "broadcasts" && subCommand) {
+      const broadcastId = sub[2];
+      const contentOptions = {
+        awsAccountId: flags.awsAccountId,
+        channel: flags.channel,
+        name: flags.name,
+        audienceType: flags.audienceType,
+        topicId: flags.topicId,
+        segmentId: flags.segmentId,
+        subject: flags.subject,
+        previewText: flags.previewText,
+        from: flags.from,
+        fromName: flags.fromName,
+        replyTo: flags.replyTo,
+        templateId: flags.templateId,
+        htmlContent: flags.htmlContent,
+        body: flags.body,
+        senderId: flags.senderId,
+        scheduledFor: flags.scheduledFor,
+        totalRecipients: flags.totalRecipients,
+        variableMappings: flags.variableMappings,
+      };
+
+      switch (subCommand) {
+        case "create":
+          await broadcastsCreate({
+            ...contentOptions,
+            dryRun: flags.dryRun,
+            yes: flags.yes,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "send":
+          await broadcastsSend({
+            ...contentOptions,
+            id: broadcastId,
+            yes: flags.yes,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "status":
+          await broadcastsStatus({
+            id: broadcastId,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "recipients":
+          await broadcastsRecipients({
+            id: broadcastId,
+            status: flags.status,
+            limit: flags.limit,
+            cursor: flags.cursor,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "resume":
+          await broadcastsResume({
+            id: broadcastId,
+            fromChunkIndex: flags.fromChunkIndex,
+            yes: flags.yes,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        default:
+          throw errors.unknownCommand(
+            "broadcasts command",
+            subCommand,
+            "Available commands: create, send, status, recipients, resume"
+          );
+      }
+      const broadcastsDuration = Date.now() - startTime;
+      trackCommandFallback(`broadcasts:${subCommand}`, {
+        success: process.exitCode !== 1,
+        duration_ms: broadcastsDuration,
+        service: "broadcasts",
+      });
+      return;
+    }
+    // Workflow runtime control (wraps workflows trigger|enable|disable|retry|cancel)
+    if (primaryCommand === "workflows" && subCommand) {
+      const workflowsTarget = sub[2];
+      switch (subCommand) {
+        case "trigger":
+          await workflowsTrigger({
+            workflowId: workflowsTarget,
+            contactId: flags.contactId,
+            contactEmail: flags.contactEmail,
+            data: flags.data,
+            dryRun: flags.dryRun,
+            yes: flags.yes,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "enable":
+          await workflowsEnable({
+            workflowId: workflowsTarget,
+            cron: flags.cron,
+            timezone: flags.timezone,
+            yes: flags.yes,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "disable":
+          await workflowsDisable({
+            workflowId: workflowsTarget,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "retry":
+          await workflowsRetry({
+            executionId: workflowsTarget,
+            yes: flags.yes,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "cancel":
+          await workflowsCancel({
+            executionId: workflowsTarget,
+            yes: flags.yes,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        default:
+          throw errors.unknownCommand(
+            "workflows runtime command",
+            subCommand,
+            "Available commands: trigger, enable, disable, retry, cancel\n\nRun wraps --help for more information."
+          );
+      }
+      const workflowsRuntimeDuration = Date.now() - startTime;
+      trackCommandFallback(`workflows:${subCommand}`, {
+        success: process.exitCode !== 1,
+        duration_ms: workflowsRuntimeDuration,
+        service: "workflows",
+      });
+      return;
+    }
     // Handle Platform subcommands
     if (primaryCommand === "platform") {
       if (!subCommand) {
@@ -1808,6 +2424,10 @@ async function run() {
       case "sms":
       case "cdn":
       case "aws":
+      case "contacts":
+      case "segments":
+      case "broadcasts":
+      case "workflows":
       case "workflow":
         console.log(
           `\nPlease specify a command for ${primaryCommand} service.\n`

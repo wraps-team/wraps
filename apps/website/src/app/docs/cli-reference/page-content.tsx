@@ -22,6 +22,278 @@ import Link from "next/link";
 import { CLICommand } from "@/components/docs/cli-command";
 import { DocsLayout } from "@/components/docs-layout";
 
+type DataCommand = {
+  command: string;
+  summary: string;
+  flags?: string;
+  data?: string;
+  notes?: string;
+};
+
+type DataCommandGroup = {
+  title: string;
+  commands: DataCommand[];
+};
+
+const CONTACT_FIELDS =
+  "id, externalId, email, phone, firstName, lastName, company, jobTitle, emailStatus, smsStatus, preferredChannel, properties, emailsSent, emailsOpened, emailsClicked, smsSent, smsClicked, createdAt, updatedAt";
+
+const SEGMENT_FIELDS =
+  "id, name, description, condition, trackMembership, memberCount, lastComputedAt, createdAt, updatedAt";
+
+const TEMPLATE_FIELDS =
+  "id, name, slug, channel, emailType, status, subject, previewText, description, variables, source, sourceHash, compiledHtml, compiledText, lastEditedFrom, publishedAt, createdAt, updatedAt";
+
+const APPROVAL_FIELDS =
+  "id, agentId, organizationId, status, payload, reason, messageId, errorMessage, decidedAt, decidedBy, createdAt, updatedAt";
+
+const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
+  {
+    title: "Contacts",
+    commands: [
+      {
+        command: "contacts list",
+        summary: "List contacts in your organization.",
+        flags:
+          "--search, --email-status, --sms-status, --preferred-channel, --limit (1-100), --cursor",
+        data: "contacts, total, page, pageSize, totalPages, nextCursor",
+        notes: "The cursor is a page number. Pass nextCursor back unchanged.",
+      },
+      {
+        command: "contacts get <id>",
+        summary: "Show one contact by UUID, email or externalId.",
+        data: `${CONTACT_FIELDS}, topics`,
+      },
+      {
+        command: "contacts create",
+        summary: "Create a contact. Needs --email or --phone.",
+        flags:
+          "--email, --phone, --first-name, --last-name, --company, --job-title, --external-id, --email-status, --sms-status, --preferred-channel, --topic-ids, --properties (JSON object)",
+        data: `${CONTACT_FIELDS}, pendingTopics`,
+        notes:
+          "Returns CONFLICT if the contact already exists. Search with contacts list --search first.",
+      },
+      {
+        command: "contacts update <id>",
+        summary: "Change only the fields you pass.",
+        flags: "The same field flags as contacts create",
+        data: `${CONTACT_FIELDS}, pendingTopics`,
+        notes: "At least one field flag is required.",
+      },
+      {
+        command: "contacts delete <id>",
+        summary: "Delete a contact.",
+        flags: "--yes (required), --dry-run",
+        data: "id, deleted, dryRun",
+      },
+    ],
+  },
+  {
+    title: "Segments",
+    commands: [
+      {
+        command: "segments list",
+        summary: "List segments with live member counts. Pro plan.",
+        flags: "--limit (1-100, default 20), --cursor (an offset)",
+        data: "segments, total, limit, offset, nextCursor",
+      },
+      {
+        command: "segments get <id>",
+        summary: "Show one segment and its filter condition.",
+        data: SEGMENT_FIELDS,
+      },
+      {
+        command: "segments create",
+        summary: "Create a segment.",
+        flags:
+          "--name (required), --condition (JSON, required), --description, --track-membership",
+        data: SEGMENT_FIELDS,
+      },
+      {
+        command: "segments update <id>",
+        summary: "Change a segment's name, description, condition or tracking.",
+        flags:
+          "--name, --description, --condition, --track-membership (at least one required)",
+        data: SEGMENT_FIELDS,
+      },
+      {
+        command: "segments delete <id>",
+        summary: "Delete a segment.",
+        flags: "--yes (required), --dry-run",
+        data: "id, deleted, dryRun",
+      },
+      {
+        command: "segments preview <id>",
+        summary:
+          "Count and sample who a segment would reach. Read-only, changes nothing.",
+        flags: "--limit",
+        data: "id, count, sample",
+      },
+    ],
+  },
+  {
+    title: "Broadcasts",
+    commands: [
+      {
+        command: "broadcasts create",
+        summary:
+          "Queue a broadcast. It sends immediately unless --scheduled-for is set.",
+        flags:
+          "--yes (required), --dry-run, --aws-account-id (from email health), --subject, --channel (email or sms), --audience-type (all, topic or segment), --topic-id, --segment-id, --template-id, --html-content, --body, --from, --from-name, --reply-to, --preview-text, --sender-id, --variable-mappings, --scheduled-for (ISO time)",
+        data: "id, status, channel, createdAt, totalRecipients, payload, dryRun, warning",
+        notes: "--dry-run validates the payload locally and makes no request.",
+      },
+      {
+        command: "broadcasts send <id>",
+        summary:
+          "Send a draft made in the dashboard. Broadcasts made with create are already queued.",
+        flags:
+          "--yes (required), --aws-account-id (from email health), --total-recipients (read it from broadcasts status)",
+        data: "id, status, warning",
+        notes: "Returns NOT_DRAFT for a broadcast that is not a draft.",
+      },
+      {
+        command: "broadcasts status <id>",
+        summary: "Show a broadcast's status and delivery counts.",
+        data: "id, name, channel, status, totalRecipients, processedRecipients, sent, delivered, failed, opened, clicked, bounced, complained, suppressed, startedAt, completedAt, createdAt",
+      },
+      {
+        command: "broadcasts recipients <id>",
+        summary: "List the recipients of a broadcast.",
+        flags: "--status, --limit (1-1000), --cursor (an offset)",
+        data: "id, recipients, total, limit, offset, nextCursor",
+      },
+      {
+        command: "broadcasts resume <id>",
+        summary: "Resume a stopped broadcast.",
+        flags: "--yes (required), --from-chunk-index",
+        data: "id, resumed, fromChunkIndex",
+        notes: "Can return RESUME_DISABLED.",
+      },
+    ],
+  },
+  {
+    title: "Email Templates, Metrics and Health",
+    commands: [
+      {
+        command: "email templates list",
+        summary: "List templates.",
+        flags:
+          "--limit (1-100), --cursor, --status (DRAFT, PUBLISHED or ARCHIVED), --channel (email or sms), --search",
+        data: "templates, nextCursor",
+      },
+      {
+        command: "email templates get <id>",
+        summary: "Show one template. The source is included by default.",
+        flags: "--without-source",
+        data: TEMPLATE_FIELDS,
+      },
+      {
+        command: "email templates pull",
+        summary: "Write every template to <slug>.tsx files in a local folder.",
+        flags:
+          "--out-dir (default wraps/templates), --dry-run, --yes (needed to overwrite existing files)",
+        data: "outDir, dryRun, files (id, slug, path, exists, written), skipped",
+        notes:
+          "Refuses to overwrite existing local files unless --yes is given.",
+      },
+      {
+        command: "email templates publish <id>",
+        summary: "Publish a template to SES. This makes it live.",
+        flags:
+          "--yes (required), --aws-account-id (required when the organization has more than one AWS account)",
+        data: "id, publishedAt, sesTemplateName, awsAccountId",
+      },
+      {
+        command: "email templates duplicate <id>",
+        summary: "Copy a template as a new draft.",
+        data: TEMPLATE_FIELDS,
+        notes: "The copy is always a DRAFT.",
+      },
+      {
+        command: "email metrics",
+        summary:
+          "Aggregate sends, opens, clicks, bounces and cost for the organization.",
+        flags:
+          "--start-date, --end-date (ISO 8601), --timezone, --granularity (hourly, daily, weekly or monthly), --dimensions (period, domain, broadcast, template, source, account, region), --broadcast-id, --template-id, --aws-account-id (ID filters take up to 100 comma-separated values)",
+        data: "object, totals, data, meta",
+        notes:
+          "Not paginated. Errors: INVALID_DATE, INVALID_DATE_RANGE, INVALID_GRANULARITY.",
+      },
+      {
+        command: "email health",
+        summary:
+          "Check SES health per AWS account. Each account's id is the value for --aws-account-id.",
+        data: "status, checkedAt, accounts (each with id, accountNumber, region, status, checkedAt, sandbox, productionAccessEnabled, sendingEnabled, enforcementStatus, quota, reputation)",
+        notes:
+          "The id is the awsAccount row id, not the 12-digit AWS account number.",
+      },
+    ],
+  },
+  {
+    title: "Agent Approvals",
+    commands: [
+      {
+        command: "email agent approvals list",
+        summary: "List the approval queue.",
+        flags: "--status (PENDING, APPROVED, REJECTED, SENT or FAILED)",
+        data: "approvals, nextCursor",
+        notes:
+          "No --limit or --cursor. The whole queue is returned, and nextCursor is always null.",
+      },
+      {
+        command: "email agent approvals approve --id <id>",
+        summary: "Approve a pending send. This executes it.",
+        flags: "--id (required), --yes (required)",
+        data: APPROVAL_FIELDS,
+      },
+      {
+        command: "email agent approvals reject --id <id>",
+        summary: "Reject a pending send.",
+        flags: "--id (required), --yes (required)",
+        data: APPROVAL_FIELDS,
+      },
+    ],
+  },
+  {
+    title: "Workflow Runs",
+    commands: [
+      {
+        command: "workflows trigger <workflow-id>",
+        summary: "Trigger an API workflow for one contact.",
+        flags:
+          "--contact-id or --contact-email (one required), --data (JSON object), --yes (required), --dry-run",
+        data: "workflowId, workflowName, contactId, contactEmail, data, dryRun, message",
+        notes: "Returns WORKFLOW_REJECTED when the route rejects the run.",
+      },
+      {
+        command: "workflows enable <workflow-id>",
+        summary: "Create the next scheduled run.",
+        flags: "--cron (required), --timezone, --yes (required)",
+        data: "workflowId, scheduleName, cronExpression, timezone",
+      },
+      {
+        command: "workflows disable <workflow-id>",
+        summary: "Remove the pending scheduled run.",
+        data: "workflowId, disabled",
+        notes: "Does not need --yes.",
+      },
+      {
+        command: "workflows retry <execution-id>",
+        summary: "Retry a failed execution.",
+        flags: "--yes (required)",
+        data: "executionId, message",
+      },
+      {
+        command: "workflows cancel <execution-id>",
+        summary: "Cancel an in-progress execution.",
+        flags: "--yes (required)",
+        data: "executionId, cancelled",
+      },
+    ],
+  },
+];
+
 export default function CLIReferencePageContent() {
   return (
     <DocsLayout>
@@ -185,6 +457,123 @@ export default function CLIReferencePageContent() {
             </CardContent>
           </Card>
         </div>
+      </section>
+
+      {/* Data Commands for Agents */}
+      <section className="mb-12">
+        <h2 className="mb-6 font-bold text-2xl">Data Commands for Agents</h2>
+        <p className="mb-6 text-muted-foreground">
+          These commands read and change data in your Wraps organization:
+          contacts, segments, templates, broadcasts, workflow runs and
+          approvals. They use the Wraps API and do not deploy AWS
+          infrastructure.
+        </p>
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">
+              Authentication, Output and Exit Codes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc space-y-2 pl-5 text-muted-foreground text-sm">
+              <li>
+                Pass --token or set WRAPS_API_KEY. A token or key takes priority
+                over a stored session from wraps auth login. Self-hosted
+                instances follow wraps selfhost login.
+              </li>
+              <li>Every command below takes --token and --json.</li>
+              <li>
+                With --json, stdout is one JSON object with success, command,
+                and either data or error. The error object has code, message and
+                suggestion. Command names are dotted, for example contacts.list.
+              </li>
+              <li>Every error sets exit code 1.</li>
+              <li>
+                Workflow routes can return HTTP 200 with success false. The CLI
+                reports that as an error, so check the exit code or success
+                field, not only the HTTP status.
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">The --yes Rule</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 text-muted-foreground text-sm">
+              These commands send email, make a live change or delete data.
+              Without --yes they return CONFIRMATION_REQUIRED before making any
+              request: contacts delete, segments delete, email templates
+              publish, broadcasts create, broadcasts send, broadcasts resume,
+              workflows trigger, workflows enable, workflows retry, workflows
+              cancel, email agent approvals approve, and email agent approvals
+              reject.
+            </p>
+            <p className="text-muted-foreground text-sm">
+              email templates pull fetches without --yes, but it refuses to
+              overwrite existing local files unless --yes is given. workflows
+              disable needs no --yes.
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Pagination</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 text-muted-foreground text-sm">
+              List commands take --limit and --cursor. Their data includes
+              nextCursor, which is null when there are no more results. Pass it
+              back unchanged as --cursor and do not construct it yourself. email
+              agent approvals list has no --limit or --cursor, and email metrics
+              is not paginated.
+            </p>
+          </CardContent>
+        </Card>
+        {DATA_COMMAND_GROUPS.map((group) => (
+          <div className="mb-8" key={group.title}>
+            <h3 className="mb-4 font-bold text-xl">{group.title}</h3>
+            <div className="space-y-4">
+              {group.commands.map((doc) => (
+                <Card key={doc.command}>
+                  <CardHeader>
+                    <CardTitle className="font-mono text-base">
+                      {`wraps ${doc.command}`}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p className="text-muted-foreground">{doc.summary}</p>
+                    {doc.flags ? (
+                      <p>
+                        <span className="font-medium">Flags:</span>{" "}
+                        <span className="text-muted-foreground">
+                          {doc.flags}
+                        </span>
+                      </p>
+                    ) : null}
+                    {doc.data ? (
+                      <p>
+                        <span className="font-medium">JSON data:</span>{" "}
+                        <span className="text-muted-foreground">
+                          {doc.data}
+                        </span>
+                      </p>
+                    ) : null}
+                    {doc.notes ? (
+                      <p>
+                        <span className="font-medium">Notes:</span>{" "}
+                        <span className="text-muted-foreground">
+                          {doc.notes}
+                        </span>
+                      </p>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ))}
       </section>
 
       {/* Global Commands */}
