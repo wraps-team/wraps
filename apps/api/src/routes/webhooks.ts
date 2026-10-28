@@ -391,8 +391,8 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
         insertedId = inserted[0]?.id;
       }
       // Only the event that created the row records its diagnostic. A duplicate
-      // lifecycle event inserts nothing and so records nothing new. This runs
-      // outside the try below, so a failed write is returned as 500 here.
+      // lifecycle event inserts nothing and so records nothing new. The diagnostic
+      // write is best-effort: a failure is logged and the event carries on.
       if (recipient && insertedId) {
         const sdkDiagnostic = sdkDiagnosticFor(
           eventType,
@@ -410,11 +410,9 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
               db
             );
           } catch (error) {
-            log.error("Webhook: SDK diagnostic write failed", error, {
+            log.error("Webhook: diagnostic write failed", error, {
               messageId,
             });
-            set.status = 500;
-            return { error: "Failed to process event" };
           }
         }
       }
@@ -908,20 +906,24 @@ async function processBounce(
     return;
   }
 
-  // Record the receiver diagnostic before the transition, so a retry after a
-  // later failure still stores it. A duplicate event leaves the stored values
-  // in place (COALESCE in recordMessageSendDiagnostic) and does not change the
-  // status or the counters below.
-  await recordMessageSendDiagnostic(
-    {
-      organizationId,
-      messageSendId: message.id,
-      eventType: "bounce",
-      ...diagnostic,
-      feedbackType: null,
-    },
-    db
-  );
+  // Record the receiver diagnostic before the transition. A duplicate event
+  // leaves the stored values in place (COALESCE in recordMessageSendDiagnostic).
+  // The write is best-effort: a failure is logged and the status and counters
+  // below run exactly as before.
+  try {
+    await recordMessageSendDiagnostic(
+      {
+        organizationId,
+        messageSendId: message.id,
+        eventType: "bounce",
+        ...diagnostic,
+        feedbackType: null,
+      },
+      db
+    );
+  } catch (error) {
+    log.error("Webhook: diagnostic write failed", error, { messageId });
+  }
 
   const bouncedAt = timestamp ? new Date(timestamp) : new Date();
 
@@ -998,19 +1000,24 @@ async function processComplaint(
   const complainedAt = timestamp ? new Date(timestamp) : new Date();
 
   // Record the feedback type before the transition, as processBounce does for
-  // its diagnostic. Complaints carry no per-recipient SMTP fields.
-  await recordMessageSendDiagnostic(
-    {
-      organizationId,
-      messageSendId: message.id,
-      eventType: "complaint",
-      enhancedStatus: null,
-      diagnosticCode: null,
-      reasonKey: null,
-      feedbackType,
-    },
-    db
-  );
+  // its diagnostic. Complaints carry no per-recipient SMTP fields. The write is
+  // best-effort: a failure is logged and the status update below still runs.
+  try {
+    await recordMessageSendDiagnostic(
+      {
+        organizationId,
+        messageSendId: message.id,
+        eventType: "complaint",
+        enhancedStatus: null,
+        diagnosticCode: null,
+        reasonKey: null,
+        feedbackType,
+      },
+      db
+    );
+  } catch (error) {
+    log.error("Webhook: diagnostic write failed", error, { messageId });
+  }
 
   // Update messageSend status — guarded on a genuine transition (WHERE status
   // <> 'complained') so a duplicate Complaint event does not re-count.
