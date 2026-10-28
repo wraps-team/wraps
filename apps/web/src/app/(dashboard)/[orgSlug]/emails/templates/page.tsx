@@ -1,6 +1,6 @@
-import { auth } from "@wraps/auth";
 import { redirect } from "next/navigation";
 import { TemplatesList } from "@/components/template-editor/templates-list";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
 type PageProps = {
@@ -12,9 +12,7 @@ type PageProps = {
 export default async function TemplatesPage({ params }: PageProps) {
   const { orgSlug } = await params;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

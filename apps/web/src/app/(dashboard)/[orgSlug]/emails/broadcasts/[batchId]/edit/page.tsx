@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import { db, organizationExtension } from "@wraps/db";
 import { eq } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
@@ -9,6 +8,7 @@ import {
   listTemplatesForBatch,
   listTopicsForBatch,
 } from "@/actions/batch";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkFeatureAccess } from "@/lib/plan-limits";
 import { BatchForm } from "../../new/components/batch-form";
@@ -24,9 +24,7 @@ type EditBatchPageProps = {
 export default async function EditBatchPage({ params }: EditBatchPageProps) {
   const { orgSlug, batchId } = await params;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

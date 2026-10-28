@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import {
   awsAccount,
   db,
@@ -10,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getWorkflow } from "@/actions/(ee)/workflows";
 import { WorkflowBuilder } from "@/components/(ee)/workflow-builder/workflow-builder";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
 type WorkflowBuilderPageProps = {
@@ -24,9 +24,7 @@ export default async function WorkflowBuilderPage({
 }: WorkflowBuilderPageProps) {
   const { orgSlug, workflowId } = await params;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

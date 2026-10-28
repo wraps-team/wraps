@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
 import { awsAccount } from "@wraps/db/schema/app";
 import { messageSend } from "@wraps/db/schema/batch";
@@ -11,6 +10,7 @@ import { notFound, redirect } from "next/navigation";
 import { EmailArchiveViewer } from "@/components/email-archive-viewer";
 import { Button } from "@/components/ui/button";
 import { queryEmailEvents, queryEventsByMessageIds } from "@/lib/aws/dynamodb";
+import { getCurrentSession } from "@/lib/current-session";
 import { isOpenEventBot } from "@/lib/email-bot-detection";
 import { logger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
@@ -370,9 +370,7 @@ export default async function EmailDetailPage({
 }: EmailDetailPageProps) {
   const { orgSlug, emailId } = await params;
   const listFilters = await searchParams;
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

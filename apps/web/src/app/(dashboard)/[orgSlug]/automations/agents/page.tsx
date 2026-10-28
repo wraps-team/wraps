@@ -1,6 +1,6 @@
-import { auth } from "@wraps/auth";
 import { redirect } from "next/navigation";
 import { AgentsList } from "@/components/agents-list";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
 type AgentsPageProps = {
@@ -11,9 +11,7 @@ type AgentsPageProps = {
 
 export default async function AgentsPage({ params }: AgentsPageProps) {
   const { orgSlug } = await params;
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");
@@ -53,9 +51,7 @@ export async function generateMetadata({
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     return { title: "Agents" };

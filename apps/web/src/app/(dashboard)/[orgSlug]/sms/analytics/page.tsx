@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import { BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -11,6 +10,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkHasAwsAccounts } from "@/lib/setup-status";
 import { SMSAnalyticsRefreshButton } from "./components/sms-analytics-refresh-button";
@@ -32,9 +32,7 @@ export default async function SMSAnalyticsPage({
   params,
 }: SMSAnalyticsPageProps) {
   const { orgSlug } = await params;
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

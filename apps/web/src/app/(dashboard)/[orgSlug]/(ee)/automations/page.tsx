@@ -1,7 +1,7 @@
-import { auth } from "@wraps/auth";
 import { redirect } from "next/navigation";
 import { listWorkflows } from "@/actions/(ee)/workflows";
 import { FeatureGate } from "@/components/feature-gate";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkFeatureAccess, getOrganizationPlan } from "@/lib/plan-limits";
 import { getRequiredPlan, type PlanId } from "@/lib/plans";
@@ -26,9 +26,7 @@ export default async function AutomationsPage({
   const { orgSlug } = await params;
   const { page = "1", pageSize = "20", search, status } = await searchParams;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

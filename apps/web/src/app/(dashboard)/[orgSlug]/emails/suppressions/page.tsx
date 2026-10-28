@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
 import { awsAccount } from "@wraps/db/schema/app";
 import { eq } from "drizzle-orm";
@@ -16,6 +15,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkHasAwsAccounts } from "@/lib/setup-status";
 import { SuppressionsTable } from "./components/suppressions-table";
@@ -27,9 +27,7 @@ type SuppressionsPageProps = {
 
 export async function generateMetadata({ params }: SuppressionsPageProps) {
   const { orgSlug } = await params;
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
   if (!session?.user) {
     return { title: "Suppression List" };
   }
@@ -129,9 +127,7 @@ export default async function SuppressionsPage({
 }: SuppressionsPageProps) {
   const { orgSlug } = await params;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

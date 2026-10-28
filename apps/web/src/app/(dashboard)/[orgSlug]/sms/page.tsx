@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
 import { awsAccount } from "@wraps/db/schema/app";
 import { eq } from "drizzle-orm";
@@ -16,6 +15,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { querySMSEvents } from "@/lib/aws/sms-voice";
+import { getCurrentSession } from "@/lib/current-session";
 import { logger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkHasAwsAccounts } from "@/lib/setup-status";
@@ -173,9 +173,7 @@ export default async function SMSPage({ params, searchParams }: SMSPageProps) {
   const { orgSlug } = await params;
   const { days = "7", limit = "100" } = await searchParams;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

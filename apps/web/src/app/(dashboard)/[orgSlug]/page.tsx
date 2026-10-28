@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import {
   batchSend,
   contactEvent,
@@ -7,7 +6,6 @@ import {
   workflowExecution,
 } from "@wraps/db";
 import { count, desc, eq } from "drizzle-orm";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { refreshIdentitySnapshots } from "@/lib/aws/identity-refresh";
@@ -22,6 +20,8 @@ export type {
   AwsAccountData,
   SetupStatus,
 } from "@/lib/setup-status";
+
+import { getCurrentSession } from "@/lib/current-session";
 
 type OrganizationDashboardProps = {
   params: Promise<{
@@ -143,9 +143,7 @@ export default async function OrganizationDashboard({
   params,
 }: OrganizationDashboardProps) {
   const { orgSlug } = await params;
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

@@ -1,6 +1,6 @@
-import { auth } from "@wraps/auth";
 import { redirect } from "next/navigation";
 import { getEventNames, listEvents } from "@/actions/events";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { EventAnalytics } from "./components/event-analytics";
 import { EventsTable } from "./components/events-table";
@@ -38,9 +38,7 @@ export default async function EventsPage({
     datePreset,
   } = await searchParams;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

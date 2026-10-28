@@ -1,9 +1,9 @@
-import { auth } from "@wraps/auth";
 import { Pencil } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getWorkflow, listWorkflowExecutions } from "@/actions/(ee)/workflows";
 import { Button } from "@/components/ui/button";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { ExecutionsTable } from "./components/executions-table";
 
@@ -25,9 +25,7 @@ export default async function ExecutionsPage({
   const { orgSlug, workflowId } = await params;
   const { page = "1", status } = await searchParams;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

@@ -1,8 +1,8 @@
-import { auth } from "@wraps/auth";
 import type { awsAccount } from "@wraps/db";
 import { db } from "@wraps/db";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationBySlug } from "@/lib/organization";
 import { checkAWSAccountAccess } from "@/lib/permissions/check-access";
 
@@ -37,9 +37,7 @@ export type AccountTab =
 // Cached per request on primitive args (React cache() dedupes by argument
 // identity), so the layout and the page share one lookup.
 const getAccountContext = cache(async (orgSlug: string, accountId: string) => {
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
   if (!session?.user) {
     return { missing: "session" as const };
   }
