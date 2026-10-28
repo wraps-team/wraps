@@ -127,6 +127,11 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** `part` as a percentage of `whole`, 2 dp. Null when `whole` is zero. */
+export function percentOf(part: number, whole: number): number | null {
+  return whole > 0 ? round2((part / whole) * 100) : null;
+}
+
 // Excess is a float (sent * rate). Compare at 1e-6 so two groups that are
 // mathematically tied are tied here too, and their order is decided by volume
 // and key, not by float noise.
@@ -178,8 +183,8 @@ export function rankAttribution(
   }: (typeof scored)[number]): AttributionGroup => ({
     ...group,
     events,
-    rate: group.sent > 0 ? round2((events / group.sent) * 100) : null,
-    share: totalEvents > 0 ? round2((events / totalEvents) * 100) : null,
+    rate: percentOf(events, group.sent),
+    share: percentOf(events, totalEvents),
     excess: round2(excess),
     eligible: group.sent >= floor,
   });
