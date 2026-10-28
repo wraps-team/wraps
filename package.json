@@ -17,7 +17,7 @@
     "test:e2e": "pnpm --filter @wraps/e2e test:e2e",
     "test:coverage": "turbo run test:coverage --filter=@wraps.dev/cli",
     "typecheck": "turbo run typecheck",
-    "typecheck:infra": "tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution bundler --resolveJsonModule --esModuleInterop --allowSyntheticDefaultImports sst.config.ts infra/selfhost.config.ts",
+    "typecheck:infra": "bash scripts/typecheck-infra.sh",
     "check": "pnpm dlx ultracite@6.3.2 check",
     "check:errors": "pnpm dlx ultracite@6.3.2 check --diagnostic-level=error",
     "test:architecture": "vitest run --config vitest.config.ts",
@@ -76,6 +76,7 @@
     "react-email": "5.2.8",
     "sst": "4.2.4",
     "tsx": "^4.23.1",
+    "typescript": "catalog:",
     "turbo": "^2.10.7",
     "ultracite": "6.3.2",
     "vitest": "catalog:"
