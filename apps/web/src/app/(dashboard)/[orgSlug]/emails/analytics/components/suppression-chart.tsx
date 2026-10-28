@@ -25,7 +25,14 @@ import {
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import * as React from "react";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ReferenceLine,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -35,6 +42,12 @@ import {
 import { SERIES_COLOR } from "@/lib/chart-series";
 import { useSuppressionData } from "../hooks/use-analytics";
 import { ViewCausesLink } from "./view-causes-link";
+import {
+  ChangeMarkerList,
+  ChangeMarkersToggle,
+  markerLineProps,
+  useChartChangeMarkers,
+} from "./change-marker-overlay";
 
 const chartConfig = {
   suppressionRate: {
@@ -47,7 +60,13 @@ function formatPercentage(value: number) {
   return `${value.toFixed(1)}%`;
 }
 
-export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
+export function SuppressionChart({
+  orgSlug,
+  showChangeMarkers = false,
+}: {
+  orgSlug: string;
+  showChangeMarkers?: boolean;
+}) {
   const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = React.useState("30d");
 
@@ -71,6 +90,14 @@ export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
   } = useSuppressionData(orgSlug, days);
 
   const chartData = suppressionData || [];
+  const [showMarkers, setShowMarkers] = React.useState(true);
+  const { overlayOn, markerLines, markers, listState } = useChartChangeMarkers({
+    orgSlug,
+    days,
+    enabled: showChangeMarkers,
+    showMarkers,
+    dates: chartData.map((d) => d.date),
+  });
 
   return (
     <Card className="@container/card">
@@ -84,6 +111,11 @@ export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
         </CardDescription>
         <CardAction className="self-center">
           <ViewCausesLink days={days} metric="suppression" orgSlug={orgSlug} />
+          <ChangeMarkersToggle
+            enabled={showChangeMarkers}
+            onPressedChange={setShowMarkers}
+            pressed={showMarkers}
+          />
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "90d"}
@@ -221,9 +253,21 @@ export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
                 strokeWidth={2}
                 type="monotone"
               />
+              {markerLines.map((line) => (
+                <ReferenceLine key={line.date} {...markerLineProps(line)} />
+              ))}
             </AreaChart>
           </ChartContainer>
         )}
+        <ChangeMarkerList
+          active={overlayOn}
+          days={days}
+          markers={markers}
+          metric="suppression"
+          orgSlug={orgSlug}
+          state={listState}
+          tz={tz}
+        />
       </CardContent>
     </Card>
   );
