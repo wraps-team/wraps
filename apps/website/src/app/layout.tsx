@@ -46,9 +46,12 @@ export const metadata: Metadata = {
     images: ["/og-image.png"],
   },
   icons: {
+    // One SVG that switches color itself: Chrome ignores `media` on
+    // <link rel="icon"> and takes the last entry, so a light/dark PNG pair
+    // shows the white W on a light tab strip.
     icon: [
-      { url: "/favicon-light.png", media: "(prefers-color-scheme: light)" },
-      { url: "/favicon-dark.png", media: "(prefers-color-scheme: dark)" },
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
     ],
     apple: "/apple-touch-icon.png",
   },

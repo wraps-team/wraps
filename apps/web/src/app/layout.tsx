@@ -40,9 +40,12 @@ export const metadata: Metadata = {
   description:
     "Deploy production-ready email infrastructure to your AWS account in minutes. Zero stored credentials, beautiful DX, and transparent AWS pricing.",
   icons: {
+    // One SVG that switches color itself: Chrome ignores `media` on
+    // <link rel="icon"> and takes the last entry, so a light/dark PNG pair
+    // shows the white W on a light tab strip.
     icon: [
-      { url: "/favicon-light.png", media: "(prefers-color-scheme: light)" },
-      { url: "/favicon-dark.png", media: "(prefers-color-scheme: dark)" },
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
     ],
   },
 };
