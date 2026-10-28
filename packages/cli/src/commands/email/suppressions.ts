@@ -38,6 +38,7 @@ export type SuppressionsListOptions = {
   cursor?: string;
   json?: boolean;
   token?: string;
+  region?: string;
 };
 
 export type SuppressionsRemoveOptions = {
@@ -48,6 +49,7 @@ export type SuppressionsRemoveOptions = {
   dryRun?: boolean;
   json?: boolean;
   token?: string;
+  region?: string;
 };
 
 type Failure = { code: string; message: string; suggestion: string };

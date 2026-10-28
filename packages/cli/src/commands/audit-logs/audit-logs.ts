@@ -469,11 +469,7 @@ function isExportBody(
 }
 
 function isDirectory(path: string): boolean {
-  try {
-    return statSync(path).isDirectory();
-  } catch {
-    return false;
-  }
+  return existsSync(path) && statSync(path).isDirectory();
 }
 
 /** True when a date-only or timestamp --from falls before the plan's window. */

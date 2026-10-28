@@ -1622,6 +1622,7 @@ async function run() {
                 cursor: flags.cursor,
                 json: flags.json,
                 token: flags.token,
+                region: flags.region,
               });
               break;
 
@@ -1634,6 +1635,7 @@ async function run() {
                 dryRun: flags.dryRun,
                 json: flags.json,
                 token: flags.token,
+                region: flags.region,
               });
               break;
 
@@ -2742,6 +2744,7 @@ async function run() {
             ...auditLogsFilters,
             limit: flags.limit,
             cursor: flags.cursor,
+            region: flags.region,
           });
           break;
 
@@ -2751,6 +2754,7 @@ async function run() {
             format: flags.format,
             output: flags.output,
             yes: flags.yes,
+            region: flags.region,
           });
           break;
 

@@ -432,8 +432,9 @@ async function pathExists(path: string): Promise<boolean> {
   try {
     await stat(path);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    // Only a missing file is safe to overwrite; an unreadable one may exist.
+    return !(err instanceof Error && "code" in err && err.code === "ENOENT");
   }
 }
 
