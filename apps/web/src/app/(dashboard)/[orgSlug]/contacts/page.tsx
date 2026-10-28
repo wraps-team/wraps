@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import { CircleAlert } from "lucide-react";
 import { redirect } from "next/navigation";
 import { listContacts } from "@/actions/contacts";
@@ -14,6 +13,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { isEmailStatus } from "@/lib/contacts";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkFeatureAccess } from "@/lib/plan-limits";
 import { ContactAnalytics } from "./components/contact-analytics";
@@ -57,9 +57,7 @@ export default async function ContactsPage({
   // `listContacts` validates those itself (audit F14).
   const validEmailStatus = isEmailStatus(emailStatus) ? emailStatus : undefined;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");
@@ -225,9 +223,7 @@ export async function generateMetadata({
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     return { title: "Contacts" };

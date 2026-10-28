@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import { ArrowRight, Mail, RefreshCw, Terminal } from "lucide-react";
 import { redirect } from "next/navigation";
 import { CliCommand } from "@/components/cli-command";
@@ -11,6 +10,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
 type EmailSetupPageProps = {
@@ -22,9 +22,7 @@ type EmailSetupPageProps = {
 export default async function EmailSetupPage({ params }: EmailSetupPageProps) {
   const { orgSlug } = await params;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

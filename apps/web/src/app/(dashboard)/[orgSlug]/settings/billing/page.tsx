@@ -1,6 +1,6 @@
-import { auth } from "@wraps/auth";
 import { redirect } from "next/navigation";
 import { OrganizationSettingsBilling } from "@/components/organization-settings-billing";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
 type BillingPageProps = {
@@ -11,9 +11,7 @@ type BillingPageProps = {
 
 export default async function BillingPage({ params }: BillingPageProps) {
   const { orgSlug } = await params;
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");
@@ -51,9 +49,7 @@ export async function generateMetadata({
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     return { title: "Billing" };

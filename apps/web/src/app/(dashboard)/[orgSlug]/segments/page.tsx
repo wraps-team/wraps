@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import { CircleAlert } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getPropertyKeys, listSegments } from "@/actions/segments";
@@ -14,6 +13,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkFeatureAccess, getOrganizationPlan } from "@/lib/plan-limits";
 import { getRequiredPlan, type PlanId } from "@/lib/plans";
@@ -28,9 +28,7 @@ type SegmentsPageProps = {
 export default async function SegmentsPage({ params }: SegmentsPageProps) {
   const { orgSlug } = await params;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");
@@ -202,9 +200,7 @@ export async function generateMetadata({
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     return { title: "Segments" };

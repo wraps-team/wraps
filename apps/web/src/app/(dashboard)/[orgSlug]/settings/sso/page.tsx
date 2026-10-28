@@ -1,9 +1,9 @@
-import { auth } from "@wraps/auth";
 import { db, eq, scimProvider, ssoProvider } from "@wraps/db";
 import { redirect } from "next/navigation";
 import { getExistingVerificationToken } from "@/actions/sso";
 import { FeatureGate } from "@/components/feature-gate";
 import { OrganizationSettingsSso } from "@/components/organization-settings-sso";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkFeatureAccess, getOrganizationPlan } from "@/lib/plan-limits";
 import { getRequiredPlan, type PlanId } from "@/lib/plans";
@@ -18,9 +18,7 @@ export async function generateMetadata({
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
   if (!session?.user) return { title: "SSO & SCIM" };
   const orgWithMembership = await getOrganizationWithMembership(
     orgSlug,
@@ -36,9 +34,7 @@ export async function generateMetadata({
 export default async function SsoPage({ params }: SsoPageProps) {
   const { orgSlug } = await params;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) redirect("/auth");
 

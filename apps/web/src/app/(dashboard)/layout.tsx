@@ -1,8 +1,7 @@
-import { auth } from "@wraps/auth";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type React from "react";
 import { OrganizationProvider } from "@/contexts/organization-context";
+import { getCurrentSession } from "@/lib/current-session";
 import { DashboardShell } from "./dashboard-shell";
 
 export default async function DashboardLayout({
@@ -20,7 +19,7 @@ export default async function DashboardLayout({
   // active org is known. Seeding those props server-side cost a database
   // round-trip *above* the shell, which meant the whole application sat
   // behind the root full-screen loader while it ran.
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

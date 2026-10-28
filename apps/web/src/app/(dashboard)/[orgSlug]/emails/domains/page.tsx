@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import { GlobeIcon } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -12,6 +11,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkHasAwsAccounts } from "@/lib/setup-status";
 import { SendingDomainsView } from "./components/sending-domains-view";
@@ -22,9 +22,7 @@ type DomainsPageProps = {
 
 export async function generateMetadata({ params }: DomainsPageProps) {
   const { orgSlug } = await params;
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
   if (!session?.user) {
     return { title: "Sending Domains" };
   }
@@ -44,9 +42,7 @@ export async function generateMetadata({ params }: DomainsPageProps) {
 export default async function DomainsPage({ params }: DomainsPageProps) {
   const { orgSlug } = await params;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

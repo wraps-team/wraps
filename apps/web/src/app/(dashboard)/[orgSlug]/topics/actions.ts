@@ -1,6 +1,5 @@
 "use server";
 
-import { auth } from "@wraps/auth";
 import {
   contact,
   db,
@@ -9,7 +8,7 @@ import {
   topicSettings,
 } from "@wraps/db";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { getCurrentSession } from "@/lib/current-session";
 import { createActionLogger } from "@/lib/logger";
 import {
   sanitizeLogoUrl,
@@ -33,9 +32,7 @@ export type UpdateTopicSettingsResult =
 async function verifyOrgAccess(
   organizationId: string
 ): Promise<{ userId: string; role: string } | null> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     return null;

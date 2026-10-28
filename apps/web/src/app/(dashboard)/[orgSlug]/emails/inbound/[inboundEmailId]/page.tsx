@@ -1,9 +1,9 @@
-import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
 import { awsAccount } from "@wraps/db/schema/app";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getInboundEmail } from "@/lib/aws/s3-inbound";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { EmailPreview } from "./components/email-preview";
 
@@ -19,9 +19,7 @@ export default async function InboundEmailDetailPage({
 }: InboundDetailPageProps) {
   const { orgSlug, inboundEmailId } = await params;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

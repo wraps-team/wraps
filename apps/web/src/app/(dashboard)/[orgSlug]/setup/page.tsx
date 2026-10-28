@@ -1,5 +1,5 @@
-import { auth } from "@wraps/auth";
 import { redirect } from "next/navigation";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { getSetupStatus } from "@/lib/setup-status";
 import { GettingStartedDashboard } from "../components/getting-started-dashboard";
@@ -12,9 +12,7 @@ type SetupPageProps = {
 
 export default async function SetupPage({ params }: SetupPageProps) {
   const { orgSlug } = await params;
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

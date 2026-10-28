@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import { MAX_WORKFLOW_RETRIES, type WorkflowStep } from "@wraps/db";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
@@ -39,6 +38,7 @@ function getExecutionStatusBadgeVariant(status: string): BadgeVariant {
   }
 }
 
+import { getCurrentSession } from "@/lib/current-session";
 import { CancelButton } from "./components/cancel-button";
 import { RetryButton } from "./components/retry-button";
 import { StepTrace } from "./components/step-trace";
@@ -77,9 +77,7 @@ export default async function ExecutionDetailPage({
 }: ExecutionDetailPageProps) {
   const { orgSlug, workflowId, executionId } = await params;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");

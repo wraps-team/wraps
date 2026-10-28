@@ -1,4 +1,3 @@
-import { auth } from "@wraps/auth";
 import {
   and,
   db,
@@ -34,6 +33,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { BatchStats } from "./components/batch-stats";
 import { CancelBatchButton } from "./components/cancel-button";
@@ -52,9 +52,7 @@ export default async function BatchDetailPage({
 }: BatchDetailPageProps) {
   const { orgSlug, batchId } = await params;
 
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then((mod) => mod.headers()),
-  });
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     redirect("/auth");
