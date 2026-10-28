@@ -241,3 +241,103 @@ describe("parseCliArgs — workflows push slug", () => {
     expect(extraPositionals).toEqual([]);
   });
 });
+
+describe("parseCliArgs — negative numeric values", () => {
+  const argv = (...args: string[]) => ["node", "wraps", ...args];
+  const base = ["email", "logs", "list"];
+  const parse = (...rest: string[]) => parseCliArgs(argv(...base, ...rest));
+
+  it.each([
+    ["--limit -1", ["--limit", "-1"], "-1"],
+    ["--limit -5", ["--limit", "-5"], "-5"],
+    ["--limit -0.5", ["--limit", "-0.5"], "-0.5"],
+  ])("consumes %s as the value of the string flag", (_label, tokens, value) => {
+    const { flags, sub, extraPositionals } = parse(...tokens);
+    expect(flags.limit).toBe(value);
+    expect(sub).toEqual(base);
+    expect(extraPositionals).toEqual([]);
+  });
+
+  it("parses --limit=-1 exactly as --limit -1 does", () => {
+    expect(parse("--limit=-1")).toEqual(parse("--limit", "-1"));
+    expect(parse("--limit=-1").flags.limit).toBe("-1");
+  });
+
+  it("consumes a negative value for an undeclared flag without leaking it", () => {
+    // --offset is not a declared flag, so nothing reads it; the observable
+    // contract is that -2 is neither a positional nor a phantom flag.
+    const spaced = parse("--offset", "-2");
+    expect(spaced.sub).toEqual(base);
+    expect(spaced.extraPositionals).toEqual([]);
+    expect(spaced).toEqual(parse("--offset=-2"));
+  });
+
+  it("keeps a non-numeric dash token as the existing (non-value) behaviour", () => {
+    // `-x` is not a negative number: --limit still receives no value.
+    const { flags, sub } = parse("--limit", "-x");
+    expect(flags.limit).toBeUndefined();
+    expect(sub).toEqual(base);
+  });
+
+  it.each([
+    ["--limit -h", "help"],
+    ["--limit -y", "yes"],
+    ["--limit -v", "version"],
+  ])("keeps %s reading the short flag, not a value", (tokens, flag) => {
+    const { flags, sub } = parse(...tokens.split(" "));
+    expect(flags[flag as keyof typeof flags]).toBe(true);
+    expect(flags.limit).toBeUndefined();
+    expect(sub).toEqual(base);
+  });
+
+  it("keeps a bare -1 positional instead of a phantom flag", () => {
+    const { flags, sub } = parse("-1");
+    expect(sub).toEqual([...base, "-1"]);
+    expect(flags).toEqual({});
+  });
+
+  it("never gives a boolean flag a negative value", () => {
+    const { flags, sub } = parse("--json", "-1");
+    expect(flags.json).toBe(true);
+    expect(sub).toEqual([...base, "-1"]);
+  });
+
+  it("does not rewrite tokens after the -- terminator", () => {
+    const { sub } = parse("--", "--limit", "-1");
+    expect(sub).toEqual([...base, "--limit", "-1"]);
+  });
+
+  it.each([
+    ["-r -1", "region", "-1"],
+    ["-d -1", "domain", "-1"],
+    ["-p -1", "provider", "-1"],
+  ])("gives the value to the short string alias: %s", (tokens, key, value) => {
+    // Short aliases of string flags must match the long form: the number is
+    // the value, never a placeholder leaking out of the parser.
+    const short = parse(...tokens.split(" "));
+    expect(short.flags[key as keyof typeof short.flags]).toBe(value);
+    expect(short).toEqual(parse(`--${key}`, value));
+  });
+
+  it("keeps -y -1 as the boolean -y with -1 as a positional", () => {
+    const { flags, sub } = parse("-y", "-1");
+    expect(flags.yes).toBe(true);
+    expect(sub).toEqual([...base, "-1"]);
+  });
+
+  it.each([
+    [["-r", "-1"]],
+    [["-d", "-1"]],
+    [["-z", "-1"]],
+    [["-yv", "-1"]],
+    [["-1", "-2"]],
+    [["--limit", "-1", "-2"]],
+    [["--json", "-1", "--limit", "-5"]],
+  ])(
+    "never leaks the placeholder into any flag or positional: %j",
+    (tokens) => {
+      const result = parse(...tokens);
+      expect(JSON.stringify(result)).not.toContain("\uE000");
+    }
+  );
+});
