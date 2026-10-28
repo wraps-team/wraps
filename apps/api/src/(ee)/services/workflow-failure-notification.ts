@@ -1,20 +1,15 @@
 /**
  * Workflow failure notification
  *
- * Writes an in-app (better-inbox) notification to the org when a workflow
- * execution fails. Deduped to one per workflow per 24h so a broken sequence
- * does not flood the inbox. Never throws — a notification failure must not
- * fail the job. Imported by the DLQ consumer, so keep imports minimal.
+ * Writes an in-app notification to the org when a workflow execution fails.
+ * Deduped to one per workflow per 24h so a broken sequence does not flood the
+ * inbox. Never throws — a notification failure must not fail the job. Imported
+ * by the DLQ consumer, so keep imports minimal: `@wraps/auth/notify` (better-auth
+ * and the notifications plugin) is loaded with a dynamic import at the call site.
  */
 
 import { captureException } from "@sentry/aws-serverless";
-import {
-  db,
-  hasRecentNotification,
-  notifyOrg,
-  organization,
-  workflow,
-} from "@wraps/db";
+import { db, hasRecentNotification, organization, workflow } from "@wraps/db";
 import { and, eq } from "drizzle-orm";
 import { log } from "../../lib/logger";
 
@@ -57,6 +52,7 @@ export async function notifyWorkflowExecutionFailed(params: {
       return false;
     }
 
+    const { notifyOrg } = await import("@wraps/auth/notify");
     await notifyOrg({
       organizationId: params.organizationId,
       roles: ["owner", "admin", "marketing"],

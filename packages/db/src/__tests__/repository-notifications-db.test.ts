@@ -4,8 +4,6 @@ import { db } from "../index";
 import {
   deleteNotificationsForOrg,
   hasRecentNotification,
-  notifyOrg,
-  notifyUser,
 } from "../repositories/notifications";
 import { member, notification, organization, user } from "../schema/auth";
 
@@ -106,77 +104,12 @@ describe("Repository: notifications", () => {
     await db.delete(organization).where(eq(organization.id, orgB));
   });
 
-  it("notifyUser inserts a single unread notification with payload", async () => {
-    const row = await notifyUser({
-      userId: memberId,
-      organizationId: orgA,
-      type: "test.single",
-      title: "Hello",
-      body: "World",
-      href: "/x",
-      data: { k: "v" },
-    });
-
-    expect(row.id).toBeTruthy();
-    expect(row.userId).toBe(memberId);
-    expect(row.organizationId).toBe(orgA);
-    expect(row.read).toBe(false);
-    expect(row.data).toEqual({ k: "v" });
-    expect(row.createdAt).toBeInstanceOf(Date);
-  });
-
-  it("notifyOrg without roles fans out to every member of the org only", async () => {
-    const rows = await notifyOrg({
-      organizationId: orgA,
-      type: "test.fanout",
-      title: "All hands",
-    });
-
-    const userIds = rows.map((r) => r.userId).sort();
-    expect(userIds).toEqual([ownerId, adminId, memberId, multiRoleId].sort());
-    expect(userIds).not.toContain(outsiderId);
-  });
-
-  it("notifyOrg role filter matches comma-separated multi-role members", async () => {
-    const rows = await notifyOrg({
-      organizationId: orgA,
-      roles: ["admin"],
-      type: "test.roles",
-      title: "Admins only",
-    });
-
-    const userIds = rows.map((r) => r.userId).sort();
-    expect(userIds).toEqual([adminId, multiRoleId].sort());
-  });
-
-  it("notifyOrg excludeUserIds skips the actor", async () => {
-    const rows = await notifyOrg({
-      organizationId: orgA,
-      roles: ["owner", "admin"],
-      excludeUserIds: [adminId],
-      type: "test.exclude",
-      title: "Not the actor",
-    });
-
-    const userIds = rows.map((r) => r.userId);
-    expect(userIds).toContain(ownerId);
-    expect(userIds).not.toContain(adminId);
-  });
-
-  it("notifyOrg returns empty array when no member matches the role filter", async () => {
-    const rows = await notifyOrg({
-      organizationId: orgB,
-      roles: ["marketing"],
-      type: "test.nomatch",
-      title: "Nobody",
-    });
-    expect(rows).toEqual([]);
-  });
-
   it("hasRecentNotification sees a fresh notification and respects the window", async () => {
-    await notifyOrg({
+    // Fixture row: writers go through auth.api.notify (@wraps/auth/notify), so
+    // this repository only reads and deletes.
+    await db.insert(notification).values({
+      userId: ownerId,
       organizationId: orgA,
-      roles: ["owner"],
       type: "test.dedupe",
       title: "Once",
       data: { awsAccountId: "acct-1" },
@@ -223,6 +156,21 @@ describe("Repository: notifications", () => {
   });
 
   it("deleteNotificationsForOrg removes only the given types for the org", async () => {
+    await db.insert(notification).values([
+      {
+        userId: ownerId,
+        organizationId: orgA,
+        type: "test.fanout",
+        title: "A",
+      },
+      {
+        userId: memberId,
+        organizationId: orgA,
+        type: "test.single",
+        title: "B",
+      },
+    ]);
+
     await deleteNotificationsForOrg(orgA, ["test.fanout"]);
 
     const remaining = await db

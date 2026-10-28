@@ -14,12 +14,12 @@
  */
 
 import { timingSafeEqual } from "node:crypto";
+import { notifyOrg } from "@wraps/auth/notify";
 import {
   awsAccount,
   db,
   findAgentForOrg,
   insertApprovalRequest,
-  notifyOrg,
   organization,
 } from "@wraps/db";
 import { eq, isNotNull } from "drizzle-orm";

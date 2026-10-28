@@ -1,12 +1,12 @@
 "use server";
 
 import { auth } from "@wraps/auth";
+import { notifyUser } from "@wraps/auth/notify";
 import {
   auditLog,
   db,
   invitation,
   member,
-  notifyUser,
   organization,
   user,
 } from "@wraps/db";

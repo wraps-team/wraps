@@ -216,7 +216,15 @@ export const subscription = pgTable(
   ]
 );
 
-// better-inbox plugin table (in-app notifications)
+// @byo-oss/notifications plugin tables (in-app inbox, email/SMS delivery,
+// presence). Field names and shapes are owned by the plugin's schema
+// (https://github.com/byo-oss/notifications, docs/schema.mdx); the plugin
+// reads these by export name, so keep the exports and columns in step with it.
+//
+// Exception to the organizationId rule in packages/db/CLAUDE.md: these tables
+// carry no organizationId. The plugin defines their shape and deletes a
+// user's rows through the userId foreign keys. Organization cleanup reaches
+// notifications through notification.organizationId.
 export const notification = pgTable(
   "notification",
   {
@@ -235,13 +243,75 @@ export const notification = pgTable(
     href: text("href"),
     data: jsonb("data").$type<Record<string, unknown>>(),
     read: boolean("read").default(false).notNull(),
+    seenAt: timestamp("seen_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
     index("notification_org_idx").on(table.organizationId),
     index("notification_user_read_idx").on(table.userId, table.read),
+    // The three below are declared here so drizzle tracks them, but created
+    // out-of-band, CONCURRENTLY, via scripts/index-manifest.ts (notification is
+    // an existing table).
+    // Organization cleanup and export look notifications up by org, then by time.
+    index("notification_org_created_idx").on(
+      table.organizationId,
+      table.createdAt
+    ),
+    // The inbox list query: one user's notifications, newest first.
+    index("notification_user_created_idx").on(table.userId, table.createdAt),
+    // Time-ordered scans across all notifications (retention, backfills).
+    index("notification_created_idx").on(table.createdAt),
   ]
 );
+
+export const notificationDelivery = pgTable(
+  "notification_delivery",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    notificationId: text("notification_id")
+      .notNull()
+      .references(() => notification.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    channel: text("channel").notNull(),
+    // pending | sending | sent | skipped | failed
+    status: text("status").notNull(),
+    scheduledFor: timestamp("scheduled_for").notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    claimedAt: timestamp("claimed_at"),
+    sentAt: timestamp("sent_at"),
+    detail: text("detail"),
+    createdAt: timestamp("created_at").notNull(),
+  },
+  (table) => [
+    // The email sweep: status + due time.
+    index("notification_delivery_due_idx").on(table.status, table.scheduledFor),
+    // Throttling: recent sends per user, type and channel.
+    index("notification_delivery_throttle_idx").on(
+      table.userId,
+      table.type,
+      table.channel,
+      table.sentAt
+    ),
+    // Postgres does not index foreign keys on its own.
+    index("notification_delivery_notification_idx").on(table.notificationId),
+  ]
+);
+
+export const inboxPresence = pgTable("inbox_presence", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
+  lastSeenAt: timestamp("last_seen_at").notNull(),
+});
 
 // Relations
 export const userRelations = relations(user, ({ many }) => ({

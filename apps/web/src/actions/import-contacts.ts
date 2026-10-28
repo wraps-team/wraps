@@ -1,6 +1,7 @@
 "use server";
 
 import { SESv2Client } from "@aws-sdk/client-sesv2";
+import { notifyUser } from "@wraps/auth/notify";
 import { isSesPricingPlan } from "@wraps/core/ses-plans";
 import {
   auditLog,
@@ -8,7 +9,6 @@ import {
   contact,
   contactTopic,
   db,
-  notifyUser,
   topic,
 } from "@wraps/db";
 import { and, eq, inArray, sql } from "drizzle-orm";

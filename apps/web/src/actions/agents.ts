@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@wraps/auth";
+import { notifyOrg } from "@wraps/auth/notify";
 import {
   auditLog,
   db,
@@ -8,7 +9,6 @@ import {
   findApprovalForOrg,
   listAgentsForOrg,
   listApprovalQueueForOrg,
-  notifyOrg,
 } from "@wraps/db";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";

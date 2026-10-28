@@ -21,13 +21,13 @@
 import "../lib/sentry";
 
 import { withMonitor, wrapHandler } from "@sentry/aws-serverless";
+import { notifyOrg } from "@wraps/auth/notify";
 import {
   closeDbConnection,
   contactEvent,
   db,
   messageSend,
   notification,
-  notifyOrg,
   subscription,
 } from "@wraps/db";
 import type { Handler } from "aws-lambda";
@@ -310,15 +310,27 @@ async function warnOrgIfNeeded(
 
   const deletionDate = daysAgo(-GRACE_DAYS).toISOString().slice(0, 10);
 
-  await notifyOrg({
-    organizationId,
-    roles: ["owner", "admin"],
-    type: WARNING_TYPE,
-    title: "Some of your email history will be removed soon",
-    body: `${graceRowCount} messages older than ${visibleDays} days will be deleted from your Wraps dashboard on ${deletionDate}. Upgrade to keep a longer history — your raw delivery events remain in your own AWS account either way.`,
-    href: "/settings/billing",
-    data: { rowsAffected: graceRowCount, deletionDate, plan, visibleDays },
-  });
+  // Guarded: this runs once per org inside the nightly loop with no catch
+  // above it, so a throw (an org over the fan-out cap, or a notify failure)
+  // would stop the deletion pass for every remaining org. The old direct
+  // insert could not fail that way.
+  try {
+    await notifyOrg({
+      organizationId,
+      roles: ["owner", "admin"],
+      type: WARNING_TYPE,
+      title: "Some of your email history will be removed soon",
+      body: `${graceRowCount} messages older than ${visibleDays} days will be deleted from your Wraps dashboard on ${deletionDate}. Upgrade to keep a longer history — your raw delivery events remain in your own AWS account either way.`,
+      href: "/settings/billing",
+      data: { rowsAffected: graceRowCount, deletionDate, plan, visibleDays },
+    });
+  } catch (error) {
+    log.error(
+      "[message-send-cleanup] Failed to write retention warning",
+      error,
+      { organizationId }
+    );
+  }
 }
 
 /**

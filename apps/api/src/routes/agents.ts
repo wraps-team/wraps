@@ -16,6 +16,7 @@
  * Every query is scoped to the authenticated organization.
  */
 
+import { notifyOrg } from "@wraps/auth/notify";
 import {
   type AgentApproval,
   type AgentPolicy,
@@ -34,7 +35,6 @@ import {
   markApprovalFailed,
   markApprovalSent,
   member,
-  notifyOrg,
   organization,
   updateAgentForOrg,
 } from "@wraps/db";

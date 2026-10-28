@@ -2,6 +2,7 @@
 
 import crypto from "node:crypto";
 import { auth } from "@wraps/auth";
+import { notifyOrg } from "@wraps/auth/notify";
 import {
   type apiKey,
   auditLog,
@@ -11,7 +12,6 @@ import {
   findApiKeyForOrg,
   insertApiKey,
   listApiKeysForOrg,
-  notifyOrg,
   touchApiKeyLastUsed,
   updateApiKeyForOrg,
 } from "@wraps/db";

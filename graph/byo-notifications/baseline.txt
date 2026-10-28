@@ -1,0 +1,7 @@
+N0 baseline (before any source edit, base 3e2e46a4)
+- pnpm turbo run typecheck --filter=@wraps/auth --filter=@wraps/db --filter=@wraps/web: exit 0, 13/13 tasks
+  (a bare `pnpm --filter ... typecheck` fails before workspace packages are built: use turbo)
+- packages/auth vitest: auth-login-notification, auth-email-hooks, auth-schema-parity: 3 files, 7 tests, pass
+  NOTE: auth-login-notification is DB-backed. With no apps/web/.env.test in this worktree it ran against the
+  apps/web/.env.local DATABASE_URL (the dev Neon host, not the production host in .env.production.local).
+  It inserts and deletes one fixture user, login-notif-user-a. No further DB-backed tests until .env.test exists.

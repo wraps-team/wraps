@@ -41,13 +41,16 @@ vi.mock("@/actions/shared/verify-org-access", () => ({
   verifyOrgAccess: mockVerifyOrgAccess,
 }));
 
+vi.mock("@wraps/auth/notify", () => ({
+  notifyOrg: mockNotifyOrg,
+}));
+
 vi.mock("@wraps/db", () => ({
   db: { insert: mockInsert },
   findAgentForOrg: mockFindAgentForOrg,
   findApprovalForOrg: mockFindApprovalForOrg,
   listAgentsForOrg: vi.fn(),
   listApprovalQueueForOrg: vi.fn(),
-  notifyOrg: mockNotifyOrg,
   auditLog: { __table: "audit_log" },
 }));
 

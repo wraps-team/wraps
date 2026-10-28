@@ -39,6 +39,10 @@ export const CRON_MONITORS = {
     schedule: { type: "crontab", value: "45 * * * *" },
     maxRuntime: 11, // timeout: 10 minutes
   },
+  "notification-deliveries": {
+    schedule: { type: "interval", value: 1, unit: "minute" },
+    maxRuntime: 6, // timeout: 5 minutes
+  },
 } satisfies Record<string, MonitorConfig>;
 
 export type CronMonitorSlug = keyof typeof CRON_MONITORS;

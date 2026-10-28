@@ -2,6 +2,7 @@ import { passkey } from "@better-auth/passkey";
 import { type SCIMCanonicalUser, scim } from "@better-auth/scim";
 import { sso } from "@better-auth/sso";
 import { stripe } from "@better-auth/stripe";
+import { inbox } from "@byo-oss/notifications";
 import { captureException } from "@sentry/nextjs";
 import { getPostHogClient } from "@wraps/analytics";
 import { and, auditLog, db, eq, member } from "@wraps/db";
@@ -25,11 +26,12 @@ import {
   twoFactor,
 } from "better-auth/plugins";
 import { userAc } from "better-auth/plugins/admin/access";
-import { inbox } from "better-inbox";
 import { desc } from "drizzle-orm";
 import Stripe from "stripe";
 import { ac, roles } from "./access";
 import { sendLoginAlertSms } from "./login-alert-sms";
+import { notificationsOptions } from "./notifications-config";
+import { notifyUser } from "./notify";
 import { findScimProviderByToken } from "./scim-token";
 import { onStripeEvent } from "./stripe-webhooks";
 
@@ -226,19 +228,20 @@ async function isNewDeviceOrIp(
  * Failures are silently swallowed so a DB issue never breaks login.
  */
 /**
- * Insert an in-app "new sign-in" notification (better-inbox row).
- * Direct row insert — `auth` does not exist inside its own config, and a
- * notification is just a row. Fire-and-forget like the audit log.
+ * Send an in-app "new sign-in" notification through `notifyUser`, which runs
+ * on the notifications-only instance in `./notify`. `auth` does not exist
+ * inside its own config, so the login path cannot reach the full instance
+ * either; the notifications-only one is what makes `auth.api.notify` (and its
+ * email route) available here. Fire-and-forget like the audit log: a failure
+ * is reported and never reaches the session hook.
  */
 export async function createLoginNotification(
   userId: string,
   ipAddress?: string,
   userAgent?: string
 ): Promise<void> {
-  await db
-    .insert(schema.notification)
-    .values({
-      id: crypto.randomUUID(),
+  try {
+    await notifyUser({
       userId,
       type: "security.new_device_login",
       title: "New sign-in to your account",
@@ -248,10 +251,10 @@ export async function createLoginNotification(
         ipAddress: ipAddress ?? null,
         userAgent: userAgent ?? null,
       },
-      read: false,
-      createdAt: new Date(),
-    })
-    .catch(() => {});
+    });
+  } catch (error) {
+    reportAuthSideEffectFailure("login notification", error);
+  }
 }
 
 export async function writeLoginAuditLogs(
@@ -812,7 +815,7 @@ export const auth = betterAuth<BetterAuthOptions>({
     // stray DB edit or a future feature that starts writing `role` cannot open
     // that door by accident. Tenancy stays the organization plugin's job.
     admin({ adminRoles: [], roles: { user: userAc } }),
-    inbox(),
+    inbox(notificationsOptions),
     sso({
       domainVerification: { enabled: true },
       organizationProvisioning: { disabled: false, defaultRole: "member" },

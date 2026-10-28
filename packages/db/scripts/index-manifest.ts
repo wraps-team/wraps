@@ -95,4 +95,22 @@ export const CONCURRENT_INDEXES: ConcurrentIndex[] = [
       "Contacts-analytics period scans: countContactEventsInPeriod, countActiveContactsWithEvents, getDailyContactEventCounts and getTopContactEventNames all filter contact_event by (organization_id, created_at). Without it each dashboard load sequentially scans every event the org has retained — up to the 2-year TTL backstop — four times per load.",
     ddl: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "contact_event_org_created_idx" ON "contact_event" ("organization_id", "created_at")',
   },
+  {
+    name: "notification_org_created_idx",
+    purpose:
+      "Organization cleanup and export: both page through an org's notifications by time. Without it they scan the whole notification table filtered by organization_id. Declared in schema/auth.ts; the migration (0094) strips the CREATE INDEX.",
+    ddl: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "notification_org_created_idx" ON "notification" ("organization_id", "created_at")',
+  },
+  {
+    name: "notification_user_created_idx",
+    purpose:
+      "The inbox list query: listing a user's notifications newest first. Without it each inbox open sorts every row the user has ever received.",
+    ddl: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "notification_user_created_idx" ON "notification" ("user_id", "created_at")',
+  },
+  {
+    name: "notification_created_idx",
+    purpose:
+      "Time-ordered scans of the notification table (retention sweeps, backfills). Without it they scan the whole table.",
+    ddl: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "notification_created_idx" ON "notification" ("created_at")',
+  },
 ];

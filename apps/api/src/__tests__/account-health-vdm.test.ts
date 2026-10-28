@@ -97,6 +97,12 @@ const mockNotifyOrg = vi.fn().mockResolvedValue([]);
 const mockHasRecentNotification = vi.fn().mockResolvedValue(false);
 const mockDbSet = vi.fn();
 
+// notifyOrg now comes from @wraps/auth/notify (the @byo-oss/notifications plugin
+// path), not @wraps/db, so it is stubbed on its own module.
+vi.mock("@wraps/auth/notify", () => ({
+  notifyOrg: (...args: unknown[]) => mockNotifyOrg(...args),
+}));
+
 vi.mock("@wraps/db", () => {
   const awsAccountTable = { __table: "awsAccount" };
   const organizationTable = { __table: "organization" };
@@ -135,7 +141,6 @@ vi.mock("@wraps/db", () => {
     awsAccount: awsAccountTable,
     organization: organizationTable,
     subscription: subscriptionTable,
-    notifyOrg: mockNotifyOrg,
     hasRecentNotification: mockHasRecentNotification,
     closeDbConnection: vi.fn(),
     eq: vi.fn(),

@@ -102,6 +102,7 @@ import {
   withMonitor,
   wrapHandler,
 } from "@sentry/aws-serverless";
+import { notifyOrg } from "@wraps/auth/notify";
 import {
   awsAccount,
   closeDbConnection,
@@ -109,7 +110,6 @@ import {
   MESSAGE_SEND_UNACCEPTED_STATUSES,
   member,
   messageSend,
-  notifyOrg,
   organization,
   subscription,
   user,

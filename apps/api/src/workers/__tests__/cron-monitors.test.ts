@@ -24,6 +24,8 @@ const HANDLER_PATHS: Record<keyof typeof CRON_MONITORS, string> = {
   "workflow-reaper": "apps/api/src/(ee)/workers/workflow-reaper.handler",
   "event-feed-staleness": "apps/api/src/workers/event-feed-staleness.handler",
   "account-health": "apps/api/src/workers/account-health.handler",
+  "notification-deliveries":
+    "apps/api/src/workers/notification-deliveries.handler",
 };
 
 type TranslatedSchedule =
@@ -70,8 +72,8 @@ function extractAwsSchedule(block: string): string {
 }
 
 describe("cron monitor schedules match infra/cron.ts", () => {
-  it("defines exactly six monitors", () => {
-    expect(Object.keys(CRON_MONITORS).length).toBe(6);
+  it("defines exactly seven monitors", () => {
+    expect(Object.keys(CRON_MONITORS).length).toBe(7);
   });
 
   it.each(Object.entries(HANDLER_PATHS))(

@@ -57,6 +57,17 @@
  *   health: sending paused/enforcement, reputation thresholds, daily quota,
  *   sandbox->production transitions. Writes inbox notifications (deduped
  *   per account per day). See apps/api/src/workers/account-health.ts.
+ *
+ * NotificationDeliveries:
+ * - Runs every minute in production
+ * - Sweeps the notification delivery queue: sends emails held for
+ *   `ifUnreadAfter` once due, and retries failed sends. Calls
+ *   auth.api.processDeliveries on the notifications-only auth instance
+ *   (@wraps/auth/notifications), looping while hasMore, up to a cap per run.
+ *   Without this, delayed notification emails never go out.
+ *   See apps/api/src/workers/notification-deliveries.ts.
+ * - Sends through getWrapsClient with the same WRAPS_EMAIL_ROLE_ARN wiring as
+ *   EventFeedStaleness (see the definition below).
  */
 
 import { batchQueue } from "./queues";
@@ -275,3 +286,49 @@ export const accountHealthCron = new sst.aws.CronV2("AccountHealth", {
     ],
   },
 });
+
+export const notificationDeliveriesCron = new sst.aws.CronV2(
+  "NotificationDeliveries",
+  {
+    schedule: "rate(1 minute)",
+    enabled: $app.stage === "production",
+    job: {
+      handler: "apps/api/src/workers/notification-deliveries.handler",
+      runtime: "nodejs24.x",
+      timeout: "5 minutes",
+      memory: "256 MB",
+      environment: {
+        DATABASE_URL:
+          process.env.DATABASE_URL ||
+          (() => {
+            throw new Error("DATABASE_URL is required");
+          })(),
+        // baseURL for the notifications-only instance. No BETTER_AUTH_SECRET and
+        // no NODE_ENV=production here on purpose: better-auth refuses its default
+        // secret in production, and this instance never signs a token. Set
+        // NODE_ENV=production only together with a real secret.
+        BETTER_AUTH_URL: process.env.BETTER_AUTH_URL || "https://app.wraps.dev",
+        AXIOM_TOKEN: axiomToken.value,
+        AXIOM_DATASET: "wraps",
+        ...sentryEnv,
+        // Email links are built at send time by resolveAppUrl, which throws
+        // rather than defaulting to app.wraps.dev (see the EventFeedStaleness
+        // comment for the same reason). `||` for the same CI reason.
+        NEXT_PUBLIC_APP_URL:
+          process.env.NEXT_PUBLIC_APP_URL || "https://app.wraps.dev",
+        // Same dogfood email role as EventFeedStaleness; the cross-account trust
+        // half is hand-applied in 010836206701 (see that function's comment).
+        WRAPS_EMAIL_ROLE_ARN: "arn:aws:iam::010836206701:role/wraps-email-role",
+      },
+      // @sentry/profiling-node ships native .node binaries that esbuild cannot
+      // bundle; installing it keeps it external, the same as the API handler.
+      nodejs: { install: ["pg", "@sentry/profiling-node"] },
+      permissions: [
+        {
+          actions: ["sts:AssumeRole"],
+          resources: ["arn:aws:iam::010836206701:role/wraps-email-role"],
+        },
+      ],
+    },
+  }
+);
