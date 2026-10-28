@@ -1,0 +1,6 @@
+-- NOTE: message_send_org_recipient_lower_idx, message_send_org_problem_sent_at_idx
+-- and audit_log_org_resource_idx are created out-of-band, CONCURRENTLY, via
+-- packages/db/scripts/index-manifest.ts (migrate-indexes.ts).
+-- message_send and audit_log are existing and large; a blocking index build
+-- is not acceptable. Run db:migrate-indexes after this migration and before
+-- relying on them. The address drill-down is correct without them, only slower.
