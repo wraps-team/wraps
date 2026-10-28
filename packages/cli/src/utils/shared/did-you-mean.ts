@@ -14,6 +14,8 @@
  * here, so a routed command missing below reports `command:unknown`.
  */
 export const TOP_LEVEL_COMMANDS = [
+  "api-keys",
+  "audit-logs",
   "auth",
   "aws",
   "broadcasts",
@@ -24,6 +26,7 @@ export const TOP_LEVEL_COMMANDS = [
   "destroy",
   "doctor",
   "email",
+  "events",
   "help",
   "license",
   "news",
@@ -36,6 +39,7 @@ export const TOP_LEVEL_COMMANDS = [
   "status",
   "support",
   "telemetry",
+  "topics",
   "update",
   "workflow",
   "workflows",

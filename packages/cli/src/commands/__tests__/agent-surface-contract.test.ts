@@ -15,6 +15,9 @@
  * suggestion, and set process.exitCode = 1.
  */
 
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setJsonMode } from "../../utils/shared/json-output.js";
 
@@ -32,9 +35,25 @@ import {
   resolveApiTarget,
 } from "../../utils/shared/api-target.js";
 import {
+  apiKeysCreate,
+  apiKeysList,
+  apiKeysRevoke,
+} from "../api-keys/api-keys.js";
+import { auditLogsExport, auditLogsList } from "../audit-logs/audit-logs.js";
+import {
   broadcastsRecipients,
   broadcastsStatus,
 } from "../broadcasts/broadcasts.js";
+import {
+  broadcastsCancel,
+  broadcastsDuplicate,
+  broadcastsUpdate,
+} from "../broadcasts/lifecycle.js";
+import {
+  contactsExport,
+  contactsImport,
+  contactsValidate,
+} from "../contacts/bulk.js";
 import {
   contactsDelete,
   contactsGet,
@@ -48,6 +67,7 @@ import {
 } from "../email/agent-approvals.js";
 import { emailHealth } from "../email/health.js";
 import { emailMetrics } from "../email/metrics.js";
+import { suppressionsList, suppressionsRemove } from "../email/suppressions.js";
 import {
   templatesDuplicate,
   templatesGet,
@@ -55,12 +75,32 @@ import {
   templatesPublish,
 } from "../email/templates/remote.js";
 import {
+  eventsAnalytics,
+  eventsGet,
+  eventsList,
+  eventsNames,
+} from "../events/events.js";
+import {
   segmentsDelete,
   segmentsGet,
   segmentsList,
   segmentsPreview,
   segmentsUpdate,
 } from "../segments/segments.js";
+import {
+  topicsCreate,
+  topicsDelete,
+  topicsGet,
+  topicsList,
+  topicsSubscribers,
+  topicsUpdate,
+} from "../topics/topics.js";
+import {
+  workflowsExecution,
+  workflowsExecutions,
+  workflowsGet,
+  workflowsList,
+} from "../workflows/read.js";
 import {
   workflowsCancel,
   workflowsDisable,
@@ -77,7 +117,32 @@ type Case = {
   takesId?: boolean;
 };
 
+let contractImport: string | undefined;
+
+/** A one-row CSV, created once per run, so the import case parses before it reaches the target check. */
+function contractImportFile(): string {
+  if (contractImport === undefined) {
+    const file = join(
+      mkdtempSync(join(tmpdir(), "contract-import-")),
+      "contacts.csv"
+    );
+    writeFileSync(file, "email\na@example.com\n", "utf8");
+    contractImport = file;
+  }
+  return contractImport;
+}
+
 const CASES: Case[] = [
+  { name: "api-keys list", run: () => apiKeysList({ json: true }) },
+  {
+    name: "api-keys create",
+    run: () => apiKeysCreate({ name: "ci", json: true }),
+  },
+  {
+    name: "api-keys revoke",
+    takesId: true,
+    run: (id = "key_1") => apiKeysRevoke({ id, yes: true, json: true }),
+  },
   { name: "contacts list", run: () => contactsList({ json: true }) },
   {
     name: "contacts get",
@@ -93,6 +158,29 @@ const CASES: Case[] = [
     name: "contacts delete",
     takesId: true,
     run: (id = "c_1") => contactsDelete({ id, yes: true, json: true }),
+  },
+  { name: "events list", run: () => eventsList({ json: true }) },
+  { name: "events analytics", run: () => eventsAnalytics({ json: true }) },
+  { name: "events names", run: () => eventsNames({ json: true }) },
+  {
+    name: "events get",
+    takesId: true,
+    run: (id = "evt_1") => eventsGet({ id, json: true }),
+  },
+  {
+    name: "contacts import",
+    run: () => contactsImport({ file: contractImportFile(), json: true }),
+  },
+  { name: "contacts export", run: () => contactsExport({ json: true }) },
+  {
+    name: "contacts validate",
+    run: () =>
+      contactsValidate({
+        emails: "a@example.com",
+        awsAccountId: "acct_1",
+        yes: true,
+        json: true,
+      }),
   },
   { name: "segments list", run: () => segmentsList({ json: true }) },
   {
@@ -124,6 +212,21 @@ const CASES: Case[] = [
     name: "broadcasts recipients",
     takesId: true,
     run: (id = "bc_1") => broadcastsRecipients({ id, json: true }),
+  },
+  {
+    name: "broadcasts cancel",
+    takesId: true,
+    run: (id = "bc_1") => broadcastsCancel({ id, yes: true, json: true }),
+  },
+  {
+    name: "broadcasts duplicate",
+    takesId: true,
+    run: (id = "bc_1") => broadcastsDuplicate({ id, json: true }),
+  },
+  {
+    name: "broadcasts update",
+    takesId: true,
+    run: (id = "bc_1") => broadcastsUpdate({ id, subject: "n", json: true }),
   },
   { name: "email templates list", run: () => templatesList({ json: true }) },
   {
@@ -159,8 +262,65 @@ const CASES: Case[] = [
     run: (id = "ex_1") =>
       workflowsCancel({ executionId: id, yes: true, json: true }),
   },
+  { name: "workflows list", run: () => workflowsList({ json: true }) },
+  {
+    name: "workflows get",
+    takesId: true,
+    run: (id = "wf_1") => workflowsGet({ workflowId: id, json: true }),
+  },
+  {
+    name: "workflows executions",
+    takesId: true,
+    run: (id = "wf_1") => workflowsExecutions({ workflowId: id, json: true }),
+  },
+  {
+    name: "workflows execution",
+    takesId: true,
+    run: (id = "ex_1") => workflowsExecution({ executionId: id, json: true }),
+  },
   { name: "email metrics", run: () => emailMetrics({ json: true }) },
+  { name: "audit-logs list", run: () => auditLogsList({ json: true }) },
+  { name: "audit-logs export", run: () => auditLogsExport({ json: true }) },
+  {
+    name: "email suppressions list",
+    run: () => suppressionsList({ json: true }),
+  },
+  {
+    name: "email suppressions remove",
+    run: () =>
+      suppressionsRemove({
+        email: "a@example.com",
+        account: "acc_1",
+        yes: true,
+        json: true,
+      }),
+  },
   { name: "email health", run: () => emailHealth({ json: true }) },
+  { name: "topics list", run: () => topicsList({ json: true }) },
+  {
+    name: "topics get",
+    takesId: true,
+    run: (id = "topic_1") => topicsGet({ id, json: true }),
+  },
+  {
+    name: "topics create",
+    run: () => topicsCreate({ name: "News", json: true }),
+  },
+  {
+    name: "topics update",
+    takesId: true,
+    run: (id = "topic_1") => topicsUpdate({ id, name: "News", json: true }),
+  },
+  {
+    name: "topics delete",
+    takesId: true,
+    run: (id = "topic_1") => topicsDelete({ id, yes: true, json: true }),
+  },
+  {
+    name: "topics subscribers",
+    takesId: true,
+    run: (id = "topic_1") => topicsSubscribers({ id, json: true }),
+  },
   { name: "email agent approvals list", run: () => agentApprovalsList({}) },
   {
     name: "email agent approvals approve",

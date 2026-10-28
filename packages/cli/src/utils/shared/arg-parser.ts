@@ -36,6 +36,7 @@ export type CliFlags = {
   quick?: boolean;
   json?: boolean;
   token?: string;
+  actor?: string;
   verbose?: boolean;
   dkimSelector?: string;
   skipBlacklists?: boolean;
@@ -99,6 +100,8 @@ export type CliFlags = {
   status?: string;
   limit?: string;
   cursor?: string;
+  reason?: string;
+  acknowledgeComplaint?: boolean;
 
   // Email plan
   set?: string;
@@ -144,6 +147,9 @@ export type CliFlags = {
   cron?: string;
   data?: string;
   description?: string;
+  slug?: string;
+  public?: string;
+  doubleOptIn?: string;
   dimensions?: string;
   email?: string;
   emailStatus?: string;
@@ -178,7 +184,17 @@ export type CliFlags = {
   totalRecipients?: string;
   trackMembership?: boolean;
   variableMappings?: string;
+  eventName?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  days?: string;
   withoutSource?: boolean;
+  file?: string;
+  format?: string;
+  output?: string;
+  emails?: string;
+  validate?: boolean;
+  duplicateStrategy?: string;
 
   // Help / version (informational; cli.ts short-circuits before parsing)
   help?: boolean;
@@ -230,6 +246,9 @@ const STRING_FLAGS = [
   "template",
   "workflow",
   "org",
+  "type",
+  "permissions",
+  "expires-in-days",
   "subdomain",
   "tier",
   "expires",
@@ -240,6 +259,7 @@ const STRING_FLAGS = [
   "app-url",
   "status",
   "limit",
+  "reason",
   "cursor",
   "set",
   "volume",
@@ -263,6 +283,9 @@ const STRING_FLAGS = [
   "cron",
   "data",
   "description",
+  "slug",
+  "public",
+  "double-opt-in",
   "dimensions",
   "email",
   "email-status",
@@ -296,6 +319,16 @@ const STRING_FLAGS = [
   "topic-ids",
   "total-recipients",
   "variable-mappings",
+  "actor",
+  "file",
+  "format",
+  "output",
+  "emails",
+  "duplicate-strategy",
+  "event-name",
+  "date-from",
+  "date-to",
+  "days",
 ] as const;
 
 /**
@@ -305,6 +338,21 @@ const STRING_FLAGS = [
  */
 const BOOLEAN_FLAGS = [
   "clear-allowlist",
+  "clear-name",
+  "clear-subject",
+  "clear-preview-text",
+  "clear-from",
+  "clear-from-name",
+  "clear-reply-to",
+  "clear-template-id",
+  "clear-html-content",
+  "clear-body",
+  "clear-sender-id",
+  "clear-topic-id",
+  "clear-segment-id",
+  "clear-aws-account-id",
+  "clear-scheduled-for",
+  "clear-variable-mappings",
   "all",
   "yes",
   "force",
@@ -319,6 +367,7 @@ const BOOLEAN_FLAGS = [
   "skip-blacklists",
   "skip-tls",
   "dry-run",
+  "acknowledge-complaint",
   "draft",
   "root",
   "cleanup",
@@ -348,6 +397,7 @@ const BOOLEAN_FLAGS = [
   "request",
   "track-membership",
   "without-source",
+  "validate",
 ] as const;
 
 /**

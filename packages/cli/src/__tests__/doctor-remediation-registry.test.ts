@@ -266,7 +266,8 @@ describe("doctor remediation registry", () => {
     // Too few means the walk lost the dispatch; too many means it started
     // scooping subcommands back up.
     expect(routed.size).toBeGreaterThanOrEqual(20);
-    expect(routed.size).toBeLessThanOrEqual(25);
+    // 25 before topics, events, api-keys and audit-logs were routed (29 now).
+    expect(routed.size).toBeLessThanOrEqual(29);
     expect(routedPaths.size).toBeGreaterThan(60);
   });
 

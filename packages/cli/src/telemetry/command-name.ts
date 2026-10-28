@@ -51,6 +51,12 @@ const PAIRS_WITH_DATA_THIRD_POSITIONAL: readonly string[] = [
   "segments:update",
   "segments:delete",
   "segments:preview",
+  "events:get",
+  "topics:get",
+  "topics:update",
+  "topics:delete",
+  "topics:subscribers",
+  "api-keys:revoke",
   "broadcasts:status",
   "broadcasts:send",
   "broadcasts:recipients",
@@ -60,6 +66,9 @@ const PAIRS_WITH_DATA_THIRD_POSITIONAL: readonly string[] = [
   "workflows:disable",
   "workflows:retry",
   "workflows:cancel",
+  "workflows:get",
+  "workflows:executions",
+  "workflows:execution",
 ];
 
 /**
