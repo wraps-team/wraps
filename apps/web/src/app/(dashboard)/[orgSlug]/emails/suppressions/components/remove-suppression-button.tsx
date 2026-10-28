@@ -24,6 +24,8 @@ type RemoveSuppressionButtonProps = {
   awsAccountId: string;
   email: string;
   reason: "BOUNCE" | "COMPLAINT";
+  /** Called after a successful removal. Optional: the table needs no callback. */
+  onRemoved?: () => void;
 };
 
 export function RemoveSuppressionButton({
@@ -31,6 +33,7 @@ export function RemoveSuppressionButton({
   awsAccountId,
   email,
   reason,
+  onRemoved,
 }: RemoveSuppressionButtonProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -49,6 +52,7 @@ export function RemoveSuppressionButton({
       if (result.success) {
         toast.success(`${email} removed from the suppression list`);
         router.refresh();
+        onRemoved?.();
       } else {
         toast.error(result.error);
       }

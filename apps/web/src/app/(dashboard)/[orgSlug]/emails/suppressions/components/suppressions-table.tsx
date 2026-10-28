@@ -22,11 +22,13 @@ import { useMemo, useState, useTransition } from "react";
 import { listSuppressions } from "@/actions/suppressions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AddressDetailSheet } from "../../components/address-detail-sheet";
 import type { SuppressionRow } from "../types";
 import { buildColumns } from "./columns";
 
 type SuppressionsTableProps = {
   organizationId: string;
+  orgSlug: string;
   initialRows: SuppressionRow[];
   initialHasMore: boolean;
   initialNextToken?: string;
@@ -34,10 +36,14 @@ type SuppressionsTableProps = {
 
 export function SuppressionsTable({
   organizationId,
+  orgSlug,
   initialRows,
   initialHasMore,
   initialNextToken,
 }: SuppressionsTableProps) {
+  // The open address lives in client state, never in the URL: an address is
+  // personal data, and a URL reaches history, referrers and access logs.
+  const [selected, setSelected] = useState<SuppressionRow | null>(null);
   const [rows, setRows] = useState(initialRows);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [nextToken, setNextToken] = useState(initialNextToken);
@@ -47,7 +53,10 @@ export function SuppressionsTable({
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
 
-  const columns = useMemo(() => buildColumns(organizationId), [organizationId]);
+  const columns = useMemo(
+    () => buildColumns(organizationId, setSelected),
+    [organizationId]
+  );
 
   const handleLoadMore = () => {
     setLoadMoreError(null);
@@ -97,6 +106,22 @@ export function SuppressionsTable({
 
   return (
     <div className="w-full space-y-4">
+      {selected ? (
+        <AddressDetailSheet
+          address={selected.email}
+          key={`${selected.awsAccountId}:${selected.email}`}
+          onClose={() => setSelected(null)}
+          onRemoved={() => setSelected(null)}
+          organizationId={organizationId}
+          orgSlug={orgSlug}
+          suppression={{
+            awsAccountId: selected.awsAccountId,
+            reason: selected.reason,
+            lastUpdated: selected.lastUpdated,
+          }}
+        />
+      ) : null}
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

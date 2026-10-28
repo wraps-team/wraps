@@ -415,6 +415,25 @@ export const messageSend = pgTable(
       table.channel,
       table.sentAt
     ),
+    // Address drill-down: every send to one address within an org, matched
+    // case-insensitively. There is no index on recipient, and the trigram
+    // index serves fuzzy search (not org-scoped), so it cannot serve this.
+    // Created in production via packages/db/scripts/index-manifest.ts
+    // (CONCURRENTLY) — schema declared here as source of truth.
+    index("message_send_org_recipient_lower_idx").on(
+      table.organizationId,
+      sql`lower(${table.recipient})`,
+      table.createdAt
+    ),
+    // Address drill-down window scan over only the problem rows (bounced,
+    // complained or suppressed). The predicate matches the query's WHERE
+    // exactly, so the planner can use it. Created in production via
+    // packages/db/scripts/index-manifest.ts (CONCURRENTLY).
+    index("message_send_org_problem_sent_at_idx")
+      .on(table.organizationId, table.sentAt)
+      .where(
+        sql`channel = 'email' AND (bounced_at IS NOT NULL OR complained_at IS NOT NULL OR suppressed_at IS NOT NULL)`
+      ),
   ]
 );
 

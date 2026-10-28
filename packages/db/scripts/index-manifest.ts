@@ -113,4 +113,22 @@ export const CONCURRENT_INDEXES: ConcurrentIndex[] = [
       "Time-ordered scans of the notification table (retention sweeps, backfills). Without it they scan the whole table.",
     ddl: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "notification_created_idx" ON "notification" ("created_at")',
   },
+  {
+    name: "message_send_org_recipient_lower_idx",
+    purpose:
+      "Address drill-down: find every send to one address within an org, case-insensitively (lower(recipient)). Without it each address lookup scans the org's sends. No index on recipient exists.",
+    ddl: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "message_send_org_recipient_lower_idx" ON "message_send" ("organization_id", lower("recipient"), "created_at")',
+  },
+  {
+    name: "message_send_org_problem_sent_at_idx",
+    purpose:
+      "Addresses drill-down: window scan over only the problem rows (bounced, complained or suppressed), so the top-addresses query does not read every email send in the window. The predicate matches the query's WHERE exactly.",
+    ddl: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "message_send_org_problem_sent_at_idx" ON "message_send" ("organization_id", "sent_at") WHERE "channel" = \'email\' AND ("bounced_at" IS NOT NULL OR "complained_at" IS NOT NULL OR "suppressed_at" IS NOT NULL)',
+  },
+  {
+    name: "audit_log_org_resource_idx",
+    purpose:
+      "Contact creation record lookup: the audit row for one contact (organization_id, resource_id). Without it every contact detail scans the org's audit log.",
+    ddl: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "audit_log_org_resource_idx" ON "audit_log" ("organization_id", "resource_id")',
+  },
 ];
