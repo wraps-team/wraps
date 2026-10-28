@@ -256,7 +256,12 @@ export const accountHealthCron = new sst.aws.CronV2("AccountHealth", {
     handler: "apps/api/src/workers/account-health.handler",
     runtime: "nodejs24.x",
     timeout: "10 minutes",
-    memory: "256 MB",
+    // 1024 MB, not 256 MB: the sweep's resident set measured 194 MB before the
+    // byo-notifications migration and 256 MB after it, so at 256 MB the runtime
+    // sat at its hard ceiling and the ~29-account sweep went from ~173s to
+    // timing out every run. Memory also buys CPU proportionally, so this keeps
+    // the sweep well inside the 10-minute timeout with room for the notify path.
+    memory: "1024 MB",
     environment: {
       DATABASE_URL:
         process.env.DATABASE_URL ||

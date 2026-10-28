@@ -56,7 +56,6 @@ import {
   withMonitor,
   wrapHandler,
 } from "@sentry/aws-serverless";
-import { notifyOrg } from "@wraps/auth/notify";
 import {
   awsAccount,
   closeDbConnection,
@@ -159,6 +158,12 @@ async function notifyOnce(params: {
   // here would abort this account's remaining checks, the reputation and
   // verdict writes included. The old direct insert could not fail that way.
   try {
+    // Imported lazily, like the DLQ consumer's notifier: @wraps/auth/notify
+    // pulls in notifications-config -> @wraps/email (SES client + renderer),
+    // and evaluating that graph on every cold start pushed this worker's
+    // resident set to its 256 MB ceiling, which starved the sweep of CPU and
+    // made it exceed the 10-minute timeout on every run.
+    const { notifyOrg } = await import("@wraps/auth/notify");
     await notifyOrg({
       organizationId: params.account.organizationId,
       roles: ["owner", "admin"],
