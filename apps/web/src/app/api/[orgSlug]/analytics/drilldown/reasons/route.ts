@@ -198,14 +198,19 @@ async function loadDetailed(
   metric: ReasonsMetric,
   query: ReasonsQuery
 ): Promise<ReasonsResponse> {
-  const [totals, fallbackSince, suppressionReconciliation, bounceRows, complaintRows] =
-    await Promise.all([
-      queryReasonTotals(query, metric),
-      queryReasonsFallbackSince(query.organizationId, metric),
-      metric === "bounce" ? queryReasonsSuppressionCount(query) : 0,
-      metric === "bounce" ? queryBounceReasonRows(query) : [],
-      metric === "complaint" ? queryComplaintReasonRows(query) : [],
-    ]);
+  const [
+    totals,
+    fallbackSince,
+    suppressionReconciliation,
+    bounceRows,
+    complaintRows,
+  ] = await Promise.all([
+    queryReasonTotals(query, metric),
+    queryReasonsFallbackSince(query.organizationId, metric),
+    metric === "bounce" ? queryReasonsSuppressionCount(query) : 0,
+    metric === "bounce" ? queryBounceReasonRows(query) : [],
+    metric === "complaint" ? queryComplaintReasonRows(query) : [],
+  ]);
 
   const groups =
     metric === "bounce"
