@@ -54,6 +54,10 @@ export function buildBounceEvent(
     bounceSubType?: string;
     bouncedAt?: string;
     recipients?: string[];
+    // Optional per-recipient SMTP diagnostic. Omitted from the payload when
+    // not given, so the default event keeps only { emailAddress }.
+    status?: string;
+    diagnosticCode?: string;
   } = {}
 ) {
   const bouncedAt = overrides.bouncedAt ?? new Date().toISOString();
@@ -67,7 +71,15 @@ export function buildBounceEvent(
         bounceSubType: overrides.bounceSubType ?? "General",
         timestamp: bouncedAt,
         bouncedRecipients: (overrides.recipients ?? ["user@example.com"]).map(
-          (emailAddress) => ({ emailAddress })
+          (emailAddress) => ({
+            emailAddress,
+            ...(overrides.status !== undefined
+              ? { status: overrides.status }
+              : {}),
+            ...(overrides.diagnosticCode !== undefined
+              ? { diagnosticCode: overrides.diagnosticCode }
+              : {}),
+          })
         ),
       },
     },
