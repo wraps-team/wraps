@@ -1,7 +1,6 @@
-// DB-backed. NOT RUN in the drill-down worktree: apps/web/.env.test does not
-// exist there yet. Covers spec section 8.4's two real-query cases (org
-// isolation and identical totals across grouping dimensions). Fixtures are
-// namespaced by a per-file suffix.
+// DB-backed (needs apps/web/.env.test). Covers spec section 8.4's two real-query
+// cases (org isolation and identical totals across grouping dimensions).
+// Fixtures are namespaced by a per-file suffix.
 import {
   awsAccount,
   batchSend,
@@ -208,14 +207,16 @@ describe("drill-down sends, real query", () => {
         name: "Drill DB Org",
         slug: "acme",
       });
-      const totals = await Promise.all(
-        ["broadcast", "workflow", "template", "from"].map(async (by) => {
-          const body = (await drilldown(`metric=bounce&by=${by}&days=7`)) as {
-            totals: Record<string, number>;
-          };
-          return body.totals;
-        })
-      );
+      // One request at a time: the route's dynamic `import("next/headers")`
+      // races the module mock when several run concurrently, and the losers
+      // reach the real module ("headers was called outside a request scope").
+      const totals: Record<string, number>[] = [];
+      for (const by of ["broadcast", "workflow", "template", "from"]) {
+        const body = (await drilldown(`metric=bounce&by=${by}&days=7`)) as {
+          totals: Record<string, number>;
+        };
+        totals.push(body.totals);
+      }
       for (const t of totals) {
         expect(t).toEqual(totals[0]);
       }
