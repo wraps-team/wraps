@@ -67,21 +67,22 @@ export function ChangeMarkerLabel({ viewBox, count, major }: LabelProps) {
   return (
     <g>
       <rect
+        className={
+          major
+            ? "fill-foreground stroke-foreground"
+            : "fill-background stroke-foreground"
+        }
         height={LABEL_HEIGHT}
         rx={4}
         strokeWidth={1}
-        style={{
-          fill: major ? "var(--foreground)" : "var(--background)",
-          stroke: "var(--foreground)",
-        }}
         width={LABEL_WIDTH}
         x={x - LABEL_WIDTH / 2}
         y={top}
       />
       <text
+        className={major ? "fill-background" : "fill-foreground"}
         dominantBaseline="central"
         fontSize={11}
-        style={{ fill: major ? "var(--background)" : "var(--foreground)" }}
         textAnchor="middle"
         x={x}
         y={top + LABEL_HEIGHT / 2}
@@ -230,7 +231,7 @@ export function ChangeMarkerList({
       <Button
         aria-controls={listId}
         aria-expanded={expanded}
-        className="min-h-11 justify-start px-0"
+        className="min-h-11 justify-start"
         onClick={() => setExpanded((value) => !value)}
         size="sm"
         variant="ghost"
