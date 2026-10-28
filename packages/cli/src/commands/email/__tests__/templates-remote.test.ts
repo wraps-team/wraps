@@ -8,13 +8,7 @@
  */
 
 import { existsSync } from "node:fs";
-import {
-  mkdtemp,
-  readdir,
-  readFile,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { log } from "@clack/prompts";
