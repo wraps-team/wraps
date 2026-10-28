@@ -55,6 +55,7 @@ const NEVER_CANCEL_IN_PROGRESS = /^\s+cancel-in-progress: false$/m;
 const DATABASE_URL_FROM_SECRETS = /^\s+DATABASE_URL: \$\{\{ secrets\./m;
 const DECLARES_ENVIRONMENT = /^\s+environment: /m;
 const PINNED_TO_SELF_HOSTED_POOL = /^ +runs-on: blacksmith-/m;
+const TRIGGERED_BY_PUSH = /^ {2}push:$/m;
 
 describe("the production migration gate", () => {
   it("runs migrations before the API deploy, as a dependency it cannot skip", () => {
@@ -141,6 +142,26 @@ describe("the production migration gate", () => {
     // DATABASE_URL is an environment secret on `Production`, not a repository
     // secret, so the job only receives it if it declares the environment.
     expect(migrateJob).toMatch(DECLARES_ENVIRONMENT);
+  });
+
+  it("runs the migration on push, independent of the Test verdict", () => {
+    // deploy-api's gate requires the whole Test suite to be green, but apps/web
+    // ships on the same push through Vercel and reads no such verdict. On
+    // 2026-10-28 a failing test-web on 8a7243db left migration 0094 unapplied —
+    // both Deploy API runs for that SHA skipped gate, migrate and deploy — while
+    // the new dashboard code went live: `relation "inbox_presence" does not
+    // exist` for fourteen minutes, until someone dispatched the migration by
+    // hand. Some workflow must therefore run the migration on push, before the
+    // Test verdict that deploy-api waits on even exists.
+    const callers = readdirSync(workflowDir)
+      .filter((name) => name.endsWith(".yml"))
+      .filter((name) => name !== "deploy-api.yml")
+      .filter((name) => USES_MIGRATE_WORKFLOW.test(read(name)));
+
+    expect(callers.length).toBeGreaterThan(0);
+    expect(callers.some((name) => TRIGGERED_BY_PUSH.test(read(name)))).toBe(
+      true
+    );
   });
 });
 

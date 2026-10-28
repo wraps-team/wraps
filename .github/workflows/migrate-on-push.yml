@@ -1,0 +1,29 @@
+name: Migrate database on push
+
+# The production migration must run for every commit that reaches main, and it
+# must not depend on the Test workflow's verdict.
+#
+# deploy-api.yml reaches migrate.yml only through a `gate` job that requires the
+# whole Test suite to conclude `success`. apps/web reads no such verdict — Vercel
+# ships it on the same push — so a red Test (here, a failing test-web) left the
+# schema change unapplied while the new web code went live. On 2026-10-28 that
+# produced `relation "inbox_presence" does not exist` on the dashboard inbox for
+# fourteen minutes, until someone dispatched the migration workflow by hand.
+#
+# This caller runs the same migrate.yml on every push to main. It cannot race
+# deploy-api's own call: both share migrate.yml's `db-migrate-production`
+# concurrency group, so whichever starts second waits and then no-ops on an
+# already-migrated schema.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    uses: ./.github/workflows/migrate.yml
+    with:
+      stage: production
+    secrets: inherit

@@ -7,6 +7,11 @@ name: Migrate database
 # (deployed by Vercel's git integration — see the note at the bottom of this
 # file, which this workflow cannot order and does not pretend to).
 #
+# It also runs on its own `push` trigger, through migrate-on-push.yml, so a red
+# Test cannot stop it: deploy-api.yml reaches this workflow only behind a gate
+# that requires the whole Test suite to be green, while apps/web ships on the
+# same push whatever that verdict says.
+#
 # Kept as its own workflow rather than a step inside deploy-api.yml for three
 # reasons:
 #
@@ -133,12 +138,15 @@ jobs:
 # on push, on its own clock, with no dependency on GitHub Actions. Nothing in
 # .github/workflows can make it wait.
 #
-# In practice the migration lands well before Vercel promotes — measured on
-# 1cd949d1 (2026-08-19): push 19:35:42Z, migration applied 19:37:02Z, web live
-# 19:39:48Z — but that is a margin, not a guarantee, and on 2026-07-30 the same
-# race with no migration step at all produced
-# `column "preference_center_theme" does not exist` on /topics.
+# migrate-on-push.yml starts this workflow on every push to main, so the
+# migration no longer waits on the Test verdict. In practice it lands well before
+# Vercel promotes — measured on 1cd949d1 (2026-08-19): push 19:35:42Z, migration
+# applied 19:37:02Z, web live 19:39:48Z — but that is a margin, not a guarantee.
+# A web build that promotes faster than the migration can still read a column
+# that is not there yet: on 2026-07-30 the race with no migration step at all
+# produced `column "preference_center_theme" does not exist` on /topics.
 #
-# Closing it needs a Vercel-side decision (an Ignored Build Step that gates on
-# the migration journal, or disabling git auto-deploy on main and deploying web
-# from Actions behind this workflow). Both need access this repo does not have.
+# Closing the race entirely needs a Vercel-side decision (an Ignored Build Step
+# that gates on the migration journal, or disabling git auto-deploy on main and
+# deploying web from Actions behind this workflow). Both need access this repo
+# does not have.
