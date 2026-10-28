@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildDrilldownHref,
   DRILLDOWN_DEFAULT_DAYS,
+  DRILLDOWN_METRIC_LABEL,
+  describeDrilldownWindow,
   parseDrilldownWindow,
   validateDrilldownParams,
 } from "../analytics-drilldown-window";
@@ -158,5 +160,37 @@ describe("buildDrilldownHref", () => {
     ).toBe(
       "/acme/emails/analytics/drilldown?metric=complaint&days=7&day=2026-10-20&tz=UTC"
     );
+  });
+});
+
+describe("describeDrilldownWindow", () => {
+  it("labels a one-day rolling window as the last 24 hours", () => {
+    const w = parseDrilldownWindow({ days: "1" }, NOW);
+    expect(describeDrilldownWindow(w)).toBe("the last 24 hours");
+  });
+
+  it("labels a rolling window of N days as the last N days", () => {
+    expect(
+      describeDrilldownWindow(parseDrilldownWindow({ days: "30" }, NOW))
+    ).toBe("the last 30 days");
+    expect(
+      describeDrilldownWindow(parseDrilldownWindow({ days: "7" }, NOW))
+    ).toBe("the last 7 days");
+  });
+
+  it("labels day mode as the sent-on date in the window's timezone", () => {
+    const w = parseDrilldownWindow(
+      { days: "30", day: "2026-10-20", tz: "America/New_York" },
+      NOW
+    );
+    expect(describeDrilldownWindow(w)).toBe("sent on Oct 20, 2026");
+  });
+
+  it("names each metric for the page title and summary", () => {
+    expect(DRILLDOWN_METRIC_LABEL).toEqual({
+      bounce: "Bounce rate",
+      complaint: "Complaint rate",
+      suppression: "Suppression rate",
+    });
   });
 });

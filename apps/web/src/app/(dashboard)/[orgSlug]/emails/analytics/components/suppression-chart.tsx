@@ -23,10 +23,16 @@ import {
   SelectValue,
 } from "@wraps/ui/components/ui/select";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  browserTimeZone,
+  buildDrilldownHref,
+} from "@/lib/analytics-drilldown-window";
 import { SERIES_COLOR } from "@/lib/chart-series";
 import { useSuppressionData } from "../hooks/use-analytics";
 
@@ -52,6 +58,12 @@ export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
   }, [isMobile]);
 
   const days = timeRange === "90d" ? 90 : timeRange === "30d" ? 30 : 7;
+  const router = useRouter();
+  // Set after mount: the server render must not carry the server's timezone.
+  const [tz, setTz] = React.useState("UTC");
+  React.useEffect(() => {
+    setTz(browserTimeZone());
+  }, []);
   const {
     data: suppressionData,
     isLoading,
@@ -71,6 +83,16 @@ export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
           <span className="@[540px]/card:hidden">Suppression rate (%)</span>
         </CardDescription>
         <CardAction className="self-center">
+          <Link
+            className="self-center text-muted-foreground text-sm underline underline-offset-4 hover:text-foreground"
+            href={buildDrilldownHref(orgSlug, {
+              metric: "suppression",
+              days,
+              tz,
+            })}
+          >
+            View causes
+          </Link>
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "90d"}
@@ -129,7 +151,23 @@ export function SuppressionChart({ orgSlug }: { orgSlug: string }) {
             className="aspect-auto h-[300px] w-full"
             config={chartConfig}
           >
-            <AreaChart accessibilityLayer data={chartData}>
+            <AreaChart
+              accessibilityLayer
+              data={chartData}
+              onClick={(state) => {
+                const day = state?.activeLabel;
+                if (typeof day === "string") {
+                  router.push(
+                    buildDrilldownHref(orgSlug, {
+                      metric: "suppression",
+                      days,
+                      day,
+                      tz,
+                    })
+                  );
+                }
+              }}
+            >
               <defs>
                 <linearGradient
                   id="fillSuppressionRate"

@@ -8,6 +8,12 @@ import {
 } from "@wraps/ui/components/ui/card";
 import { Progress } from "@wraps/ui/components/ui/progress";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import {
+  browserTimeZone,
+  buildDrilldownHref,
+} from "@/lib/analytics-drilldown-window";
 import {
   reputationPartialLabel,
   reputationScopeLabel,
@@ -22,6 +28,8 @@ type MetricRowProps = {
   total: number;
   percentage: number;
   tone?: MetricTone;
+  // Set for rows that explain a rate. Opens the drill-down for this window.
+  href?: string;
 };
 
 function MetricRow({
@@ -30,6 +38,7 @@ function MetricRow({
   total,
   percentage,
   tone = "default",
+  href,
 }: MetricRowProps) {
   return (
     <div className="space-y-2">
@@ -42,6 +51,14 @@ function MetricRow({
           <span className="text-muted-foreground text-xs">
             ({percentage.toFixed(1)}%)
           </span>
+          {href ? (
+            <Link
+              className="text-muted-foreground text-xs underline underline-offset-4 hover:text-foreground"
+              href={href}
+            >
+              View causes
+            </Link>
+          ) : null}
         </div>
       </div>
       <Progress className="h-2" value={percentage} variant={tone} />
@@ -51,6 +68,11 @@ function MetricRow({
 
 export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
   const { data, isLoading, error } = useAnalyticsOverview(orgSlug, 30);
+  // Set after mount: the server render must not carry the server's timezone.
+  const [tz, setTz] = useState("UTC");
+  useEffect(() => {
+    setTz(browserTimeZone());
+  }, []);
 
   if (isLoading) {
     return (
@@ -113,6 +135,7 @@ export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
       total: effectiveSent,
       percentage: windowRate(data.totalBounced),
       tone: "warning",
+      href: buildDrilldownHref(orgSlug, { metric: "bounce", days: 30, tz }),
     },
     {
       label: "Complaints",
@@ -120,6 +143,7 @@ export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
       total: effectiveSent,
       percentage: windowRate(data.totalComplaints),
       tone: "destructive",
+      href: buildDrilldownHref(orgSlug, { metric: "complaint", days: 30, tz }),
     },
   ];
 

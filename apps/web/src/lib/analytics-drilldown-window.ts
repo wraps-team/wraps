@@ -194,3 +194,42 @@ export function buildDrilldownHref(
   search.set("tz", args.tz);
   return `/${orgSlug}/emails/analytics/drilldown?${search.toString()}`;
 }
+
+export const DRILLDOWN_METRIC_LABEL: Record<DrilldownMetric, string> = {
+  bounce: "Bounce rate",
+  complaint: "Complaint rate",
+  suppression: "Suppression rate",
+};
+
+/**
+ * Plain-language name of the window, used in the title, the summary and the
+ * error copy. Day mode formats the date in the window's timezone; it formats
+ * the `YYYY-MM-DD` string itself, so the label never shifts by a day.
+ */
+/** `YYYY-MM-DD` as "Oct 20, 2026". Formats the string itself, so no timezone shift. */
+export function formatDrilldownDay(day: string): string {
+  const [year, month, dayOfMonth] = day.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, dayOfMonth)).toLocaleDateString(
+    "en-US",
+    { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" }
+  );
+}
+
+export function describeDrilldownWindow(window: DrilldownWindow): string {
+  if (window.day) {
+    return `sent on ${formatDrilldownDay(window.day)}`;
+  }
+  if (window.days === 1) {
+    return "the last 24 hours";
+  }
+  return `the last ${window.days} days`;
+}
+
+/**
+ * The viewer's IANA timezone. Components call this after mount, never during
+ * render: on the server it would return the server's zone and the href would
+ * not match the browser's.
+ */
+export function browserTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
