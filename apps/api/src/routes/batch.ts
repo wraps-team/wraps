@@ -13,8 +13,11 @@ import {
   createBroadcast,
   db,
   eq,
+  fetchTopicsForSubscription,
   findAwsAccountForOrg,
   findBroadcast,
+  findSegment,
+  findTemplateForValidation,
   getBroadcastClickBreakdown,
   listBroadcastRecipients,
   listBroadcasts,
@@ -139,6 +142,9 @@ const batchResponseSchema = t.Object({
   ),
 });
 
+// Same shape the segments routes return for an unknown or foreign id.
+const notFoundResponseSchema = t.Object({ error: t.String() });
+
 /**
  * A `scheduledFor` in the past used to fall through to `isScheduled = false`
  * and send immediately. Clock skew between the browser and the server, or a
@@ -197,6 +203,47 @@ function resolveSchedule(
   return { ok: true, scheduledFor, isScheduled: true };
 }
 
+/**
+ * The body can name a segment, topic or template by id. Each id is stored on
+ * the broadcast and read back at send time, so it must belong to the caller's
+ * organization: an id from another org, or a deleted one, would otherwise be
+ * accepted and produce a broadcast that targets nothing. Every lookup is
+ * org-scoped, so a foreign id comes back empty and is reported as not found,
+ * the same 404 the segments routes return. Returns the error message for the
+ * first reference that does not resolve, or null when all of them do.
+ */
+async function findUnresolvedReference(
+  body: { segmentId?: string; topicId?: string; templateId?: string },
+  organizationId: string
+): Promise<string | null> {
+  if (body.segmentId) {
+    const row = await findSegment(body.segmentId, organizationId);
+    if (!row) {
+      return "Segment not found";
+    }
+  }
+  if (body.topicId) {
+    // Org-scoped topic lookup by id; there is no single-row finder for topics.
+    const [row] = await fetchTopicsForSubscription(
+      [body.topicId],
+      organizationId
+    );
+    if (!row) {
+      return "Topic not found";
+    }
+  }
+  if (body.templateId) {
+    const row = await findTemplateForValidation(
+      body.templateId,
+      organizationId
+    );
+    if (!row) {
+      return "Template not found";
+    }
+  }
+  return null;
+}
+
 export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
   .use(rateLimitMiddleware)
   .use(planGateMiddleware("batch"))
@@ -222,6 +269,16 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
           createdAt: new Date().toISOString(),
           error: "AWS account does not belong to this organization",
         };
+      }
+
+      // Reject foreign or unknown ids before anything is counted or written.
+      const unresolved = await findUnresolvedReference(
+        body,
+        authContext.organizationId
+      );
+      if (unresolved) {
+        set.status = 404;
+        return { error: unresolved };
       }
 
       // Use pre-counted recipients if provided, otherwise count here
@@ -318,7 +375,7 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
     },
     {
       body: createBatchSchema,
-      response: batchResponseSchema,
+      response: { 200: batchResponseSchema, 404: notFoundResponseSchema },
       detail: {
         tags: ["batch"],
         summary: "Create batch send",
