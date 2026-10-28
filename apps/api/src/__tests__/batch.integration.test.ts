@@ -11,6 +11,7 @@ import {
   db,
   member,
   organization,
+  segment,
   user,
 } from "@wraps/db";
 import { eq } from "drizzle-orm";
@@ -85,6 +86,23 @@ const testAwsAccount = {
   createdBy: testUser.id,
 };
 
+// A second organization that owns a segment the first org must not reference.
+const foreignOrg = {
+  id: `${TEST_PREFIX}-org-2`,
+  name: "API Batch Foreign Org",
+  slug: `${TEST_PREFIX}-org-2`,
+  createdAt: new Date(),
+  logo: null,
+  metadata: null,
+};
+
+const foreignSegment = {
+  id: `${TEST_PREFIX}-seg-foreign`,
+  organizationId: foreignOrg.id,
+  name: "Foreign Segment",
+  condition: { logic: "AND" as const, groups: [] },
+};
+
 // Mock auth context
 const mockAuth = {
   apiKeyId: `${TEST_PREFIX}-key-1`,
@@ -135,6 +153,22 @@ beforeAll(async () => {
       target: awsAccount.id,
       set: { name: testAwsAccount.name },
     });
+
+  await db
+    .insert(organization)
+    .values(foreignOrg)
+    .onConflictDoUpdate({
+      target: organization.id,
+      set: { name: foreignOrg.name },
+    });
+
+  await db
+    .insert(segment)
+    .values(foreignSegment)
+    .onConflictDoUpdate({
+      target: segment.id,
+      set: { name: foreignSegment.name },
+    });
 });
 
 // Clean up batch sends and contacts before each test
@@ -145,6 +179,8 @@ beforeEach(async () => {
 
 // Clean up after all tests
 afterAll(async () => {
+  await db.delete(segment).where(eq(segment.id, foreignSegment.id));
+  await db.delete(organization).where(eq(organization.id, foreignOrg.id));
   await db.delete(batchSend).where(eq(batchSend.organizationId, testOrg.id));
   await db.delete(contact).where(eq(contact.organizationId, testOrg.id));
   await db.delete(awsAccount).where(eq(awsAccount.organizationId, testOrg.id));
@@ -155,6 +191,33 @@ afterAll(async () => {
 
 describe("Batch API Integration", () => {
   describe("POST /v1/batch", () => {
+    it("rejects another org's segmentId and writes no broadcast", async () => {
+      const app = createTestApp();
+      const response = await app.handle(
+        new Request("http://localhost/v1/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            awsAccountId: testAwsAccount.id,
+            channel: "email",
+            audienceType: "segment",
+            segmentId: foreignSegment.id,
+            subject: "Cross-org segment",
+            from: "test@example.com",
+          }),
+        })
+      );
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "Segment not found" });
+
+      const rows = await db
+        .select({ id: batchSend.id })
+        .from(batchSend)
+        .where(eq(batchSend.organizationId, testOrg.id));
+      expect(rows).toHaveLength(0);
+    });
+
     it("creates email batch send", async () => {
       // Insert some contacts to send to
       await db.insert(contact).values([

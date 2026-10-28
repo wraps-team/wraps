@@ -42,7 +42,25 @@ const COMMANDS_WITH_DATA_SECOND_POSITIONAL: readonly string[] = ["push"];
  * Every other `sub[2]` in cli.ts selects a subcommand, so this stays a
  * one-entry list until a command starts reading data from that position.
  */
-const PAIRS_WITH_DATA_THIRD_POSITIONAL: readonly string[] = ["email:check"];
+const PAIRS_WITH_DATA_THIRD_POSITIONAL: readonly string[] = [
+  "email:check",
+  "contacts:get",
+  "contacts:update",
+  "contacts:delete",
+  "segments:get",
+  "segments:update",
+  "segments:delete",
+  "segments:preview",
+  "broadcasts:status",
+  "broadcasts:send",
+  "broadcasts:recipients",
+  "broadcasts:resume",
+  "workflows:trigger",
+  "workflows:enable",
+  "workflows:disable",
+  "workflows:retry",
+  "workflows:cancel",
+];
 
 /**
  * Build the name a command is reported under, from the raw positionals.

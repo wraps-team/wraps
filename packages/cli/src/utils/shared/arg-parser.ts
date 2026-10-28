@@ -131,6 +131,55 @@ export type CliFlags = {
   filter?: string;
   source?: string;
 
+  // Agent-surface CLI (contacts, segments, broadcasts, workflows, metrics, health, approvals)
+  audienceType?: string;
+  awsAccountId?: string;
+  body?: string;
+  broadcastId?: string;
+  channel?: string;
+  company?: string;
+  condition?: string;
+  contactEmail?: string;
+  contactId?: string;
+  cron?: string;
+  data?: string;
+  description?: string;
+  dimensions?: string;
+  email?: string;
+  emailStatus?: string;
+  endDate?: string;
+  externalId?: string;
+  firstName?: string;
+  from?: string;
+  fromChunkIndex?: string;
+  fromName?: string;
+  granularity?: string;
+  htmlContent?: string;
+  id?: string;
+  jobTitle?: string;
+  lastName?: string;
+  outDir?: string;
+  phone?: string;
+  preferredChannel?: string;
+  previewText?: string;
+  properties?: string;
+  replyTo?: string;
+  scheduledFor?: string;
+  search?: string;
+  segmentId?: string;
+  senderId?: string;
+  smsStatus?: string;
+  startDate?: string;
+  subject?: string;
+  templateId?: string;
+  timezone?: string;
+  topicId?: string;
+  topicIds?: string;
+  totalRecipients?: string;
+  trackMembership?: boolean;
+  variableMappings?: string;
+  withoutSource?: boolean;
+
   // Help / version (informational; cli.ts short-circuits before parsing)
   help?: boolean;
   version?: boolean;
@@ -202,6 +251,51 @@ const STRING_FLAGS = [
   "filter",
   "source",
   "validation-threshold",
+  "audience-type",
+  "aws-account-id",
+  "body",
+  "broadcast-id",
+  "channel",
+  "company",
+  "condition",
+  "contact-email",
+  "contact-id",
+  "cron",
+  "data",
+  "description",
+  "dimensions",
+  "email",
+  "email-status",
+  "end-date",
+  "external-id",
+  "first-name",
+  "from",
+  "from-chunk-index",
+  "from-name",
+  "granularity",
+  "html-content",
+  "id",
+  "job-title",
+  "last-name",
+  "out-dir",
+  "phone",
+  "preferred-channel",
+  "preview-text",
+  "properties",
+  "reply-to",
+  "scheduled-for",
+  "search",
+  "segment-id",
+  "sender-id",
+  "sms-status",
+  "start-date",
+  "subject",
+  "template-id",
+  "timezone",
+  "topic-id",
+  "topic-ids",
+  "total-recipients",
+  "variable-mappings",
 ] as const;
 
 /**
@@ -252,6 +346,8 @@ const BOOLEAN_FLAGS = [
   "live",
   "platform",
   "request",
+  "track-membership",
+  "without-source",
 ] as const;
 
 /**
@@ -328,6 +424,91 @@ export function resolveNegatableFlag(
 }
 
 /**
+ * A negative number (`-1`, `-5`, `-0.5`). mri reads any `-<token>` as a cluster
+ * of short flags, so `--limit -1` lost its value and `-1` became a phantom
+ * flag `1`.
+ */
+const NEGATIVE_NUMBER = /^-\d+(\.\d+)?$/;
+
+/** A long flag name without its value, e.g. `--limit`. */
+const LONG_FLAG_NAME = /^--([a-z][a-z0-9-]*)$/;
+
+/** Private-use prefix marking a protected positional; never a real argument. */
+const PROTECTED_POSITIONAL = "\uE000";
+
+/**
+ * Rewrites argv so mri keeps negative numbers intact, without touching any
+ * real flag. Two cases:
+ *
+ * - `--name -1`, where `--name` is a value flag (not declared boolean, not
+ *   `--no-*`): becomes `--name=-1`, which mri already parses correctly.
+ *   Applies to declared string flags and undeclared ones alike, the same
+ *   tokens mri already treats as values; `-x` or `-h` are not numeric, so
+ *   they keep today's behaviour.
+ * - a bare `-1` anywhere else: swapped for a placeholder so mri files it as a
+ *   positional, and `restore` puts `-1` back in place.
+ *
+ * Everything after `--` is passed through untouched.
+ */
+function protectNegativeNumbers(userArgs: string[]): {
+  argv: string[];
+  restore: (positional: string) => string;
+  restoreFlagValues: (parsed: Record<string, unknown>) => void;
+} {
+  const booleans = new Set<string>([
+    ...BOOLEAN_FLAGS,
+    ...NEGATED_BOOLEANS.map((n) => n.positive),
+  ]);
+  const originals: string[] = [];
+  const argv: string[] = [];
+
+  for (let i = 0; i < userArgs.length; i++) {
+    const token = userArgs[i];
+    if (token === "--") {
+      argv.push(...userArgs.slice(i));
+      break;
+    }
+    const name = LONG_FLAG_NAME.exec(token)?.[1];
+    const next = userArgs[i + 1];
+    if (
+      name !== undefined &&
+      !booleans.has(name) &&
+      !name.startsWith("no-") &&
+      next !== undefined &&
+      NEGATIVE_NUMBER.test(next)
+    ) {
+      argv.push(`${token}=${next}`);
+      i += 1;
+    } else if (NEGATIVE_NUMBER.test(token)) {
+      originals.push(token);
+      argv.push(`${PROTECTED_POSITIONAL}${originals.length - 1}`);
+    } else {
+      argv.push(token);
+    }
+  }
+
+  // A short string flag (`-d -1`) takes the placeholder as its value, since
+  // mri cannot tell that it is not a flag. Put the number back.
+  const restore = (text: string): string =>
+    text.startsWith(PROTECTED_POSITIONAL)
+      ? (originals[Number(text.slice(PROTECTED_POSITIONAL.length))] ?? text)
+      : text;
+
+  return {
+    argv,
+    restore,
+    restoreFlagValues: (parsed) => {
+      for (const key of Object.keys(parsed)) {
+        const value = parsed[key];
+        if (typeof value === "string") {
+          parsed[key] = restore(value);
+        }
+      }
+    },
+  };
+}
+
+/**
  * Parse `process.argv` (including the leading `node` + script entries) into a
  * legacy-compatible `{ flags, sub }` shape.
  *
@@ -344,11 +525,13 @@ export function parseCliArgs(argv: string[]): ParsedCli {
   // Skip the leading `node` + script entries, matching process.argv.slice(2).
   const userArgs = argv.slice(2);
 
-  const parsed = mri<Record<string, unknown>>(userArgs, {
+  const protectedArgs = protectNegativeNumbers(userArgs);
+  const parsed = mri<Record<string, unknown>>(protectedArgs.argv, {
     boolean: [...BOOLEAN_FLAGS, ...NEGATED_BOOLEANS.map((n) => n.positive)],
     string: [...STRING_FLAGS, ...LIST_FLAGS],
     alias: ALIAS,
   });
+  protectedArgs.restoreFlagValues(parsed);
 
   const flags: CliFlags = {};
 
@@ -384,9 +567,11 @@ export function parseCliArgs(argv: string[]): ParsedCli {
     }
   }
 
+  const positionals = (parsed._ as string[]).map(protectedArgs.restore);
+
   return {
     flags,
-    sub: parsed._ as string[],
-    extraPositionals: (parsed._ as string[]).slice(4),
+    sub: positionals,
+    extraPositionals: positionals.slice(4),
   };
 }

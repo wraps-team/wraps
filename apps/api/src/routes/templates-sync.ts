@@ -8,19 +8,11 @@
  * GET  /v1/templates/pull       - List all code-pushed templates with source
  */
 
-import {
-  and,
-  db,
-  decodeCursor,
-  desc,
-  encodeCursor,
-  eq,
-  or,
-  template,
-} from "@wraps/db";
+import { and, db, desc, encodeCursor, eq, or, template } from "@wraps/db";
 import { lt } from "drizzle-orm";
 import { t } from "elysia";
 import { trackFirstResourceCreated } from "../lib/activation-tracking";
+import { parseCursorParam } from "../lib/cursor";
 import type { AuthContext } from "../middleware/auth";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 
@@ -234,6 +226,8 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
       const authContext = getAuth(ctx);
       const { limit, cursor, source } = ctx.query;
       const includeSource = source ?? true;
+      // Validate before branching: a bad cursor is a 400 with or without `limit`.
+      const decoded = parseCursorParam(cursor, ctx.set);
 
       type PullRow = {
         id: string;
@@ -296,7 +290,6 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
         eq(template.organizationId, authContext.organizationId),
         eq(template.sourceFormat, "react-email"),
       ];
-      const decoded = cursor ? decodeCursor(cursor) : null;
       if (decoded) {
         const keyset = or(
           lt(template.updatedAt, decoded.createdAt),

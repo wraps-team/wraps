@@ -1,13 +1,17 @@
 import { Elysia } from "elysia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthContext } from "../middleware/auth";
+import { createErrorHarness } from "./error-handler-harness";
 
 const { mockListEmailLogs, mockGetEmailLogByMessageId } = vi.hoisted(() => ({
   mockListEmailLogs: vi.fn(),
   mockGetEmailLogByMessageId: vi.fn(),
 }));
 
-vi.mock("@wraps/db", () => ({
+vi.mock("@wraps/db", async (importOriginal) => ({
+  // Real decodeCursor: the route validates cursors with it before the mocked
+  // repository call.
+  ...(await importOriginal<typeof import("@wraps/db")>()),
   listEmailLogs: mockListEmailLogs,
   getEmailLogByMessageId: mockGetEmailLogByMessageId,
 }));
@@ -130,10 +134,14 @@ describe("Email Logs Route", () => {
         total: 0,
         nextCursor: null,
       });
+      const cursor = Buffer.from(
+        "2026-05-20T10:00:00.000Z|log-1",
+        "utf8"
+      ).toString("base64url");
 
       const app = createApp();
       const response = await app.handle(
-        authedGet("/v1/email/logs?cursor=2026-05-20T10%3A00%3A00.000Z")
+        authedGet(`/v1/email/logs?cursor=${encodeURIComponent(cursor)}`)
       );
       const body = await response.json();
 
@@ -141,8 +149,23 @@ describe("Email Logs Route", () => {
       expect(body).toHaveProperty("logs");
       expect(mockListEmailLogs).toHaveBeenCalledWith(
         mockAuthContext.organizationId,
-        expect.objectContaining({ cursor: "2026-05-20T10:00:00.000Z" })
+        expect.objectContaining({ cursor })
       );
+    });
+
+    it("rejects a malformed cursor with 400 instead of listing page one", async () => {
+      // Mount the real onError handler so the body is the API error shape.
+      const { app: harnessApp } = createErrorHarness();
+      const app = harnessApp.use(emailLogsRoutes);
+      const response = await app.handle(
+        authedGet("/v1/email/logs?cursor=2026-05-20T10%3A00%3A00.000Z")
+      );
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.code).toBe("BAD_REQUEST");
+      expect(body.error).toMatch(/cursor/i);
+      expect(mockListEmailLogs).not.toHaveBeenCalled();
     });
 
     it("passes limit to repository", async () => {
