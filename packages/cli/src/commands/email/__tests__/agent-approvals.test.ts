@@ -212,12 +212,12 @@ describe("email agent approvals commands", () => {
       expectError("NOT_AUTHENTICATED", LIST_COMMAND);
     });
 
-    it("401 is UNAUTHORIZED", async () => {
+    it("401 is NOT_AUTHENTICATED", async () => {
       respondOnce(401, { error: "Unauthorized", code: "UNAUTHORIZED" });
 
       await agentApprovalsList({});
 
-      expectError("UNAUTHORIZED", LIST_COMMAND);
+      expectError("NOT_AUTHENTICATED", LIST_COMMAND);
     });
 
     it("422 from the API is VALIDATION_FAILED", async () => {
@@ -405,12 +405,12 @@ describe("email agent approvals commands", () => {
       expectError("CONFLICT", APPROVE_COMMAND);
     });
 
-    it("401 is UNAUTHORIZED", async () => {
+    it("401 is NOT_AUTHENTICATED", async () => {
       respondOnce(401, { error: "Unauthorized" });
 
       await agentApprovalsApprove({ id: "apr_1", yes: true });
 
-      expectError("UNAUTHORIZED", APPROVE_COMMAND);
+      expectError("NOT_AUTHENTICATED", APPROVE_COMMAND);
     });
 
     it("429 is RATE_LIMITED", async () => {

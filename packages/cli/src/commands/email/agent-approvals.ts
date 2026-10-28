@@ -133,7 +133,7 @@ async function apiFailure(resp: Response): Promise<Failure> {
 
   if (resp.status === 401) {
     return {
-      code: "UNAUTHORIZED",
+      code: "NOT_AUTHENTICATED",
       message: `The Wraps API rejected the credentials (${detail})`,
       suggestion:
         "Sign in again with: wraps auth login, or pass a valid key with --token or WRAPS_API_KEY",

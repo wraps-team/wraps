@@ -188,7 +188,7 @@ function describeHttpFailure(
 ): Failure {
   if (status === 401) {
     return {
-      code: "UNAUTHORIZED",
+      code: "NOT_AUTHENTICATED",
       message: "The Wraps API rejected your credentials (HTTP 401).",
       suggestion: `Run: ${loginCommand}, or set WRAPS_API_KEY to a valid key, then run the command again.`,
     };

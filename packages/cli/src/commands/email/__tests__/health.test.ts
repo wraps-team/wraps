@@ -281,13 +281,13 @@ describe("emailHealth", () => {
       expect(process.exitCode).toBe(1);
     });
 
-    it("UNAUTHORIZED on 401", async () => {
+    it("NOT_AUTHENTICATED on 401", async () => {
       fetchMock.mockResolvedValue(response(401, { error: "Unauthorized" }));
 
       await emailHealth({ json: true });
 
       const envelope = lastEnvelope(consoleLogSpy);
-      expect(envelope.error?.code).toBe("UNAUTHORIZED");
+      expect(envelope.error?.code).toBe("NOT_AUTHENTICATED");
       expect(envelope.error?.suggestion).toContain(LOGIN);
       expect(process.exitCode).toBe(1);
     });
