@@ -49,6 +49,7 @@ const { Elysia } = await import("elysia");
 const { batchSend, messageSend, messageSendDiagnostic } = await import(
   "@wraps/db"
 );
+const { log } = await import("../lib/logger");
 
 const TEST_AWS_ACCOUNT_NUMBER = "123456789012";
 const TEST_WEBHOOK_SECRET = "test-secret-key";
@@ -105,6 +106,7 @@ let sdkInsertRows: Array<{ id: string }>;
 let diagnosticUpsertError: Error | null;
 
 let updateTables: unknown[];
+let setCalls: Array<{ table: unknown; data: Record<string, unknown> }>;
 let diagnosticUpserts: Array<{
   values: Record<string, unknown>;
   config: { set: Record<string, unknown> };
@@ -120,6 +122,7 @@ function setupMocks(opts: {
   sdkInsertRows = opts.sdkInsertRows ?? [];
   diagnosticUpsertError = null;
   updateTables = [];
+  setCalls = [];
   diagnosticUpserts = [];
 
   // Odd selects are the account lookup, even selects the message lookup. The
@@ -138,14 +141,17 @@ function setupMocks(opts: {
     const transitioned =
       table === messageSend ? (transitionResults.shift() ?? true) : true;
     return {
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue(
-          Object.assign(Promise.resolve(undefined), {
-            returning: vi
-              .fn()
-              .mockResolvedValue(transitioned ? [{ id: "msg-send-1" }] : []),
-          })
-        ),
+      set: vi.fn((data: Record<string, unknown>) => {
+        setCalls.push({ table, data });
+        return {
+          where: vi.fn().mockReturnValue(
+            Object.assign(Promise.resolve(undefined), {
+              returning: vi
+                .fn()
+                .mockResolvedValue(transitioned ? [{ id: "msg-send-1" }] : []),
+            })
+          ),
+        };
       }),
     };
   });
@@ -354,7 +360,7 @@ describe("Webhook: Bounce diagnostics", () => {
     expect(diagnosticUpserts).toHaveLength(0);
   });
 
-  it("SDK-path diagnostic failure returns 500 instead of being swallowed", async () => {
+  it("SDK-path diagnostic write failure is logged and the response is not 500", async () => {
     setupMocks({
       message: null,
       sdkInsertRows: [{ id: "sdk-send-3" }],
@@ -370,7 +376,54 @@ describe("Webhook: Bounce diagnostics", () => {
       })
     );
 
-    expect(response.status).toBe(500);
+    expect(response.status).not.toBe(500);
+    expect(log.error).toHaveBeenCalledWith(
+      "Webhook: diagnostic write failed",
+      expect.any(Error),
+      expect.objectContaining({ messageId: expect.any(String) })
+    );
+    expect(JSON.stringify(vi.mocked(log.error).mock.calls)).not.toContain(
+      RECIPIENT
+    );
+  });
+
+  it("batch Bounce diagnostic write failure still runs the status transition and counter", async () => {
+    setupMocks({
+      message: {
+        id: "msg-send-1",
+        status: "sent",
+        batchSendId: "batch-1",
+        contactId: null,
+        openedAt: null,
+        clickedAt: null,
+        recipient: RECIPIENT,
+      },
+      transitions: [true],
+    });
+    diagnosticUpsertError = new Error("upsert failed");
+
+    const response = await sendWebhookEvent(
+      app,
+      buildBounceEvent({
+        bounceSubType: "General",
+        status: "5.1.1",
+        diagnosticCode: "smtp; 550 5.1.1 user unknown",
+      })
+    );
+
+    expect(response.status).not.toBe(500);
+    expect(setCalls).toContainEqual(
+      expect.objectContaining({
+        table: messageSend,
+        data: expect.objectContaining({ status: "bounced" }),
+      })
+    );
+    expect(setCalls.some((c) => c.table === batchSend)).toBe(true);
+    expect(log.error).toHaveBeenCalledWith(
+      "Webhook: diagnostic write failed",
+      expect.any(Error),
+      expect.objectContaining({ messageId: expect.any(String) })
+    );
   });
 
   it("writes the diagnostic through the messageSendDiagnostic table", async () => {

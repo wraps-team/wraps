@@ -44,7 +44,8 @@ vi.mock("@wraps/db", async () => {
 
 const { webhooksRoutes } = await import("../routes/webhooks");
 const { Elysia } = await import("elysia");
-const { messageSendDiagnostic } = await import("@wraps/db");
+const { messageSend, messageSendDiagnostic } = await import("@wraps/db");
+const { log } = await import("../lib/logger");
 
 const TEST_AWS_ACCOUNT_NUMBER = "123456789012";
 const TEST_WEBHOOK_SECRET = "test-secret-key";
@@ -90,9 +91,15 @@ let diagnosticUpserts: Array<{
   values: Record<string, unknown>;
   config: { set: Record<string, unknown> };
 }>;
+// Every messageSend / batchSend update payload, in call order.
+let setCalls: Array<{ table: unknown; data: Record<string, unknown> }>;
+// When set, the diagnostic upsert rejects with this error.
+let diagnosticUpsertError: Error | null;
 
 function setupMocks() {
   diagnosticUpserts = [];
+  setCalls = [];
+  diagnosticUpsertError = null;
   const message = {
     id: "msg-send-1",
     status: "sent",
@@ -109,13 +116,16 @@ function setupMocks() {
     return selectChain(selectCalls % 2 === 1 ? [mockAwsAccount] : [message]);
   });
 
-  mockDbUpdate.mockImplementation(() => ({
-    set: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue(
-        Object.assign(Promise.resolve(undefined), {
-          returning: vi.fn().mockResolvedValue([{ id: "msg-send-1" }]),
-        })
-      ),
+  mockDbUpdate.mockImplementation((table: unknown) => ({
+    set: vi.fn((data: Record<string, unknown>) => {
+      setCalls.push({ table, data });
+      return {
+        where: vi.fn().mockReturnValue(
+          Object.assign(Promise.resolve(undefined), {
+            returning: vi.fn().mockResolvedValue([{ id: "msg-send-1" }]),
+          })
+        ),
+      };
     }),
   }));
 
@@ -124,6 +134,9 @@ function setupMocks() {
       onConflictDoUpdate: (config: { set: Record<string, unknown> }) => {
         if (table === messageSendDiagnostic) {
           diagnosticUpserts.push({ values: row, config });
+          if (diagnosticUpsertError) {
+            return Promise.reject(diagnosticUpsertError);
+          }
         }
         return Promise.resolve(undefined);
       },
@@ -141,6 +154,28 @@ describe("Webhook: Complaint diagnostics", () => {
     vi.clearAllMocks();
     app = createTestApp();
     setupMocks();
+  });
+
+  it("complaint diagnostic write failure still runs the status update and the response is not 500", async () => {
+    diagnosticUpsertError = new Error("upsert failed");
+
+    const response = await sendWebhookEvent(
+      app,
+      buildComplaintEvent({ complaintFeedbackType: "abuse" })
+    );
+
+    expect(response.status).not.toBe(500);
+    expect(setCalls).toContainEqual(
+      expect.objectContaining({
+        table: messageSend,
+        data: expect.objectContaining({ status: "complained" }),
+      })
+    );
+    expect(log.error).toHaveBeenCalledWith(
+      "Webhook: diagnostic write failed",
+      expect.any(Error),
+      expect.objectContaining({ messageId: expect.any(String) })
+    );
   });
 
   it("webhook persists complaint feedback type on Complaint", async () => {
