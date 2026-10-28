@@ -17,7 +17,8 @@ function formatLastUpdated(timestamp: string): string {
 }
 
 export function buildColumns(
-  organizationId: string
+  organizationId: string,
+  onOpenAddress: (row: SuppressionRow) => void
 ): ColumnDef<SuppressionRow>[] {
   return [
     {
@@ -26,8 +27,16 @@ export function buildColumns(
       header: ({ column }) => (
         <DataTableColumnHeader column={column} label="Address" />
       ),
+      // The address is the only target that opens the detail. The row itself
+      // is not clickable, so the Unsuppress button keeps its own behaviour.
       cell: ({ row }) => (
-        <span className="font-mono text-sm">{row.original.email}</span>
+        <button
+          className="break-all text-left font-mono text-primary text-sm underline-offset-4 hover:underline"
+          onClick={() => onOpenAddress(row.original)}
+          type="button"
+        >
+          {row.original.email}
+        </button>
       ),
       meta: {
         label: "Address",
