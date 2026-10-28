@@ -9,7 +9,6 @@
 
 import { existsSync } from "node:fs";
 import {
-  mkdir,
   mkdtemp,
   readdir,
   readFile,

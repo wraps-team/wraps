@@ -30,7 +30,7 @@ vi.mock("../../../utils/shared/api-target.js", () => ({
   checkApiTarget: vi.fn(),
 }));
 
-import { log, note } from "@clack/prompts";
+import { log } from "@clack/prompts";
 import {
   workflowsCancel,
   workflowsDisable,
