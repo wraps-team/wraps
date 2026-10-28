@@ -18,9 +18,10 @@ import {
   type InboxOptions,
   inbox,
 } from "@byo-oss/notifications";
-import { mailerChannel, renderEmail } from "@byo-oss/notifications/mailer";
+import { mailerChannel } from "@byo-oss/notifications/mailer";
 import { getWrapsClient } from "@wraps/email";
 import { resolveAppUrl } from "@wraps/email/lib/app-url";
+import { renderNotificationEmail } from "./notification-email";
 
 /** Same sender as every other app email (packages/email/src/lib/client.ts). */
 export const NOTIFICATION_EMAIL_FROM =
@@ -61,7 +62,7 @@ const emailChannel = mailerChannel({
   // when no dashboard URL is configured, and that must not stop the web app
   // from loading. A missing URL fails the delivery (it retries, and names the fix).
   render: (ctx) =>
-    renderEmail({ ...ctx, appUrl: ctx.appUrl ?? resolveAppUrl() }),
+    renderNotificationEmail({ ...ctx, appUrl: ctx.appUrl ?? resolveAppUrl() }),
 });
 
 /** Email after 15 minutes if still unread; at most one such email per user per hour. */
