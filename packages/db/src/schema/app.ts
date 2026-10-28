@@ -453,6 +453,12 @@ export const auditLog = pgTable(
       table.organizationId,
       table.createdAt
     ),
+    // Contact creation record lookup: the audit row for one contact. Created
+    // in production via packages/db/scripts/index-manifest.ts (CONCURRENTLY).
+    orgResourceIdx: index("audit_log_org_resource_idx").on(
+      table.organizationId,
+      table.resourceId
+    ),
   })
 );
 
