@@ -24,12 +24,27 @@ import {
 } from "@wraps/ui/components/ui/select";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import * as React from "react";
-import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ReferenceLine,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { browserTimeZone } from "@/lib/analytics-drilldown-window";
 import { countYAxisProps } from "@/lib/chart-axis";
 import { SERIES_COLOR } from "@/lib/chart-series";
 import { useVolumeData } from "../hooks/use-analytics";
+import {
+  ChangeMarkerList,
+  ChangeMarkersToggle,
+  markerLineProps,
+  useChartChangeMarkers,
+} from "./change-marker-overlay";
 
 const chartConfig = {
   delivered: {
@@ -46,7 +61,13 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function DeliverabilityChart({ orgSlug }: { orgSlug: string }) {
+export function DeliverabilityChart({
+  orgSlug,
+  showChangeMarkers = false,
+}: {
+  orgSlug: string;
+  showChangeMarkers?: boolean;
+}) {
   const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = React.useState("30d");
 
@@ -57,9 +78,22 @@ export function DeliverabilityChart({ orgSlug }: { orgSlug: string }) {
   }, [isMobile]);
 
   const days = timeRange === "30d" ? 30 : 7;
+  // Set after mount: the server render must not carry the server's timezone.
+  const [tz, setTz] = React.useState("UTC");
+  React.useEffect(() => {
+    setTz(browserTimeZone());
+  }, []);
   const { data: volumeData, isLoading, error } = useVolumeData(orgSlug, days);
 
   const chartData = volumeData || [];
+  const [showMarkers, setShowMarkers] = React.useState(true);
+  const { overlayOn, markerLines, markers, listState } = useChartChangeMarkers({
+    orgSlug,
+    days,
+    enabled: showChangeMarkers,
+    showMarkers,
+    dates: chartData.map((d) => d.date),
+  });
   const maxValue = Math.max(
     ...chartData.map((d) => (d.delivered || 0) + (d.bounced || 0))
   );
@@ -75,6 +109,11 @@ export function DeliverabilityChart({ orgSlug }: { orgSlug: string }) {
           <span className="@[540px]/card:hidden">Delivery status</span>
         </CardDescription>
         <CardAction className="self-center">
+          <ChangeMarkersToggle
+            enabled={showChangeMarkers}
+            onPressedChange={setShowMarkers}
+            pressed={showMarkers}
+          />
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "30d"}
@@ -167,9 +206,21 @@ export function DeliverabilityChart({ orgSlug }: { orgSlug: string }) {
                 radius={[4, 4, 0, 0]}
                 stackId="a"
               />
+              {markerLines.map((line) => (
+                <ReferenceLine key={line.date} {...markerLineProps(line)} />
+              ))}
             </BarChart>
           </ChartContainer>
         )}
+        <ChangeMarkerList
+          active={overlayOn}
+          days={days}
+          markers={markers}
+          metric="bounce"
+          orgSlug={orgSlug}
+          state={listState}
+          tz={tz}
+        />
       </CardContent>
     </Card>
   );

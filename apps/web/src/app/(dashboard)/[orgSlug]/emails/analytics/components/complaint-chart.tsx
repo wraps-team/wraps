@@ -41,6 +41,12 @@ import {
 } from "@/lib/analytics-drilldown-window";
 import { SERIES_COLOR } from "@/lib/chart-series";
 import { useComplaintData } from "../hooks/use-analytics";
+import {
+  ChangeMarkerList,
+  ChangeMarkersToggle,
+  markerLineProps,
+  useChartChangeMarkers,
+} from "./change-marker-overlay";
 import { ViewCausesLink } from "./view-causes-link";
 
 const chartConfig = {
@@ -54,7 +60,13 @@ function formatPercentage(value: number) {
   return `${value.toFixed(2)}%`;
 }
 
-export function ComplaintChart({ orgSlug }: { orgSlug: string }) {
+export function ComplaintChart({
+  orgSlug,
+  showChangeMarkers = false,
+}: {
+  orgSlug: string;
+  showChangeMarkers?: boolean;
+}) {
   const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = React.useState("30d");
 
@@ -78,6 +90,14 @@ export function ComplaintChart({ orgSlug }: { orgSlug: string }) {
   } = useComplaintData(orgSlug, days);
 
   const chartData = complaintData || [];
+  const [showMarkers, setShowMarkers] = React.useState(true);
+  const { overlayOn, markerLines, markers, listState } = useChartChangeMarkers({
+    orgSlug,
+    days,
+    enabled: showChangeMarkers,
+    showMarkers,
+    dates: chartData.map((d) => d.date),
+  });
 
   return (
     <Card className="@container/card">
@@ -91,6 +111,11 @@ export function ComplaintChart({ orgSlug }: { orgSlug: string }) {
         </CardDescription>
         <CardAction className="self-center">
           <ViewCausesLink days={days} metric="complaint" orgSlug={orgSlug} />
+          <ChangeMarkersToggle
+            enabled={showChangeMarkers}
+            onPressedChange={setShowMarkers}
+            pressed={showMarkers}
+          />
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "90d"}
@@ -236,9 +261,21 @@ export function ComplaintChart({ orgSlug }: { orgSlug: string }) {
                 strokeWidth={2}
                 type="monotone"
               />
+              {markerLines.map((line) => (
+                <ReferenceLine key={line.date} {...markerLineProps(line)} />
+              ))}
             </AreaChart>
           </ChartContainer>
         )}
+        <ChangeMarkerList
+          active={overlayOn}
+          days={days}
+          markers={markers}
+          metric="complaint"
+          orgSlug={orgSlug}
+          state={listState}
+          tz={tz}
+        />
       </CardContent>
     </Card>
   );
