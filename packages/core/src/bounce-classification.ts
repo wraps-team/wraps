@@ -16,11 +16,12 @@ export const SOFT_BOUNCE_ESCALATION_THRESHOLD = 3;
 /** A contact's soft-bounce count rises at most once per this many hours. */
 export const SOFT_BOUNCE_MIN_GAP_HOURS = 24;
 
-const CONTENT_SUBTYPES = new Set([
+export const CONTENT_BOUNCE_SUBTYPES = [
   "MessageTooLarge",
   "ContentRejected",
   "AttachmentRejected",
-]);
+] as const;
+const CONTENT_SUBTYPES = new Set<string>(CONTENT_BOUNCE_SUBTYPES);
 
 export function classifyBounce(
   bounceType?: string | null,

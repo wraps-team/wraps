@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { type BounceKind, classifyBounce } from "./bounce-classification";
+import {
+  type BounceKind,
+  CONTENT_BOUNCE_SUBTYPES,
+  classifyBounce,
+} from "./bounce-classification";
 
 describe("classifyBounce", () => {
   const cases: [
@@ -23,5 +27,13 @@ describe("classifyBounce", () => {
 
   it.each(cases)("%s / %s -> %s", (type, subType, expected) => {
     expect(classifyBounce(type, subType)).toBe(expected);
+  });
+
+  it("exports the content sub-types the classifier treats as message problems", () => {
+    expect([...CONTENT_BOUNCE_SUBTYPES]).toEqual([
+      "MessageTooLarge",
+      "ContentRejected",
+      "AttachmentRejected",
+    ]);
   });
 });
