@@ -590,9 +590,12 @@ export const updateContact = orgAction(
       } else if (data.emailStatus === "suppressed") {
         updateData.emailSuppressedAt = new Date();
       }
-      // A manual set to active also clears the soft-bounce count.
+      // A manual reactivation clears the soft-bounce count AND its timestamp,
+      // like a successful delivery does. A stale timestamp would make the
+      // 24-hour rule skip the next soft bounce and leave count 0.
       if (data.emailStatus === "active") {
         updateData.emailSoftBounceCount = 0;
+        updateData.emailLastSoftBouncedAt = null;
       }
     }
 

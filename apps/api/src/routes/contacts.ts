@@ -722,6 +722,7 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
         if (body.emailStatus === "active") {
           updateValues.emailVerifiedAt = sql`COALESCE(${contact.emailVerifiedAt}, now())`;
           updateValues.emailSoftBounceCount = 0;
+          updateValues.emailLastSoftBouncedAt = null;
         } else if (body.emailStatus === "unsubscribed") {
           updateValues.emailUnsubscribedAt = new Date();
         } else if (body.emailStatus === "bounced") {
