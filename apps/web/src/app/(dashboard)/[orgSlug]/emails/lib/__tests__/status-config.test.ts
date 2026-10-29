@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import type { EmailStatus } from "../../types";
 import {
   getEmailStatusConfig,
+  getEmailStatusLabel,
   humanizeEmailStatus,
   normalizeEmailStatus,
 } from "../status-config";
@@ -114,5 +115,27 @@ describe("normalizeEmailStatus", () => {
 
   it("returns null rather than guessing", () => {
     expect(normalizeEmailStatus("archived")).toBeNull();
+  });
+});
+
+describe("getEmailStatusLabel", () => {
+  it("names the bounce kind on a bounced message", () => {
+    expect(getEmailStatusLabel("bounced", "hard")).toBe("Hard bounce");
+    expect(getEmailStatusLabel("bounced", "soft")).toBe("Soft bounce");
+  });
+
+  it("keeps the plain label when the bounce kind is unknown", () => {
+    expect(getEmailStatusLabel("bounced", null)).toBe("Bounced");
+    expect(getEmailStatusLabel("bounced")).toBe("Bounced");
+  });
+
+  it("ignores the bounce kind for every other status", () => {
+    expect(getEmailStatusLabel("delivered", "hard")).toBe("Delivered");
+    expect(getEmailStatusLabel("complained", "soft")).toBe("Complained");
+  });
+
+  it("falls back to the humanized label for an unknown status", () => {
+    expect(() => getEmailStatusLabel("archived", "hard")).not.toThrow();
+    expect(getEmailStatusLabel("archived", "hard")).toBe("Archived");
   });
 });

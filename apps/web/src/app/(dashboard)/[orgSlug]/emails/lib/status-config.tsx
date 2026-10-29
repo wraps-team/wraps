@@ -215,3 +215,19 @@ export function getEmailStatusConfig(status: string): EmailStatusConfig {
     variant: "outline",
   };
 }
+
+/**
+ * The badge text for a status. A bounced message says "Hard bounce" or "Soft
+ * bounce" when its SES bounce type is known; the icon and colour stay the
+ * "Bounced" ones. Every other status, and a bounce of unknown kind, keeps the
+ * label from `getEmailStatusConfig`.
+ */
+export function getEmailStatusLabel(
+  status: string,
+  bounceKind?: "hard" | "soft" | null
+): string {
+  if (normalizeEmailStatus(status) === "bounced" && bounceKind) {
+    return bounceKind === "hard" ? "Hard bounce" : "Soft bounce";
+  }
+  return getEmailStatusConfig(status).label;
+}
