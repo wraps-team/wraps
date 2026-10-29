@@ -126,7 +126,7 @@ describe("ReviewTable", () => {
     expect(screen.getByText("Soft 4 · 3 soft-bounce days")).toBeInTheDocument();
   });
 
-  it("opens the row from a row click", async () => {
+  it("opens the address from its button, by mouse and by keyboard", async () => {
     const user = userEvent.setup();
     const onOpen = vi.fn();
     render(
@@ -137,14 +137,14 @@ describe("ReviewTable", () => {
         rows={ROWS}
       />
     );
-    const bounceRow = screen.getByText("bounce@example.com").closest("tr");
-    await user.click(
-      within(bounceRow as HTMLElement).getByText(
-        "Bounced hard on the first send"
-      )
-    );
+    const address = screen.getByRole("button", { name: "bounce@example.com" });
+    await user.click(address);
     expect(onOpen).toHaveBeenCalledTimes(1);
     expect(onOpen.mock.calls[0][0].address).toBe("bounce@example.com");
+
+    address.focus();
+    await user.keyboard("{Enter}");
+    expect(onOpen).toHaveBeenCalledTimes(2);
   });
 
   it("suppresses from the Suppress button without opening the row", async () => {

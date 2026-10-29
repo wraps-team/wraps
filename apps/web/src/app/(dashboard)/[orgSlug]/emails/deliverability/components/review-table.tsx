@@ -59,8 +59,9 @@ function eventsText(row: ReviewRow, list: ReviewTableProps["list"]): string {
 }
 
 /**
- * One review list as a plain table of at most 25 rows. A row opens the
- * address detail; the Suppress button stops propagation so it never opens it.
+ * One review list as a plain table of at most 25 rows. The address is a real
+ * button that opens the address detail, so mouse and keyboard reach it the
+ * same way; Suppress is a separate button in the last cell.
  */
 export function ReviewTable({
   rows,
@@ -84,18 +85,11 @@ export function ReviewTable({
           {rows.map((row) => {
             const last = row.lastEventAt ? Date.parse(row.lastEventAt) : null;
             return (
-              <TableRow
-                className="cursor-pointer"
-                key={row.address}
-                onClick={() => onOpen(row)}
-              >
+              <TableRow key={row.address}>
                 <TableCell className="max-w-[24ch]">
                   <button
                     className="block max-w-full truncate text-left font-mono text-primary text-sm underline-offset-4 hover:underline"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onOpen(row);
-                    }}
+                    onClick={() => onOpen(row)}
                     title={row.address}
                     type="button"
                   >
@@ -134,10 +128,7 @@ export function ReviewTable({
                   ) : (
                     <Button
                       aria-label={`Suppress ${row.address}`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onSuppress(row);
-                      }}
+                      onClick={() => onSuppress(row)}
                       size="sm"
                       variant="outline"
                     >
