@@ -1,12 +1,7 @@
 "use client";
 
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@wraps/ui/components/ui/toggle-group";
 import { parseAsString, useQueryState } from "nuqs";
-import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -16,7 +11,6 @@ import {
 } from "@/components/ui/empty";
 import { eventsFor } from "@/lib/analytics-drilldown-rank";
 import {
-  DRILLDOWN_BY,
   DRILLDOWN_METRIC_LABEL,
   type DrilldownBy,
   type DrilldownMetric,
@@ -24,30 +18,20 @@ import {
   describeDrilldownWindow,
   formatDrilldownDay,
 } from "@/lib/analytics-drilldown-window";
-import { AttributionTable } from "../components/attribution-table";
+import { RateBarTable } from "../components/rate-bar-table";
 import {
   DrilldownRequestError,
   type DrilldownSendsResponse,
   useDrilldownSends,
 } from "../hooks/use-drilldown-sends";
+import { readSendsBy } from "../lib/params";
 import type { DrilldownTab, DrilldownTabProps } from "./tab-contract";
-
-const BY_LABEL: Record<DrilldownBy, string> = {
-  broadcast: "Broadcast",
-  workflow: "Workflow",
-  template: "Template",
-  from: "From address",
-};
 
 const EVENTS_PHRASE: Record<DrilldownMetric, { noun: string; verb: string }> = {
   bounce: { noun: "bounces", verb: "bounced" },
   complaint: { noun: "complaints", verb: "received a complaint" },
   suppression: { noun: "suppressions", verb: "was suppressed" },
 };
-
-function isBy(value: string | null): value is DrilldownBy {
-  return (DRILLDOWN_BY as readonly string[]).includes(value ?? "");
-}
 
 function errorMessage(status: number, label: string): string {
   if (status === 422) {
@@ -150,25 +134,20 @@ function SendsResults({
   }
 
   const nothingRanked = data.ranked.length === 0 && data.belowFloor.length > 0;
+  const caption = `${DRILLDOWN_METRIC_LABEL[metric]} is ${data.totals.rate?.toFixed(2)}% for ${label}: ${events.toLocaleString("en-US")} of ${data.totals.sent.toLocaleString("en-US")} sends.`;
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-sm">
-        {`${DRILLDOWN_METRIC_LABEL[metric]} is ${data.totals.rate?.toFixed(2)}% for ${label}: ${events.toLocaleString("en-US")} of ${data.totals.sent.toLocaleString("en-US")} sends.`}
-      </p>
       {nothingRanked ? (
         <EmptyNotice
           body={`Each group has fewer than ${data.floor} sends. They are listed below with their counts.`}
           title="No group has enough sends to rank yet"
         />
-      ) : (
-        <h2 className="font-medium text-sm">
-          Ranked by how far each group pushed the rate above the window rate.
-        </h2>
-      )}
-      <AttributionTable
+      ) : null}
+      <RateBarTable
         belowFloor={data.belowFloor}
         belowFloorOpen={nothingRanked}
         by={by}
+        caption={caption}
         floor={data.floor}
         metric={metric}
         omitted={data.omitted}
@@ -181,63 +160,34 @@ function SendsResults({
 }
 
 function SendsTab({ orgSlug, metric, window }: DrilldownTabProps) {
-  const [byParam, setBy] = useQueryState("sends.by", parseAsString);
-  const by: DrilldownBy = isBy(byParam) ? byParam : "broadcast";
+  const [byParam] = useQueryState("sends.by", parseAsString);
+  const by = readSendsBy(byParam);
   const label = describeDrilldownWindow(window);
   const query = useDrilldownSends(orgSlug, metric, by, window);
 
-  const groupSwitch = (
-    <ToggleGroup
-      aria-label="Group sends by"
-      onValueChange={(value) => {
-        if (isBy(value)) {
-          setBy(value);
-        }
-      }}
-      size="sm"
-      type="single"
-      value={by}
-      variant="outline"
-    >
-      {DRILLDOWN_BY.map((option) => (
-        <ToggleGroupItem key={option} value={option}>
-          {BY_LABEL[option]}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
-  );
-
-  let body: ReactNode;
   if (query.isLoading) {
-    body = <LoadingRows label={label} />;
-  } else if (query.error || !query.data) {
+    return <LoadingRows label={label} />;
+  }
+  if (query.error || !query.data) {
     const status =
       query.error instanceof DrilldownRequestError ? query.error.status : 0;
-    body = (
+    return (
       <FailedNotice
         canRetry={status !== 422 && status !== 400}
         message={errorMessage(status, label)}
         onRetry={() => query.refetch()}
       />
     );
-  } else {
-    body = (
-      <SendsResults
-        by={by}
-        data={query.data}
-        label={label}
-        metric={metric}
-        orgSlug={orgSlug}
-        window={window}
-      />
-    );
   }
-
   return (
-    <div className="flex flex-col gap-6">
-      {groupSwitch}
-      {body}
-    </div>
+    <SendsResults
+      by={by}
+      data={query.data}
+      label={label}
+      metric={metric}
+      orgSlug={orgSlug}
+      window={window}
+    />
   );
 }
 

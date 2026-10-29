@@ -1,5 +1,9 @@
 import { parseAsStringLiteral } from "nuqs";
 import { useHubDays } from "@/hooks/use-hub-days";
+import {
+  DRILLDOWN_BY,
+  type DrilldownBy,
+} from "@/lib/analytics-drilldown-window";
 
 /** The metrics the deliverability views show, in toggle order. */
 export const DELIVERABILITY_METRICS = [
@@ -7,6 +11,16 @@ export const DELIVERABILITY_METRICS = [
   "complaint",
   "suppression",
 ] as const;
+
+export type DeliverabilityMetric = (typeof DELIVERABILITY_METRICS)[number];
+
+/** The label each metric carries in toggles and titles. */
+export const DELIVERABILITY_METRIC_LABEL: Record<DeliverabilityMetric, string> =
+  {
+    bounce: "Bounces",
+    complaint: "Complaints",
+    suppression: "Suppressed",
+  };
 
 /**
  * The `metric` URL state. The card and the causes panel read it with this one
@@ -29,3 +43,10 @@ export function useDeliverabilityDays(): number {
 export const metricParam = parseAsStringLiteral(
   DELIVERABILITY_METRICS
 ).withDefault("bounce");
+
+/** The group-by the `sends.by` URL param asks for. Unknown or missing means broadcast. */
+export function readSendsBy(value: string | null): DrilldownBy {
+  return (DRILLDOWN_BY as readonly string[]).includes(value ?? "")
+    ? (value as DrilldownBy)
+    : "broadcast";
+}

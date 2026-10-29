@@ -216,16 +216,16 @@ describe("AddressesToReview", () => {
     renderPanel();
     await screen.findByText("one@example.com");
     expect(
-      await screen.findByRole("tab", { name: "Soft bounces (4)" })
+      await screen.findByRole("tab", { name: "Soft bounces 4" })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("tab", { name: "Hard bounces (2)" })
+      screen.getByRole("tab", { name: "Hard bounces 2" })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("tab", { name: "Complaints (1)" })
+      screen.getByRole("tab", { name: "Complaints 1" })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("tab", { name: "Recommendations (2)" })
+      screen.getByRole("tab", { name: "Recommendations 2" })
     ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Suppressed" })).toBeInTheDocument();
   });
@@ -235,7 +235,7 @@ describe("AddressesToReview", () => {
     const { onUrlUpdate } = renderPanel();
     await screen.findByText("one@example.com");
     await user.click(
-      await screen.findByRole("tab", { name: "Soft bounces (4)" })
+      await screen.findByRole("tab", { name: "Soft bounces 4" })
     );
     await waitFor(() =>
       expect(onUrlUpdate.mock.calls.at(-1)?.[0].searchParams.get("list")).toBe(

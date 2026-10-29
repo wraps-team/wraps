@@ -64,21 +64,11 @@ vi.mock("../../tabs/sends-tab", () => ({
     Component: () => <p>Causes stub</p>,
   },
 }));
-vi.mock("../../tabs/reasons-tab", () => ({
-  default: {
-    id: "reasons",
-    label: "Reasons",
-    enabled: true,
-    Component: () => <p>Reasons stub</p>,
-  },
-}));
-vi.mock("../../tabs/timeline-tab", () => ({
-  default: {
-    id: "timeline",
-    label: "Timeline",
-    enabled: true,
-    Component: () => <p>Changes stub</p>,
-  },
+// The side card runs its own reasons query, so the body test stubs it.
+vi.mock("../metric-reasons-card", () => ({
+  MetricReasonsCard: (props: { metric: string }) => (
+    <p>{`Reasons card stub: ${props.metric}`}</p>
+  ),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -331,12 +321,9 @@ describe("chart and metric toggle", () => {
     expect(screen.getByText("SES review line · 5%")).toBeInTheDocument();
   });
 
-  it("sets metric=complaint in the URL and redraws against 0.1%", async () => {
+  it("draws the complaint chart and its 0.1% review line from metric=complaint", () => {
     loadHealthy();
-    const onUrlUpdate = renderCard();
-    await userEvent.click(screen.getByRole("radio", { name: "Complaints" }));
-    const last = onUrlUpdate.mock.calls.at(-1)?.[0];
-    expect(last?.searchParams.get("metric")).toBe("complaint");
+    renderCard({ metric: "complaint" });
     expect(
       screen.getByRole("figure", {
         name: /Complaint rate over the last 30 days/,
@@ -495,6 +482,7 @@ describe("DeliverabilityBody", () => {
       screen.getByRole("heading", { name: "What's driving your bounce rate" })
     ).toBeInTheDocument();
     expect(screen.getByText("Causes stub")).toBeInTheDocument();
+    expect(screen.getByText("Reasons card stub: bounce")).toBeInTheDocument();
   });
 
   it("shows no causes panel in the low-volume state", () => {
@@ -536,5 +524,16 @@ describe("DeliverabilityBody", () => {
       </NuqsTestingAdapter>
     );
     expect(screen.queryByText("Breakdown")).not.toBeInTheDocument();
+  });
+
+  it("shows no side card for suppression", () => {
+    loadHealthy();
+    render(
+      <NuqsTestingAdapter searchParams={{ metric: "suppression" }}>
+        <DeliverabilityBody orgSlug="acme" />
+      </NuqsTestingAdapter>
+    );
+    expect(screen.getByText("Causes stub")).toBeInTheDocument();
+    expect(screen.queryByText(/Reasons card stub/)).not.toBeInTheDocument();
   });
 });

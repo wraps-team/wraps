@@ -1,18 +1,19 @@
 /**
- * Timeline tab: the default export contract and the list it renders. The
- * marker hook is mocked, so this runs without a server.
+ * Changes table: one row per change, the selected metric's comparison only,
+ * and the one sentence for a comparison that is not ready. The marker hook is
+ * mocked, so this runs without a server.
  *
  * @vitest-environment jsdom
  */
 
 import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DrilldownWindow } from "@/lib/analytics-drilldown-window";
 import type { ChangeMarker, ChangeMarkersResponse } from "@/lib/change-markers";
-import timelineTab from "../timeline-tab";
+import { ChangesTable, withoutKind } from "../changes-table";
 
 const mockUseChangeMarkers = vi.fn();
 vi.mock("../../../analytics/hooks/use-analytics", () => ({
@@ -78,17 +79,50 @@ function setQuery(
   });
 }
 
-function renderTab(metric: "bounce" | "complaint" | "suppression" = "bounce") {
+function renderTable(
+  metric: "bounce" | "complaint" | "suppression" = "bounce"
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  const { Component } = timelineTab;
   return render(
     <QueryClientProvider client={client}>
-      <Component metric={metric} orgSlug="acme" window={WINDOW} />
+      <ChangesTable metric={metric} orgSlug="acme" window={WINDOW} />
     </QueryClientProvider>
   );
 }
+
+const READY_BOUNCE_DELTA = {
+  afterClosesAt: Date.parse("2026-10-26T11:00:00.000Z"),
+  beforeSent: 10000,
+  afterSent: 10000,
+  metrics: [
+    {
+      metric: "bounce" as const,
+      status: "ready" as const,
+      before: 1.2,
+      after: 2.9,
+      deltaPts: 1.7,
+      direction: "up" as const,
+    },
+    {
+      metric: "complaint" as const,
+      status: "ready" as const,
+      before: 0.01,
+      after: 0.01,
+      deltaPts: 0,
+      direction: "flat" as const,
+    },
+    {
+      metric: "suppression" as const,
+      status: "ready" as const,
+      before: 0.5,
+      after: 0.5,
+      deltaPts: 0,
+      direction: "flat" as const,
+    },
+  ],
+};
 
 beforeEach(() => {
   mockUseChangeMarkers.mockReset();
@@ -98,19 +132,10 @@ afterEach(() => {
   cleanup();
 });
 
-describe("timelineTab default export", () => {
-  it("is enabled with id timeline and a Component", () => {
-    expect(timelineTab.id).toBe("timeline");
-    expect(timelineTab.label).toBe("Timeline");
-    expect(timelineTab.enabled).toBe(true);
-    expect(typeof timelineTab.Component).toBe("function");
-  });
-});
-
-describe("TimelineTab", () => {
+describe("ChangesTable", () => {
   it("asks for markers with deltas, the window's days and its timezone", () => {
     setQuery({ data: response() });
-    renderTab();
+    renderTable();
     expect(mockUseChangeMarkers).toHaveBeenCalledWith(
       "acme",
       14,
@@ -118,17 +143,9 @@ describe("TimelineTab", () => {
     );
   });
 
-  it("renders the heading, the description and the footer copy", () => {
-    setQuery({ data: response() });
-    renderTab();
-    expect(
-      screen.getByRole("heading", { name: "Changes" })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Changes made in this window, listed next to the rate movements that happened around the same time. These are timing records only, not a diagnosis."
-      )
-    ).toBeInTheDocument();
+  it("shows the footer copy", () => {
+    setQuery({ data: response({ markers: [markerWith()], totalMarkers: 1 }) });
+    renderTable();
     expect(
       screen.getByText(
         "Changes cover the whole 14-day window. Choosing a day does not filter this list."
@@ -136,101 +153,67 @@ describe("TimelineTab", () => {
     ).toBeInTheDocument();
   });
 
-  it("lists each change as a link to its href, with its label", () => {
+  it("lists each change in a row, with its kind and a link to its href", () => {
     setQuery({ data: response({ markers: [markerWith()], totalMarkers: 1 }) });
-    renderTab();
-    const link = screen.getByRole("link", {
-      name: /Broadcast started: October launch/,
+    renderTable();
+    const row = screen.getByRole("row", { name: /Broadcast started/ });
+    expect(within(row).getByText("Broadcast started")).toBeInTheDocument();
+    const link = within(row).getByRole("link", {
+      name: "October launch (1,200 recipients)",
     });
     expect(link).toHaveAttribute("href", "/acme/emails/broadcasts/b1");
   });
 
-  it("shows a ready delta with its heading, a notable chip and the sentence", () => {
+  it("shows only the selected metric's before and after, with its chip", () => {
     setQuery({
       data: response({
-        markers: [
-          markerWith({
-            delta: {
-              afterClosesAt: Date.parse("2026-10-26T11:00:00.000Z"),
-              beforeSent: 10000,
-              afterSent: 10000,
-              metrics: [
-                {
-                  metric: "bounce",
-                  status: "ready",
-                  before: 1.2,
-                  after: 2.9,
-                  deltaPts: 1.7,
-                  direction: "up",
-                },
-                {
-                  metric: "complaint",
-                  status: "ready",
-                  before: 0.01,
-                  after: 0.01,
-                  deltaPts: 0,
-                  direction: "flat",
-                },
-                {
-                  metric: "suppression",
-                  status: "ready",
-                  before: 0.5,
-                  after: 0.5,
-                  deltaPts: 0,
-                  direction: "flat",
-                },
-              ],
-            },
-          }),
-        ],
+        markers: [markerWith({ delta: READY_BOUNCE_DELTA })],
         totalMarkers: 1,
       }),
     });
-    renderTab("bounce");
-    expect(
-      screen.getByText("Bounce rate 1.20% -> 2.90% (+1.70 points)")
-    ).toBeInTheDocument();
+    renderTable("bounce");
+    expect(screen.getByText("1.20% → 2.90%")).toBeInTheDocument();
     expect(screen.getByText("Notable increase")).toBeInTheDocument();
+    // The other metrics are not repeated in the table.
+    expect(screen.queryByText(/Complaint rate/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Suppression rate/)).not.toBeInTheDocument();
+  });
+
+  it("gives the header the selected metric's name", () => {
+    setQuery({ data: response({ markers: [markerWith()], totalMarkers: 1 }) });
+    renderTable("complaint");
     expect(
-      screen.getByText(
-        "The bounce rate was 1.20% in the 24 hours before and 2.90% in the 24 hours after. This change happened around the same time as that movement."
-      )
+      screen.getByRole("columnheader", {
+        name: "Complaint rate before → after",
+      })
     ).toBeInTheDocument();
   });
 
-  it("lists the selected metric first within a change's delta block", () => {
+  it("states the one sentence for an insufficient comparison, once per change", () => {
     setQuery({
       data: response({
         markers: [
           markerWith({
             delta: {
               afterClosesAt: Date.parse("2026-10-26T11:00:00.000Z"),
-              beforeSent: 10000,
-              afterSent: 10000,
+              beforeSent: 3,
+              afterSent: 10,
               metrics: [
                 {
                   metric: "bounce",
-                  status: "ready",
-                  before: 1.2,
-                  after: 2.9,
-                  deltaPts: 1.7,
-                  direction: "up",
-                },
-                {
-                  metric: "complaint",
-                  status: "accruing",
+                  status: "insufficient_volume",
                   before: null,
                   after: null,
                   deltaPts: null,
                   direction: null,
                 },
                 {
-                  metric: "suppression",
-                  status: "ready",
-                  before: 0.5,
-                  after: 0.5,
-                  deltaPts: 0,
-                  direction: "flat",
+                  metric: "complaint",
+                  status: "insufficient_volume",
+                  before: null,
+                  after: null,
+                  deltaPts: null,
+                  direction: null,
                 },
               ],
             },
@@ -239,20 +222,15 @@ describe("TimelineTab", () => {
         totalMarkers: 1,
       }),
     });
-    const { container } = renderTab("complaint");
-    const text = container.textContent ?? "";
-    const complaint = text.indexOf("Complaint figures are still arriving");
-    const bounce = text.indexOf("Bounce rate 1.20%");
-    const suppression = text.indexOf("Suppression rate 0.50%");
-    expect(complaint).toBeGreaterThan(-1);
-    expect(bounce).toBeGreaterThan(-1);
-    expect(suppression).toBeGreaterThan(-1);
-    // The metric the user came from comes first, then the others in order.
-    expect(complaint).toBeLessThan(bounce);
-    expect(bounce).toBeLessThan(suppression);
+    renderTable("bounce");
+    expect(
+      screen.getAllByText(
+        "Not enough sends to compare: 3 before and 10 after. Each window needs 200 sends."
+      )
+    ).toHaveLength(1);
   });
 
-  it("states that a group has no single comparison", () => {
+  it("says a group has no single comparison", () => {
     setQuery({
       data: response({
         markers: [
@@ -267,7 +245,7 @@ describe("TimelineTab", () => {
         totalMarkers: 1,
       }),
     });
-    renderTab();
+    renderTable();
     expect(
       screen.getByText("3 changes that day. No single comparison is shown.")
     ).toBeInTheDocument();
@@ -281,7 +259,7 @@ describe("TimelineTab", () => {
         truncated: true,
       }),
     });
-    renderTab();
+    renderTable();
     expect(
       screen.getByText(
         "Showing the 100 most recent of 140 changes. Narrow the window to see older ones."
@@ -291,7 +269,7 @@ describe("TimelineTab", () => {
 
   it("shows the empty copy when no change falls in the window", () => {
     setQuery({ data: response() });
-    renderTab();
+    renderTable();
     expect(
       screen.getByText(
         /No changes were recorded in the last 14 days\. Changes appear here when a broadcast starts/
@@ -301,7 +279,7 @@ describe("TimelineTab", () => {
 
   it("shows three loading rows without the error copy", () => {
     setQuery({ isLoading: true });
-    renderTab();
+    renderTable();
     expect(
       screen.queryByText("Could not load changes.")
     ).not.toBeInTheDocument();
@@ -311,9 +289,23 @@ describe("TimelineTab", () => {
   it("shows the error copy and a Try again button that refetches", async () => {
     const refetch = vi.fn();
     setQuery({ error: new Error("boom"), refetch });
-    renderTab();
+    renderTable();
     expect(screen.getByText("Could not load changes.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("withoutKind", () => {
+  it("drops a leading kind and its colon", () => {
+    expect(withoutKind("Template saved: Welcome (v2)", "Template saved")).toBe(
+      "Welcome (v2)"
+    );
+  });
+
+  it("keeps a label that has no kind prefix", () => {
+    expect(
+      withoutKind("Suppressed address removed", "Suppressed address removed")
+    ).toBe("Suppressed address removed");
   });
 });

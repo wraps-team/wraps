@@ -8,36 +8,40 @@ import {
   ToggleGroupItem,
 } from "@wraps/ui/components/ui/toggle-group";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   browserTimeZone,
+  DRILLDOWN_BY,
   DRILLDOWN_METRIC_LABEL,
+  type DrilldownBy,
   formatDrilldownDay,
   parseDrilldownWindow,
 } from "@/lib/analytics-drilldown-window";
-import { metricParam, useDeliverabilityDays } from "../lib/params";
-import reasonsTab from "../tabs/reasons-tab";
+import { metricParam, readSendsBy, useDeliverabilityDays } from "../lib/params";
 import sendsTab from "../tabs/sends-tab";
-import timelineTab from "../tabs/timeline-tab";
+import { ChangesTable } from "./changes-table";
 
-const DRIVES = ["causes", "reasons", "changes"] as const;
-type Drive = (typeof DRIVES)[number];
+const BY_LABEL: Record<DrilldownBy, string> = {
+  broadcast: "Broadcast",
+  workflow: "Workflow",
+  template: "Template",
+  from: "From",
+};
 
-const driveParam = parseAsStringLiteral(DRIVES).withDefault("causes");
-
-function isDrive(value: string): value is Drive {
-  return (DRIVES as readonly string[]).includes(value);
-}
+/** `drive=changes` shows the changes list. Any other value is the group-by table. */
+const driveParam = parseAsStringLiteral(["changes"] as const);
 
 /**
- * "What's driving your rate": the sends, reasons and changes behind the
- * deliverability card's metric, reusing the drilldown's tabs. The URL carries
- * the metric, the view (`drive`) and an optional selected day (`day`).
+ * "What's driving your rate": the sends behind the deliverability card's
+ * metric, grouped by one of four keys, or the changes in the window. The URL
+ * carries the metric, the group-by (`sends.by`), the view (`drive`) and an
+ * optional selected day (`day`).
  */
 export function CausesPanel({ orgSlug }: { orgSlug: string }) {
   const [metric] = useQueryState("metric", metricParam);
   const [driveValue, setDrive] = useQueryState("drive", driveParam);
+  const [byParam, setBy] = useQueryState("sends.by", parseAsString);
   const [day, setDay] = useQueryState("day", parseAsString);
   const days = useDeliverabilityDays();
 
@@ -55,28 +59,15 @@ export function CausesPanel({ orgSlug }: { orgSlug: string }) {
     [days, day, tz]
   );
 
-  // Suppressions have no reasons view, so a reasons link falls back to causes.
-  const showReasons = metric !== "suppression";
-  const drive: Drive =
-    driveValue === "reasons" && !showReasons ? "causes" : driveValue;
-
+  const by = readSendsBy(byParam);
+  const changes = driveValue === "changes";
   const label = DRILLDOWN_METRIC_LABEL[metric].toLowerCase();
 
-  let body: ReactNode;
+  let body: React.ReactNode;
   if (window === null) {
     body = <Skeleton className="h-64 w-full" />;
-  } else if (drive === "reasons") {
-    body = (
-      <reasonsTab.Component metric={metric} orgSlug={orgSlug} window={window} />
-    );
-  } else if (drive === "changes") {
-    body = (
-      <timelineTab.Component
-        metric={metric}
-        orgSlug={orgSlug}
-        window={window}
-      />
-    );
+  } else if (changes) {
+    body = <ChangesTable metric={metric} orgSlug={orgSlug} window={window} />;
   } else {
     body = (
       <sendsTab.Component metric={metric} orgSlug={orgSlug} window={window} />
@@ -90,7 +81,7 @@ export function CausesPanel({ orgSlug }: { orgSlug: string }) {
           {`What's driving your ${label}`}
         </h2>
         <p className="text-muted-foreground text-sm">
-          Which sends, reasons and changes moved this rate.
+          Which sends and changes moved this rate.
         </p>
       </div>
 
@@ -98,22 +89,29 @@ export function CausesPanel({ orgSlug }: { orgSlug: string }) {
         <CardContent className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <ToggleGroup
-              aria-label="View"
+              aria-label="Group by"
               onValueChange={(value) => {
                 // A single-type group emits "" when the active item is clicked.
-                if (value && isDrive(value)) {
-                  setDrive(value);
+                if (value === "changes") {
+                  setDrive("changes");
+                } else if (
+                  value &&
+                  (DRILLDOWN_BY as readonly string[]).includes(value)
+                ) {
+                  setBy(value);
+                  setDrive(null);
                 }
               }}
               size="sm"
               type="single"
-              value={drive}
+              value={changes ? "changes" : by}
               variant="outline"
             >
-              <ToggleGroupItem value="causes">Causes</ToggleGroupItem>
-              {showReasons ? (
-                <ToggleGroupItem value="reasons">Reasons</ToggleGroupItem>
-              ) : null}
+              {DRILLDOWN_BY.map((option) => (
+                <ToggleGroupItem key={option} value={option}>
+                  {BY_LABEL[option]}
+                </ToggleGroupItem>
+              ))}
               <ToggleGroupItem value="changes">Changes</ToggleGroupItem>
             </ToggleGroup>
 

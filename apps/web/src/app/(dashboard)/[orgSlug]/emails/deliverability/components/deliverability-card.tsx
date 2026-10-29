@@ -14,12 +14,8 @@ import {
   PopoverTrigger,
 } from "@wraps/ui/components/ui/popover";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@wraps/ui/components/ui/toggle-group";
 import { Info } from "lucide-react";
-import { parseAsString, useQueryState } from "nuqs";
+import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import * as React from "react";
 import {
   Area,
@@ -63,19 +59,17 @@ import {
   UpdatedLine,
 } from "../../components/summary-rail";
 import {
-  DELIVERABILITY_METRICS,
+  DELIVERABILITY_METRIC_LABEL,
+  type DELIVERABILITY_METRICS,
   metricParam,
   useDeliverabilityDays,
 } from "../lib/params";
 import { CausesPanel } from "./causes-panel";
+import { MetricReasonsCard } from "./metric-reasons-card";
 
 type Metric = (typeof DELIVERABILITY_METRICS)[number];
 
-const METRIC_LABEL: Record<Metric, string> = {
-  bounce: "Bounces",
-  complaint: "Complaints",
-  suppression: "Suppressed",
-};
+const METRIC_LABEL = DELIVERABILITY_METRIC_LABEL;
 
 const METRIC_NOUN: Record<Metric, string> = {
   bounce: "Bounce rate",
@@ -136,10 +130,6 @@ function rateText(
     return "—";
   }
   return `${value.toFixed(digits)}%`;
-}
-
-function isMetric(value: string): value is Metric {
-  return (DELIVERABILITY_METRICS as readonly string[]).includes(value);
 }
 
 const VERDICT_BADGE: Record<
@@ -385,7 +375,12 @@ function TrendChart({
 export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
   const days = useDeliverabilityDays();
   const [metric, setMetric] = useQueryState("metric", metricParam);
-  const [showMarkers, setShowMarkers] = React.useState(true);
+  // Changes are closed until the user opens them. `changes=1` in the URL is open.
+  const [changesParam, setChangesParam] = useQueryState(
+    "changes",
+    parseAsStringLiteral(["1"] as const)
+  );
+  const showChanges = changesParam === "1";
 
   const emailQuery = useEmailChartData(orgSlug, days);
   const overviewQuery = useAnalyticsOverview(orgSlug, days);
@@ -439,7 +434,7 @@ export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
     orgSlug,
     days,
     enabled: true,
-    showMarkers,
+    showMarkers: showChanges,
     dates: points?.map((p) => p.date) ?? [],
   });
 
@@ -587,33 +582,12 @@ export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
           <p className="text-muted-foreground text-sm">{verdict.sentence}</p>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <ToggleGroup
-            aria-label="Metric"
-            onValueChange={(value) => {
-              // A single-type group emits "" when the active item is clicked.
-              if (value && isMetric(value)) {
-                setMetric(value);
-              }
-            }}
-            size="sm"
-            type="single"
-            value={metric}
-            variant="outline"
-          >
-            {DELIVERABILITY_METRICS.map((option) => (
-              <ToggleGroupItem key={option} value={option}>
-                {METRIC_LABEL[option]}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-          <div className="flex items-center gap-2">
-            <ChangeMarkersToggle
-              enabled
-              onPressedChange={setShowMarkers}
-              pressed={showMarkers}
-            />
-          </div>
+        <div className="flex items-center justify-end gap-2">
+          <ChangeMarkersToggle
+            enabled
+            onPressedChange={(next) => setChangesParam(next ? "1" : null)}
+            pressed={showChanges}
+          />
         </div>
 
         {chartBody}
@@ -661,13 +635,27 @@ function breakdownCopy(sends: number | null): string | null {
  */
 export function DeliverabilityBody({ orgSlug }: { orgSlug: string }) {
   const days = useDeliverabilityDays();
+  const [metric] = useQueryState("metric", metricParam);
   const sends = useAnalyticsOverview(orgSlug, days).data?.totalSent ?? null;
   const note = breakdownCopy(sends);
   return (
     <>
       <DeliverabilityCard orgSlug={orgSlug} />
       {note === null ? (
-        <CausesPanel orgSlug={orgSlug} />
+        <div
+          className={
+            metric === "suppression" ? "space-y-6" : "grid gap-6 lg:grid-cols-3"
+          }
+        >
+          <div className="lg:col-span-2">
+            <CausesPanel orgSlug={orgSlug} />
+          </div>
+          {metric === "suppression" ? null : (
+            <div className="lg:col-span-1">
+              <MetricReasonsCard metric={metric} orgSlug={orgSlug} />
+            </div>
+          )}
+        </div>
       ) : (
         <Card className="@container/card">
           <CardContent className="space-y-2">

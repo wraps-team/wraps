@@ -1,7 +1,7 @@
 /**
- * Causes panel: the view toggle, the day chip and the window handed to the
- * three drilldown tabs. The tabs are stubbed to print their props, and the
- * hub range is fixed through useHubDays.
+ * Causes panel: the group-by row (with Changes as a peer), the day chip and
+ * the window handed to the sends tab and the changes table. Both are stubbed
+ * to print their props, and the hub range is fixed through useHubDays.
  *
  * @vitest-environment jsdom
  */
@@ -34,32 +34,13 @@ vi.mock("../../tabs/sends-tab", () => ({
   },
 }));
 
-vi.mock("../../tabs/reasons-tab", () => ({
-  default: {
-    id: "reasons",
-    label: "Reasons",
-    enabled: true,
-    Component: (props: {
-      metric: string;
-      window: { days: number; day: string | null };
-    }) => (
-      <p>{`Reasons stub: ${props.metric}, ${props.window.days} days, day ${props.window.day ?? "none"}`}</p>
-    ),
-  },
-}));
-
-vi.mock("../../tabs/timeline-tab", () => ({
-  default: {
-    id: "timeline",
-    label: "Timeline",
-    enabled: true,
-    Component: (props: {
-      metric: string;
-      window: { days: number; day: string | null };
-    }) => (
-      <p>{`Timeline stub: ${props.metric}, ${props.window.days} days, day ${props.window.day ?? "none"}`}</p>
-    ),
-  },
+vi.mock("../changes-table", () => ({
+  ChangesTable: (props: {
+    metric: string;
+    window: { days: number; day: string | null };
+  }) => (
+    <p>{`Changes stub: ${props.metric}, ${props.window.days} days, day ${props.window.day ?? "none"}`}</p>
+  ),
 }));
 
 function renderPanel(search: Record<string, string> = {}) {
@@ -81,11 +62,12 @@ afterEach(() => {
 });
 
 describe("CausesPanel", () => {
-  it("shows the Causes view by default, for the hub range", () => {
+  it("shows the broadcast table by default, for the hub range", () => {
     renderPanel();
     expect(
       screen.getByText("Sends stub: bounce, 30 days, day none")
     ).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Broadcast" })).toBeChecked();
   });
 
   it("draws the card's window: a 24h range reads as 7 days", () => {
@@ -104,31 +86,43 @@ describe("CausesPanel", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the Reasons view when chosen", async () => {
-    renderPanel();
-    await userEvent.click(screen.getByRole("radio", { name: "Reasons" }));
-    expect(
-      screen.getByText("Reasons stub: bounce, 30 days, day none")
-    ).toBeInTheDocument();
+  it("groups the table by the chosen key in the URL", async () => {
+    const onUrlUpdate = renderPanel();
+    await userEvent.click(screen.getByRole("radio", { name: "Template" }));
+    const last = onUrlUpdate.mock.calls.at(-1)?.[0];
+    expect(last?.searchParams.get("sends.by")).toBe("template");
+    expect(last?.searchParams.get("drive")).toBeNull();
   });
 
-  it("shows the Changes view when chosen", async () => {
-    renderPanel();
+  it("reads the group-by from the URL", () => {
+    renderPanel({ "sends.by": "from" });
+    expect(screen.getByRole("radio", { name: "From" })).toBeChecked();
+  });
+
+  it("shows the changes list when Changes is chosen, and sets drive=changes", async () => {
+    const onUrlUpdate = renderPanel();
     await userEvent.click(screen.getByRole("radio", { name: "Changes" }));
     expect(
-      screen.getByText("Timeline stub: bounce, 30 days, day none")
+      screen.getByText("Changes stub: bounce, 30 days, day none")
+    ).toBeInTheDocument();
+    expect(onUrlUpdate.mock.calls.at(-1)?.[0].searchParams.get("drive")).toBe(
+      "changes"
+    );
+  });
+
+  it("opens on the changes list from drive=changes", () => {
+    renderPanel({ drive: "changes" });
+    expect(
+      screen.getByText("Changes stub: bounce, 30 days, day none")
     ).toBeInTheDocument();
   });
 
-  it("hides Reasons for suppressions, and falls back to Causes", () => {
-    renderPanel({ metric: "suppression", drive: "reasons" });
+  it("keeps an old drive=reasons link on the default table", () => {
+    renderPanel({ drive: "reasons" });
     expect(
-      screen.queryByRole("radio", { name: "Reasons" })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByText("Sends stub: suppression, 30 days, day none")
+      screen.getByText("Sends stub: bounce, 30 days, day none")
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Reasons stub/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Reasons" })).toBeNull();
   });
 
   it("titles the panel with the metric", () => {
@@ -162,7 +156,7 @@ describe("CausesPanel", () => {
     ).toBeNull();
   });
 
-  it("renders no tab on the server, before the browser zone is read", () => {
+  it("renders no table on the server, before the browser zone is read", () => {
     const html = renderToStaticMarkup(
       <NuqsTestingAdapter searchParams={{}}>
         <CausesPanel orgSlug="acme" />

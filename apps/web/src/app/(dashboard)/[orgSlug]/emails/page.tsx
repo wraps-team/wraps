@@ -33,6 +33,7 @@ import { EmailsTable } from "./components/emails-table";
 import { EmailsTableSkeleton } from "./components/emails-table-skeleton";
 import { AddressesToReview } from "./deliverability/components/addresses-to-review";
 import { DeliverabilityBody } from "./deliverability/components/deliverability-card";
+import { MetricSwitch } from "./deliverability/components/metric-switch";
 
 type EmailsPageProps = {
   params: Promise<{
@@ -170,7 +171,10 @@ function HubTabContent({
   if (tab === "deliverability") {
     return (
       <div className="@container/main space-y-6 px-4 lg:px-6">
-        <h2 className="font-semibold text-lg">Deliverability</h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="font-semibold text-lg">Deliverability</h2>
+          <MetricSwitch />
+        </div>
         <DeliverabilityBody orgSlug={orgSlug} />
         <Suspense fallback={null}>
           <AddressesToReviewSection

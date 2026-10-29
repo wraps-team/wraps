@@ -22,8 +22,8 @@ import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmailChartMeta } from "@/lib/analytics-scope";
 import type { ChangeMarker, ChangeMarkersResponse } from "@/lib/change-markers";
+import { ChangesTable } from "../../../deliverability/components/changes-table";
 import { DeliverabilityCard } from "../../../deliverability/components/deliverability-card";
-import timelineTab from "../../../deliverability/tabs/timeline-tab";
 import {
   ChangeMarkerList,
   ChangeMarkersToggle,
@@ -255,9 +255,9 @@ function renderWithClient(ui: React.ReactElement) {
   );
 }
 
-function renderCard() {
+function renderCard(search: Record<string, string> = {}) {
   return render(
-    <NuqsTestingAdapter searchParams={{ days: "30" }}>
+    <NuqsTestingAdapter searchParams={{ days: "30", ...search }}>
       <DeliverabilityCard orgSlug="acme" />
     </NuqsTestingAdapter>
   );
@@ -275,17 +275,50 @@ afterEach(() => {
 });
 
 describe("change markers on the Deliverability card", () => {
-  it("toggle reflects aria-pressed and draws or removes the marker line", async () => {
+  it("starts closed: no marker line and no marker list until Changes is pressed", async () => {
     setMarkers([marker()]);
     renderCard();
     const toggle = screen.getByRole("button", { name: "Changes" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(markerLines()).toHaveLength(0);
+    expect(
+      screen.queryByRole("list", { name: "Changes in this period" })
+    ).toBeNull();
+
+    await userEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(markerLines()).toHaveLength(1);
     expect(markerLines()[0]).toHaveAttribute("data-x", "2026-10-25");
+    expect(
+      screen.getByRole("list", { name: "Changes in this period" })
+    ).toBeInTheDocument();
 
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-pressed", "false");
     expect(markerLines()).toHaveLength(0);
+  });
+
+  it("opens from changes=1 in the URL, and closing removes the param", async () => {
+    const onUrlUpdate = vi.fn();
+    setMarkers([marker()]);
+    render(
+      <NuqsTestingAdapter
+        onUrlUpdate={onUrlUpdate}
+        searchParams={{ days: "30", changes: "1" }}
+      >
+        <DeliverabilityCard orgSlug="acme" />
+      </NuqsTestingAdapter>
+    );
+    expect(screen.getByRole("button", { name: "Changes" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(markerLines()).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Changes" }));
+    expect(
+      onUrlUpdate.mock.calls.at(-1)?.[0].searchParams.get("changes")
+    ).toBeNull();
   });
 
   it("the card asks for markers without deltas, enabled", () => {
@@ -461,8 +494,8 @@ describe("ChangeMarkersToggle", () => {
   });
 });
 
-describe("timeline copy in the overlay tests", () => {
-  it("timeline shows Not enough sends copy and never a percentage change for insufficient_volume", () => {
+describe("changes table copy in the overlay tests", () => {
+  it("the changes table shows Not enough sends copy and never a percentage change for insufficient_volume", () => {
     mockUseChangeMarkers.mockReturnValue({
       data: markersResponse([
         marker({
@@ -503,9 +536,8 @@ describe("timeline copy in the overlay tests", () => {
       error: null,
       refetch: vi.fn(),
     });
-    const { Component } = timelineTab;
     const { container } = renderWithClient(
-      <Component
+      <ChangesTable
         metric="bounce"
         orgSlug="acme"
         window={{
@@ -521,7 +553,7 @@ describe("timeline copy in the overlay tests", () => {
       screen.getAllByText(
         "Not enough sends to compare: 3 before and 10 after. Each window needs 200 sends."
       )
-    ).toHaveLength(3);
+    ).toHaveLength(1);
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/\d+(\.\d+)?% -> /);
     expect(text).not.toMatch(/points\)/);

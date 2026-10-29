@@ -2,7 +2,6 @@
 
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@wraps/ui/components/ui/tabs";
 import { useQueryState } from "nuqs";
 import { useEffect, useState } from "react";
 import {
@@ -12,6 +11,7 @@ import {
   type ReviewRow,
 } from "@/actions/address-review";
 import { Button } from "@/components/ui/button";
+import { UnderlineTabs } from "@/components/underline-tabs";
 import { browserTimeZone } from "@/lib/analytics-drilldown-window";
 import { AddressDetailSheet } from "../../components/address-detail-sheet";
 import { useDeliverabilityDays } from "../lib/params";
@@ -295,27 +295,24 @@ export function AddressesToReview({
         </p>
       </div>
 
-      <Tabs
+      <UnderlineTabs
+        label="Review lists"
         onValueChange={(value) => {
           if (isReviewListParam(value)) {
             setList(value);
           }
         }}
+        tabs={REVIEW_LISTS.map((option) => ({
+          value: option,
+          label: TAB_LABEL[option],
+          count: countFor(option),
+          countVariant:
+            option === "recommended" && (countFor(option) ?? 0) > 0
+              ? "warning"
+              : "secondary",
+        }))}
         value={list}
-      >
-        <TabsList className="h-auto flex-wrap justify-start">
-          {REVIEW_LISTS.map((option) => {
-            const count = countFor(option);
-            return (
-              <TabsTrigger key={option} value={option}>
-                {count === null || count === undefined
-                  ? TAB_LABEL[option]
-                  : `${TAB_LABEL[option]} (${count})`}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
-      </Tabs>
+      />
 
       {renderBody()}
 
