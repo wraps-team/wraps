@@ -32,6 +32,7 @@ import {
   messageSendRow,
   seedBaseOrg,
 } from "../(ee)/__tests__/fixtures/real-db";
+import { clearSoftBounce, recordSoftBounce } from "../services/contact-bounce";
 import { buildBounceEvent, buildDeliveryEvent } from "./fixtures/ses-events";
 
 vi.mock("../services/workflow-queue", () => ({
@@ -42,6 +43,18 @@ vi.mock("../services/workflow-queue", () => ({
 vi.mock("../lib/activation-tracking", () => ({
   trackFirstEmailDelivered: vi.fn().mockResolvedValue(undefined),
 }));
+
+// Real implementations by default; a test can make one reject once to prove the
+// transition and the contact write roll back together.
+vi.mock("../services/contact-bounce", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../services/contact-bounce")>();
+  return {
+    ...actual,
+    recordSoftBounce: vi.fn(actual.recordSoftBounce),
+    clearSoftBounce: vi.fn(actual.clearSoftBounce),
+  };
+});
 
 const { webhooksRoutes } = await import("../routes/webhooks");
 
@@ -109,6 +122,18 @@ async function deliver(messageId: string, at: Date) {
     })
   );
   expect(res.status).toBe(200);
+}
+
+async function readSend(messageId: string) {
+  const [row] = await db
+    .select({
+      status: messageSend.status,
+      bouncedAt: messageSend.bouncedAt,
+      deliveredAt: messageSend.deliveredAt,
+    })
+    .from(messageSend)
+    .where(eq(messageSend.messageId, messageId));
+  return row;
 }
 
 async function resetContact(
@@ -200,6 +225,7 @@ describe("webhook soft bounces (real DB)", () => {
     const row = await readContact(fixture.ids.contact);
     expect(row.emailStatus).toBe("active");
     expect(row.emailSoftBounceCount).toBe(0);
+    expect(row.emailLastSoftBouncedAt).toBeNull();
   });
 
   it("a stale Delivery older than the soft bounce does not clear it; a newer one does", async () => {
@@ -277,5 +303,87 @@ describe("webhook soft bounces (real DB)", () => {
     expect(other.emailStatus).toBe("active");
     expect(other.emailSoftBounceCount).toBe(0);
     expect(other.emailLastSoftBouncedAt).toBeNull();
+  });
+
+  it("recovery resets the streak: a soft bounce within 24h of the old one is counted", async () => {
+    await bounce(await seedSend(), T0);
+    const first = await readContact(fixture.ids.contact);
+    expect(first.emailStatus).toBe("soft_bounced");
+    expect(first.emailSoftBounceCount).toBe(1);
+
+    await deliver(await seedSend(), new Date(T0.getTime() + HOUR));
+    const cleared = await readContact(fixture.ids.contact);
+    expect(cleared.emailStatus).toBe("active");
+    expect(cleared.emailSoftBounceCount).toBe(0);
+    expect(cleared.emailLastSoftBouncedAt).toBeNull();
+
+    const again = new Date(T0.getTime() + 2 * HOUR);
+    await bounce(await seedSend(), again);
+    const row = await readContact(fixture.ids.contact);
+    expect(row.emailStatus).toBe("soft_bounced");
+    expect(row.emailSoftBounceCount).toBe(1);
+    expect(row.emailLastSoftBouncedAt?.toISOString()).toBe(again.toISOString());
+  });
+
+  it("a failed soft-bounce contact write rolls the transition back and the retry recovers", async () => {
+    const messageId = await seedSend();
+    const event = buildBounceEvent({
+      mail: { messageId },
+      bounceType: "Transient",
+      bounceSubType: "General",
+      bouncedAt: T0.toISOString(),
+    });
+    vi.mocked(recordSoftBounce).mockRejectedValueOnce(new Error("boom"));
+
+    const failed = await postEvent(event);
+    expect(failed.status).toBe(500);
+
+    const send = await readSend(messageId);
+    expect(send.status).toBe("sent");
+    expect(send.bouncedAt).toBeNull();
+    const untouched = await readContact(fixture.ids.contact);
+    expect(untouched.emailStatus).toBe("active");
+    expect(untouched.emailSoftBounceCount).toBe(0);
+
+    const retried = await postEvent(event);
+    expect(retried.status).toBe(200);
+
+    const sendAfter = await readSend(messageId);
+    expect(sendAfter.status).toBe("bounced");
+    const row = await readContact(fixture.ids.contact);
+    expect(row.emailStatus).toBe("soft_bounced");
+    expect(row.emailSoftBounceCount).toBe(1);
+  });
+
+  it("a failed recovery write rolls the transition back and the retry recovers", async () => {
+    await resetContact(fixture.ids.contact, {
+      emailStatus: "soft_bounced",
+      emailSoftBounceCount: 1,
+      emailLastSoftBouncedAt: T0,
+    });
+    const messageId = await seedSend();
+    const event = buildDeliveryEvent({
+      mail: { messageId },
+      deliveredAt: new Date(T0.getTime() + HOUR).toISOString(),
+    });
+    vi.mocked(clearSoftBounce).mockRejectedValueOnce(new Error("boom"));
+
+    const failed = await postEvent(event);
+    expect(failed.status).toBe(500);
+
+    const send = await readSend(messageId);
+    expect(send.status).toBe("sent");
+    expect(send.deliveredAt).toBeNull();
+    const untouched = await readContact(fixture.ids.contact);
+    expect(untouched.emailStatus).toBe("soft_bounced");
+
+    const retried = await postEvent(event);
+    expect(retried.status).toBe(200);
+
+    const sendAfter = await readSend(messageId);
+    expect(sendAfter.status).toBe("delivered");
+    const row = await readContact(fixture.ids.contact);
+    expect(row.emailStatus).toBe("active");
+    expect(row.emailSoftBounceCount).toBe(0);
   });
 });

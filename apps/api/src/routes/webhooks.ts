@@ -680,64 +680,81 @@ async function processDelivery(
   // with an atomic status='failed' flip below, so exactly one of N
   // concurrent duplicate events wins and the counter decrement can never
   // double-apply.
-  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
-  const updated = await db
-    .update(messageSend)
-    .set({ status: "delivered", deliveredAt })
-    .where(
-      and(
-        eq(messageSend.id, message.id),
-        inArray(messageSend.status, ["pending", "queued", "sent"])
-      )
-    )
-    .returning({ id: messageSend.id });
+  // Transition, batch counter and contact recovery run in ONE transaction: if
+  // the contact write fails, everything rolls back, so the EventBridge retry
+  // finds the row untransitioned instead of hitting the duplicate-event return.
+  const { didTransition, wasWronglyFailed } = await db.transaction(
+    async (tx) => {
+      // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
+      const updated = await tx
+        .update(messageSend)
+        .set({ status: "delivered", deliveredAt })
+        .where(
+          and(
+            eq(messageSend.id, message.id),
+            inArray(messageSend.status, ["pending", "queued", "sent"])
+          )
+        )
+        .returning({ id: messageSend.id });
 
-  let wasWronglyFailed = false;
-  if (updated.length === 0) {
-    // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
-    const healed = await db
-      .update(messageSend)
-      .set({ status: "delivered", deliveredAt, error: null })
-      .where(
-        and(eq(messageSend.id, message.id), eq(messageSend.status, "failed"))
-      )
-      .returning({ id: messageSend.id });
-    wasWronglyFailed = healed.length > 0;
-  }
+      let wronglyFailed = false;
+      if (updated.length === 0) {
+        // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
+        const healed = await tx
+          .update(messageSend)
+          .set({ status: "delivered", deliveredAt, error: null })
+          .where(
+            and(
+              eq(messageSend.id, message.id),
+              eq(messageSend.status, "failed")
+            )
+          )
+          .returning({ id: messageSend.id });
+        wronglyFailed = healed.length > 0;
+      }
 
-  // Only bump the counter when THIS call transitioned the row — otherwise a
-  // duplicate Delivery for an already-delivered row would double-count.
-  const didTransition = updated.length > 0 || wasWronglyFailed;
+      // Only bump the counter when THIS call transitioned the row — otherwise a
+      // duplicate Delivery for an already-delivered row would double-count.
+      const transitioned = updated.length > 0 || wronglyFailed;
+
+      if (!transitioned) {
+        return { didTransition: false, wasWronglyFailed: false };
+      }
+
+      // Increment batchSend counter if applicable
+      if (message.batchSendId) {
+        // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
+        await tx
+          .update(batchSend)
+          .set({
+            delivered: sql`${batchSend.delivered} + 1`,
+            ...(wronglyFailed
+              ? { failed: sql`greatest(${batchSend.failed} - 1, 0)` }
+              : {}),
+          })
+          .where(eq(batchSend.id, message.batchSendId));
+      }
+
+      // A successful delivery clears a soft-bounced contact. Runs only when this
+      // call transitioned the row, so duplicate Delivery events do nothing.
+      if (message.contactId) {
+        await clearSoftBounce({
+          organizationId,
+          contactId: message.contactId,
+          deliveredAt,
+          client: tx,
+        });
+      }
+
+      return { didTransition: true, wasWronglyFailed: wronglyFailed };
+    }
+  );
 
   if (!didTransition) {
     log.info("Webhook: duplicate delivery, skipping counter", {
       messageId: message.id,
     });
     return false;
-  }
-
-  // Increment batchSend counter if applicable
-  if (message.batchSendId) {
-    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(batchSend)
-      .set({
-        delivered: sql`${batchSend.delivered} + 1`,
-        ...(wasWronglyFailed
-          ? { failed: sql`greatest(${batchSend.failed} - 1, 0)` }
-          : {}),
-      })
-      .where(eq(batchSend.id, message.batchSendId));
-  }
-
-  // A successful delivery clears a soft-bounced contact. Runs only when this
-  // call transitioned the row, so duplicate Delivery events do nothing.
-  if (message.contactId) {
-    await clearSoftBounce({
-      organizationId,
-      contactId: message.contactId,
-      deliveredAt,
-    });
   }
 
   log.info("Webhook: message delivered", {
@@ -941,58 +958,70 @@ async function processBounce(
 
   const bouncedAt = timestamp ? new Date(timestamp) : new Date();
 
-  // Update messageSend status — guarded on a genuine transition (WHERE status
-  // <> 'bounced') so a duplicate Bounce event does not re-count.
-  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
-  const transitioned = await db
-    .update(messageSend)
-    .set({
-      status: "bounced",
-      bouncedAt,
-      bounceType: bounceType ?? null,
-      bounceSubType: bounceSubType ?? null,
-    })
-    .where(
-      and(eq(messageSend.id, message.id), ne(messageSend.status, "bounced"))
-    )
-    .returning({ id: messageSend.id });
+  // Transition, batch counter and contact write run in ONE transaction: if the
+  // contact write fails, everything rolls back, so the EventBridge retry finds
+  // the row untransitioned instead of hitting the duplicate-event return.
+  // Contact update: hard bounces end sendability; soft bounces are counted
+  // (see services/contact-bounce.ts).
+  const kind = classifyBounce(bounceType, bounceSubType);
+  const transitioned = await db.transaction(async (tx) => {
+    // Update messageSend status — guarded on a genuine transition (WHERE status
+    // <> 'bounced') so a duplicate Bounce event does not re-count.
+    // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
+    const rows = await tx
+      .update(messageSend)
+      .set({
+        status: "bounced",
+        bouncedAt,
+        bounceType: bounceType ?? null,
+        bounceSubType: bounceSubType ?? null,
+      })
+      .where(
+        and(eq(messageSend.id, message.id), ne(messageSend.status, "bounced"))
+      )
+      .returning({ id: messageSend.id });
 
-  if (transitioned.length === 0) {
+    if (rows.length === 0) {
+      return false;
+    }
+
+    // Increment batchSend counter if applicable
+    if (message.batchSendId) {
+      // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
+      await tx
+        .update(batchSend)
+        .set({
+          bounced: sql`${batchSend.bounced} + 1`,
+        })
+        .where(eq(batchSend.id, message.batchSendId));
+    }
+
+    if (message.contactId && kind === "hard") {
+      // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
+      await tx
+        .update(contact)
+        .set({
+          emailStatus: "bounced",
+          emailBouncedAt: bouncedAt,
+        })
+        .where(eq(contact.id, message.contactId));
+    } else if (message.contactId && kind === "soft") {
+      await recordSoftBounce({
+        organizationId,
+        contactId: message.contactId,
+        bouncedAt,
+        client: tx,
+      });
+    }
+
+    return true;
+  });
+
+  if (!transitioned) {
     log.info("Webhook: duplicate bounce, skipping counter", {
       messageId: message.id,
     });
     return;
-  }
-
-  // Increment batchSend counter if applicable
-  if (message.batchSendId) {
-    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(batchSend)
-      .set({
-        bounced: sql`${batchSend.bounced} + 1`,
-      })
-      .where(eq(batchSend.id, message.batchSendId));
-  }
-
-  // Update the contact: hard bounces end sendability; soft bounces are counted
-  // (see services/contact-bounce.ts)
-  const kind = classifyBounce(bounceType, bounceSubType);
-  if (message.contactId && kind === "hard") {
-    // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(contact)
-      .set({
-        emailStatus: "bounced",
-        emailBouncedAt: bouncedAt,
-      })
-      .where(eq(contact.id, message.contactId));
-  } else if (message.contactId && kind === "soft") {
-    await recordSoftBounce({
-      organizationId,
-      contactId: message.contactId,
-      bouncedAt,
-    });
   }
 
   // Resume waiting workflow executions (any bounce type)
