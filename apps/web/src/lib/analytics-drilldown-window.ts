@@ -11,7 +11,7 @@ import { validateTimezone } from "./analytics-utils";
 export type DrilldownMetric = "bounce" | "complaint" | "suppression";
 export type DrilldownBy = "broadcast" | "workflow" | "template" | "from";
 
-export const DRILLDOWN_METRICS: readonly DrilldownMetric[] = [
+const DRILLDOWN_METRICS: readonly DrilldownMetric[] = [
   "bounce",
   "complaint",
   "suppression",
