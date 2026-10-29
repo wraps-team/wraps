@@ -83,9 +83,14 @@ export const recheckConsolePolicyAction = orgAction(
     }
 
     if (!response.ok) {
+      // A body-less 503/504 is API Gateway giving up on the Lambda, not a
+      // verdict on the role — which the customer has usually just repaired.
+      const gatewayTimeout = response.status === 503 || response.status === 504;
       const error =
         (parsed as { error?: string } | null)?.error ||
-        `Request failed (${response.status})`;
+        (gatewayTimeout
+          ? "AWS didn't answer in time. Your repair may already have worked, so check again in a minute."
+          : `Request failed (${response.status})`);
       ctx.log.warn(
         { awsAccountId, status: response.status, error },
         "Console-policy re-check failed"

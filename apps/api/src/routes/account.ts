@@ -19,6 +19,7 @@ import {
   CURRENT_CONSOLE_POLICY_VERSION,
   probeConsolePolicyVersion,
 } from "../lib/console-policy-version";
+import { log } from "../lib/logger";
 import { rollUpSesHealth, SES_THRESHOLDS } from "../lib/ses-health";
 import {
   type AuthContext,
@@ -183,6 +184,28 @@ const ACCOUNT_HEALTH_VIEW = t.Object({
  */
 const RECHECK_COOLDOWN_MS = 60_000;
 
+/**
+ * How long the re-check may spend in AWS (STS plus the SES ladder) before it
+ * gives up and serves the stored reading. Must sit well under the API
+ * Lambda's 30s timeout, past which API Gateway answers 503 with no body.
+ */
+export const RECHECK_BUDGET_MS = 20_000;
+
+async function withinBudget<T>(
+  work: Promise<T>,
+  ms: number
+): Promise<T | "timeout"> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => resolve("timeout"), ms);
+  });
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const CONSOLE_POLICY_VIEW = t.Object({
   version: NULLABLE_NUMBER,
   currentVersion: t.Number(),
@@ -238,20 +261,38 @@ export const accountRoutes = createAuthenticatedRoutes("/v1/account")
         return storedView(false);
       }
 
-      const credentials = await getCredentials(
-        account.id,
-        account.organizationId
+      let step: "assume-role" | "probe" = "assume-role";
+      const probed = await withinBudget(
+        (async () => {
+          const credentials = await getCredentials(
+            account.id,
+            account.organizationId
+          );
+          step = "probe";
+          const sesClient = new SESv2Client({
+            region: credentials.region,
+            credentials: {
+              accessKeyId: credentials.accessKeyId,
+              secretAccessKey: credentials.secretAccessKey,
+              sessionToken: credentials.sessionToken,
+            },
+          });
+          return probeConsolePolicyVersion(sesClient);
+        })(),
+        RECHECK_BUDGET_MS
       );
-      const sesClient = new SESv2Client({
-        region: credentials.region,
-        credentials: {
-          accessKeyId: credentials.accessKeyId,
-          secretAccessKey: credentials.secretAccessKey,
-          sessionToken: credentials.sessionToken,
-        },
-      });
 
-      const result = await probeConsolePolicyVersion(sesClient);
+      // A stalled AWS call would otherwise run into the Lambda timeout, which
+      // API Gateway reports as a bare 503 — on a button customers press right
+      // after a repair that, in the case that prompted this, had worked.
+      if (probed === "timeout") {
+        log.warn("Console-policy re-check exceeded its time budget", {
+          awsAccountId: account.id,
+          step,
+        });
+        return storedView(false);
+      }
+      const result = probed;
 
       // Throttled or transport-failed is not a policy-version fact. Returning
       // the stored reading is right: erasing a known-good version because SES

@@ -56,7 +56,7 @@ vi.mock("../lib/console-policy-version", async (importOriginal) => {
   };
 });
 
-const { accountRoutes } = await import("../routes/account");
+const { accountRoutes, RECHECK_BUDGET_MS } = await import("../routes/account");
 const { CURRENT_CONSOLE_POLICY_VERSION } = await import(
   "../lib/console-policy-version"
 );
@@ -208,6 +208,40 @@ describe("POST /v1/account/console-policy/:id/recheck — probing", () => {
       upToDate: true,
       rechecked: false,
     });
+  });
+
+  it("serves the stored reading when AWS stalls past the time budget", async () => {
+    // A hung AWS call used to run into the Lambda's 30s timeout, which API
+    // Gateway reports as a bare 503 to a customer who has just repaired.
+    await setStoredPolicy(CURRENT_CONSOLE_POLICY_VERSION, null);
+    let probeStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      probeStarted = resolve;
+    });
+    mockProbe.mockImplementation(() => {
+      probeStarted();
+      return new Promise(() => {});
+    });
+
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const pending = recheck(ids.org, ids.awsAccount);
+      await started;
+      await vi.advanceTimersByTimeAsync(RECHECK_BUDGET_MS);
+      const res = await pending;
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body).toMatchObject({
+        version: CURRENT_CONSOLE_POLICY_VERSION,
+        upToDate: true,
+        rechecked: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    const stored = await readStoredPolicy();
+    expect(stored?.consolePolicyCheckedAt).toBeNull();
   });
 
   it("keeps the known-good version when the probe is throttled", async () => {
