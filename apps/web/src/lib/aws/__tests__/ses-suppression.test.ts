@@ -33,8 +33,12 @@ const mockSend = vi.fn();
 
 vi.mock("@aws-sdk/client-sesv2", () => ({
   SESv2Client: class {
+    config: unknown;
+    constructor(config: unknown) {
+      this.config = config;
+    }
     send(command: SesCommand) {
-      return mockSend(command);
+      return mockSend(command, this.config);
     }
   },
   ListSuppressedDestinationsCommand: class {
@@ -69,6 +73,7 @@ vi.mock("@aws-sdk/client-sesv2", () => ({
 
 // Import after mocks are set up
 import {
+  checkSuppressedAddresses,
   deleteSuppressedAddress,
   getSuppressedAddress,
   listSuppressedAddresses,
@@ -561,6 +566,158 @@ describe("ses-suppression", () => {
           reason: "BOUNCE",
         })
       ).rejects.toThrow("ThrottlingException");
+    });
+  });
+  describe("checkSuppressedAddresses", () => {
+    const notFound = () => {
+      const err = new Error("NotFoundException");
+      err.name = "NotFoundException";
+      return err;
+    };
+    const denied = () => {
+      const err = new Error("AccessDeniedException");
+      err.name = "AccessDeniedException";
+      return err;
+    };
+    // MOCK_ACCOUNT_1 is us-east-1 and MOCK_ACCOUNT_2 is eu-west-1.
+    const regionOf = (config: unknown) => (config as { region: string }).region;
+
+    it("returns listed with the reason from the first account that has the address", async () => {
+      mockSend.mockImplementation(async (_command, config) => {
+        if (regionOf(config) === "eu-west-1") {
+          return {
+            SuppressedDestination: {
+              EmailAddress: "x@example.com",
+              Reason: "COMPLAINT",
+              LastUpdateTime: new Date("2026-01-01T00:00:00Z"),
+            },
+          };
+        }
+        throw notFound();
+      });
+
+      const result = await checkSuppressedAddresses({
+        accounts: [MOCK_ACCOUNT_1, MOCK_ACCOUNT_2],
+        items: [{ address: "x@example.com", awsAccountId: null }],
+      });
+
+      expect(result.get("x@example.com")).toEqual({
+        status: "listed",
+        reason: "COMPLAINT",
+        awsAccountId: "acc-2",
+      });
+    });
+
+    it("returns not_listed only when every checked account answers not found", async () => {
+      mockSend.mockRejectedValue(notFound());
+
+      const result = await checkSuppressedAddresses({
+        accounts: [MOCK_ACCOUNT_1, MOCK_ACCOUNT_2],
+        items: [{ address: "free@example.com", awsAccountId: null }],
+      });
+
+      expect(result.get("free@example.com")).toEqual({ status: "not_listed" });
+      expect(mockSend).toHaveBeenCalledTimes(2);
+    });
+
+    it("returns unknown when an account denies the check, without throwing", async () => {
+      mockSend.mockImplementation(async (_command, config) => {
+        if (regionOf(config) === "us-east-1") {
+          throw denied();
+        }
+        throw notFound();
+      });
+
+      const result = await checkSuppressedAddresses({
+        accounts: [MOCK_ACCOUNT_1, MOCK_ACCOUNT_2],
+        items: [{ address: "denied@example.com", awsAccountId: null }],
+      });
+
+      expect(result.get("denied@example.com")).toEqual({ status: "unknown" });
+    });
+
+    it("returns unknown when a call fails, and does not rethrow", async () => {
+      mockSend.mockImplementation(async (_command, config) => {
+        if (regionOf(config) === "us-east-1") {
+          throw new Error("ThrottlingException");
+        }
+        throw notFound();
+      });
+
+      const result = await checkSuppressedAddresses({
+        accounts: [MOCK_ACCOUNT_1, MOCK_ACCOUNT_2],
+        items: [{ address: "throttled@example.com", awsAccountId: null }],
+      });
+
+      expect(result.get("throttled@example.com")).toEqual({
+        status: "unknown",
+      });
+    });
+
+    it("checks only the named account when it belongs to the org", async () => {
+      mockSend.mockRejectedValue(notFound());
+
+      const result = await checkSuppressedAddresses({
+        accounts: [MOCK_ACCOUNT_1, MOCK_ACCOUNT_2],
+        items: [{ address: "named@example.com", awsAccountId: "acc-1" }],
+      });
+
+      expect(result.get("named@example.com")).toEqual({ status: "not_listed" });
+      expect(mockSend).toHaveBeenCalledTimes(1);
+      expect(regionOf(mockSend.mock.calls[0]?.[1])).toBe("us-east-1");
+    });
+
+    it("checks every account when the named account is not one of the org's accounts", async () => {
+      mockSend.mockRejectedValue(notFound());
+
+      await checkSuppressedAddresses({
+        accounts: [MOCK_ACCOUNT_1, MOCK_ACCOUNT_2],
+        items: [
+          { address: "stray@example.com", awsAccountId: "acc-other-org" },
+        ],
+      });
+
+      expect(mockSend).toHaveBeenCalledTimes(2);
+    });
+
+    it("returns unknown for every item and makes no calls when the org has no accounts", async () => {
+      const result = await checkSuppressedAddresses({
+        accounts: [],
+        items: [
+          { address: "a@example.com", awsAccountId: null },
+          { address: "b@example.com", awsAccountId: "acc-1" },
+        ],
+      });
+
+      expect(result.get("a@example.com")).toEqual({ status: "unknown" });
+      expect(result.get("b@example.com")).toEqual({ status: "unknown" });
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("never has more than `concurrency` address checks in flight", async () => {
+      let inFlight = 0;
+      let peak = 0;
+      mockSend.mockImplementation(async () => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        throw notFound();
+      });
+
+      const items = Array.from({ length: 12 }, (_, i) => ({
+        address: `c-${i}@example.com`,
+        awsAccountId: null,
+      }));
+      const result = await checkSuppressedAddresses({
+        accounts: [MOCK_ACCOUNT_1],
+        items,
+        concurrency: 3,
+      });
+
+      expect(result.size).toBe(12);
+      expect(peak).toBeLessThanOrEqual(3);
+      expect(peak).toBeGreaterThan(1);
     });
   });
 });
