@@ -22,6 +22,7 @@ export const EMAIL_STATUSES = [
   "active",
   "unsubscribed",
   "bounced",
+  "soft_bounced",
   "complained",
   "suppressed",
 ] as const;
@@ -40,9 +41,13 @@ export type EmailStatus = (typeof EMAIL_STATUSES)[number];
  * validation the moment a suppressed contact opened the sheet. A denylist
  * answers "send it" for anything it has not heard of, which is the wrong
  * default when the unknown value arrives from a bounce.
+ *
+ * `soft_bounced` stays sendable because SES already retried before reporting a
+ * transient bounce; the status escalates to `bounced` after repeated soft bounces.
  */
 const EMAIL_STATUS_SENDABLE: Record<EmailStatus, boolean> = {
   active: true,
+  soft_bounced: true,
   unsubscribed: false,
   bounced: false,
   complained: false,
@@ -115,6 +120,7 @@ export const contact = pgTable(
     emailVerifiedAt: timestamp("email_verified_at"),
     emailUnsubscribedAt: timestamp("email_unsubscribed_at"),
     emailBouncedAt: timestamp("email_bounced_at"),
+    emailLastSoftBouncedAt: timestamp("email_last_soft_bounced_at"),
     emailComplainedAt: timestamp("email_complained_at"),
     emailSuppressedAt: timestamp("email_suppressed_at"),
 
@@ -125,6 +131,9 @@ export const contact = pgTable(
     emailsSent: integer("emails_sent").default(0).notNull(),
     emailsOpened: integer("emails_opened").default(0).notNull(),
     emailsClicked: integer("emails_clicked").default(0).notNull(),
+    emailSoftBounceCount: integer("email_soft_bounce_count")
+      .default(0)
+      .notNull(),
 
     // ═══════════════════════════════════════════════════════════════════════
     // SMS CHANNEL
