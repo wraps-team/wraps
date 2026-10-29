@@ -42,6 +42,13 @@ vi.mock("@wraps/db", async () => {
   return {
     ...actual,
     db: {
+      // Runs the callback against this same fake so call recording and order are unchanged.
+      transaction: vi.fn(async function (
+        this: unknown,
+        fn: (tx: unknown) => unknown
+      ) {
+        return fn(this);
+      }),
       select: mockDbSelect,
       update: mockDbUpdate,
       insert: mockDbInsert,
@@ -155,6 +162,10 @@ function setupInsertCapture() {
 describe("Webhook: account disambiguation by secret", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // An SDK Delivery also issues the recipient-keyed soft-bounce recovery UPDATE.
+    mockDbUpdate.mockImplementation(() => ({
+      set: () => ({ where: () => Promise.resolve({ rowCount: 0 }) }),
+    }));
   });
 
   it("resolves the victim's row (never the attacker's) when both share an accountId", async () => {

@@ -278,9 +278,19 @@ export async function applyLifecycleToContact({
       }
       const kind = classifyBounce(bounceType, bounceSubType);
       if (kind === "hard") {
-        await markContactBounced({ organizationId, contactId, bouncedAt, client });
+        await markContactBounced({
+          organizationId,
+          contactId,
+          bouncedAt,
+          client,
+        });
       } else if (kind === "soft") {
-        await recordSoftBounce({ organizationId, contactId, bouncedAt, client });
+        await recordSoftBounce({
+          organizationId,
+          contactId,
+          bouncedAt,
+          client,
+        });
       }
       return;
     }

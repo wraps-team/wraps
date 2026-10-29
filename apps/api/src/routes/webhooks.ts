@@ -63,6 +63,15 @@ type SesEventType =
   | "DeliveryDelay"
   | "Suppressed";
 
+// SDK sends (direct SES, `transactional` rows with no contact) are linked to a
+// contact by recipient address for these events. Delivery is handled separately
+// (it clears soft_bounced by address inside the delivery transaction).
+const CONTACT_LINKED_EVENTS = new Set<SesEventType>([
+  "Bounce",
+  "Complaint",
+  "Suppressed",
+]);
+
 // EventBridge envelope structure for SES events
 type EventBridgeEvent = {
   version: string;
@@ -348,7 +357,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
     log.info("Webhook: processing event", { eventType, messageId });
 
     // 5. Find the messageSend record, scoped to the authenticated AWS account's org
-    const [message] = await db
+    const [foundMessage] = await db
       .select({
         id: messageSend.id,
         status: messageSend.status,
@@ -357,6 +366,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
         openedAt: messageSend.openedAt,
         clickedAt: messageSend.clickedAt,
         recipient: messageSend.recipient,
+        sourceType: messageSend.sourceType,
       })
       .from(messageSend)
       .where(
@@ -367,7 +377,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
       )
       .limit(1);
 
-    if (!message) {
+    if (!foundMessage) {
       // Message not found — likely sent via SDK (direct SES), not through our
       // batch pipeline. Materialize a minimal row so the send appears in email
       // logs. Because SES doesn't guarantee event order, we create the row from
@@ -379,25 +389,69 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
       let insertedRow = false;
       let insertedId: string | undefined;
       if (recipient && lifecycle) {
-        const inserted = await db
-          .insert(messageSend)
-          .values({
+        const insertRow = (client: Pick<typeof db, "insert">) =>
+          client
+            .insert(messageSend)
+            .values({
+              organizationId: account.organizationId,
+              awsAccountId: account.id,
+              channel: "email",
+              sourceType: "transactional",
+              recipient,
+              // SES includes original headers when the configuration set event
+              // destination is configured with includeOriginalHeaders — without
+              // this, invite/transactional sends show no subject in email logs.
+              subject: mail.commonHeaders?.subject ?? null,
+              from: mail.source ?? null,
+              messageId,
+              sentAt: mail.timestamp ? new Date(mail.timestamp) : new Date(),
+              ...lifecycle,
+            })
+            .onConflictDoNothing()
+            .returning({ id: messageSend.id });
+
+        // Bounce / Complaint / Suppressed / Delivery on an SDK send also update
+        // the matching contact in this org (by address), in the same
+        // transaction as the row insert so a failure rolls both back and the
+        // EventBridge retry re-materializes. No contact: nothing to apply.
+        let contactId: string | null = null;
+        if (CONTACT_LINKED_EVENTS.has(eventType)) {
+          contactId = await findContactIdByRecipient({
             organizationId: account.organizationId,
-            awsAccountId: account.id,
-            channel: "email",
-            sourceType: "transactional",
             recipient,
-            // SES includes original headers when the configuration set event
-            // destination is configured with includeOriginalHeaders — without
-            // this, invite/transactional sends show no subject in email logs.
-            subject: mail.commonHeaders?.subject ?? null,
-            from: mail.source ?? null,
-            messageId,
-            sentAt: mail.timestamp ? new Date(mail.timestamp) : new Date(),
-            ...lifecycle,
-          })
-          .onConflictDoNothing()
-          .returning({ id: messageSend.id });
+          });
+        }
+        const linkable = eventType === "Delivery" || contactId !== null;
+
+        let inserted: { id: string }[];
+        if (linkable) {
+          inserted = await db.transaction(async (tx) => {
+            const rows = await insertRow(tx);
+            if (rows.length > 0) {
+              if (eventType === "Delivery") {
+                await clearSoftBounceByRecipient({
+                  organizationId: account.organizationId,
+                  recipient,
+                  deliveredAt: event.detail.delivery?.timestamp
+                    ? new Date(event.detail.delivery.timestamp)
+                    : new Date(),
+                  client: tx,
+                });
+              } else if (contactId) {
+                await applyLifecycleToContact({
+                  organizationId: account.organizationId,
+                  contactId,
+                  eventType,
+                  detail: event.detail,
+                  client: tx,
+                });
+              }
+            }
+            return rows;
+          });
+        } else {
+          inserted = await insertRow(db);
+        }
         insertedRow = inserted.length > 0;
         insertedId = inserted[0]?.id;
       }
@@ -449,6 +503,25 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
       }
       log.info("Webhook: message not found", { messageId });
       return { status: "ignored", reason: "message not found" };
+    }
+
+    let message: MessageRecord = foundMessage;
+
+    // SDK sends (transactional rows with no contact) are linked to the contact
+    // in the same org by recipient address; in memory only, never persisted.
+    if (
+      !message.contactId &&
+      message.sourceType === "transactional" &&
+      message.recipient?.trim() &&
+      CONTACT_LINKED_EVENTS.has(eventType)
+    ) {
+      const linkedContactId = await findContactIdByRecipient({
+        organizationId: account.organizationId,
+        recipient: message.recipient,
+      });
+      if (linkedContactId) {
+        message = { ...message, contactId: linkedContactId };
+      }
     }
 
     // 6. Process based on event type
@@ -661,6 +734,7 @@ type MessageRecord = {
   clickedAt: Date | null;
   // Optional: the existing mocks omit it, and the code tolerates undefined.
   recipient?: string | null;
+  sourceType?: string;
 };
 
 async function processDelivery(
@@ -751,6 +825,14 @@ async function processDelivery(
         await clearSoftBounce({
           organizationId,
           contactId: message.contactId,
+          deliveredAt,
+          client: tx,
+        });
+      } else if (message.sourceType === "transactional" && message.recipient) {
+        // SDK send: no contact id on the row, so recover by recipient address.
+        await clearSoftBounceByRecipient({
+          organizationId,
+          recipient: message.recipient,
           deliveredAt,
           client: tx,
         });

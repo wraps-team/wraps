@@ -191,6 +191,7 @@ describe("webhook delivery counting", () => {
     mockAccountLookup();
     mockMessageSendLookup(false);
     mockInsertChain();
+    mockUpdateChain();
 
     const response = await sendWebhook(makeDeliveryEvent());
 
@@ -379,6 +380,7 @@ describe("webhook delivery counting", () => {
     mockAccountLookup();
     mockMessageSendLookup(false);
     mockInsertChain();
+    mockUpdateChain();
 
     await sendWebhook(makeDeliveryEvent());
 
