@@ -223,15 +223,18 @@ describe("AddressDetailSheet", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the not-checked line and Open Suppression List link in the drill-down case", async () => {
+  it("shows the not-checked line and Open Suppressed list link in the drill-down case", async () => {
     renderSheet();
     expect(
       await screen.findByText(
         "Not checked against the AWS suppression list here."
       )
     ).toBeInTheDocument();
-    const link = screen.getByRole("link", { name: "Open Suppression List" });
-    expect(link).toHaveAttribute("href", `/${ORG_SLUG}/emails/suppressions`);
+    const link = screen.getByRole("link", { name: "Open Suppressed list" });
+    expect(link).toHaveAttribute(
+      "href",
+      `/${ORG_SLUG}/emails?tab=deliverability&list=suppressed`
+    );
   });
 
   it("shows the error state with a working Try again button", async () => {
@@ -290,10 +293,10 @@ describe("AddressDetailSheet", () => {
     ).toBeInTheDocument();
   });
 
-  it('"Open Suppression List" link has no address in its URL', async () => {
+  it('"Open Suppressed list" link has no address in its URL', async () => {
     renderSheet();
     const link = await screen.findByRole("link", {
-      name: "Open Suppression List",
+      name: "Open Suppressed list",
     });
     expect(link.getAttribute("href")).not.toContain("someone");
     expect(link.getAttribute("href")).not.toContain("@");
@@ -396,7 +399,10 @@ describe("AddressDetailSheet suppress state", () => {
       screen.queryByRole("button", { name: "Suppress address" })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Open Suppression List" })
-    ).toHaveAttribute("href", `/${ORG_SLUG}/emails/suppressions`);
+      screen.getByRole("link", { name: "Open Suppressed list" })
+    ).toHaveAttribute(
+      "href",
+      `/${ORG_SLUG}/emails?tab=deliverability&list=suppressed`
+    );
   });
 });

@@ -9,7 +9,7 @@ const PAGES: { path: string; heading?: string; text?: string }[] = [
   { path: "/emails", text: "Email Activity" },
   { path: "/emails/domains", text: "Sending Domains" },
   { path: "/emails/inbound", heading: "Deploy Inbound Email with CLI" },
-  { path: "/emails/suppressions", text: "Suppression List" },
+  { path: "/emails/suppressions", text: "Email Activity" },
   { path: "/emails/broadcasts", text: "Create a broadcast" },
   { path: "/emails/templates", heading: "Email Templates" },
   { path: "/emails/brand-kits", heading: "Brand Kits" },

@@ -150,7 +150,7 @@ export const removeSuppression = orgAction(
       );
     }
 
-    revalidatePath(`/${ctx.access.orgSlug}/emails/suppressions`, "page");
+    revalidatePath(`/${ctx.access.orgSlug}/emails`, "page");
 
     return {
       success: true,
@@ -265,7 +265,7 @@ export const addSuppression = orgAction(
       );
     }
 
-    revalidatePath(`/${ctx.access.orgSlug}/emails/suppressions`, "page");
+    revalidatePath(`/${ctx.access.orgSlug}/emails`, "page");
 
     return { success: true, email: address, alreadyPresent: false };
   }

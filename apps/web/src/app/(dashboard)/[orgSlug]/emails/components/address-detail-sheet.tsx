@@ -282,9 +282,9 @@ function SuppressionSection({
         </p>
         <Link
           className="text-sm underline underline-offset-4"
-          href={`/${orgSlug}/emails/suppressions`}
+          href={`/${orgSlug}/emails?tab=deliverability&list=suppressed`}
         >
-          Open Suppression List
+          Open Suppressed list
         </Link>
       </section>
     );
