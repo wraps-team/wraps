@@ -20,7 +20,7 @@ set -uo pipefail
 # Ceiling: measured count of unused files matching the pattern below on
 # 2026-09-02 at commit c91f6043. Lower this whenever files in the slice are
 # deleted or wired up. Never raise it to make a failing run pass.
-CEILING=29
+CEILING=24
 
 PATTERN='^apps/web/src/(app|components)/'
 
