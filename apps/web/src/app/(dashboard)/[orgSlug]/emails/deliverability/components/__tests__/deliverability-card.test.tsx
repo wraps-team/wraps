@@ -430,6 +430,26 @@ describe("chart day click", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it("shows a pointer cursor on the chart when a day can be clicked", () => {
+    loadHealthy();
+    renderCard();
+    expect(screen.getByRole("figure")).toHaveClass("cursor-pointer");
+  });
+
+  it("does nothing on a day click in the low-volume state", async () => {
+    loadHealthy();
+    state.overview = overview(14, 0);
+    const onUrlUpdate = renderCard();
+    expect(screen.getByRole("figure")).not.toHaveClass("cursor-pointer");
+    await userEvent.click(screen.getByRole("button", { name: "Click day 22" }));
+    expect(
+      onUrlUpdate.mock.calls.every(
+        (call) => call[0].searchParams.get("day") === null
+      )
+    ).toBe(true);
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it("has no View causes link", () => {
     loadHealthy();
     renderCard();

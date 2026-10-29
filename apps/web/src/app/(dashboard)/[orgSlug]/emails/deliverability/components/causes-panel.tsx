@@ -10,14 +10,13 @@ import {
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useHubDays } from "@/hooks/use-hub-days";
 import {
   browserTimeZone,
   DRILLDOWN_METRIC_LABEL,
   formatDrilldownDay,
   parseDrilldownWindow,
 } from "@/lib/analytics-drilldown-window";
-import { metricParam } from "../lib/params";
+import { metricParam, useDeliverabilityDays } from "../lib/params";
 import reasonsTab from "../tabs/reasons-tab";
 import sendsTab from "../tabs/sends-tab";
 import timelineTab from "../tabs/timeline-tab";
@@ -40,7 +39,7 @@ export function CausesPanel({ orgSlug }: { orgSlug: string }) {
   const [metric] = useQueryState("metric", metricParam);
   const [driveValue, setDrive] = useQueryState("drive", driveParam);
   const [day, setDay] = useQueryState("day", parseAsString);
-  const days = useHubDays();
+  const days = useDeliverabilityDays();
 
   // Null until mounted: the server render must not carry the server's zone.
   const [tz, setTz] = useState<string | null>(null);

@@ -31,7 +31,6 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { useHubDays } from "@/hooks/use-hub-days";
 import { browserTimeZone } from "@/lib/analytics-drilldown-window";
 import {
   reputationPartialLabel,
@@ -64,7 +63,11 @@ import {
   ReputationScope,
   UpdatedLine,
 } from "../../components/summary-rail";
-import { DELIVERABILITY_METRICS, metricParam } from "../lib/params";
+import {
+  DELIVERABILITY_METRICS,
+  metricParam,
+  useDeliverabilityDays,
+} from "../lib/params";
 import { CausesPanel } from "./causes-panel";
 
 type Metric = (typeof DELIVERABILITY_METRICS)[number];
@@ -109,11 +112,6 @@ function reviewLabel(metric: Metric): string | null {
 }
 
 const CHART_HEIGHT = "h-[180px]";
-
-/** Chart buckets are daily, so a 24h range reads as 7 days. */
-function useWindowDays() {
-  return Math.max(useHubDays(), 7);
-}
 
 /**
  * Keeps the last defined value of a query. A refetch, or a range change that
@@ -220,6 +218,7 @@ function TrendChart({
   points,
   markerLines,
   lowVolumeSends,
+  clickable,
 }: {
   metric: Metric;
   days: number;
@@ -227,6 +226,8 @@ function TrendChart({
   markerLines: ReturnType<typeof useChartChangeMarkers>["markerLines"];
   /** Set only in the insufficient state, to caption the chart with its sample. */
   lowVolumeSends: number | null;
+  /** False in the low-volume states: a day click then does nothing. */
+  clickable: boolean;
 }) {
   const [, setDay] = useQueryState("day", parseAsString);
   const review = reviewPercent(metric);
@@ -260,7 +261,7 @@ function TrendChart({
     <div>
       <ChartContainer
         aria-label={ariaLabel}
-        className={`aspect-auto ${CHART_HEIGHT} w-full`}
+        className={`aspect-auto ${CHART_HEIGHT} w-full ${clickable ? "cursor-pointer" : ""}`}
         config={config}
         role="figure"
       >
@@ -270,7 +271,7 @@ function TrendChart({
           margin={{ top: 16, right: 16, bottom: 0, left: 0 }}
           onClick={(state) => {
             const day = state?.activeLabel;
-            if (typeof day !== "string") {
+            if (!clickable || typeof day !== "string") {
               return;
             }
             setDay(day);
@@ -392,7 +393,7 @@ function TrendChart({
  * and one trend chart with a metric toggle.
  */
 export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
-  const days = useWindowDays();
+  const days = useDeliverabilityDays();
   const tz = useTimeZone();
   const [metric, setMetric] = useQueryState("metric", metricParam);
   const [showMarkers, setShowMarkers] = React.useState(true);
@@ -484,6 +485,7 @@ export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
     }
     return (
       <TrendChart
+        clickable={verdict.level !== "insufficient"}
         days={days}
         lowVolumeSends={verdict.level === "insufficient" ? sends : null}
         markerLines={overlayOn ? markerLines : []}
@@ -670,7 +672,7 @@ function breakdownCopy(sends: number | null): string | null {
  * the window has too few sends to compare) or the causes panel under the card.
  */
 export function DeliverabilityBody({ orgSlug }: { orgSlug: string }) {
-  const days = useWindowDays();
+  const days = useDeliverabilityDays();
   const sends = useAnalyticsOverview(orgSlug, days).data?.totalSent ?? null;
   const note = breakdownCopy(sends);
   return (

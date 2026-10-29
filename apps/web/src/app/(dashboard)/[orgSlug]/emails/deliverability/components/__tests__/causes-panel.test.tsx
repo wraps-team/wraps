@@ -88,6 +88,14 @@ describe("CausesPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("draws the card's window: a 24h range reads as 7 days", () => {
+    state.days = 1;
+    renderPanel();
+    expect(
+      screen.getByText("Sends stub: bounce, 7 days, day none")
+    ).toBeInTheDocument();
+  });
+
   it("follows the hub range", () => {
     state.days = 90;
     renderPanel();

@@ -1,4 +1,5 @@
 import { parseAsStringLiteral } from "nuqs";
+import { useHubDays } from "@/hooks/use-hub-days";
 
 /** The metrics the deliverability views show, in toggle order. */
 export const DELIVERABILITY_METRICS = [
@@ -11,6 +12,20 @@ export const DELIVERABILITY_METRICS = [
  * The `metric` URL state. The card and the causes panel read it with this one
  * definition, so the two never disagree about its default.
  */
+/**
+ * The window the deliverability card and the causes panel both draw. Chart
+ * buckets are daily, so a 24h range reads as 7 days. Both surfaces take their
+ * days from here, so they cannot drift apart.
+ */
+export function deliverabilityWindowDays(hubDays: number): number {
+  return Math.max(hubDays, 7);
+}
+
+/** The deliverability window for the current `?days=` range. */
+export function useDeliverabilityDays(): number {
+  return deliverabilityWindowDays(useHubDays());
+}
+
 export const metricParam = parseAsStringLiteral(
   DELIVERABILITY_METRICS
 ).withDefault("bounce");
