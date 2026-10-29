@@ -2,6 +2,7 @@ import {
   DeleteSuppressedDestinationCommand,
   GetSuppressedDestinationCommand,
   ListSuppressedDestinationsCommand,
+  PutSuppressedDestinationCommand,
   SESv2Client,
   type SuppressedDestinationSummary,
   type SuppressionListReason,
@@ -333,6 +334,49 @@ export async function deleteSuppressedAddress(params: {
     logger.warn(
       { awsAccountId: account.id, err: error },
       "Failed to delete SES suppressed destination"
+    );
+    throw error;
+  }
+}
+
+export type PutSuppressedAddressResult =
+  | { status: "added" }
+  | { status: "denied" };
+
+/**
+ * Add an address to the account-level suppression list. Callers decide
+ * beforehand whether a write is needed (see the addSuppression action); this
+ * only performs the write and reports whether the role was allowed to make it.
+ */
+export async function putSuppressedAddress(params: {
+  account: AwsAccountRow;
+  email: string;
+  reason: SuppressionListReason;
+}): Promise<PutSuppressedAddressResult> {
+  const { account, email, reason } = params;
+
+  const credentials = await getOrAssumeRole({
+    roleArn: account.roleArn,
+    externalId: account.externalId,
+    region: account.region,
+  });
+  const client = sesClientFor(account, credentials);
+
+  try {
+    await client.send(
+      new PutSuppressedDestinationCommand({
+        EmailAddress: email,
+        Reason: reason,
+      })
+    );
+    return { status: "added" };
+  } catch (error) {
+    if (isAccessDeniedError(error)) {
+      return { status: "denied" };
+    }
+    logger.warn(
+      { awsAccountId: account.id, err: error },
+      "Failed to put SES suppressed destination"
     );
     throw error;
   }

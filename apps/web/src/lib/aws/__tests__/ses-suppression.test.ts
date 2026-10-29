@@ -58,6 +58,13 @@ vi.mock("@aws-sdk/client-sesv2", () => ({
       this.input = input;
     }
   },
+  PutSuppressedDestinationCommand: class {
+    _type = "PutSuppressedDestinationCommand";
+    input: Record<string, unknown>;
+    constructor(input: Record<string, unknown>) {
+      this.input = input;
+    }
+  },
 }));
 
 // Import after mocks are set up
@@ -65,6 +72,7 @@ import {
   deleteSuppressedAddress,
   getSuppressedAddress,
   listSuppressedAddresses,
+  putSuppressedAddress,
 } from "../ses-suppression";
 
 // getSuppressedAddress/deleteSuppressedAddress accept a full AwsAccountRow
@@ -506,6 +514,53 @@ describe("ses-suppression", () => {
       });
 
       expect(result.status).toBe("denied");
+    });
+  });
+  describe("putSuppressedAddress", () => {
+    it("returns added and sends the address and reason", async () => {
+      mockSend.mockResolvedValueOnce({});
+
+      const result = await putSuppressedAddress({
+        account: MOCK_ACCOUNT_1,
+        email: "bounced@example.com",
+        reason: "BOUNCE",
+      });
+
+      expect(result.status).toBe("added");
+      const sent = mockSend.mock.calls[0][0] as SesCommand;
+      expect(sent._type).toBe("PutSuppressedDestinationCommand");
+      expect(sent.input).toEqual({
+        EmailAddress: "bounced@example.com",
+        Reason: "BOUNCE",
+      });
+    });
+
+    it("returns denied on AccessDeniedException", async () => {
+      const err = new Error("AccessDeniedException");
+      err.name = "AccessDeniedException";
+      mockSend.mockRejectedValueOnce(err);
+
+      const result = await putSuppressedAddress({
+        account: MOCK_ACCOUNT_1,
+        email: "denied@example.com",
+        reason: "COMPLAINT",
+      });
+
+      expect(result.status).toBe("denied");
+    });
+
+    it("rethrows an unrelated error", async () => {
+      const err = new Error("ThrottlingException");
+      err.name = "ThrottlingException";
+      mockSend.mockRejectedValueOnce(err);
+
+      await expect(
+        putSuppressedAddress({
+          account: MOCK_ACCOUNT_1,
+          email: "slow@example.com",
+          reason: "BOUNCE",
+        })
+      ).rejects.toThrow("ThrottlingException");
     });
   });
 });
