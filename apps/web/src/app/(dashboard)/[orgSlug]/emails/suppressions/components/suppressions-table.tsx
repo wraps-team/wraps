@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@wraps/ui/components/ui/table";
 import { Search } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { type ReactNode, useMemo, useState, useTransition } from "react";
 import { listSuppressions } from "@/actions/suppressions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,10 @@ type SuppressionsTableProps = {
   initialRows: SuppressionRow[];
   initialHasMore: boolean;
   initialNextToken?: string;
+  /** Rendered to the right of the search box, in the toolbar row. */
+  toolbarEnd?: ReactNode;
+  /** Called after a successful removal, once the sheet has closed. */
+  onRemoved?: () => void;
 };
 
 export function SuppressionsTable({
@@ -40,6 +44,8 @@ export function SuppressionsTable({
   initialRows,
   initialHasMore,
   initialNextToken,
+  toolbarEnd,
+  onRemoved,
 }: SuppressionsTableProps) {
   // The open address lives in client state, never in the URL: an address is
   // personal data, and a URL reaches history, referrers and access logs.
@@ -111,7 +117,10 @@ export function SuppressionsTable({
           address={selected.email}
           key={`${selected.awsAccountId}:${selected.email}`}
           onClose={() => setSelected(null)}
-          onRemoved={() => setSelected(null)}
+          onRemoved={() => {
+            setSelected(null);
+            onRemoved?.();
+          }}
           organizationId={organizationId}
           orgSlug={orgSlug}
           suppression={{
@@ -132,6 +141,7 @@ export function SuppressionsTable({
             value={globalFilter}
           />
         </div>
+        {toolbarEnd}
       </div>
 
       <div className="rounded-md border">

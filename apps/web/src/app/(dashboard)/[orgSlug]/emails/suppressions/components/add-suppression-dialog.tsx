@@ -47,11 +47,14 @@ const REASON_OPTIONS: {
 type AddSuppressionDialogProps = {
   organizationId: string;
   accounts: { id: string; name: string; region: string }[];
+  /** Called once after a successful add, after the page has refreshed. */
+  onAdded?: () => void;
 };
 
 export function AddSuppressionDialog({
   organizationId,
   accounts,
+  onAdded,
 }: AddSuppressionDialogProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -98,6 +101,7 @@ export function AddSuppressionDialog({
         );
         router.refresh();
         handleOpenChange(false);
+        onAdded?.();
       } else {
         toast.error(result.error);
       }
