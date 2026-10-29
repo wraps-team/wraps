@@ -625,8 +625,8 @@ describe("addSuppression", () => {
       testOrg.id,
       testAwsAccount.id,
       "reason-296@example.com",
-      // @ts-expect-error — exercising the server-side guard against a bad client value
-      "SPAM"
+      // Deliberately invalid: exercises the server-side reason guard.
+      "SPAM" as unknown as "BOUNCE"
     );
 
     expect(result).toEqual({
