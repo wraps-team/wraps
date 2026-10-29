@@ -40,14 +40,15 @@ export function parseHubDays(
 /**
  * Builds a hub URL. `tab` is omitted when it is the default (`activity`) and
  * `days` when it is the default window, so the common links stay short.
- * `extra` params are appended after those, in the order given.
+ * `extra` params are appended after those, in the order given; empty and
+ * undefined values are skipped.
  */
 export function hubHref(
   orgSlug: string,
   opts: {
     tab?: HubTab;
     days?: HubDays;
-    extra?: Record<string, string>;
+    extra?: Record<string, string | undefined>;
   } = {}
 ): string {
   const params = new URLSearchParams();
@@ -58,8 +59,52 @@ export function hubHref(
     params.set("days", String(opts.days));
   }
   for (const [key, value] of Object.entries(opts.extra ?? {})) {
-    params.append(key, value);
+    if (value) {
+      params.append(key, value);
+    }
   }
   const query = params.toString();
   return query ? `/${orgSlug}/emails?${query}` : `/${orgSlug}/emails`;
+}
+
+export type DrilldownSearchParams = Record<
+  string,
+  string | string[] | undefined
+>;
+
+const DRILLDOWN_METRICS = ["bounce", "complaint", "suppression"] as const;
+const DRILLDOWN_SENDS_BY = ["broadcast", "workflow", "template", "from"];
+const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Maps the retired drilldown page's URL params onto the Deliverability tab's
+ * params (the `extra` of `hubHref`). The one place that knows the old shape:
+ * do not add params here. `tz` is dropped because the hub reads the browser
+ * zone itself, and the Addresses tab became the `recommended` list.
+ */
+export function mapDrilldownParams(
+  sp: DrilldownSearchParams
+): Record<string, string | undefined> {
+  const metric = firstValue(sp.metric);
+  const tab = firstValue(sp.tab);
+  const day = firstValue(sp.day);
+  const sendsBy = firstValue(sp["sends.by"]);
+
+  let drive: string | undefined;
+  let list: string | undefined;
+  if (tab === "reasons") {
+    drive = "reasons";
+  } else if (tab === "timeline") {
+    drive = "changes";
+  } else if (tab === "addresses") {
+    list = "recommended";
+  }
+
+  return {
+    metric: DRILLDOWN_METRICS.find((m) => m === metric),
+    drive,
+    day: day && DAY_PATTERN.test(day) ? day : undefined,
+    list,
+    "sends.by": DRILLDOWN_SENDS_BY.find((s) => s === sendsBy),
+  };
 }

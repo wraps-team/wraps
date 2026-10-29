@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   HUB_DEFAULT_DAYS,
   hubHref,
+  mapDrilldownParams,
   parseHubDays,
   parseHubTab,
 } from "../emails-hub";
@@ -65,5 +66,80 @@ describe("hubHref", () => {
         extra: { status: "bounced", q: "a@b.c" },
       })
     ).toBe("/acme/emails?days=7&status=bounced&q=a%40b.c");
+  });
+
+  it("skips empty and undefined extra values", () => {
+    expect(
+      hubHref("acme", {
+        tab: "deliverability",
+        extra: { metric: undefined, drive: "", list: "suppressed" },
+      })
+    ).toBe("/acme/emails?tab=deliverability&list=suppressed");
+  });
+});
+
+describe("mapDrilldownParams", () => {
+  it("returns nothing for no params", () => {
+    expect(mapDrilldownParams({})).toEqual({
+      metric: undefined,
+      drive: undefined,
+      day: undefined,
+      list: undefined,
+      "sends.by": undefined,
+    });
+  });
+
+  it("keeps each known metric and drops unknown ones", () => {
+    expect(mapDrilldownParams({ metric: "bounce" }).metric).toBe("bounce");
+    expect(mapDrilldownParams({ metric: "complaint" }).metric).toBe(
+      "complaint"
+    );
+    expect(mapDrilldownParams({ metric: "suppression" }).metric).toBe(
+      "suppression"
+    );
+    expect(mapDrilldownParams({ metric: "opens" }).metric).toBeUndefined();
+    expect(
+      mapDrilldownParams({ metric: ["bounce", "complaint"] }).metric
+    ).toBeUndefined();
+  });
+
+  it("maps the sends tab and absent tab to the default causes drive", () => {
+    expect(mapDrilldownParams({ tab: "sends" }).drive).toBeUndefined();
+    expect(mapDrilldownParams({}).drive).toBeUndefined();
+  });
+
+  it("maps reasons to drive=reasons and timeline to drive=changes", () => {
+    expect(mapDrilldownParams({ tab: "reasons" }).drive).toBe("reasons");
+    expect(mapDrilldownParams({ tab: "timeline" }).drive).toBe("changes");
+  });
+
+  it("maps addresses to the recommended list", () => {
+    expect(mapDrilldownParams({ tab: "addresses" }).list).toBe("recommended");
+  });
+
+  it("ignores an unknown tab", () => {
+    const mapped = mapDrilldownParams({ tab: "bogus" });
+    expect(mapped.drive).toBeUndefined();
+    expect(mapped.list).toBeUndefined();
+  });
+
+  it("keeps a well-formed day and drops anything else", () => {
+    expect(mapDrilldownParams({ day: "2026-10-22" }).day).toBe("2026-10-22");
+    expect(mapDrilldownParams({ day: "2026-10-2" }).day).toBeUndefined();
+    expect(mapDrilldownParams({ day: "22/10/2026" }).day).toBeUndefined();
+    expect(mapDrilldownParams({ day: "" }).day).toBeUndefined();
+  });
+
+  it("keeps each sends.by value and drops unknown ones", () => {
+    for (const by of ["broadcast", "workflow", "template", "from"]) {
+      expect(mapDrilldownParams({ "sends.by": by })["sends.by"]).toBe(by);
+    }
+    expect(
+      mapDrilldownParams({ "sends.by": "campaign" })["sends.by"]
+    ).toBeUndefined();
+  });
+
+  it("drops tz", () => {
+    expect(mapDrilldownParams({ tz: "UTC" })).not.toHaveProperty("tz");
   });
 });
