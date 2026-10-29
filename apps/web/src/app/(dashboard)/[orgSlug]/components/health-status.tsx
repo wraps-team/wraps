@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useEventUsage } from "@/hooks/use-event-usage";
 import { useProductsStatus } from "@/hooks/use-products-status";
 import { useSesHealth } from "@/hooks/use-ses-health-queries";
+import { hubHref } from "@/lib/emails-hub";
 import { humanizeSesHealthReason } from "@/lib/ses-health-reasons";
 import { cn } from "@/lib/utils";
 import { useProductsStore } from "@/stores/products-store";
@@ -135,7 +136,7 @@ export function HealthStatus({
       icon: <ShieldIcon className="h-3.5 w-3.5" />,
       level: sesLevel,
       metrics: reasons.length > 0 ? [...new Set(reasons)] : ["Not checked yet"],
-      href: `/${orgSlug}/emails/analytics`,
+      href: hubHref(orgSlug, { tab: "deliverability" }),
       detailedElsewhere: true,
     });
   }
@@ -160,7 +161,7 @@ export function HealthStatus({
       icon: <MailIcon className="h-3.5 w-3.5" />,
       level,
       metrics: issues,
-      href: `/${orgSlug}/emails/analytics`,
+      href: hubHref(orgSlug, { tab: "deliverability" }),
     });
   }
 

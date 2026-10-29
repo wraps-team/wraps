@@ -36,6 +36,7 @@ const EMAIL_STATUS_BADGE_VARIANT: Record<EmailStatus, BadgeVariant> = {
   active: "success",
   unsubscribed: "secondary",
   bounced: "destructive",
+  soft_bounced: "warning",
   complained: "destructive",
   suppressed: "warning",
 };

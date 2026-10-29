@@ -131,7 +131,7 @@ const LIST_PATH: Record<MarkerType, string> = {
   automation_disabled: "/automations",
   template_saved: "/emails/templates",
   contacts_imported: "/contacts",
-  suppression_removed: "/emails/suppressions",
+  suppression_removed: "/emails?tab=deliverability&list=suppressed",
   sender_defaults_changed: "/settings/sender-defaults",
 };
 
@@ -346,7 +346,7 @@ function auditMarker(
           sourceId: row.id,
           at: row.createdAt,
           label: MARKER_LABEL.suppressionRemoved(),
-          href: `/${orgSlug}/emails/suppressions`,
+          href: `/${orgSlug}/emails?tab=deliverability&list=suppressed`,
           weight: "minor",
           value: null,
         },
@@ -793,13 +793,13 @@ export function describeMarkerDelta(
 /** The one place the timeline link's query shape is written. */
 export function TIMELINE_TAB_HREF(
   orgSlug: string,
-  args: { metric: MarkerMetric; days: number; tz: string }
+  args: { metric: MarkerMetric; days: number }
 ): string {
   const search = new URLSearchParams({
+    tab: "deliverability",
     metric: args.metric,
     days: String(args.days),
-    tz: args.tz,
-    tab: "timeline",
+    drive: "changes",
   });
-  return `/${orgSlug}/emails/analytics/drilldown?${search.toString()}`;
+  return `/${orgSlug}/emails?${search.toString()}`;
 }

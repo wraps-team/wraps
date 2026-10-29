@@ -44,6 +44,8 @@ export type EmailListItem = {
   eventCount: number;
   hasOpened: boolean;
   hasClicked: boolean;
+  /** Set only for bounced messages whose SES bounce type is known. */
+  bounceKind?: "hard" | "soft" | null;
 };
 
 /** One AWS account's event-feed health, for the banners above the list. */

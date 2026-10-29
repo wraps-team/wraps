@@ -1365,14 +1365,15 @@ Resources:
                   - "ses:SendBulkEmail"
                 Resource: "*"
 
-              # SES - Suppression List (read + clear). Delete is deliberate:
+              # SES - Suppression List (read, add + clear). Put is used by the
+              # dashboard's Add address and Suppress actions. Delete is deliberate:
               # the dashboard's suppressions page unsuppresses an address.
-              # Put is intentionally absent.
               - Sid: "SESSuppressionListAccess"
                 Effect: Allow
                 Action:
                   - "ses:ListSuppressedDestinations"
                   - "ses:GetSuppressedDestination"
+                  - "ses:PutSuppressedDestination"
                   - "ses:DeleteSuppressedDestination"
                 Resource: "*"
 

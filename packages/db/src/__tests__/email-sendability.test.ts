@@ -23,10 +23,12 @@ import {
 } from "../schema/contacts";
 
 describe("SENDABLE_EMAIL_STATUSES", () => {
-  it("permits exactly one status", () => {
+  it("permits active and soft_bounced only", () => {
     // Pinned rather than derived: widening the set is a deliverability
     // decision, and it should have to be made here as well as in the map.
-    expect([...SENDABLE_EMAIL_STATUSES]).toEqual(["active"]);
+    // soft_bounced was added deliberately: SES has already retried a transient
+    // bounce, and the status escalates to bounced after repeated soft bounces.
+    expect([...SENDABLE_EMAIL_STATUSES]).toEqual(["active", "soft_bounced"]);
   });
 
   it("carries suppressed among the statuses it knows about", () => {
@@ -35,6 +37,7 @@ describe("SENDABLE_EMAIL_STATUSES", () => {
       "active",
       "unsubscribed",
       "bounced",
+      "soft_bounced",
       "complained",
       "suppressed",
     ]);
@@ -51,6 +54,10 @@ describe("isEmailSendable", () => {
 
   it("allows an active contact", () => {
     expect(isEmailSendable("active")).toBe(true);
+  });
+
+  it("allows a soft-bounced contact", () => {
+    expect(isEmailSendable("soft_bounced")).toBe(true);
   });
 
   it("treats a null status as sendable", () => {

@@ -136,6 +136,8 @@ export const exportAllContacts = orgAction(
         emailVerifiedAt: c.emailVerifiedAt,
         emailUnsubscribedAt: c.emailUnsubscribedAt,
         emailBouncedAt: c.emailBouncedAt,
+        emailLastSoftBouncedAt: c.emailLastSoftBouncedAt,
+        emailSoftBounceCount: c.emailSoftBounceCount,
         emailComplainedAt: c.emailComplainedAt,
         emailSuppressedAt: c.emailSuppressedAt,
         lastEmailSentAt: c.lastEmailSentAt,

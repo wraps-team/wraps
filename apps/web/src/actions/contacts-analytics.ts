@@ -369,6 +369,8 @@ export type ContactListHealth = {
   active: number;
   unsubscribed: number;
   bounced: number;
+  /** Soft-bounced contacts are still sendable; they escalate to "bounced". */
+  soft_bounced: number;
   complained: number;
   suppressed: number;
   /** Contacts with no email status yet — SMS-only contacts included. */
@@ -538,6 +540,7 @@ export const getContactAnalytics = orgAction(
       active: 0,
       unsubscribed: 0,
       bounced: 0,
+      soft_bounced: 0,
       complained: 0,
       suppressed: 0,
       noEmailStatus: 0,

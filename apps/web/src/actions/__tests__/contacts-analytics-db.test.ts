@@ -80,6 +80,7 @@ const contacts = [
   { id: `${PREFIX}-c-unsub`, emailStatus: "unsubscribed" as const },
   { id: `${PREFIX}-c-unsub-2`, emailStatus: "unsubscribed" as const },
   { id: `${PREFIX}-c-bounced`, emailStatus: "bounced" as const },
+  { id: `${PREFIX}-c-soft-bounced`, emailStatus: "soft_bounced" as const },
   { id: `${PREFIX}-c-complained`, emailStatus: "complained" as const },
   { id: `${PREFIX}-c-suppressed`, emailStatus: "suppressed" as const },
 ];
@@ -271,6 +272,8 @@ describe("getContactAnalytics — list health (F13)", () => {
       active: 5,
       unsubscribed: 2,
       bounced: 1,
+      // Counted in its own bucket, not lumped into noEmailStatus.
+      soft_bounced: 1,
       complained: 1,
       suppressed: 1,
       noEmailStatus: 1,
@@ -289,6 +292,7 @@ describe("getContactAnalytics — list health (F13)", () => {
       health.active +
       health.unsubscribed +
       health.bounced +
+      health.soft_bounced +
       health.complained +
       health.suppressed +
       health.noEmailStatus;

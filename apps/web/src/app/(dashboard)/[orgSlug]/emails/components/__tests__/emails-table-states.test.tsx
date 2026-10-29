@@ -11,7 +11,7 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmailListItem } from "../../types";
@@ -288,5 +288,40 @@ describe("EmailsTable pagination and search ergonomics (F2, F13)", () => {
     expect(document.activeElement).toBe(
       screen.getByPlaceholderText("Search the last 7 days")
     );
+  });
+});
+
+describe("EmailsTable bounce labels", () => {
+  function bouncedRow(
+    id: string,
+    bounceKind?: EmailListItem["bounceKind"]
+  ): EmailListItem {
+    return { ...emailRow(id), status: "bounced", bounceKind };
+  }
+
+  function statusCellFor(id: string) {
+    const row = screen.getByText(`Invoice ${id}`).closest("tr");
+    if (!row) {
+      throw new Error(`no table row for ${id}`);
+    }
+    return within(row);
+  }
+
+  it("labels a bounced row by its bounce kind and leaves unknown ones as Bounced", () => {
+    queryResult.emails = [
+      bouncedRow("hard", "hard"),
+      bouncedRow("soft", "soft"),
+      bouncedRow("unset"),
+      bouncedRow("null", null),
+      emailRow("ok"),
+    ];
+
+    render(<EmailsTable {...baseProps} hasEverSent />);
+
+    expect(statusCellFor("hard").getByText("Hard bounce")).toBeInTheDocument();
+    expect(statusCellFor("soft").getByText("Soft bounce")).toBeInTheDocument();
+    expect(statusCellFor("unset").getByText("Bounced")).toBeInTheDocument();
+    expect(statusCellFor("null").getByText("Bounced")).toBeInTheDocument();
+    expect(statusCellFor("ok").getByText("Delivered")).toBeInTheDocument();
   });
 });

@@ -680,6 +680,13 @@
       "when": 1793207085596,
       "tag": "0096_smooth_shotgun",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1793284801435,
+      "tag": "0097_useful_stick",
+      "breakpoints": true
     }
   ]
 }

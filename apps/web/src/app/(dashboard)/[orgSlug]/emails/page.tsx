@@ -1,3 +1,6 @@
+import { db } from "@wraps/db";
+import { awsAccount } from "@wraps/db/schema/app";
+import { eq } from "drizzle-orm";
 import { Mail } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -12,17 +15,32 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { getCurrentSession } from "@/lib/current-session";
+import {
+  type HubDays,
+  type HubTab,
+  parseHubDays,
+  parseHubTab,
+} from "@/lib/emails-hub";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkHasAwsAccounts, getEmailsListStatus } from "@/lib/setup-status";
+import { EngagementChart } from "./analytics/components/engagement-chart";
+import { PerformanceMetrics } from "./analytics/components/performance-metrics";
+import { RecentActivity } from "./analytics/components/recent-activity";
 import { EmailAnalytics } from "./components/email-analytics";
+import { EmailsHubHeader } from "./components/emails-hub-header";
+import { EmailsHubTabs } from "./components/emails-hub-tabs";
 import { EmailsTable } from "./components/emails-table";
 import { EmailsTableSkeleton } from "./components/emails-table-skeleton";
+import { AddressesToReview } from "./deliverability/components/addresses-to-review";
+import { DeliverabilityBody } from "./deliverability/components/deliverability-card";
+import { MetricSwitch } from "./deliverability/components/metric-switch";
 
 type EmailsPageProps = {
   params: Promise<{
     orgSlug: string;
   }>;
   searchParams: Promise<{
+    tab?: string;
     days?: string;
     q?: string;
     /** `asc` for oldest first. Absent or anything else means newest first. */
@@ -36,7 +54,10 @@ export default async function EmailsPage({
   searchParams,
 }: EmailsPageProps) {
   const { orgSlug } = await params;
-  const { days = "7", q, sort, status } = await searchParams;
+  const sp = await searchParams;
+  const tab = parseHubTab(sp.tab);
+  const days = parseHubDays(sp.days);
+  const { q, sort, status } = sp;
 
   const session = await getCurrentSession();
 
@@ -95,16 +116,79 @@ export default async function EmailsPage({
 
   return (
     <>
-      {/*
-        The page needs a heading - without one assistive tech has no page
-        identity and every message tab reads "{Org} | Wraps" (audit F14) - but
-        it does not need to occupy a block of its own. The sidebar already says
-        Emails, and the two sections below name themselves, so on screen this
-        was a third label for something nobody was unsure about.
-      */}
-      <h1 className="sr-only">Emails</h1>
+      <EmailsHubHeader orgSlug={orgSlug} />
 
-      {/* Email Analytics */}
+      <div className="mt-4">
+        <EmailsHubTabs days={days} orgSlug={orgSlug} tab={tab} />
+      </div>
+
+      <HubTabContent
+        days={days}
+        organizationId={orgWithMembership.id}
+        orgSlug={orgSlug}
+        q={q}
+        sort={sort}
+        status={status}
+        tab={tab}
+      />
+    </>
+  );
+}
+
+type HubTabContentProps = {
+  days: HubDays;
+  orgSlug: string;
+  organizationId: string;
+  q?: string;
+  sort?: string;
+  status?: string;
+  tab: HubTab;
+};
+
+/**
+ * Renders only the open tab. Inactive tabs are not rendered at all, so their
+ * queries never run.
+ */
+function HubTabContent({
+  days,
+  orgSlug,
+  organizationId,
+  q,
+  sort,
+  status,
+  tab,
+}: HubTabContentProps) {
+  if (tab === "engagement") {
+    return (
+      <div className="@container/main space-y-6 px-4 lg:px-6">
+        <EngagementChart orgSlug={orgSlug} />
+        <PerformanceMetrics orgSlug={orgSlug} />
+        <RecentActivity orgSlug={orgSlug} />
+      </div>
+    );
+  }
+
+  if (tab === "deliverability") {
+    return (
+      <div className="@container/main space-y-6 px-4 lg:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="font-semibold text-lg">Deliverability</h2>
+          <MetricSwitch />
+        </div>
+        <DeliverabilityBody orgSlug={orgSlug} />
+        <Suspense fallback={null}>
+          <AddressesToReviewSection
+            organizationId={organizationId}
+            orgSlug={orgSlug}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Email Activity */}
       <div className="px-4 lg:px-6">
         <EmailAnalytics orgSlug={orgSlug} />
       </div>
@@ -118,8 +202,8 @@ export default async function EmailsPage({
       <div className="@container/main px-4 lg:px-6">
         <Suspense fallback={<EmailsTableSkeleton />}>
           <EmailsTableSection
-            days={Number.parseInt(days, 10)}
-            organizationId={orgWithMembership.id}
+            days={days}
+            organizationId={organizationId}
             orgSlug={orgSlug}
             search={q}
             sort={sort}
@@ -128,6 +212,31 @@ export default async function EmailsPage({
         </Suspense>
       </div>
     </>
+  );
+}
+
+/**
+ * The accounts load here, not on the page, so the other tabs never run this
+ * query and the card renders without waiting on it.
+ */
+async function AddressesToReviewSection({
+  organizationId,
+  orgSlug,
+}: {
+  organizationId: string;
+  orgSlug: string;
+}) {
+  const accounts = await db.query.awsAccount.findMany({
+    where: eq(awsAccount.organizationId, organizationId),
+    columns: { id: true, name: true, region: true },
+  });
+
+  return (
+    <AddressesToReview
+      accounts={accounts}
+      organizationId={organizationId}
+      orgSlug={orgSlug}
+    />
   );
 }
 

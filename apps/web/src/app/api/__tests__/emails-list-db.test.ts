@@ -26,6 +26,9 @@ const TEST_PREFIX = "emails-list-db";
 const ORG_ID = `${TEST_PREFIX}-org`;
 const OTHER_ORG_ID = `${TEST_PREFIX}-other-org`;
 const ORG_SLUG = `${TEST_PREFIX}-org-slug`;
+// Holds the bounce-kind rows so the other suites' row counts stay as they are.
+const BOUNCE_ORG_ID = `${TEST_PREFIX}-bounce-org`;
+const BOUNCE_ORG_SLUG = `${TEST_PREFIX}-bounce-org-slug`;
 
 vi.mock("@wraps/auth", () => ({
   auth: {
@@ -41,7 +44,9 @@ vi.mock("@/lib/organization", () => ({
   getOrganizationWithMembership: vi.fn(async (slug: string) =>
     slug === ORG_SLUG
       ? { id: ORG_ID, name: "Emails List Org", slug: ORG_SLUG }
-      : null
+      : slug === BOUNCE_ORG_SLUG
+        ? { id: BOUNCE_ORG_ID, name: "Bounce Org", slug: BOUNCE_ORG_SLUG }
+        : null
   ),
 }));
 
@@ -130,15 +135,54 @@ const EXPECTED_DESC = MESSAGES.map((m) => `${TEST_PREFIX}-${m.key}`);
 
 const now = Date.now();
 
+/** Bounced rows of every class, plus a non-bounced row that carries a type. */
+const BOUNCE_ROWS = [
+  {
+    key: "hard",
+    status: "bounced" as const,
+    bounceType: "Permanent",
+    bounceSubType: "General",
+    expected: "hard",
+  },
+  {
+    key: "soft",
+    status: "bounced" as const,
+    bounceType: "Transient",
+    bounceSubType: "General",
+    expected: "soft",
+  },
+  {
+    key: "content",
+    status: "bounced" as const,
+    bounceType: "Transient",
+    bounceSubType: "ContentRejected",
+    expected: null,
+  },
+  {
+    key: "untyped",
+    status: "bounced" as const,
+    bounceType: null,
+    bounceSubType: null,
+    expected: null,
+  },
+  {
+    key: "delivered",
+    status: "delivered" as const,
+    bounceType: "Permanent",
+    bounceSubType: "General",
+    expected: null,
+  },
+];
+
 function messageIdFor(key: string) {
   return `${TEST_PREFIX}-${key}`;
 }
 
-async function callList(query: string) {
+async function callList(query: string, orgSlug: string = ORG_SLUG) {
   const { GET } = await import("../[orgSlug]/emails/route");
   const response = await GET(
-    new Request(`http://localhost/api/${ORG_SLUG}/emails?${query}`),
-    { params: Promise.resolve({ orgSlug: ORG_SLUG }) }
+    new Request(`http://localhost/api/${orgSlug}/emails?${query}`),
+    { params: Promise.resolve({ orgSlug }) }
   );
   return { response, body: await response.json() };
 }
@@ -182,6 +226,14 @@ beforeAll(async () => {
         id: OTHER_ORG_ID,
         name: "Emails List Other Org",
         slug: `${ORG_SLUG}-other`,
+        createdAt: new Date(),
+        logo: null,
+        metadata: null,
+      },
+      {
+        id: BOUNCE_ORG_ID,
+        name: "Bounce Org",
+        slug: BOUNCE_ORG_SLUG,
         createdAt: new Date(),
         logo: null,
         metadata: null,
@@ -261,6 +313,21 @@ beforeAll(async () => {
         status: "delivered" as const,
         sentAt: new Date(now - 90_000),
       },
+      ...BOUNCE_ROWS.map((row, index) => ({
+        id: messageIdFor(row.key),
+        organizationId: BOUNCE_ORG_ID,
+        awsAccountId: HEALTHY_ACCOUNT,
+        channel: "email" as const,
+        sourceType: "transactional" as const,
+        recipient: "grace@example.com",
+        subject: `Bounce ${row.key}`,
+        from: "billing@wraps.dev",
+        messageId: messageIdFor(row.key),
+        status: row.status,
+        bounceType: row.bounceType,
+        bounceSubType: row.bounceSubType,
+        sentAt: new Date(now - (index + 1) * 60_000),
+      })),
       // An SMS send in the same window - this list is email only.
       {
         id: messageIdFor("sms"),
@@ -282,11 +349,13 @@ beforeAll(async () => {
 afterAll(async () => {
   await db
     .delete(messageSend)
-    .where(inArray(messageSend.organizationId, [ORG_ID, OTHER_ORG_ID]));
+    .where(
+      inArray(messageSend.organizationId, [ORG_ID, OTHER_ORG_ID, BOUNCE_ORG_ID])
+    );
   await db.delete(awsAccount).where(eq(awsAccount.organizationId, ORG_ID));
   await db
     .delete(organization)
-    .where(inArray(organization.id, [ORG_ID, OTHER_ORG_ID]));
+    .where(inArray(organization.id, [ORG_ID, OTHER_ORG_ID, BOUNCE_ORG_ID]));
 });
 
 describe("Emails API - keyset pagination", () => {
@@ -519,5 +588,26 @@ describe("Emails API - event feed health", () => {
     expect(body.items).toHaveLength(0);
     expect(body.feed.hasEverSent).toBe(true);
     expect(body.feed.accounts).toHaveLength(2);
+  });
+});
+
+describe("Emails API - bounce kind", () => {
+  it("labels bounced rows hard or soft from the stored SES bounce type", async () => {
+    const { response, body } = await callList(
+      "days=7&limit=100",
+      BOUNCE_ORG_SLUG
+    );
+
+    expect(response.status).toBe(200);
+    expect(body.items).toHaveLength(BOUNCE_ROWS.length);
+
+    for (const row of BOUNCE_ROWS) {
+      const item = body.items.find(
+        (i: { messageId: string }) => i.messageId === messageIdFor(row.key)
+      );
+      // Permanent -> hard, Transient/General -> soft; a content rejection, a
+      // bounce with no type and a non-bounced row all stay unlabelled.
+      expect(item.bounceKind, row.key).toBe(row.expected);
+    }
   });
 });

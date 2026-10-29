@@ -491,11 +491,10 @@ export function buildConsolePolicyDocument(
     });
   }
 
-  // Allow reading and clearing the account-level SES suppression list.
-  // Delete is a deliberate write: the dashboard's suppressions page lets an
-  // operator unsuppress an address that should not be on the list. Put is
-  // NOT granted — adding a suppression from the dashboard is a separate
-  // consent question.
+  // Allow reading, adding and clearing the account-level SES suppression list.
+  // Put is used by the dashboard's "Add address" dialog and its Suppress
+  // actions. Delete is a deliberate write: the dashboard's suppressions page
+  // lets an operator unsuppress an address that should not be on the list.
   const suppressionList = emailConfig?.suppressionList as
     | Record<string, unknown>
     | undefined;
@@ -505,6 +504,7 @@ export function buildConsolePolicyDocument(
       Action: [
         "ses:ListSuppressedDestinations",
         "ses:GetSuppressedDestination",
+        "ses:PutSuppressedDestination",
         "ses:DeleteSuppressedDestination",
       ],
       Resource: "*",

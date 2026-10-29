@@ -6,6 +6,7 @@
 
 import { timingSafeEqual } from "node:crypto";
 import { notifyOrg } from "@wraps/auth/notify";
+import { classifyBounce } from "@wraps/core/bounce-classification";
 import {
   awsAccount,
   batchSend,
@@ -13,7 +14,6 @@ import {
   db,
   eq,
   hasRecentNotification,
-  type MessageSendDiagnosticInput,
   messageSend,
   messageUsageMonthly,
   organization,
@@ -33,149 +33,27 @@ import {
 import { recordSendingIdentity } from "../lib/identity-backstop";
 import { log } from "../lib/logger";
 import { logNonHomeRegionEvent } from "../lib/region-mismatch";
+import {
+  CONTACT_LINKED_EVENTS,
+  type EventBridgeEvent,
+  sdkDiagnosticFor,
+  sdkLogLifecycleFields,
+} from "../lib/ses-event";
 import { hasActiveSubscription } from "../lib/subscription-gate";
+import {
+  applyLifecycleToContact,
+  clearSoftBounce,
+  clearSoftBounceByRecipient,
+  findContactIdByRecipient,
+  markContactBounced,
+  markContactComplained,
+  markContactSuppressed,
+  recordSoftBounce,
+} from "../services/contact-bounce";
 import {
   deleteScheduledStep,
   enqueueWorkflowStep,
 } from "../services/workflow-queue";
-
-// SES event types we care about
-type SesEventType =
-  | "Send"
-  | "Delivery"
-  | "Open"
-  | "Click"
-  | "Bounce"
-  | "Complaint"
-  | "Reject"
-  | "Rendering Failure"
-  | "DeliveryDelay"
-  | "Suppressed";
-
-// EventBridge envelope structure for SES events
-type EventBridgeEvent = {
-  version: string;
-  id: string;
-  "detail-type": string;
-  source: string;
-  account: string;
-  time: string;
-  region: string;
-  detail: {
-    eventType: SesEventType;
-    mail?: {
-      messageId: string;
-      timestamp: string;
-      source: string;
-      destination: string[];
-      commonHeaders?: {
-        subject?: string;
-      };
-      tags?: Record<string, string[]>;
-    };
-    // Event-specific data
-    delivery?: {
-      timestamp: string;
-      recipients: string[];
-    };
-    // SES also sends `ipAddress` on open/click. We deliberately don't read or
-    // store it — it's recipient personal data we have no feature for.
-    open?: {
-      timestamp: string;
-      userAgent?: string;
-    };
-    click?: {
-      timestamp: string;
-      link: string;
-      userAgent?: string;
-    };
-    bounce?: {
-      bounceType: string;
-      bounceSubType: string;
-      timestamp: string;
-      // status and diagnosticCode are the receiver's SMTP diagnostic. SES sends
-      // them per recipient; they are read here and stored as a diagnostic row.
-      bouncedRecipients: Array<{
-        emailAddress: string;
-        status?: string;
-        diagnosticCode?: string;
-      }>;
-    };
-    complaint?: {
-      timestamp: string;
-      complainedRecipients: Array<{ emailAddress: string }>;
-      complaintFeedbackType?: string;
-    };
-    // Suppression event data (from transformed Lambda events)
-    suppression?: {
-      reason: string; // "Suppressed" or "OnAccountSuppressionList"
-      timestamp: string;
-      suppressedRecipients: Array<{ emailAddress: string }>;
-    };
-    // Rendering failure data (SES template variable missing, etc.)
-    failure?: {
-      errorMessage: string;
-      templateName: string;
-    };
-  };
-};
-
-/**
- * Derive the persisted status + event timestamps for an SDK send (direct SES)
- * from whichever lifecycle event arrives first. SES does NOT guarantee event
- * ordering, so the row may be materialized by a Delivery/Bounce that precedes
- * its Send event. Returns null for events that shouldn't create a standalone
- * log row on their own (Open, Click, Reject, DeliveryDelay, Rendering Failure).
- */
-function sdkLogLifecycleFields(
-  eventType: SesEventType,
-  detail: EventBridgeEvent["detail"]
-): {
-  status: "sent" | "delivered" | "bounced" | "complained" | "suppressed";
-  deliveredAt?: Date;
-  bouncedAt?: Date;
-  bounceType?: string;
-  bounceSubType?: string;
-  complainedAt?: Date;
-  suppressedAt?: Date;
-} | null {
-  switch (eventType) {
-    case "Send":
-      return { status: "sent" };
-    case "Delivery":
-      return {
-        status: "delivered",
-        deliveredAt: detail.delivery?.timestamp
-          ? new Date(detail.delivery.timestamp)
-          : undefined,
-      };
-    case "Bounce":
-      return {
-        status: "bounced",
-        bouncedAt: detail.bounce?.timestamp
-          ? new Date(detail.bounce.timestamp)
-          : undefined,
-        bounceType: detail.bounce?.bounceType,
-        bounceSubType: detail.bounce?.bounceSubType,
-      };
-    case "Complaint":
-      return {
-        status: "complained",
-        complainedAt: detail.complaint?.timestamp
-          ? new Date(detail.complaint.timestamp)
-          : undefined,
-      };
-    case "Suppressed":
-      return {
-        status: "suppressed",
-        suppressedAt: detail.suppression?.timestamp
-          ? new Date(detail.suppression.timestamp)
-          : undefined,
-      };
-    default:
-      return null;
-  }
-}
 
 /**
  * Increment delivery count for an org in message_usage_monthly.
@@ -281,6 +159,10 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
     // 4. Parse the EventBridge event
     const event = body as EventBridgeEvent;
     const { eventType, mail } = event.detail;
+    // SES reports bounces, complaints and deliveries per recipient, but a
+    // message row carries only destination[0]. Only a single-recipient send can
+    // be attributed to a contact; a multi-recipient send never touches one.
+    const singleRecipient = (mail?.destination?.length ?? 0) === 1;
 
     if (!mail?.messageId) {
       log.warn("Webhook: event missing mail.messageId", {
@@ -337,7 +219,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
     log.info("Webhook: processing event", { eventType, messageId });
 
     // 5. Find the messageSend record, scoped to the authenticated AWS account's org
-    const [message] = await db
+    const [foundMessage] = await db
       .select({
         id: messageSend.id,
         status: messageSend.status,
@@ -346,6 +228,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
         openedAt: messageSend.openedAt,
         clickedAt: messageSend.clickedAt,
         recipient: messageSend.recipient,
+        sourceType: messageSend.sourceType,
       })
       .from(messageSend)
       .where(
@@ -356,7 +239,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
       )
       .limit(1);
 
-    if (!message) {
+    if (!foundMessage) {
       // Message not found — likely sent via SDK (direct SES), not through our
       // batch pipeline. Materialize a minimal row so the send appears in email
       // logs. Because SES doesn't guarantee event order, we create the row from
@@ -368,25 +251,70 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
       let insertedRow = false;
       let insertedId: string | undefined;
       if (recipient && lifecycle) {
-        const inserted = await db
-          .insert(messageSend)
-          .values({
+        const insertRow = (client: Pick<typeof db, "insert">) =>
+          client
+            .insert(messageSend)
+            .values({
+              organizationId: account.organizationId,
+              awsAccountId: account.id,
+              channel: "email",
+              sourceType: "transactional",
+              recipient,
+              // SES includes original headers when the configuration set event
+              // destination is configured with includeOriginalHeaders — without
+              // this, invite/transactional sends show no subject in email logs.
+              subject: mail.commonHeaders?.subject ?? null,
+              from: mail.source ?? null,
+              messageId,
+              sentAt: mail.timestamp ? new Date(mail.timestamp) : new Date(),
+              ...lifecycle,
+            })
+            .onConflictDoNothing()
+            .returning({ id: messageSend.id });
+
+        // Bounce / Complaint / Suppressed / Delivery on an SDK send also update
+        // the matching contact in this org (by address), in the same
+        // transaction as the row insert so a failure rolls both back and the
+        // EventBridge retry re-materializes. No contact: nothing to apply.
+        let contactId: string | null = null;
+        if (singleRecipient && CONTACT_LINKED_EVENTS.has(eventType)) {
+          contactId = await findContactIdByRecipient({
             organizationId: account.organizationId,
-            awsAccountId: account.id,
-            channel: "email",
-            sourceType: "transactional",
             recipient,
-            // SES includes original headers when the configuration set event
-            // destination is configured with includeOriginalHeaders — without
-            // this, invite/transactional sends show no subject in email logs.
-            subject: mail.commonHeaders?.subject ?? null,
-            from: mail.source ?? null,
-            messageId,
-            sentAt: mail.timestamp ? new Date(mail.timestamp) : new Date(),
-            ...lifecycle,
-          })
-          .onConflictDoNothing()
-          .returning({ id: messageSend.id });
+          });
+        }
+        const linkable =
+          singleRecipient && (eventType === "Delivery" || contactId !== null);
+
+        let inserted: { id: string }[];
+        if (linkable) {
+          inserted = await db.transaction(async (tx) => {
+            const rows = await insertRow(tx);
+            if (rows.length > 0) {
+              if (eventType === "Delivery") {
+                await clearSoftBounceByRecipient({
+                  organizationId: account.organizationId,
+                  recipient,
+                  deliveredAt: event.detail.delivery?.timestamp
+                    ? new Date(event.detail.delivery.timestamp)
+                    : new Date(),
+                  client: tx,
+                });
+              } else if (contactId) {
+                await applyLifecycleToContact({
+                  organizationId: account.organizationId,
+                  contactId,
+                  eventType,
+                  detail: event.detail,
+                  client: tx,
+                });
+              }
+            }
+            return rows;
+          });
+        } else {
+          inserted = await insertRow(db);
+        }
         insertedRow = inserted.length > 0;
         insertedId = inserted[0]?.id;
       }
@@ -440,6 +368,26 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
       return { status: "ignored", reason: "message not found" };
     }
 
+    let message: MessageRecord = { ...foundMessage, singleRecipient };
+
+    // SDK sends (transactional rows with no contact) are linked to the contact
+    // in the same org by recipient address; in memory only, never persisted.
+    if (
+      singleRecipient &&
+      !message.contactId &&
+      message.sourceType === "transactional" &&
+      message.recipient?.trim() &&
+      CONTACT_LINKED_EVENTS.has(eventType)
+    ) {
+      const linkedContactId = await findContactIdByRecipient({
+        organizationId: account.organizationId,
+        recipient: message.recipient,
+      });
+      if (linkedContactId) {
+        message = { ...message, contactId: linkedContactId };
+      }
+    }
+
     // 6. Process based on event type
     try {
       switch (eventType) {
@@ -447,6 +395,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
           // Critical: update message status (throws on failure → 500 → EventBridge retries)
           const didTransition = await processDelivery(
             message,
+            account.organizationId,
             event.detail.delivery?.timestamp
           );
           // Best-effort side effects — don't fail the webhook. Billing must
@@ -518,6 +467,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
         case "Suppressed":
           await processSuppression(
             message,
+            account.organizationId,
             event.detail.suppression?.reason,
             event.detail.suppression?.timestamp
           );
@@ -603,41 +553,6 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
   }
 );
 
-/**
- * The diagnostic an SDK-path Bounce or Complaint stores when its event creates
- * the messageSend row. Null for every other event, and for suppression subtypes:
- * those are not recorded as bounces (see processBounce).
- */
-function sdkDiagnosticFor(
-  eventType: SesEventType,
-  detail: EventBridgeEvent["detail"],
-  recipient: string
-): Omit<MessageSendDiagnosticInput, "organizationId" | "messageSendId"> | null {
-  if (eventType === "Bounce") {
-    const subType = detail.bounce?.bounceSubType;
-    if (subType === "Suppressed" || subType === "EmailValidationSuppressed") {
-      return null;
-    }
-    return {
-      eventType: "bounce",
-      ...extractBounceDiagnostic(detail.bounce?.bouncedRecipients, recipient),
-      feedbackType: null,
-    };
-  }
-  if (eventType === "Complaint") {
-    return {
-      eventType: "complaint",
-      enhancedStatus: null,
-      diagnosticCode: null,
-      reasonKey: null,
-      feedbackType: normalizeFeedbackType(
-        detail.complaint?.complaintFeedbackType
-      ),
-    };
-  }
-  return null;
-}
-
 // Helper types
 type MessageRecord = {
   id: string;
@@ -648,10 +563,15 @@ type MessageRecord = {
   clickedAt: Date | null;
   // Optional: the existing mocks omit it, and the code tolerates undefined.
   recipient?: string | null;
+  sourceType?: string;
+  // True when the SES event named exactly one recipient. Only then may a
+  // transactional SDK send be attributed to a contact by address.
+  singleRecipient?: boolean;
 };
 
 async function processDelivery(
   message: MessageRecord,
+  organizationId: string,
   timestamp?: string
 ): Promise<boolean> {
   // Status precedence: bounced/complained cannot be overwritten by a delivery event
@@ -676,54 +596,93 @@ async function processDelivery(
   // with an atomic status='failed' flip below, so exactly one of N
   // concurrent duplicate events wins and the counter decrement can never
   // double-apply.
-  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
-  const updated = await db
-    .update(messageSend)
-    .set({ status: "delivered", deliveredAt })
-    .where(
-      and(
-        eq(messageSend.id, message.id),
-        inArray(messageSend.status, ["pending", "queued", "sent"])
-      )
-    )
-    .returning({ id: messageSend.id });
+  // Transition, batch counter and contact recovery run in ONE transaction: if
+  // the contact write fails, everything rolls back, so the EventBridge retry
+  // finds the row untransitioned instead of hitting the duplicate-event return.
+  const { didTransition, wasWronglyFailed } = await db.transaction(
+    async (tx) => {
+      // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
+      const updated = await tx
+        .update(messageSend)
+        .set({ status: "delivered", deliveredAt })
+        .where(
+          and(
+            eq(messageSend.id, message.id),
+            inArray(messageSend.status, ["pending", "queued", "sent"])
+          )
+        )
+        .returning({ id: messageSend.id });
 
-  let wasWronglyFailed = false;
-  if (updated.length === 0) {
-    // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
-    const healed = await db
-      .update(messageSend)
-      .set({ status: "delivered", deliveredAt, error: null })
-      .where(
-        and(eq(messageSend.id, message.id), eq(messageSend.status, "failed"))
-      )
-      .returning({ id: messageSend.id });
-    wasWronglyFailed = healed.length > 0;
-  }
+      let wronglyFailed = false;
+      if (updated.length === 0) {
+        // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
+        const healed = await tx
+          .update(messageSend)
+          .set({ status: "delivered", deliveredAt, error: null })
+          .where(
+            and(
+              eq(messageSend.id, message.id),
+              eq(messageSend.status, "failed")
+            )
+          )
+          .returning({ id: messageSend.id });
+        wronglyFailed = healed.length > 0;
+      }
 
-  // Only bump the counter when THIS call transitioned the row — otherwise a
-  // duplicate Delivery for an already-delivered row would double-count.
-  const didTransition = updated.length > 0 || wasWronglyFailed;
+      // Only bump the counter when THIS call transitioned the row — otherwise a
+      // duplicate Delivery for an already-delivered row would double-count.
+      const transitioned = updated.length > 0 || wronglyFailed;
+
+      if (!transitioned) {
+        return { didTransition: false, wasWronglyFailed: false };
+      }
+
+      // Increment batchSend counter if applicable
+      if (message.batchSendId) {
+        // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
+        await tx
+          .update(batchSend)
+          .set({
+            delivered: sql`${batchSend.delivered} + 1`,
+            ...(wronglyFailed
+              ? { failed: sql`greatest(${batchSend.failed} - 1, 0)` }
+              : {}),
+          })
+          .where(eq(batchSend.id, message.batchSendId));
+      }
+
+      // A successful delivery clears a soft-bounced contact. Runs only when this
+      // call transitioned the row, so duplicate Delivery events do nothing.
+      if (message.contactId) {
+        await clearSoftBounce({
+          organizationId,
+          contactId: message.contactId,
+          deliveredAt,
+          client: tx,
+        });
+      } else if (
+        message.singleRecipient &&
+        message.sourceType === "transactional" &&
+        message.recipient
+      ) {
+        // SDK send: no contact id on the row, so recover by recipient address.
+        await clearSoftBounceByRecipient({
+          organizationId,
+          recipient: message.recipient,
+          deliveredAt,
+          client: tx,
+        });
+      }
+
+      return { didTransition: true, wasWronglyFailed: wronglyFailed };
+    }
+  );
 
   if (!didTransition) {
     log.info("Webhook: duplicate delivery, skipping counter", {
       messageId: message.id,
     });
     return false;
-  }
-
-  // Increment batchSend counter if applicable
-  if (message.batchSendId) {
-    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(batchSend)
-      .set({
-        delivered: sql`${batchSend.delivered} + 1`,
-        ...(wasWronglyFailed
-          ? { failed: sql`greatest(${batchSend.failed} - 1, 0)` }
-          : {}),
-      })
-      .where(eq(batchSend.id, message.batchSendId));
   }
 
   log.info("Webhook: message delivered", {
@@ -894,7 +853,7 @@ async function processBounce(
     bounceSubType === "Suppressed" ||
     bounceSubType === "EmailValidationSuppressed"
   ) {
-    await processSuppression(message, bounceSubType, timestamp);
+    await processSuppression(message, organizationId, bounceSubType, timestamp);
     if (message.contactId) {
       await resumeWaitingExecutions(
         messageId,
@@ -927,50 +886,68 @@ async function processBounce(
 
   const bouncedAt = timestamp ? new Date(timestamp) : new Date();
 
-  // Update messageSend status — guarded on a genuine transition (WHERE status
-  // <> 'bounced') so a duplicate Bounce event does not re-count.
-  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
-  const transitioned = await db
-    .update(messageSend)
-    .set({
-      status: "bounced",
-      bouncedAt,
-      bounceType: bounceType ?? null,
-      bounceSubType: bounceSubType ?? null,
-    })
-    .where(
-      and(eq(messageSend.id, message.id), ne(messageSend.status, "bounced"))
-    )
-    .returning({ id: messageSend.id });
+  // Transition, batch counter and contact write run in ONE transaction: if the
+  // contact write fails, everything rolls back, so the EventBridge retry finds
+  // the row untransitioned instead of hitting the duplicate-event return.
+  // Contact update: hard bounces end sendability; soft bounces are counted
+  // (see services/contact-bounce.ts).
+  const kind = classifyBounce(bounceType, bounceSubType);
+  const transitioned = await db.transaction(async (tx) => {
+    // Update messageSend status — guarded on a genuine transition (WHERE status
+    // <> 'bounced') so a duplicate Bounce event does not re-count.
+    // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
+    const rows = await tx
+      .update(messageSend)
+      .set({
+        status: "bounced",
+        bouncedAt,
+        bounceType: bounceType ?? null,
+        bounceSubType: bounceSubType ?? null,
+      })
+      .where(
+        and(eq(messageSend.id, message.id), ne(messageSend.status, "bounced"))
+      )
+      .returning({ id: messageSend.id });
 
-  if (transitioned.length === 0) {
+    if (rows.length === 0) {
+      return false;
+    }
+
+    // Increment batchSend counter if applicable
+    if (message.batchSendId) {
+      // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
+      await tx
+        .update(batchSend)
+        .set({
+          bounced: sql`${batchSend.bounced} + 1`,
+        })
+        .where(eq(batchSend.id, message.batchSendId));
+    }
+
+    if (message.contactId && kind === "hard") {
+      await markContactBounced({
+        organizationId,
+        contactId: message.contactId,
+        bouncedAt,
+        client: tx,
+      });
+    } else if (message.contactId && kind === "soft") {
+      await recordSoftBounce({
+        organizationId,
+        contactId: message.contactId,
+        bouncedAt,
+        client: tx,
+      });
+    }
+
+    return true;
+  });
+
+  if (!transitioned) {
     log.info("Webhook: duplicate bounce, skipping counter", {
       messageId: message.id,
     });
     return;
-  }
-
-  // Increment batchSend counter if applicable
-  if (message.batchSendId) {
-    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(batchSend)
-      .set({
-        bounced: sql`${batchSend.bounced} + 1`,
-      })
-      .where(eq(batchSend.id, message.batchSendId));
-  }
-
-  // Update contact status for permanent bounces
-  if (message.contactId && bounceType === "Permanent") {
-    // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(contact)
-      .set({
-        emailStatus: "bounced",
-        emailBouncedAt: bouncedAt,
-      })
-      .where(eq(contact.id, message.contactId));
   }
 
   // Resume waiting workflow executions (any bounce type)
@@ -1019,48 +996,60 @@ async function processComplaint(
     log.error("Webhook: diagnostic write failed", error, { messageId });
   }
 
-  // Update messageSend status — guarded on a genuine transition (WHERE status
-  // <> 'complained') so a duplicate Complaint event does not re-count.
-  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
-  const transitioned = await db
-    .update(messageSend)
-    .set({
-      status: "complained",
-      complainedAt,
-    })
-    .where(
-      and(eq(messageSend.id, message.id), ne(messageSend.status, "complained"))
-    )
-    .returning({ id: messageSend.id });
+  // Transition, batch counter and contact write run in ONE transaction: if the
+  // contact write fails, everything rolls back, so the EventBridge retry finds
+  // the row untransitioned instead of hitting the duplicate-event return.
+  const transitioned = await db.transaction(async (tx) => {
+    // Update messageSend status — guarded on a genuine transition (WHERE status
+    // <> 'complained') so a duplicate Complaint event does not re-count.
+    // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
+    const rows = await tx
+      .update(messageSend)
+      .set({
+        status: "complained",
+        complainedAt,
+      })
+      .where(
+        and(
+          eq(messageSend.id, message.id),
+          ne(messageSend.status, "complained")
+        )
+      )
+      .returning({ id: messageSend.id });
 
-  if (transitioned.length === 0) {
+    if (rows.length === 0) {
+      return false;
+    }
+
+    // Increment batchSend counter if applicable
+    if (message.batchSendId) {
+      // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
+      await tx
+        .update(batchSend)
+        .set({
+          complained: sql`${batchSend.complained} + 1`,
+        })
+        .where(eq(batchSend.id, message.batchSendId));
+    }
+
+    // Update contact status
+    if (message.contactId) {
+      await markContactComplained({
+        organizationId,
+        contactId: message.contactId,
+        complainedAt,
+        client: tx,
+      });
+    }
+
+    return true;
+  });
+
+  if (!transitioned) {
     log.info("Webhook: duplicate complaint, skipping counter", {
       messageId: message.id,
     });
     return;
-  }
-
-  // Increment batchSend counter if applicable
-  if (message.batchSendId) {
-    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(batchSend)
-      .set({
-        complained: sql`${batchSend.complained} + 1`,
-      })
-      .where(eq(batchSend.id, message.batchSendId));
-  }
-
-  // Update contact status
-  if (message.contactId) {
-    // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(contact)
-      .set({
-        emailStatus: "complained",
-        emailComplainedAt: complainedAt,
-      })
-      .where(eq(contact.id, message.contactId));
   }
 
   // Resume waiting workflow executions — complaint is treated like a bounce
@@ -1173,53 +1162,66 @@ async function processReject(
 
 async function processSuppression(
   message: MessageRecord,
+  organizationId: string,
   suppressionReason?: string,
   timestamp?: string
 ): Promise<void> {
   const suppressedAt = timestamp ? new Date(timestamp) : new Date();
 
-  // Update messageSend status — guarded on a genuine transition (WHERE status
-  // <> 'suppressed') so a duplicate Suppressed event does not re-count.
-  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
-  const transitioned = await db
-    .update(messageSend)
-    .set({
-      status: "suppressed",
-      suppressedAt,
-    })
-    .where(
-      and(eq(messageSend.id, message.id), ne(messageSend.status, "suppressed"))
-    )
-    .returning({ id: messageSend.id });
+  // Transition, batch counter and contact write run in ONE transaction: if the
+  // contact write fails, everything rolls back, so the EventBridge retry finds
+  // the row untransitioned instead of hitting the duplicate-event return.
+  const transitioned = await db.transaction(async (tx) => {
+    // Update messageSend status — guarded on a genuine transition (WHERE status
+    // <> 'suppressed') so a duplicate Suppressed event does not re-count.
+    // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
+    const rows = await tx
+      .update(messageSend)
+      .set({
+        status: "suppressed",
+        suppressedAt,
+      })
+      .where(
+        and(
+          eq(messageSend.id, message.id),
+          ne(messageSend.status, "suppressed")
+        )
+      )
+      .returning({ id: messageSend.id });
 
-  if (transitioned.length === 0) {
+    if (rows.length === 0) {
+      return false;
+    }
+
+    // Increment batchSend counter if applicable
+    if (message.batchSendId) {
+      // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
+      await tx
+        .update(batchSend)
+        .set({
+          suppressed: sql`${batchSend.suppressed} + 1`,
+        })
+        .where(eq(batchSend.id, message.batchSendId));
+    }
+
+    // Update contact status - all suppressions mark contact as suppressed
+    if (message.contactId) {
+      await markContactSuppressed({
+        organizationId,
+        contactId: message.contactId,
+        suppressedAt,
+        client: tx,
+      });
+    }
+
+    return true;
+  });
+
+  if (!transitioned) {
     log.info("Webhook: duplicate suppression, skipping counter", {
       messageId: message.id,
     });
     return;
-  }
-
-  // Increment batchSend counter if applicable
-  if (message.batchSendId) {
-    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(batchSend)
-      .set({
-        suppressed: sql`${batchSend.suppressed} + 1`,
-      })
-      .where(eq(batchSend.id, message.batchSendId));
-  }
-
-  // Update contact status - all suppressions mark contact as suppressed
-  if (message.contactId) {
-    // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(contact)
-      .set({
-        emailStatus: "suppressed",
-        emailSuppressedAt: suppressedAt,
-      })
-      .where(eq(contact.id, message.contactId));
   }
 
   log.info("Webhook: message suppressed", {

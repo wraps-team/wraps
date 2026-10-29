@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildDrilldownHref,
   DRILLDOWN_DEFAULT_DAYS,
   DRILLDOWN_METRIC_LABEL,
   describeDrilldownWindow,
@@ -133,33 +132,6 @@ describe("validateDrilldownParams (strict, for the route)", () => {
     if (r.ok) {
       expect(r.window.tz).toBe("UTC");
     }
-  });
-});
-
-describe("buildDrilldownHref", () => {
-  it("builds a rolling link with metric, days and tz", () => {
-    expect(
-      buildDrilldownHref("acme", {
-        metric: "bounce",
-        days: 30,
-        tz: "America/New_York",
-      })
-    ).toBe(
-      "/acme/emails/analytics/drilldown?metric=bounce&days=30&tz=America%2FNew_York"
-    );
-  });
-
-  it("adds the day when given, and omits it otherwise", () => {
-    expect(
-      buildDrilldownHref("acme", {
-        metric: "complaint",
-        days: 7,
-        day: "2026-10-20",
-        tz: "UTC",
-      })
-    ).toBe(
-      "/acme/emails/analytics/drilldown?metric=complaint&days=7&day=2026-10-20&tz=UTC"
-    );
   });
 });
 

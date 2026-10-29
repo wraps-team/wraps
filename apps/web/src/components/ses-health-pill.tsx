@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 import type { SesHealthAccount } from "@/hooks/use-ses-health-queries";
 import { useSesHealth } from "@/hooks/use-ses-health-queries";
+import { hubHref } from "@/lib/emails-hub";
 import { humanizeSesHealthReason } from "@/lib/ses-health-reasons";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -69,7 +70,7 @@ export function SesHealthPill({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Link href={`/${orgSlug}/emails/analytics`}>
+        <Link href={hubHref(orgSlug, { tab: "deliverability" })}>
           <Badge variant={badgeVariant}>{label}</Badge>
         </Link>
       </TooltipTrigger>
