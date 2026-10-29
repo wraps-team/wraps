@@ -1,10 +1,7 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { ButtonGroup } from "@wraps/ui/components/ui/button-group";
 import {
   Card,
-  CardAction,
   CardContent,
   CardHeader,
   CardTitle,
@@ -20,22 +17,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@wraps/ui/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@wraps/ui/components/ui/select";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { formatDistance } from "date-fns";
 import { CircleAlert, Info, Loader2, RotateCw } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { refreshEmailChart } from "@/actions/analytics";
 import { Button } from "@/components/ui/button";
-import { RefreshButton } from "@/components/ui/refresh-button";
+import { useHubDays } from "@/hooks/use-hub-days";
 import {
   type ReputationLabel,
   reputationPartialLabel,
@@ -43,6 +31,7 @@ import {
 } from "@/lib/analytics-scope";
 import { countYAxisProps } from "@/lib/chart-axis";
 import { SERIES_COLOR } from "@/lib/chart-series";
+import { HUB_RANGES } from "@/lib/emails-hub";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { useEmailChartData } from "../analytics/hooks/use-analytics";
@@ -145,21 +134,6 @@ const chartConfig: ChartConfig = {
     icon: seriesIcon("clicked"),
   },
 };
-
-/**
- * The same windows the emails table offers, so the two controls cannot select
- * ranges that do not exist on the other. The chart reads `?days` rather than
- * holding private state — it previously defaulted to 30 over a 7-day table,
- * which guaranteed the card and the table disagreed.
- */
-const TIME_RANGES = [
-  { days: 1, short: "24h", long: "Last 24 hours" },
-  { days: 7, short: "7d", long: "Last 7 days" },
-  { days: 30, short: "30d", long: "Last 30 days" },
-  { days: 90, short: "90d", long: "Last 90 days" },
-] as const;
-
-const DEFAULT_DAYS = 7;
 
 /**
  * One height for the plot, the error state and the skeleton.
@@ -287,7 +261,6 @@ type SummaryProps = {
   generatedAt: number | undefined;
   reputation: ReputationLabel | null;
   reputationPartial: string | null;
-  refreshFailed: boolean;
 };
 
 /**
@@ -305,7 +278,6 @@ function ActivitySummary({
   generatedAt,
   reputation,
   reputationPartial,
-  refreshFailed,
 }: SummaryProps) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b pb-5">
@@ -359,9 +331,6 @@ function ActivitySummary({
       {generatedAt === undefined ? null : (
         <p className="text-muted-foreground text-xs">
           <UpdatedAgo generatedAt={generatedAt} />
-          {refreshFailed ? (
-            <span className="text-destructive"> · refresh failed</span>
-          ) : null}
         </p>
       )}
     </div>
@@ -436,58 +405,14 @@ type EmailAnalyticsProps = {
 };
 
 export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
-  const queryClient = useQueryClient();
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const reducedMotion = useReducedMotion();
-
-  const daysParam = searchParams.get("days");
-  const days =
-    TIME_RANGES.find((r) => String(r.days) === daysParam)?.days ?? DEFAULT_DAYS;
+  const days = useHubDays();
 
   const { data, isError, isFetching, isLoading, refetch } = useEmailChartData(
     orgSlug,
     days
   );
   const meta = data?.meta;
-
-  const [refreshFailed, setRefreshFailed] = useState(false);
-  /**
-   * Spoken once per refresh, and never on a timer.
-   *
-   * The visible "Updated N minutes ago" cannot be a live region - it rewrites
-   * itself every minute and would interrupt the reader each time. This says
-   * what happened, when something happened.
-   */
-  const [refreshStatus, setRefreshStatus] = useState("");
-
-  function selectDays(next: string) {
-    // Preserve every other filter on the URL — the window is not the only one.
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("days", next);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }
-
-  async function handleRefresh() {
-    // Expire the server cache FIRST. Invalidating only the React Query cache
-    // refetches a route wrapped in `unstable_cache`, which hands back the exact
-    // same bytes — the spinner spins and nothing changes.
-    const result = await refreshEmailChart(orgSlug);
-    const failed = !result.ok && result.reason === "error";
-    setRefreshFailed(failed);
-
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["emails", orgSlug] }),
-      queryClient.invalidateQueries({
-        queryKey: ["analytics", "email-chart", orgSlug],
-      }),
-    ]);
-
-    setRefreshStatus(
-      failed ? "Could not refresh email activity." : "Email activity refreshed."
-    );
-  }
 
   const overview = data?.overview;
 
@@ -522,7 +447,7 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
     (d) => d.sent > 0 || d.delivered > 0 || d.opened > 0 || d.clicked > 0
   );
 
-  const range = TIME_RANGES.find((r) => r.days === days) ?? TIME_RANGES[1];
+  const range = HUB_RANGES.find((r) => r.days === days) ?? HUB_RANGES[1];
   const reputation = meta ? reputationScopeLabel(meta) : null;
   const reputationPartial = meta ? reputationPartialLabel(meta) : null;
 
@@ -548,56 +473,8 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
         <CardTitle asChild>
           <h2>Email Activity</h2>
         </CardTitle>
-        <CardAction className="self-center">
-          <ButtonGroup
-            aria-label="Time range"
-            className="@[767px]/card:flex hidden"
-          >
-            {TIME_RANGES.map((r) => (
-              <Button
-                aria-pressed={days === r.days}
-                key={r.days}
-                onClick={() => selectDays(String(r.days))}
-                size="touch"
-                variant="outline"
-              >
-                {r.short}
-              </Button>
-            ))}
-            <RefreshButton
-              label="Refresh email activity"
-              onRefresh={handleRefresh}
-            />
-          </ButtonGroup>
-          <ButtonGroup className="@[767px]/card:hidden flex">
-            <Select onValueChange={selectDays} value={String(days)}>
-              <SelectTrigger
-                aria-label="Select time range"
-                className="w-32 **:data-[slot=select-value]:block"
-                size="touch"
-              >
-                <SelectValue placeholder="Last 7 days" />
-              </SelectTrigger>
-              <SelectContent>
-                {TIME_RANGES.map((r) => (
-                  <SelectItem key={r.days} value={String(r.days)}>
-                    {r.long}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <RefreshButton
-              label="Refresh email activity"
-              onRefresh={handleRefresh}
-            />
-          </ButtonGroup>
-        </CardAction>
       </CardHeader>
       <CardContent>
-        <p aria-live="polite" className="sr-only">
-          {refreshStatus}
-        </p>
-
         {isLoading && (
           // Mirrors the loaded card block for block. The old skeleton modelled
           // a 216px sidebar against a 452px real one, so the card grew by more
@@ -637,7 +514,6 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
             <ActivitySummary
               generatedAt={meta?.generatedAt}
               overview={overview}
-              refreshFailed={refreshFailed}
               reputation={reputation}
               reputationPartial={reputationPartial}
             />

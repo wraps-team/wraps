@@ -1,6 +1,5 @@
 "use client";
 
-import { ButtonGroup } from "@wraps/ui/components/ui/button-group";
 import {
   Card,
   CardAction,
@@ -15,13 +14,6 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@wraps/ui/components/ui/select";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -33,8 +25,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useHubDays } from "@/hooks/use-hub-days";
 import {
   browserTimeZone,
   buildDrilldownHref,
@@ -67,16 +58,8 @@ export function ComplaintChart({
   orgSlug: string;
   showChangeMarkers?: boolean;
 }) {
-  const isMobile = useIsMobile();
-  const [timeRange, setTimeRange] = React.useState("30d");
-
-  React.useEffect(() => {
-    if (isMobile) {
-      setTimeRange("7d");
-    }
-  }, [isMobile]);
-
-  const days = timeRange === "90d" ? 90 : timeRange === "30d" ? 30 : 7;
+  // The page-level range; these charts bucket by day, so 24h shows as 7 days.
+  const days = Math.max(useHubDays(), 7);
   const router = useRouter();
   // Set after mount: the server render must not carry the server's timezone.
   const [tz, setTz] = React.useState("UTC");
@@ -116,46 +99,6 @@ export function ComplaintChart({
             onPressedChange={setShowMarkers}
             pressed={showMarkers}
           />
-          <ButtonGroup className="@[767px]/card:flex hidden">
-            <Button
-              aria-pressed={timeRange === "90d"}
-              onClick={() => setTimeRange("90d")}
-              size="sm"
-              variant="outline"
-            >
-              90 days
-            </Button>
-            <Button
-              aria-pressed={timeRange === "30d"}
-              onClick={() => setTimeRange("30d")}
-              size="sm"
-              variant="outline"
-            >
-              30 days
-            </Button>
-            <Button
-              aria-pressed={timeRange === "7d"}
-              onClick={() => setTimeRange("7d")}
-              size="sm"
-              variant="outline"
-            >
-              7 days
-            </Button>
-          </ButtonGroup>
-          <Select onValueChange={setTimeRange} value={timeRange}>
-            <SelectTrigger
-              aria-label="Select time range"
-              className="flex @[767px]/card:hidden w-32 **:data-[slot=select-value]:block"
-              size="sm"
-            >
-              <SelectValue placeholder="30 days" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="90d">90 days</SelectItem>
-              <SelectItem value="30d">30 days</SelectItem>
-              <SelectItem value="7d">7 days</SelectItem>
-            </SelectContent>
-          </Select>
         </CardAction>
       </CardHeader>
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">

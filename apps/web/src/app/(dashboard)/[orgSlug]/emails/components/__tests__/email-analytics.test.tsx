@@ -10,7 +10,7 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -39,19 +39,7 @@ globalThis.matchMedia ??= ((query: string) => ({
 })) as unknown as typeof matchMedia;
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: vi.fn() }),
-  usePathname: () => "/acme/emails",
   useSearchParams: () => new URLSearchParams("days=30"),
-}));
-
-vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
-}));
-
-const refreshEmailChart = vi.fn();
-
-vi.mock("@/actions/analytics", () => ({
-  refreshEmailChart: (...args: unknown[]) => refreshEmailChart(...args),
 }));
 
 vi.mock("../lib/analytics", () => ({
@@ -108,8 +96,6 @@ function payload(volume: VolumePoint[], meta?: Partial<EmailChartMeta>) {
 afterEach(cleanup);
 
 beforeEach(() => {
-  refreshEmailChart.mockReset();
-  refreshEmailChart.mockResolvedValue({ ok: true });
   queryResult.data = undefined;
   queryResult.isError = false;
   queryResult.isFetching = false;
@@ -158,7 +144,7 @@ describe("EmailAnalytics", () => {
     ).toBeInTheDocument();
   });
 
-  it("puts the card in the heading outline and names both controls", () => {
+  it("puts the card in the heading outline", () => {
     queryResult.data = payload([
       { date: "2026-08-17", sent: 5, delivered: 5, opens: 1, clicks: 0 },
     ]);
@@ -168,10 +154,6 @@ describe("EmailAnalytics", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "Email Activity" })
     ).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Time range" })).toBeTruthy();
-    expect(
-      screen.getAllByRole("button", { name: "Refresh email activity" }).length
-    ).toBeGreaterThan(0);
   });
 
   it("does not claim an empty period when the fetch failed", () => {
@@ -233,46 +215,5 @@ describe("EmailAnalytics", () => {
     expect(
       screen.getByText(/1 of 3 AWS accounts did not report reputation/i)
     ).toBeInTheDocument();
-  });
-
-  it("stays focusable through a refresh and announces the outcome", async () => {
-    // `disabled` while pending removed the focused button from the tab order,
-    // which drops focus to <body> - a keyboard user pressed Refresh and was
-    // returned to the top of the document with nothing announced.
-    queryResult.data = payload([
-      { date: "2026-08-17", sent: 5, delivered: 5, opens: 1, clicks: 0 },
-    ]);
-
-    render(<EmailAnalytics orgSlug="acme" />);
-
-    const [refresh] = screen.getAllByRole("button", {
-      name: "Refresh email activity",
-    });
-
-    await userEvent.click(refresh);
-
-    expect(refresh).not.toBeDisabled();
-    await waitFor(() =>
-      expect(screen.getByText("Email activity refreshed.")).toBeInTheDocument()
-    );
-  });
-
-  it("says so when the refresh itself failed", async () => {
-    refreshEmailChart.mockResolvedValue({ ok: false, reason: "error" });
-    queryResult.data = payload([
-      { date: "2026-08-17", sent: 5, delivered: 5, opens: 1, clicks: 0 },
-    ]);
-
-    render(<EmailAnalytics orgSlug="acme" />);
-
-    await userEvent.click(
-      screen.getAllByRole("button", { name: "Refresh email activity" })[0]
-    );
-
-    await waitFor(() =>
-      expect(
-        screen.getByText("Could not refresh email activity.")
-      ).toBeInTheDocument()
-    );
   });
 });

@@ -17,6 +17,7 @@ import { PerformanceMetrics } from "../performance-metrics";
 const pushSpy = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushSpy }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("@/hooks/use-mobile", () => ({

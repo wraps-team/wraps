@@ -12,9 +12,24 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { getCurrentSession } from "@/lib/current-session";
+import {
+  type HubDays,
+  type HubTab,
+  parseHubDays,
+  parseHubTab,
+} from "@/lib/emails-hub";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkHasAwsAccounts, getEmailsListStatus } from "@/lib/setup-status";
+import { BounceTypeChart } from "./analytics/components/bounce-type-chart";
+import { ComplaintChart } from "./analytics/components/complaint-chart";
+import { DeliverabilityChart } from "./analytics/components/deliverability-chart";
+import { EngagementChart } from "./analytics/components/engagement-chart";
+import { PerformanceMetrics } from "./analytics/components/performance-metrics";
+import { RecentActivity } from "./analytics/components/recent-activity";
+import { SuppressionChart } from "./analytics/components/suppression-chart";
 import { EmailAnalytics } from "./components/email-analytics";
+import { EmailsHubHeader } from "./components/emails-hub-header";
+import { EmailsHubTabs } from "./components/emails-hub-tabs";
 import { EmailsTable } from "./components/emails-table";
 import { EmailsTableSkeleton } from "./components/emails-table-skeleton";
 
@@ -23,6 +38,7 @@ type EmailsPageProps = {
     orgSlug: string;
   }>;
   searchParams: Promise<{
+    tab?: string;
     days?: string;
     q?: string;
     /** `asc` for oldest first. Absent or anything else means newest first. */
@@ -36,7 +52,10 @@ export default async function EmailsPage({
   searchParams,
 }: EmailsPageProps) {
   const { orgSlug } = await params;
-  const { days = "7", q, sort, status } = await searchParams;
+  const sp = await searchParams;
+  const tab = parseHubTab(sp.tab);
+  const days = parseHubDays(sp.days);
+  const { q, sort, status } = sp;
 
   const session = await getCurrentSession();
 
@@ -95,16 +114,74 @@ export default async function EmailsPage({
 
   return (
     <>
-      {/*
-        The page needs a heading - without one assistive tech has no page
-        identity and every message tab reads "{Org} | Wraps" (audit F14) - but
-        it does not need to occupy a block of its own. The sidebar already says
-        Emails, and the two sections below name themselves, so on screen this
-        was a third label for something nobody was unsure about.
-      */}
-      <h1 className="sr-only">Emails</h1>
+      <EmailsHubHeader orgSlug={orgSlug} />
 
-      {/* Email Analytics */}
+      <div className="mt-4">
+        <EmailsHubTabs days={days} orgSlug={orgSlug} tab={tab} />
+      </div>
+
+      <HubTabContent
+        days={days}
+        organizationId={orgWithMembership.id}
+        orgSlug={orgSlug}
+        q={q}
+        sort={sort}
+        status={status}
+        tab={tab}
+      />
+    </>
+  );
+}
+
+type HubTabContentProps = {
+  days: HubDays;
+  orgSlug: string;
+  organizationId: string;
+  q?: string;
+  sort?: string;
+  status?: string;
+  tab: HubTab;
+};
+
+/**
+ * Renders only the open tab. Inactive tabs are not rendered at all, so their
+ * queries never run.
+ */
+function HubTabContent({
+  days,
+  orgSlug,
+  organizationId,
+  q,
+  sort,
+  status,
+  tab,
+}: HubTabContentProps) {
+  if (tab === "engagement") {
+    return (
+      <div className="@container/main space-y-6 px-4 lg:px-6">
+        <EngagementChart orgSlug={orgSlug} />
+        <PerformanceMetrics orgSlug={orgSlug} />
+        <RecentActivity orgSlug={orgSlug} />
+      </div>
+    );
+  }
+
+  if (tab === "deliverability") {
+    return (
+      <div className="@container/main space-y-6 px-4 lg:px-6">
+        <DeliverabilityChart orgSlug={orgSlug} showChangeMarkers />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <BounceTypeChart orgSlug={orgSlug} showChangeMarkers />
+          <SuppressionChart orgSlug={orgSlug} showChangeMarkers />
+          <ComplaintChart orgSlug={orgSlug} showChangeMarkers />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Email Activity */}
       <div className="px-4 lg:px-6">
         <EmailAnalytics orgSlug={orgSlug} />
       </div>
@@ -118,8 +195,8 @@ export default async function EmailsPage({
       <div className="@container/main px-4 lg:px-6">
         <Suspense fallback={<EmailsTableSkeleton />}>
           <EmailsTableSection
-            days={Number.parseInt(days, 10)}
-            organizationId={orgWithMembership.id}
+            days={days}
+            organizationId={organizationId}
             orgSlug={orgSlug}
             search={q}
             sort={sort}

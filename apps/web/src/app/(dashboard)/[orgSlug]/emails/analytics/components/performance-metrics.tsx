@@ -10,6 +10,7 @@ import { Progress } from "@wraps/ui/components/ui/progress";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useHubDays } from "@/hooks/use-hub-days";
 import {
   browserTimeZone,
   buildDrilldownHref,
@@ -67,7 +68,8 @@ function MetricRow({
 }
 
 export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
-  const { data, isLoading, error } = useAnalyticsOverview(orgSlug, 30);
+  const days = useHubDays();
+  const { data, isLoading, error } = useAnalyticsOverview(orgSlug, days);
   // Set after mount: the server render must not carry the server's timezone.
   const [tz, setTz] = useState("UTC");
   useEffect(() => {
@@ -135,7 +137,7 @@ export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
       total: effectiveSent,
       percentage: windowRate(data.totalBounced),
       tone: "warning",
-      href: buildDrilldownHref(orgSlug, { metric: "bounce", days: 30, tz }),
+      href: buildDrilldownHref(orgSlug, { metric: "bounce", days, tz }),
     },
     {
       label: "Complaints",
@@ -143,7 +145,7 @@ export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
       total: effectiveSent,
       percentage: windowRate(data.totalComplaints),
       tone: "destructive",
-      href: buildDrilldownHref(orgSlug, { metric: "complaint", days: 30, tz }),
+      href: buildDrilldownHref(orgSlug, { metric: "complaint", days, tz }),
     },
   ];
 
