@@ -444,4 +444,54 @@ describe("webhook SDK-send contact linking (real DB)", () => {
     expect(row.emailStatus).toBe("soft_bounced");
     expect(row.emailSoftBounceCount).toBe(1);
   });
+
+  // The recipient-keyed recovery UPDATE has no org-scoped lookup before it, so
+  // cases 15 and 16 are the guard against it touching another org's contact.
+  async function seedOtherOrgSoftBounced() {
+    await resetContact(
+      fixture.ids.contact,
+      `${TEST_PREFIX}-primary@example.com`
+    );
+    await resetContact(fixture.ids.otherContact, EMAIL, {
+      emailStatus: "soft_bounced",
+      emailSoftBounceCount: 1,
+      emailLastSoftBouncedAt: T0,
+    });
+  }
+
+  async function expectOtherOrgStillSoftBounced() {
+    const other = await readContact(fixture.ids.otherContact);
+    expect(other.emailStatus).toBe("soft_bounced");
+    expect(other.emailSoftBounceCount).toBe(1);
+    expect(other.emailLastSoftBouncedAt?.toISOString()).toBe(T0.toISOString());
+  }
+
+  it("15. a Delivery as the first event does not recover a soft-bounced contact in another org", async () => {
+    await seedOtherOrgSoftBounced();
+
+    await post200(
+      buildDeliveryEvent({
+        mail: mailFor(nextMessageId()),
+        deliveredAt: new Date(T0.getTime() + HOUR).toISOString(),
+      })
+    );
+
+    await expectOtherOrgStillSoftBounced();
+  });
+
+  it("16. Send then Delivery does not recover a soft-bounced contact in another org", async () => {
+    await seedOtherOrgSoftBounced();
+    const messageId = nextMessageId();
+
+    await post200(sendEvent(messageId));
+    await post200(
+      buildDeliveryEvent({
+        mail: mailFor(messageId),
+        deliveredAt: new Date(T0.getTime() + HOUR).toISOString(),
+      })
+    );
+
+    expect((await readSend(messageId)).status).toBe("delivered");
+    await expectOtherOrgStillSoftBounced();
+  });
 });

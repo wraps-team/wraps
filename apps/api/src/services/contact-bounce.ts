@@ -4,8 +4,6 @@
  * routes/webhooks.ts.
  *
  * Soft-bounce policy:
- *
- * Policy:
  * - A soft bounce sets the contact to `soft_bounced`, which is still sendable
  *   (SES already retried before reporting it).
  * - The soft-bounce count rises at most once per SOFT_BOUNCE_MIN_GAP_HOURS, so a
