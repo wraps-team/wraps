@@ -18,6 +18,7 @@ import {
 import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkHasAwsAccounts } from "@/lib/setup-status";
+import { AddSuppressionDialog } from "./components/add-suppression-dialog";
 import { SuppressionsTable } from "./components/suppressions-table";
 import type { SuppressionRow } from "./types";
 
@@ -187,7 +188,7 @@ export default async function SuppressionsPage({
 
   const accounts = await db.query.awsAccount.findMany({
     where: eq(awsAccount.organizationId, orgWithMembership.id),
-    columns: { id: true },
+    columns: { id: true, name: true, region: true },
   });
 
   const allDenied =
@@ -216,11 +217,17 @@ export default async function SuppressionsPage({
 
   return (
     <div className="space-y-6 px-4 lg:px-6">
-      <div>
-        <h1 className="font-bold text-3xl">Suppression List</h1>
-        <p className="text-muted-foreground">
-          Addresses AWS SES will not send to, read live from your AWS account.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-bold text-3xl">Suppression List</h1>
+          <p className="text-muted-foreground">
+            Addresses AWS SES will not send to, read live from your AWS account.
+          </p>
+        </div>
+        <AddSuppressionDialog
+          accounts={accounts}
+          organizationId={orgWithMembership.id}
+        />
       </div>
 
       {page.deniedAccountIds.length > 0 && (
