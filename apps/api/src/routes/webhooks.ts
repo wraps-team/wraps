@@ -35,7 +35,16 @@ import { recordSendingIdentity } from "../lib/identity-backstop";
 import { log } from "../lib/logger";
 import { logNonHomeRegionEvent } from "../lib/region-mismatch";
 import { hasActiveSubscription } from "../lib/subscription-gate";
-import { clearSoftBounce, recordSoftBounce } from "../services/contact-bounce";
+import {
+  applyLifecycleToContact,
+  clearSoftBounce,
+  clearSoftBounceByRecipient,
+  findContactIdByRecipient,
+  markContactBounced,
+  markContactComplained,
+  markContactSuppressed,
+  recordSoftBounce,
+} from "../services/contact-bounce";
 import {
   deleteScheduledStep,
   enqueueWorkflowStep,
@@ -521,6 +530,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
         case "Suppressed":
           await processSuppression(
             message,
+            account.organizationId,
             event.detail.suppression?.reason,
             event.detail.suppression?.timestamp
           );
@@ -925,7 +935,7 @@ async function processBounce(
     bounceSubType === "Suppressed" ||
     bounceSubType === "EmailValidationSuppressed"
   ) {
-    await processSuppression(message, bounceSubType, timestamp);
+    await processSuppression(message, organizationId, bounceSubType, timestamp);
     if (message.contactId) {
       await resumeWaitingExecutions(
         messageId,
@@ -997,14 +1007,12 @@ async function processBounce(
     }
 
     if (message.contactId && kind === "hard") {
-      // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
-      await tx
-        .update(contact)
-        .set({
-          emailStatus: "bounced",
-          emailBouncedAt: bouncedAt,
-        })
-        .where(eq(contact.id, message.contactId));
+      await markContactBounced({
+        organizationId,
+        contactId: message.contactId,
+        bouncedAt,
+        client: tx,
+      });
     } else if (message.contactId && kind === "soft") {
       await recordSoftBounce({
         organizationId,
@@ -1104,14 +1112,11 @@ async function processComplaint(
 
   // Update contact status
   if (message.contactId) {
-    // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(contact)
-      .set({
-        emailStatus: "complained",
-        emailComplainedAt: complainedAt,
-      })
-      .where(eq(contact.id, message.contactId));
+    await markContactComplained({
+      organizationId,
+      contactId: message.contactId,
+      complainedAt,
+    });
   }
 
   // Resume waiting workflow executions — complaint is treated like a bounce
@@ -1224,6 +1229,7 @@ async function processReject(
 
 async function processSuppression(
   message: MessageRecord,
+  organizationId: string,
   suppressionReason?: string,
   timestamp?: string
 ): Promise<void> {
@@ -1263,14 +1269,11 @@ async function processSuppression(
 
   // Update contact status - all suppressions mark contact as suppressed
   if (message.contactId) {
-    // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(contact)
-      .set({
-        emailStatus: "suppressed",
-        emailSuppressedAt: suppressedAt,
-      })
-      .where(eq(contact.id, message.contactId));
+    await markContactSuppressed({
+      organizationId,
+      contactId: message.contactId,
+      suppressedAt,
+    });
   }
 
   log.info("Webhook: message suppressed", {

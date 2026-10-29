@@ -1,5 +1,9 @@
 /**
- * Contact updates driven by SES soft bounces (called from routes/webhooks.ts).
+ * The single place that writes deliverability state (bounced, soft_bounced,
+ * complained, suppressed, recovery) onto a contact. Called from
+ * routes/webhooks.ts.
+ *
+ * Soft-bounce policy:
  *
  * Policy:
  * - A soft bounce sets the contact to `soft_bounced`, which is still sendable
@@ -15,15 +19,22 @@
  *   the count AND clears `emailLastSoftBouncedAt`: "consecutive" ends at a
  *   successful delivery, so the 24-hour rule must not look back across it.
  *
- * Both writes are a single atomic UPDATE scoped by organizationId. They accept
+ * Every write is a single atomic UPDATE scoped by organizationId. They accept
  * an optional `client` so callers can run them inside their own transaction.
  */
 
 import {
+  classifyBounce,
   SOFT_BOUNCE_ESCALATION_THRESHOLD,
   SOFT_BOUNCE_MIN_GAP_HOURS,
 } from "@wraps/core/bounce-classification";
-import { contact, db, eq } from "@wraps/db";
+import {
+  contact,
+  db,
+  eq,
+  findContactByEmailHash,
+  hashContactValue,
+} from "@wraps/db";
 import { and, inArray, isNull, lt, or, sql } from "drizzle-orm";
 
 type DbClient = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -96,4 +107,208 @@ export async function clearSoftBounce({
         )
       )
     );
+}
+
+export async function markContactBounced({
+  organizationId,
+  contactId,
+  bouncedAt,
+  client = db,
+}: {
+  organizationId: string;
+  contactId: string;
+  bouncedAt: Date;
+  client?: DbClient;
+}): Promise<void> {
+  await client
+    .update(contact)
+    .set({ emailStatus: "bounced", emailBouncedAt: bouncedAt })
+    .where(
+      and(eq(contact.id, contactId), eq(contact.organizationId, organizationId))
+    );
+}
+
+export async function markContactComplained({
+  organizationId,
+  contactId,
+  complainedAt,
+  client = db,
+}: {
+  organizationId: string;
+  contactId: string;
+  complainedAt: Date;
+  client?: DbClient;
+}): Promise<void> {
+  await client
+    .update(contact)
+    .set({ emailStatus: "complained", emailComplainedAt: complainedAt })
+    .where(
+      and(eq(contact.id, contactId), eq(contact.organizationId, organizationId))
+    );
+}
+
+export async function markContactSuppressed({
+  organizationId,
+  contactId,
+  suppressedAt,
+  client = db,
+}: {
+  organizationId: string;
+  contactId: string;
+  suppressedAt: Date;
+  client?: DbClient;
+}): Promise<void> {
+  await client
+    .update(contact)
+    .set({ emailStatus: "suppressed", emailSuppressedAt: suppressedAt })
+    .where(
+      and(eq(contact.id, contactId), eq(contact.organizationId, organizationId))
+    );
+}
+
+/**
+ * Find the contact in `organizationId` whose email matches `recipient`
+ * (case-insensitive, via the contact email hash). Returns null when there is
+ * none; never creates a contact.
+ */
+export async function findContactIdByRecipient({
+  organizationId,
+  recipient,
+  client = db,
+}: {
+  organizationId: string;
+  recipient: string | null | undefined;
+  client?: DbClient;
+}): Promise<string | null> {
+  if (!recipient?.trim()) {
+    return null;
+  }
+  const found = await findContactByEmailHash(
+    hashContactValue(recipient),
+    organizationId,
+    client
+  );
+  return found?.id ?? null;
+}
+
+/**
+ * Same as clearSoftBounce but keyed by recipient address, for deliveries on SDK
+ * sends where no contact id is known. One UPDATE; matches no row in the common
+ * case.
+ */
+export async function clearSoftBounceByRecipient({
+  organizationId,
+  recipient,
+  deliveredAt,
+  client = db,
+}: {
+  organizationId: string;
+  recipient: string;
+  deliveredAt: Date;
+  client?: DbClient;
+}): Promise<void> {
+  if (!recipient.trim()) {
+    return;
+  }
+  await client
+    .update(contact)
+    .set({
+      emailStatus: "active",
+      emailSoftBounceCount: 0,
+      emailLastSoftBouncedAt: null,
+    })
+    .where(
+      and(
+        eq(contact.emailHash, hashContactValue(recipient)),
+        eq(contact.organizationId, organizationId),
+        eq(contact.emailStatus, "soft_bounced"),
+        or(
+          isNull(contact.emailLastSoftBouncedAt),
+          lt(contact.emailLastSoftBouncedAt, deliveredAt)
+        )
+      )
+    );
+}
+
+type LifecycleDetail = {
+  bounce?: { bounceType?: string; bounceSubType?: string; timestamp?: string };
+  complaint?: { timestamp?: string };
+  suppression?: { timestamp?: string };
+  delivery?: { timestamp?: string };
+};
+
+function eventTime(timestamp: string | undefined): Date {
+  return timestamp ? new Date(timestamp) : new Date();
+}
+
+/**
+ * Apply an SES lifecycle event to a contact with the same rules the webhook
+ * uses for broadcast sends. Used when the first event for an SDK send creates
+ * the message row.
+ */
+export async function applyLifecycleToContact({
+  organizationId,
+  contactId,
+  eventType,
+  detail,
+  client = db,
+}: {
+  organizationId: string;
+  contactId: string;
+  eventType: string;
+  detail: LifecycleDetail;
+  client?: DbClient;
+}): Promise<void> {
+  switch (eventType) {
+    case "Bounce": {
+      const bounceType = detail.bounce?.bounceType;
+      const bounceSubType = detail.bounce?.bounceSubType;
+      const bouncedAt = eventTime(detail.bounce?.timestamp);
+      if (
+        bounceSubType === "Suppressed" ||
+        bounceSubType === "EmailValidationSuppressed"
+      ) {
+        await markContactSuppressed({
+          organizationId,
+          contactId,
+          suppressedAt: bouncedAt,
+          client,
+        });
+        return;
+      }
+      const kind = classifyBounce(bounceType, bounceSubType);
+      if (kind === "hard") {
+        await markContactBounced({ organizationId, contactId, bouncedAt, client });
+      } else if (kind === "soft") {
+        await recordSoftBounce({ organizationId, contactId, bouncedAt, client });
+      }
+      return;
+    }
+    case "Complaint":
+      await markContactComplained({
+        organizationId,
+        contactId,
+        complainedAt: eventTime(detail.complaint?.timestamp),
+        client,
+      });
+      return;
+    case "Suppressed":
+      await markContactSuppressed({
+        organizationId,
+        contactId,
+        suppressedAt: eventTime(detail.suppression?.timestamp),
+        client,
+      });
+      return;
+    case "Delivery":
+      await clearSoftBounce({
+        organizationId,
+        contactId,
+        deliveredAt: eventTime(detail.delivery?.timestamp),
+        client,
+      });
+      return;
+    default:
+      return;
+  }
 }
