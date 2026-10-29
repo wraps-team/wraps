@@ -1,3 +1,6 @@
+import { db } from "@wraps/db";
+import { awsAccount } from "@wraps/db/schema/app";
+import { eq } from "drizzle-orm";
 import { Mail } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -28,6 +31,7 @@ import { EmailsHubHeader } from "./components/emails-hub-header";
 import { EmailsHubTabs } from "./components/emails-hub-tabs";
 import { EmailsTable } from "./components/emails-table";
 import { EmailsTableSkeleton } from "./components/emails-table-skeleton";
+import { AddressesToReview } from "./deliverability/components/addresses-to-review";
 import { DeliverabilityBody } from "./deliverability/components/deliverability-card";
 
 type EmailsPageProps = {
@@ -168,6 +172,12 @@ function HubTabContent({
       <div className="@container/main space-y-6 px-4 lg:px-6">
         <h2 className="font-semibold text-lg">Deliverability</h2>
         <DeliverabilityBody orgSlug={orgSlug} />
+        <Suspense fallback={null}>
+          <AddressesToReviewSection
+            organizationId={organizationId}
+            orgSlug={orgSlug}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -198,6 +208,31 @@ function HubTabContent({
         </Suspense>
       </div>
     </>
+  );
+}
+
+/**
+ * The accounts load here, not on the page, so the other tabs never run this
+ * query and the card renders without waiting on it.
+ */
+async function AddressesToReviewSection({
+  organizationId,
+  orgSlug,
+}: {
+  organizationId: string;
+  orgSlug: string;
+}) {
+  const accounts = await db.query.awsAccount.findMany({
+    where: eq(awsAccount.organizationId, organizationId),
+    columns: { id: true, name: true, region: true },
+  });
+
+  return (
+    <AddressesToReview
+      accounts={accounts}
+      organizationId={organizationId}
+      orgSlug={orgSlug}
+    />
   );
 }
 
