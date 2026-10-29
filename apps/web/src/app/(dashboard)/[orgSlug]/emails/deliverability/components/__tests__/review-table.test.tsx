@@ -16,7 +16,7 @@ import { ReviewTable } from "../review-table";
 function row(overrides: Partial<ReviewRow> & { address: string }): ReviewRow {
   return {
     kinds: ["hard"],
-    why: "Hard bounce",
+    why: "Bounced hard on the first send",
     soft: 0,
     hard: 1,
     complaints: 0,
@@ -41,7 +41,7 @@ const ROWS: ReviewRow[] = [
   row({
     address: "unknown@example.com",
     status: "unknown",
-    why: "Complaint",
+    why: "Reported as spam twice",
     complaints: 2,
     hard: 0,
     reasonToSuppress: "COMPLAINT",
@@ -138,7 +138,11 @@ describe("ReviewTable", () => {
       />
     );
     const bounceRow = screen.getByText("bounce@example.com").closest("tr");
-    await user.click(within(bounceRow as HTMLElement).getByText("Hard bounce"));
+    await user.click(
+      within(bounceRow as HTMLElement).getByText(
+        "Bounced hard on the first send"
+      )
+    );
     expect(onOpen).toHaveBeenCalledTimes(1);
     expect(onOpen.mock.calls[0][0].address).toBe("bounce@example.com");
   });

@@ -23,6 +23,22 @@ type ReviewTableProps = {
   onSuppress: (row: ReviewRow) => void;
 };
 
+/** Row tags: hard bounces and complaints are destructive, soft bounces warn. */
+const KIND_BADGE: Record<
+  ReviewRow["kinds"][number],
+  "destructive" | "warning"
+> = {
+  hard: "destructive",
+  complaint: "destructive",
+  soft: "warning",
+};
+
+const KIND_LABEL: Record<ReviewRow["kinds"][number], string> = {
+  hard: "Hard bounce",
+  complaint: "Complaint",
+  soft: "Soft bounce",
+};
+
 function eventsText(row: ReviewRow, list: ReviewTableProps["list"]): string {
   const parts: string[] = [];
   if (row.hard > 0) {
@@ -87,7 +103,16 @@ export function ReviewTable({
                   </button>
                 </TableCell>
                 <TableCell>
-                  <p className="text-muted-foreground text-sm">{row.why}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {row.kinds.map((kind) => (
+                      <Badge key={kind} variant={KIND_BADGE[kind]}>
+                        {KIND_LABEL[kind]}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-muted-foreground text-sm">
+                    {row.why}
+                  </p>
                   {row.status === "unknown" ? (
                     <p className="text-muted-foreground text-xs">
                       SES status unknown
