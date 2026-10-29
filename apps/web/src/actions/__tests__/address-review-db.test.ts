@@ -15,7 +15,7 @@ import {
   organization,
   user,
 } from "@wraps/db";
-import { eq, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,

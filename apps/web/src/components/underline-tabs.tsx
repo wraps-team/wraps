@@ -62,7 +62,7 @@ export function UnderlineTabs<T extends string>({
       return;
     }
     event.preventDefault();
-    let next = current;
+    let next: number;
     if (event.key === "Home") {
       next = 0;
     } else if (event.key === "End") {
