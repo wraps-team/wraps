@@ -13,7 +13,7 @@ const PAGES: { path: string; heading?: string; text?: string }[] = [
   { path: "/emails/broadcasts", text: "Create a broadcast" },
   { path: "/emails/templates", heading: "Email Templates" },
   { path: "/emails/brand-kits", heading: "Brand Kits" },
-  { path: "/emails/analytics", text: "Email Analytics" },
+  { path: "/emails/analytics", text: "Email Activity" },
   { path: "/sms", text: "SMS Messages" },
   { path: "/sms/analytics", text: "SMS Analytics" },
   { path: "/contacts", heading: "Contacts" },

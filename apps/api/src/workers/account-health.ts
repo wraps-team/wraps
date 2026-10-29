@@ -613,7 +613,7 @@ async function checkAccount(account: AccountRow): Promise<void> {
       type: "ses.reputation_warning",
       title: "SES reputation needs attention",
       body: `AWS account ${account.accountId} is in the SES review range: ${parts.join("; ")}. Clean your lists and investigate recent bounces/complaints before AWS pauses sending.`,
-      href: `/${orgSlug}/emails/analytics`,
+      href: `/${orgSlug}/emails?tab=deliverability`,
       data: { bounceRate, complaintRate },
     });
   }

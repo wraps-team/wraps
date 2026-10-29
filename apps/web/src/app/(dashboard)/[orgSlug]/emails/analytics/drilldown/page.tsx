@@ -1,5 +1,6 @@
 import { auth } from "@wraps/auth";
 import { redirect } from "next/navigation";
+import { hubHref } from "@/lib/emails-hub";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkHasAwsAccounts } from "@/lib/setup-status";
 import { DrilldownShell } from "./components/drilldown-shell";
@@ -37,8 +38,8 @@ export default async function DrilldownPage({ params }: DrilldownPageProps) {
   const hasAccounts = await checkHasAwsAccounts(orgWithMembership.id);
 
   if (!hasAccounts) {
-    // The analytics page renders the connect prompt for an org without accounts.
-    redirect(`/${orgSlug}/emails/analytics`);
+    // The Deliverability tab renders the connect prompt for an org without accounts.
+    redirect(hubHref(orgSlug, { tab: "deliverability" }));
   }
 
   return (

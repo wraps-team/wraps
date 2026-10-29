@@ -14,6 +14,7 @@ import {
   describeDrilldownWindow,
   parseDrilldownWindow,
 } from "@/lib/analytics-drilldown-window";
+import { hubHref } from "@/lib/emails-hub";
 import addressesTab from "../tabs/addresses-tab";
 import reasonsTab from "../tabs/reasons-tab";
 import sendsTab from "../tabs/sends-tab";
@@ -51,9 +52,9 @@ export function DrilldownShell({ orgSlug }: { orgSlug: string }) {
     <div className="flex flex-col gap-6">
       <Link
         className="text-muted-foreground text-sm hover:text-foreground"
-        href={`/${orgSlug}/emails/analytics`}
+        href={hubHref(orgSlug, { tab: "deliverability" })}
       >
-        Back to analytics
+        Back to Deliverability
       </Link>
 
       <div className="flex flex-col gap-2">
