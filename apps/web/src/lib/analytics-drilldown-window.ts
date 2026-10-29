@@ -171,30 +171,6 @@ export function validateDrilldownParams(
   };
 }
 
-/**
- * Builds the drill-down link used by the analytics entry points. Keys are
- * written in one fixed order so the same window always yields the same URL.
- */
-export function buildDrilldownHref(
-  orgSlug: string,
-  args: {
-    metric: DrilldownMetric;
-    days: number;
-    day?: string | null;
-    tz: string;
-  }
-): string {
-  const search = new URLSearchParams({
-    metric: args.metric,
-    days: String(args.days),
-  });
-  if (args.day) {
-    search.set("day", args.day);
-  }
-  search.set("tz", args.tz);
-  return `/${orgSlug}/emails/analytics/drilldown?${search.toString()}`;
-}
-
 export const DRILLDOWN_METRIC_LABEL: Record<DrilldownMetric, string> = {
   bounce: "Bounce rate",
   complaint: "Complaint rate",

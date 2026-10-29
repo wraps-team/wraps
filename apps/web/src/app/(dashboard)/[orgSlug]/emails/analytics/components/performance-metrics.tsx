@@ -9,16 +9,12 @@ import {
 import { Progress } from "@wraps/ui/components/ui/progress";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { useHubDays } from "@/hooks/use-hub-days";
-import {
-  browserTimeZone,
-  buildDrilldownHref,
-} from "@/lib/analytics-drilldown-window";
 import {
   reputationPartialLabel,
   reputationScopeLabel,
 } from "@/lib/analytics-scope";
+import { hubHref } from "@/lib/emails-hub";
 import { useAnalyticsOverview } from "../hooks/use-analytics";
 
 type MetricTone = "default" | "success" | "warning" | "destructive";
@@ -29,7 +25,7 @@ type MetricRowProps = {
   total: number;
   percentage: number;
   tone?: MetricTone;
-  // Set for rows that explain a rate. Opens the drill-down for this window.
+  // Set for rows that explain a rate. Opens the hub's deliverability view.
   href?: string;
 };
 
@@ -70,11 +66,6 @@ function MetricRow({
 export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
   const days = useHubDays();
   const { data, isLoading, error } = useAnalyticsOverview(orgSlug, days);
-  // Set after mount: the server render must not carry the server's timezone.
-  const [tz, setTz] = useState("UTC");
-  useEffect(() => {
-    setTz(browserTimeZone());
-  }, []);
 
   if (isLoading) {
     return (
@@ -137,7 +128,11 @@ export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
       total: effectiveSent,
       percentage: windowRate(data.totalBounced),
       tone: "warning",
-      href: buildDrilldownHref(orgSlug, { metric: "bounce", days, tz }),
+      href: hubHref(orgSlug, {
+        tab: "deliverability",
+        days,
+        extra: { metric: "bounce", drive: "reasons" },
+      }),
     },
     {
       label: "Complaints",
@@ -145,7 +140,11 @@ export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
       total: effectiveSent,
       percentage: windowRate(data.totalComplaints),
       tone: "destructive",
-      href: buildDrilldownHref(orgSlug, { metric: "complaint", days, tz }),
+      href: hubHref(orgSlug, {
+        tab: "deliverability",
+        days,
+        extra: { metric: "complaint" },
+      }),
     },
   ];
 

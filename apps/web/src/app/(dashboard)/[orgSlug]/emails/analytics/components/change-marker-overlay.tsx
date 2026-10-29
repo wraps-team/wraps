@@ -163,7 +163,6 @@ export function ChangeMarkerList({
   markers,
   metric,
   days,
-  tz,
   state,
 }: {
   active: boolean;
@@ -171,7 +170,6 @@ export function ChangeMarkerList({
   markers: ChangeMarker[];
   metric: DrilldownMetric;
   days: number;
-  tz: string;
   state: ChangeListState;
 }) {
   const isMobile = useIsMobile();
@@ -214,7 +212,7 @@ export function ChangeMarkerList({
       {extra > 0 ? (
         <Link
           className="min-h-11 py-2 text-sm underline underline-offset-4 hover:text-foreground"
-          href={TIMELINE_TAB_HREF(orgSlug, { metric, days, tz })}
+          href={TIMELINE_TAB_HREF(orgSlug, { metric, days })}
         >
           {COPY.moreChanges(extra)}
         </Link>

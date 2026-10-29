@@ -31,7 +31,6 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { browserTimeZone } from "@/lib/analytics-drilldown-window";
 import {
   reputationPartialLabel,
   reputationScopeLabel,
@@ -127,15 +126,6 @@ function useHeld<T>(value: T | undefined): T | undefined {
   return value ?? held;
 }
 
-function useTimeZone() {
-  // Set after mount: the server render must not carry the server's timezone.
-  const [tz, setTz] = React.useState("UTC");
-  React.useEffect(() => {
-    setTz(browserTimeZone());
-  }, []);
-  return tz;
-}
-
 /** "—" while loading and in the no-sends state, where a rate would be invented. */
 function rateText(
   value: number | undefined,
@@ -209,7 +199,7 @@ function ChartBox({
 }
 
 /**
- * The trend for one metric. Mirrors ComplaintChart's axes, tooltip and
+ * The trend for one metric. Its axes, tooltip and
  * change-marker lines, with the SES review line as the only dashed element.
  */
 function TrendChart({
@@ -394,7 +384,6 @@ function TrendChart({
  */
 export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
   const days = useDeliverabilityDays();
-  const tz = useTimeZone();
   const [metric, setMetric] = useQueryState("metric", metricParam);
   const [showMarkers, setShowMarkers] = React.useState(true);
 
@@ -642,7 +631,6 @@ export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
           metric={metric}
           orgSlug={orgSlug}
           state={listState}
-          tz={tz}
         />
       </CardContent>
     </Card>
