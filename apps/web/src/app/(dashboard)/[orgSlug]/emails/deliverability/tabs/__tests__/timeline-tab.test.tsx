@@ -15,7 +15,7 @@ import type { ChangeMarker, ChangeMarkersResponse } from "@/lib/change-markers";
 import timelineTab from "../timeline-tab";
 
 const mockUseChangeMarkers = vi.fn();
-vi.mock("../../../hooks/use-analytics", () => ({
+vi.mock("../../../analytics/hooks/use-analytics", () => ({
   useChangeMarkers: (...args: unknown[]) => mockUseChangeMarkers(...args),
 }));
 

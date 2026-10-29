@@ -22,7 +22,7 @@ import { NextResponse } from "next/server";
 import type {
   ReasonGroup,
   ReasonsResponse,
-} from "@/app/(dashboard)/[orgSlug]/emails/analytics/drilldown/components/reason-groups";
+} from "@/app/(dashboard)/[orgSlug]/emails/deliverability/components/reason-groups";
 import { validateDrilldownParams } from "@/lib/analytics-drilldown-window";
 import { createRequestLogger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";

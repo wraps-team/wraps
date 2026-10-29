@@ -26,7 +26,10 @@ import { useActiveOrganization } from "@/contexts/organization-context";
 import type { DrilldownMetric } from "@/lib/analytics-drilldown-window";
 import { AddressDetailSheet } from "../../../components/address-detail-sheet";
 import { formatFullTimestamp } from "../../../lib/timestamps";
-import type { DrilldownTab, DrilldownTabProps } from "./tab-contract";
+import type {
+  DrilldownTab,
+  DrilldownTabProps,
+} from "../../../deliverability/tabs/tab-contract";
 
 // The count column the metric points at. Ranking does not change with metric.
 const METRIC_COLUMN: Record<

@@ -13,7 +13,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChangeMarker, ChangeMarkersResponse } from "@/lib/change-markers";
-import timelineTab from "../../drilldown/tabs/timeline-tab";
+import timelineTab from "../../../deliverability/tabs/timeline-tab";
 import { BounceTypeChart } from "../bounce-type-chart";
 import {
   ChangeMarkerList,

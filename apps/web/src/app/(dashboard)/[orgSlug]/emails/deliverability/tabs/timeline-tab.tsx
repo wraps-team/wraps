@@ -12,7 +12,7 @@ import {
   describeMarkerDelta,
   type MarkerMetric,
 } from "@/lib/change-markers";
-import { useChangeMarkers } from "../../hooks/use-analytics";
+import { useChangeMarkers } from "../../analytics/hooks/use-analytics";
 import type { DrilldownTab, DrilldownTabProps } from "./tab-contract";
 
 /** The viewer's local time, short form. The rows are read on the viewer's clock. */
