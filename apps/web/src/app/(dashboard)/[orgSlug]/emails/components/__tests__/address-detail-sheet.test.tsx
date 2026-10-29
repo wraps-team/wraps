@@ -321,4 +321,25 @@ describe("AddressDetailSheet", () => {
       )
     ).toBeInTheDocument();
   });
+
+  it("does not say broadcasts skip a soft-bounced contact (still sendable)", async () => {
+    mockGetAddressDetail.mockResolvedValue(
+      detail({
+        totals: { sends: 1, bounces: 1, complaints: 0, suppressed: 0 },
+        contact: {
+          id: "contact-8",
+          name: "Soft Person",
+          emailStatus: "soft_bounced",
+          createdAt: "2026-10-01T00:00:00.000Z",
+          createdBy: null,
+          creationRecord: null,
+        },
+      })
+    );
+    renderSheet();
+    expect(await screen.findByText("Soft bounced")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/so broadcasts and automations skip it/)
+    ).not.toBeInTheDocument();
+  });
 });

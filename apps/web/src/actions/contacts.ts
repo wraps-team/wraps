@@ -586,6 +586,10 @@ export const updateContact = orgAction(
       } else if (data.emailStatus === "suppressed") {
         updateData.emailSuppressedAt = new Date();
       }
+      // A manual set to active also clears the soft-bounce count.
+      if (data.emailStatus === "active") {
+        updateData.emailSoftBounceCount = 0;
+      }
     }
 
     // Handle SMS status update

@@ -24,6 +24,7 @@ export const EMAIL_STATUSES = [
   "active",
   "unsubscribed",
   "bounced",
+  "soft_bounced",
   "complained",
   "suppressed",
 ] as const satisfies readonly EmailStatus[];
@@ -48,6 +49,7 @@ export const EMAIL_STATUS_LABELS: Record<EmailStatus, string> = {
   active: "Active",
   unsubscribed: "Unsubscribed",
   bounced: "Bounced",
+  soft_bounced: "Soft bounced",
   complained: "Complained",
   suppressed: "Suppressed",
 };
@@ -58,9 +60,30 @@ export const EMAIL_STATUS_COLORS: Record<EmailStatus, string> = {
   active: "bg-success/15 text-success",
   unsubscribed: "bg-muted text-muted-foreground",
   bounced: "bg-destructive/15 text-destructive",
+  soft_bounced: "bg-warning/15 text-warning",
   complained: "bg-destructive/15 text-destructive",
   suppressed: "bg-warning/15 text-warning",
 };
+
+const EMAIL_STATUS_SENDABLE: Record<EmailStatus, boolean> = {
+  active: true,
+  soft_bounced: true,
+  unsubscribed: false,
+  bounced: false,
+  complained: false,
+  suppressed: false,
+};
+
+/**
+ * Client-side mirror of `isEmailSendable` from @wraps/db (a runtime import of
+ * which cannot reach client bundles, see the import note above). A null status
+ * is sendable, as in the schema helper.
+ */
+export function isEmailStatusSendable(
+  status: EmailStatus | null | undefined
+): boolean {
+  return status == null || EMAIL_STATUS_SENDABLE[status];
+}
 
 /**
  * The contacts table's programmatic focus target.

@@ -19,7 +19,11 @@ import {
 } from "@/actions/address-detail";
 import { getContactTimeline } from "@/actions/contacts-analytics";
 import { Button } from "@/components/ui/button";
-import { EMAIL_STATUS_LABELS, type EmailStatus } from "@/lib/contacts";
+import {
+  EMAIL_STATUS_LABELS,
+  type EmailStatus,
+  isEmailStatusSendable,
+} from "@/lib/contacts";
 import { formatFullTimestamp } from "../lib/timestamps";
 import { RemoveSuppressionButton } from "../suppressions/components/remove-suppression-button";
 
@@ -29,6 +33,7 @@ const EMAIL_STATUS_BADGE_VARIANT: Record<EmailStatus, BadgeVariant> = {
   active: "success",
   unsubscribed: "secondary",
   bounced: "destructive",
+  soft_bounced: "warning",
   complained: "destructive",
   suppressed: "warning",
 };
@@ -367,7 +372,7 @@ function ContactSection({
   }
 
   const status = contact.emailStatus;
-  const isActive = !status || status === "active";
+  const isSendable = isEmailStatusSendable(status);
 
   return (
     <section className="flex flex-col gap-3">
@@ -380,7 +385,7 @@ function ContactSection({
           </Badge>
         ) : null}
       </div>
-      {!isActive && status ? (
+      {!isSendable && status ? (
         <p className="text-sm">
           Wraps still treats this contact as{" "}
           {EMAIL_STATUS_LABELS[status].toLowerCase()}, so broadcasts and

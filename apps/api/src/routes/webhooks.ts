@@ -6,6 +6,7 @@
 
 import { timingSafeEqual } from "node:crypto";
 import { notifyOrg } from "@wraps/auth/notify";
+import { classifyBounce } from "@wraps/core/bounce-classification";
 import {
   awsAccount,
   batchSend,
@@ -34,6 +35,7 @@ import { recordSendingIdentity } from "../lib/identity-backstop";
 import { log } from "../lib/logger";
 import { logNonHomeRegionEvent } from "../lib/region-mismatch";
 import { hasActiveSubscription } from "../lib/subscription-gate";
+import { clearSoftBounce, recordSoftBounce } from "../services/contact-bounce";
 import {
   deleteScheduledStep,
   enqueueWorkflowStep,
@@ -447,6 +449,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
           // Critical: update message status (throws on failure → 500 → EventBridge retries)
           const didTransition = await processDelivery(
             message,
+            account.organizationId,
             event.detail.delivery?.timestamp
           );
           // Best-effort side effects — don't fail the webhook. Billing must
@@ -652,6 +655,7 @@ type MessageRecord = {
 
 async function processDelivery(
   message: MessageRecord,
+  organizationId: string,
   timestamp?: string
 ): Promise<boolean> {
   // Status precedence: bounced/complained cannot be overwritten by a delivery event
@@ -724,6 +728,16 @@ async function processDelivery(
           : {}),
       })
       .where(eq(batchSend.id, message.batchSendId));
+  }
+
+  // A successful delivery clears a soft-bounced contact. Runs only when this
+  // call transitioned the row, so duplicate Delivery events do nothing.
+  if (message.contactId) {
+    await clearSoftBounce({
+      organizationId,
+      contactId: message.contactId,
+      deliveredAt,
+    });
   }
 
   log.info("Webhook: message delivered", {
@@ -961,8 +975,10 @@ async function processBounce(
       .where(eq(batchSend.id, message.batchSendId));
   }
 
-  // Update contact status for permanent bounces
-  if (message.contactId && bounceType === "Permanent") {
+  // Update the contact: hard bounces end sendability; soft bounces are counted
+  // (see services/contact-bounce.ts)
+  const kind = classifyBounce(bounceType, bounceSubType);
+  if (message.contactId && kind === "hard") {
     // biome-ignore lint/plugin: message.contactId comes from the org-scoped messageSend row fetched in the route handler above.
     await db
       .update(contact)
@@ -971,6 +987,12 @@ async function processBounce(
         emailBouncedAt: bouncedAt,
       })
       .where(eq(contact.id, message.contactId));
+  } else if (message.contactId && kind === "soft") {
+    await recordSoftBounce({
+      organizationId,
+      contactId: message.contactId,
+      bouncedAt,
+    });
   }
 
   // Resume waiting workflow executions (any bounce type)
