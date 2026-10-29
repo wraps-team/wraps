@@ -83,6 +83,7 @@ export const CONSOLE_ACCESS_POLICY_JSON = JSON.stringify(
         Action: [
           "ses:ListSuppressedDestinations",
           "ses:GetSuppressedDestination",
+          "ses:PutSuppressedDestination",
           "ses:DeleteSuppressedDestination",
         ],
         Resource: "*",
