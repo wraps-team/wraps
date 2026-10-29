@@ -13,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@wraps/ui/components/ui/alert-dialog";
+import { SOFT_BOUNCE_ESCALATION_THRESHOLD } from "@wraps/core/bounce-classification";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Checkbox } from "@wraps/ui/components/ui/checkbox";
 import { Label } from "@wraps/ui/components/ui/label";
@@ -62,6 +63,50 @@ import type { TopicWithMeta } from "@/lib/topics";
 import { ContactTimeline } from "./contact-timeline";
 
 type BadgeVariant = ComponentProps<typeof Badge>["variant"];
+
+const SOFT_BOUNCE_DATE_FORMAT: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+};
+
+/**
+ * What the status badge cannot say about a bounce: a soft-bounced contact is
+ * still receiving email, and an escalated one says how it got there.
+ */
+function SoftBounceNote({ contact }: { contact: ContactWithMeta }) {
+  const count = contact.emailSoftBounceCount ?? 0;
+
+  if (contact.emailStatus === "soft_bounced") {
+    const last = contact.emailLastSoftBouncedAt
+      ? new Date(contact.emailLastSoftBouncedAt).toLocaleDateString(
+          "en-US",
+          SOFT_BOUNCE_DATE_FORMAT
+        )
+      : null;
+    return (
+      <div className="mt-1 text-muted-foreground text-xs">
+        <p>
+          Soft bounced {count}×{last ? ` · last ${last}` : ""}
+        </p>
+        <p>
+          Still receiving email. Marked bounced after{" "}
+          {SOFT_BOUNCE_ESCALATION_THRESHOLD} soft bounces on separate days.
+        </p>
+      </div>
+    );
+  }
+
+  if (contact.emailStatus === "bounced" && count > 0) {
+    return (
+      <p className="mt-1 text-muted-foreground text-xs">
+        Marked bounced after {count} soft bounces
+      </p>
+    );
+  }
+
+  return null;
+}
 
 const EMAIL_STATUS_BADGE_VARIANT: Record<EmailStatus, BadgeVariant> = {
   active: "success",
@@ -744,27 +789,30 @@ export function ContactDetailsSheet({
               ) : (
                 <div className="space-y-3">
                   {contact.email && (
-                    <div className="group flex items-center gap-2">
-                      <span className="font-medium">{contact.email}</span>
-                      {/* (audit H3) The button is an icon with no text, so
+                    <div>
+                      <div className="group flex items-center gap-2">
+                        <span className="font-medium">{contact.email}</span>
+                        {/* (audit H3) The button is an icon with no text, so
                         without this it reached AT as an unnamed control. */}
-                      <span className="opacity-0 transition-opacity group-hover:opacity-100">
-                        <CopyButton
-                          aria-label={`Copy ${contact.email}`}
-                          content={contact.email}
-                          size="sm"
-                          variant="ghost"
-                        />
-                      </span>
-                      {contact.emailStatus && (
-                        <Badge
-                          variant={
-                            EMAIL_STATUS_BADGE_VARIANT[contact.emailStatus]
-                          }
-                        >
-                          {EMAIL_STATUS_LABELS[contact.emailStatus]}
-                        </Badge>
-                      )}
+                        <span className="opacity-0 transition-opacity group-hover:opacity-100">
+                          <CopyButton
+                            aria-label={`Copy ${contact.email}`}
+                            content={contact.email}
+                            size="sm"
+                            variant="ghost"
+                          />
+                        </span>
+                        {contact.emailStatus && (
+                          <Badge
+                            variant={
+                              EMAIL_STATUS_BADGE_VARIANT[contact.emailStatus]
+                            }
+                          >
+                            {EMAIL_STATUS_LABELS[contact.emailStatus]}
+                          </Badge>
+                        )}
+                      </div>
+                      <SoftBounceNote contact={contact} />
                     </div>
                   )}
                   {contact.phone && (

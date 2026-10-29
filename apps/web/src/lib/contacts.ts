@@ -218,6 +218,8 @@ export type ContactWithMeta = {
   emailVerifiedAt: Date | null;
   emailUnsubscribedAt: Date | null;
   emailBouncedAt: Date | null;
+  emailLastSoftBouncedAt: Date | null;
+  emailSoftBounceCount: number;
   emailComplainedAt: Date | null;
   emailSuppressedAt: Date | null;
   lastEmailSentAt: Date | null;
