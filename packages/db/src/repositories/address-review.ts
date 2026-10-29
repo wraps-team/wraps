@@ -3,8 +3,8 @@
  * window, grouped per address, for the Deliverability review lists
  * (recommended, soft, hard, complaint).
  *
- * Soft and hard follow the classifier in @wraps/core (bounce-classification.ts).
- * This package does not depend on @wraps/core, so the content sub-types and
+ * Soft and hard follow the classifier in the core package (bounce-classification.ts).
+ * This package does not depend on core, so the content sub-types and
  * the escalation threshold arrive as arguments (`classification`).
  *
  * Windows and bounce timestamps follow address-sends.ts: a send is in the

@@ -23,8 +23,8 @@ const ORG_B = `address-review-org-b-${suffix}`;
 const ACCOUNT_A1 = `address-review-acct-a1-${suffix}`;
 const ACCOUNT_A2 = `address-review-acct-a2-${suffix}`;
 
-// Mirrors CONTENT_BOUNCE_SUBTYPES and SOFT_BOUNCE_ESCALATION_THRESHOLD in
-// @wraps/core. packages/db does not import @wraps/core.
+// Mirrors CONTENT_BOUNCE_SUBTYPES and SOFT_BOUNCE_ESCALATION_THRESHOLD from
+// the core package. packages/db does not import it.
 const CLASSIFICATION: ReviewClassification = {
   contentSubTypes: ["MessageTooLarge", "ContentRejected", "AttachmentRejected"],
   softThreshold: 3,
