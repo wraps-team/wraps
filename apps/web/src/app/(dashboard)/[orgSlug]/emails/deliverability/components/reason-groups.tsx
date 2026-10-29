@@ -15,6 +15,8 @@ export type ReasonsMetric = "bounce" | "complaint";
 // route (type only) and the tab. No field holds a recipient address.
 export type ReasonGroup = {
   receiverDomain: string;
+  /** The SES bounce type (Permanent, Transient, Undetermined); null for complaints and legacy rows without one. */
+  bounceType: string | null;
   title: string;
   explanation: string | null;
   suggestedAction: string | null;

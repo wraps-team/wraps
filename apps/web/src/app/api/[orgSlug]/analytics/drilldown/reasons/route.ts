@@ -88,6 +88,7 @@ function bounceGroup(row: BounceReasonRow, totalCount: number): ReasonGroup {
 
   return {
     receiverDomain: row.receiverDomain,
+    bounceType: row.bounceType,
     title: translation?.title ?? subtype.title,
     explanation: translation?.explanation ?? null,
     suggestedAction: translation
@@ -114,6 +115,7 @@ function complaintGroup(
   const unreported = row.hasDetail && row.feedbackType === null;
   return {
     receiverDomain: row.receiverDomain,
+    bounceType: null,
     title: unreported ? NOT_REPORTED_TITLE : copy.title,
     explanation: copy.explanation,
     suggestedAction: copy.suggestedAction,
@@ -155,6 +157,7 @@ function legacyGroup(
     });
     return {
       ...base,
+      bounceType: row.bounceType,
       title: subtype.title,
       explanation: null,
       suggestedAction: subtype.suggestedAction ?? null,
@@ -164,6 +167,7 @@ function legacyGroup(
   const copy = describeComplaintFeedbackType(null);
   return {
     ...base,
+    bounceType: null,
     title: copy.title,
     explanation: copy.explanation,
     suggestedAction: copy.suggestedAction,

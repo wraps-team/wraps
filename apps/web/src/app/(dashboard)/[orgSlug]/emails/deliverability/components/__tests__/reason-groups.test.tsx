@@ -22,6 +22,7 @@ afterEach(() => {
 function group(overrides: Partial<ReasonGroup> = {}): ReasonGroup {
   return {
     receiverDomain: "gmail.com",
+    bounceType: "Permanent",
     title: "Mailbox does not exist",
     explanation: "The address does not exist at the receiver.",
     suggestedAction: "Remove the address from your list.",
