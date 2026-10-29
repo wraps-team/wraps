@@ -29,6 +29,10 @@ import { userAc } from "better-auth/plugins/admin/access";
 import { desc } from "drizzle-orm";
 import Stripe from "stripe";
 import { ac, roles } from "./access";
+import {
+  cancelOrganizationSubscriptions,
+  closeOrganizationsOwnedBy,
+} from "./close-organization";
 import { sendLoginAlertSms } from "./login-alert-sms";
 import { notificationsOptions } from "./notifications-config";
 import { notifyUser } from "./notify";
@@ -633,6 +637,9 @@ export const auth = betterAuth<BetterAuthOptions>({
     },
     deleteUser: {
       enabled: true,
+      beforeDelete: async (user) => {
+        await closeOrganizationsOwnedBy(stripeClient, user.id);
+      },
       afterDelete: async (user) => {
         await trackUserDeleted({
           email: user.email,
@@ -795,7 +802,16 @@ export const auth = betterAuth<BetterAuthOptions>({
     twoFactor({
       issuer: "Wraps",
     }),
-    organization({ ac, roles }),
+    organization({
+      ac,
+      roles,
+      organizationHooks: {
+        // The subscription row cascades with the org; Stripe would keep billing.
+        beforeDeleteOrganization: async ({ organization: org }) => {
+          await cancelOrganizationSubscriptions(stripeClient, org.id);
+        },
+      },
+    }),
     // Carried only for SCIM deprovisioning. `banned` is the sole enforced
     // disabled-user state in better-auth, and @better-auth/scim maps SCIM
     // `active: false` onto it — without this plugin the SCIM plugin rejects
