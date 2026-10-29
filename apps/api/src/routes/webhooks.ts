@@ -301,6 +301,10 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
     // 4. Parse the EventBridge event
     const event = body as EventBridgeEvent;
     const { eventType, mail } = event.detail;
+    // SES reports bounces, complaints and deliveries per recipient, but a
+    // message row carries only destination[0]. Only a single-recipient send can
+    // be attributed to a contact; a multi-recipient send never touches one.
+    const singleRecipient = (mail?.destination?.length ?? 0) === 1;
 
     if (!mail?.messageId) {
       log.warn("Webhook: event missing mail.messageId", {
@@ -415,13 +419,14 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
         // transaction as the row insert so a failure rolls both back and the
         // EventBridge retry re-materializes. No contact: nothing to apply.
         let contactId: string | null = null;
-        if (CONTACT_LINKED_EVENTS.has(eventType)) {
+        if (singleRecipient && CONTACT_LINKED_EVENTS.has(eventType)) {
           contactId = await findContactIdByRecipient({
             organizationId: account.organizationId,
             recipient,
           });
         }
-        const linkable = eventType === "Delivery" || contactId !== null;
+        const linkable =
+          singleRecipient && (eventType === "Delivery" || contactId !== null);
 
         let inserted: { id: string }[];
         if (linkable) {
@@ -505,11 +510,12 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
       return { status: "ignored", reason: "message not found" };
     }
 
-    let message: MessageRecord = foundMessage;
+    let message: MessageRecord = { ...foundMessage, singleRecipient };
 
     // SDK sends (transactional rows with no contact) are linked to the contact
     // in the same org by recipient address; in memory only, never persisted.
     if (
+      singleRecipient &&
       !message.contactId &&
       message.sourceType === "transactional" &&
       message.recipient?.trim() &&
@@ -735,6 +741,9 @@ type MessageRecord = {
   // Optional: the existing mocks omit it, and the code tolerates undefined.
   recipient?: string | null;
   sourceType?: string;
+  // True when the SES event named exactly one recipient. Only then may a
+  // transactional SDK send be attributed to a contact by address.
+  singleRecipient?: boolean;
 };
 
 async function processDelivery(
@@ -828,7 +837,11 @@ async function processDelivery(
           deliveredAt,
           client: tx,
         });
-      } else if (message.sourceType === "transactional" && message.recipient) {
+      } else if (
+        message.singleRecipient &&
+        message.sourceType === "transactional" &&
+        message.recipient
+      ) {
         // SDK send: no contact id on the row, so recover by recipient address.
         await clearSoftBounceByRecipient({
           organizationId,

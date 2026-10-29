@@ -94,7 +94,7 @@ function mailFor(messageId: string, destination = EMAIL) {
   return { messageId, destination: [destination] };
 }
 
-function sendEvent(messageId: string, destination = EMAIL) {
+function sendEvent(messageId: string, destination: string | string[] = EMAIL) {
   return {
     version: "0",
     id: "event-send-1",
@@ -109,7 +109,7 @@ function sendEvent(messageId: string, destination = EMAIL) {
         messageId,
         timestamp: new Date().toISOString(),
         source: "noreply@test.com",
-        destination: [destination],
+        destination: Array.isArray(destination) ? destination : [destination],
       },
     },
   };
@@ -493,5 +493,94 @@ describe("webhook SDK-send contact linking (real DB)", () => {
 
     expect((await readSend(messageId)).status).toBe("delivered");
     await expectOtherOrgStillSoftBounced();
+  });
+
+  // Multi-recipient direct-SES sends: SES reports per recipient but the row
+  // carries only destination[0], so such sends must never touch a contact.
+  const OTHER = `${TEST_PREFIX}-someone-else@example.com`;
+
+  it("17. a multi-recipient hard Bounce as the first event creates the row and leaves the contact alone, in both orders", async () => {
+    for (const destination of [
+      [OTHER, EMAIL],
+      [EMAIL, OTHER],
+    ]) {
+      const messageId = nextMessageId();
+      const res = await postEvent(
+        buildBounceEvent({
+          mail: { messageId, destination },
+          bounceType: "Permanent",
+          bounceSubType: "General",
+          bouncedAt: T0.toISOString(),
+        })
+      );
+      expect(res.status).toBe(200);
+
+      expect((await readSend(messageId)).status).toBe("bounced");
+      const row = await readContact(fixture.ids.contact);
+      expect(row.emailStatus).toBe("active");
+      expect(row.emailBouncedAt).toBeNull();
+    }
+  });
+
+  it("18. a multi-recipient Send then Bounce, and Send then Complaint, leave the contact alone", async () => {
+    const destination = [EMAIL, OTHER];
+
+    const bounced = nextMessageId();
+    await post200(sendEvent(bounced, destination));
+    await post200(
+      buildBounceEvent({
+        mail: { messageId: bounced, destination },
+        bounceType: "Permanent",
+        bounceSubType: "General",
+        bouncedAt: T0.toISOString(),
+      })
+    );
+    expect((await readSend(bounced)).status).toBe("bounced");
+
+    const complained = nextMessageId();
+    await post200(sendEvent(complained, destination));
+    await post200(
+      buildComplaintEvent({
+        mail: { messageId: complained, destination },
+        complainedAt: T0.toISOString(),
+      })
+    );
+    expect((await readSend(complained)).status).toBe("complained");
+
+    const row = await readContact(fixture.ids.contact);
+    expect(row.emailStatus).toBe("active");
+    expect(row.emailBouncedAt).toBeNull();
+    expect(row.emailComplainedAt).toBeNull();
+  });
+
+  it("19. a multi-recipient Delivery, as the first event or after Send, does not recover a soft-bounced contact", async () => {
+    await resetContact(fixture.ids.contact, EMAIL, {
+      emailStatus: "soft_bounced",
+      emailSoftBounceCount: 1,
+      emailLastSoftBouncedAt: T0,
+    });
+    const destination = [EMAIL, OTHER];
+    const deliveredAt = new Date(T0.getTime() + HOUR).toISOString();
+
+    await post200(
+      buildDeliveryEvent({
+        mail: { messageId: nextMessageId(), destination },
+        deliveredAt,
+      })
+    );
+
+    const messageId = nextMessageId();
+    await post200(sendEvent(messageId, destination));
+    await post200(
+      buildDeliveryEvent({
+        mail: { messageId, destination },
+        deliveredAt,
+      })
+    );
+    expect((await readSend(messageId)).status).toBe("delivered");
+
+    const row = await readContact(fixture.ids.contact);
+    expect(row.emailStatus).toBe("soft_bounced");
+    expect(row.emailSoftBounceCount).toBe(1);
   });
 });
