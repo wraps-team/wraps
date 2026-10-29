@@ -54,6 +54,7 @@ const EMAIL_STATUSES = [
   "active",
   "unsubscribed",
   "bounced",
+  "soft_bounced",
   "complained",
   "suppressed",
 ] as const;
