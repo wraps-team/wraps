@@ -20,18 +20,15 @@ import {
 } from "@/lib/emails-hub";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkHasAwsAccounts, getEmailsListStatus } from "@/lib/setup-status";
-import { BounceTypeChart } from "./analytics/components/bounce-type-chart";
-import { ComplaintChart } from "./analytics/components/complaint-chart";
-import { DeliverabilityChart } from "./analytics/components/deliverability-chart";
 import { EngagementChart } from "./analytics/components/engagement-chart";
 import { PerformanceMetrics } from "./analytics/components/performance-metrics";
 import { RecentActivity } from "./analytics/components/recent-activity";
-import { SuppressionChart } from "./analytics/components/suppression-chart";
 import { EmailAnalytics } from "./components/email-analytics";
 import { EmailsHubHeader } from "./components/emails-hub-header";
 import { EmailsHubTabs } from "./components/emails-hub-tabs";
 import { EmailsTable } from "./components/emails-table";
 import { EmailsTableSkeleton } from "./components/emails-table-skeleton";
+import { DeliverabilityBody } from "./deliverability/components/deliverability-card";
 
 type EmailsPageProps = {
   params: Promise<{
@@ -169,12 +166,8 @@ function HubTabContent({
   if (tab === "deliverability") {
     return (
       <div className="@container/main space-y-6 px-4 lg:px-6">
-        <DeliverabilityChart orgSlug={orgSlug} showChangeMarkers />
-        <div className="grid gap-6 lg:grid-cols-3">
-          <BounceTypeChart orgSlug={orgSlug} showChangeMarkers />
-          <SuppressionChart orgSlug={orgSlug} showChangeMarkers />
-          <ComplaintChart orgSlug={orgSlug} showChangeMarkers />
-        </div>
+        <h2 className="font-semibold text-lg">Deliverability</h2>
+        <DeliverabilityBody orgSlug={orgSlug} />
       </div>
     );
   }
