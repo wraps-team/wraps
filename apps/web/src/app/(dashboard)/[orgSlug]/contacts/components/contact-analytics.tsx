@@ -299,7 +299,9 @@ function HealthStat({
       <span className={cn("font-medium tabular-nums", tone)}>
         {value.toLocaleString()}
       </span>{" "}
-      <span className="text-muted-foreground">{status}</span>
+      <span className="text-muted-foreground">
+        {status.replaceAll("_", " ")}
+      </span>
     </>
   );
 
@@ -367,6 +369,14 @@ function ListHealth({
       tone: "text-destructive",
     },
   ];
+
+  if (health.soft_bounced > 0) {
+    stats.splice(3, 0, {
+      status: "soft_bounced",
+      value: health.soft_bounced,
+      tone: "text-warning",
+    });
+  }
 
   if (health.suppressed > 0) {
     stats.push({
