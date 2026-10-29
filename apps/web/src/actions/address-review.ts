@@ -211,7 +211,10 @@ async function recommendedRows(
     }
   }
 
-  return { rows: rows.slice(0, REVIEW_PAGE_SIZE), hasMore: !exhausted };
+  // A page can end past REVIEW_PAGE_SIZE. The overflow is cut, so the
+  // unlisted rows it held still count as "more".
+  const hasMore = rows.length > REVIEW_PAGE_SIZE || !exhausted;
+  return { rows: rows.slice(0, REVIEW_PAGE_SIZE), hasMore };
 }
 
 /**

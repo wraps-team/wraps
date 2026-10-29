@@ -123,6 +123,8 @@ const suffix = crypto.randomUUID().slice(0, 8);
 const ORG_A = `address-review-org-a-${suffix}`;
 const ORG_B = `address-review-org-b-${suffix}`;
 const ORG_C = `address-review-org-c-${suffix}`;
+const ORG_D = `address-review-org-d-${suffix}`;
+const ACCOUNT_D = `address-review-acct-d-${suffix}`;
 const USER_A = `address-review-user-a-${suffix}`;
 const USER_B = `address-review-user-b-${suffix}`;
 const ACCOUNT_A1 = `address-review-acct-a1-${suffix}`; // us-east-1
@@ -211,6 +213,12 @@ beforeAll(async () => {
       slug: `address-review-c-${suffix}`,
       createdAt: new Date(),
     },
+    {
+      id: ORG_D,
+      name: "Address Review D",
+      slug: `address-review-d-${suffix}`,
+      createdAt: new Date(),
+    },
   ]);
   await db.insert(user).values([
     {
@@ -231,6 +239,13 @@ beforeAll(async () => {
     },
   ]);
   await db.insert(member).values([
+    {
+      id: `address-review-member-d-${suffix}`,
+      organizationId: ORG_D,
+      userId: USER_A,
+      role: "owner",
+      createdAt: new Date(),
+    },
     {
       id: `address-review-member-a-${suffix}`,
       organizationId: ORG_A,
@@ -282,6 +297,15 @@ beforeAll(async () => {
       externalId: `address-review-ext-b-${suffix}`,
     },
     {
+      id: ACCOUNT_D,
+      organizationId: ORG_D,
+      name: "Address Review D",
+      accountId: "555555555555",
+      region: "ca-central-1",
+      roleArn: "arn:aws:iam::555555555555:role/WrapsRole",
+      externalId: `address-review-ext-d-${suffix}`,
+    },
+    {
       id: ACCOUNT_C,
       organizationId: ORG_C,
       name: "Address Review C",
@@ -308,15 +332,21 @@ afterAll(async () => {
   await db
     .delete(awsAccount)
     .where(
-      inArray(awsAccount.id, [ACCOUNT_A1, ACCOUNT_A2, ACCOUNT_B, ACCOUNT_C])
+      inArray(awsAccount.id, [
+        ACCOUNT_A1,
+        ACCOUNT_A2,
+        ACCOUNT_B,
+        ACCOUNT_C,
+        ACCOUNT_D,
+      ])
     );
   await db
     .delete(member)
-    .where(inArray(member.organizationId, [ORG_A, ORG_B, ORG_C]));
+    .where(inArray(member.organizationId, [ORG_A, ORG_B, ORG_C, ORG_D]));
   await db.delete(user).where(inArray(user.id, [USER_A, USER_B]));
   await db
     .delete(organization)
-    .where(inArray(organization.id, [ORG_A, ORG_B, ORG_C]));
+    .where(inArray(organization.id, [ORG_A, ORG_B, ORG_C, ORG_D]));
 });
 
 const DAYS_30 = { days: 30, tz: "UTC" };
@@ -407,6 +437,41 @@ describe("recommended list", () => {
     expect(result.rows).toHaveLength(25);
     expect(result.hasMore).toBe(true);
     expect(result.rows.every((row) => row.status === "not_listed")).toBe(true);
+  });
+
+  it("reports more when the last page overflows the 25-row cap", async () => {
+    // 35 complaint candidates. Page one (the first 25 by address) has 5 that
+    // SES lists, so it keeps 20. Page two adds 10 more unlisted rows, so the
+    // walk holds 30 and cuts 5. Those 5 are still unlisted candidates.
+    const addresses = Array.from(
+      { length: 35 },
+      (_, i) => `overflow-${String(i).padStart(2, "0")}-review@example.com`
+    );
+    await seedSends(
+      addresses.map((recipient) => ({
+        organizationId: ORG_D,
+        recipient,
+        complainedAt: ago(2),
+      }))
+    );
+    for (const address of addresses.slice(0, 5)) {
+      sesState.listed.add(address);
+    }
+
+    const result = await listAddressesToReview(ORG_D, {
+      list: "recommended",
+      ...DAYS_30,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      return;
+    }
+    expect(result.rows).toHaveLength(25);
+    expect(result.hasMore).toBe(true);
+    expect(result.rows.some((row) => sesState.listed.has(row.address))).toBe(
+      false
+    );
   });
 
   it("stops after 100 candidates checked and reports more", async () => {
