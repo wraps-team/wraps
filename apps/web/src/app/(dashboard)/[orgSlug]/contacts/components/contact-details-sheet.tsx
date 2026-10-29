@@ -3,6 +3,7 @@
 import { useForm } from "@tanstack/react-form";
 import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@tanstack/react-store";
+import { SOFT_BOUNCE_ESCALATION_THRESHOLD } from "@wraps/core/bounce-classification";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,7 +14,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@wraps/ui/components/ui/alert-dialog";
-import { SOFT_BOUNCE_ESCALATION_THRESHOLD } from "@wraps/core/bounce-classification";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Checkbox } from "@wraps/ui/components/ui/checkbox";
 import { Label } from "@wraps/ui/components/ui/label";
