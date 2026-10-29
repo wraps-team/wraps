@@ -330,7 +330,9 @@ export const awsAccount = pgTable(
     }>(),
 
     // Audit
-    createdBy: text("created_by").references(() => user.id),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -360,9 +362,9 @@ export const awsAccountPermission = pgTable(
     permissions: json("permissions").$type<string[]>().notNull(),
 
     // Audit
-    grantedBy: text("granted_by")
-      .references(() => user.id)
-      .notNull(),
+    grantedBy: text("granted_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
     expiresAt: timestamp("expires_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -393,7 +395,9 @@ export const emailTemplate = pgTable(
     subject: text("subject"),
     html: text("html"),
     variables: json("variables").default([]),
-    createdBy: text("created_by").references(() => user.id),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -418,7 +422,9 @@ export const apiKey = pgTable(
     permissions: json("permissions").default([]),
     lastUsedAt: timestamp("last_used_at"),
     expiresAt: timestamp("expires_at"),
-    createdBy: text("created_by").references(() => user.id),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
@@ -438,7 +444,7 @@ export const auditLog = pgTable(
     organizationId: text("organization_id")
       .references(() => organization.id, { onDelete: "cascade" })
       .notNull(),
-    userId: text("user_id").references(() => user.id),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
     actorEmail: text("actor_email"),
     action: text("action").notNull(),
     resource: text("resource").notNull(),
