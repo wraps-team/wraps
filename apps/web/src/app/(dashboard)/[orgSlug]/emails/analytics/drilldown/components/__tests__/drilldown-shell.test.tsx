@@ -11,10 +11,10 @@ import userEvent from "@testing-library/user-event";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DrilldownSendsResponse } from "../../../../deliverability/hooks/use-drilldown-sends";
-import addressesTab from "../../tabs/addresses-tab";
 import reasonsTab from "../../../../deliverability/tabs/reasons-tab";
 import sendsTab from "../../../../deliverability/tabs/sends-tab";
 import timelineTab from "../../../../deliverability/tabs/timeline-tab";
+import addressesTab from "../../tabs/addresses-tab";
 import { DrilldownShell } from "../drilldown-shell";
 
 const mockUseSends = vi.fn();

@@ -15,6 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmailChartMeta } from "@/lib/analytics-scope";
 import { DeliverabilityBody, DeliverabilityCard } from "../deliverability-card";
 
+const push = vi.hoisted(() => vi.fn());
+
 const state = vi.hoisted(() => ({
   email: undefined as unknown,
   emailError: false,
@@ -53,8 +55,34 @@ vi.mock("../../../analytics/hooks/use-analytics", () => {
   };
 });
 
+// The panel's tabs fetch their own data; the card test checks only the card.
+vi.mock("../../tabs/sends-tab", () => ({
+  default: {
+    id: "sends",
+    label: "Sends",
+    enabled: true,
+    Component: () => <p>Causes stub</p>,
+  },
+}));
+vi.mock("../../tabs/reasons-tab", () => ({
+  default: {
+    id: "reasons",
+    label: "Reasons",
+    enabled: true,
+    Component: () => <p>Reasons stub</p>,
+  },
+}));
+vi.mock("../../tabs/timeline-tab", () => ({
+  default: {
+    id: "timeline",
+    label: "Timeline",
+    enabled: true,
+    Component: () => <p>Changes stub</p>,
+  },
+}));
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push }),
   useSearchParams: () => new URLSearchParams("days=30"),
 }));
 
@@ -69,6 +97,24 @@ vi.mock("recharts", async (importOriginal) => {
     }: {
       children: React.ReactElement<{ width?: number; height?: number }>;
     }) => React.cloneElement(children, { width: 640, height: 180 }),
+    // jsdom has no pointer geometry, so a stand-in button fires a day click.
+    AreaChart: (props: React.ComponentProps<typeof actual.AreaChart>) => (
+      <>
+        <button
+          onClick={() =>
+            (
+              props.onClick as unknown as
+                | ((state: { activeLabel: string }) => void)
+                | undefined
+            )?.({ activeLabel: "2026-10-22" })
+          }
+          type="button"
+        >
+          Click day 22
+        </button>
+        <actual.AreaChart {...props} />
+      </>
+    ),
   };
 });
 
@@ -373,6 +419,26 @@ describe("low-volume and no-activity states", () => {
   });
 });
 
+describe("chart day click", () => {
+  it("sets day in the URL and does not navigate to the drilldown", async () => {
+    loadHealthy();
+    const onUrlUpdate = renderCard();
+    await userEvent.click(screen.getByRole("button", { name: "Click day 22" }));
+    expect(onUrlUpdate.mock.calls.at(-1)?.[0].searchParams.get("day")).toBe(
+      "2026-10-22"
+    );
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("has no View causes link", () => {
+    loadHealthy();
+    renderCard();
+    expect(
+      screen.queryByRole("link", { name: "View causes" })
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("refetch", () => {
   it("keeps the drawn chart while the next range loads", () => {
     loadHealthy();
@@ -398,6 +464,33 @@ describe("refetch", () => {
 });
 
 describe("DeliverabilityBody", () => {
+  it("mounts the causes panel under the card at normal volume", () => {
+    loadHealthy();
+    render(
+      <NuqsTestingAdapter searchParams={{}}>
+        <DeliverabilityBody orgSlug="acme" />
+      </NuqsTestingAdapter>
+    );
+    expect(
+      screen.getByRole("heading", { name: "What's driving your bounce rate" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("Causes stub")).toBeInTheDocument();
+  });
+
+  it("shows no causes panel in the low-volume state", () => {
+    loadHealthy();
+    state.overview = overview(14, 0);
+    render(
+      <NuqsTestingAdapter searchParams={{}}>
+        <DeliverabilityBody orgSlug="acme" />
+      </NuqsTestingAdapter>
+    );
+    expect(screen.queryByText("Causes stub")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /What's driving/ })
+    ).not.toBeInTheDocument();
+  });
+
   it("shows the Breakdown note while the window is too small to compare", () => {
     loadHealthy();
     state.overview = overview(14, 0);

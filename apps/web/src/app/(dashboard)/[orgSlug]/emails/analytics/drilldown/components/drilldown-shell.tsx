@@ -15,11 +15,11 @@ import {
   parseDrilldownWindow,
 } from "@/lib/analytics-drilldown-window";
 import { hubHref } from "@/lib/emails-hub";
-import addressesTab from "../tabs/addresses-tab";
 import reasonsTab from "../../../deliverability/tabs/reasons-tab";
 import sendsTab from "../../../deliverability/tabs/sends-tab";
 import type { DrilldownTab } from "../../../deliverability/tabs/tab-contract";
 import timelineTab from "../../../deliverability/tabs/timeline-tab";
+import addressesTab from "../tabs/addresses-tab";
 
 // Enabled tabs only. A reserved tab is not rendered, so the shell needs no
 // edit when a tab's owning spec turns it on.

@@ -19,8 +19,7 @@ import {
   ToggleGroupItem,
 } from "@wraps/ui/components/ui/toggle-group";
 import { Info } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { parseAsStringLiteral, useQueryState } from "nuqs";
+import { parseAsString, useQueryState } from "nuqs";
 import * as React from "react";
 import {
   Area,
@@ -33,11 +32,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useHubDays } from "@/hooks/use-hub-days";
-import {
-  browserTimeZone,
-  buildDrilldownHref,
-  type DrilldownMetric,
-} from "@/lib/analytics-drilldown-window";
+import { browserTimeZone } from "@/lib/analytics-drilldown-window";
 import {
   reputationPartialLabel,
   reputationScopeLabel,
@@ -56,7 +51,6 @@ import {
   markerLineProps,
   useChartChangeMarkers,
 } from "../../analytics/components/change-marker-overlay";
-import { ViewCausesLink } from "../../analytics/components/view-causes-link";
 import {
   useAnalyticsOverview,
   useBounceData,
@@ -70,9 +64,10 @@ import {
   ReputationScope,
   UpdatedLine,
 } from "../../components/summary-rail";
+import { DELIVERABILITY_METRICS, metricParam } from "../lib/params";
+import { CausesPanel } from "./causes-panel";
 
-const METRICS = ["bounce", "complaint", "suppression"] as const;
-type Metric = (typeof METRICS)[number];
+type Metric = (typeof DELIVERABILITY_METRICS)[number];
 
 const METRIC_LABEL: Record<Metric, string> = {
   bounce: "Bounces",
@@ -156,7 +151,7 @@ function rateText(
 }
 
 function isMetric(value: string): value is Metric {
-  return (METRICS as readonly string[]).includes(value);
+  return (DELIVERABILITY_METRICS as readonly string[]).includes(value);
 }
 
 const VERDICT_BADGE: Record<
@@ -220,24 +215,20 @@ function ChartBox({
  * change-marker lines, with the SES review line as the only dashed element.
  */
 function TrendChart({
-  orgSlug,
   metric,
   days,
   points,
   markerLines,
-  tz,
   lowVolumeSends,
 }: {
-  orgSlug: string;
   metric: Metric;
   days: number;
   points: { date: string; value: number }[];
   markerLines: ReturnType<typeof useChartChangeMarkers>["markerLines"];
-  tz: string;
   /** Set only in the insufficient state, to caption the chart with its sample. */
   lowVolumeSends: number | null;
 }) {
-  const router = useRouter();
+  const [, setDay] = useQueryState("day", parseAsString);
   const review = reviewPercent(metric);
   const reviewText = reviewLabel(metric);
   const color = METRIC_COLOR[metric];
@@ -279,15 +270,17 @@ function TrendChart({
           margin={{ top: 16, right: 16, bottom: 0, left: 0 }}
           onClick={(state) => {
             const day = state?.activeLabel;
-            if (typeof day === "string") {
-              router.push(
-                buildDrilldownHref(orgSlug, {
-                  metric: metric as DrilldownMetric,
-                  days,
-                  day,
-                  tz,
-                })
-              );
+            if (typeof day !== "string") {
+              return;
+            }
+            setDay(day);
+            // The panel sits under the card. Scroll only when it is off screen.
+            const panel = document.getElementById("deliverability-causes");
+            if (
+              panel &&
+              panel.getBoundingClientRect().top > window.innerHeight
+            ) {
+              panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
             }
           }}
         >
@@ -401,10 +394,7 @@ function TrendChart({
 export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
   const days = useWindowDays();
   const tz = useTimeZone();
-  const [metric, setMetric] = useQueryState(
-    "metric",
-    parseAsStringLiteral(METRICS).withDefault("bounce")
-  );
+  const [metric, setMetric] = useQueryState("metric", metricParam);
   const [showMarkers, setShowMarkers] = React.useState(true);
 
   const emailQuery = useEmailChartData(orgSlug, days);
@@ -498,9 +488,7 @@ export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
         lowVolumeSends={verdict.level === "insufficient" ? sends : null}
         markerLines={overlayOn ? markerLines : []}
         metric={metric}
-        orgSlug={orgSlug}
         points={points}
-        tz={tz}
       />
     );
   })();
@@ -622,14 +610,13 @@ export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
             value={metric}
             variant="outline"
           >
-            {METRICS.map((option) => (
+            {DELIVERABILITY_METRICS.map((option) => (
               <ToggleGroupItem key={option} value={option}>
                 {METRIC_LABEL[option]}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
           <div className="flex items-center gap-2">
-            <ViewCausesLink days={days} metric={metric} orgSlug={orgSlug} />
             <ChangeMarkersToggle
               enabled
               onPressedChange={setShowMarkers}
@@ -662,8 +649,8 @@ export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
 
 /**
  * Copy for the Breakdown panel while the window is too small to compare. It
- * stands where plan 012 mounts the causes panel and is replaced by that panel
- * at 100 sends or more.
+ * stands where the causes panel sits, and the panel replaces it at 100 sends
+ * or more.
  */
 function breakdownCopy(sends: number | null): string | null {
   if (sends === null) {
@@ -679,9 +666,8 @@ function breakdownCopy(sends: number | null): string | null {
 }
 
 /**
- * The Deliverability tab body: the card, then the Breakdown note while the
- * window has too few sends to compare. Plan 012 mounts its causes panel here,
- * under the card, in the normal state.
+ * The Deliverability tab body: the card, then either the Breakdown note (while
+ * the window has too few sends to compare) or the causes panel under the card.
  */
 export function DeliverabilityBody({ orgSlug }: { orgSlug: string }) {
   const days = useWindowDays();
@@ -690,7 +676,9 @@ export function DeliverabilityBody({ orgSlug }: { orgSlug: string }) {
   return (
     <>
       <DeliverabilityCard orgSlug={orgSlug} />
-      {note === null ? null : (
+      {note === null ? (
+        <CausesPanel orgSlug={orgSlug} />
+      ) : (
         <Card className="@container/card">
           <CardContent className="space-y-2">
             <h3 className="font-semibold text-sm">Breakdown</h3>
