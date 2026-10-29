@@ -12,15 +12,9 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@wraps/ui/components/ui/popover";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
-import { formatDistance } from "date-fns";
-import { CircleAlert, Info, Loader2, RotateCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { CircleAlert, Loader2, RotateCw } from "lucide-react";
+import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useHubDays } from "@/hooks/use-hub-days";
@@ -36,6 +30,7 @@ import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { useEmailChartData } from "../analytics/hooks/use-analytics";
 import { captureEmailsErrorRetried } from "../lib/analytics";
+import { Figure, ReputationScope, UpdatedAgo } from "./summary-rail";
 
 /**
  * The four series, each owning its colour AND a stroke treatment.
@@ -146,107 +141,6 @@ const chartConfig: ChartConfig = {
  * the only one in play.
  */
 const PLOT_HEIGHT = "h-[260px] @[540px]/card:h-[320px]";
-
-/**
- * "Updated N minutes ago", in a leaf of its own.
- *
- * The clock used to live in `EmailAnalytics`, so every tick re-rendered the
- * whole card - four `<Area>`s, two gradient defs, both axes and the tooltip -
- * to repaint one line of 12px text. Isolating it means the chart re-renders
- * only when the chart data changes.
- *
- * Starting at null keeps the server and first client render identical; the
- * interval matches `formatDistance`'s minute granularity, so no tick is spent
- * producing the string that is already on screen.
- */
-function UpdatedAgo({ generatedAt }: { generatedAt: number }) {
-  const [now, setNow] = useState<number | null>(null);
-
-  useEffect(() => {
-    setNow(Date.now());
-    const id = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(id);
-  }, []);
-
-  if (now === null) {
-    return null;
-  }
-
-  return (
-    <>
-      Updated{" "}
-      {formatDistance(new Date(generatedAt), new Date(now), {
-        addSuffix: true,
-      })}
-    </>
-  );
-}
-
-/**
- * The scope prose for the reputation figure, behind a disclosure.
- *
- * These two sentences are the reason the card had a layout problem: three or
- * four lines of 12px text explaining which population the rates describe, set
- * in a 176px column, generating more height than the chart beside them. They
- * still matter - a reader who assumes the bounce rate is window-scoped will
- * misread it - but they are reference material, not something to re-read on
- * every visit.
- *
- * A popover rather than a tooltip: a tooltip cannot be opened by touch.
- */
-function ReputationScope({ reputation }: { reputation: ReputationLabel }) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          aria-label={`What "${reputation.title}" measures`}
-          className="-my-2"
-          size="icon-sm"
-          variant="ghost"
-        >
-          <Info className="size-3.5" />
-        </Button>
-      </PopoverTrigger>
-      {/*
-        Opens upward, into the header's whitespace. Anchored below or beside,
-        the panel covered the two rates it exists to explain - the trigger sits
-        in the middle of the rail, with the numbers under and after it.
-      */}
-      <PopoverContent align="start" className="w-72" side="top">
-        <p className="text-sm">{reputation.detail}</p>
-        {reputation.note ? (
-          <p className="mt-2 text-muted-foreground text-sm">
-            {reputation.note}
-          </p>
-        ) : null}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function Figure({
-  label,
-  value,
-  aside,
-}: {
-  label: string;
-  value: string;
-  aside?: string;
-}) {
-  return (
-    <div>
-      <div className="text-muted-foreground text-xs">{label}</div>
-      <div className="mt-1.5 flex items-baseline gap-1.5">
-        <span className="font-semibold text-2xl leading-none tabular-nums">
-          {value}
-        </span>
-        {aside ? (
-          <span className="text-muted-foreground text-sm">{aside}</span>
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 type SummaryProps = {
   overview:
