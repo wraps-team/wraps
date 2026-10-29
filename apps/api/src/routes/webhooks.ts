@@ -1173,45 +1173,60 @@ async function processComplaint(
     log.error("Webhook: diagnostic write failed", error, { messageId });
   }
 
-  // Update messageSend status — guarded on a genuine transition (WHERE status
-  // <> 'complained') so a duplicate Complaint event does not re-count.
-  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
-  const transitioned = await db
-    .update(messageSend)
-    .set({
-      status: "complained",
-      complainedAt,
-    })
-    .where(
-      and(eq(messageSend.id, message.id), ne(messageSend.status, "complained"))
-    )
-    .returning({ id: messageSend.id });
+  // Transition, batch counter and contact write run in ONE transaction: if the
+  // contact write fails, everything rolls back, so the EventBridge retry finds
+  // the row untransitioned instead of hitting the duplicate-event return.
+  const transitioned = await db.transaction(async (tx) => {
+    // Update messageSend status — guarded on a genuine transition (WHERE status
+    // <> 'complained') so a duplicate Complaint event does not re-count.
+    // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
+    const rows = await tx
+      .update(messageSend)
+      .set({
+        status: "complained",
+        complainedAt,
+      })
+      .where(
+        and(
+          eq(messageSend.id, message.id),
+          ne(messageSend.status, "complained")
+        )
+      )
+      .returning({ id: messageSend.id });
 
-  if (transitioned.length === 0) {
+    if (rows.length === 0) {
+      return false;
+    }
+
+    // Increment batchSend counter if applicable
+    if (message.batchSendId) {
+      // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
+      await tx
+        .update(batchSend)
+        .set({
+          complained: sql`${batchSend.complained} + 1`,
+        })
+        .where(eq(batchSend.id, message.batchSendId));
+    }
+
+    // Update contact status
+    if (message.contactId) {
+      await markContactComplained({
+        organizationId,
+        contactId: message.contactId,
+        complainedAt,
+        client: tx,
+      });
+    }
+
+    return true;
+  });
+
+  if (!transitioned) {
     log.info("Webhook: duplicate complaint, skipping counter", {
       messageId: message.id,
     });
     return;
-  }
-
-  // Increment batchSend counter if applicable
-  if (message.batchSendId) {
-    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(batchSend)
-      .set({
-        complained: sql`${batchSend.complained} + 1`,
-      })
-      .where(eq(batchSend.id, message.batchSendId));
-  }
-
-  // Update contact status
-  if (message.contactId) {
-    await markContactComplained({
-      organizationId,
-      contactId: message.contactId,
-      complainedAt,
-    });
   }
 
   // Resume waiting workflow executions — complaint is treated like a bounce
@@ -1330,45 +1345,60 @@ async function processSuppression(
 ): Promise<void> {
   const suppressedAt = timestamp ? new Date(timestamp) : new Date();
 
-  // Update messageSend status — guarded on a genuine transition (WHERE status
-  // <> 'suppressed') so a duplicate Suppressed event does not re-count.
-  // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
-  const transitioned = await db
-    .update(messageSend)
-    .set({
-      status: "suppressed",
-      suppressedAt,
-    })
-    .where(
-      and(eq(messageSend.id, message.id), ne(messageSend.status, "suppressed"))
-    )
-    .returning({ id: messageSend.id });
+  // Transition, batch counter and contact write run in ONE transaction: if the
+  // contact write fails, everything rolls back, so the EventBridge retry finds
+  // the row untransitioned instead of hitting the duplicate-event return.
+  const transitioned = await db.transaction(async (tx) => {
+    // Update messageSend status — guarded on a genuine transition (WHERE status
+    // <> 'suppressed') so a duplicate Suppressed event does not re-count.
+    // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
+    const rows = await tx
+      .update(messageSend)
+      .set({
+        status: "suppressed",
+        suppressedAt,
+      })
+      .where(
+        and(
+          eq(messageSend.id, message.id),
+          ne(messageSend.status, "suppressed")
+        )
+      )
+      .returning({ id: messageSend.id });
 
-  if (transitioned.length === 0) {
+    if (rows.length === 0) {
+      return false;
+    }
+
+    // Increment batchSend counter if applicable
+    if (message.batchSendId) {
+      // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
+      await tx
+        .update(batchSend)
+        .set({
+          suppressed: sql`${batchSend.suppressed} + 1`,
+        })
+        .where(eq(batchSend.id, message.batchSendId));
+    }
+
+    // Update contact status - all suppressions mark contact as suppressed
+    if (message.contactId) {
+      await markContactSuppressed({
+        organizationId,
+        contactId: message.contactId,
+        suppressedAt,
+        client: tx,
+      });
+    }
+
+    return true;
+  });
+
+  if (!transitioned) {
     log.info("Webhook: duplicate suppression, skipping counter", {
       messageId: message.id,
     });
     return;
-  }
-
-  // Increment batchSend counter if applicable
-  if (message.batchSendId) {
-    // biome-ignore lint/plugin: message.batchSendId comes from the org-scoped messageSend row fetched in the route handler above.
-    await db
-      .update(batchSend)
-      .set({
-        suppressed: sql`${batchSend.suppressed} + 1`,
-      })
-      .where(eq(batchSend.id, message.batchSendId));
-  }
-
-  // Update contact status - all suppressions mark contact as suppressed
-  if (message.contactId) {
-    await markContactSuppressed({
-      organizationId,
-      contactId: message.contactId,
-      suppressedAt,
-    });
   }
 
   log.info("Webhook: message suppressed", {
