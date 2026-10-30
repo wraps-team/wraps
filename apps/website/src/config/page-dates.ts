@@ -50,7 +50,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/blog/yc-w26-email-security-audit": "2026-09-15T08:41:41-06:00",
   "/blog/your-dmarc-policy-is-useless": "2026-09-18T08:52:25-06:00",
   "/byoc": "2026-10-29T16:49:48-06:00",
-  "/changelog": "2026-10-29T19:23:06-06:00",
+  "/changelog": "2026-10-29T19:44:24-06:00",
   "/cli": "2026-09-15T08:41:41-06:00",
   "/compare": "2026-10-26T14:37:41-06:00",
   "/compare/amazon-ses-vs-wraps": "2026-09-15T09:42:21-06:00",
