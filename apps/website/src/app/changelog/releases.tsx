@@ -114,11 +114,11 @@ export const Code = ({ children }: { children: ReactNode }) => (
 export const releases: Release[] = [
   {
     slug: "deliverability-tab-and-address-review",
-    versions: ["CLI v3.18.0"],
+    versions: ["CLI v3.18.0", "@wraps.dev/client v0.13.0"],
     date: "2026-10-29",
     icon: Gauge,
     title: "Deliverability tab and address review",
-    tags: ["dashboard", "api", "cli"],
+    tags: ["dashboard", "api", "cli", "sdk"],
     summary:
       "See whether your sending is healthy, what is driving bounces and complaints, and suppress the addresses behind them from the Emails page.",
     items: [
@@ -128,7 +128,8 @@ export const releases: Release[] = [
         Contacts that soft bounce now show <Code>soft_bounced</Code> and stay
         sendable. A third soft bounce on separate days marks the contact{" "}
         <Code>bounced</Code>, and a delivery clears it. If you read{" "}
-        <Code>emailStatus</Code> from the API, handle the new value
+        <Code>emailStatus</Code> from the API or <Code>@wraps.dev/client</Code>{" "}
+        v0.13.0, handle the new value
       </>,
       <>
         Run <Code>wraps platform update-role</Code> on CLI v3.18.0 so the
