@@ -113,6 +113,27 @@ export const Code = ({ children }: { children: ReactNode }) => (
 
 export const releases: Release[] = [
   {
+    slug: "wcag-aaa-contrast-across-the-dashboard",
+    date: "2026-10-30",
+    icon: LayoutDashboard,
+    title: "WCAG AAA contrast across the dashboard",
+    tags: ["dashboard"],
+    summary:
+      "Read every page of the dashboard at WCAG 2.2 AAA contrast in light and dark themes, in the same type and layout as wraps.dev.",
+    items: [
+      "Read muted text, status badges, alerts and chart labels at 7:1 contrast or better in both themes, and follow a solid focus ring on every control when you move through a page with the keyboard",
+      "Find the primary action on a page as an ink button. Orange marks accents such as active tabs and progress, and orange text uses a darker shade that stays readable on white",
+      "Check your preference centre if you kept its built-in status colours: warning and success are darker and carry white labels, so subscribers see them at AAA contrast too",
+      "Work in a layout that runs to the window edges, with rounded cards, square controls inside them, and the Inter, Space Grotesk and JetBrains Mono type wraps.dev uses",
+    ],
+    media: {
+      src: "/email/2026-10-aaa-contrast.png",
+      alt: "A dark Wraps card reading: Every screen at 7:1 contrast. Muted text, badges and focus rings meet WCAG 2.2 AAA in light and dark.",
+      width: 1104,
+      height: 480,
+    },
+  },
+  {
     slug: "deliverability-tab-and-address-review",
     versions: ["CLI v3.18.0", "@wraps.dev/client v0.13.0"],
     date: "2026-10-29",
