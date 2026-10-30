@@ -39,6 +39,7 @@ import { getOrganizationWithMembership } from "@/lib/organization";
 import { canEditScheduledBroadcast } from "../new/components/batch-form-utils";
 import { BatchStats } from "./components/batch-stats";
 import { CancelBatchButton } from "./components/cancel-button";
+import { LocalDateTime } from "./components/local-date-time";
 import { RecipientsPanel } from "./components/recipients-panel";
 import { ResumeBatchButton } from "./components/resume-button";
 
@@ -331,7 +332,11 @@ export default async function BatchDetailPage({
           <div className="grid gap-4 text-sm sm:grid-cols-2">
             <div>
               <div className="font-medium text-muted-foreground">Created</div>
-              <div>{new Date(batch.createdAt).toLocaleString()}</div>
+              <div>
+                <LocalDateTime
+                  value={new Date(batch.createdAt).toISOString()}
+                />
+              </div>
             </div>
             {batch.createdBy && (
               <div>
@@ -356,13 +361,22 @@ export default async function BatchDetailPage({
                 <div className="font-medium text-muted-foreground">
                   Scheduled For
                 </div>
-                <div>{new Date(batch.scheduledFor).toLocaleString()}</div>
+                <div>
+                  <LocalDateTime
+                    showTimeZone
+                    value={new Date(batch.scheduledFor).toISOString()}
+                  />
+                </div>
               </div>
             )}
             {batch.startedAt && (
               <div>
                 <div className="font-medium text-muted-foreground">Started</div>
-                <div>{new Date(batch.startedAt).toLocaleString()}</div>
+                <div>
+                  <LocalDateTime
+                    value={new Date(batch.startedAt).toISOString()}
+                  />
+                </div>
               </div>
             )}
             {batch.completedAt && (
@@ -370,7 +384,11 @@ export default async function BatchDetailPage({
                 <div className="font-medium text-muted-foreground">
                   Completed
                 </div>
-                <div>{new Date(batch.completedAt).toLocaleString()}</div>
+                <div>
+                  <LocalDateTime
+                    value={new Date(batch.completedAt).toISOString()}
+                  />
+                </div>
               </div>
             )}
           </div>

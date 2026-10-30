@@ -253,8 +253,8 @@ type Step = "setup" | "content" | "audience" | "review";
 
 /** The viewer's IANA zone, e.g. "America/Denver". Every scheduled time in this
  *  wizard is built in local time via Date#setHours, and the detail page renders
- *  in the viewer's zone too — but nothing ever said which zone, so "9:00 AM"
- *  was unverifiable and looked like it disagreed with the detail page. */
+ *  it in the viewer's zone (LocalDateTime) — but nothing ever said which zone,
+ *  so "9:00 AM" was unverifiable. */
 function localTimeZoneLabel(): string {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "local time";
