@@ -167,6 +167,94 @@ export const releases: Release[] = [
     docs: "/docs/guides/suppression-lists",
   },
   {
+    slug: "cli-and-api-for-agents",
+    versions: ["CLI v3.18.0"],
+    date: "2026-10-29",
+    icon: Bot,
+    title: "CLI commands and API routes for agents",
+    tags: ["cli", "api", "agents"],
+    summary:
+      "Read and change contacts, segments, topics, broadcasts, workflows, templates, suppressions, events and the audit log from the CLI or the API with an API key.",
+    items: [
+      <>
+        Run <Code>wraps contacts</Code>, <Code>wraps segments</Code>,{" "}
+        <Code>wraps topics</Code>, <Code>wraps broadcasts</Code>,{" "}
+        <Code>wraps workflows</Code>, <Code>wraps events</Code> and{" "}
+        <Code>wraps audit-logs</Code>, plus <Code>wraps email templates</Code>,{" "}
+        <Code>wraps email suppressions</Code>, <Code>wraps email metrics</Code>,{" "}
+        <Code>wraps email health</Code> and{" "}
+        <Code>wraps email agent approvals</Code>, to work with your
+        organization&apos;s data from a script or an agent
+      </>,
+      <>
+        Pass <Code>--json</Code> to get one envelope per call with an error code
+        and a suggestion, and page through lists with <Code>--limit</Code> and{" "}
+        <Code>--cursor</Code>. Every error exits 1. Commands that send email,
+        make a live change or delete data refuse to run without{" "}
+        <Code>--yes</Code>, and deletes also take <Code>--dry-run</Code>
+      </>,
+      <>
+        Call the new API routes directly: <Code>/v1/topics</Code>,{" "}
+        <Code>/v1/suppressions</Code>, <Code>/v1/events</Code>, contact{" "}
+        <Code>import</Code>, <Code>export</Code> and <Code>validate</Code> under{" "}
+        <Code>/v1/contacts</Code>, workflow runs under{" "}
+        <Code>/v1/workflows</Code>, and <Code>/v1/audit-logs</Code>. A route
+        that changes data checks the same role permissions as the dashboard
+      </>,
+      <>
+        Manage API keys with <Code>wraps api-keys</Code> from a session signed
+        in with <Code>wraps auth login</Code>. An API key cannot list, create or
+        revoke keys
+      </>,
+    ],
+    docs: "/docs/cli-reference",
+  },
+  {
+    slug: "scheduled-broadcast-editing",
+    date: "2026-10-29",
+    icon: Send,
+    title: "Scheduled broadcast editing",
+    tags: ["dashboard", "api"],
+    summary:
+      "Change a scheduled broadcast's content, sender, audience or send time up to a minute before it sends, instead of cancelling and rebuilding it.",
+    items: [
+      "Choose Edit on a scheduled email broadcast, on its page or in the broadcasts table menu, to change its content, from address, audience or send time. Owners and admins can edit until a minute before the send",
+      <>
+        Edit a scheduled email or SMS broadcast over the API with{" "}
+        <Code>PATCH /v1/batch/:id</Code>. Within a minute of the send time it
+        returns 409, and a broadcast that is no longer scheduled returns 400
+      </>,
+      <>
+        Each saved edit re-runs the checks a send runs and writes a{" "}
+        <Code>broadcast.schedule_updated</Code> entry to the audit log
+      </>,
+    ],
+    alsoFixed: [
+      "Broadcast times on a broadcast's page now show in your own time zone, and Scheduled For names the zone. Before, they showed in UTC.",
+      "Editing a broadcast in the dashboard no longer shifts its send time by your offset from UTC.",
+    ],
+  },
+  {
+    slug: "broadcasts-on-the-free-plan",
+    date: "2026-10-27",
+    icon: Gift,
+    title: "Broadcasts on the Free plan",
+    tags: ["dashboard", "api"],
+    summary:
+      "Send a broadcast to all of your contacts on Free. Topic and segment audiences and scheduled sends stay on Pro.",
+    items: [
+      <>
+        Send a broadcast to every contact on Free, from the dashboard or with{" "}
+        <Code>POST /v1/batch</Code>. Sending to a topic or a segment, and
+        scheduling a broadcast, need Pro or higher, and a request that needs
+        them returns 403 with the plan it needs
+      </>,
+      "Start a workflow when a contact enters or leaves a segment on Pro or higher. On Free, a workflow with one of these triggers cannot be saved, enabled, duplicated or pushed",
+      "Every broadcast now carries a one-click unsubscribe header and unsubscribe links, even when its template is marked transactional",
+    ],
+    docs: "/#pricing",
+  },
+  {
     slug: "push-respects-dashboard-edits",
     versions: [
       "CLI v3.17.0",
