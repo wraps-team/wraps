@@ -30,8 +30,10 @@ vi.mock("@/actions/contacts-analytics", () => ({
 }));
 
 const mockRemoveSuppression = vi.fn();
+const mockAddSuppression = vi.fn();
 vi.mock("@/actions/suppressions", () => ({
   removeSuppression: (...args: unknown[]) => mockRemoveSuppression(...args),
+  addSuppression: (...args: unknown[]) => mockAddSuppression(...args),
 }));
 
 vi.mock("sonner", () => ({
@@ -221,15 +223,18 @@ describe("AddressDetailSheet", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the not-checked line and Open Suppression List link in the drill-down case", async () => {
+  it("shows the not-checked line and Open Suppressed list link in the drill-down case", async () => {
     renderSheet();
     expect(
       await screen.findByText(
         "Not checked against the AWS suppression list here."
       )
     ).toBeInTheDocument();
-    const link = screen.getByRole("link", { name: "Open Suppression List" });
-    expect(link).toHaveAttribute("href", `/${ORG_SLUG}/emails/suppressions`);
+    const link = screen.getByRole("link", { name: "Open Suppressed list" });
+    expect(link).toHaveAttribute(
+      "href",
+      `/${ORG_SLUG}/emails?tab=deliverability&list=suppressed`
+    );
   });
 
   it("shows the error state with a working Try again button", async () => {
@@ -288,10 +293,10 @@ describe("AddressDetailSheet", () => {
     ).toBeInTheDocument();
   });
 
-  it('"Open Suppression List" link has no address in its URL', async () => {
+  it('"Open Suppressed list" link has no address in its URL', async () => {
     renderSheet();
     const link = await screen.findByRole("link", {
-      name: "Open Suppression List",
+      name: "Open Suppressed list",
     });
     expect(link.getAttribute("href")).not.toContain("someone");
     expect(link.getAttribute("href")).not.toContain("@");
@@ -320,5 +325,84 @@ describe("AddressDetailSheet", () => {
         /Wraps still treats this contact as bounced, so broadcasts and automations skip it./
       )
     ).toBeInTheDocument();
+  });
+
+  it("does not say broadcasts skip a soft-bounced contact (still sendable)", async () => {
+    mockGetAddressDetail.mockResolvedValue(
+      detail({
+        totals: { sends: 1, bounces: 1, complaints: 0, suppressed: 0 },
+        contact: {
+          id: "contact-8",
+          name: "Soft Person",
+          emailStatus: "soft_bounced",
+          createdAt: "2026-10-01T00:00:00.000Z",
+          createdBy: null,
+          creationRecord: null,
+        },
+      })
+    );
+    renderSheet();
+    expect(await screen.findByText("Soft bounced")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/so broadcasts and automations skip it/)
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("AddressDetailSheet suppress state", () => {
+  it("offers Suppress when SES does not list the address", async () => {
+    renderSheet({
+      accounts: [{ id: "aws-1", name: "Production", region: "us-east-1" }],
+      listedState: "not_listed",
+    });
+    await screen.findByText("This address is not on the SES suppression list.");
+    expect(
+      screen.getByRole("button", { name: "Suppress address" })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Not checked against the AWS suppression list here.")
+    ).not.toBeInTheDocument();
+  });
+
+  it("says the SES list could not be checked when the status is unknown", async () => {
+    renderSheet({
+      accounts: [{ id: "aws-1", name: "Production", region: "us-east-1" }],
+      listedState: "unknown",
+    });
+    await screen.findByText(
+      "Could not check the SES suppression list for this address."
+    );
+    expect(
+      screen.getByRole("button", { name: "Suppress address" })
+    ).toBeInTheDocument();
+  });
+
+  it("points a listed address to the Suppressed tab without a remove button", async () => {
+    renderSheet({ listedState: "listed" });
+    await screen.findByText(
+      "On the SES suppression list. Open the Suppressed tab to remove it."
+    );
+    expect(
+      screen.queryByRole("button", { name: "Suppress address" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Unsuppress" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the existing not-checked text and link when no state is given", async () => {
+    renderSheet();
+    await screen.findByText(
+      "Not checked against the AWS suppression list here."
+    );
+    expect(
+      screen.queryByRole("button", { name: "Suppress address" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Open Suppressed list" })
+    ).toHaveAttribute(
+      "href",
+      `/${ORG_SLUG}/emails?tab=deliverability&list=suppressed`
+    );
   });
 });

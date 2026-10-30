@@ -48,6 +48,8 @@ function makeContact(
     emailVerifiedAt: null,
     emailUnsubscribedAt: null,
     emailBouncedAt: null,
+    emailLastSoftBouncedAt: null,
+    emailSoftBounceCount: 0,
     emailComplainedAt: null,
     emailSuppressedAt: null,
     lastEmailSentAt: null,
@@ -135,6 +137,51 @@ describe("copy button has an accessible name (H3)", () => {
     expect(
       screen.queryByRole("button", { name: "Copy ada@example.com" })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("soft-bounce note under the email address", () => {
+  it("shows the count, last date and escalation hint for a soft-bounced contact", () => {
+    renderSheet({
+      contact: makeContact({
+        emailStatus: "soft_bounced",
+        emailSoftBounceCount: 2,
+        emailLastSoftBouncedAt: new Date("2026-08-10T12:00:00.000Z"),
+      }),
+    });
+
+    expect(screen.getByText(/Soft bounced 2×/)).toHaveTextContent(
+      "Soft bounced 2× · last Aug 10, 2026"
+    );
+    expect(
+      screen.getByText(
+        "Still receiving email. Marked bounced after 3 soft bounces on separate days."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("says how an escalated contact got to bounced", () => {
+    renderSheet({
+      contact: makeContact({
+        emailStatus: "bounced",
+        emailSoftBounceCount: 3,
+      }),
+    });
+
+    expect(
+      screen.getByText("Marked bounced after 3 soft bounces")
+    ).toBeInTheDocument();
+  });
+
+  it("shows nothing for a plain bounce or an active contact", () => {
+    renderSheet({
+      contact: makeContact({ emailStatus: "bounced", emailSoftBounceCount: 0 }),
+    });
+    expect(screen.queryByText(/soft bounce/i)).not.toBeInTheDocument();
+    cleanup();
+
+    renderSheet({ contact: makeContact({ emailStatus: "active" }) });
+    expect(screen.queryByText(/soft bounce/i)).not.toBeInTheDocument();
   });
 });
 

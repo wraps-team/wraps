@@ -113,6 +113,39 @@ export const Code = ({ children }: { children: ReactNode }) => (
 
 export const releases: Release[] = [
   {
+    slug: "deliverability-tab-and-address-review",
+    versions: ["CLI v3.18.0", "@wraps.dev/client v0.13.0"],
+    date: "2026-10-29",
+    icon: Gauge,
+    title: "Deliverability tab and address review",
+    tags: ["dashboard", "api", "cli", "sdk"],
+    summary:
+      "See whether your sending is healthy, what is driving bounces and complaints, and suppress the addresses behind them from the Emails page.",
+    items: [
+      "Open Emails and switch to the Deliverability tab for a verdict on your bounce and complaint rates, their trend against the SES review line, and the broadcasts, workflows, templates and from addresses driving them. Activity and Engagement are tabs on the same page, under one date range",
+      "Review the addresses SES is not suppressing yet: ones that complained, hard bounced, or soft bounced on three or more days since their last delivery. Suppress one, or all of them after a confirmation, or add an address by hand",
+      <>
+        Contacts that soft bounce now show <Code>soft_bounced</Code> and stay
+        sendable. A third soft bounce on separate days marks the contact{" "}
+        <Code>bounced</Code>, and a delivery clears it. If you read{" "}
+        <Code>emailStatus</Code> from the API or <Code>@wraps.dev/client</Code>{" "}
+        v0.13.0, handle the new value
+      </>,
+      <>
+        Run <Code>wraps platform update-role</Code> on CLI v3.18.0 so the
+        dashboard can add addresses to the suppression list. Until you do,
+        listing and removing suppressions still work
+      </>,
+    ],
+    media: {
+      src: "/email/2026-10-deliverability-tab.png",
+      alt: "A dark Wraps card reading: See who is behind your bounces. The Deliverability tab rates your sending and lists the addresses to suppress.",
+      width: 1104,
+      height: 480,
+    },
+    docs: "/docs/guides/suppression-lists",
+  },
+  {
     slug: "push-respects-dashboard-edits",
     versions: [
       "CLI v3.17.0",

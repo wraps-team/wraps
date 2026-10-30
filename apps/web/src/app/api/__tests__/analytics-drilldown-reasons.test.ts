@@ -252,8 +252,37 @@ describe("GET /api/[orgSlug]/analytics/drilldown/reasons", () => {
     expect(group.severity).toBe(expected?.severity);
     expect(group.rawCode).toBe("smtp; 550 5.1.1 user unknown");
     expect(group.hasDetail).toBe(true);
+    expect(group.bounceType).toBe("Permanent");
     expect(group.share).toBe(100);
     expect(group.firstSeen).toBe(FIRST.toISOString());
+  });
+
+  it("returns the bounce type of each group, Permanent or Transient", async () => {
+    repo.queryBounceReasonRows.mockResolvedValue([
+      bounceRow({ receiverDomain: "gmail.com", bounceType: "Permanent" }),
+      bounceRow({
+        receiverDomain: "yahoo.com",
+        bounceType: "Transient",
+        bounceSubType: "MailboxFull",
+        count: 4,
+      }),
+    ]);
+    repo.queryReasonTotals.mockResolvedValue(totals(14, 0));
+    const body = await (await call("metric=bounce")).json();
+    expect(body.groups[0].bounceType).toBe("Permanent");
+    expect(body.groups[1].bounceType).toBe("Transient");
+  });
+
+  it("returns the bounce type on legacy bounce groups", async () => {
+    repo.queryReasonTotals.mockRejectedValue(
+      Object.assign(new Error("column does not exist"), { code: "42703" })
+    );
+    repo.queryLegacyReasonRows.mockResolvedValue([
+      legacyRow({ bounceType: "Transient", bounceSubType: "General" }),
+    ]);
+    const body = await (await call("metric=bounce")).json();
+    expect(body.mode).toBe("legacy");
+    expect(body.groups[0].bounceType).toBe("Transient");
   });
 
   it("gives a pre-M1 row the bounce-subtype copy with no raw code and no detail", async () => {
@@ -296,6 +325,8 @@ describe("GET /api/[orgSlug]/analytics/drilldown/reasons", () => {
     expect(body.groups[1].title).toBe("Spam complaint — marked as spam");
     expect(body.groups[0].feedbackType).toBeNull();
     expect(body.groups[1].feedbackType).toBe("abuse");
+    expect(body.groups[0].bounceType).toBeNull();
+    expect(body.groups[1].bounceType).toBeNull();
   });
 
   it("does not ask for suppression reconciliation on the complaint metric", async () => {

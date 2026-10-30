@@ -1,5 +1,5 @@
 {
-  "id": "452dfbc6-01b8-4eb7-a6e9-21fde383e3ec",
+  "id": "d979dd16-8a30-45fb-ad1c-32de52820e1c",
   "prevId": "4c65cece-6516-4259-b683-9d061146837f",
   "version": "7",
   "dialect": "postgresql",
@@ -503,7 +503,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -653,7 +653,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -897,7 +897,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -947,7 +947,7 @@
           "name": "granted_by",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "expires_at": {
           "name": "expires_at",
@@ -1060,7 +1060,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -1342,7 +1342,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -4417,6 +4417,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "email_last_soft_bounced_at": {
+          "name": "email_last_soft_bounced_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "email_complained_at": {
           "name": "email_complained_at",
           "type": "timestamp",
@@ -4463,6 +4469,13 @@
         },
         "emails_clicked": {
           "name": "emails_clicked",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "email_soft_bounce_count": {
+          "name": "email_soft_bounce_count",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -4879,7 +4892,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -5143,7 +5156,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -6687,7 +6700,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },

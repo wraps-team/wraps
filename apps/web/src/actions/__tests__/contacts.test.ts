@@ -558,6 +558,75 @@ describe("Contacts Server Actions", () => {
       }
     });
 
+    it("clears the soft-bounce count and timestamp on a manual reactivation", async () => {
+      const createResult = await createContact(testOrganization.id, {
+        email: "reactivate-soft@example.com",
+      });
+      expect(createResult.success).toBe(true);
+      if (!createResult.success) {
+        return;
+      }
+      await db
+        .update(contact)
+        .set({
+          emailStatus: "soft_bounced",
+          emailSoftBounceCount: 2,
+          emailLastSoftBouncedAt: new Date("2024-01-02T03:04:05.000Z"),
+        })
+        .where(eq(contact.id, createResult.contact.id));
+
+      const result = await updateContact(
+        createResult.contact.id,
+        testOrganization.id,
+        { emailStatus: "active" }
+      );
+      expect(result.success).toBe(true);
+
+      const [row] = await db
+        .select()
+        .from(contact)
+        .where(eq(contact.id, createResult.contact.id));
+      expect(row.emailStatus).toBe("active");
+      expect(row.emailSoftBounceCount).toBe(0);
+      expect(row.emailLastSoftBouncedAt).toBeNull();
+    });
+
+    it("leaves the soft-bounce streak alone on a non-reactivation status change", async () => {
+      const lastSoft = new Date("2024-01-02T03:04:05.000Z");
+      const createResult = await createContact(testOrganization.id, {
+        email: "unsub-soft@example.com",
+      });
+      expect(createResult.success).toBe(true);
+      if (!createResult.success) {
+        return;
+      }
+      await db
+        .update(contact)
+        .set({
+          emailStatus: "soft_bounced",
+          emailSoftBounceCount: 2,
+          emailLastSoftBouncedAt: lastSoft,
+        })
+        .where(eq(contact.id, createResult.contact.id));
+
+      const result = await updateContact(
+        createResult.contact.id,
+        testOrganization.id,
+        { emailStatus: "unsubscribed" }
+      );
+      expect(result.success).toBe(true);
+
+      const [row] = await db
+        .select()
+        .from(contact)
+        .where(eq(contact.id, createResult.contact.id));
+      expect(row.emailStatus).toBe("unsubscribed");
+      expect(row.emailSoftBounceCount).toBe(2);
+      expect(row.emailLastSoftBouncedAt?.toISOString()).toBe(
+        lastSoft.toISOString()
+      );
+    });
+
     it("should update contact properties", async () => {
       const createResult = await createContact(testOrganization.id, {
         email: "props-update@example.com",

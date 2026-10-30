@@ -12,7 +12,10 @@ import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkFeatureAccess } from "@/lib/plan-limits";
 import { BatchForm } from "../../new/components/batch-form";
-import { mapBatchToCampaignData } from "../../new/components/batch-form-utils";
+import {
+  canEditScheduledBroadcast,
+  mapBatchToCampaignData,
+} from "../../new/components/batch-form-utils";
 
 type EditBatchPageProps = {
   params: Promise<{
@@ -39,7 +42,7 @@ export default async function EditBatchPage({ params }: EditBatchPageProps) {
     redirect("/");
   }
 
-  // Only owners and admins can edit drafts
+  // Only owners and admins can edit drafts and scheduled broadcasts
   if (!["owner", "admin"].includes(orgWithMembership.userRole)) {
     redirect(`/${orgSlug}/emails/broadcasts`);
   }
@@ -50,8 +53,11 @@ export default async function EditBatchPage({ params }: EditBatchPageProps) {
     notFound();
   }
 
-  // Only drafts are editable — non-drafts route to the detail page
-  if (batchResult.batch.status !== "draft") {
+  // Drafts, and scheduled broadcasts that have not started, are editable.
+  // Everything else routes to the detail page. The API refuses edits in the
+  // last minute before the send time, so the page does too.
+  const isScheduledEdit = canEditScheduledBroadcast(batchResult.batch);
+  if (!(batchResult.batch.status === "draft" || isScheduledEdit)) {
     redirect(`/${orgSlug}/emails/broadcasts/${batchId}`);
   }
 
@@ -131,9 +137,10 @@ export default async function EditBatchPage({ params }: EditBatchPageProps) {
         awsAccounts={awsAccounts}
         currentUserEmail={session.user.email}
         draftId={batchResult.batch.id}
+        initialScheduledFor={batchResult.batch.scheduledFor}
         initialValues={initialValues}
         initialVerifiedDomains={initialVerifiedDomains}
-        mode="edit"
+        mode={isScheduledEdit ? "edit-scheduled" : "edit"}
         organizationId={orgWithMembership.id}
         orgDefaults={orgDefaults ?? null}
         orgSlug={orgSlug}

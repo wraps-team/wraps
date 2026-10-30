@@ -1,4 +1,5 @@
 import { auth } from "@wraps/auth";
+import { classifyBounce } from "@wraps/core/bounce-classification";
 import { db } from "@wraps/db";
 import { awsAccount } from "@wraps/db/schema/app";
 import { messageSend } from "@wraps/db/schema/batch";
@@ -111,6 +112,8 @@ const LIST_COLUMNS = {
   bouncedAt: messageSend.bouncedAt,
   complainedAt: messageSend.complainedAt,
   suppressedAt: messageSend.suppressedAt,
+  bounceType: messageSend.bounceType,
+  bounceSubType: messageSend.bounceSubType,
 } as const;
 
 type ListRow = {
@@ -127,6 +130,8 @@ type ListRow = {
   bouncedAt: Date | null;
   complainedAt: Date | null;
   suppressedAt: Date | null;
+  bounceType: string | null;
+  bounceSubType: string | null;
 };
 
 function toListItem(row: ListRow): EmailListItem {
@@ -154,6 +159,13 @@ function toListItem(row: ListRow): EmailListItem {
     Boolean(row.suppressedAt),
   ].filter(Boolean).length;
 
+  // Only bounced rows carry a kind. "content" bounces are about the message
+  // itself and unknown types keep the plain "Bounced" label.
+  const kind =
+    row.status === "bounced"
+      ? classifyBounce(row.bounceType, row.bounceSubType)
+      : "unknown";
+
   return {
     id: row.messageId ?? row.id,
     messageId: row.messageId ?? row.id,
@@ -166,6 +178,7 @@ function toListItem(row: ListRow): EmailListItem {
     eventCount,
     hasOpened: Boolean(row.openedAt),
     hasClicked: Boolean(row.clickedAt),
+    bounceKind: kind === "hard" || kind === "soft" ? kind : null,
   };
 }
 

@@ -163,7 +163,7 @@ describe("buildChangeMarkers: one marker per source row", () => {
     expect(marker).toMatchObject({
       type: "suppression_removed",
       label: "Suppressed address removed",
-      href: "/acme/emails/suppressions",
+      href: "/acme/emails?tab=deliverability&list=suppressed",
       weight: "minor",
     });
   });
@@ -871,18 +871,10 @@ describe("groupMarkersByDate", () => {
 });
 
 describe("TIMELINE_TAB_HREF", () => {
-  it("uses the metric, days and tz keys and tab=timeline", () => {
-    const href = TIMELINE_TAB_HREF("acme", {
-      metric: "complaint",
-      days: 30,
-      tz: "America/New_York",
-    });
-    const url = new URL(href, "https://x.test");
-    expect(url.pathname).toBe("/acme/emails/analytics/drilldown");
-    expect(url.searchParams.get("metric")).toBe("complaint");
-    expect(url.searchParams.get("days")).toBe("30");
-    expect(url.searchParams.get("tz")).toBe("America/New_York");
-    expect(url.searchParams.get("tab")).toBe("timeline");
+  it("links to the hub's changes view with the metric and days", () => {
+    expect(TIMELINE_TAB_HREF("acme", { metric: "complaint", days: 30 })).toBe(
+      "/acme/emails?tab=deliverability&metric=complaint&days=30&drive=changes"
+    );
   });
 });
 

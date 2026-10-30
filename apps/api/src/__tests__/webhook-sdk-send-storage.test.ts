@@ -35,6 +35,13 @@ vi.mock("@wraps/db", async () => {
   return {
     ...actual,
     db: {
+      // Runs the callback against this same fake so call recording and order are unchanged.
+      transaction: vi.fn(async function (
+        this: unknown,
+        fn: (tx: unknown) => unknown
+      ) {
+        return fn(this);
+      }),
       select: mockDbSelect,
       update: vi.fn().mockImplementation(() => ({
         set: () => ({ where: () => Promise.resolve({ rowCount: 1 }) }),
@@ -91,6 +98,14 @@ function mockMessageSendLookup(found: boolean) {
             : Promise.resolve([]),
       }),
     }),
+  });
+}
+
+// The contact lookup that Bounce/Complaint/Suppressed on an SDK send performs:
+// .from(contact).where(...).limit(1). Resolves "no matching contact".
+function mockContactLookupNoMatch() {
+  mockDbSelect.mockReturnValueOnce({
+    from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
   });
 }
 
@@ -307,6 +322,7 @@ describe("webhook SDK send storage", () => {
   it("Bounce event for unknown messageId materializes a bounced row", async () => {
     mockAccountLookup();
     mockMessageSendLookup(false);
+    mockContactLookupNoMatch();
     mockInsertChain();
 
     const response = await sendWebhook(

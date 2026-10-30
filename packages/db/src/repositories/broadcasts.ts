@@ -442,6 +442,31 @@ export async function promoteBroadcast(
 }
 
 /**
+ * Edit a broadcast that is scheduled but has not started. Status-gated so it
+ * loses to the batch worker: once the schedule fires and chunk 0 flips the row
+ * to `processing`, this matches nothing and returns null.
+ */
+export async function updateScheduledBroadcast(
+  id: string,
+  organizationId: string,
+  data: Partial<BroadcastInsert>,
+  dbClient: DbClient = db
+): Promise<BroadcastRecord | null> {
+  const [result] = await dbClient
+    .update(batchSend)
+    .set({ ...data, updatedAt: new Date() })
+    .where(
+      and(
+        eq(batchSend.id, id),
+        eq(batchSend.organizationId, organizationId),
+        eq(batchSend.status, "scheduled")
+      )
+    )
+    .returning();
+  return result ?? null;
+}
+
+/**
  * Record that a broadcast is marked `scheduled` but has no EventBridge schedule
  * behind it, so nothing will ever fire. Written to `errorMessage` so the detail
  * page says the same thing the creation toast said, days later.

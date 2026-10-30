@@ -36,7 +36,7 @@ function getShortcutUrl(key: string, orgSlug: string): string | null {
   const shortcuts: Record<string, string> = {
     E: `/${orgSlug}/emails`,
     T: `/${orgSlug}/emails/templates`,
-    A: `/${orgSlug}/emails/analytics`,
+    A: `/${orgSlug}/emails`,
     S: `/${orgSlug}/settings`,
   };
   return shortcuts[key] ?? null;

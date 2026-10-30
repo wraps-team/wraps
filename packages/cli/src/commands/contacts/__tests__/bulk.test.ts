@@ -783,7 +783,7 @@ describe("contacts import, export and validate", () => {
       const env = onlyEnvelope(logSpy);
       expect(env.error?.code).toBe("INVALID_FLAG_VALUE");
       expect(env.error?.message).toContain(
-        '--email-status must be one of active, unsubscribed, bounced, complained, suppressed, got "vip"'
+        '--email-status must be one of active, unsubscribed, bounced, soft_bounced, complained, suppressed, got "vip"'
       );
       expect(fetchMock).not.toHaveBeenCalled();
     });

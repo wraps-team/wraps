@@ -704,6 +704,31 @@ describe("GET /v1/contacts/export", () => {
     ]);
   });
 
+  it("accepts emailStatus=soft_bounced and returns only soft-bounced contacts", async () => {
+    await seedExportSet();
+    await db.insert(contact).values({
+      id: `${PREFIX}-ex-soft`,
+      organizationId: ids.org,
+      email: `exsoft-${PREFIX}@example.com`,
+      emailStatus: "soft_bounced",
+      emailSoftBounceCount: 2,
+      emailLastSoftBouncedAt: new Date("2026-08-10T12:00:00.000Z"),
+      firstName: "ExSoft",
+    });
+    const app = appFor(ids.org, ids.user);
+
+    const res = await getExport(app, "?emailStatus=soft_bounced");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.total).toBe(1);
+    expect(body.contacts).toHaveLength(1);
+    expect(body.contacts[0].email).toBe(`exsoft-${PREFIX}@example.com`);
+    expect(body.contacts[0].emailSoftBounceCount).toBe(2);
+    expect(body.contacts[0].emailLastSoftBouncedAt).toBe(
+      "2026-08-10T12:00:00.000Z"
+    );
+  });
+
   it("returns 422 for an emailStatus outside the enum, and never queries with it", async () => {
     await seedExportSet();
     const app = appFor(ids.org, ids.user);

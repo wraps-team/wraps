@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useActiveOrganization } from "@/contexts/organization-context";
 import { useEventUsage } from "@/hooks/use-event-usage";
 import { useInsightExplanation } from "@/hooks/use-insight-explanation";
+import { hubHref } from "@/lib/emails-hub";
 import { cn } from "@/lib/utils";
 import { useProductsStore } from "@/stores/products-store";
 import {
@@ -355,7 +356,9 @@ export function InsightsSection({
       description,
       href: isSMS
         ? `/${orgSlug}/sms/analytics`
-        : `/${orgSlug}/emails/analytics`,
+        : anomalyKind === "volume_drop"
+          ? hubHref(orgSlug)
+          : hubHref(orgSlug, { tab: "deliverability" }),
       label: "Investigate",
       severity: anomaly.severity,
       facts: anomalyKind
@@ -423,7 +426,7 @@ export function InsightsSection({
           emailAnalytics.bounceRate > 5
             ? "This is above the 5% threshold. Clean your contact list and verify your DNS records."
             : "Getting elevated. Review bounced emails and consider cleaning your list.",
-        href: `/${orgSlug}/emails/analytics`,
+        href: hubHref(orgSlug, { tab: "deliverability" }),
         label: "View Bounces",
         severity,
         facts: {
@@ -445,7 +448,7 @@ export function InsightsSection({
       title: `Complaint rate at ${emailAnalytics.complaintRate.toFixed(2)}%`,
       description:
         "AWS SES may suspend sending if this stays above 0.1%. Review your sending practices.",
-      href: `/${orgSlug}/emails/analytics`,
+      href: hubHref(orgSlug, { tab: "deliverability" }),
       label: "View Details",
       severity,
       facts: {

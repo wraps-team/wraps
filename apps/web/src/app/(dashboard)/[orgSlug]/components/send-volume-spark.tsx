@@ -17,6 +17,7 @@ import { ArrowRightIcon, MailIcon, MessageSquareIcon } from "lucide-react";
 import Link from "next/link";
 import { Area, AreaChart } from "recharts";
 import { SERIES_COLOR } from "@/lib/chart-series";
+import { hubHref } from "@/lib/emails-hub";
 import { useProductsStore } from "@/stores/products-store";
 import { useVolumeData } from "../emails/analytics/hooks/use-analytics";
 import { useSMSVolumeData } from "../sms/analytics/hooks/use-sms-analytics";
@@ -90,9 +91,9 @@ export function SendVolumeSpark({
             {showEmail && (
               <Link
                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                href={`/${orgSlug}/emails/analytics`}
+                href={hubHref(orgSlug)}
               >
-                Email analytics
+                Email activity
                 <ArrowRightIcon className="h-3 w-3" />
               </Link>
             )}

@@ -1,10 +1,7 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { ButtonGroup } from "@wraps/ui/components/ui/button-group";
 import {
   Card,
-  CardAction,
   CardContent,
   CardHeader,
   CardTitle,
@@ -15,27 +12,12 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@wraps/ui/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@wraps/ui/components/ui/select";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
-import { formatDistance } from "date-fns";
-import { CircleAlert, Info, Loader2, RotateCw } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { CircleAlert, Loader2, RotateCw } from "lucide-react";
+import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { refreshEmailChart } from "@/actions/analytics";
 import { Button } from "@/components/ui/button";
-import { RefreshButton } from "@/components/ui/refresh-button";
+import { useHubDays } from "@/hooks/use-hub-days";
 import {
   type ReputationLabel,
   reputationPartialLabel,
@@ -43,10 +25,12 @@ import {
 } from "@/lib/analytics-scope";
 import { countYAxisProps } from "@/lib/chart-axis";
 import { SERIES_COLOR } from "@/lib/chart-series";
+import { HUB_RANGES } from "@/lib/emails-hub";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { useEmailChartData } from "../analytics/hooks/use-analytics";
 import { captureEmailsErrorRetried } from "../lib/analytics";
+import { Figure, ReputationScope, UpdatedAgo } from "./summary-rail";
 
 /**
  * The four series, each owning its colour AND a stroke treatment.
@@ -147,21 +131,6 @@ const chartConfig: ChartConfig = {
 };
 
 /**
- * The same windows the emails table offers, so the two controls cannot select
- * ranges that do not exist on the other. The chart reads `?days` rather than
- * holding private state — it previously defaulted to 30 over a 7-day table,
- * which guaranteed the card and the table disagreed.
- */
-const TIME_RANGES = [
-  { days: 1, short: "24h", long: "Last 24 hours" },
-  { days: 7, short: "7d", long: "Last 7 days" },
-  { days: 30, short: "30d", long: "Last 30 days" },
-  { days: 90, short: "90d", long: "Last 90 days" },
-] as const;
-
-const DEFAULT_DAYS = 7;
-
-/**
  * One height for the plot, the error state and the skeleton.
  *
  * The plot used to be pinned at 280px beside a text column that rendered
@@ -172,107 +141,6 @@ const DEFAULT_DAYS = 7;
  * the only one in play.
  */
 const PLOT_HEIGHT = "h-[260px] @[540px]/card:h-[320px]";
-
-/**
- * "Updated N minutes ago", in a leaf of its own.
- *
- * The clock used to live in `EmailAnalytics`, so every tick re-rendered the
- * whole card - four `<Area>`s, two gradient defs, both axes and the tooltip -
- * to repaint one line of 12px text. Isolating it means the chart re-renders
- * only when the chart data changes.
- *
- * Starting at null keeps the server and first client render identical; the
- * interval matches `formatDistance`'s minute granularity, so no tick is spent
- * producing the string that is already on screen.
- */
-function UpdatedAgo({ generatedAt }: { generatedAt: number }) {
-  const [now, setNow] = useState<number | null>(null);
-
-  useEffect(() => {
-    setNow(Date.now());
-    const id = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(id);
-  }, []);
-
-  if (now === null) {
-    return null;
-  }
-
-  return (
-    <>
-      Updated{" "}
-      {formatDistance(new Date(generatedAt), new Date(now), {
-        addSuffix: true,
-      })}
-    </>
-  );
-}
-
-/**
- * The scope prose for the reputation figure, behind a disclosure.
- *
- * These two sentences are the reason the card had a layout problem: three or
- * four lines of 12px text explaining which population the rates describe, set
- * in a 176px column, generating more height than the chart beside them. They
- * still matter - a reader who assumes the bounce rate is window-scoped will
- * misread it - but they are reference material, not something to re-read on
- * every visit.
- *
- * A popover rather than a tooltip: a tooltip cannot be opened by touch.
- */
-function ReputationScope({ reputation }: { reputation: ReputationLabel }) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          aria-label={`What "${reputation.title}" measures`}
-          className="-my-2"
-          size="icon-sm"
-          variant="ghost"
-        >
-          <Info className="size-3.5" />
-        </Button>
-      </PopoverTrigger>
-      {/*
-        Opens upward, into the header's whitespace. Anchored below or beside,
-        the panel covered the two rates it exists to explain - the trigger sits
-        in the middle of the rail, with the numbers under and after it.
-      */}
-      <PopoverContent align="start" className="w-72" side="top">
-        <p className="text-sm">{reputation.detail}</p>
-        {reputation.note ? (
-          <p className="mt-2 text-muted-foreground text-sm">
-            {reputation.note}
-          </p>
-        ) : null}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function Figure({
-  label,
-  value,
-  aside,
-}: {
-  label: string;
-  value: string;
-  aside?: string;
-}) {
-  return (
-    <div>
-      <div className="text-muted-foreground text-xs">{label}</div>
-      <div className="mt-1.5 flex items-baseline gap-1.5">
-        <span className="font-semibold text-2xl leading-none tabular-nums">
-          {value}
-        </span>
-        {aside ? (
-          <span className="text-muted-foreground text-sm">{aside}</span>
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 type SummaryProps = {
   overview:
@@ -287,7 +155,6 @@ type SummaryProps = {
   generatedAt: number | undefined;
   reputation: ReputationLabel | null;
   reputationPartial: string | null;
-  refreshFailed: boolean;
 };
 
 /**
@@ -305,7 +172,6 @@ function ActivitySummary({
   generatedAt,
   reputation,
   reputationPartial,
-  refreshFailed,
 }: SummaryProps) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b pb-5">
@@ -359,9 +225,6 @@ function ActivitySummary({
       {generatedAt === undefined ? null : (
         <p className="text-muted-foreground text-xs">
           <UpdatedAgo generatedAt={generatedAt} />
-          {refreshFailed ? (
-            <span className="text-destructive"> · refresh failed</span>
-          ) : null}
         </p>
       )}
     </div>
@@ -436,58 +299,14 @@ type EmailAnalyticsProps = {
 };
 
 export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
-  const queryClient = useQueryClient();
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const reducedMotion = useReducedMotion();
-
-  const daysParam = searchParams.get("days");
-  const days =
-    TIME_RANGES.find((r) => String(r.days) === daysParam)?.days ?? DEFAULT_DAYS;
+  const days = useHubDays();
 
   const { data, isError, isFetching, isLoading, refetch } = useEmailChartData(
     orgSlug,
     days
   );
   const meta = data?.meta;
-
-  const [refreshFailed, setRefreshFailed] = useState(false);
-  /**
-   * Spoken once per refresh, and never on a timer.
-   *
-   * The visible "Updated N minutes ago" cannot be a live region - it rewrites
-   * itself every minute and would interrupt the reader each time. This says
-   * what happened, when something happened.
-   */
-  const [refreshStatus, setRefreshStatus] = useState("");
-
-  function selectDays(next: string) {
-    // Preserve every other filter on the URL — the window is not the only one.
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("days", next);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }
-
-  async function handleRefresh() {
-    // Expire the server cache FIRST. Invalidating only the React Query cache
-    // refetches a route wrapped in `unstable_cache`, which hands back the exact
-    // same bytes — the spinner spins and nothing changes.
-    const result = await refreshEmailChart(orgSlug);
-    const failed = !result.ok && result.reason === "error";
-    setRefreshFailed(failed);
-
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["emails", orgSlug] }),
-      queryClient.invalidateQueries({
-        queryKey: ["analytics", "email-chart", orgSlug],
-      }),
-    ]);
-
-    setRefreshStatus(
-      failed ? "Could not refresh email activity." : "Email activity refreshed."
-    );
-  }
 
   const overview = data?.overview;
 
@@ -522,7 +341,7 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
     (d) => d.sent > 0 || d.delivered > 0 || d.opened > 0 || d.clicked > 0
   );
 
-  const range = TIME_RANGES.find((r) => r.days === days) ?? TIME_RANGES[1];
+  const range = HUB_RANGES.find((r) => r.days === days) ?? HUB_RANGES[1];
   const reputation = meta ? reputationScopeLabel(meta) : null;
   const reputationPartial = meta ? reputationPartialLabel(meta) : null;
 
@@ -548,56 +367,8 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
         <CardTitle asChild>
           <h2>Email Activity</h2>
         </CardTitle>
-        <CardAction className="self-center">
-          <ButtonGroup
-            aria-label="Time range"
-            className="@[767px]/card:flex hidden"
-          >
-            {TIME_RANGES.map((r) => (
-              <Button
-                aria-pressed={days === r.days}
-                key={r.days}
-                onClick={() => selectDays(String(r.days))}
-                size="touch"
-                variant="outline"
-              >
-                {r.short}
-              </Button>
-            ))}
-            <RefreshButton
-              label="Refresh email activity"
-              onRefresh={handleRefresh}
-            />
-          </ButtonGroup>
-          <ButtonGroup className="@[767px]/card:hidden flex">
-            <Select onValueChange={selectDays} value={String(days)}>
-              <SelectTrigger
-                aria-label="Select time range"
-                className="w-32 **:data-[slot=select-value]:block"
-                size="touch"
-              >
-                <SelectValue placeholder="Last 7 days" />
-              </SelectTrigger>
-              <SelectContent>
-                {TIME_RANGES.map((r) => (
-                  <SelectItem key={r.days} value={String(r.days)}>
-                    {r.long}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <RefreshButton
-              label="Refresh email activity"
-              onRefresh={handleRefresh}
-            />
-          </ButtonGroup>
-        </CardAction>
       </CardHeader>
       <CardContent>
-        <p aria-live="polite" className="sr-only">
-          {refreshStatus}
-        </p>
-
         {isLoading && (
           // Mirrors the loaded card block for block. The old skeleton modelled
           // a 216px sidebar against a 452px real one, so the card grew by more
@@ -637,7 +408,6 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
             <ActivitySummary
               generatedAt={meta?.generatedAt}
               overview={overview}
-              refreshFailed={refreshFailed}
               reputation={reputation}
               reputationPartial={reputationPartial}
             />

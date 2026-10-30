@@ -11,7 +11,7 @@ import { validateTimezone } from "./analytics-utils";
 export type DrilldownMetric = "bounce" | "complaint" | "suppression";
 export type DrilldownBy = "broadcast" | "workflow" | "template" | "from";
 
-export const DRILLDOWN_METRICS: readonly DrilldownMetric[] = [
+const DRILLDOWN_METRICS: readonly DrilldownMetric[] = [
   "bounce",
   "complaint",
   "suppression",
@@ -169,30 +169,6 @@ export function validateDrilldownParams(
     by: by as DrilldownBy,
     window: buildWindow(days, day, validateTimezone(params.tz), now),
   };
-}
-
-/**
- * Builds the drill-down link used by the analytics entry points. Keys are
- * written in one fixed order so the same window always yields the same URL.
- */
-export function buildDrilldownHref(
-  orgSlug: string,
-  args: {
-    metric: DrilldownMetric;
-    days: number;
-    day?: string | null;
-    tz: string;
-  }
-): string {
-  const search = new URLSearchParams({
-    metric: args.metric,
-    days: String(args.days),
-  });
-  if (args.day) {
-    search.set("day", args.day);
-  }
-  search.set("tz", args.tz);
-  return `/${orgSlug}/emails/analytics/drilldown?${search.toString()}`;
 }
 
 export const DRILLDOWN_METRIC_LABEL: Record<DrilldownMetric, string> = {

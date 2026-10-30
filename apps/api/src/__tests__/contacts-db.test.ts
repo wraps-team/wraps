@@ -2461,6 +2461,77 @@ describe("Contacts API Integration", () => {
         );
       });
 
+      it("clears the soft-bounce count and timestamp on a manual reactivation", async () => {
+        const [existing] = await db
+          .insert(contact)
+          .values({
+            organizationId: testOrg.id,
+            email: "reactivate-soft@example.com",
+            emailHash: "hash-reactivate-soft",
+            emailStatus: "soft_bounced",
+            emailSoftBounceCount: 2,
+            emailLastSoftBouncedAt: new Date("2024-01-02T03:04:05.000Z"),
+            properties: {},
+          })
+          .returning();
+
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request(`http://localhost/v1/contacts/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emailStatus: "active" }),
+          })
+        );
+
+        expect(response.status).toBe(200);
+
+        const [updated] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, existing.id));
+        expect(updated.emailStatus).toBe("active");
+        expect(updated.emailSoftBounceCount).toBe(0);
+        expect(updated.emailLastSoftBouncedAt).toBeNull();
+      });
+
+      it("leaves the soft-bounce streak alone on a non-reactivation status change", async () => {
+        const lastSoft = new Date("2024-01-02T03:04:05.000Z");
+        const [existing] = await db
+          .insert(contact)
+          .values({
+            organizationId: testOrg.id,
+            email: "unsub-soft@example.com",
+            emailHash: "hash-unsub-soft",
+            emailStatus: "soft_bounced",
+            emailSoftBounceCount: 2,
+            emailLastSoftBouncedAt: lastSoft,
+            properties: {},
+          })
+          .returning();
+
+        const app = createTestApp();
+        const response = await app.handle(
+          new Request(`http://localhost/v1/contacts/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emailStatus: "unsubscribed" }),
+          })
+        );
+
+        expect(response.status).toBe(200);
+
+        const [updated] = await db
+          .select()
+          .from(contact)
+          .where(eq(contact.id, existing.id));
+        expect(updated.emailStatus).toBe("unsubscribed");
+        expect(updated.emailSoftBounceCount).toBe(2);
+        expect(updated.emailLastSoftBouncedAt?.toISOString()).toBe(
+          lastSoft.toISOString()
+        );
+      });
+
       it("defaults a newly-added phone to pending_consent", async () => {
         const [existing] = await db
           .insert(contact)

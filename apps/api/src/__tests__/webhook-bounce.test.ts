@@ -4,7 +4,9 @@
  * Tests that SES "Bounce" events correctly:
  * - Update messageSend status to "bounced" with type/subtype
  * - Increment batchSend.bounced counter
- * - Mark contact emailStatus "bounced" for Permanent bounces only
+ * - Mark contact emailStatus "bounced" for Permanent bounces
+ * - Count Transient/Undetermined bounces on the contact (soft_bounced), and
+ *   leave the contact alone for content-related Transient bounces
  * - Call resumeWaitingExecutions with "bounced" branch
  */
 
@@ -36,6 +38,13 @@ vi.mock("@wraps/db", async () => {
   return {
     ...actual,
     db: {
+      // Runs the callback against this same fake so call recording and order are unchanged.
+      transaction: vi.fn(async function (
+        this: unknown,
+        fn: (tx: unknown) => unknown
+      ) {
+        return fn(this);
+      }),
       select: mockDbSelect,
       update: mockDbUpdate,
       // processBounce / processComplaint write the receiver diagnostic.
@@ -224,7 +233,7 @@ describe("Webhook: Bounce", () => {
     );
   });
 
-  it("does NOT update contact emailStatus for Transient bounces", async () => {
+  it("counts a Transient bounce on the contact without marking it bounced", async () => {
     const { updateCalls } = setupWebhookMocks();
 
     const event = buildBounceEvent({ bounceType: "Transient" });
@@ -235,13 +244,38 @@ describe("Webhook: Bounce", () => {
       expect.objectContaining({ status: "bounced" })
     );
 
-    // No update should carry emailStatus="bounced"
+    // The contact gets a soft-bounce count update (SQL expressions, so this
+    // can only check which keys are written; the DB suite checks the values)
+    const softUpdate = updateCalls.find(
+      (c) =>
+        "emailSoftBounceCount" in
+        ((c.set.mock.calls[0]?.[0] as Record<string, unknown>) ?? {})
+    );
+    expect(softUpdate).toBeDefined();
+
+    // No update should carry the literal emailStatus="bounced"
     const contactBouncedUpdate = updateCalls.find(
       (c) =>
         (c.set.mock.calls[0]?.[0] as Record<string, unknown>)?.emailStatus ===
         "bounced"
     );
     expect(contactBouncedUpdate).toBeUndefined();
+  });
+
+  it("leaves the contact alone for a Transient content-rejection bounce", async () => {
+    const { updateCalls } = setupWebhookMocks();
+
+    const event = buildBounceEvent({
+      bounceType: "Transient",
+      bounceSubType: "ContentRejected",
+    });
+    await sendWebhookEvent(app, event);
+
+    const contactUpdate = updateCalls.find((c) => {
+      const set = (c.set.mock.calls[0]?.[0] as Record<string, unknown>) ?? {};
+      return "emailSoftBounceCount" in set || "emailStatus" in set;
+    });
+    expect(contactUpdate).toBeUndefined();
   });
 
   it("calls resumeWaitingExecutions with 'bounced' branch when waiting execution present", async () => {

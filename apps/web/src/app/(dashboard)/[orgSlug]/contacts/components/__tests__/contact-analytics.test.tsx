@@ -80,6 +80,7 @@ function analytics(
       unsubscribed: 100,
       bounced: 80,
       complained: 13,
+      soft_bounced: 0,
       suppressed: 0,
       noEmailStatus: 0,
     },
@@ -212,6 +213,43 @@ describe("ContactAnalytics — proportions on a narrow card", () => {
     expect(heroRow).not.toBeNull();
     expect(heroRow?.contains(allContacts)).toBe(true);
     expect(heroRow?.contains(label)).toBe(false);
+  });
+
+  it("shows soft-bounced contacts as their own linked bucket when there are any", async () => {
+    getContactAnalytics.mockResolvedValue({
+      success: true,
+      analytics: analytics({
+        listHealth: {
+          active: 1800,
+          unsubscribed: 100,
+          bounced: 80,
+          soft_bounced: 4,
+          complained: 13,
+          suppressed: 0,
+          noEmailStatus: 0,
+        },
+      }),
+    });
+
+    renderCard();
+
+    const label = await screen.findByText("soft bounced");
+    const link = label.closest("a");
+    expect(link).not.toBeNull();
+    expect(link?.textContent).toContain("4");
+    expect(link?.getAttribute("href")).toContain("emailStatus=soft_bounced");
+  });
+
+  it("renders no soft-bounced bucket when there are none", async () => {
+    getContactAnalytics.mockResolvedValue({
+      success: true,
+      analytics: analytics(),
+    });
+
+    renderCard();
+
+    await screen.findByText("List health");
+    expect(screen.queryByText("soft bounced")).not.toBeInTheDocument();
   });
 });
 

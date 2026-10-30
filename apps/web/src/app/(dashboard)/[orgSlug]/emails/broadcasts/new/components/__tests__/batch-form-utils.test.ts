@@ -3,8 +3,11 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { BatchSendWithMeta } from "@/lib/batch";
 import {
+  buildTimeOptions,
+  canEditScheduledBroadcast,
   mapBatchToCampaignData,
   requiredPlanName,
+  scheduleFieldsFromInstant,
   stripSelfReferencingPlaceholder,
 } from "../batch-form-utils";
 
@@ -155,7 +158,10 @@ describe("mapBatchToCampaignData", () => {
     expect(result.htmlContent).toBe("<p>Hello</p>");
   });
 
-  it("restores a scheduled send as date plus time-of-day", () => {
+  // The mapper runs on the server; the date and time are split in the
+  // browser (scheduleFieldsFromInstant) so they use the zone the wizard
+  // rebuilds the instant in.
+  it("restores a scheduled send as 'later' without splitting the time", () => {
     // Relative to now so the assertion doesn't start failing once a hardcoded
     // date falls into the past and hits the send-now fallback below.
     const scheduledFor = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -167,8 +173,17 @@ describe("mapBatchToCampaignData", () => {
     } as BatchSendWithMeta);
 
     expect(result.scheduleType).toBe("later");
-    expect(result.scheduledDate).toEqual(scheduledFor);
-    expect(result.scheduledTime).toBe("14:30");
+    expect(result.scheduledDate).toBeUndefined();
+    expect(result.scheduledTime).toBeUndefined();
+  });
+
+  it("splits an instant into local midnight plus time-of-day", () => {
+    const instant = new Date(2026, 10, 3, 14, 30, 45);
+
+    const fields = scheduleFieldsFromInstant(instant);
+
+    expect(fields.scheduledTime).toBe("14:30");
+    expect(fields.scheduledDate).toEqual(new Date(2026, 10, 3));
   });
 
   // The date picker disables past dates, so a restored past schedule is a
@@ -212,5 +227,86 @@ describe("batch-form lock labels", () => {
       "utf8"
     );
     expect(src).not.toMatch(/\b(Starter|Growth|Scale)\b/);
+  });
+});
+
+describe("canEditScheduledBroadcast", () => {
+  const now = Date.parse("2026-10-29T12:00:00.000Z");
+
+  it("allows a scheduled broadcast well before its send time", () => {
+    expect(
+      canEditScheduledBroadcast(
+        {
+          status: "scheduled",
+          channel: "email",
+          scheduledFor: new Date(now + 10 * 60 * 1000),
+        },
+        now
+      )
+    ).toBe(true);
+  });
+
+  it("stops inside the last minute, matching the API cutoff", () => {
+    expect(
+      canEditScheduledBroadcast(
+        {
+          status: "scheduled",
+          channel: "email",
+          scheduledFor: new Date(now + 30 * 1000),
+        },
+        now
+      )
+    ).toBe(false);
+  });
+
+  it("rejects anything that is not scheduled", () => {
+    for (const status of ["draft", "queued", "processing", "completed"]) {
+      expect(
+        canEditScheduledBroadcast(
+          {
+            status,
+            channel: "email",
+            scheduledFor: new Date(now + 60 * 60 * 1000),
+          },
+          now
+        )
+      ).toBe(false);
+    }
+  });
+
+  it("rejects a scheduled SMS broadcast, which the wizard cannot edit", () => {
+    expect(
+      canEditScheduledBroadcast(
+        {
+          status: "scheduled",
+          channel: "sms",
+          scheduledFor: new Date(now + 60 * 60 * 1000),
+        },
+        now
+      )
+    ).toBe(false);
+  });
+});
+
+describe("buildTimeOptions", () => {
+  it("offers every half hour by default", () => {
+    const options = buildTimeOptions();
+    expect(options).toHaveLength(48);
+    expect(options[0]).toEqual({ value: "00:00", label: "12:00 AM" });
+    expect(options[19]).toEqual({ value: "09:30", label: "9:30 AM" });
+  });
+
+  it("adds an off-grid stored time in order", () => {
+    const options = buildTimeOptions(["09:15"]);
+    expect(options).toHaveLength(49);
+    const values = options.map((o) => o.value);
+    expect(values.slice(18, 21)).toEqual(["09:00", "09:15", "09:30"]);
+    expect(options[19].label).toBe("9:15 AM");
+  });
+
+  it("does not duplicate a time already on the grid, and ignores junk", () => {
+    expect(buildTimeOptions(["09:30", undefined, null, "9am"])).toHaveLength(
+      48
+    );
   });
 });

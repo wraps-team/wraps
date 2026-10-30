@@ -274,7 +274,7 @@ export function CommandSearch({ open, onOpenChange }: CommandSearchProps) {
         },
         {
           title: "Analytics",
-          url: `/${orgSlug}/emails/analytics`,
+          url: `/${orgSlug}/emails`,
           group: "Navigation",
           icon: BarChart3,
           shortcut: "G A",

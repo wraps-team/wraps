@@ -403,6 +403,14 @@ export type PromoteDraftBatchResult =
   | { success: true; batch: BatchSendWithMeta; warning?: string }
   | { success: false; error: string };
 
+/** Edits a scheduled broadcast in place. The form always sends the whole
+ *  broadcast, so a field left empty here is cleared, not kept. */
+export type UpdateScheduledBatchInput = CreateBatchInput & {
+  scheduledFor: Date;
+};
+
+export type UpdateScheduledBatchResult = PromoteDraftBatchResult;
+
 export type DeleteDraftBatchResult =
   | { success: true }
   | { success: false; error: string };

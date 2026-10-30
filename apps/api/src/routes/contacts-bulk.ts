@@ -1,3 +1,4 @@
+import { EMAIL_STATUSES } from "@wraps/db";
 import { t } from "elysia";
 import { requirePermission } from "../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
@@ -64,6 +65,8 @@ const exportedContact = t.Object(
     company: t.Nullable(t.String()),
     jobTitle: t.Nullable(t.String()),
     emailStatus: t.Nullable(t.String()),
+    emailLastSoftBouncedAt: t.Unknown({ description: "ISO timestamp or null" }),
+    emailSoftBounceCount: t.Number(),
     smsStatus: t.Nullable(t.String()),
     properties: t.Record(t.String(), t.Unknown()),
     createdAt: t.Unknown({ description: "ISO timestamp" }),
@@ -80,13 +83,9 @@ const exportedContact = t.Object(
   { additionalProperties: true }
 );
 
-const emailStatusLiteral = t.Union([
-  t.Literal("active"),
-  t.Literal("unsubscribed"),
-  t.Literal("bounced"),
-  t.Literal("complained"),
-  t.Literal("suppressed"),
-]);
+// Derived from EMAIL_STATUSES so a new status cannot be left out of the export
+// filter (see emailStatusSchema in contacts.ts for how the list drifted before).
+const emailStatusLiteral = t.Union(EMAIL_STATUSES.map((s) => t.Literal(s)));
 
 const verdictLiteral = t.Union([
   t.Literal("LOW"),

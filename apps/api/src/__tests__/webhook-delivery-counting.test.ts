@@ -35,6 +35,13 @@ vi.mock("@wraps/db", async () => {
   return {
     ...actual,
     db: {
+      // Runs the callback against this same fake so call recording and order are unchanged.
+      transaction: vi.fn(async function (
+        this: unknown,
+        fn: (tx: unknown) => unknown
+      ) {
+        return fn(this);
+      }),
       select: mockDbSelect,
       update: mockDbUpdate,
       insert: mockDbInsert,
@@ -184,6 +191,7 @@ describe("webhook delivery counting", () => {
     mockAccountLookup();
     mockMessageSendLookup(false);
     mockInsertChain();
+    mockUpdateChain();
 
     const response = await sendWebhook(makeDeliveryEvent());
 
@@ -372,6 +380,7 @@ describe("webhook delivery counting", () => {
     mockAccountLookup();
     mockMessageSendLookup(false);
     mockInsertChain();
+    mockUpdateChain();
 
     await sendWebhook(makeDeliveryEvent());
 

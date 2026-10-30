@@ -38,6 +38,7 @@ vi.mock("@/actions/contacts-analytics", () => ({
 vi.mock("@/actions/suppressions", () => ({
   listSuppressions: vi.fn(),
   removeSuppression: vi.fn(),
+  addSuppression: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({

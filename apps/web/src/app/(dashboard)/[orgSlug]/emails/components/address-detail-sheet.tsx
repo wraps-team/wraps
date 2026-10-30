@@ -19,7 +19,12 @@ import {
 } from "@/actions/address-detail";
 import { getContactTimeline } from "@/actions/contacts-analytics";
 import { Button } from "@/components/ui/button";
-import { EMAIL_STATUS_LABELS, type EmailStatus } from "@/lib/contacts";
+import {
+  EMAIL_STATUS_LABELS,
+  type EmailStatus,
+  isEmailStatusSendable,
+} from "@/lib/contacts";
+import { SuppressConfirmDialog } from "../deliverability/components/suppress-confirm-dialog";
 import { formatFullTimestamp } from "../lib/timestamps";
 import { RemoveSuppressionButton } from "../suppressions/components/remove-suppression-button";
 
@@ -29,6 +34,7 @@ const EMAIL_STATUS_BADGE_VARIANT: Record<EmailStatus, BadgeVariant> = {
   active: "success",
   unsubscribed: "secondary",
   bounced: "destructive",
+  soft_bounced: "warning",
   complained: "destructive",
   suppressed: "warning",
 };
@@ -50,6 +56,17 @@ export type AddressDetailSheetProps = {
   suppression: null | SuppressionInfo;
   onClose: () => void;
   onRemoved?: () => void; // called after a successful unsuppress
+  /** From a review list: how SES lists the address. Absent elsewhere. */
+  listedState?: "listed" | "not_listed" | "unknown";
+  /** The accounts the Suppress confirmation can use. Suppress needs them. */
+  accounts?: { id: string; name: string; region: string }[];
+  /** The account and reason a Suppress uses, taken from the review row. */
+  suppressTarget?: {
+    awsAccountId: string | null;
+    reason: "BOUNCE" | "COMPLAINT";
+  };
+  /** Called after a successful suppress, before the sheet closes. */
+  onSuppressed?: () => void;
 };
 
 type ReadySuccess = Extract<AddressDetail, { success: true }>;
@@ -131,6 +148,75 @@ function complaintDateFrom(sends: ProblemSend[]): string | null {
   return complained?.complainedAt ? formatWhen(complained.complainedAt) : null;
 }
 
+/**
+ * Suppress for an address that SES does not list (or cannot be checked). The
+ * brand button only opens the confirmation; nothing reaches SES until the user
+ * confirms there.
+ */
+function SuppressAddressSection({
+  address,
+  detail,
+  organizationId,
+  listedState,
+  accounts,
+  suppressTarget,
+  onSuppressed,
+  onClose,
+}: {
+  address: string;
+  detail: ReadySuccess;
+  organizationId: string;
+  listedState: "not_listed" | "unknown";
+  accounts: { id: string; name: string; region: string }[];
+  suppressTarget?: {
+    awsAccountId: string | null;
+    reason: "BOUNCE" | "COMPLAINT";
+  };
+  onSuppressed?: () => void;
+  onClose: () => void;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const target = {
+    address,
+    reason:
+      suppressTarget?.reason ??
+      (detail.totals.complaints > 0 ? "COMPLAINT" : "BOUNCE"),
+    awsAccountId:
+      suppressTarget?.awsAccountId ??
+      detail.problemSends.find((send) => send.awsAccountId)?.awsAccountId ??
+      null,
+  } as const;
+
+  return (
+    <section className="flex flex-col gap-3">
+      <p className="text-sm">
+        {listedState === "unknown"
+          ? "Could not check the SES suppression list for this address."
+          : "This address is not on the SES suppression list."}
+      </p>
+      <div>
+        <Button onClick={() => setConfirmOpen(true)} variant="brand">
+          Suppress address
+        </Button>
+      </div>
+      <SuppressConfirmDialog
+        accounts={accounts}
+        onDone={(result) => {
+          if (result.failed === 0 && result.added > 0) {
+            setConfirmOpen(false);
+            onSuppressed?.();
+            onClose();
+          }
+        }}
+        onOpenChange={setConfirmOpen}
+        open={confirmOpen}
+        organizationId={organizationId}
+        targets={[target]}
+      />
+    </section>
+  );
+}
+
 function SuppressionSection({
   detail,
   address,
@@ -138,6 +224,11 @@ function SuppressionSection({
   organizationId,
   suppression,
   onRemoved,
+  listedState,
+  accounts,
+  suppressTarget,
+  onSuppressed,
+  onClose,
 }: {
   detail: ReadySuccess;
   address: string;
@@ -145,7 +236,44 @@ function SuppressionSection({
   organizationId: string;
   suppression: SuppressionInfo | null;
   onRemoved?: () => void;
+  listedState?: "listed" | "not_listed" | "unknown";
+  accounts?: { id: string; name: string; region: string }[];
+  suppressTarget?: {
+    awsAccountId: string | null;
+    reason: "BOUNCE" | "COMPLAINT";
+  };
+  onSuppressed?: () => void;
+  onClose: () => void;
 }) {
+  if (!suppression && listedState === "listed") {
+    return (
+      <section className="flex flex-col gap-2">
+        <p className="text-sm">
+          On the SES suppression list. Open the Suppressed tab to remove it.
+        </p>
+      </section>
+    );
+  }
+
+  if (
+    !suppression &&
+    accounts &&
+    (listedState === "not_listed" || listedState === "unknown")
+  ) {
+    return (
+      <SuppressAddressSection
+        accounts={accounts}
+        address={address}
+        detail={detail}
+        listedState={listedState}
+        onClose={onClose}
+        onSuppressed={onSuppressed}
+        organizationId={organizationId}
+        suppressTarget={suppressTarget}
+      />
+    );
+  }
+
   if (!suppression) {
     return (
       <section className="flex flex-col gap-2">
@@ -154,9 +282,9 @@ function SuppressionSection({
         </p>
         <Link
           className="text-sm underline underline-offset-4"
-          href={`/${orgSlug}/emails/suppressions`}
+          href={`/${orgSlug}/emails?tab=deliverability&list=suppressed`}
         >
-          Open Suppression List
+          Open Suppressed list
         </Link>
       </section>
     );
@@ -367,7 +495,7 @@ function ContactSection({
   }
 
   const status = contact.emailStatus;
-  const isActive = !status || status === "active";
+  const isSendable = isEmailStatusSendable(status);
 
   return (
     <section className="flex flex-col gap-3">
@@ -380,7 +508,7 @@ function ContactSection({
           </Badge>
         ) : null}
       </div>
-      {!isActive && status ? (
+      {!isSendable && status ? (
         <p className="text-sm">
           Wraps still treats this contact as{" "}
           {EMAIL_STATUS_LABELS[status].toLowerCase()}, so broadcasts and
@@ -444,6 +572,10 @@ export function AddressDetailSheet({
   suppression,
   onClose,
   onRemoved,
+  listedState,
+  accounts,
+  suppressTarget,
+  onSuppressed,
 }: AddressDetailSheetProps) {
   const [detailState, setDetailState] = useState<DetailState>({
     status: "loading",
@@ -559,12 +691,17 @@ export function AddressDetailSheet({
           {detailState.status === "ready" ? (
             <>
               <SuppressionSection
+                accounts={accounts}
                 address={address}
                 detail={detailState.detail}
+                listedState={listedState}
+                onClose={onClose}
                 onRemoved={onRemoved}
+                onSuppressed={onSuppressed}
                 organizationId={organizationId}
                 orgSlug={orgSlug}
                 suppression={suppression}
+                suppressTarget={suppressTarget}
               />
               <SendsSection
                 detail={detailState.detail}

@@ -6,7 +6,10 @@ import { Checkbox } from "@wraps/ui/components/ui/checkbox";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { captureEmailsRowOpened } from "../lib/analytics";
-import { getEmailStatusConfig } from "../lib/status-config";
+import {
+  getEmailStatusConfig,
+  getEmailStatusLabel,
+} from "../lib/status-config";
 import {
   formatFullTimestamp,
   formatRelativeTimestamp,
@@ -164,7 +167,7 @@ export function createColumns({
         return (
           <Badge variant={config.variant}>
             <Icon className="mr-1 h-3 w-3" />
-            {config.label}
+            {getEmailStatusLabel(row.original.status, row.original.bounceKind)}
           </Badge>
         );
       },

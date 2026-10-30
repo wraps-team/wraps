@@ -1,26 +1,44 @@
 /**
- * Chart overlay and change list: opt-in props, the toggle, the reference
- * lines, the list's links, keyboard order, the mobile disclosure, and the
- * copy. Recharts is stubbed so only ReferenceLine children render. The data
- * hooks are mocked, so this runs without a server.
+ * Change markers on the Deliverability card's trend chart, and the overlay
+ * pieces the card renders: the list's links, keyboard order, the mobile
+ * disclosure, the copy and the toggle. Recharts is stubbed so only the
+ * ReferenceLine children render. The data hooks are mocked, so this runs
+ * without a server.
  *
  * @vitest-environment jsdom
  */
 
 import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  renderHook,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { EmailChartMeta } from "@/lib/analytics-scope";
 import type { ChangeMarker, ChangeMarkersResponse } from "@/lib/change-markers";
-import timelineTab from "../../drilldown/tabs/timeline-tab";
-import { BounceTypeChart } from "../bounce-type-chart";
+import { ChangesTable } from "../../../deliverability/components/changes-table";
+import { DeliverabilityCard } from "../../../deliverability/components/deliverability-card";
 import {
   ChangeMarkerList,
   ChangeMarkersToggle,
+  useChartChangeMarkers,
 } from "../change-marker-overlay";
 
 const hoisted = vi.hoisted(() => ({ isMobile: false }));
+
+const state = vi.hoisted(() => ({
+  email: undefined as unknown,
+  overview: undefined as unknown,
+  bounce: undefined as unknown,
+  complaint: undefined as unknown,
+  suppression: undefined as unknown,
+}));
 
 vi.mock("@/hooks/use-mobile", () => ({
   useIsMobile: () => hoisted.isMobile,
@@ -28,6 +46,7 @@ vi.mock("@/hooks/use-mobile", () => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams("days=30"),
 }));
 
 vi.mock("recharts", async (importOriginal) => {
@@ -62,35 +81,30 @@ vi.mock("recharts", async (importOriginal) => {
 });
 
 const mockUseChangeMarkers = vi.fn();
-vi.mock("../../hooks/use-analytics", () => ({
-  useBounceData: () => ({
-    data: [
-      {
-        date: "2026-10-20",
-        timestamp: 0,
-        permanent: 1,
-        transient: 0,
-        undetermined: 0,
-        total: 1,
-        sent: 50,
-        bounceRate: 2,
-      },
-      {
-        date: "2026-10-25",
-        timestamp: 0,
-        permanent: 1,
-        transient: 0,
-        undetermined: 0,
-        total: 1,
-        sent: 50,
-        bounceRate: 2,
-      },
-    ],
-    isLoading: false,
+vi.mock("../../hooks/use-analytics", () => {
+  const hook = (data: unknown) => ({
+    data,
+    isLoading: data === undefined,
+    isError: false,
     error: null,
-  }),
-  useChangeMarkers: (...args: unknown[]) => mockUseChangeMarkers(...args),
-}));
+    refetch: vi.fn(),
+  });
+  return {
+    useEmailChartData: () => ({
+      data: state.email,
+      isLoading: state.email === undefined,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    }),
+    useAnalyticsOverview: () => hook(state.overview),
+    useBounceData: () => hook(state.bounce),
+    useComplaintData: () => hook(state.complaint),
+    useSuppressionData: () => hook(state.suppression),
+    useChangeMarkers: (...args: unknown[]) => mockUseChangeMarkers(...args),
+  };
+});
 
 globalThis.ResizeObserver ??= class {
   observe() {
@@ -104,13 +118,96 @@ globalThis.ResizeObserver ??= class {
   }
 } as unknown as typeof ResizeObserver;
 
-/** Marker lines only: the chart's own threshold line uses a different stroke. */
+globalThis.matchMedia ??= ((query: string) => ({
+  matches: false,
+  media: query,
+  addEventListener() {
+    // no OS preference changes in jsdom
+  },
+  removeEventListener() {
+    // no-op
+  },
+})) as unknown as typeof matchMedia;
+
+const NOW = Date.parse("2026-10-26T12:00:00.000Z");
+const DAYS = [
+  "2026-10-20",
+  "2026-10-21",
+  "2026-10-22",
+  "2026-10-23",
+  "2026-10-24",
+  "2026-10-25",
+  "2026-10-26",
+];
+
+function meta(): EmailChartMeta {
+  return {
+    reputationScope: "ses-account",
+    awsAccountCount: 1,
+    awsAccountsUnavailable: 0,
+    reputationAsOf: NOW,
+    generatedAt: NOW,
+  } as EmailChartMeta;
+}
+
+/** A rated, healthy account with a bounce series that has a 2026-10-25 row. */
+function loadHealthy() {
+  state.email = {
+    overview: {
+      totalSent: 5000,
+      totalDelivered: 4990,
+      totalBounced: 13,
+      totalComplaints: 7,
+      totalRenderingFailures: 0,
+      deliveryRate: 99.8,
+      bounceRate: 2.6,
+      complaintRate: 0.03,
+    },
+    volume: [],
+    engagement: [],
+    meta: meta(),
+  };
+  state.overview = {
+    totalSent: 5000,
+    totalDelivered: 4990,
+    totalBounced: 13,
+    totalComplaints: 7,
+    totalRenderingFailures: 0,
+    deliveryRate: 99.8,
+    bounceRate: 0,
+    complaintRate: 0,
+  };
+  state.bounce = DAYS.map((date, i) => ({
+    date,
+    timestamp: NOW - (DAYS.length - i) * 86_400_000,
+    permanent: 0,
+    transient: 0,
+    undetermined: 0,
+    total: 0,
+    sent: 100,
+    bounceRate: i === DAYS.length - 1 ? 2.6 : 1,
+  }));
+  state.complaint = DAYS.map((date, i) => ({
+    date,
+    timestamp: NOW - (DAYS.length - i) * 86_400_000,
+    complaints: 0,
+    sent: 100,
+    complaintRate: 0,
+  }));
+  state.suppression = DAYS.map((date, i) => ({
+    date,
+    timestamp: NOW - (DAYS.length - i) * 86_400_000,
+    suppressed: 0,
+    sent: 100,
+    suppressionRate: 0,
+  }));
+}
+
+/** Marker lines only: the card's SES review line has a y, not an x. */
 function markerLines() {
   return screen
     .queryAllByTestId("ref-line")
-    .filter(
-      (el) => el.getAttribute("data-stroke") === "var(--muted-foreground)"
-    );
+    .filter((el) => el.hasAttribute("data-x"));
 }
 
 function marker(overrides: Partial<ChangeMarker> = {}): ChangeMarker {
@@ -158,57 +255,101 @@ function renderWithClient(ui: React.ReactElement) {
   );
 }
 
+function renderCard(search: Record<string, string> = {}) {
+  return render(
+    <NuqsTestingAdapter searchParams={{ days: "30", ...search }}>
+      <DeliverabilityCard orgSlug="acme" />
+    </NuqsTestingAdapter>
+  );
+}
+
 beforeEach(() => {
   hoisted.isMobile = false;
   mockUseChangeMarkers.mockReset();
   setMarkers([]);
+  loadHealthy();
 });
 
 afterEach(() => {
   cleanup();
 });
 
-describe("charts with showChangeMarkers", () => {
-  it("charts render unchanged when showChangeMarkers is absent (no toggle, no request)", () => {
-    renderWithClient(<BounceTypeChart orgSlug="acme" />);
-    expect(
-      screen.queryByRole("button", { name: "Changes" })
-    ).not.toBeInTheDocument();
-    expect(markerLines()).toHaveLength(0);
-    expect(mockUseChangeMarkers).toHaveBeenCalledWith(
-      "acme",
-      30,
-      expect.objectContaining({ withDeltas: false, enabled: false })
-    );
-  });
-
-  it("the drill-down link stays present with the overlay off (S1 header unchanged)", () => {
-    renderWithClient(<BounceTypeChart orgSlug="acme" />);
-    expect(
-      screen.getByRole("link", { name: "View causes" })
-    ).toBeInTheDocument();
-  });
-
-  it("toggle reflects aria-pressed and removes the lines when pressed off", async () => {
+describe("change markers on the Deliverability card", () => {
+  it("starts closed: no marker line and no marker list until Changes is pressed", async () => {
     setMarkers([marker()]);
-    renderWithClient(<BounceTypeChart orgSlug="acme" showChangeMarkers />);
+    renderCard();
     const toggle = screen.getByRole("button", { name: "Changes" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(markerLines()).toHaveLength(0);
+    expect(
+      screen.queryByRole("list", { name: "Changes in this period" })
+    ).toBeNull();
+
+    await userEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(markerLines()).toHaveLength(1);
     expect(markerLines()[0]).toHaveAttribute("data-x", "2026-10-25");
+    expect(
+      screen.getByRole("list", { name: "Changes in this period" })
+    ).toBeInTheDocument();
 
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-pressed", "false");
     expect(markerLines()).toHaveLength(0);
   });
 
-  it("the overlay asks for markers without deltas, enabled", () => {
-    renderWithClient(<BounceTypeChart orgSlug="acme" showChangeMarkers />);
+  it("opens from changes=1 in the URL, and closing removes the param", async () => {
+    const onUrlUpdate = vi.fn();
+    setMarkers([marker()]);
+    render(
+      <NuqsTestingAdapter
+        onUrlUpdate={onUrlUpdate}
+        searchParams={{ days: "30", changes: "1" }}
+      >
+        <DeliverabilityCard orgSlug="acme" />
+      </NuqsTestingAdapter>
+    );
+    expect(screen.getByRole("button", { name: "Changes" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(markerLines()).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Changes" }));
+    expect(
+      onUrlUpdate.mock.calls.at(-1)?.[0].searchParams.get("changes")
+    ).toBeNull();
+  });
+
+  it("the card asks for markers without deltas, enabled", () => {
+    renderCard();
     expect(mockUseChangeMarkers).toHaveBeenCalledWith(
       "acme",
       30,
       expect.objectContaining({ withDeltas: false, enabled: true })
     );
+  });
+});
+
+describe("useChartChangeMarkers", () => {
+  it("makes the request disabled and draws no lines when the overlay is off", () => {
+    setMarkers([marker()]);
+    const { result } = renderHook(() =>
+      useChartChangeMarkers({
+        orgSlug: "acme",
+        days: 30,
+        enabled: false,
+        showMarkers: true,
+        dates: ["2026-10-25"],
+      })
+    );
+    expect(mockUseChangeMarkers).toHaveBeenCalledWith(
+      "acme",
+      30,
+      expect.objectContaining({ withDeltas: false, enabled: false })
+    );
+    expect(result.current.overlayOn).toBe(false);
+    expect(result.current.markerLines).toEqual([]);
   });
 });
 
@@ -229,7 +370,6 @@ describe("ChangeMarkerList", () => {
         metric="bounce"
         orgSlug="acme"
         state="ready"
-        tz="UTC"
       />
     );
     const list = screen.getByRole("list", { name: "Changes in this period" });
@@ -246,7 +386,7 @@ describe("ChangeMarkerList", () => {
         days={30}
         markers={[
           marker({ id: "a", href: "/acme/contacts", label: "A" }),
-          marker({ id: "b", href: "/acme/emails/suppressions", label: "B" }),
+          marker({ id: "b", href: "/acme/emails/inbound", label: "B" }),
           marker({
             id: "c",
             href: "/acme/settings/sender-defaults",
@@ -256,7 +396,6 @@ describe("ChangeMarkerList", () => {
         metric="bounce"
         orgSlug="acme"
         state="ready"
-        tz="UTC"
       />
     );
     const links = screen.getAllByRole("link");
@@ -266,7 +405,7 @@ describe("ChangeMarkerList", () => {
     }
   });
 
-  it("shows at most five items and a +N more link to the timeline tab", () => {
+  it("shows at most five items and a +N more link to the hub's changes view", () => {
     const many = Array.from({ length: 7 }, (_, i) =>
       marker({ id: `m${i}`, label: `Change ${i}`, href: `/acme/x/${i}` })
     );
@@ -278,7 +417,6 @@ describe("ChangeMarkerList", () => {
         metric="complaint"
         orgSlug="acme"
         state="ready"
-        tz="UTC"
       />
     );
     const list = screen.getByRole("list", { name: "Changes in this period" });
@@ -286,7 +424,7 @@ describe("ChangeMarkerList", () => {
     const more = screen.getByRole("link", { name: "+2 more" });
     expect(more).toHaveAttribute(
       "href",
-      "/acme/emails/analytics/drilldown?metric=complaint&days=30&tz=UTC&tab=timeline"
+      "/acme/emails?tab=deliverability&metric=complaint&days=30&drive=changes"
     );
   });
 
@@ -300,7 +438,6 @@ describe("ChangeMarkerList", () => {
         metric="bounce"
         orgSlug="acme"
         state="ready"
-        tz="UTC"
       />
     );
     const disclosure = screen.getByRole("button", { name: "Show 2 changes" });
@@ -324,7 +461,6 @@ describe("ChangeMarkerList", () => {
         metric="bounce"
         orgSlug="acme"
         state="ready"
-        tz="UTC"
       />
     );
     expect(screen.getByText("No changes in this period.")).toBeInTheDocument();
@@ -339,7 +475,6 @@ describe("ChangeMarkerList", () => {
         metric="bounce"
         orgSlug="acme"
         state="error"
-        tz="UTC"
       />
     );
     expect(
@@ -359,8 +494,8 @@ describe("ChangeMarkersToggle", () => {
   });
 });
 
-describe("timeline copy in the overlay tests", () => {
-  it("timeline shows Not enough sends copy and never a percentage change for insufficient_volume", () => {
+describe("changes table copy in the overlay tests", () => {
+  it("the changes table shows Not enough sends copy and never a percentage change for insufficient_volume", () => {
     mockUseChangeMarkers.mockReturnValue({
       data: markersResponse([
         marker({
@@ -401,9 +536,8 @@ describe("timeline copy in the overlay tests", () => {
       error: null,
       refetch: vi.fn(),
     });
-    const { Component } = timelineTab;
     const { container } = renderWithClient(
-      <Component
+      <ChangesTable
         metric="bounce"
         orgSlug="acme"
         window={{
@@ -419,7 +553,7 @@ describe("timeline copy in the overlay tests", () => {
       screen.getAllByText(
         "Not enough sends to compare: 3 before and 10 after. Each window needs 200 sends."
       )
-    ).toHaveLength(3);
+    ).toHaveLength(1);
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/\d+(\.\d+)?% -> /);
     expect(text).not.toMatch(/points\)/);
@@ -440,7 +574,6 @@ describe("copy", () => {
           metric="bounce"
           orgSlug="acme"
           state="ready"
-          tz="UTC"
         />
       </>
     );

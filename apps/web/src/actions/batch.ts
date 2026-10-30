@@ -62,6 +62,8 @@ import type {
   SaveDraftBatchResult,
   UpdateDraftBatchInput,
   UpdateDraftBatchResult,
+  UpdateScheduledBatchInput,
+  UpdateScheduledBatchResult,
   VariableMapping,
 } from "@/lib/batch";
 import {
@@ -1673,6 +1675,174 @@ export const promoteDraftToSend = orgAction(
     return promoted.success && promoteWarning
       ? { ...promoted, warning: promoteWarning }
       : promoted;
+  }
+);
+
+/**
+ * Edit a scheduled broadcast that has not started sending. It stays scheduled;
+ * the API moves the EventBridge schedule when the time or account changes.
+ */
+export const updateScheduledBatchSend = orgAction(
+  {
+    name: "updateScheduledBatchSend",
+    resource: "broadcasts",
+    permission: ["send"],
+    orgId: (
+      _batchId: string,
+      organizationId: string,
+      _data: UpdateScheduledBatchInput
+    ) => organizationId,
+    onError: "Failed to update scheduled broadcast",
+  },
+  async (
+    ctx,
+    batchId: string,
+    organizationId: string,
+    data: UpdateScheduledBatchInput
+  ): Promise<UpdateScheduledBatchResult> => {
+    const existing = await findBroadcast(batchId, organizationId);
+
+    if (!existing) {
+      return { success: false, error: "Broadcast not found" };
+    }
+
+    if (existing.status !== "scheduled") {
+      return {
+        success: false,
+        error: `Cannot edit: broadcast is already ${existing.status}`,
+      };
+    }
+
+    // The form has no SMS fields: saving an SMS broadcast through it would
+    // turn it into an email and clear its body.
+    if (existing.channel !== "email") {
+      return {
+        success: false,
+        error: "Only scheduled email broadcasts can be edited here",
+      };
+    }
+
+    // Same preflight as a fresh send: the template is re-published if it
+    // changed, and the audience and variable coverage are checked again.
+    const prep = await validateAndPrepareSend(organizationId, {
+      awsAccountId: data.awsAccountId,
+      channel: data.channel,
+      templateId: data.templateId,
+      htmlContent: data.htmlContent,
+      subject: data.subject,
+      recipientFilter: data.recipientFilter,
+      scheduledFor: data.scheduledFor,
+      variableMappings: data.variableMappings,
+    });
+
+    if (!prep.ok) {
+      return { success: false, error: prep.error };
+    }
+
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session) {
+      return { success: false, error: "Session not found" };
+    }
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) {
+      return { success: false, error: "API URL not configured" };
+    }
+
+    // `null` tells the API to clear a field, so switching from a template to
+    // HTML (or dropping the preview text) does not keep the old value.
+    const response = await fetch(`${apiUrl}/v1/batch/${batchId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.session.token}`,
+        "X-Organization-Id": organizationId,
+      },
+      body: JSON.stringify({
+        channel: data.channel ?? "email",
+        name: data.name ?? null,
+        audienceType: data.recipientFilter?.audienceType ?? "all",
+        topicId: data.recipientFilter?.topicId ?? null,
+        segmentId: data.recipientFilter?.segmentId ?? null,
+        subject: data.subject ?? null,
+        previewText: data.previewText ?? null,
+        from: data.from ?? null,
+        fromName: data.fromName ?? null,
+        replyTo: data.replyTo ?? null,
+        templateId: data.templateId ?? null,
+        htmlContent: data.htmlContent ?? null,
+        variableMappings: data.variableMappings ?? null,
+        body: data.body ?? null,
+        senderId: data.senderId ?? null,
+        scheduledFor: data.scheduledFor.toISOString(),
+        awsAccountId: data.awsAccountId,
+        totalRecipients: prep.recipientCount,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      try {
+        const errorData = JSON.parse(errorText) as { error?: string };
+        return {
+          success: false,
+          error: errorData.error || "Failed to update scheduled broadcast",
+        };
+      } catch {
+        return {
+          success: false,
+          error: errorText || "Failed to update scheduled broadcast",
+        };
+      }
+    }
+
+    const updateResponse = (await response.json().catch(() => ({}))) as {
+      warning?: string;
+    };
+
+    revalidatePath(`/${ctx.access.orgSlug}/emails/broadcasts`, "page");
+    revalidatePath(
+      `/${ctx.access.orgSlug}/emails/broadcasts/${batchId}`,
+      "page"
+    );
+
+    const auditCtx = await getAuditContext();
+    after(() =>
+      db
+        .insert(auditLog)
+        .values(
+          auditLogEntry(auditCtx, {
+            organizationId,
+            actorId: ctx.access.userId,
+            actorEmail: ctx.access.userEmail,
+            action: "broadcast.schedule_updated",
+            resource: "broadcast",
+            resourceId: batchId,
+            metadata: {
+              broadcastId: batchId,
+              scheduledFor: data.scheduledFor.toISOString(),
+              recipientCount: prep.recipientCount,
+            },
+          })
+        )
+        .catch((err) =>
+          createActionLogger("updateScheduledBatchSend", {
+            orgSlug: organizationId,
+          }).warn({ err }, "Best-effort audit log write failed")
+        )
+    );
+
+    const updated = await loadBatchWithMeta(batchId, organizationId);
+    const warning = joinSendWarnings(
+      updateResponse.warning,
+      prep.enforcementWarning,
+      prep.sandboxWarning,
+      prep.quotaWarning
+    );
+    return updated.success && warning ? { ...updated, warning } : updated;
   }
 );
 

@@ -2,6 +2,7 @@ import {
   DeleteSuppressedDestinationCommand,
   GetSuppressedDestinationCommand,
   ListSuppressedDestinationsCommand,
+  PutSuppressedDestinationCommand,
   SESv2Client,
   type SuppressedDestinationSummary,
   type SuppressionListReason,
@@ -336,4 +337,141 @@ export async function deleteSuppressedAddress(params: {
     );
     throw error;
   }
+}
+
+export type PutSuppressedAddressResult =
+  | { status: "added" }
+  | { status: "denied" };
+
+/**
+ * Add an address to the account-level suppression list. Callers decide
+ * beforehand whether a write is needed (see the addSuppression action); this
+ * only performs the write and reports whether the role was allowed to make it.
+ */
+export async function putSuppressedAddress(params: {
+  account: AwsAccountRow;
+  email: string;
+  reason: SuppressionListReason;
+}): Promise<PutSuppressedAddressResult> {
+  const { account, email, reason } = params;
+
+  const credentials = await getOrAssumeRole({
+    roleArn: account.roleArn,
+    externalId: account.externalId,
+    region: account.region,
+  });
+  const client = sesClientFor(account, credentials);
+
+  try {
+    await client.send(
+      new PutSuppressedDestinationCommand({
+        EmailAddress: email,
+        Reason: reason,
+      })
+    );
+    return { status: "added" };
+  } catch (error) {
+    if (isAccessDeniedError(error)) {
+      return { status: "denied" };
+    }
+    logger.warn(
+      { awsAccountId: account.id, err: error },
+      "Failed to put SES suppressed destination"
+    );
+    throw error;
+  }
+}
+
+/**
+ * One account's answer for one address. A thrown error is logged here and
+ * reported as an unknown answer, so the caller never sees it.
+ */
+async function probeAccount(
+  account: AwsAccountRow,
+  email: string
+): Promise<GetSuppressedAddressResult | { status: "unknown" }> {
+  try {
+    return await getSuppressedAddress({ account, email });
+  } catch (err) {
+    logger.warn(
+      { awsAccountId: account.id, err },
+      "Failed to check SES suppression for an address"
+    );
+    return { status: "unknown" };
+  }
+}
+
+export type ListedStatus =
+  | { status: "listed"; reason: "BOUNCE" | "COMPLAINT"; awsAccountId: string }
+  | { status: "not_listed" }
+  | { status: "unknown" };
+
+/**
+ * Whether each address is already on an account's suppression list, for the
+ * review lists. One GetSuppressedDestination call per address per checked
+ * account (there is no batch read or email filter in SES). An address is
+ * checked against the account named by its `awsAccountId` when that account
+ * belongs to the org, and against every account otherwise.
+ *
+ * `listed` at the first account that has it. `not_listed` only when every
+ * checked account answered not-found. A denied or failed check makes the
+ * result `unknown`, and a failure is logged, never thrown. At most
+ * `concurrency` addresses are checked at once.
+ */
+export async function checkSuppressedAddresses(params: {
+  accounts: AwsAccountRow[];
+  items: { address: string; awsAccountId: string | null }[];
+  concurrency?: number;
+}): Promise<Map<string, ListedStatus>> {
+  const { accounts, items, concurrency = 5 } = params;
+  const result = new Map<string, ListedStatus>();
+
+  if (accounts.length === 0) {
+    for (const item of items) {
+      result.set(item.address, { status: "unknown" });
+    }
+    return result;
+  }
+
+  async function checkOne(item: {
+    address: string;
+    awsAccountId: string | null;
+  }): Promise<ListedStatus> {
+    const named = item.awsAccountId
+      ? accounts.filter((account) => account.id === item.awsAccountId)
+      : [];
+    const checked = named.length > 0 ? named : accounts;
+
+    let anyUnknown = false;
+    for (const account of checked) {
+      const outcome = await probeAccount(account, item.address);
+      if (outcome.status === "found") {
+        return {
+          status: "listed",
+          reason: outcome.address.reason,
+          awsAccountId: account.id,
+        };
+      }
+      if (outcome.status !== "not_found") {
+        anyUnknown = true;
+      }
+    }
+    return anyUnknown ? { status: "unknown" } : { status: "not_listed" };
+  }
+
+  let next = 0;
+  async function worker(): Promise<void> {
+    while (next < items.length) {
+      const item = items[next];
+      next += 1;
+      if (!item) {
+        continue;
+      }
+      result.set(item.address, await checkOne(item));
+    }
+  }
+
+  const workers = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  return result;
 }

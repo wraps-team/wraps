@@ -6,6 +6,7 @@ export default defineConfig({
     "src/ses-plans.ts",
     "src/config-set-name.ts",
     "src/email-diagnostics.ts",
+    "src/bounce-classification.ts",
   ],
   format: ["esm"],
   dts: true,

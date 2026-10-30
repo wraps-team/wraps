@@ -33,6 +33,13 @@ vi.mock("@wraps/db", () => {
 
   return {
     db: {
+      // Runs the callback against this same fake so call recording and order are unchanged.
+      transaction: vi.fn(async function (
+        this: unknown,
+        fn: (tx: unknown) => unknown
+      ) {
+        return fn(this);
+      }),
       select: vi.fn(() => ({
         from: vi.fn(() => ({
           where: vi.fn((...args: unknown[]) => {
