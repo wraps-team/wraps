@@ -419,7 +419,7 @@ Permissions are shown as `resource:action`. Plan requirements are stated per rou
 
 - `DELETE /v1/batch/{id}`: cancel a scheduled, queued or processing broadcast. This is the existing route; there is no `/cancel` route.
 - `POST /v1/batch/{id}/duplicate`: copy any broadcast into a new draft with ` (copy)` added to its name. The schedule is not copied. Needs `broadcasts:write`.
-- `PATCH /v1/batch/{id}`: edit a draft. Only fields in the body change, and `null` clears a nullable field. A broadcast that is not a draft returns 409 with its status. Setting `audienceType` or `scheduledFor` applies the plan entitlements that creating a broadcast applies. Needs `broadcasts:write`.
+- `PATCH /v1/batch/{id}`: edit a draft or a scheduled broadcast. Only fields in the body change, and `null` clears a nullable field. Setting `audienceType` or `scheduledFor` applies the plan entitlements that creating a broadcast applies. A scheduled broadcast stays scheduled: `scheduledFor` must be in the future and neither it nor `awsAccountId` can be `null`, and within 60 seconds of the send time it returns 409. Any other status returns 409 with the status. Needs `broadcasts:write`.
 
 ### Workflows
 

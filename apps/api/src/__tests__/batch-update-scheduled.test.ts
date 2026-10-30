@@ -2,8 +2,9 @@
  * Scheduled Batch Edit Tests
  *
  * Tests for PATCH /v1/batch/:id — edits a scheduled broadcast before it
- * starts. Verifies:
- *  - Status gating (only 'scheduled' is editable)
+ * starts. The route lives in batch-lifecycle.ts and hands a scheduled
+ * broadcast to editScheduledBroadcast in batch.ts. Verifies:
+ *  - Status gating (only draft and scheduled are editable)
  *  - The near-send cutoff
  *  - The EventBridge schedule moves only when time, account or channel change
  *  - A lost race with the worker (0 rows updated) is a 409, not a silent no-op
@@ -15,6 +16,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockFindBroadcast,
+  mockFindBroadcastStatus,
   mockFindAwsAccountForOrg,
   mockUpdateScheduledBroadcast,
   mockEnqueueJob,
@@ -23,6 +25,7 @@ const {
   mockMarkBroadcastNotScheduled,
 } = vi.hoisted(() => ({
   mockFindBroadcast: vi.fn(),
+  mockFindBroadcastStatus: vi.fn(),
   mockFindAwsAccountForOrg: vi.fn(),
   mockUpdateScheduledBroadcast: vi.fn(),
   mockEnqueueJob: vi.fn(async (_args: unknown) => {}),
@@ -33,6 +36,7 @@ const {
 
 vi.mock("@wraps/db", () => ({
   findBroadcast: mockFindBroadcast,
+  findBroadcastStatus: mockFindBroadcastStatus,
   findAwsAccountForOrg: mockFindAwsAccountForOrg,
   updateScheduledBroadcast: mockUpdateScheduledBroadcast,
   promoteBroadcast: vi.fn(),
@@ -75,10 +79,24 @@ vi.mock("../services/scheduler", () => ({
   deleteBroadcastSchedule: mockDeleteBroadcastSchedule,
 }));
 
-const { batchRoutes } = await import("../routes/batch");
+vi.mock("../lib/require-permission", () => ({
+  requirePermission: vi.fn(async () => ({
+    ok: true,
+    userId: "user-123",
+    role: "owner",
+  })),
+}));
 
+vi.mock("../services/batch-lifecycle", () => ({
+  withBatchAudit: vi.fn(),
+}));
+
+const { batchRoutes } = await import("../routes/batch");
+const { batchLifecycleRoutes } = await import("../routes/batch-lifecycle");
+
+// Mounted as index.ts mounts them, so the test hits the PATCH production does.
 function createApp() {
-  return new Elysia().use(batchRoutes);
+  return new Elysia().use(batchRoutes).use(batchLifecycleRoutes);
 }
 
 const inOneDay = () => new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -123,6 +141,7 @@ function patch(body: Record<string, unknown>, id = "batch-sched-1") {
 describe("PATCH /v1/batch/:id (edit scheduled)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFindBroadcastStatus.mockResolvedValue({ status: "scheduled" });
     mockFindAwsAccountForOrg.mockResolvedValue({ id: "aws-acc-1" });
     mockCreateBroadcastSchedule.mockImplementation(
       async (args: { batchId: string }) => ({
@@ -220,19 +239,25 @@ describe("PATCH /v1/batch/:id (edit scheduled)", () => {
     );
   });
 
-  it("rejects a broadcast that is not scheduled (400)", async () => {
-    mockFindBroadcast.mockResolvedValueOnce(
-      scheduledRow({ status: "processing" })
-    );
+  it("rejects a broadcast that is neither draft nor scheduled (409)", async () => {
+    mockFindBroadcastStatus.mockResolvedValueOnce({ status: "processing" });
 
     const response = await patch({ from: "new@example.com" });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
     expect(mockUpdateScheduledBroadcast).not.toHaveBeenCalled();
   });
 
+  it("rejects clearing the send time of a scheduled broadcast (400)", async () => {
+    const response = await patch({ scheduledFor: null });
+
+    expect(response.status).toBe(400);
+    expect(mockUpdateScheduledBroadcast).not.toHaveBeenCalled();
+    expect(mockDeleteBroadcastSchedule).not.toHaveBeenCalled();
+  });
+
   it("returns 404 for a batch outside the org", async () => {
-    mockFindBroadcast.mockResolvedValueOnce(null);
+    mockFindBroadcastStatus.mockResolvedValueOnce(null);
 
     const response = await patch({ from: "attacker@evil.com" });
 

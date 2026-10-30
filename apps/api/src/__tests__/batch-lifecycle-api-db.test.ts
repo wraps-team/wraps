@@ -57,6 +57,20 @@ function appFor(
     .use(routes);
 }
 
+/**
+ * Both batch routers, mounted in the order index.ts mounts them. Both declare
+ * routes under /v1/batch, so a route one of them shadows only shows up here.
+ */
+function productionApp(organizationId: string, userId: string) {
+  const { app } = createErrorHarness();
+  return app
+    .derive(() => ({
+      auth: { apiKeyId: null, organizationId, userId, planId: "free" },
+    }))
+    .use(batchRoutes)
+    .use(batchLifecycleRoutes);
+}
+
 function unauthedApp() {
   const { app } = createErrorHarness();
   return app.use(batchLifecycleRoutes);
@@ -248,6 +262,21 @@ describe("POST /v1/batch/:id/duplicate", () => {
 });
 
 describe("PATCH /v1/batch/:id", () => {
+  it("edits a draft when both batch routers are mounted as in production", async () => {
+    const draftId = await insertBatch(ids.org, { name: "Old name" });
+
+    const res = await patchJson(
+      productionApp(ids.org, ids.user),
+      `/v1/batch/${draftId}`,
+      { name: "New name" }
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string; name: string };
+    expect(body.status).toBe("draft");
+    expect(body.name).toBe("New name");
+    expect((await readBatch(draftId)).name).toBe("New name");
+  });
+
   it("updates a draft and clears a field sent as null", async () => {
     const draftId = await insertBatch(ids.org, {
       name: "Old name",
@@ -414,7 +443,7 @@ describe("org isolation", () => {
       { name: "hijacked" }
     );
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "Draft not found" });
+    expect(await res.json()).toEqual({ error: "Broadcast not found" });
 
     const b = await readBatch(bId);
     expect(b.organizationId).toBe(ids.otherOrg);

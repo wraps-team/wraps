@@ -29,6 +29,12 @@ import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import { planGateMiddleware } from "../middleware/plan-gate";
 import { rateLimitMiddleware } from "../middleware/rate-limit";
 import { withBatchAudit } from "../services/batch-lifecycle";
+import {
+  editScheduledBroadcast,
+  SCHEDULED_EDIT_DESCRIPTION,
+  type ScheduledEditBody,
+  scheduledEditResponseSchema,
+} from "./batch";
 
 const errorResponse = t.Object({ error: t.String() });
 
@@ -101,6 +107,11 @@ const patchDraftBodySchema = t.Object({
     })
   ),
   awsAccountId: t.Optional(t.Union([t.String({ maxLength: 36 }), t.Null()])),
+  totalRecipients: t.Optional(
+    t.Number({
+      description: "Scheduled broadcasts only. Ignored for a draft.",
+    })
+  ),
 });
 
 type ScheduleResult =
@@ -262,7 +273,19 @@ export const batchLifecycleRoutes = createAuthenticatedRoutes("/v1/batch")
       const existing = await findBroadcastStatus(params.id, orgId);
       if (!existing) {
         set.status = 404;
-        return { error: "Draft not found" };
+        return { error: "Broadcast not found" };
+      }
+      if (existing.status === "scheduled") {
+        // A scheduled broadcast keeps a send time and an AWS account, so the
+        // draft's "null clears it" does not apply to either.
+        if (body.scheduledFor === null || body.awsAccountId === null) {
+          set.status = 400;
+          return {
+            error:
+              "A scheduled broadcast needs a send time and an AWS account. Cancel it to unschedule.",
+          };
+        }
+        return editScheduledBroadcast(ctx, body as ScheduledEditBody);
       }
       if (existing.status !== "draft") {
         set.status = 409;
@@ -407,11 +430,14 @@ export const batchLifecycleRoutes = createAuthenticatedRoutes("/v1/batch")
     },
     {
       params: t.Object({
-        id: t.String({ description: "Draft broadcast ID", maxLength: 36 }),
+        id: t.String({
+          description: "Draft or scheduled broadcast ID",
+          maxLength: 36,
+        }),
       }),
       body: patchDraftBodySchema,
       response: {
-        200: draftResponseSchema,
+        200: t.Union([draftResponseSchema, scheduledEditResponseSchema]),
         400: errorResponse,
         403: errorResponse,
         404: errorResponse,
@@ -419,9 +445,14 @@ export const batchLifecycleRoutes = createAuthenticatedRoutes("/v1/batch")
       },
       detail: {
         tags: ["batch"],
-        summary: "Update draft broadcast",
-        description:
-          "Updates a DRAFT broadcast. Only fields present in the body change; send null to clear a nullable field. Returns 409 with the current status if the broadcast is not a draft (use the send/resume routes for live broadcasts). Setting audienceType or scheduledFor applies the same plan entitlements as creating a broadcast. Requires the broadcasts write permission.",
+        summary: "Update draft or scheduled broadcast",
+        description: `Updates a draft or a scheduled broadcast. Requires the broadcasts write permission.
+
+Draft: only fields present in the body change; send null to clear a nullable field. Setting audienceType or scheduledFor applies the same plan entitlements as creating a broadcast.
+
+Scheduled: ${SCHEDULED_EDIT_DESCRIPTION} scheduledFor and awsAccountId cannot be null.
+
+Any other status returns 409 with the current status (use the send/resume routes for live broadcasts).`,
       },
     }
   );

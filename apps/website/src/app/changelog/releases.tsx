@@ -221,8 +221,9 @@ export const releases: Release[] = [
       "Choose Edit on a scheduled email broadcast, on its page or in the broadcasts table menu, to change its content, from address, audience or send time. Owners and admins can edit until a minute before the send",
       <>
         Edit a scheduled email or SMS broadcast over the API with{" "}
-        <Code>PATCH /v1/batch/:id</Code>. Within a minute of the send time it
-        returns 409, and a broadcast that is no longer scheduled returns 400
+        <Code>PATCH /v1/batch/:id</Code>, the same route that edits drafts.
+        Within a minute of the send time, or once the broadcast is no longer
+        scheduled, it returns 409
       </>,
       <>
         Each saved edit re-runs the checks a send runs and writes a{" "}

@@ -26,7 +26,7 @@ import {
   promoteBroadcast,
   updateScheduledBroadcast,
 } from "@wraps/db";
-import { t } from "elysia";
+import { type Static, t } from "elysia";
 import { checkBroadcastEntitlements } from "../lib/plan-features";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import { planGateMiddleware } from "../middleware/plan-gate";
@@ -255,6 +255,265 @@ async function findUnresolvedReference(
     }
   }
   return null;
+}
+
+/** The fields an edit to a scheduled broadcast takes. */
+export const scheduledEditBodySchema = t.Object({
+  channel: t.Optional(t.Union([t.Literal("email"), t.Literal("sms")])),
+  name: t.Optional(t.Nullable(t.String({ maxLength: 255 }))),
+  audienceType: t.Optional(
+    t.Union([t.Literal("all"), t.Literal("topic"), t.Literal("segment")])
+  ),
+  topicId: t.Optional(t.Nullable(t.String({ maxLength: 36 }))),
+  segmentId: t.Optional(t.Nullable(t.String({ maxLength: 36 }))),
+  subject: t.Optional(t.Nullable(t.String({ maxLength: 998 }))),
+  previewText: t.Optional(t.Nullable(t.String({ maxLength: 500 }))),
+  from: t.Optional(t.Nullable(t.String({ maxLength: 255 }))),
+  fromName: t.Optional(t.Nullable(t.String({ maxLength: 100 }))),
+  replyTo: t.Optional(t.Nullable(t.String({ maxLength: 255 }))),
+  templateId: t.Optional(t.Nullable(t.String({ maxLength: 36 }))),
+  htmlContent: t.Optional(t.Nullable(t.String())),
+  variableMappings: t.Optional(
+    t.Nullable(
+      t.Array(
+        t.Object({
+          variableName: t.String(),
+          source: t.Union([
+            t.Object({
+              type: t.Literal("static"),
+              value: t.String(),
+            }),
+            t.Object({
+              type: t.Literal("contact"),
+              field: t.String(),
+            }),
+          ]),
+        })
+      )
+    )
+  ),
+  body: t.Optional(t.Nullable(t.String({ maxLength: 1600 }))),
+  senderId: t.Optional(t.Nullable(t.String({ maxLength: 20 }))),
+  scheduledFor: t.Optional(t.String({ format: "date-time" })),
+  awsAccountId: t.Optional(t.String({ maxLength: 36 })),
+  totalRecipients: t.Optional(t.Number()),
+});
+
+export type ScheduledEditBody = Static<typeof scheduledEditBodySchema>;
+
+export const scheduledEditResponseSchema = t.Object({
+  id: t.String(),
+  status: t.String(),
+  scheduledFor: t.String({ format: "date-time" }),
+  warning: t.Optional(t.String()),
+});
+
+/** How an edit to a scheduled broadcast behaves, for the route's OpenAPI text. */
+export const SCHEDULED_EDIT_DESCRIPTION =
+  "Edits a scheduled batch send that has not started. Omitted fields keep their stored value; `null` clears a field. The broadcast stays scheduled: `scheduledFor` must be in the future, and changing it, the AWS account or the channel moves the EventBridge schedule. Rejected with 409 within 60 seconds of the send time or once sending has started.";
+
+/**
+ * Edits a scheduled broadcast that has not started.
+ *
+ * PATCH /v1/batch/:id lives in batch-lifecycle.ts, which edits drafts itself
+ * and calls this for a scheduled broadcast. One route serves both because
+ * the two routers share the /v1/batch prefix: when each declared its own
+ * PATCH /:id, the one mounted first took every request and drafts got 400.
+ */
+export async function editScheduledBroadcast(
+  ctx: { params: { id: string }; set: { status?: number | string } },
+  body: ScheduledEditBody
+) {
+  const { params, set } = ctx;
+  const authContext = getAuth(ctx);
+
+  const existing = await findBroadcast(params.id, authContext.organizationId);
+
+  if (!existing) {
+    set.status = 404;
+    throw new Error("Batch not found");
+  }
+
+  if (existing.status !== "scheduled") {
+    set.status = 400;
+    throw new Error(
+      `Cannot edit batch in '${existing.status}' status. Only draft and scheduled batches can be edited.`
+    );
+  }
+
+  // Inside this window the schedule may already have fired with the old
+  // row, so an edit could land between chunks of one send.
+  if (
+    existing.scheduledFor &&
+    existing.scheduledFor.getTime() - Date.now() < SCHEDULED_EDIT_CUTOFF_MS
+  ) {
+    set.status = 409;
+    throw new Error(
+      "This broadcast is about to start sending and can no longer be edited. Cancel it instead."
+    );
+  }
+
+  const awsAccountId = body.awsAccountId ?? existing.awsAccountId;
+  if (!awsAccountId) {
+    set.status = 400;
+    throw new Error("awsAccountId is required");
+  }
+  const account = await findAwsAccountForOrg(
+    awsAccountId,
+    authContext.organizationId
+  );
+  if (!account) {
+    set.status = 403;
+    throw new Error("AWS account does not belong to this organization");
+  }
+
+  const unresolved = await findUnresolvedReference(
+    {
+      segmentId: body.segmentId ?? undefined,
+      topicId: body.topicId ?? undefined,
+      templateId: body.templateId ?? undefined,
+    },
+    authContext.organizationId
+  );
+  if (unresolved) {
+    set.status = 404;
+    return { error: unresolved };
+  }
+
+  // An edit keeps the broadcast scheduled. Sending now is a different,
+  // irreversible action, so a time that has arrived is rejected rather
+  // than turned into an immediate send.
+  let scheduledFor = existing.scheduledFor;
+  if (body.scheduledFor !== undefined) {
+    const schedule = resolveSchedule(body.scheduledFor);
+    if (!schedule.ok) {
+      set.status = 400;
+      throw new Error(schedule.error);
+    }
+    if (!(schedule.isScheduled && schedule.scheduledFor)) {
+      set.status = 400;
+      throw new Error(
+        "scheduledFor must be in the future. To send now, cancel this broadcast and send a copy."
+      );
+    }
+    scheduledFor = schedule.scheduledFor;
+  }
+  if (!scheduledFor) {
+    set.status = 400;
+    throw new Error("scheduledFor is required");
+  }
+
+  const audienceType = body.audienceType ?? existing.audienceType;
+  const entitlement = checkBroadcastEntitlements(authContext.planId, {
+    audienceType: audienceType as "all" | "topic" | "segment" | undefined,
+    scheduled: true,
+  });
+  if (!entitlement.ok) {
+    set.status = 403;
+    throw new Error(entitlement.message);
+  }
+
+  const channel = body.channel ?? existing.channel;
+
+  // The EventBridge payload carries the send time, account and channel;
+  // everything else is read from the row when the schedule fires. Only
+  // touch the schedule when one of those three moves, so an edit to the
+  // from address cannot lose a schedule that was working.
+  // A previous move that failed to re-create the schedule left the row
+  // without one; any edit, even at the same time, has to create it.
+  const scheduleChanged =
+    scheduledFor.getTime() !== existing.scheduledFor?.getTime() ||
+    awsAccountId !== existing.awsAccountId ||
+    channel !== existing.channel ||
+    existing.errorMessage === SCHEDULE_RECREATE_FAILED_MESSAGE;
+
+  // Delete before the update: the schedule name is fixed per batch, so the
+  // new one cannot be created while the old exists, and the old one must
+  // not fire against the edited row at the old time.
+  if (scheduleChanged) {
+    await deleteBroadcastSchedule(existing.id);
+  }
+
+  // `null` clears a field; an omitted field keeps the stored value.
+  const keep = <T>(value: T | null | undefined, current: T | null) =>
+    value === undefined ? current : value;
+
+  const batch = await updateScheduledBroadcast(
+    params.id,
+    authContext.organizationId,
+    {
+      awsAccountId,
+      channel,
+      name: keep(body.name, existing.name),
+      audienceType,
+      topicId: keep(body.topicId, existing.topicId),
+      segmentId: keep(body.segmentId, existing.segmentId),
+      subject: keep(body.subject, existing.subject),
+      previewText: keep(body.previewText, existing.previewText),
+      from: keep(body.from, existing.from),
+      fromName: keep(body.fromName, existing.fromName),
+      replyTo: keep(body.replyTo, existing.replyTo),
+      emailTemplateId: keep(body.templateId, existing.emailTemplateId),
+      htmlContent: keep(body.htmlContent, existing.htmlContent),
+      variableMappings: keep(body.variableMappings, existing.variableMappings),
+      body: keep(body.body, existing.body),
+      senderId: keep(body.senderId, existing.senderId),
+      scheduledFor,
+      ...(body.totalRecipients === undefined
+        ? {}
+        : { totalRecipients: body.totalRecipients }),
+    }
+  );
+
+  if (!batch) {
+    // The worker flipped it to processing (or it was cancelled) between
+    // the read above and this write.
+    set.status = 409;
+    throw new Error(
+      "This broadcast has already started sending or was cancelled, so it was not changed."
+    );
+  }
+
+  let scheduleWarning: string | undefined;
+  if (scheduleChanged) {
+    try {
+      const schedulingResult = await createBroadcastSchedule({
+        batchId: batch.id,
+        organizationId: authContext.organizationId,
+        awsAccountId,
+        scheduledFor,
+        channel: channel as "email" | "sms",
+      });
+      if (!schedulingResult.created) {
+        scheduleWarning = SCHEDULER_UNCONFIGURED_WARNING;
+        await markBroadcastScheduleUnconfigured(
+          batch.id,
+          authContext.organizationId
+        );
+      } else if (existing.errorMessage === SCHEDULE_RECREATE_FAILED_MESSAGE) {
+        // The schedule exists again; stop telling the detail page it won't send.
+        await updateScheduledBroadcast(batch.id, authContext.organizationId, {
+          errorMessage: null,
+        });
+      }
+    } catch (error) {
+      // The old schedule is gone. Say so on the row instead of leaving a
+      // broadcast that reads "scheduled" and never fires.
+      await markBroadcastNotScheduled(
+        batch.id,
+        authContext.organizationId,
+        SCHEDULE_RECREATE_FAILED_MESSAGE
+      );
+      throw error;
+    }
+  }
+
+  return {
+    id: batch.id,
+    status: batch.status,
+    scheduledFor: scheduledFor.toISOString(),
+    ...(scheduleWarning ? { warning: scheduleWarning } : {}),
+  };
 }
 
 export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
@@ -909,271 +1168,6 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
         summary: "Promote draft batch send",
         description:
           "Promotes an existing draft batch_send to an active send (queued or scheduled).",
-      },
-    }
-  )
-  .patch(
-    "/:id",
-    async (ctx) => {
-      const { body, params, set } = ctx;
-      const authContext = getAuth(ctx);
-
-      const existing = await findBroadcast(
-        params.id,
-        authContext.organizationId
-      );
-
-      if (!existing) {
-        set.status = 404;
-        throw new Error("Batch not found");
-      }
-
-      if (existing.status !== "scheduled") {
-        set.status = 400;
-        throw new Error(
-          `Cannot edit batch in '${existing.status}' status. Only scheduled batches can be edited; edit a draft from the dashboard.`
-        );
-      }
-
-      // Inside this window the schedule may already have fired with the old
-      // row, so an edit could land between chunks of one send.
-      if (
-        existing.scheduledFor &&
-        existing.scheduledFor.getTime() - Date.now() < SCHEDULED_EDIT_CUTOFF_MS
-      ) {
-        set.status = 409;
-        throw new Error(
-          "This broadcast is about to start sending and can no longer be edited. Cancel it instead."
-        );
-      }
-
-      const awsAccountId = body.awsAccountId ?? existing.awsAccountId;
-      if (!awsAccountId) {
-        set.status = 400;
-        throw new Error("awsAccountId is required");
-      }
-      const account = await findAwsAccountForOrg(
-        awsAccountId,
-        authContext.organizationId
-      );
-      if (!account) {
-        set.status = 403;
-        throw new Error("AWS account does not belong to this organization");
-      }
-
-      const unresolved = await findUnresolvedReference(
-        {
-          segmentId: body.segmentId ?? undefined,
-          topicId: body.topicId ?? undefined,
-          templateId: body.templateId ?? undefined,
-        },
-        authContext.organizationId
-      );
-      if (unresolved) {
-        set.status = 404;
-        return { error: unresolved };
-      }
-
-      // An edit keeps the broadcast scheduled. Sending now is a different,
-      // irreversible action, so a time that has arrived is rejected rather
-      // than turned into an immediate send.
-      let scheduledFor = existing.scheduledFor;
-      if (body.scheduledFor !== undefined) {
-        const schedule = resolveSchedule(body.scheduledFor);
-        if (!schedule.ok) {
-          set.status = 400;
-          throw new Error(schedule.error);
-        }
-        if (!(schedule.isScheduled && schedule.scheduledFor)) {
-          set.status = 400;
-          throw new Error(
-            "scheduledFor must be in the future. To send now, cancel this broadcast and send a copy."
-          );
-        }
-        scheduledFor = schedule.scheduledFor;
-      }
-      if (!scheduledFor) {
-        set.status = 400;
-        throw new Error("scheduledFor is required");
-      }
-
-      const audienceType = body.audienceType ?? existing.audienceType;
-      const entitlement = checkBroadcastEntitlements(authContext.planId, {
-        audienceType: audienceType as "all" | "topic" | "segment" | undefined,
-        scheduled: true,
-      });
-      if (!entitlement.ok) {
-        set.status = 403;
-        throw new Error(entitlement.message);
-      }
-
-      const channel = body.channel ?? existing.channel;
-
-      // The EventBridge payload carries the send time, account and channel;
-      // everything else is read from the row when the schedule fires. Only
-      // touch the schedule when one of those three moves, so an edit to the
-      // from address cannot lose a schedule that was working.
-      // A previous move that failed to re-create the schedule left the row
-      // without one; any edit, even at the same time, has to create it.
-      const scheduleChanged =
-        scheduledFor.getTime() !== existing.scheduledFor?.getTime() ||
-        awsAccountId !== existing.awsAccountId ||
-        channel !== existing.channel ||
-        existing.errorMessage === SCHEDULE_RECREATE_FAILED_MESSAGE;
-
-      // Delete before the update: the schedule name is fixed per batch, so the
-      // new one cannot be created while the old exists, and the old one must
-      // not fire against the edited row at the old time.
-      if (scheduleChanged) {
-        await deleteBroadcastSchedule(existing.id);
-      }
-
-      // `null` clears a field; an omitted field keeps the stored value.
-      const keep = <T>(value: T | null | undefined, current: T | null) =>
-        value === undefined ? current : value;
-
-      const batch = await updateScheduledBroadcast(
-        params.id,
-        authContext.organizationId,
-        {
-          awsAccountId,
-          channel,
-          name: keep(body.name, existing.name),
-          audienceType,
-          topicId: keep(body.topicId, existing.topicId),
-          segmentId: keep(body.segmentId, existing.segmentId),
-          subject: keep(body.subject, existing.subject),
-          previewText: keep(body.previewText, existing.previewText),
-          from: keep(body.from, existing.from),
-          fromName: keep(body.fromName, existing.fromName),
-          replyTo: keep(body.replyTo, existing.replyTo),
-          emailTemplateId: keep(body.templateId, existing.emailTemplateId),
-          htmlContent: keep(body.htmlContent, existing.htmlContent),
-          variableMappings: keep(
-            body.variableMappings,
-            existing.variableMappings
-          ),
-          body: keep(body.body, existing.body),
-          senderId: keep(body.senderId, existing.senderId),
-          scheduledFor,
-          ...(body.totalRecipients === undefined
-            ? {}
-            : { totalRecipients: body.totalRecipients }),
-        }
-      );
-
-      if (!batch) {
-        // The worker flipped it to processing (or it was cancelled) between
-        // the read above and this write.
-        set.status = 409;
-        throw new Error(
-          "This broadcast has already started sending or was cancelled, so it was not changed."
-        );
-      }
-
-      let scheduleWarning: string | undefined;
-      if (scheduleChanged) {
-        try {
-          const schedulingResult = await createBroadcastSchedule({
-            batchId: batch.id,
-            organizationId: authContext.organizationId,
-            awsAccountId,
-            scheduledFor,
-            channel: channel as "email" | "sms",
-          });
-          if (!schedulingResult.created) {
-            scheduleWarning = SCHEDULER_UNCONFIGURED_WARNING;
-            await markBroadcastScheduleUnconfigured(
-              batch.id,
-              authContext.organizationId
-            );
-          } else if (
-            existing.errorMessage === SCHEDULE_RECREATE_FAILED_MESSAGE
-          ) {
-            // The schedule exists again; stop telling the detail page it won't send.
-            await updateScheduledBroadcast(
-              batch.id,
-              authContext.organizationId,
-              { errorMessage: null }
-            );
-          }
-        } catch (error) {
-          // The old schedule is gone. Say so on the row instead of leaving a
-          // broadcast that reads "scheduled" and never fires.
-          await markBroadcastNotScheduled(
-            batch.id,
-            authContext.organizationId,
-            SCHEDULE_RECREATE_FAILED_MESSAGE
-          );
-          throw error;
-        }
-      }
-
-      return {
-        id: batch.id,
-        status: batch.status,
-        scheduledFor: scheduledFor.toISOString(),
-        ...(scheduleWarning ? { warning: scheduleWarning } : {}),
-      };
-    },
-    {
-      params: t.Object({
-        id: t.String({ description: "Scheduled batch ID", maxLength: 36 }),
-      }),
-      body: t.Object({
-        channel: t.Optional(t.Union([t.Literal("email"), t.Literal("sms")])),
-        name: t.Optional(t.Nullable(t.String({ maxLength: 255 }))),
-        audienceType: t.Optional(
-          t.Union([t.Literal("all"), t.Literal("topic"), t.Literal("segment")])
-        ),
-        topicId: t.Optional(t.Nullable(t.String({ maxLength: 36 }))),
-        segmentId: t.Optional(t.Nullable(t.String({ maxLength: 36 }))),
-        subject: t.Optional(t.Nullable(t.String({ maxLength: 998 }))),
-        previewText: t.Optional(t.Nullable(t.String({ maxLength: 500 }))),
-        from: t.Optional(t.Nullable(t.String({ maxLength: 255 }))),
-        fromName: t.Optional(t.Nullable(t.String({ maxLength: 100 }))),
-        replyTo: t.Optional(t.Nullable(t.String({ maxLength: 255 }))),
-        templateId: t.Optional(t.Nullable(t.String({ maxLength: 36 }))),
-        htmlContent: t.Optional(t.Nullable(t.String())),
-        variableMappings: t.Optional(
-          t.Nullable(
-            t.Array(
-              t.Object({
-                variableName: t.String(),
-                source: t.Union([
-                  t.Object({
-                    type: t.Literal("static"),
-                    value: t.String(),
-                  }),
-                  t.Object({
-                    type: t.Literal("contact"),
-                    field: t.String(),
-                  }),
-                ]),
-              })
-            )
-          )
-        ),
-        body: t.Optional(t.Nullable(t.String({ maxLength: 1600 }))),
-        senderId: t.Optional(t.Nullable(t.String({ maxLength: 20 }))),
-        scheduledFor: t.Optional(t.String({ format: "date-time" })),
-        awsAccountId: t.Optional(t.String({ maxLength: 36 })),
-        totalRecipients: t.Optional(t.Number()),
-      }),
-      response: {
-        200: t.Object({
-          id: t.String(),
-          status: t.String(),
-          scheduledFor: t.String({ format: "date-time" }),
-          warning: t.Optional(t.String()),
-        }),
-        404: notFoundResponseSchema,
-      },
-      detail: {
-        tags: ["batch"],
-        summary: "Edit scheduled batch send",
-        description:
-          "Edits a scheduled batch send that has not started. Omitted fields keep their stored value; `null` clears a field. The broadcast stays scheduled: `scheduledFor` must be in the future, and changing it, the AWS account or the channel moves the EventBridge schedule. Rejected with 409 within 60 seconds of the send time or once sending has started.",
       },
     }
   )
