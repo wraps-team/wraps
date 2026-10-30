@@ -19,7 +19,10 @@ import {
 } from "@wraps/ui/components/ui/select";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { addSuppression } from "@/actions/suppressions";
+import {
+  type AddSuppressionsItem,
+  addSuppressions,
+} from "@/actions/suppressions";
 import { Button } from "@/components/ui/button";
 
 export type SuppressTarget = {
@@ -49,10 +52,34 @@ function confirmButtonLabel(hasFailed: boolean, count: number): string {
 }
 
 /**
- * Confirms a suppression before SES is told to stop sending. Targets run one
- * after another, so a failure leaves a clear count; failed targets stay in the
- * dialog for a retry. The confirm action is a plain button, so Radix does not
- * close the dialog on click.
+ * Pairs each target with its answer by position. A target with no answer
+ * counts as failed, so a short response can never read as success.
+ */
+function tally(batch: SuppressTarget[], results: AddSuppressionsItem[]) {
+  let added = 0;
+  const failed: SuppressTarget[] = [];
+  let firstError: string | null = null;
+  let single: { email: string; alreadyPresent: boolean } | null = null;
+
+  for (const [index, target] of batch.entries()) {
+    const result = results[index];
+    if (result?.success) {
+      added += 1;
+      single = { email: result.email, alreadyPresent: result.alreadyPresent };
+    } else {
+      failed.push(target);
+      firstError ??= result?.error ?? "Failed to add suppression";
+    }
+  }
+
+  return { added, failed, firstError, single };
+}
+
+/**
+ * Confirms a suppression before SES is told to stop sending. The whole batch
+ * goes in one server call that answers per address, so a failure leaves a
+ * clear count; failed targets stay in the dialog for a retry. The confirm
+ * action is a plain button, so Radix does not close the dialog on click.
  */
 export function SuppressConfirmDialog({
   organizationId,
@@ -77,31 +104,35 @@ export function SuppressConfirmDialog({
   const accountFor = (target: SuppressTarget) =>
     target.awsAccountId ?? accountId;
 
+  /** One server call for the whole batch; anything it can't answer is a failure. */
+  const suppressBatch = async (
+    batch: SuppressTarget[]
+  ): Promise<AddSuppressionsItem[]> => {
+    const failAll = (error: string): AddSuppressionsItem[] =>
+      batch.map((target) => ({
+        email: target.address,
+        success: false,
+        error,
+      }));
+    try {
+      const response = await addSuppressions(
+        organizationId,
+        batch.map((target) => ({
+          awsAccountId: accountFor(target),
+          email: target.address,
+          reason: target.reason,
+        }))
+      );
+      return response.success ? response.results : failAll(response.error);
+    } catch {
+      return failAll("Could not reach Wraps. Try again.");
+    }
+  };
+
   const run = (batch: SuppressTarget[]) => {
     startTransition(async () => {
-      let added = 0;
-      const failed: SuppressTarget[] = [];
-      let firstError: string | null = null;
-      let single: { email: string; alreadyPresent: boolean } | null = null;
-
-      for (const target of batch) {
-        const result = await addSuppression(
-          organizationId,
-          accountFor(target),
-          target.address,
-          target.reason
-        );
-        if (result.success) {
-          added += 1;
-          single = {
-            email: result.email,
-            alreadyPresent: result.alreadyPresent,
-          };
-        } else {
-          failed.push(target);
-          firstError ??= result.error;
-        }
-      }
+      const outcome = tally(batch, await suppressBatch(batch));
+      const { added, failed, firstError, single } = outcome;
 
       setRemaining(failed);
       setSucceeded((count) => count + added);

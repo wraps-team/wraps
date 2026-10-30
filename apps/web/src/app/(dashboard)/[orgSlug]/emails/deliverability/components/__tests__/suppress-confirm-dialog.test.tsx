@@ -1,7 +1,8 @@
 /**
- * Suppress confirmation: the copy names what will happen, targets run one after
- * another with their own reason and account, and a partial failure keeps the
- * dialog open so only the failed targets are retried.
+ * Suppress confirmation: the copy names what will happen, the batch goes in one
+ * call with each target's own reason and account, and any failure (per address,
+ * or the call itself) keeps the dialog open so only the failed targets are
+ * retried.
  *
  * @vitest-environment jsdom
  */
@@ -10,10 +11,50 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type {
+  AddSuppressionsItem,
+  AddSuppressionsResult,
+} from "@/actions/suppressions";
 
+type Request = {
+  awsAccountId: string;
+  email: string;
+  reason: "BOUNCE" | "COMPLAINT";
+};
+
+/** The per-address answer, called as (org, account, email, reason). */
 const mockAddSuppression = vi.fn();
+
+/** The batch action: one call, answered per address by mockAddSuppression. */
+const mockAddSuppressions = vi.fn(
+  async (
+    organizationId: string,
+    requests: Request[]
+  ): Promise<AddSuppressionsResult> => {
+    const results: AddSuppressionsItem[] = [];
+    for (const request of requests) {
+      const result = await mockAddSuppression(
+        organizationId,
+        request.awsAccountId,
+        request.email,
+        request.reason
+      );
+      results.push(
+        result.success
+          ? {
+              email: result.email,
+              success: true,
+              alreadyPresent: result.alreadyPresent,
+            }
+          : { email: request.email, success: false, error: result.error }
+      );
+    }
+    return { success: true, results };
+  }
+);
 vi.mock("@/actions/suppressions", () => ({
-  addSuppression: (...args: unknown[]) => mockAddSuppression(...args),
+  addSuppressions: (organizationId: string, requests: Request[]) =>
+    mockAddSuppressions(organizationId, requests),
 }));
 
 const toast = vi.hoisted(() => ({
@@ -92,7 +133,7 @@ describe("SuppressConfirmDialog", () => {
     expect(screen.getByText("and 2 more")).toBeInTheDocument();
   });
 
-  it("runs each target in order with its own reason and account", async () => {
+  it("sends the whole batch in one call, each target with its own reason and account", async () => {
     const user = userEvent.setup();
     mockAddSuppression.mockImplementation(
       async (_org: string, _acct: string, email: string) => ({
@@ -109,9 +150,18 @@ describe("SuppressConfirmDialog", () => {
       await screen.findByRole("button", { name: "Suppress all 2" })
     );
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
-    expect(mockAddSuppression.mock.calls).toEqual([
-      [ORG_ID, "aws-1", "a@example.com", "BOUNCE"],
-      [ORG_ID, "aws-2", "b@example.com", "COMPLAINT"],
+    expect(mockAddSuppressions.mock.calls).toEqual([
+      [
+        ORG_ID,
+        [
+          { awsAccountId: "aws-1", email: "a@example.com", reason: "BOUNCE" },
+          {
+            awsAccountId: "aws-2",
+            email: "b@example.com",
+            reason: "COMPLAINT",
+          },
+        ],
+      ],
     ]);
     expect(onDone).toHaveBeenCalledWith({ added: 2, failed: 0 });
     expect(toast.success).toHaveBeenCalledWith(
@@ -208,6 +258,50 @@ describe("SuppressConfirmDialog", () => {
     expect(mockAddSuppression.mock.calls).toEqual([
       [ORG_ID, "aws-1", "h@example.com", "BOUNCE"],
     ]);
+  });
+
+  it("counts every target as failed and keeps the dialog open when the call itself throws", async () => {
+    const user = userEvent.setup();
+    mockAddSuppressions.mockRejectedValueOnce(new Error("network"));
+    const { onDone, onOpenChange } = renderDialog([
+      { address: "t@example.com", reason: "BOUNCE", awsAccountId: "aws-1" },
+      { address: "u@example.com", reason: "BOUNCE", awsAccountId: "aws-1" },
+    ]);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Suppress all 2" })
+    );
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    expect(onDone).toHaveBeenCalledWith({ added: 0, failed: 2 });
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(
+      await screen.findByText("Suppressed 0 of 2. 2 failed.")
+    ).toBeInTheDocument();
+    expect(toast.error).toHaveBeenCalledWith(
+      "2 failed. Could not reach Wraps. Try again."
+    );
+    expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+  });
+
+  it("counts every target as failed when the action refuses the batch", async () => {
+    const user = userEvent.setup();
+    mockAddSuppressions.mockResolvedValueOnce({
+      success: false,
+      error: "Failed to add suppressions",
+    });
+    const { onDone } = renderDialog([
+      { address: "v@example.com", reason: "BOUNCE", awsAccountId: "aws-1" },
+      { address: "w@example.com", reason: "BOUNCE", awsAccountId: "aws-1" },
+    ]);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Suppress all 2" })
+    );
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    expect(onDone).toHaveBeenCalledWith({ added: 0, failed: 2 });
+    expect(toast.error).toHaveBeenCalledWith(
+      "2 failed. Failed to add suppressions"
+    );
   });
 
   it("disables the buttons while the run is pending", async () => {

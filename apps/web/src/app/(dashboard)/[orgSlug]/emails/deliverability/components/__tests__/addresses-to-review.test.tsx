@@ -27,10 +27,12 @@ vi.mock("@/actions/address-review", () => ({
 
 const mockListSuppressions = vi.fn();
 const mockAddSuppression = vi.fn();
+const mockAddSuppressions = vi.fn();
 vi.mock("@/actions/suppressions", () => ({
   listSuppressions: (...args: unknown[]) => mockListSuppressions(...args),
   removeSuppression: vi.fn(),
   addSuppression: (...args: unknown[]) => mockAddSuppression(...args),
+  addSuppressions: (...args: unknown[]) => mockAddSuppressions(...args),
 }));
 
 const mockGetAddressDetail = vi.fn();
@@ -289,11 +291,16 @@ describe("AddressesToReview", () => {
 
   it("confirms Suppress all with every loaded row, then refetches", async () => {
     const user = userEvent.setup();
-    mockAddSuppression.mockResolvedValue({
-      success: true,
-      email: "one@example.com",
-      alreadyPresent: false,
-    });
+    mockAddSuppressions.mockImplementation(
+      async (_org: string, requests: { email: string }[]) => ({
+        success: true,
+        results: requests.map((request) => ({
+          email: request.email,
+          success: true,
+          alreadyPresent: false,
+        })),
+      })
+    );
     renderPanel();
     await screen.findByText("one@example.com");
     const callsBefore = mockList.mock.calls.length;
@@ -307,7 +314,8 @@ describe("AddressesToReview", () => {
       within(dialog).getByRole("button", { name: "Suppress all 2" })
     );
 
-    await waitFor(() => expect(mockAddSuppression).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockAddSuppressions).toHaveBeenCalledTimes(1));
+    expect(mockAddSuppressions.mock.calls[0][1]).toHaveLength(2);
     await waitFor(() =>
       expect(mockList.mock.calls.length).toBeGreaterThan(callsBefore)
     );

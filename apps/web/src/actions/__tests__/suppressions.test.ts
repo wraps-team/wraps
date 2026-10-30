@@ -2,6 +2,8 @@
  * Tests for removeSuppression — audit-row write, the COMPLAINT
  * acknowledgement guard, and the server-side reason re-read — and for
  * addSuppression — idempotency, never weakening a COMPLAINT, and the audit row.
+ * addSuppressions — one call, a per-address answer, and one address's
+ * exception never stopping the rest.
  *
  * Mocking model follows domains.test.ts (added 2026-09-10): session/db
  * fixtures are real rows in the shared test Postgres (per contacts-audit
@@ -28,7 +30,11 @@ import {
   it,
   vi,
 } from "vitest";
-import { addSuppression, removeSuppression } from "../suppressions";
+import {
+  addSuppression,
+  addSuppressions,
+  removeSuppression,
+} from "../suppressions";
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -661,6 +667,143 @@ describe("addSuppression", () => {
       error: "Enter a valid email address.",
     });
 
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+});
+
+// ─── addSuppressions ────────────────────────────────────────────────────────
+
+describe("addSuppressions", () => {
+  it("suppresses every address in one call and writes one audit row each", async () => {
+    mockSesState();
+
+    const emails = Array.from(
+      { length: 7 },
+      (_, i) => `batch-${i}-296@example.com`
+    );
+    const result = await addSuppressions(
+      testOrg.id,
+      emails.map((email) => ({
+        awsAccountId: testAwsAccount.id,
+        email,
+        reason: "BOUNCE" as const,
+      }))
+    );
+
+    expect(result).toEqual({
+      success: true,
+      results: emails.map((email) => ({
+        email,
+        success: true,
+        alreadyPresent: false,
+      })),
+    });
+    expect(callsOf("PutSuppressedDestinationCommand")).toHaveLength(7);
+    const rows = await addedAuditRows();
+    expect(rows.map((row) => row.resourceId).sort()).toEqual(
+      [...emails].sort()
+    );
+  });
+
+  it("an exception for one address fails only that address; the rest are still suppressed", async () => {
+    mockSend.mockImplementation((command: SesCommand) => {
+      if (command._type === "GetSuppressedDestinationCommand") {
+        return Promise.reject(namedError("NotFoundException"));
+      }
+      if (command._type === "PutSuppressedDestinationCommand") {
+        if (command.input.EmailAddress === "throws-296@example.com") {
+          return Promise.reject(namedError("TooManyRequestsException"));
+        }
+        return Promise.resolve({});
+      }
+      return Promise.reject(new Error(`Unexpected command ${command._type}`));
+    });
+
+    const result = await addSuppressions(testOrg.id, [
+      {
+        awsAccountId: testAwsAccount.id,
+        email: "first-296@example.com",
+        reason: "BOUNCE",
+      },
+      {
+        awsAccountId: testAwsAccount.id,
+        email: "throws-296@example.com",
+        reason: "BOUNCE",
+      },
+      {
+        awsAccountId: testAwsAccount.id,
+        email: "last-296@example.com",
+        reason: "COMPLAINT",
+      },
+    ]);
+
+    expect(result).toEqual({
+      success: true,
+      results: [
+        {
+          email: "first-296@example.com",
+          success: true,
+          alreadyPresent: false,
+        },
+        {
+          email: "throws-296@example.com",
+          success: false,
+          error: "Failed to add suppression",
+        },
+        {
+          email: "last-296@example.com",
+          success: true,
+          alreadyPresent: false,
+        },
+      ],
+    });
+    const rows = await addedAuditRows();
+    expect(rows.map((row) => row.resourceId).sort()).toEqual([
+      "first-296@example.com",
+      "last-296@example.com",
+    ]);
+  });
+
+  it("refuses another org's AWS account per address, without any AWS call for it", async () => {
+    mockSesState();
+
+    const result = await addSuppressions(testOrg.id, [
+      {
+        awsAccountId: otherOrgAccount.id,
+        email: "cross-org-296@example.com",
+        reason: "BOUNCE",
+      },
+    ]);
+
+    expect(result).toEqual({
+      success: true,
+      results: [
+        {
+          email: "cross-org-296@example.com",
+          success: false,
+          error: "AWS account not found",
+        },
+      ],
+    });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty batch and a batch over 100 without any AWS call", async () => {
+    mockSesState();
+
+    expect(await addSuppressions(testOrg.id, [])).toEqual({
+      success: false,
+      error: "Choose at least one address.",
+    });
+    const tooMany = Array.from({ length: 101 }, (_, i) => ({
+      awsAccountId: testAwsAccount.id,
+      email: `over-${i}-296@example.com`,
+      reason: "BOUNCE" as const,
+    }));
+    expect(await addSuppressions(testOrg.id, tooMany)).toEqual({
+      success: false,
+      error: "Suppress at most 100 addresses at a time.",
+    });
     expect(mockSend).not.toHaveBeenCalled();
   });
 });
