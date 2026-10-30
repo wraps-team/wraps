@@ -105,6 +105,7 @@ import {
 } from "@/lib/batch";
 import { broadcastCSVColumns } from "@/lib/csv-columns";
 import { exportTableToCSV } from "@/lib/csv-export";
+import { canEditScheduledBroadcast } from "../new/components/batch-form-utils";
 
 type BadgeVariant = ComponentProps<typeof Badge>["variant"];
 
@@ -580,6 +581,8 @@ export function BatchTable({
           const batch = row.original;
           const isDraft = batch.status === "draft";
           const canEditDraft = canManage && isDraft;
+          const canEditScheduled =
+            canManage && canEditScheduledBroadcast(batch);
           const canCancel =
             canManage &&
             (batch.status === "scheduled" ||
@@ -607,13 +610,27 @@ export function BatchTable({
                     Continue editing
                   </DropdownMenuItem>
                 ) : (
-                  <DropdownMenuItem
-                    onClick={() =>
-                      router.push(`/${orgSlug}/emails/broadcasts/${batch.id}`)
-                    }
-                  >
-                    View details
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        router.push(`/${orgSlug}/emails/broadcasts/${batch.id}`)
+                      }
+                    >
+                      View details
+                    </DropdownMenuItem>
+                    {canEditScheduled && (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          router.push(
+                            `/${orgSlug}/emails/broadcasts/${batch.id}/edit`
+                          )
+                        }
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                    )}
+                  </>
                 )}
                 {canManage && (
                   <>

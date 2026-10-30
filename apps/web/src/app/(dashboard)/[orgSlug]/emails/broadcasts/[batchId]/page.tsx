@@ -19,6 +19,7 @@ import {
   ArrowLeft,
   Mail,
   MessageSquare,
+  Pencil,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui/empty";
 import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
+import { canEditScheduledBroadcast } from "../new/components/batch-form-utils";
 import { BatchStats } from "./components/batch-stats";
 import { CancelBatchButton } from "./components/cancel-button";
 import { RecipientsPanel } from "./components/recipients-panel";
@@ -141,6 +143,8 @@ export default async function BatchDetailPage({
       batch.status === "processing") &&
     isManager;
 
+  const canEdit = isManager && canEditScheduledBroadcast(batch);
+
   // Mirrors the API's own gate (POST /v1/batch/:id/resume): email only, and
   // only from 'processing' or 'failed'. Without this the endpoint existed but
   // was reachable only by curl, so a recoverable send looked terminal.
@@ -189,6 +193,14 @@ export default async function BatchDetailPage({
               organizationId={orgWithMembership.id}
               status={batch.status}
             />
+          )}
+          {canEdit && (
+            <Button asChild variant="outline">
+              <Link href={`/${orgSlug}/emails/broadcasts/${batch.id}/edit`}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Link>
+            </Button>
           )}
           {canCancel && (
             <CancelBatchButton

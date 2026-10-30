@@ -36,6 +36,7 @@ import {
   promoteDraftToSend,
   saveDraftBatchSend,
   updateDraftBatchSend,
+  updateScheduledBatchSend,
 } from "../batch";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -756,6 +757,139 @@ describe("cancelBatchSend — writes broadcast.cancelled audit log", () => {
       } else {
         process.env.NEXT_PUBLIC_API_URL = origApiUrl;
       }
+    }
+  });
+});
+
+describe("updateScheduledBatchSend — edits a scheduled broadcast", () => {
+  it("PATCHes the full broadcast with nulls for cleared fields and writes broadcast.schedule_updated", async () => {
+    const origApiUrl = process.env.NEXT_PUBLIC_API_URL;
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+
+    const scheduledFor = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const [scheduledBatch] = await db
+      .insert(batchSend)
+      .values({
+        organizationId: testOrganization.id,
+        status: "scheduled",
+        channel: "email",
+        subject: "Scheduled audit test",
+        previewText: "Old preview",
+        from: "old@example.com",
+        emailTemplateId: testTemplate.id,
+        awsAccountId: testAwsAccount.id,
+        scheduledFor,
+        createdBy: testUser.id,
+      })
+      .returning();
+    expect(scheduledBatch).toBeDefined();
+    if (!scheduledBatch) return;
+
+    let fetchSpy: ReturnType<typeof vi.spyOn> | null = null;
+    let patchBody: Record<string, unknown> | null = null;
+
+    try {
+      const realFetch = globalThis.fetch.bind(globalThis);
+      fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(async (...args: Parameters<typeof fetch>) => {
+          const [url, init] = args;
+          const asString = typeof url === "string" ? url : url.toString();
+          if (
+            asString.endsWith(`/v1/batch/${scheduledBatch.id}`) &&
+            (init as RequestInit)?.method === "PATCH"
+          ) {
+            patchBody = JSON.parse(String((init as RequestInit).body));
+            return new Response(
+              JSON.stringify({
+                id: scheduledBatch.id,
+                status: "scheduled",
+                scheduledFor: scheduledFor.toISOString(),
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } }
+            );
+          }
+          return realFetch(...args);
+        });
+
+      const result = await updateScheduledBatchSend(
+        scheduledBatch.id,
+        testOrganization.id,
+        {
+          awsAccountId: testAwsAccount.id,
+          templateId: testTemplate.id,
+          from: "new@example.com",
+          subject: "Scheduled audit test",
+          scheduledFor,
+        }
+      );
+
+      expect(result.success).toBe(true);
+      expect(patchBody).toMatchObject({
+        from: "new@example.com",
+        previewText: null,
+        htmlContent: null,
+        templateId: testTemplate.id,
+        scheduledFor: scheduledFor.toISOString(),
+      });
+
+      const rows = await db
+        .select()
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.organizationId, testOrganization.id),
+            eq(auditLog.action, "broadcast.schedule_updated")
+          )
+        );
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows[rows.length - 1].resourceId).toBe(scheduledBatch.id);
+    } finally {
+      fetchSpy?.mockRestore();
+      if (origApiUrl === undefined) {
+        process.env.NEXT_PUBLIC_API_URL = undefined;
+      } else {
+        process.env.NEXT_PUBLIC_API_URL = origApiUrl;
+      }
+    }
+  });
+
+  it("refuses a broadcast that is no longer scheduled without calling the API", async () => {
+    const [processingBatch] = await db
+      .insert(batchSend)
+      .values({
+        organizationId: testOrganization.id,
+        status: "processing",
+        channel: "email",
+        subject: "Already sending",
+        awsAccountId: testAwsAccount.id,
+        createdBy: testUser.id,
+      })
+      .returning();
+    if (!processingBatch) return;
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    try {
+      const result = await updateScheduledBatchSend(
+        processingBatch.id,
+        testOrganization.id,
+        {
+          awsAccountId: testAwsAccount.id,
+          from: "new@example.com",
+          scheduledFor: new Date(Date.now() + 60 * 60 * 1000),
+        }
+      );
+
+      expect(result).toEqual({
+        success: false,
+        error: "Cannot edit: broadcast is already processing",
+      });
+      expect(fetchSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining(`/v1/batch/${processingBatch.id}`),
+        expect.anything()
+      );
+    } finally {
+      fetchSpy.mockRestore();
     }
   });
 });

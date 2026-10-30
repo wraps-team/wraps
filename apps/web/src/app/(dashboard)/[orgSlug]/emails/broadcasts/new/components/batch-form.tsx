@@ -87,6 +87,7 @@ import {
   type RecipientFilter,
   saveDraftBatchSend,
   updateDraftBatchSend,
+  updateScheduledBatchSend,
 } from "@/actions/batch";
 import { ConnectAwsDialog } from "@/components/connect-aws-dialog";
 import { SendConfirmDialog } from "@/components/send-confirm-dialog";
@@ -104,9 +105,11 @@ import type {
 } from "@/lib/batch";
 import { cn } from "@/lib/utils";
 import {
+  buildTimeOptions,
   type CampaignData,
   requiredPlanName,
   type ScheduleType,
+  scheduleFieldsFromInstant,
   stripSelfReferencingPlaceholder,
 } from "./batch-form-utils";
 import { EmailPreviewCarousel } from "./email-preview-carousel";
@@ -151,7 +154,27 @@ type OrgDefaults = {
   defaultReplyTo: string | null;
 } | null;
 
-type BatchFormMode = "create" | "edit";
+/** `edit-scheduled` edits a broadcast that is scheduled but has not started.
+ *  It stays scheduled: no draft save, and no "send now". */
+type BatchFormMode = "create" | "edit" | "edit-scheduled";
+
+const HEADER_COPY: Record<
+  BatchFormMode,
+  { title: string; description: string }
+> = {
+  create: {
+    title: "New Broadcast",
+    description: "Send an email to your contacts",
+  },
+  edit: {
+    title: "Edit Draft",
+    description: "Finish your draft, then send or schedule",
+  },
+  "edit-scheduled": {
+    title: "Edit Scheduled Broadcast",
+    description: "Changes apply when it sends. It stays scheduled.",
+  },
+};
 
 type BatchFormProps = {
   awsAccounts: AwsAccount[];
@@ -172,6 +195,9 @@ type BatchFormProps = {
   mode?: BatchFormMode;
   draftId?: string;
   initialValues?: Partial<CampaignData>;
+  /** The stored send time. Split into date and time in the browser, never on
+   *  the server, so the wizard reads it in the zone it rebuilds it in. */
+  initialScheduledFor?: Date | null;
 };
 
 /**
@@ -253,6 +279,7 @@ export function BatchForm({
   mode = "create",
   draftId,
   initialValues,
+  initialScheduledFor,
 }: BatchFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -260,6 +287,7 @@ export function BatchForm({
   // Tracks the draft ID after first save so rapid re-saves update in place
   // instead of creating duplicate rows before the router.push resolves.
   const savedDraftId = useRef<string | null>(draftId ?? null);
+  const isEditingScheduled = mode === "edit-scheduled";
   const {
     requireAws,
     dialogOpen: awsDialogOpen,
@@ -446,6 +474,24 @@ export function BatchForm({
       cancelled = true;
     };
   }, [organizationId, getCurrentFilter]);
+
+  const initialScheduledMs = initialScheduledFor?.getTime() ?? null;
+  useEffect(() => {
+    if (initialScheduledMs === null || initialScheduledMs <= Date.now()) {
+      return;
+    }
+    setCampaignData((prev) => ({
+      ...prev,
+      ...scheduleFieldsFromInstant(new Date(initialScheduledMs)),
+    }));
+  }, [initialScheduledMs]);
+
+  // Formatted here rather than kept in state: it has to read in the browser's
+  // zone, and the effect above has already run by the time the review step shows.
+  const storedTime =
+    initialScheduledMs === null
+      ? undefined
+      : format(new Date(initialScheduledMs), "HH:mm");
 
   const updateData = (updates: Partial<CampaignData>) => {
     setCampaignData((prev) => ({ ...prev, ...updates }));
@@ -666,6 +712,45 @@ export function BatchForm({
           scheduledFor,
         };
 
+        if (isEditingScheduled) {
+          if (!(draftId && scheduledFor)) {
+            toast.error("Pick a send time for this scheduled broadcast");
+            return;
+          }
+          // The pickers only hold whole minutes. When the user left the time
+          // alone, send the stored instant so its seconds survive and the API
+          // does not move the schedule for a content-only edit.
+          const sendAt =
+            initialScheduledMs !== null &&
+            Math.floor(initialScheduledMs / 60_000) ===
+              Math.floor(scheduledFor.getTime() / 60_000)
+              ? new Date(initialScheduledMs)
+              : scheduledFor;
+          const result = await updateScheduledBatchSend(
+            draftId,
+            organizationId,
+            { ...payload, scheduledFor: sendAt }
+          );
+          if (!result.success) {
+            toast.error("Failed to update broadcast", {
+              description: result.error,
+            });
+            return;
+          }
+          clearRecoverySnapshot();
+          toast.success("Scheduled broadcast updated", {
+            description: `Will send to ${result.batch.totalRecipients} recipients at ${format(sendAt, "PPp")} (${localTimeZoneLabel()})`,
+          });
+          if (result.warning) {
+            toast.warning("Sending will pause and resume", {
+              description: result.warning,
+              duration: 12_000,
+            });
+          }
+          router.push(`/${orgSlug}/emails/broadcasts/${result.batch.id}`);
+          return;
+        }
+
         // Promote-from-draft vs direct-create. Both paths return the same
         // { success, batch? | error } shape so the rest of this handler
         // doesn't branch further.
@@ -754,12 +839,10 @@ export function BatchForm({
         </Button>
         <div>
           <h1 className="font-bold text-2xl tracking-tight">
-            {mode === "edit" ? "Edit Draft" : "New Broadcast"}
+            {HEADER_COPY[mode].title}
           </h1>
           <p className="text-muted-foreground">
-            {mode === "edit"
-              ? "Finish your draft, then send or schedule"
-              : "Send an email to your contacts"}
+            {HEADER_COPY[mode].description}
           </p>
         </div>
       </div>
@@ -896,6 +979,7 @@ export function BatchForm({
               countError={countError}
               currentUserEmail={currentUserEmail}
               data={campaignData}
+              isEditingScheduled={isEditingScheduled}
               isPending={isPending}
               loadingCount={loadingCount}
               onChange={updateData}
@@ -905,6 +989,7 @@ export function BatchForm({
               recipientCount={recipientCount}
               schedulingEnabled={schedulingEnabled}
               segments={segments}
+              storedTime={storedTime}
               topics={topics}
             />
           )}
@@ -923,14 +1008,16 @@ export function BatchForm({
             Back
           </Button>
           <div className="flex items-center gap-2">
-            <Button
-              disabled={isSavingDraft || isPending}
-              onClick={handleSaveDraft}
-              type="button"
-              variant="outline"
-            >
-              {isSavingDraft ? "Saving..." : "Save as draft"}
-            </Button>
+            {!isEditingScheduled && (
+              <Button
+                disabled={isSavingDraft || isPending}
+                onClick={handleSaveDraft}
+                type="button"
+                variant="outline"
+              >
+                {isSavingDraft ? "Saving..." : "Save as draft"}
+              </Button>
+            )}
             {currentStep !== "review" && (
               <Button
                 disabled={
@@ -1774,6 +1861,8 @@ function AudienceStep({
 // Review Step Component
 function ReviewStep({
   data,
+  isEditingScheduled,
+  storedTime,
   isPending,
   countError,
   currentUserEmail,
@@ -1790,6 +1879,8 @@ function ReviewStep({
   countError: string | null;
   currentUserEmail: string;
   data: CampaignData;
+  isEditingScheduled: boolean;
+  storedTime?: string;
   isPending: boolean;
   loadingCount: boolean;
   onChange: (updates: Partial<CampaignData>) => void;
@@ -2160,9 +2251,11 @@ function ReviewStep({
 
       {/* Scheduling Card */}
       <SchedulingCard
+        allowSendNow={!isEditingScheduled}
         data={data}
         onChange={onChange}
         schedulingEnabled={schedulingEnabled}
+        storedTime={storedTime}
       />
 
       {/* Variable coverage warning */}
@@ -2310,13 +2403,20 @@ function ReviewStep({
           size="lg"
         >
           {isPending ? (
-            data.scheduleType === "later" ? (
+            isEditingScheduled ? (
+              "Saving..."
+            ) : data.scheduleType === "later" ? (
               "Scheduling..."
             ) : (
               "Sending..."
             )
           ) : recipientCount === null ? (
             "Recipient count unavailable"
+          ) : isEditingScheduled ? (
+            <>
+              <Clock className="mr-2 h-4 w-4" />
+              Save changes for {recipientCount.toLocaleString()} contacts
+            </>
           ) : data.scheduleType === "later" ? (
             <>
               <Clock className="mr-2 h-4 w-4" />
@@ -2356,10 +2456,15 @@ function ReviewStep({
 // Scheduling Card Component - isolated to prevent NL input keystrokes from
 // re-rendering the rest of ReviewStep (notably EmailPreviewCarousel)
 function SchedulingCard({
+  allowSendNow,
   data,
   onChange,
   schedulingEnabled,
+  storedTime,
 }: {
+  allowSendNow: boolean;
+  /** The saved send time as "HH:mm" in the viewer's zone, when editing. */
+  storedTime?: string;
   data: CampaignData;
   onChange: (updates: Partial<CampaignData>) => void;
   schedulingEnabled: boolean;
@@ -2407,15 +2512,9 @@ function SchedulingCard({
     onChange({ scheduledTime: time });
   };
 
-  // Generate time options in 30-minute increments
-  const timeOptions = [];
-  for (let hour = 0; hour < 24; hour++) {
-    for (const minute of [0, 30]) {
-      const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-      const displayTime = format(new Date().setHours(hour, minute), "h:mm a");
-      timeOptions.push({ value: time, label: displayTime });
-    }
-  }
+  // Half-hour slots, plus the current value and the stored send time when
+  // either falls between slots, so both stay visible and re-selectable.
+  const timeOptions = buildTimeOptions([data.scheduledTime, storedTime]);
 
   // Calculate the scheduled datetime for display
   const getScheduledDateTime = () => {
@@ -2434,7 +2533,11 @@ function SchedulingCard({
     <Card>
       <CardHeader>
         <CardTitle>When to Send</CardTitle>
-        <CardDescription>Send now or schedule for later</CardDescription>
+        <CardDescription>
+          {allowSendNow
+            ? "Send now or schedule for later"
+            : "Move the send time. To send now, cancel this broadcast and send a copy."}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <RadioGroup
@@ -2442,21 +2545,23 @@ function SchedulingCard({
           value={data.scheduleType}
         >
           {/* Send Now */}
-          <div className="flex items-start space-x-3 rounded-lg border p-4">
-            <RadioGroupItem id="now" value="now" />
-            <div className="flex-1">
-              <label
-                className="cursor-pointer font-medium text-sm"
-                htmlFor="now"
-              >
-                <Send className="mr-1 inline h-4 w-4" />
-                Send immediately
-              </label>
-              <p className="mt-1 text-muted-foreground text-xs">
-                Start sending to recipients right away
-              </p>
+          {allowSendNow && (
+            <div className="flex items-start space-x-3 rounded-lg border p-4">
+              <RadioGroupItem id="now" value="now" />
+              <div className="flex-1">
+                <label
+                  className="cursor-pointer font-medium text-sm"
+                  htmlFor="now"
+                >
+                  <Send className="mr-1 inline h-4 w-4" />
+                  Send immediately
+                </label>
+                <p className="mt-1 text-muted-foreground text-xs">
+                  Start sending to recipients right away
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Schedule for Later */}
           <div

@@ -49,6 +49,7 @@ export type AuditLogAction =
   | "broadcast.draft_saved"
   | "broadcast.draft_updated"
   | "broadcast.sent_from_draft"
+  | "broadcast.schedule_updated"
   | "broadcast.draft_deleted"
   | "broadcast.duplicated"
   | "broadcast.cancelled"

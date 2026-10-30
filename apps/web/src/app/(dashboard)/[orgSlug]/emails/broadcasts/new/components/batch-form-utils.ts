@@ -77,6 +77,70 @@ export function resolveFormManagedValue(
   return mapped?.source.type === "static" ? mapped.source.value : "";
 }
 
+/** Mirrors the API's cutoff on PATCH /v1/batch/:id: inside the last minute the
+ *  schedule may already have fired, so a scheduled broadcast stops being
+ *  editable. */
+export const SCHEDULED_EDIT_CUTOFF_MS = 60 * 1000;
+
+/** A scheduled email broadcast can be edited until shortly before it sends.
+ *  Email only: the wizard has no SMS fields, so saving an SMS broadcast
+ *  through it would turn it into an email and drop its body. */
+export function canEditScheduledBroadcast(
+  batch: {
+    status: string;
+    channel: string;
+    scheduledFor: Date | string | null;
+  },
+  now: number = Date.now()
+): boolean {
+  return (
+    batch.status === "scheduled" &&
+    batch.channel === "email" &&
+    batch.scheduledFor !== null &&
+    new Date(batch.scheduledFor).getTime() - now > SCHEDULED_EDIT_CUTOFF_MS
+  );
+}
+
+/** Split a stored send time into the wizard's date and time-of-day fields, in
+ *  the zone of whoever runs it. Call it in the browser: the wizard rebuilds the
+ *  instant there with Date#setHours. */
+export function scheduleFieldsFromInstant(
+  instant: Date
+): Pick<CampaignData, "scheduledDate" | "scheduledTime"> {
+  const scheduledDate = new Date(instant);
+  scheduledDate.setHours(0, 0, 0, 0);
+  return { scheduledDate, scheduledTime: format(instant, "HH:mm") };
+}
+
+/** Time-of-day choices for the schedule dropdown: every half hour, plus any
+ *  `extraTimes` ("HH:mm") that fall between slots. A broadcast scheduled
+ *  through the API at 9:15 would otherwise show a blank dropdown when edited. */
+export function buildTimeOptions(
+  extraTimes: Array<string | null | undefined> = []
+): { value: string; label: string }[] {
+  const values = new Set<string>();
+  for (let hour = 0; hour < 24; hour++) {
+    for (const minute of [0, 30]) {
+      values.add(
+        `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
+      );
+    }
+  }
+  for (const time of extraTimes) {
+    if (time && /^\d{2}:\d{2}$/.test(time)) {
+      values.add(time);
+    }
+  }
+  // Zero-padded "HH:mm" sorts chronologically as a string.
+  return [...values].sort().map((value) => {
+    const [hours, minutes] = value.split(":").map(Number);
+    return {
+      value,
+      label: format(new Date().setHours(hours, minutes), "h:mm a"),
+    };
+  });
+}
+
 export function mapBatchToCampaignData(
   batch: BatchSendWithMeta
 ): Partial<CampaignData> {
@@ -96,10 +160,14 @@ export function mapBatchToCampaignData(
   // picker disables past dates, so restoring one leaves the user looking at a
   // date they cannot re-select while the review step promises a send time that
   // is already gone.
+  //
+  // Only the schedule type is set here. This runs in the edit page's server
+  // component, so formatting the time here would use the server's zone while
+  // the form rebuilds the instant in the browser's: on a UTC server a 9:00 AM
+  // Denver send came back as "15:00" and an unrelated edit moved it six hours.
+  // The form derives the date and time itself with scheduleFieldsFromInstant.
   if (batch.scheduledFor && batch.scheduledFor.getTime() > Date.now()) {
     result.scheduleType = "later";
-    result.scheduledDate = batch.scheduledFor;
-    result.scheduledTime = format(batch.scheduledFor, "HH:mm");
   }
 
   if (batch.name) result.name = batch.name;

@@ -97,6 +97,7 @@ const ACTION_LABELS: Record<AuditLogAction, string> = {
   "broadcast.draft_saved": "Draft Saved",
   "broadcast.draft_updated": "Draft Updated",
   "broadcast.sent_from_draft": "Draft Sent",
+  "broadcast.schedule_updated": "Scheduled Broadcast Edited",
   "broadcast.draft_deleted": "Draft Deleted",
   "broadcast.duplicated": "Broadcast Duplicated",
   "broadcast.cancelled": "Broadcast Cancelled",
