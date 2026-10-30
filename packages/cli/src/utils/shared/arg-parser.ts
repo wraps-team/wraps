@@ -148,6 +148,21 @@ export type CliFlags = {
   data?: string;
   description?: string;
   slug?: string;
+  // Brand kits
+  logoUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  backgroundColor?: string;
+  textColor?: string;
+  fontFamily?: string;
+  headingFontFamily?: string;
+  buttonStyle?: string;
+  buttonRadius?: string;
+  companyName?: string;
+  companyAddress?: string;
+  socialLinks?: string;
+  sourceDomain?: string;
+  default?: boolean;
   public?: string;
   doubleOptIn?: string;
   dimensions?: string;
@@ -284,6 +299,19 @@ const STRING_FLAGS = [
   "data",
   "description",
   "slug",
+  "logo-url",
+  "primary-color",
+  "secondary-color",
+  "background-color",
+  "text-color",
+  "font-family",
+  "heading-font-family",
+  "button-style",
+  "button-radius",
+  "company-name",
+  "company-address",
+  "social-links",
+  "source-domain",
   "public",
   "double-opt-in",
   "dimensions",
@@ -398,6 +426,7 @@ const BOOLEAN_FLAGS = [
   "track-membership",
   "without-source",
   "validate",
+  "default",
 ] as const;
 
 /**

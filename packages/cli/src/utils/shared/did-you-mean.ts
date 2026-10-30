@@ -18,6 +18,7 @@ export const TOP_LEVEL_COMMANDS = [
   "audit-logs",
   "auth",
   "aws",
+  "brand-kits",
   "broadcasts",
   "cdn",
   "completion",

@@ -21,12 +21,21 @@ import { authStatus as authStatusCmd } from "./commands/auth/status.js";
 import { doctor as awsDoctor } from "./commands/aws/doctor.js";
 import { setup as awsSetup } from "./commands/aws/setup.js";
 import {
+  brandKitsCreate,
+  brandKitsDelete,
+  brandKitsGet,
+  brandKitsList,
+  brandKitsSetDefault,
+  brandKitsUpdate,
+} from "./commands/brand-kits/brand-kits.js";
+import {
   broadcastsCreate,
   broadcastsRecipients,
   broadcastsResume,
   broadcastsSend,
   broadcastsStatus,
 } from "./commands/broadcasts/broadcasts.js";
+import { broadcastsDraft } from "./commands/broadcasts/draft.js";
 import {
   broadcastsCancel,
   broadcastsDuplicate,
@@ -87,6 +96,10 @@ import {
   inboundTest,
   inboundVerify,
 } from "./commands/email/inbound.js";
+import {
+  inboundEmailsGet,
+  inboundEmailsList,
+} from "./commands/email/inbound-emails.js";
 import { init } from "./commands/email/init.js";
 import { emailLogsGet, emailLogsList } from "./commands/email/logs.js";
 import { emailMetrics } from "./commands/email/metrics.js";
@@ -332,6 +345,12 @@ function showHelp() {
     `  ${pc.cyan("email inbound destroy")}   Remove inbound email infrastructure`
   );
   console.log(
+    `  ${pc.cyan("email inbound list")}      List inbound emails (--account, --limit, --cursor). S3 key order, not received time; a page can be empty while more follow`
+  );
+  console.log(
+    `  ${pc.cyan("email inbound get <emailId>")} Show one inbound email (--account, --json). htmlTruncated flags an HTML body cut at 200 KB`
+  );
+  console.log(
     `  ${pc.cyan("email reply init")}        Set up signed reply-to threading`
   );
   console.log(
@@ -553,6 +572,25 @@ function showHelp() {
   console.log(
     `  ${pc.cyan("topics subscribers <id>")}     List subscribers: --status subscribed|pending|unsubscribed; --limit is the page size (1-100, default 50); --cursor is the page number (starts at 1)\n`
   );
+  console.log("Brand Kit Commands:");
+  console.log(
+    `  ${pc.cyan("brand-kits list")}                 List every brand kit in the organization (unpaginated: one response; JSON carries total)`
+  );
+  console.log(
+    `  ${pc.cyan("brand-kits get <id>")}             Show one brand kit`
+  );
+  console.log(
+    `  ${pc.cyan("brand-kits create")}               Create a brand kit: --name, --primary-color, --secondary-color, --background-color, --text-color, --font-family, --heading-font-family, --button-style, --button-radius, --company-name, --company-address, --social-links <json array>, --logo-url, --source-domain; --default makes it the default`
+  );
+  console.log(
+    `  ${pc.cyan("brand-kits update <id>")}          Change any of the same fields (at least one flag). Pass null to clear a nullable field (logo, heading font, company name, company address, source domain)`
+  );
+  console.log(
+    `  ${pc.cyan("brand-kits delete <id>")}          Delete a brand kit (requires --yes; --dry-run to preview)`
+  );
+  console.log(
+    `  ${pc.cyan("brand-kits set-default <id>")}     Make a brand kit the organization's default (clears the previous default)\n`
+  );
   console.log("Events:");
   console.log(
     `  ${pc.cyan("events list")}                List contact events, newest first (--limit, --cursor, --event-name, --search, --contact-email, --date-from, --date-to)`
@@ -568,6 +606,9 @@ function showHelp() {
   );
   console.log(`  ${pc.cyan("events get <id>")}            Show one event\n`);
   console.log("Broadcasts:");
+  console.log(
+    `  ${pc.cyan("broadcasts draft")}           Save a new draft; sends nothing (--name, --subject, --template-id, --audience-type all|topic|segment with --topic-id or --segment-id, --aws-account-id, --html-content, --scheduled-for). Prints the send command`
+  );
   console.log(
     `  ${pc.cyan("broadcasts create")}          Queue a broadcast; sends now unless --scheduled-for (needs --yes, --aws-account-id)`
   );
@@ -1116,6 +1157,34 @@ async function run() {
           const inboundSubCommand = sub[2];
 
           switch (inboundSubCommand) {
+            case "list":
+              await inboundEmailsList({
+                account: flags.account,
+                limit: flags.limit,
+                cursor: flags.cursor,
+                json: flags.json,
+                token: flags.token,
+                region: flags.region,
+              });
+              break;
+
+            case "get": {
+              const emailId = sub[3];
+              if (!emailId) {
+                throw errors.missingInput(
+                  "<email-id>",
+                  "wraps email inbound get <email-id>"
+                );
+              }
+              await inboundEmailsGet({
+                emailId,
+                account: flags.account,
+                json: flags.json,
+                token: flags.token,
+                region: flags.region,
+              });
+              break;
+            }
             case "init":
               await inboundInit({
                 region: flags.region,
@@ -1185,7 +1254,7 @@ async function run() {
               throw errors.unknownCommand(
                 "inbound command",
                 inboundSubCommand,
-                "Available commands: init, destroy, status, verify, test, add, remove"
+                "Available commands: init, destroy, status, verify, test, add, remove, list, get"
               );
           }
           break;
@@ -2331,6 +2400,33 @@ async function run() {
       });
       return;
     }
+    // Broadcast draft (POST /v1/batch/drafts): saves a draft and sends nothing
+    if (primaryCommand === "broadcasts" && subCommand === "draft") {
+      await broadcastsDraft({
+        name: flags.name,
+        subject: flags.subject,
+        previewText: flags.previewText,
+        from: flags.from,
+        fromName: flags.fromName,
+        replyTo: flags.replyTo,
+        templateId: flags.templateId,
+        htmlContent: flags.htmlContent,
+        audienceType: flags.audienceType,
+        segmentId: flags.segmentId,
+        topicId: flags.topicId,
+        awsAccountId: flags.awsAccountId,
+        scheduledFor: flags.scheduledFor,
+        json: flags.json,
+        token: flags.token,
+        region: flags.region,
+      });
+      trackCommandFallback("broadcasts:draft", {
+        success: process.exitCode !== 1,
+        duration_ms: Date.now() - startTime,
+        service: "broadcasts",
+      });
+      return;
+    }
     if (primaryCommand === "broadcasts" && subCommand) {
       const broadcastId = sub[2];
       const contentOptions = {
@@ -2460,7 +2556,7 @@ async function run() {
           throw errors.unknownCommand(
             "broadcasts command",
             subCommand,
-            "Available commands: create, send, status, recipients, resume, cancel, duplicate, update"
+            "Available commands: create, send, status, recipients, resume, cancel, duplicate, update, draft"
           );
       }
       const broadcastsDuration = Date.now() - startTime;
@@ -2671,6 +2767,107 @@ async function run() {
         success: process.exitCode !== 1,
         duration_ms: topicsDuration,
         service: "topics",
+      });
+      return;
+    }
+    // Handle Brand kit subcommands (brand kits; writes need the templates write permission)
+    if (primaryCommand === "brand-kits" && subCommand) {
+      switch (subCommand) {
+        case "list":
+          await brandKitsList({
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "get":
+          await brandKitsGet({
+            id: sub[2],
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "create":
+          await brandKitsCreate({
+            name: flags.name,
+            logoUrl: flags.logoUrl,
+            primaryColor: flags.primaryColor,
+            secondaryColor: flags.secondaryColor,
+            backgroundColor: flags.backgroundColor,
+            textColor: flags.textColor,
+            fontFamily: flags.fontFamily,
+            headingFontFamily: flags.headingFontFamily,
+            buttonStyle: flags.buttonStyle,
+            buttonRadius: flags.buttonRadius,
+            companyName: flags.companyName,
+            companyAddress: flags.companyAddress,
+            socialLinks: flags.socialLinks,
+            sourceDomain: flags.sourceDomain,
+            default: flags.default,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "update":
+          await brandKitsUpdate({
+            id: sub[2],
+            name: flags.name,
+            logoUrl: flags.logoUrl,
+            primaryColor: flags.primaryColor,
+            secondaryColor: flags.secondaryColor,
+            backgroundColor: flags.backgroundColor,
+            textColor: flags.textColor,
+            fontFamily: flags.fontFamily,
+            headingFontFamily: flags.headingFontFamily,
+            buttonStyle: flags.buttonStyle,
+            buttonRadius: flags.buttonRadius,
+            companyName: flags.companyName,
+            companyAddress: flags.companyAddress,
+            socialLinks: flags.socialLinks,
+            sourceDomain: flags.sourceDomain,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "delete":
+          await brandKitsDelete({
+            id: sub[2],
+            yes: flags.yes,
+            dryRun: flags.dryRun,
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        case "set-default":
+          await brandKitsSetDefault({
+            id: sub[2],
+            json: flags.json,
+            token: flags.token,
+            region: flags.region,
+          });
+          break;
+
+        default:
+          throw errors.unknownCommand(
+            "brand-kits command",
+            subCommand,
+            "Available commands: list, get <id>, create, update <id>, delete <id>, set-default <id>\n\nRun wraps --help for more information."
+          );
+      }
+      const brandKitsDuration = Date.now() - startTime;
+      trackCommandFallback(`brand-kits:${subCommand}`, {
+        success: process.exitCode !== 1,
+        duration_ms: brandKitsDuration,
+        service: "brand-kits",
       });
       return;
     }

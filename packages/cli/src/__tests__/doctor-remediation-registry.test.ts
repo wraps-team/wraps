@@ -267,7 +267,7 @@ describe("doctor remediation registry", () => {
     // scooping subcommands back up.
     expect(routed.size).toBeGreaterThanOrEqual(20);
     // 25 before topics, events, api-keys and audit-logs were routed (29 now).
-    expect(routed.size).toBeLessThanOrEqual(29);
+    expect(routed.size).toBeLessThanOrEqual(30);
     expect(routedPaths.size).toBeGreaterThan(60);
   });
 
