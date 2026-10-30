@@ -431,6 +431,25 @@ describe("Batch sender reputation pause (real DB)", () => {
     expect(sqsState.sendCalls).toHaveLength(2);
   });
 
+  it("a pause that outlasts the 24h dedupe window still notifies only once", async () => {
+    // The per-batch 24h notification check used to be the only guard, so a
+    // pause lasting days re-alerted daily. Deleting the first notification
+    // stands in for that window lapsing: only the pausedReason transition
+    // check is left to keep the second cycle quiet.
+    await setVerdict("in_danger", new Date(), ["bounce_pause"]);
+
+    await runWorker(0);
+    expect(await loadReputationNotifications()).toHaveLength(1);
+    await db
+      .delete(notification)
+      .where(eq(notification.organizationId, fixture.ids.org));
+
+    await runWorker(0);
+
+    expect(await loadReputationNotifications()).toHaveLength(0);
+    expect((await loadBatch()).pausedReason).toBe("reputation");
+  });
+
   it("stale in_danger falls through and sends", async () => {
     await setVerdict("in_danger", new Date(Date.now() - 4 * 60 * 60 * 1000), [
       "bounce_pause",

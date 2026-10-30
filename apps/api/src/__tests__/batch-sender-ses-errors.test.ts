@@ -317,10 +317,12 @@ function makeManyContacts(count: number) {
  * notify* helpers, which issue two extra selects (batch name/subject, org
  * slug) on top of the standard 5.
  */
-function setupBulkSelectsForEarlyReturn() {
+function setupBulkSelectsForEarlyReturn(
+  batchOverrides: Record<string, unknown> = {}
+) {
   mockClaimReturning = makeContacts().map((c) => ({ contactId: c.id }));
   selectResults = [
-    [makeBulkBatch()],
+    [makeBulkBatch(batchOverrides)],
     makeContacts(),
     [{}], // aws account features
     [
@@ -606,6 +608,21 @@ describe("SES daily quota error", () => {
       organizationId: "org-1",
       type: "broadcast.daily_quota_paused",
     });
+  });
+
+  it("does not notify again while the batch is still paused for the daily quota", async () => {
+    // A send larger than the daily quota cycles here every 900s for days.
+    // pausedReason already "daily_quota" means this pause was announced;
+    // the retry stays quiet even with no notification in the 24h window.
+    setupBulkSelectsForEarlyReturn({ pausedReason: "daily_quota" });
+    sesErrorToThrow = Object.assign(new Error("Daily message quota exceeded"), {
+      name: "LimitExceededException",
+    });
+
+    await handler(makeSQSEvent(3), makeMockContext(), vi.fn());
+
+    expect(sqsSendCalls[0]?.DelaySeconds).toBe(900);
+    expect(notifyOrgMock).not.toHaveBeenCalled();
   });
 
   it("writes no second notification when one already landed in the dedupe window", async () => {

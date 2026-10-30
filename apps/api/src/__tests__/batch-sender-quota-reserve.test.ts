@@ -262,10 +262,13 @@ function makeContacts(count = 50) {
 }
 
 /** Setup selects for a chunk that is EXPECTED to pause (gate triggers). */
-function setupSelectsForPause(dailyQuotaReserve: number) {
+function setupSelectsForPause(
+  dailyQuotaReserve: number,
+  batchOverrides: Record<string, unknown> = {}
+) {
   mockClaimReturning = [];
   selectResults = [
-    [makeBatch()],
+    [makeBatch(batchOverrides)],
     makeContacts(50),
     [{ dailyQuotaReserve }], // aws account row
     [{ name: "Test Broadcast", subject: "Quota Reserve Test" }], // notifyBroadcastQuotaPaused: batch
@@ -364,6 +367,21 @@ describe("daily quota reserve gate", () => {
       organizationId: "org-1",
       type: "broadcast.quota_paused",
     });
+  });
+
+  it("does not notify again while the batch is still paused for the reserve", async () => {
+    // pausedReason already "quota_reserve" means the previous cycle paused
+    // and alerted; the 15-minute retry must stay quiet even once the 24h
+    // notification window lapses (hasRecentNotification -> false here).
+    sesMaxSendRate = 14;
+    sesMax24HourSend = 120_000;
+    sesSentLast24Hours = 115_000;
+    setupSelectsForPause(40_000, { pausedReason: "quota_reserve" });
+
+    await handler(makeSQSEvent(), makeMockContext(), vi.fn());
+
+    expect(sqsSendCalls[0]?.DelaySeconds).toBe(900);
+    expect(notifyOrgMock).not.toHaveBeenCalled();
   });
 
   it("proceeds with sends when the reserve is null (feature off)", async () => {

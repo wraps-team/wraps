@@ -515,7 +515,9 @@ async function notifyBroadcastFinished(
 }
 
 /**
- * Write a broadcast-paused inbox notification, deduplicated per batch per 24h.
+ * Write a broadcast-paused inbox notification. The caller invokes it only when
+ * the batch enters the pause (pausedReason changes); the per-batch 24h
+ * dedupe here is a floor behind that.
  * Mirrors notifyBroadcastFinished's shape exactly — never lets a notification
  * failure break the send loop.
  */
@@ -622,8 +624,8 @@ async function getOrgAlertEmails(organizationId: string): Promise<string[]> {
  * QUOTA_STUCK_THRESHOLD_MS: a distinct in-app notification (type
  * broadcast.quota_stuck) plus an email to the org's owners/admins. This is an
  * escalation ALONGSIDE the routine broadcast.quota_paused notification, not a
- * replacement — that one fires every 24h regardless of whether the pause is
- * temporary or permanent; this one only fires once a pause has proven itself
+ * replacement — that one fires once when the pause starts, whether it turns
+ * out temporary or permanent; this one only fires once a pause has proven itself
  * stuck, and its copy says so explicitly (no "resumes automatically" claim).
  */
 async function alertBroadcastQuotaStuck(
@@ -805,8 +807,9 @@ async function notifyBroadcastStoppedEarly(
 
 /**
  * Write a broadcast-paused inbox notification for SES daily quota exhaustion,
- * deduplicated per batch per 24h. Mirrors notifyBroadcastQuotaPaused's shape
- * exactly — never lets a notification failure break the send loop. Distinct
+ * called once per pause like notifyBroadcastQuotaPaused, with the same 24h
+ * floor. Mirrors notifyBroadcastQuotaPaused's shape exactly — never lets a
+ * notification failure break the send loop. Distinct
  * from notifyBroadcastQuotaPaused: that one is the transactional-reserve
  * gate (a self-imposed headroom), this one is the account's actual SES daily
  * sending limit being exhausted.
@@ -881,9 +884,9 @@ async function notifyBroadcastDailyQuotaPaused(
 
 /**
  * Write a broadcast-paused inbox notification for a dangerous SES health
- * verdict, deduplicated per batch per 24h. Mirrors
- * notifyBroadcastDailyQuotaPaused's shape exactly — never lets a
- * notification failure break the send loop.
+ * verdict, called once per pause like notifyBroadcastQuotaPaused, with the
+ * same 24h floor. Mirrors notifyBroadcastDailyQuotaPaused's shape exactly —
+ * never lets a notification failure break the send loop.
  */
 async function notifyBroadcastReputationPaused(
   batchId: string,
@@ -1256,7 +1259,13 @@ async function processJob(
         reasons,
         healthCheckedAt: checkedAt?.toISOString(),
       });
-      await notifyBroadcastReputationPaused(batchId, organizationId, reasons);
+      // Once per pause, not once per 15-minute retry: pausedReason was
+      // already "reputation" if the previous cycle paused for the same
+      // reason, and a chunk that gets through clears it (see the progress
+      // write below), so a later pause alerts again.
+      if (batch.pausedReason !== "reputation") {
+        await notifyBroadcastReputationPaused(batchId, organizationId, reasons);
+      }
       // pausedAt, not lastChunkAt — see the quota_reserve gate below for why.
       // biome-ignore lint/plugin: batchId is verified org-scoped by the "Scoped by (id, organizationId)" fetch in processJob above.
       await db
@@ -1327,11 +1336,14 @@ async function processJob(
         reserve,
         headroom,
       });
-      await notifyBroadcastQuotaPaused(batchId, organizationId, {
-        max24HourSend,
-        sentLast24Hours,
-        reserve,
-      });
+      // Once per pause — see the reputation gate above.
+      if (batch.pausedReason !== "quota_reserve") {
+        await notifyBroadcastQuotaPaused(batchId, organizationId, {
+          max24HourSend,
+          sentLast24Hours,
+          reserve,
+        });
+      }
       // pausedAt, not lastChunkAt: the stuck-alert below reads lastChunkAt's
       // staleness as its "no progress" signal, so the pause path must leave it
       // alone. pausedAt is the separate liveness heartbeat that lets
@@ -1754,7 +1766,10 @@ async function processJob(
             chunkIndex,
             organizationId,
           });
-          await notifyBroadcastDailyQuotaPaused(batchId, organizationId);
+          // Once per pause — see the reputation gate above.
+          if (batch.pausedReason !== "daily_quota") {
+            await notifyBroadcastDailyQuotaPaused(batchId, organizationId);
+          }
           await enqueueNextChunk({ ...job }, { delaySeconds: 900 });
           return;
         }

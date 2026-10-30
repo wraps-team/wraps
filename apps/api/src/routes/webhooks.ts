@@ -21,7 +21,18 @@ import {
   workflow,
   workflowExecution,
 } from "@wraps/db";
-import { and, inArray, isNull, lt, ne, notInArray, or, sql } from "drizzle-orm";
+import {
+  and,
+  gte,
+  inArray,
+  isNull,
+  like,
+  lt,
+  ne,
+  notInArray,
+  or,
+  sql,
+} from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { isSelfHosted } from "../(ee)/lib/license";
 import { trackFirstEmailDelivered } from "../lib/activation-tracking";
@@ -483,7 +494,11 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
 
         case "Reject":
           await processReject(message, messageId, account.organizationId);
-          await notifySendFailures(account.organizationId, "reject");
+          await notifySendFailures(
+            account.organizationId,
+            message.id,
+            "reject"
+          );
           break;
 
         case "Rendering Failure":
@@ -496,6 +511,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
           );
           await notifySendFailures(
             account.organizationId,
+            message.id,
             "rendering_failure",
             event.detail.failure?.templateName
           );
@@ -1065,24 +1081,70 @@ async function processComplaint(
   log.info("Webhook: message complained", { messageId: message.id });
 }
 
+const SEND_FAILURE_EPISODE_GAP_MS = 24 * 60 * 60 * 1000;
+
 /**
- * Alert the org (once per 24h) that SES is refusing or failing to render
- * their sends. Individual Reject / Rendering Failure events are stored per
- * message; this is the "your sends are silently dying" wake-up call.
+ * The `message_send.error` text each failure reason writes — see
+ * processReject and processRenderingFailure. Keep these in step with them.
+ */
+function sendFailureErrorMatches(reason: "reject" | "rendering_failure") {
+  return reason === "reject"
+    ? eq(messageSend.error, "Rejected by SES")
+    : or(
+        eq(messageSend.error, "Template rendering failure"),
+        like(messageSend.error, "Rendering failure:%")
+      );
+}
+
+/**
+ * Alert the org that SES is refusing or failing to render their sends, once
+ * per episode per reason. Individual Reject / Rendering Failure events are
+ * stored per message; this is the "your sends are silently dying" wake-up
+ * call, and one is enough while the same failure keeps happening.
+ *
+ * An episode is a run of failures of one reason with no gap longer than
+ * SEND_FAILURE_EPISODE_GAP_MS. A failure is the start of one when no other
+ * failure of that reason was sent in the gap before it; ordering by
+ * (sentAt, id) means two failures processed concurrently cannot both count
+ * as the first. The 24h notification check stays as a floor for events
+ * processed out of order, where the earlier message is not marked failed yet.
+ * Rejects and rendering failures are separate episodes: one does not hide
+ * the other.
  */
 async function notifySendFailures(
   organizationId: string,
+  messageSendId: string,
   reason: "reject" | "rendering_failure",
   detail?: string
 ): Promise<void> {
   try {
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const since = new Date(Date.now() - SEND_FAILURE_EPISODE_GAP_MS);
     const already = await hasRecentNotification({
       organizationId,
       type: "ses.send_failures",
       since,
+      dataEquals: { key: "reason", value: reason },
     });
     if (already) {
+      return;
+    }
+
+    const [earlier] = await db
+      .select({ id: messageSend.id })
+      .from(messageSend)
+      .where(
+        and(
+          eq(messageSend.organizationId, organizationId),
+          eq(messageSend.channel, "email"),
+          eq(messageSend.status, "failed"),
+          sendFailureErrorMatches(reason),
+          ne(messageSend.id, messageSendId),
+          gte(messageSend.sentAt, since),
+          sql`(${messageSend.sentAt}, ${messageSend.id}) < (select ms.sent_at, ms.id from message_send ms where ms.id = ${messageSendId})`
+        )
+      )
+      .limit(1);
+    if (earlier) {
       return;
     }
 
