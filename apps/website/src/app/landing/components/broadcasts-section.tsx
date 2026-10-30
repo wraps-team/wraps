@@ -93,11 +93,11 @@ export function BroadcastsSection() {
           {/* Background glow */}
           <div className="-translate-x-1/2 lg:-top-4 absolute top-2 left-1/2 mx-auto h-16 w-[70%] transform rounded-full bg-brand/10 blur-2xl lg:h-32" />
 
-          <div className="relative overflow-hidden rounded-2xl border-2 bg-card shadow-2xl">
+          <div className="relative overflow-hidden">
             {/* Light mode image */}
             <Image
               alt="Broadcast Dashboard - Light Mode"
-              className="block w-full rounded-xl object-cover dark:hidden"
+              className="block w-full object-cover dark:hidden"
               height={675}
               src={assetUrl("broadcasts-list-light.webp")}
               width={1200}
@@ -106,14 +106,14 @@ export function BroadcastsSection() {
             {/* Dark mode image */}
             <Image
               alt="Broadcast Dashboard - Dark Mode"
-              className="hidden w-full rounded-xl object-cover dark:block"
+              className="hidden w-full object-cover dark:block"
               height={675}
               src={assetUrl("broadcasts-list-dark.webp")}
               width={1200}
             />
 
             {/* Bottom fade effect */}
-            <div className="absolute bottom-0 left-0 h-32 w-full rounded-b-xl bg-linear-to-b from-background/0 via-background/70 to-background md:h-40" />
+            <div className="absolute bottom-0 left-0 h-32 w-full bg-linear-to-b from-background/0 via-background/70 to-background md:h-40" />
           </div>
         </div>
       </div>

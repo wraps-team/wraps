@@ -33,13 +33,9 @@ export function Image3D({
             isRight ? "group-hover:-rotate-y-12" : "group-hover:rotate-y-12"
           )}
         >
-          {/* Depth layers for 3D effect */}
-          <div className="-translate-z-8 -top-5 -right-4 -bottom-5 -left-7 absolute translate-x-2 translate-y-0 rounded-3xl">
-            <div className="size-full rounded-3xl border border-brand/20 bg-linear-to-br from-brand/5 via-background/40 to-brand/5 shadow-xl" />
-          </div>
-
-          {/* Main image container */}
-          <div className="relative z-10 size-full overflow-hidden rounded-xl shadow-xl">
+          {/* The image itself, with no card, shadow or ring around it: product
+              media sits straight on the page across wraps.dev. */}
+          <div className="relative z-10 size-full overflow-hidden">
             {/* Shimmer effect */}
             <div
               className={cn(
@@ -74,9 +70,6 @@ export function Image3D({
               sizes="(max-width: 768px) 100vw, 50vw"
               src={assetUrl(darkSrc)}
             />
-
-            {/* Border highlight */}
-            <div className="absolute inset-0 rounded-xl ring-1 ring-white/20 transition-all duration-500 group-hover:ring-brand/30 dark:ring-white/10" />
           </div>
         </div>
       </div>

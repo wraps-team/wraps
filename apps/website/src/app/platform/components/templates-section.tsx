@@ -59,7 +59,7 @@ export function DashboardTemplatesSection() {
 
       {/* Full-width screenshot - larger on desktop */}
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:max-w-7xl lg:px-8 xl:max-w-[90rem]">
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
+        <div className="relative overflow-hidden">
           {/* Light mode image */}
           <img
             alt="Template Editor - Light Mode"

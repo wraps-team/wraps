@@ -57,7 +57,7 @@ export function DashboardBroadcastsSection() {
         <div className="grid items-center gap-12 lg:grid-cols-2">
           {/* Screenshot - overflows left */}
           <div className="relative lg:-ml-32 xl:-ml-48 2xl:-ml-64">
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
+            <div className="relative overflow-hidden">
               {/* Light mode image */}
               <img
                 alt="Broadcasts Dashboard - Light Mode"
