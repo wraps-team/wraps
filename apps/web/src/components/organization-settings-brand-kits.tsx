@@ -3,13 +3,6 @@
 import type { BrandKit } from "@wraps/db";
 import { Alert, AlertDescription } from "@wraps/ui/components/ui/alert";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -24,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@wraps/ui/components/ui/dropdown-menu";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -473,122 +467,112 @@ export function OrganizationSettingsBrandKits({
         </Alert>
       )}
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Brand Kits</CardTitle>
-              <CardDescription>
-                Manage your organization's brand kits for consistent email
-                styling.
-              </CardDescription>
-            </div>
+      <Panel
+        actions={
+          canEdit && (
+            <Button onClick={handleOpenCreate} size="sm">
+              <Plus className="mr-2 h-4 w-4" />
+              New Brand Kit
+            </Button>
+          )
+        }
+        description="Manage your organization's brand kits for consistent email styling."
+        label={<PanelTitle>Brand Kits</PanelTitle>}
+      >
+        {brandKits.length === 0 ? (
+          <div className="py-8 text-center">
+            <Palette className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <h3 className="mb-2 font-medium">No brand kits yet</h3>
+            <p className="mb-4 text-muted-foreground text-sm">
+              Create your first brand kit to maintain consistent styling across
+              your emails.
+            </p>
             {canEdit && (
               <Button onClick={handleOpenCreate} size="sm">
                 <Plus className="mr-2 h-4 w-4" />
-                New Brand Kit
+                Create Brand Kit
               </Button>
             )}
           </div>
-        </CardHeader>
-        <CardContent>
-          {brandKits.length === 0 ? (
-            <div className="py-8 text-center">
-              <Palette className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-              <h3 className="mb-2 font-medium">No brand kits yet</h3>
-              <p className="mb-4 text-muted-foreground text-sm">
-                Create your first brand kit to maintain consistent styling
-                across your emails.
-              </p>
-              {canEdit && (
-                <Button onClick={handleOpenCreate} size="sm">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Brand Kit
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {brandKits.map((kit) => (
-                <div
-                  className="flex items-center justify-between rounded-lg border p-4"
-                  key={kit.id}
-                >
-                  <div className="flex items-center gap-4">
-                    {/* Color Preview */}
-                    <div className="flex gap-1">
-                      <div
-                        className="h-8 w-8 rounded-l border"
-                        style={{ backgroundColor: kit.primaryColor }}
-                        title="Primary Color"
-                      />
-                      <div
-                        className="h-8 w-8 border-y"
-                        style={{ backgroundColor: kit.secondaryColor }}
-                        title="Secondary Color"
-                      />
-                      <div
-                        className="h-8 w-8 rounded-r border"
-                        style={{ backgroundColor: kit.backgroundColor }}
-                        title="Background Color"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium">{kit.name}</h4>
-                        {kit.isDefault && (
-                          <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-primary text-xs">
-                            <Star className="h-3 w-3" />
-                            Default
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-muted-foreground text-sm">
-                        {kit.companyName || "No company name set"}
-                      </p>
-                    </div>
+        ) : (
+          <div className="space-y-4">
+            {brandKits.map((kit) => (
+              <div
+                className="flex items-center justify-between border p-4"
+                key={kit.id}
+              >
+                <div className="flex items-center gap-4">
+                  {/* Color Preview */}
+                  <div className="flex gap-1">
+                    <div
+                      className="h-8 w-8 rounded-l border"
+                      style={{ backgroundColor: kit.primaryColor }}
+                      title="Primary Color"
+                    />
+                    <div
+                      className="h-8 w-8 border-y"
+                      style={{ backgroundColor: kit.secondaryColor }}
+                      title="Secondary Color"
+                    />
+                    <div
+                      className="h-8 w-8 rounded-r border"
+                      style={{ backgroundColor: kit.backgroundColor }}
+                      title="Background Color"
+                    />
                   </div>
 
-                  {canEdit && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          aria-label="More actions"
-                          size="icon"
-                          variant="ghost"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenEdit(kit)}>
-                          Edit
-                        </DropdownMenuItem>
-                        {!kit.isDefault && (
-                          <DropdownMenuItem
-                            onClick={() => handleSetDefault(kit)}
-                          >
-                            <Check className="mr-2 h-4 w-4" />
-                            Set as Default
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          onClick={() => handleDelete(kit)}
-                          variant="destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium">{kit.name}</h4>
+                      {kit.isDefault && (
+                        <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-primary text-xs">
+                          <Star className="h-3 w-3" />
+                          Default
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      {kit.companyName || "No company name set"}
+                    </p>
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
+                {canEdit && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        aria-label="More actions"
+                        size="icon"
+                        variant="ghost"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleOpenEdit(kit)}>
+                        Edit
+                      </DropdownMenuItem>
+                      {!kit.isDefault && (
+                        <DropdownMenuItem onClick={() => handleSetDefault(kit)}>
+                          <Check className="mr-2 h-4 w-4" />
+                          Set as Default
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
+                        onClick={() => handleDelete(kit)}
+                        variant="destructive"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
 
       {/* Create/Edit Dialog */}
       <Dialog onOpenChange={setIsDialogOpen} open={isDialogOpen}>

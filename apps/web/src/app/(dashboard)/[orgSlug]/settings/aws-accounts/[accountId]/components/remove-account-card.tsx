@@ -10,14 +10,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@wraps/ui/components/ui/alert-dialog";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -66,26 +60,27 @@ export function RemoveAccountCard({
   }
 
   return (
-    <Card className="border-destructive/40">
-      <CardHeader>
-        <CardTitle>Remove from Wraps</CardTitle>
-        <CardDescription>
+    // Removing the account is a Wraps-side action; nothing in the customer's
+    // AWS account changes, so this panel is default rather than own.
+    <Panel
+      description={
+        <>
           Wraps stops reading and sending through this account. Nothing in your
           AWS account is deleted. Remove the CloudFormation stack yourself or
           run <code className="font-mono">wraps destroy</code>.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Button
-          onClick={() => {
-            setTypedName("");
-            setOpen(true);
-          }}
-          variant="destructive"
-        >
-          Remove account...
-        </Button>
-      </CardContent>
+        </>
+      }
+      label={<PanelTitle>Remove from Wraps</PanelTitle>}
+    >
+      <Button
+        onClick={() => {
+          setTypedName("");
+          setOpen(true);
+        }}
+        variant="destructive"
+      >
+        Remove account...
+      </Button>
 
       <AlertDialog onOpenChange={setOpen} open={open}>
         <AlertDialogContent>
@@ -137,6 +132,6 @@ export function RemoveAccountCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </Panel>
   );
 }

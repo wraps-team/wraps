@@ -1,18 +1,12 @@
 "use client";
 
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { useHubDays } from "@/hooks/use-hub-days";
@@ -48,92 +42,92 @@ export function EngagementChart({ orgSlug }: { orgSlug: string }) {
   const chartData = engagementData || [];
 
   return (
-    <Card className="@container/card">
-      <CardHeader>
-        <CardTitle>Engagement Metrics</CardTitle>
-        <CardDescription>
+    <Panel
+      className="@container/card"
+      description={
+        <>
           <span className="@[540px]/card:block hidden">
             Open rates, click rates, and click-to-open ratios over time
           </span>
           <span className="@[540px]/card:hidden">Engagement trends</span>
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-        {isLoading ? (
-          <Skeleton className="h-[300px] w-full" />
-        ) : error ? (
-          <div className="flex h-[300px] items-center justify-center text-muted-foreground text-sm">
-            Failed to load engagement data
-          </div>
-        ) : chartData.length === 0 ? (
-          <div className="flex h-[300px] items-center justify-center text-muted-foreground text-sm">
-            No data available for this time period
-          </div>
-        ) : (
-          <ChartContainer
-            className="aspect-auto h-[300px] w-full"
-            config={chartConfig}
-          >
-            <LineChart accessibilityLayer data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                axisLine={false}
-                dataKey="date"
-                minTickGap={32}
-                tickFormatter={(value) => {
-                  const date = new Date(value);
-                  return date.toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  });
-                }}
-                tickLine={false}
-                tickMargin={8}
-              />
-              <YAxis
-                axisLine={false}
-                tickFormatter={(value) => `${value}%`}
-                tickLine={false}
-                tickMargin={8}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    labelFormatter={(value) =>
-                      new Date(value).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
-                    }
-                  />
-                }
-              />
-              <Line
-                dataKey="openRate"
-                dot={false}
-                stroke="var(--color-openRate)"
-                strokeWidth={2}
-                type="monotone"
-              />
-              <Line
-                dataKey="clickRate"
-                dot={false}
-                stroke="var(--color-clickRate)"
-                strokeWidth={2}
-                type="monotone"
-              />
-              <Line
-                dataKey="ctr"
-                dot={false}
-                stroke="var(--color-ctr)"
-                strokeWidth={2}
-                type="monotone"
-              />
-            </LineChart>
-          </ChartContainer>
-        )}
-      </CardContent>
-    </Card>
+        </>
+      }
+      label={<PanelTitle>Engagement Metrics</PanelTitle>}
+    >
+      {isLoading ? (
+        <Skeleton className="h-[300px] w-full" />
+      ) : error ? (
+        <div className="flex h-[300px] items-center justify-center text-muted-foreground text-sm">
+          Failed to load engagement data
+        </div>
+      ) : chartData.length === 0 ? (
+        <div className="flex h-[300px] items-center justify-center text-muted-foreground text-sm">
+          No data available for this time period
+        </div>
+      ) : (
+        <ChartContainer
+          className="aspect-auto h-[300px] w-full"
+          config={chartConfig}
+        >
+          <LineChart accessibilityLayer data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis
+              axisLine={false}
+              dataKey="date"
+              minTickGap={32}
+              tickFormatter={(value) => {
+                const date = new Date(value);
+                return date.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                });
+              }}
+              tickLine={false}
+              tickMargin={8}
+            />
+            <YAxis
+              axisLine={false}
+              tickFormatter={(value) => `${value}%`}
+              tickLine={false}
+              tickMargin={8}
+            />
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  labelFormatter={(value) =>
+                    new Date(value).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  }
+                />
+              }
+            />
+            <Line
+              dataKey="openRate"
+              dot={false}
+              stroke="var(--color-openRate)"
+              strokeWidth={2}
+              type="monotone"
+            />
+            <Line
+              dataKey="clickRate"
+              dot={false}
+              stroke="var(--color-clickRate)"
+              strokeWidth={2}
+              type="monotone"
+            />
+            <Line
+              dataKey="ctr"
+              dot={false}
+              stroke="var(--color-ctr)"
+              strokeWidth={2}
+              type="monotone"
+            />
+          </LineChart>
+        </ChartContainer>
+      )}
+    </Panel>
   );
 }

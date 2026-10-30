@@ -1,15 +1,17 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { TrendingUp } from "lucide-react";
 import { useTopPerformers } from "../hooks/use-analytics";
+
+const label = (
+  <PanelTitle className="flex items-center gap-2">
+    <TrendingUp className="h-5 w-5 text-success" />
+    Top Performing Emails
+  </PanelTitle>
+);
 
 export function TopPerformers({ orgSlug }: { orgSlug: string }) {
   const {
@@ -20,56 +22,36 @@ export function TopPerformers({ orgSlug }: { orgSlug: string }) {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-success" />
-            Top Performing Emails
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Panel label={label}>
+        <div className="space-y-4">
           {[1, 2, 3, 4, 5].map((i) => (
             <div className="space-y-2" key={i}>
               <Skeleton className="h-12 w-full" />
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   if (error || !topEmails || topEmails.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-success" />
-            Top Performing Emails
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-center text-muted-foreground text-sm">
-            {error
-              ? "Failed to load top performers"
-              : "No email data available yet"}
-          </p>
-        </CardContent>
-      </Card>
+      <Panel label={label}>
+        <p className="text-center text-muted-foreground text-sm">
+          {error
+            ? "Failed to load top performers"
+            : "No email data available yet"}
+        </p>
+      </Panel>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-success" />
-          Top Performing Emails
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Panel label={label}>
+      <div className="space-y-4">
         {topEmails.map((email, index) => (
           <div
-            className="space-y-2 rounded-lg border p-3 transition-colors hover:bg-accent"
+            className="space-y-2 border p-4 transition-colors hover:bg-accent"
             key={`${email.subject}-${email.sent}-${index}`}
           >
             <div className="flex items-start justify-between gap-2">
@@ -99,7 +81,7 @@ export function TopPerformers({ orgSlug }: { orgSlug: string }) {
             </div>
           </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

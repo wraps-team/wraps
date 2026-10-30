@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { CreditCardIcon, ZapIcon } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import posthog from "posthog-js";
@@ -187,18 +180,15 @@ export function BillingStep({
   };
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+    <Panel
+      description="Get full access to the Wraps Platform."
+      label={<PanelTitle>Choose Your Plan</PanelTitle>}
+    >
+      <div className="space-y-6">
+        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
           <CreditCardIcon className="h-5 w-5 text-primary" />
         </div>
-        <CardTitle>Choose Your Plan</CardTitle>
-        <CardDescription>
-          Get full access to the Wraps Platform.
-        </CardDescription>
-      </CardHeader>
 
-      <CardContent className="space-y-6">
         {/* Billing Interval Toggle */}
         <BillingToggle
           onChange={handleIntervalChange}
@@ -226,9 +216,9 @@ export function BillingStep({
             (~$2-5/mo for most apps).
           </p>
         </div>
-      </CardContent>
+      </div>
 
-      <CardFooter className="flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between border-t pt-4">
         <Button disabled={isLoading} onClick={handleBack} variant="outline">
           Back
         </Button>
@@ -237,7 +227,7 @@ export function BillingStep({
             ? "Continue with Free"
             : `Subscribe to ${plan.name}`}
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </Panel>
   );
 }

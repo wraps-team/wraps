@@ -1,13 +1,7 @@
 "use client";
 
 import type { member, user } from "@wraps/db";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import type { InferSelectModel } from "drizzle-orm";
 import { GrantAccessForm } from "@/components/forms/grant-access-form";
 
@@ -27,21 +21,15 @@ export function GrantAccessCard({
   organizationId,
 }: GrantAccessCardProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Grant Access</CardTitle>
-        <CardDescription>
-          Give team members access to this AWS account with specific permission
-          levels.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <GrantAccessForm
-          awsAccountId={awsAccountId}
-          members={members}
-          organizationId={organizationId}
-        />
-      </CardContent>
-    </Card>
+    <Panel
+      description="Give team members access to this AWS account with specific permission levels."
+      label={<PanelTitle>Grant Access</PanelTitle>}
+    >
+      <GrantAccessForm
+        awsAccountId={awsAccountId}
+        members={members}
+        organizationId={organizationId}
+      />
+    </Panel>
   );
 }

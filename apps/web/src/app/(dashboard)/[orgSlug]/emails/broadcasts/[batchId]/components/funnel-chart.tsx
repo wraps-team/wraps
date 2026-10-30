@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { useEffect, useRef, useState } from "react";
 import { SERIES_COLOR } from "@/lib/chart-series";
 import {
@@ -70,95 +70,93 @@ export function FunnelChart(props: FunnelChartProps) {
   const gridCols = `repeat(${stages.length}, 1fr)`;
 
   return (
-    <Card>
-      <CardContent>
-        {/* Stage labels — grid with N equal columns */}
-        <div
-          className="mb-3"
-          style={{ display: "grid", gridTemplateColumns: gridCols }}
-        >
-          {stages.map((stage, i) => (
-            <div key={stage.label}>
-              <div className="font-bold text-2xl tabular-nums">
-                {formatCount(stage.count)}
-              </div>
-              <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-full"
-                  style={{
-                    backgroundColor: STAGE_COLORS[i % STAGE_COLORS.length],
-                  }}
-                />
-                {stage.label}
-              </div>
-              {stage.rate !== null && (
-                <div className="text-muted-foreground text-xs">
-                  {formatRate(stage.rate)}
-                </div>
-              )}
+    <Panel label={<PanelTitle>Funnel</PanelTitle>}>
+      {/* Stage labels — grid with N equal columns */}
+      <div
+        className="mb-3"
+        style={{ display: "grid", gridTemplateColumns: gridCols }}
+      >
+        {stages.map((stage, i) => (
+          <div key={stage.label}>
+            <div className="font-bold text-2xl tabular-nums">
+              {formatCount(stage.count)}
             </div>
-          ))}
-        </div>
-
-        {/* SVG funnel */}
-        <div className="w-full" ref={containerRef}>
-          <svg
-            className="w-full"
-            height={FUNNEL_HEIGHT}
-            preserveAspectRatio="none"
-            viewBox={`0 0 ${chartWidth} ${FUNNEL_HEIGHT}`}
-            width={chartWidth}
-          >
-            <defs>
-              {sectionPaths.map((_, i) => (
-                <linearGradient
-                  id={`funnel-section-${i}`}
-                  key={`grad-${i}`}
-                  x1="0%"
-                  x2="100%"
-                  y1="0%"
-                  y2="0%"
-                >
-                  <stop
-                    offset="0%"
-                    stopColor={STAGE_COLORS[i % STAGE_COLORS.length]}
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor={STAGE_COLORS[(i + 1) % STAGE_COLORS.length]}
-                  />
-                </linearGradient>
-              ))}
-            </defs>
-            {sectionPaths.map((d, i) => (
-              <path
-                d={d}
-                fill={`url(#funnel-section-${i})`}
-                key={`section-${i}`}
+            <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{
+                  backgroundColor: STAGE_COLORS[i % STAGE_COLORS.length],
+                }}
               />
-            ))}
-            {/* Vertical dividers at each inner stage boundary */}
-            {stages.slice(1, -1).map((_, i) => {
-              const x = (i + 1) * sectionWidth;
-              return (
-                <line
-                  key={`divider-${i}`}
-                  stroke="hsl(var(--background))"
-                  strokeWidth="2"
-                  x1={x}
-                  x2={x}
-                  y1={0}
-                  y2={FUNNEL_HEIGHT}
-                />
-              );
-            })}
-          </svg>
-        </div>
+              {stage.label}
+            </div>
+            {stage.rate !== null && (
+              <div className="text-muted-foreground text-xs">
+                {formatRate(stage.rate)}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
 
-        {/* Issue indicators — same grid layout */}
-        <FunnelIssues gridCols={gridCols} stages={stages} />
-      </CardContent>
-    </Card>
+      {/* SVG funnel */}
+      <div className="w-full" ref={containerRef}>
+        <svg
+          className="w-full"
+          height={FUNNEL_HEIGHT}
+          preserveAspectRatio="none"
+          viewBox={`0 0 ${chartWidth} ${FUNNEL_HEIGHT}`}
+          width={chartWidth}
+        >
+          <defs>
+            {sectionPaths.map((_, i) => (
+              <linearGradient
+                id={`funnel-section-${i}`}
+                key={`grad-${i}`}
+                x1="0%"
+                x2="100%"
+                y1="0%"
+                y2="0%"
+              >
+                <stop
+                  offset="0%"
+                  stopColor={STAGE_COLORS[i % STAGE_COLORS.length]}
+                />
+                <stop
+                  offset="100%"
+                  stopColor={STAGE_COLORS[(i + 1) % STAGE_COLORS.length]}
+                />
+              </linearGradient>
+            ))}
+          </defs>
+          {sectionPaths.map((d, i) => (
+            <path
+              d={d}
+              fill={`url(#funnel-section-${i})`}
+              key={`section-${i}`}
+            />
+          ))}
+          {/* Vertical dividers at each inner stage boundary */}
+          {stages.slice(1, -1).map((_, i) => {
+            const x = (i + 1) * sectionWidth;
+            return (
+              <line
+                key={`divider-${i}`}
+                stroke="hsl(var(--background))"
+                strokeWidth="2"
+                x1={x}
+                x2={x}
+                y1={0}
+                y2={FUNNEL_HEIGHT}
+              />
+            );
+          })}
+        </svg>
+      </div>
+
+      {/* Issue indicators — same grid layout */}
+      <FunnelIssues gridCols={gridCols} stages={stages} />
+    </Panel>
   );
 }
 

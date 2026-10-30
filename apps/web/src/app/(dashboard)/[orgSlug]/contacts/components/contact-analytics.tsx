@@ -3,19 +3,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { ButtonGroup } from "@wraps/ui/components/ui/button-group";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Popover,
   PopoverContent,
@@ -757,22 +750,20 @@ export function ContactAnalytics({ organizationId }: ContactAnalyticsProps) {
   );
 
   return (
-    <Card className="@container/card">
-      <CardHeader>
-        {/* A real <h2>: the card is a section of the page, so it belongs in the
-            heading outline. */}
-        <CardTitle asChild>
-          <h2>Contact Growth</h2>
-        </CardTitle>
-        <CardDescription>
+    <Panel
+      actions={rangeControls}
+      className="@container/card"
+      description={
+        <>
           <span className="@[540px]/card:block hidden">
             New contacts added over time
           </span>
           <span className="@[540px]/card:hidden">New contacts</span>
-        </CardDescription>
-        <CardAction className="self-center">{rangeControls}</CardAction>
-      </CardHeader>
-      <CardContent>
+        </>
+      }
+      label={<PanelTitle>Contact Growth</PanelTitle>}
+    >
+      <div>
         <p aria-live="polite" className="sr-only">
           {refreshStatus}
         </p>
@@ -886,7 +877,7 @@ export function ContactAnalytics({ organizationId }: ContactAnalyticsProps) {
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

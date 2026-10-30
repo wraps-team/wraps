@@ -2,13 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
 import { Checkbox } from "@wraps/ui/components/ui/checkbox";
 import {
   Collapsible,
@@ -16,6 +9,7 @@ import {
   CollapsibleTrigger,
 } from "@wraps/ui/components/ui/collapsible";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Progress } from "@wraps/ui/components/ui/progress";
 import {
   Tabs,
@@ -1377,184 +1371,189 @@ export function GettingStartedDashboard({
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column - Setup Checklist */}
           <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader className="gap-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-lg">Setup Checklist</CardTitle>
-                      {setupStatus.sandboxStatus === true && (
-                        <Badge variant="outline">SES sandbox</Badge>
-                      )}
-                    </div>
-                    <CardDescription>
-                      {completedSteps} of {requiredSteps.length} steps complete
-                    </CardDescription>
-                  </div>
-                  <Button
-                    onClick={() => router.refresh()}
-                    size="icon"
-                    variant="ghost"
-                  >
-                    <RefreshCwIcon className="h-4 w-4" />
-                    <span className="sr-only">Refresh status</span>
-                  </Button>
-                </div>
+            <Panel
+              actions={
+                <Button
+                  onClick={() => router.refresh()}
+                  size="icon"
+                  variant="ghost"
+                >
+                  <RefreshCwIcon className="h-4 w-4" />
+                  <span className="sr-only">Refresh status</span>
+                </Button>
+              }
+              description={
+                <>
+                  {completedSteps} of {requiredSteps.length} steps complete
+                </>
+              }
+              label={
+                <PanelTitle className="flex items-center gap-2">
+                  Setup Checklist
+                  {setupStatus.sandboxStatus === true && (
+                    <Badge variant="outline">SES sandbox</Badge>
+                  )}
+                </PanelTitle>
+              }
+            >
+              <div className="space-y-4">
                 <Progress className="h-2" value={completionPercent} />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <ExpandableChecklistItem
-                  defaultOpen={nextStep.kind === "connect_aws"}
-                  description={describeStep(
-                    "connect_aws",
-                    "Set up AWS SES, DynamoDB, and event tracking in your account"
-                  )}
-                  icon={<CloudIcon className="h-5 w-5" />}
-                  isComplete={hasAwsAccount}
-                  isNext={nextStep.kind === "connect_aws"}
-                  title="Deploy email infrastructure"
-                >
-                  {awsAccount ? (
-                    <ScanFeaturesAction
-                      awsAccountId={awsAccount.id}
-                      features={awsAccount.features}
-                      organizationId={organizationId}
-                    />
-                  ) : (
-                    <>
-                      <DeployConnectGuide organizationId={organizationId} />
-                      <p className="mt-3 text-muted-foreground text-xs">
-                        Already ran the deploy elsewhere?{" "}
-                        <Link
-                          className="underline underline-offset-4"
-                          href={`/${orgSlug}/settings/aws-accounts`}
-                        >
-                          Connect the account by role ARN
-                        </Link>
-                      </p>
-                    </>
-                  )}
-                </ExpandableChecklistItem>
+                <div className="space-y-3">
+                  <ExpandableChecklistItem
+                    defaultOpen={nextStep.kind === "connect_aws"}
+                    description={describeStep(
+                      "connect_aws",
+                      "Set up AWS SES, DynamoDB, and event tracking in your account"
+                    )}
+                    icon={<CloudIcon className="h-5 w-5" />}
+                    isComplete={hasAwsAccount}
+                    isNext={nextStep.kind === "connect_aws"}
+                    title="Deploy email infrastructure"
+                  >
+                    {awsAccount ? (
+                      <ScanFeaturesAction
+                        awsAccountId={awsAccount.id}
+                        features={awsAccount.features}
+                        organizationId={organizationId}
+                      />
+                    ) : (
+                      <>
+                        <DeployConnectGuide organizationId={organizationId} />
+                        <p className="mt-3 text-muted-foreground text-xs">
+                          Already ran the deploy elsewhere?{" "}
+                          <Link
+                            className="underline underline-offset-4"
+                            href={`/${orgSlug}/settings/aws-accounts`}
+                          >
+                            Connect the account by role ARN
+                          </Link>
+                        </p>
+                      </>
+                    )}
+                  </ExpandableChecklistItem>
 
-                {/* Connect to platform */}
-                <ExpandableChecklistItem
-                  defaultOpen={nextStep.kind === "connect_platform"}
-                  description={describeStep(
-                    "connect_platform",
-                    "Stream events and grant dashboard access"
-                  )}
-                  icon={<LinkIcon className="h-5 w-5" />}
-                  isComplete={hasPlatformConnection}
-                  isNext={nextStep.kind === "connect_platform"}
-                  title="Connect to platform"
-                >
-                  {awsAccount ? (
-                    <WebhookSecretForm
-                      awsAccountId={awsAccount.id}
-                      isConnected={hasPlatformConnection}
-                      organizationId={organizationId}
-                    />
-                  ) : (
-                    <CliCommandGuide
-                      command="wraps platform connect"
-                      description="After deploying infrastructure, run this command to connect your AWS account to the Wraps dashboard:"
-                      hint="This grants the dashboard read-only access and streams email events in real time."
-                    />
-                  )}
-                </ExpandableChecklistItem>
+                  {/* Connect to platform */}
+                  <ExpandableChecklistItem
+                    defaultOpen={nextStep.kind === "connect_platform"}
+                    description={describeStep(
+                      "connect_platform",
+                      "Stream events and grant dashboard access"
+                    )}
+                    icon={<LinkIcon className="h-5 w-5" />}
+                    isComplete={hasPlatformConnection}
+                    isNext={nextStep.kind === "connect_platform"}
+                    title="Connect to platform"
+                  >
+                    {awsAccount ? (
+                      <WebhookSecretForm
+                        awsAccountId={awsAccount.id}
+                        isConnected={hasPlatformConnection}
+                        organizationId={organizationId}
+                      />
+                    ) : (
+                      <CliCommandGuide
+                        command="wraps platform connect"
+                        description="After deploying infrastructure, run this command to connect your AWS account to the Wraps dashboard:"
+                        hint="This grants the dashboard read-only access and streams email events in real time."
+                      />
+                    )}
+                  </ExpandableChecklistItem>
 
-                {/* Verify domain */}
-                <ExpandableChecklistItem
-                  defaultOpen={nextStep.kind === "verify_domain"}
-                  description={describeStep(
-                    "verify_domain",
-                    "Configure DNS records to send emails from your domain"
-                  )}
-                  icon={<GlobeIcon className="h-5 w-5" />}
-                  isComplete={hasVerifiedDomain}
-                  isNext={nextStep.kind === "verify_domain"}
-                  title="Verify your domain"
-                >
-                  <DomainVerification
-                    orgSlug={orgSlug}
-                    verifiedDomains={verifiedDomains}
-                  />
-                </ExpandableChecklistItem>
-
-                {/* Send first email */}
-                <ExpandableChecklistItem
-                  defaultOpen={nextStep.kind === "first_send"}
-                  description={describeStep(
-                    "first_send",
-                    "Configure sender defaults and use the SDK to send a test email"
-                  )}
-                  icon={<MailIcon className="h-5 w-5" />}
-                  isComplete={hasSentEmail}
-                  isNext={nextStep.kind === "first_send"}
-                  title="Send your first email"
-                >
-                  <div className="space-y-3">
-                    {hasVerifiedDomain &&
-                      setupStatus.sandboxStatus === true &&
-                      !hasSentEmail && (
-                        <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/15 p-3 text-warning">
-                          <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
-                          <div className="space-y-2 text-sm">
-                            <p>
-                              AWS starts every new account in SES sandbox mode,
-                              so you can only send to verified addresses.{" "}
-                              <a
-                                className="font-medium underline underline-offset-4"
-                                href="https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html"
-                                rel="noopener noreferrer"
-                                target="_blank"
-                              >
-                                Request production access
-                              </a>{" "}
-                              (usually approved in ~24h) to email anyone.
-                            </p>
-                            <p>
-                              Requests get declined when they cannot say how
-                              recipients opted in or what happens to a bounce.
-                              Our{" "}
-                              <a
-                                className="font-medium underline underline-offset-4"
-                                href="https://wraps.dev/tools/ses-production-access"
-                                rel="noopener noreferrer"
-                                target="_blank"
-                              >
-                                request builder
-                              </a>{" "}
-                              writes that text for you, and diagnoses a denial
-                              if you already have one.
-                            </p>
-                            <p className="font-medium">
-                              Meanwhile, send yourself a test below — it works
-                              in sandbox right now.
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    <SendFirstEmailGuide
-                      organizationId={organizationId}
+                  {/* Verify domain */}
+                  <ExpandableChecklistItem
+                    defaultOpen={nextStep.kind === "verify_domain"}
+                    description={describeStep(
+                      "verify_domain",
+                      "Configure DNS records to send emails from your domain"
+                    )}
+                    icon={<GlobeIcon className="h-5 w-5" />}
+                    isComplete={hasVerifiedDomain}
+                    isNext={nextStep.kind === "verify_domain"}
+                    title="Verify your domain"
+                  >
+                    <DomainVerification
                       orgSlug={orgSlug}
-                      sandboxStatus={setupStatus.sandboxStatus}
-                      userEmail={userEmail}
+                      verifiedDomains={verifiedDomains}
                     />
-                  </div>
-                </ExpandableChecklistItem>
-              </CardContent>
-            </Card>
+                  </ExpandableChecklistItem>
+
+                  {/* Send first email */}
+                  <ExpandableChecklistItem
+                    defaultOpen={nextStep.kind === "first_send"}
+                    description={describeStep(
+                      "first_send",
+                      "Configure sender defaults and use the SDK to send a test email"
+                    )}
+                    icon={<MailIcon className="h-5 w-5" />}
+                    isComplete={hasSentEmail}
+                    isNext={nextStep.kind === "first_send"}
+                    title="Send your first email"
+                  >
+                    <div className="space-y-3">
+                      {hasVerifiedDomain &&
+                        setupStatus.sandboxStatus === true &&
+                        !hasSentEmail && (
+                          <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/15 p-3 text-warning">
+                            <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                            <div className="space-y-2 text-sm">
+                              <p>
+                                AWS starts every new account in SES sandbox
+                                mode, so you can only send to verified
+                                addresses.{" "}
+                                <a
+                                  className="font-medium underline underline-offset-4"
+                                  href="https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html"
+                                  rel="noopener noreferrer"
+                                  target="_blank"
+                                >
+                                  Request production access
+                                </a>{" "}
+                                (usually approved in ~24h) to email anyone.
+                              </p>
+                              <p>
+                                Requests get declined when they cannot say how
+                                recipients opted in or what happens to a bounce.
+                                Our{" "}
+                                <a
+                                  className="font-medium underline underline-offset-4"
+                                  href="https://wraps.dev/tools/ses-production-access"
+                                  rel="noopener noreferrer"
+                                  target="_blank"
+                                >
+                                  request builder
+                                </a>{" "}
+                                writes that text for you, and diagnoses a denial
+                                if you already have one.
+                              </p>
+                              <p className="font-medium">
+                                Meanwhile, send yourself a test below — it works
+                                in sandbox right now.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      <SendFirstEmailGuide
+                        organizationId={organizationId}
+                        orgSlug={orgSlug}
+                        sandboxStatus={setupStatus.sandboxStatus}
+                        userEmail={userEmail}
+                      />
+                    </div>
+                  </ExpandableChecklistItem>
+                </div>
+              </div>
+            </Panel>
           </div>
 
           {/* Right Column - Status & Quick Start */}
           <div className="space-y-6">
             {/* Integration Status */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Integration Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            {/* Read from the customer's AWS account and their platform connection. */}
+            <Panel
+              label={<PanelTitle>Integration Status</PanelTitle>}
+              variant="own"
+            >
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <ServerIcon className="h-4 w-4 text-muted-foreground" />
@@ -1622,21 +1621,20 @@ export function GettingStartedDashboard({
                     the checklist to connect your AWS account.
                   </p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
 
             {/* Quick Start Code */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
+            <Panel
+              description="Install the SDK and send your first email"
+              label={
+                <PanelTitle className="flex items-center gap-2">
                   <CodeIcon className="h-5 w-5" />
                   Quick Start
-                </CardTitle>
-                <CardDescription>
-                  Install the SDK and send your first email
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+                </PanelTitle>
+              }
+            >
+              <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs font-medium text-muted-foreground">
@@ -1671,8 +1669,8 @@ export function GettingStartedDashboard({
                     View Full Documentation
                   </a>
                 </Button>
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
 
             {/* Help Card */}
             <HelpCard />

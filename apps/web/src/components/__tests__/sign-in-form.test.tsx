@@ -80,21 +80,6 @@ vi.mock("@wraps/ui/components/ui/badge", () => ({
     <span>{children}</span>
   ),
 }));
-vi.mock("@wraps/ui/components/ui/card", () => ({
-  Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardContent: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  CardHeader: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  CardTitle: ({ children }: { children: React.ReactNode }) => (
-    <h1>{children}</h1>
-  ),
-  CardDescription: ({ children }: { children: React.ReactNode }) => (
-    <p>{children}</p>
-  ),
-}));
 vi.mock("@wraps/ui/components/ui/label", () => ({
   Label: ({
     children,

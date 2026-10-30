@@ -2,16 +2,11 @@
 
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@wraps/ui/components/ui/collapsible";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   ArrowLeft,
   ChevronDown,
@@ -84,13 +79,23 @@ export function EmailPreview({ email, orgSlug }: EmailPreviewProps) {
         Back to inbound
       </Button>
 
-      {/* Header Card */}
-      <Card>
-        <CardHeader className="space-y-3">
-          <CardTitle className="text-xl">
+      {/*
+        Header panel. The subject is the label; the title is truncated in the
+        border, so the full subject sits in the tooltip.
+        Every panel on this page reads the message out of the customer's S3
+        bucket, so every one carries the `own` border.
+      */}
+      <Panel
+        label={
+          <PanelTitle
+            className="min-w-0 max-w-md truncate"
+            title={email.subject || "(no subject)"}
+          >
             {email.subject || "(no subject)"}
-          </CardTitle>
-
+          </PanelTitle>
+        }
+      >
+        <div className="space-y-3">
           {/* Verdicts */}
           <div className="flex flex-wrap gap-2">
             <VerdictBadge label="Spam" verdict={email.spamVerdict} />
@@ -147,105 +152,105 @@ export function EmailPreview({ email, orgSlug }: EmailPreviewProps) {
               <span>{new Date(email.receivedAt).toLocaleString()}</span>
             </div>
           </div>
-        </CardHeader>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Body */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Message Body</CardTitle>
-          {email.htmlTruncated && (
+      <Panel
+        description={
+          email.htmlTruncated ? (
             <p className="text-sm text-warning">
               HTML content was truncated due to size limits
             </p>
-          )}
-        </CardHeader>
-        <CardContent>
-          {email.html ? (
-            /* Fully sandboxed: this body is HTML from whoever sent the message, so
+          ) : undefined
+        }
+        label={<PanelTitle>Message Body</PanelTitle>}
+      >
+        {email.html ? (
+          /* Fully sandboxed: this body is HTML from whoever sent the message, so
                it is not trusted. Nothing here reads contentWindow, so the frame has
                no reason to hold the app's origin. no-referrer keeps remote images
                from leaking the dashboard URL — or confirming to the sender that
                someone opened the message. */
-            <iframe
-              className="h-[500px] w-full rounded-md border bg-card"
-              referrerPolicy="no-referrer"
-              sandbox=""
-              srcDoc={email.html}
-              title="Email content"
-            />
-          ) : email.text ? (
-            <pre className="max-h-[500px] overflow-auto whitespace-pre-wrap rounded-md border bg-muted/50 p-4 font-mono text-sm">
-              {email.text}
-            </pre>
-          ) : (
-            <p className="text-muted-foreground text-sm">No message body</p>
-          )}
-        </CardContent>
-      </Card>
+          <iframe
+            className="h-[500px] w-full rounded-md border bg-card"
+            referrerPolicy="no-referrer"
+            sandbox=""
+            srcDoc={email.html}
+            title="Email content"
+          />
+        ) : email.text ? (
+          <pre className="max-h-[500px] overflow-auto whitespace-pre-wrap rounded-md border bg-muted/50 p-4 font-mono text-sm">
+            {email.text}
+          </pre>
+        ) : (
+          <p className="text-muted-foreground text-sm">No message body</p>
+        )}
+      </Panel>
 
       {/* Attachments */}
       {email.attachments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Panel
+          label={
+            <PanelTitle className="flex items-center gap-2">
               <Paperclip className="h-4 w-4" />
               Attachments ({email.attachments.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {email.attachments.map((att) => (
-                <div
-                  className="flex items-center justify-between rounded-md border p-3"
-                  key={att.id}
-                >
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <div className="font-medium text-sm">{att.filename}</div>
-                      <div className="text-muted-foreground text-xs">
-                        {att.contentType} &middot; {formatFileSize(att.size)}
-                        {att.contentDisposition === "inline" && (
-                          <Badge className="ml-2" variant="info">
-                            inline
-                          </Badge>
-                        )}
-                      </div>
+            </PanelTitle>
+          }
+        >
+          <div className="space-y-2">
+            {email.attachments.map((att) => (
+              <div
+                className="flex items-center justify-between border p-4"
+                key={att.id}
+              >
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <div className="font-medium text-sm">{att.filename}</div>
+                    <div className="text-muted-foreground text-xs">
+                      {att.contentType} &middot; {formatFileSize(att.size)}
+                      {att.contentDisposition === "inline" && (
+                        <Badge className="ml-2" variant="info">
+                          inline
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </div>
+            ))}
+          </div>
+        </Panel>
       )}
 
-      {/* Raw Headers */}
+      {/*
+        Raw Headers. The collapse trigger lives in the label, so the chevron
+        sits in the border; the body folds away beneath it.
+      */}
       <Collapsible onOpenChange={setHeadersOpen} open={headersOpen}>
-        <Card>
-          <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer">
-              <CardTitle className="flex items-center justify-between">
+        <Panel
+          label={
+            <PanelTitle>
+              <CollapsibleTrigger className="flex cursor-pointer items-center gap-2">
                 <span>Raw Headers</span>
                 {headersOpen ? (
                   <ChevronUp className="h-4 w-4" />
                 ) : (
                   <ChevronDown className="h-4 w-4" />
                 )}
-              </CardTitle>
-            </CardHeader>
-          </CollapsibleTrigger>
+              </CollapsibleTrigger>
+            </PanelTitle>
+          }
+        >
           <CollapsibleContent>
-            <CardContent>
-              <pre className="max-h-[400px] overflow-auto whitespace-pre-wrap rounded-md border bg-muted/50 p-4 font-mono text-xs">
-                {Object.entries(email.headers)
-                  .map(([key, value]) => `${key}: ${value}`)
-                  .join("\n")}
-              </pre>
-            </CardContent>
+            <pre className="max-h-[400px] overflow-auto whitespace-pre-wrap rounded-md border bg-muted/50 p-4 font-mono text-xs">
+              {Object.entries(email.headers)
+                .map(([key, value]) => `${key}: ${value}`)
+                .join("\n")}
+            </pre>
           </CollapsibleContent>
-        </Card>
+        </Panel>
       </Collapsible>
     </div>
   );

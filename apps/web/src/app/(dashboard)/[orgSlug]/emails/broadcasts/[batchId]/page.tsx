@@ -6,12 +6,7 @@ import {
   MAX_CLICKED_URLS,
   messageSend,
 } from "@wraps/db";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Separator } from "@wraps/ui/components/ui/separator";
 import { sql } from "drizzle-orm";
 import {
@@ -249,11 +244,8 @@ export default async function BatchDetailPage({
 
       {/* Email Details */}
       {batch.channel === "email" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Email Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Panel label={<PanelTitle>Email Details</PanelTitle>}>
+          <div className="space-y-4">
             {batch.subject && (
               <div>
                 <div className="font-medium text-muted-foreground text-sm">
@@ -304,96 +296,86 @@ export default async function BatchDetailPage({
                 </div>
               </>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       )}
 
       {/* Error Details */}
       {batch.errorMessage && (
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <XCircle className="h-5 w-5 text-destructive" />
-              <span className="text-destructive">Error Details</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>{batch.errorMessage}</p>
-          </CardContent>
-        </Card>
+        <Panel
+          label={
+            <PanelTitle className="flex items-center gap-2">
+              <XCircle className="size-3.5 text-destructive" />
+              Error Details
+            </PanelTitle>
+          }
+        >
+          <p>{batch.errorMessage}</p>
+        </Panel>
       )}
 
       {/* Metadata */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 text-sm sm:grid-cols-2">
+      <Panel label={<PanelTitle>Details</PanelTitle>}>
+        <div className="grid gap-4 text-sm sm:grid-cols-2">
+          <div>
+            <div className="font-medium text-muted-foreground">Created</div>
             <div>
-              <div className="font-medium text-muted-foreground">Created</div>
+              <LocalDateTime value={new Date(batch.createdAt).toISOString()} />
+            </div>
+          </div>
+          {batch.createdBy && (
+            <div>
+              <div className="font-medium text-muted-foreground">
+                Created By
+              </div>
+              <div>{batch.createdBy.name || batch.createdBy.email}</div>
+            </div>
+          )}
+          {batch.awsAccount && (
+            <div>
+              <div className="font-medium text-muted-foreground">
+                AWS Account
+              </div>
+              <div>
+                {batch.awsAccount.name} ({batch.awsAccount.region})
+              </div>
+            </div>
+          )}
+          {batch.scheduledFor && (
+            <div>
+              <div className="font-medium text-muted-foreground">
+                Scheduled For
+              </div>
               <div>
                 <LocalDateTime
-                  value={new Date(batch.createdAt).toISOString()}
+                  showTimeZone
+                  value={new Date(batch.scheduledFor).toISOString()}
                 />
               </div>
             </div>
-            {batch.createdBy && (
+          )}
+          {batch.startedAt && (
+            <div>
+              <div className="font-medium text-muted-foreground">Started</div>
               <div>
-                <div className="font-medium text-muted-foreground">
-                  Created By
-                </div>
-                <div>{batch.createdBy.name || batch.createdBy.email}</div>
+                <LocalDateTime
+                  value={new Date(batch.startedAt).toISOString()}
+                />
               </div>
-            )}
-            {batch.awsAccount && (
+            </div>
+          )}
+          {batch.completedAt && (
+            <div>
+              <div className="font-medium text-muted-foreground">Completed</div>
               <div>
-                <div className="font-medium text-muted-foreground">
-                  AWS Account
-                </div>
-                <div>
-                  {batch.awsAccount.name} ({batch.awsAccount.region})
-                </div>
+                <LocalDateTime
+                  value={new Date(batch.completedAt).toISOString()}
+                />
               </div>
-            )}
-            {batch.scheduledFor && (
-              <div>
-                <div className="font-medium text-muted-foreground">
-                  Scheduled For
-                </div>
-                <div>
-                  <LocalDateTime
-                    showTimeZone
-                    value={new Date(batch.scheduledFor).toISOString()}
-                  />
-                </div>
-              </div>
-            )}
-            {batch.startedAt && (
-              <div>
-                <div className="font-medium text-muted-foreground">Started</div>
-                <div>
-                  <LocalDateTime
-                    value={new Date(batch.startedAt).toISOString()}
-                  />
-                </div>
-              </div>
-            )}
-            {batch.completedAt && (
-              <div>
-                <div className="font-medium text-muted-foreground">
-                  Completed
-                </div>
-                <div>
-                  <LocalDateTime
-                    value={new Date(batch.completedAt).toISOString()}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          )}
+        </div>
+      </Panel>
     </div>
   );
 }

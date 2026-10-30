@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Loader2, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -151,22 +144,22 @@ export function EmailServices({
     .join(" · ");
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Email · {region}</CardTitle>
-        <CardDescription>
-          What the last scan found in your AWS account
-        </CardDescription>
-        <CardAction className="flex items-center gap-3">
+    <Panel
+      actions={
+        <div className="flex items-center gap-3">
           {scannedAt && (
             <span className="text-muted-foreground text-xs">
               Scanned {formatRelativeTime(new Date(scannedAt))}
             </span>
           )}
           {email && scanButton("Rescan")}
-        </CardAction>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        </div>
+      }
+      description="What the last scan found in your AWS account"
+      label={<PanelTitle>Email · {region}</PanelTitle>}
+      variant="own"
+    >
+      <div className="space-y-4">
         {scanResult && (
           <p
             className={
@@ -231,20 +224,20 @@ export function EmailServices({
           </div>
         )}
 
-        <div className="rounded-md bg-muted p-3">
+        <div className="bg-muted p-3">
           <p className="text-muted-foreground text-xs">
             Use{" "}
-            <code className="rounded bg-muted-foreground/20 px-1">
+            <code className="bg-muted-foreground/20 px-1">
               wraps email init
             </code>{" "}
             or{" "}
-            <code className="rounded bg-muted-foreground/20 px-1">
+            <code className="bg-muted-foreground/20 px-1">
               wraps email upgrade
             </code>{" "}
             to deploy additional features.
           </p>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

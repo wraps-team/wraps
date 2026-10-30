@@ -2,14 +2,8 @@
 
 import { useForm } from "@tanstack/react-form";
 import type { topicSettings } from "@wraps/db";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   RadioGroup,
   RadioGroupItem,
@@ -98,18 +92,19 @@ export function DoubleOptInSettings({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Confirmation Email Settings</CardTitle>
-        <CardDescription>
+    <Panel
+      description={
+        <>
           Configure the sender details and email template for double opt-in
           confirmation emails. These settings apply to all topics that have
           double opt-in enabled. New sign-ups on those topics stay pending — and
           are skipped by every broadcast — until they click the confirmation
           link, so they show as Pending on the topics table until they do.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </>
+      }
+      label={<PanelTitle>Confirmation Email Settings</PanelTitle>}
+    >
+      <div>
         <form
           className="space-y-6"
           onSubmit={(e) => {
@@ -302,7 +297,7 @@ export function DoubleOptInSettings({
             Save Changes
           </Button>
         </form>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

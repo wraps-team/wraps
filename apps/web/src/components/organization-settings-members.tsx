@@ -7,13 +7,6 @@ import {
 } from "@wraps/ui/components/ui/avatar";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -29,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@wraps/ui/components/ui/dropdown-menu";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -417,206 +411,184 @@ export function OrganizationSettingsMembers({
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Left column — members + invitations */}
         <div className="min-w-0 flex-1 space-y-6">
-          {/* Members Card */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Team Members</CardTitle>
-                  <CardDescription>
-                    Manage who has access to your organization.
-                  </CardDescription>
-                </div>
-                {canEdit && (
-                  <Button onClick={() => setInviteDialogOpen(true)}>
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Invite Member
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {optimisticMembers.map((member) => {
-                  const roleInfo =
-                    roleConfig[member.role as keyof typeof roleConfig] ??
-                    roleConfig.member;
-                  const RoleIcon = roleInfo.icon;
+          {/* Members Panel */}
+          <Panel
+            actions={
+              canEdit && (
+                <Button onClick={() => setInviteDialogOpen(true)}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Invite Member
+                </Button>
+              )
+            }
+            description="Manage who has access to your organization."
+            label={<PanelTitle>Team Members</PanelTitle>}
+          >
+            <div className="space-y-4">
+              {optimisticMembers.map((member) => {
+                const roleInfo =
+                  roleConfig[member.role as keyof typeof roleConfig] ??
+                  roleConfig.member;
+                const RoleIcon = roleInfo.icon;
 
-                  return (
-                    <div
-                      className="flex items-center justify-between rounded-lg border p-4"
-                      key={member.id}
-                    >
-                      <div className="flex items-center gap-4">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage
-                            alt={member.user.name}
-                            src={member.user.image || ""}
-                          />
-                          <AvatarFallback>
-                            {getInitials(member.user.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold">
-                              {member.user.name}
-                            </h4>
-                            <Badge variant={roleInfo.variant}>
-                              <RoleIcon className="mr-1 h-3 w-3" />
-                              {roleInfo.label}
-                            </Badge>
-                          </div>
-                          <p className="text-muted-foreground text-sm">
-                            {member.user.email}
-                          </p>
-                          <p className="text-muted-foreground text-xs">
-                            Joined{" "}
-                            {new Date(member.createdAt).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              }
-                            )}
-                          </p>
+                return (
+                  <div
+                    className="flex items-center justify-between border p-4"
+                    key={member.id}
+                  >
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage
+                          alt={member.user.name}
+                          src={member.user.image || ""}
+                        />
+                        <AvatarFallback>
+                          {getInitials(member.user.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold">{member.user.name}</h4>
+                          <Badge variant={roleInfo.variant}>
+                            <RoleIcon className="mr-1 h-3 w-3" />
+                            {roleInfo.label}
+                          </Badge>
                         </div>
+                        <p className="text-muted-foreground text-sm">
+                          {member.user.email}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          Joined{" "}
+                          {new Date(member.createdAt).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            }
+                          )}
+                        </p>
                       </div>
-                      {canEdit && member.role !== "owner" && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              aria-label="More actions"
-                              disabled={isPending}
-                              size="icon"
-                              variant="ghost"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleOpenChangeRole(member)}
-                            >
-                              Change Role
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => handleRemoveMember(member.id)}
-                              variant="destructive"
-                            >
-                              Remove Member
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
                     </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                    {canEdit && member.role !== "owner" && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            aria-label="More actions"
+                            disabled={isPending}
+                            size="icon"
+                            variant="ghost"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleOpenChangeRole(member)}
+                          >
+                            Change Role
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleRemoveMember(member.id)}
+                            variant="destructive"
+                          >
+                            Remove Member
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Panel>
 
           {/* Pending Invitations */}
           {canEdit && optimisticInvitations.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Pending Invitations</CardTitle>
-                <CardDescription>
-                  Invitations that haven't been accepted yet.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {optimisticInvitations.map((invitation) => (
-                    <div
-                      className="flex items-center justify-between rounded-lg border border-dashed p-4"
-                      key={invitation.id}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                          <Mail className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold">
-                              {invitation.email}
-                            </h4>
-                            <Badge variant="outline">{invitation.role}</Badge>
-                          </div>
-                          <p className="text-muted-foreground text-sm">
-                            Invited by {invitation.inviter.name}
-                          </p>
-                          <p className="text-muted-foreground text-xs">
-                            Expires{" "}
-                            {new Date(invitation.expiresAt).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              }
-                            )}
-                          </p>
-                        </div>
+            <Panel
+              description="Invitations that haven't been accepted yet."
+              label={<PanelTitle>Pending Invitations</PanelTitle>}
+            >
+              <div className="space-y-4">
+                {optimisticInvitations.map((invitation) => (
+                  <div
+                    className="flex items-center justify-between border p-4"
+                    key={invitation.id}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-10 w-10 items-center justify-center bg-muted">
+                        <Mail className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      <Button
-                        aria-label="Cancel invitation"
-                        disabled={isPending}
-                        onClick={() => handleCancelInvitation(invitation.id)}
-                        size="icon"
-                        variant="ghost"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold">{invitation.email}</h4>
+                          <Badge variant="outline">{invitation.role}</Badge>
+                        </div>
+                        <p className="text-muted-foreground text-sm">
+                          Invited by {invitation.inviter.name}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          Expires{" "}
+                          {new Date(invitation.expiresAt).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            }
+                          )}
+                        </p>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    <Button
+                      aria-label="Cancel invitation"
+                      disabled={isPending}
+                      onClick={() => handleCancelInvitation(invitation.id)}
+                      size="icon"
+                      variant="ghost"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </Panel>
           )}
         </div>
         {/* end left column */}
 
         {/* Right column — roles reference (sticky) */}
         <div className="w-full lg:w-80 lg:shrink-0">
-          <Card className="lg:sticky lg:top-6">
-            <CardHeader>
-              <CardTitle>Roles & Permissions</CardTitle>
-              <CardDescription>
-                Understanding member roles and their permissions.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {(Object.keys(roleConfig) as (keyof typeof roleConfig)[]).map(
-                  (role) => {
-                    const config = roleConfig[role];
-                    const Icon = config.icon;
-                    return (
-                      <div className="flex items-start gap-3" key={role}>
-                        <div
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${config.bgColor}`}
-                        >
-                          <Icon className={`h-4 w-4 ${config.color}`} />
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-sm">
-                            {config.label}
-                          </h4>
-                          <p className="text-muted-foreground text-xs">
-                            {roleDescriptions[role]}
-                          </p>
-                        </div>
+          <Panel
+            className="lg:sticky lg:top-6"
+            description="Understanding member roles and their permissions."
+            label={<PanelTitle>Roles & Permissions</PanelTitle>}
+          >
+            <div className="space-y-4">
+              {(Object.keys(roleConfig) as (keyof typeof roleConfig)[]).map(
+                (role) => {
+                  const config = roleConfig[role];
+                  const Icon = config.icon;
+                  return (
+                    <div className="flex items-start gap-3" key={role}>
+                      <div
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center ${config.bgColor}`}
+                      >
+                        <Icon className={`h-4 w-4 ${config.color}`} />
                       </div>
-                    );
-                  }
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                      <div>
+                        <h4 className="font-medium text-sm">{config.label}</h4>
+                        <p className="text-muted-foreground text-xs">
+                          {roleDescriptions[role]}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          </Panel>
         </div>
       </div>
       {/* end 2-col grid */}

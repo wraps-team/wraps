@@ -3,19 +3,13 @@
 import type { BrandKit } from "@wraps/db";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@wraps/ui/components/ui/dropdown-menu";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -85,16 +79,14 @@ export default function BrandKitsPage() {
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[...new Array(3)].map((_, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: Static skeleton
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-12 w-full" />
-              </CardContent>
-            </Card>
+            <Panel
+              description={<Skeleton className="h-4 w-1/2" />}
+              // biome-ignore lint/suspicious/noArrayIndexKey: Static skeleton
+              key={i}
+              label={<Skeleton className="h-5 w-3/4" />}
+            >
+              <Skeleton className="h-12 w-full" />
+            </Panel>
           ))}
         </div>
       </div>
@@ -119,8 +111,8 @@ export default function BrandKitsPage() {
       </div>
 
       {!brandKits || brandKits.length === 0 ? (
-        <Card className="py-12">
-          <CardContent className="text-center">
+        <Panel label={<PanelTitle>Brand kits</PanelTitle>}>
+          <div className="py-8 text-center">
             <Palette className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
             <h3 className="mb-2 font-semibold text-lg">No brand kits yet</h3>
             <p className="mb-4 text-muted-foreground">
@@ -133,135 +125,129 @@ export default function BrandKitsPage() {
                 Create Brand Kit
               </Link>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {brandKits.map((kit) => (
-            <Card
-              className="group relative cursor-pointer transition-shadow hover:shadow-md"
+            <Panel
+              actions={
+                <div className="opacity-0 transition-opacity group-hover:opacity-100">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        aria-label="More actions"
+                        className="h-8 w-8"
+                        onClick={(e) => e.stopPropagation()}
+                        size="icon"
+                        variant="ghost"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(
+                            `/${orgSlug}/emails/brand-kits/${kit.id}`
+                          );
+                        }}
+                      >
+                        Edit
+                      </DropdownMenuItem>
+                      {!kit.isDefault && (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSetDefault(kit);
+                          }}
+                        >
+                          <Check className="mr-2 h-4 w-4" />
+                          Set as Default
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(kit);
+                        }}
+                        variant="destructive"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              }
+              className="group cursor-pointer"
+              description={kit.companyName || "No company name"}
               key={kit.id}
+              label={
+                <PanelTitle className="flex items-center gap-2">
+                  {kit.name}
+                  {kit.isDefault && (
+                    <Badge className="gap-1" variant="secondary">
+                      <Star className="h-3 w-3" />
+                      Default
+                    </Badge>
+                  )}
+                </PanelTitle>
+              }
               onClick={() =>
                 router.push(`/${orgSlug}/emails/brand-kits/${kit.id}`)
               }
             >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      {kit.name}
-                      {kit.isDefault && (
-                        <Badge className="gap-1" variant="secondary">
-                          <Star className="h-3 w-3" />
-                          Default
-                        </Badge>
-                      )}
-                    </CardTitle>
-                    <CardDescription className="mt-1">
-                      {kit.companyName || "No company name"}
-                    </CardDescription>
-                  </div>
-                  <div className="opacity-0 transition-opacity group-hover:opacity-100">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          aria-label="More actions"
-                          className="h-8 w-8"
-                          onClick={(e) => e.stopPropagation()}
-                          size="icon"
-                          variant="ghost"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(
-                              `/${orgSlug}/emails/brand-kits/${kit.id}`
-                            );
-                          }}
-                        >
-                          Edit
-                        </DropdownMenuItem>
-                        {!kit.isDefault && (
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSetDefault(kit);
-                            }}
-                          >
-                            <Check className="mr-2 h-4 w-4" />
-                            Set as Default
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(kit);
-                          }}
-                          variant="destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {/* Color palette preview */}
-                <div className="mb-3 flex gap-1">
-                  <div
-                    className="h-10 flex-1 rounded-l-md border"
-                    style={{ backgroundColor: kit.primaryColor }}
-                    title="Primary"
-                  />
-                  <div
-                    className="h-10 flex-1 border-y"
-                    style={{ backgroundColor: kit.secondaryColor }}
-                    title="Secondary"
-                  />
-                  <div
-                    className="h-10 flex-1 border-y"
-                    style={{ backgroundColor: kit.backgroundColor }}
-                    title="Background"
-                  />
-                  <div
-                    className="h-10 flex-1 rounded-r-md border"
-                    style={{ backgroundColor: kit.textColor }}
-                    title="Text"
-                  />
-                </div>
+              {/* Color palette preview */}
+              <div className="mb-3 flex gap-1">
+                <div
+                  className="h-10 flex-1 rounded-l-md border"
+                  style={{ backgroundColor: kit.primaryColor }}
+                  title="Primary"
+                />
+                <div
+                  className="h-10 flex-1 border-y"
+                  style={{ backgroundColor: kit.secondaryColor }}
+                  title="Secondary"
+                />
+                <div
+                  className="h-10 flex-1 border-y"
+                  style={{ backgroundColor: kit.backgroundColor }}
+                  title="Background"
+                />
+                <div
+                  className="h-10 flex-1 rounded-r-md border"
+                  style={{ backgroundColor: kit.textColor }}
+                  title="Text"
+                />
+              </div>
 
-                {/* Logo preview */}
-                {kit.logoUrl && (
-                  <div className="mb-3 flex h-12 items-center justify-center rounded border bg-muted/30 p-2">
-                    <img
-                      alt={`${kit.name} logo`}
-                      className="max-h-full max-w-full object-contain"
-                      src={kit.logoUrl}
-                    />
-                  </div>
-                )}
-
-                {/* Meta info */}
-                <div className="flex items-center justify-between text-muted-foreground text-xs">
-                  <span style={{ fontFamily: kit.fontFamily }}>
-                    {kit.fontFamily.split(",")[0].replace(/['"]/g, "")}
-                  </span>
-                  <span>
-                    Updated{" "}
-                    {formatDistanceToNow(new Date(kit.updatedAt), {
-                      addSuffix: true,
-                    })}
-                  </span>
+              {/* Logo preview */}
+              {kit.logoUrl && (
+                <div className="mb-3 flex h-12 items-center justify-center rounded border bg-muted/30 p-2">
+                  <img
+                    alt={`${kit.name} logo`}
+                    className="max-h-full max-w-full object-contain"
+                    src={kit.logoUrl}
+                  />
                 </div>
-              </CardContent>
-            </Card>
+              )}
+
+              {/* Meta info */}
+              <div className="flex items-center justify-between text-muted-foreground text-xs">
+                <span style={{ fontFamily: kit.fontFamily }}>
+                  {kit.fontFamily.split(",")[0].replace(/['"]/g, "")}
+                </span>
+                <span>
+                  Updated{" "}
+                  {formatDistanceToNow(new Date(kit.updatedAt), {
+                    addSuffix: true,
+                  })}
+                </span>
+              </div>
+            </Panel>
           ))}
         </div>
       )}

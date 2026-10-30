@@ -1,13 +1,7 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { createOrganizationAction } from "@/actions/organizations";
@@ -212,23 +206,20 @@ function DeviceFlow() {
 
   if (state === "verifying") {
     return (
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">Authorize CLI</CardTitle>
-          <CardDescription>Verifying your code...</CardDescription>
-        </CardHeader>
-      </Card>
+      <Panel
+        description="Verifying your code..."
+        label={<PanelTitle>Authorize CLI</PanelTitle>}
+      />
     );
   }
 
   if (state === "success") {
     return (
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">You're all set!</CardTitle>
-          <CardDescription>Return to your terminal to continue</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
+      <Panel
+        description="Return to your terminal to continue"
+        label={<PanelTitle>You're all set!</PanelTitle>}
+      >
+        <div className="grid gap-4">
           <p className="text-muted-foreground text-center text-sm">
             Your CLI session has been authorized
             {createdOrgName ? ` for ${createdOrgName}` : ""}. You can close this
@@ -237,79 +228,69 @@ function DeviceFlow() {
           <Button onClick={() => router.push("/")} variant="outline">
             Open Dashboard
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   if (state === "create-org") {
     return (
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">Create Organization</CardTitle>
-          <CardDescription>
-            Set up your organization to get started
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="grid gap-4" onSubmit={handleCreateOrg}>
-            {error && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-3">
-                <p className="text-destructive text-sm">{error}</p>
-              </div>
-            )}
-            <div className="grid gap-2">
-              <Label htmlFor="org-name">Organization Name</Label>
+      <Panel
+        description="Set up your organization to get started"
+        label={<PanelTitle>Create Organization</PanelTitle>}
+      >
+        <form className="grid gap-4" onSubmit={handleCreateOrg}>
+          {error && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-3">
+              <p className="text-destructive text-sm">{error}</p>
+            </div>
+          )}
+          <div className="grid gap-2">
+            <Label htmlFor="org-name">Organization Name</Label>
+            <Input
+              autoFocus
+              id="org-name"
+              onChange={(e) => handleOrgNameChange(e.target.value)}
+              placeholder="Acme Inc."
+              required
+              type="text"
+              value={orgName}
+            />
+            <p className="text-muted-foreground text-xs">
+              The name of your organization or company
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="org-slug">URL Slug</Label>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground text-sm">wraps.dev/</span>
               <Input
-                autoFocus
-                id="org-name"
-                onChange={(e) => handleOrgNameChange(e.target.value)}
-                placeholder="Acme Inc."
-                required
+                id="org-slug"
+                onChange={(e) => {
+                  setOrgSlug(e.target.value);
+                  setAutoSlug(false);
+                }}
+                placeholder="acme-inc"
                 type="text"
-                value={orgName}
+                value={orgSlug}
               />
-              <p className="text-muted-foreground text-xs">
-                The name of your organization or company
-              </p>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="org-slug">URL Slug</Label>
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground text-sm">
-                  wraps.dev/
-                </span>
-                <Input
-                  id="org-slug"
-                  onChange={(e) => {
-                    setOrgSlug(e.target.value);
-                    setAutoSlug(false);
-                  }}
-                  placeholder="acme-inc"
-                  type="text"
-                  value={orgSlug}
-                />
-              </div>
-            </div>
-            <Button disabled={isSubmitting || !orgName} type="submit">
-              {isSubmitting ? "Creating..." : "Create Organization"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+          <Button disabled={isSubmitting || !orgName} type="submit">
+            {isSubmitting ? "Creating..." : "Create Organization"}
+          </Button>
+        </form>
+      </Panel>
     );
   }
 
   if (state === "approve") {
     return (
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">Authorize CLI</CardTitle>
-          <CardDescription>
-            A CLI session is requesting access to your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
+      <Panel
+        description="A CLI session is requesting access to your account"
+        label={<PanelTitle>Authorize CLI</PanelTitle>}
+      >
+        <div className="grid gap-4">
           {error && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-3">
               <p className="text-destructive text-sm">{error}</p>
@@ -339,44 +320,41 @@ function DeviceFlow() {
               Deny
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   // Default: enter-code state
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <CardTitle className="text-xl">Authorize CLI</CardTitle>
-        <CardDescription>Enter the code shown in your terminal</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="grid gap-4" onSubmit={handleSubmit}>
-          <div className="grid gap-2">
-            <Label htmlFor="user_code">Device Code</Label>
-            <Input
-              autoComplete="off"
-              autoFocus
-              className="text-center font-mono text-lg tracking-widest"
-              id="user_code"
-              maxLength={9}
-              onChange={(e) => handleCodeChange(e.target.value)}
-              placeholder="XXXX-XXXX"
-              type="text"
-              value={code}
-            />
-            {error && <p className="text-destructive text-sm">{error}</p>}
-          </div>
-          <Button
-            disabled={isSubmitting || getRawCode(code).length !== 8}
-            type="submit"
-          >
-            {isSubmitting ? "Verifying..." : "Continue"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <Panel
+      description="Enter the code shown in your terminal"
+      label={<PanelTitle>Authorize CLI</PanelTitle>}
+    >
+      <form className="grid gap-4" onSubmit={handleSubmit}>
+        <div className="grid gap-2">
+          <Label htmlFor="user_code">Device Code</Label>
+          <Input
+            autoComplete="off"
+            autoFocus
+            className="text-center font-mono text-lg tracking-widest"
+            id="user_code"
+            maxLength={9}
+            onChange={(e) => handleCodeChange(e.target.value)}
+            placeholder="XXXX-XXXX"
+            type="text"
+            value={code}
+          />
+          {error && <p className="text-destructive text-sm">{error}</p>}
+        </div>
+        <Button
+          disabled={isSubmitting || getRawCode(code).length !== 8}
+          type="submit"
+        >
+          {isSubmitting ? "Verifying..." : "Continue"}
+        </Button>
+      </form>
+    </Panel>
   );
 }
 

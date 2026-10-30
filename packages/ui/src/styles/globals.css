@@ -48,6 +48,7 @@
   --color-info-foreground: var(--info-foreground);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
+  --color-brand-text: var(--brand-text);
 }
 
 :root {
@@ -95,6 +96,7 @@
   --info-foreground: oklch(0.985 0 0);
   --brand: oklch(0.705 0.213 47.604);
   --brand-foreground: oklch(0.985 0 0);
+  --brand-text: oklch(0.435 0.119 47.604);
 }
 
 .dark {
@@ -138,6 +140,7 @@
   --info-foreground: oklch(0.985 0 0);
   --brand: oklch(0.75 0.183 55.934);
   --brand-foreground: oklch(0.985 0 0);
+  --brand-text: oklch(0.792 0.139 55.934);
 }
 
 @layer base {

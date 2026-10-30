@@ -1,12 +1,7 @@
 import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
 import { member, organization } from "@wraps/db/schema/auth";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import Image from "next/image";
@@ -74,41 +69,26 @@ export default async function HomePage() {
           </div>
 
           <div className="mx-auto mt-12 grid max-w-3xl gap-6 md:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Zero Credentials</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground text-sm">
-                  Infrastructure deploys to your AWS account. We never store
-                  your credentials.
-                </p>
-              </CardContent>
-            </Card>
+            <Panel label={<PanelTitle>Zero Credentials</PanelTitle>}>
+              <p className="text-muted-foreground text-sm">
+                Infrastructure deploys to your AWS account. We never store your
+                credentials.
+              </p>
+            </Panel>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">AWS Pricing</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground text-sm">
-                  Pay AWS directly at $0.10 per 1,000 emails on à la carte, or
-                  $0.16 on AWS&apos;s default Essentials plan. Transparent and
-                  cost-effective.
-                </p>
-              </CardContent>
-            </Card>
+            <Panel label={<PanelTitle>AWS Pricing</PanelTitle>}>
+              <p className="text-muted-foreground text-sm">
+                Pay AWS directly at $0.10 per 1,000 emails on à la carte, or
+                $0.16 on AWS&apos;s default Essentials plan. Transparent and
+                cost-effective.
+              </p>
+            </Panel>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Beautiful DX</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground text-sm">
-                  TypeScript SDK, real-time analytics, and intuitive dashboard.
-                </p>
-              </CardContent>
-            </Card>
+            <Panel label={<PanelTitle>Beautiful DX</PanelTitle>}>
+              <p className="text-muted-foreground text-sm">
+                TypeScript SDK, real-time analytics, and intuitive dashboard.
+              </p>
+            </Panel>
           </div>
         </div>
       </div>

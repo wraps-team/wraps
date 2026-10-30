@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@wraps/ui/components/ui/dialog";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Popover,
   PopoverContent,
@@ -534,67 +535,71 @@ export function EmailsTable({
     : `Showing 1-${rowCount}`;
 
   return (
-    <div className="w-full space-y-4">
-      {/*
-        The coverage caveat is real - mail this AWS account sent outside Wraps
-        genuinely is not here - but it is reference material, not something to
-        re-read on every visit, and as a paragraph it also stated the same 200
-        characters the chart above used to state. Same disclosure the Activity
-        card gives its reputation scope.
-      */}
-      <div className="flex items-center gap-1">
-        <h2 className="font-semibold text-base">Messages</h2>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              aria-label="What this list covers"
-              className="-my-2"
-              size="icon-sm"
-              variant="ghost"
-            >
-              <Info className="size-3.5" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-80">
-            <p className="text-sm">{EMAIL_COVERAGE_EXPLAINER}</p>
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      <EmailFeedBanners feed={feed} />
-      <HistoryWindowNotice orgSlug={orgSlug} window={window} />
-
-      {/* Filters Bar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 items-center gap-3">
-          <div className="relative max-w-sm flex-1">
-            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              aria-label="Search messages"
-              className="pl-9 pr-16"
-              onChange={(event) => handleSearchChange(event.target.value)}
-              placeholder={`Search ${rangeLabel(days)}`}
-              ref={searchInputRef}
-              value={searchInput}
-            />
-            <Kbd className="absolute top-1/2 right-2 -translate-y-1/2 hidden sm:flex">
-              /
-            </Kbd>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Bulk Actions - shown when emails are selected */}
-          {selectedEmailIds.length > 0 && (
-            <Button
-              onClick={() => setCreateContactsDialogOpen(true)}
-              variant="outline"
-            >
-              <UserPlus className="mr-2 h-4 w-4" />
-              Add to contacts ({uniqueRecipientEmails.length})
-            </Button>
-          )}
-
+    // A plain labelled panel: the list is Wraps' view of the customer's
+    // messages, read from the events Wraps ingests.
+    <Panel
+      className="w-full"
+      label={
+        <>
+          <PanelTitle>Messages</PanelTitle>
           {/*
+            The coverage caveat is real - mail this AWS account sent outside
+            Wraps is not here - but it is reference material, so it sits behind
+            the same disclosure the activity panel gives its reputation scope.
+          */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                aria-label="What this list covers"
+                className="-my-2"
+                size="icon-sm"
+                variant="ghost"
+              >
+                <Info className="size-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80">
+              <p className="text-sm">{EMAIL_COVERAGE_EXPLAINER}</p>
+            </PopoverContent>
+          </Popover>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <EmailFeedBanners feed={feed} />
+        <HistoryWindowNotice orgSlug={orgSlug} window={window} />
+
+        {/* Filters Bar */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-1 items-center gap-3">
+            <div className="relative max-w-sm flex-1">
+              <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                aria-label="Search messages"
+                className="pl-9 pr-16"
+                onChange={(event) => handleSearchChange(event.target.value)}
+                placeholder={`Search ${rangeLabel(days)}`}
+                ref={searchInputRef}
+                value={searchInput}
+              />
+              <Kbd className="absolute top-1/2 right-2 -translate-y-1/2 hidden sm:flex">
+                /
+              </Kbd>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Bulk Actions - shown when emails are selected */}
+            {selectedEmailIds.length > 0 && (
+              <Button
+                onClick={() => setCreateContactsDialogOpen(true)}
+                variant="outline"
+              >
+                <UserPlus className="mr-2 h-4 w-4" />
+                Add to contacts ({uniqueRecipientEmails.length})
+              </Button>
+            )}
+
+            {/*
             Button Group: Status | Sort | Export.
 
             No time range here. `?days` governs the chart and this list
@@ -603,262 +608,264 @@ export function EmailsTable({
             writing the same parameter. One page-level filter, one place to set
             it; the search placeholder still names the window it is searching.
           */}
-          <ButtonGroup className="w-full sm:w-auto">
-            <Select
-              onValueChange={(value) => {
-                captureEmailsFilterChanged({
-                  control: "status",
-                  from: status ?? "all",
-                  to: value,
-                });
-                pushFilters({ status: value === "all" ? null : value });
-              }}
-              value={status ?? "all"}
-            >
-              <SelectTrigger
-                aria-label="Status filter"
-                className="min-w-0 flex-1 sm:flex-initial sm:w-[140px]"
+            <ButtonGroup className="w-full sm:w-auto">
+              <Select
+                onValueChange={(value) => {
+                  captureEmailsFilterChanged({
+                    control: "status",
+                    from: status ?? "all",
+                    to: value,
+                  });
+                  pushFilters({ status: value === "all" ? null : value });
+                }}
+                value={status ?? "all"}
               >
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-                <SelectItem value="opened">Opened</SelectItem>
-                <SelectItem value="clicked">Clicked</SelectItem>
-                <SelectItem value="bounced">Bounced</SelectItem>
-                <SelectItem value="suppressed">Suppressed</SelectItem>
-                <SelectItem value="complained">Complained</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              onValueChange={(value) => {
-                captureEmailsFilterChanged({
-                  control: "sort",
-                  from: sort,
-                  to: value,
-                });
-                pushFilters({ sort: value as EmailListSort });
-              }}
-              value={sort}
-            >
-              <SelectTrigger
-                aria-label="Sort by sent date"
-                className="min-w-0 flex-1 sm:flex-initial sm:w-[140px]"
-              >
-                <SelectValue placeholder="Sort" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="desc">Newest first</SelectItem>
-                <SelectItem value="asc">Oldest first</SelectItem>
-              </SelectContent>
-            </Select>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  disabled={isExporting}
-                  onClick={handleExportClick}
-                  size="icon"
-                  variant="outline"
+                <SelectTrigger
+                  aria-label="Status filter"
+                  className="min-w-0 flex-1 sm:flex-initial sm:w-[140px]"
                 >
-                  {isExporting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
-                  <span className="sr-only">Export</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Export as CSV</TooltipContent>
-            </Tooltip>
-          </ButtonGroup>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="sent">Sent</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="opened">Opened</SelectItem>
+                  <SelectItem value="clicked">Clicked</SelectItem>
+                  <SelectItem value="bounced">Bounced</SelectItem>
+                  <SelectItem value="suppressed">Suppressed</SelectItem>
+                  <SelectItem value="complained">Complained</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                onValueChange={(value) => {
+                  captureEmailsFilterChanged({
+                    control: "sort",
+                    from: sort,
+                    to: value,
+                  });
+                  pushFilters({ sort: value as EmailListSort });
+                }}
+                value={sort}
+              >
+                <SelectTrigger
+                  aria-label="Sort by sent date"
+                  className="min-w-0 flex-1 sm:flex-initial sm:w-[140px]"
+                >
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desc">Newest first</SelectItem>
+                  <SelectItem value="asc">Oldest first</SelectItem>
+                </SelectContent>
+              </Select>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    disabled={isExporting}
+                    onClick={handleExportClick}
+                    size="icon"
+                    variant="outline"
+                  >
+                    {isExporting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    <span className="sr-only">Export</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Export as CSV</TooltipContent>
+              </Tooltip>
+            </ButtonGroup>
+          </div>
         </div>
-      </div>
 
-      {searchInput ? (
-        <p className="text-muted-foreground text-sm">
-          Matches recipient, subject, and sender within the selected range.
-          {searchTooShort ? (
-            <span className="text-foreground">
-              {" "}
-              Type at least {EMAIL_SEARCH_MIN_LENGTH} characters to search.
-            </span>
-          ) : null}
-        </p>
-      ) : null}
+        {searchInput ? (
+          <p className="text-muted-foreground text-sm">
+            Matches recipient, subject, and sender within the selected range.
+            {searchTooShort ? (
+              <span className="text-foreground">
+                {" "}
+                Type at least {EMAIL_SEARCH_MIN_LENGTH} characters to search.
+              </span>
+            ) : null}
+          </p>
+        ) : null}
 
-      {/* Table */}
-      <div
-        className={cn(
-          "rounded-md border transition-opacity",
-          isFetching && !(isLoading || isFetchingNextPage) && "opacity-60"
-        )}
-      >
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  /*
-                   * No `aria-sort` here on purpose. Order is server-driven on
-                   * `sent_at` and chosen through the labelled Sort control in
-                   * the toolbar, so no column header carries a sort state -
-                   * annotating one would announce a control that does not exist.
-                   */
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <EmailsTableSkeletonRows columnCount={tableColumns.length} />
-            ) : table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  className="cursor-pointer hover:bg-muted/50"
-                  data-state={row.getIsSelected() && "selected"}
-                  key={row.id}
-                  onClick={() => {
-                    captureEmailsRowOpened({
-                      position: row.index,
-                      status: row.original.status,
-                    });
-                    router.push(
-                      `/${orgSlug}/emails/${row.original.id}?${listQuery}`
-                    );
-                  }}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
+        {/* Table */}
+        <div
+          className={cn(
+            "-mx-4 transition-opacity",
+            isFetching && !(isLoading || isFetchingNextPage) && "opacity-60"
+          )}
+        >
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    /*
+                     * No `aria-sort` here on purpose. Order is server-driven on
+                     * `sent_at` and chosen through the labelled Sort control in
+                     * the toolbar, so no column header carries a sort state -
+                     * annotating one would announce a control that does not exist.
+                     */
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={tableColumns.length}>
-                  <EmailsListState
-                    days={days}
-                    isRetrying={isFetching}
-                    kind={listState === "ok" ? "empty-filtered" : listState}
-                    onClearFilters={() => {
-                      cancelSearchCommit();
-                      setSearchInput("");
-                      setCommittedSearch("");
-                      lastPushedSearch.current = "";
-                      pushFilters({ search: null, status: null });
-                    }}
-                    onRetry={handleRetry}
-                    onWidenRange={(nextDays) => {
-                      captureEmailsFilterChanged({
-                        control: "days",
-                        from: String(days),
-                        to: String(nextDays),
+              ))}
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <EmailsTableSkeletonRows columnCount={tableColumns.length} />
+              ) : table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    className="cursor-pointer hover:bg-muted/50"
+                    data-state={row.getIsSelected() && "selected"}
+                    key={row.id}
+                    onClick={() => {
+                      captureEmailsRowOpened({
+                        position: row.index,
+                        status: row.original.status,
                       });
-                      pushFilters({ days: nextDays });
+                      router.push(
+                        `/${orgSlug}/emails/${row.original.id}?${listQuery}`
+                      );
                     }}
-                    orgSlug={orgSlug}
-                    sandboxStatus={sandboxStatus}
-                    search={search}
-                    status={status}
-                  />
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Footer: a count of what is on screen, and the only way forward. */}
-      {rowCount > 0 ? (
-        <div className="flex items-center justify-between gap-4 py-4">
-          <div className="text-muted-foreground text-sm">{footerLabel}</div>
-          {hasNextPage ? (
-            <Button
-              disabled={isFetchingNextPage}
-              onClick={handleLoadMore}
-              size="touch"
-              variant="outline"
-            >
-              {isFetchingNextPage ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              {isFetchingNextPage ? "Loading..." : "Load more"}
-            </Button>
-          ) : null}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={tableColumns.length}>
+                    <EmailsListState
+                      days={days}
+                      isRetrying={isFetching}
+                      kind={listState === "ok" ? "empty-filtered" : listState}
+                      onClearFilters={() => {
+                        cancelSearchCommit();
+                        setSearchInput("");
+                        setCommittedSearch("");
+                        lastPushedSearch.current = "";
+                        pushFilters({ search: null, status: null });
+                      }}
+                      onRetry={handleRetry}
+                      onWidenRange={(nextDays) => {
+                        captureEmailsFilterChanged({
+                          control: "days",
+                          from: String(days),
+                          to: String(nextDays),
+                        });
+                        pushFilters({ days: nextDays });
+                      }}
+                      orgSlug={orgSlug}
+                      sandboxStatus={sandboxStatus}
+                      search={search}
+                      status={status}
+                    />
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
-      ) : null}
 
-      {/* CSV export confirmation - the cap is stated before the file exists */}
-      <Dialog onOpenChange={setExportDialogOpen} open={exportDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Export messages</DialogTitle>
-            <DialogDescription>
-              Export the {EMAIL_EXPORT_ROW_CAP.toLocaleString()} most recent
-              messages matching these filters? Your full history is larger;
-              narrow the time range to export a specific period.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              onClick={() => setExportDialogOpen(false)}
-              variant="outline"
-            >
-              Cancel
-            </Button>
-            <Button disabled={isExporting} onClick={runFullExport}>
-              <Download className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Contacts Confirmation Dialog */}
-      <Dialog
-        onOpenChange={setCreateContactsDialogOpen}
-        open={createContactsDialogOpen}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Contacts</DialogTitle>
-            <DialogDescription>
-              Create contacts from {uniqueRecipientEmails.length} unique email
-              address{uniqueRecipientEmails.length === 1 ? "" : "es"}?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2 text-muted-foreground text-sm">
-            Emails that already exist as contacts will be skipped automatically.
+        {/* Footer: a count of what is on screen, and the only way forward. */}
+        {rowCount > 0 ? (
+          <div className="flex items-center justify-between gap-4 py-4">
+            <div className="text-muted-foreground text-sm">{footerLabel}</div>
+            {hasNextPage ? (
+              <Button
+                disabled={isFetchingNextPage}
+                onClick={handleLoadMore}
+                size="touch"
+                variant="outline"
+              >
+                {isFetchingNextPage ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                {isFetchingNextPage ? "Loading..." : "Load more"}
+              </Button>
+            ) : null}
           </div>
-          <DialogFooter>
-            <Button
-              onClick={() => setCreateContactsDialogOpen(false)}
-              variant="outline"
-            >
-              Cancel
-            </Button>
-            <Button disabled={isPending} onClick={handleCreateContacts}>
-              <UserPlus className="mr-2 h-4 w-4" />
-              {isPending ? "Creating..." : "Create Contacts"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        ) : null}
+
+        {/* CSV export confirmation - the cap is stated before the file exists */}
+        <Dialog onOpenChange={setExportDialogOpen} open={exportDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Export messages</DialogTitle>
+              <DialogDescription>
+                Export the {EMAIL_EXPORT_ROW_CAP.toLocaleString()} most recent
+                messages matching these filters? Your full history is larger;
+                narrow the time range to export a specific period.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                onClick={() => setExportDialogOpen(false)}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button disabled={isExporting} onClick={runFullExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Contacts Confirmation Dialog */}
+        <Dialog
+          onOpenChange={setCreateContactsDialogOpen}
+          open={createContactsDialogOpen}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Contacts</DialogTitle>
+              <DialogDescription>
+                Create contacts from {uniqueRecipientEmails.length} unique email
+                address{uniqueRecipientEmails.length === 1 ? "" : "es"}?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-2 text-muted-foreground text-sm">
+              Emails that already exist as contacts will be skipped
+              automatically.
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={() => setCreateContactsDialogOpen(false)}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button disabled={isPending} onClick={handleCreateContacts}>
+                <UserPlus className="mr-2 h-4 w-4" />
+                {isPending ? "Creating..." : "Create Contacts"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </Panel>
   );
 }

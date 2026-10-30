@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import {
   ToggleGroup,
@@ -85,8 +85,11 @@ export function CausesPanel({ orgSlug }: { orgSlug: string }) {
         </p>
       </div>
 
-      <Card className="@container/card">
-        <CardContent className="space-y-5">
+      <Panel
+        className="@container/card"
+        label={<PanelTitle level={3}>Breakdown</PanelTitle>}
+      >
+        <div className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <ToggleGroup
               aria-label="Group by"
@@ -128,8 +131,8 @@ export function CausesPanel({ orgSlug }: { orgSlug: string }) {
           </div>
 
           {body}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     </section>
   );
 }

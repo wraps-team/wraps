@@ -9,16 +9,11 @@ import {
   AlertTitle,
 } from "@wraps/ui/components/ui/alert";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@wraps/ui/components/ui/input-group";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -189,14 +184,12 @@ export function ConnectAWSAccountForm({
   if (!(isClient && externalId)) {
     return (
       <div className="mx-auto max-w-2xl space-y-8">
-        <Card>
-          <CardContent>
-            <div className="animate-pulse">
-              <div className="mb-4 h-6 w-64 rounded bg-muted" />
-              <div className="h-20 rounded bg-muted/50" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="border p-4">
+          <div className="animate-pulse">
+            <div className="mb-4 h-6 w-64 bg-muted" />
+            <div className="h-20 bg-muted/50" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -204,13 +197,12 @@ export function ConnectAWSAccountForm({
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       {/* Step 1: Deploy CloudFormation */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">
-            Step 1: Deploy IAM Role to Your AWS Account
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Panel
+        label={
+          <PanelTitle>Step 1: Deploy IAM Role to Your AWS Account</PanelTitle>
+        }
+      >
+        <div className="space-y-4">
           {cloudFormationUrl === null ? (
             <SelfhostConnectInstructions />
           ) : (
@@ -263,23 +255,17 @@ export function ConnectAWSAccountForm({
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Step 2: Connect Account */}
-      <Card>
+      <Panel label={<PanelTitle>Step 2: Connect Your AWS Account</PanelTitle>}>
         <form
           action={action as never}
           className="space-y-6"
           onSubmit={() => form.handleSubmit()}
         >
-          <CardHeader>
-            <CardTitle className="text-lg">
-              Step 2: Connect Your AWS Account
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent className="space-y-6">
+          <div className="space-y-6">
             {/* Form-level errors */}
             {formErrors.length > 0 ? (
               <Alert variant="destructive">
@@ -501,9 +487,9 @@ export function ConnectAWSAccountForm({
             <form.Subscribe selector={(formState) => formState.canSubmit}>
               {(canSubmit) => <SubmitButton canSubmit={canSubmit} />}
             </form.Subscribe>
-          </CardContent>
+          </div>
         </form>
-      </Card>
+      </Panel>
     </div>
   );
 }

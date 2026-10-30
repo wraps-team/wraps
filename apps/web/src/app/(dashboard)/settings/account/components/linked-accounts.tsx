@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -171,31 +165,31 @@ export function LinkedAccounts() {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Linked Accounts</CardTitle>
-          <CardDescription>
+      <Panel
+        description={
+          <>
             Connect your account with third-party providers for easier sign-in.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </>
+        }
+        label={<PanelTitle>Linked Accounts</PanelTitle>}
+      >
+        <div>
           <div className="flex items-center justify-center py-8">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Linked Accounts</CardTitle>
-        <CardDescription>
-          Connect your account with third-party providers for easier sign-in.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Panel
+      description={
+        <>Connect your account with third-party providers for easier sign-in.</>
+      }
+      label={<PanelTitle>Linked Accounts</PanelTitle>}
+    >
+      <div className="space-y-4">
         {/* Google */}
         <div className="flex items-center justify-between rounded-lg border p-4">
           <div className="flex items-center gap-3">
@@ -293,7 +287,7 @@ export function LinkedAccounts() {
               : "Add a password or connect another provider before disconnecting your only login method."}
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

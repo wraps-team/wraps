@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Progress } from "@wraps/ui/components/ui/progress";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import Link from "next/link";
@@ -69,34 +64,26 @@ export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Performance Breakdown</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      <Panel label={<PanelTitle>Performance Breakdown</PanelTitle>}>
+        <div className="space-y-6">
           {[1, 2, 3, 4, 5].map((i) => (
             <div className="space-y-2" key={i}>
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-2 w-full" />
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   if (error || !data) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Performance Breakdown</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            Failed to load performance metrics
-          </p>
-        </CardContent>
-      </Card>
+      <Panel label={<PanelTitle>Performance Breakdown</PanelTitle>}>
+        <p className="text-muted-foreground text-sm">
+          Failed to load performance metrics
+        </p>
+      </Panel>
     );
   }
 
@@ -156,11 +143,8 @@ export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
   const reputationPartial = meta ? reputationPartialLabel(meta) : null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Performance Breakdown</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <Panel label={<PanelTitle>Performance Breakdown</PanelTitle>}>
+      <div className="space-y-6">
         {metrics.map((metric) => (
           <MetricRow key={metric.label} {...metric} />
         ))}
@@ -184,7 +168,7 @@ export function PerformanceMetrics({ orgSlug }: { orgSlug: string }) {
             ) : null}
           </div>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

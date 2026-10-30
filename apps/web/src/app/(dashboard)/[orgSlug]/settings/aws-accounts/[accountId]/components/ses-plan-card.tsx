@@ -11,13 +11,7 @@ import {
   type SesPricingPlan,
 } from "@wraps/core/ses-plans";
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Table,
   TableBody,
@@ -148,7 +142,7 @@ function SwitchToAlaCarteHint({
   };
 
   return (
-    <div className="space-y-2 rounded-md border bg-muted/50 p-3 text-sm">
+    <div className="space-y-2 border bg-muted/50 p-3 text-sm">
       <p>
         À la carte is {formatMoney(annualSavings)} a year cheaper at this
         volume, counting sending cost only. Plans bundle features too, so check
@@ -163,9 +157,7 @@ function SwitchToAlaCarteHint({
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <code className="rounded bg-muted px-2 py-1 font-mono text-xs">
-          {command}
-        </code>
+        <code className="bg-muted px-2 py-1 font-mono text-xs">{command}</code>
         <Button onClick={copyCommand} size="sm" type="button" variant="outline">
           {copied ? (
             <CheckCircle2 className="h-4 w-4" />
@@ -233,17 +225,14 @@ export function SesPlanCard({ account }: SesPlanCardProps) {
   // Case 1: not checked yet.
   if (!account.healthDetail || sesPricingPlan === undefined) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>AWS SES pricing plan</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            Not checked yet. Wraps reads the plan during its hourly health
-            check.
-          </p>
-        </CardContent>
-      </Card>
+      <Panel
+        label={<PanelTitle>AWS SES pricing plan</PanelTitle>}
+        variant="own"
+      >
+        <p className="text-muted-foreground text-sm">
+          Not checked yet. Wraps reads the plan during its hourly health check.
+        </p>
+      </Panel>
     );
   }
 
@@ -252,11 +241,11 @@ export function SesPlanCard({ account }: SesPlanCardProps) {
   // Case 2: no plan reported, or a value Wraps doesn't recognise.
   if (current === null || !isSesPricingPlan(current)) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>AWS SES pricing plan</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <Panel
+        label={<PanelTitle>AWS SES pricing plan</PanelTitle>}
+        variant="own"
+      >
+        <div className="space-y-2">
           <p className="text-muted-foreground text-sm">
             AWS reported no SES pricing plan for {account.region}.
           </p>
@@ -266,8 +255,8 @@ export function SesPlanCard({ account }: SesPlanCardProps) {
               recognise yet.
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
@@ -289,14 +278,12 @@ export function SesPlanCard({ account }: SesPlanCardProps) {
   const dedicatedIpCount = account.features?.email?.dedicatedIpCount;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>AWS SES pricing plan</CardTitle>
-        <CardDescription>
-          {account.region}. AWS sets the plan per account, per Region.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Panel
+      description={`${account.region}. AWS sets the plan per account, per Region.`}
+      label={<PanelTitle>AWS SES pricing plan</PanelTitle>}
+      variant="own"
+    >
+      <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline">{currentLabel}</Badge>
           {nextPlan && nextPlan !== current && (
@@ -307,14 +294,16 @@ export function SesPlanCard({ account }: SesPlanCardProps) {
           )}
         </div>
 
-        {comparison ? (
-          <PlanCostTable
-            comparison={comparison}
-            sentLast24Hours={sent as number}
-          />
-        ) : (
-          <PlanRateTable current={current} />
-        )}
+        <div className="-mx-4">
+          {comparison ? (
+            <PlanCostTable
+              comparison={comparison}
+              sentLast24Hours={sent as number}
+            />
+          ) : (
+            <PlanRateTable current={current} />
+          )}
+        </div>
 
         {showSwitchHint && comparison && (
           <SwitchToAlaCarteHint
@@ -328,7 +317,7 @@ export function SesPlanCard({ account }: SesPlanCardProps) {
           current={current}
           dedicatedIpCount={dedicatedIpCount}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Info } from "lucide-react";
 import { hasDeliveryEvents } from "@/lib/batch";
 import { CompactProgress } from "./compact-progress";
@@ -55,8 +55,8 @@ export function BatchStats({
   );
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-4 py-4">
+    <Panel label={<PanelTitle>Progress</PanelTitle>}>
+      <div className="flex flex-col gap-4">
         <CompactProgress
           completedAt={batch.completedAt}
           lastChunkAt={batch.lastChunkAt}
@@ -148,7 +148,7 @@ export function BatchStats({
             softBounced={batch.softBounced}
           />
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

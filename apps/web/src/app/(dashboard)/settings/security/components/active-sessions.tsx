@@ -10,13 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@wraps/ui/components/ui/alert-dialog";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Laptop, Loader2, LogOut, Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -118,27 +112,24 @@ export function ActiveSessions() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Active Sessions</CardTitle>
-              <CardDescription>
-                Manage devices and sessions where you're currently signed in.
-              </CardDescription>
-            </div>
-            {otherSessions.length > 0 && (
-              <Button
-                className="cursor-pointer"
-                onClick={() => setIsRevokingAll(true)}
-                variant="destructive"
-              >
-                Revoke All Other Sessions
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Panel
+        actions={
+          otherSessions.length > 0 && (
+            <Button
+              className="cursor-pointer"
+              onClick={() => setIsRevokingAll(true)}
+              variant="destructive"
+            >
+              Revoke All Other Sessions
+            </Button>
+          )
+        }
+        description={
+          <>Manage devices and sessions where you're currently signed in.</>
+        }
+        label={<PanelTitle>Active Sessions</PanelTitle>}
+      >
+        <div className="space-y-3">
           {isLoading ? (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -206,8 +197,8 @@ export function ActiveSessions() {
                 );
               })
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Revoke All Sessions Confirmation */}
       <AlertDialog onOpenChange={setIsRevokingAll} open={isRevokingAll}>

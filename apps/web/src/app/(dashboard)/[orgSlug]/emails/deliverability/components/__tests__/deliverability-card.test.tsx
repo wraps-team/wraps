@@ -507,7 +507,7 @@ describe("DeliverabilityBody", () => {
         <DeliverabilityBody orgSlug="acme" />
       </NuqsTestingAdapter>
     );
-    const note = screen.getByText("Breakdown").closest("div");
+    const note = screen.getByText("Breakdown").closest("section");
     expect(note).not.toBeNull();
     expect(
       within(note as HTMLElement).getByText(
@@ -523,7 +523,9 @@ describe("DeliverabilityBody", () => {
         <DeliverabilityBody orgSlug="acme" />
       </NuqsTestingAdapter>
     );
-    expect(screen.queryByText("Breakdown")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Breakdowns need enough sends/)
+    ).not.toBeInTheDocument();
   });
 
   it("shows no side card for suppression", () => {

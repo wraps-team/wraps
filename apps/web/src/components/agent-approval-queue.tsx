@@ -1,13 +1,7 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Table,
   TableBody,
@@ -153,83 +147,77 @@ export function AgentApprovalQueue({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Approval queue</CardTitle>
-        <CardDescription>
-          Sends flagged by an agent's policy. Approve to release, reject to
-          deny.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {approvals.length === 0 ? (
-          <div className="py-8 text-center">
-            <CheckCircle2 className="mx-auto h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 font-semibold text-lg text-foreground">
-              Nothing to review
-            </h3>
-            <p className="mt-1 text-muted-foreground text-sm">
-              Flagged agent sends will show up here for approval.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Send</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {approvals.map((approval) => (
-                  <TableRow key={approval.id}>
-                    <TableCell className="max-w-xs">
-                      <div className="flex items-start gap-2">
-                        <Inbox className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-foreground">
-                            {approval.payload.subject || "(no subject)"}
-                          </p>
+    <Panel
+      description="Sends flagged by an agent's policy. Approve to release, reject to deny."
+      label={<PanelTitle>Approval queue</PanelTitle>}
+    >
+      {approvals.length === 0 ? (
+        <div className="py-8 text-center">
+          <CheckCircle2 className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-4 font-semibold text-lg text-foreground">
+            Nothing to review
+          </h3>
+          <p className="mt-1 text-muted-foreground text-sm">
+            Flagged agent sends will show up here for approval.
+          </p>
+        </div>
+      ) : (
+        <div className="-mx-4 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Send</TableHead>
+                <TableHead>Reason</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {approvals.map((approval) => (
+                <TableRow key={approval.id}>
+                  <TableCell className="max-w-xs">
+                    <div className="flex items-start gap-2">
+                      <Inbox className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-foreground">
+                          {approval.payload.subject || "(no subject)"}
+                        </p>
+                        <p className="truncate text-muted-foreground text-sm">
+                          {approval.payload.from} → {approval.payload.to}
+                        </p>
+                        {approval.payload.replyTo && (
                           <p className="truncate text-muted-foreground text-sm">
-                            {approval.payload.from} → {approval.payload.to}
+                            Reply-To: {approval.payload.replyTo}
                           </p>
-                          {approval.payload.replyTo && (
-                            <p className="truncate text-muted-foreground text-sm">
-                              Reply-To: {approval.payload.replyTo}
+                        )}
+                        {approval.status === "FAILED" &&
+                          approval.errorMessage && (
+                            <p className="truncate text-destructive text-sm">
+                              {approval.errorMessage}
                             </p>
                           )}
-                          {approval.status === "FAILED" &&
-                            approval.errorMessage && (
-                              <p className="truncate text-destructive text-sm">
-                                {approval.errorMessage}
-                              </p>
-                            )}
-                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell className="max-w-xs text-muted-foreground text-sm">
-                      {approval.reason || "—"}
-                    </TableCell>
-                    <TableCell>{statusBadge(approval.status)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        onClick={() => setSelected(approval)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Review
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
+                    </div>
+                  </TableCell>
+                  <TableCell className="max-w-xs text-muted-foreground text-sm">
+                    {approval.reason || "—"}
+                  </TableCell>
+                  <TableCell>{statusBadge(approval.status)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      onClick={() => setSelected(approval)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Review
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
       <AgentApprovalDetailSheet
         approval={selected}
         canManage={canManage}
@@ -240,6 +228,6 @@ export function AgentApprovalQueue({
         open={selected !== null}
         pending={pendingId === selected?.id}
       />
-    </Card>
+    </Panel>
   );
 }

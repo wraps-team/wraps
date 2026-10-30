@@ -2,15 +2,8 @@
 
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   BotIcon,
   CalendarIcon,
@@ -166,11 +159,11 @@ export function CliDeployConnectStep({
     null
   );
   // Both deduped per mount: a user copying three CLI commands started one
-  // deployment, and a user toggling between two cards chose each one once.
+  // deployment, and a user toggling between two options chose each one once.
   const selectedMethods = useRef<Set<DeployMethod>>(new Set());
   const startedMethods = useRef<Set<DeployMethod>>(new Set());
 
-  // The chosen path's panel renders after the whole card grid, so on a phone it
+  // The chosen path's panel renders after the whole option grid, so on a phone it
   // opens a screen or two below the button that was tapped. Focusing it scrolls
   // it into view and announces it; the button's pressed state alone does not.
   const panelIdBase = useId();
@@ -485,23 +478,16 @@ export function CliDeployConnectStep({
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="mb-2 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-            <CloudIcon className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <CardTitle>Deploy & Connect</CardTitle>
-            <CardDescription>
-              Deploy infrastructure to your AWS account and connect it to the
-              platform
-            </CardDescription>
-          </div>
+    <Panel
+      description="Deploy infrastructure to your AWS account and connect it to the platform"
+      label={<PanelTitle>Deploy & Connect</PanelTitle>}
+      variant="own"
+    >
+      <div className="space-y-6">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+          <CloudIcon className="h-5 w-5 text-primary" />
         </div>
-      </CardHeader>
 
-      <CardContent className="space-y-6">
         {cfnDeployed ? null : (
           <div
             className={
@@ -510,7 +496,7 @@ export function CliDeployConnectStep({
                 : "grid gap-4 md:grid-cols-3"
             }
           >
-            <Card className="flex flex-col items-center space-y-3 p-6 text-center">
+            <div className="flex flex-col items-center space-y-3 border p-6 text-center">
               <TerminalIcon className="h-10 w-10 text-primary" />
               <h3 className="flex items-center gap-2 font-semibold text-lg">
                 CLI
@@ -533,9 +519,9 @@ export function CliDeployConnectStep({
               >
                 Use the CLI
               </Button>
-            </Card>
+            </div>
 
-            <Card className="flex flex-col items-center space-y-3 p-6 text-center">
+            <div className="flex flex-col items-center space-y-3 border p-6 text-center">
               <BotIcon className="h-10 w-10 text-primary" />
               <h3 className="font-semibold text-lg">AI agent</h3>
               <p className="text-muted-foreground text-sm">
@@ -554,10 +540,10 @@ export function CliDeployConnectStep({
               >
                 Copy the agent prompt
               </Button>
-            </Card>
+            </div>
 
             {selfHosted ? null : (
-              <Card className="flex flex-col items-center space-y-3 p-6 text-center">
+              <div className="flex flex-col items-center space-y-3 border p-6 text-center">
                 <CloudIcon className="h-10 w-10 text-primary" />
                 <h3 className="font-semibold text-lg">Browser</h3>
                 <p className="text-muted-foreground text-sm">
@@ -579,7 +565,7 @@ export function CliDeployConnectStep({
                 >
                   Use the browser
                 </Button>
-              </Card>
+              </div>
             )}
           </div>
         )}
@@ -997,9 +983,9 @@ export function CliDeployConnectStep({
             </div>
           </div>
         </div>
-      </CardContent>
+      </div>
 
-      <CardFooter className="flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between border-t pt-4">
         <div className="flex gap-2">
           <Button onClick={handleBack} variant="outline">
             Back
@@ -1008,7 +994,7 @@ export function CliDeployConnectStep({
             Skip
           </Button>
         </div>
-      </CardFooter>
-    </Card>
+      </div>
+    </Panel>
   );
 }

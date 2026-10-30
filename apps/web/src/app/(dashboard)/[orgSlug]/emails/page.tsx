@@ -162,8 +162,19 @@ function HubTabContent({
   if (tab === "engagement") {
     return (
       <div className="@container/main space-y-6 px-4 lg:px-6">
-        <EngagementChart orgSlug={orgSlug} />
-        <PerformanceMetrics orgSlug={orgSlug} />
+        {/*
+          Chart and breakdown side by side, the same 3:2 split as the Activity
+          tab. Each sits in a one-cell grid so both panels stretch to the row's
+          height.
+        */}
+        <div className="grid gap-6 lg:grid-cols-5">
+          <div className="grid min-w-0 lg:col-span-3">
+            <EngagementChart orgSlug={orgSlug} />
+          </div>
+          <div className="grid min-w-0 lg:col-span-2">
+            <PerformanceMetrics orgSlug={orgSlug} />
+          </div>
+        </div>
         <RecentActivity orgSlug={orgSlug} />
       </div>
     );

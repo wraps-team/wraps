@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel } from "@wraps/ui/components/ui/panel";
 import type { ToolUIPart } from "ai";
 import { AlertCircle, Check, Loader2, Minus } from "lucide-react";
 import { z } from "zod";
@@ -94,12 +89,12 @@ export function SetupStatusCard({ part }: { part: ToolUIPart }) {
   }
   const status = parsed.data;
 
+  // Connection and domain state come from the customer's AWS account, so the
+  // panel is "own". The chat is embedded in the page, so its label is a span
+  // rather than a heading, which would put a heading into the page outline.
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Setup status</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2">
+    <Panel label={<SectionLabel>Setup status</SectionLabel>} variant="own">
+      <div className="flex flex-col gap-2">
         <BoolRow label="AWS account connected" value={status.hasAwsAccount} />
         <BoolRow
           label="Platform connection"
@@ -125,8 +120,8 @@ export function SetupStatusCard({ part }: { part: ToolUIPart }) {
             SES sandbox — sends only reach verified recipients.
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
@@ -152,32 +147,30 @@ export function EmailMetricsCard({ part }: { part: ToolUIPart }) {
   const bounceRate = formatRate(totals.bounced, totals.sent);
   const complaintRate = formatRate(totals.complaints, totals.sent);
 
+  // Computed by Wraps from the account's events: default panel.
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Email metrics — last {days} days</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div>
-            <p className="text-muted-foreground text-xs">Sent</p>
-            <p className="font-medium text-sm">{totals.sent}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Delivered</p>
-            <p className="font-medium text-sm">{totals.delivered}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Bounce rate</p>
-            <p className="font-medium text-sm">{bounceRate}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Complaint rate</p>
-            <p className="font-medium text-sm">{complaintRate}</p>
-          </div>
+    <Panel
+      label={<SectionLabel>Email metrics — last {days} days</SectionLabel>}
+    >
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div>
+          <p className="text-muted-foreground text-xs">Sent</p>
+          <p className="font-medium text-sm">{totals.sent}</p>
         </div>
-      </CardContent>
-    </Card>
+        <div>
+          <p className="text-muted-foreground text-xs">Delivered</p>
+          <p className="font-medium text-sm">{totals.delivered}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Bounce rate</p>
+          <p className="font-medium text-sm">{bounceRate}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Complaint rate</p>
+          <p className="font-medium text-sm">{complaintRate}</p>
+        </div>
+      </div>
+    </Panel>
   );
 }
 
@@ -194,27 +187,31 @@ export function RecentSendsList({ part }: { part: ToolUIPart }) {
   }
   const rows = parsed.data.slice(0, 10);
 
+  // Message history is a plain panel, like the Emails Messages table: the
+  // dashed "own" border is for live account state, not history.
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recent sends</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ul className="flex flex-col gap-2">
-          {rows.map((row, index) => (
-            <li className="text-sm" key={`${row.timestampFormatted}-${index}`}>
-              <span className="font-medium">
-                {row.subject || "(no subject)"}
-              </span>{" "}
-              <span className="text-muted-foreground">
-                {row.eventType} ·{" "}
-                {new Date(row.timestampFormatted).toLocaleString()}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
+    <Panel label={<SectionLabel>Recent sends</SectionLabel>}>
+      <ul className="flex flex-col gap-2">
+        {rows.map((row, index) => (
+          <li className="text-sm" key={`${row.timestampFormatted}-${index}`}>
+            <span className="font-medium">{row.subject || "(no subject)"}</span>{" "}
+            <span className="text-muted-foreground">
+              {row.eventType} ·{" "}
+              {new Date(row.timestampFormatted).toLocaleString()}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
+/** The panel label for a chat embed: monospace caps, but a span, not a heading. */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="font-mono text-2xs leading-5 tracking-eyebrow">
+      {children}
+    </span>
   );
 }
 

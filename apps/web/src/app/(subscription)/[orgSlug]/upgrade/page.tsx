@@ -1,14 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Sparkles, Zap } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import posthog from "posthog-js";
@@ -147,11 +140,14 @@ export default function UpgradePage() {
   if (!organization) {
     return (
       <div className="flex min-h-[80vh] items-center justify-center px-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="text-center">
-            <p className="text-muted-foreground">Organization not found</p>
-          </CardContent>
-        </Card>
+        <Panel
+          className="w-full max-w-md"
+          label={<PanelTitle>Organization</PanelTitle>}
+        >
+          <p className="text-center text-muted-foreground">
+            Organization not found
+          </p>
+        </Panel>
       </div>
     );
   }
@@ -178,10 +174,20 @@ export default function UpgradePage() {
           selectedPlan={selectedPlan}
         />
 
-        {/* Summary Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">
+        {/* Summary panel */}
+        <Panel
+          description={
+            <>
+              {plan.description}
+              {hasEarlyAdopterPricing(plan) && (
+                <span className="ml-2 text-success">
+                  Early adopter pricing - locked forever
+                </span>
+              )}
+            </>
+          }
+          label={
+            <PanelTitle>
               {plan.name} Plan - ${getDisplayPrice(plan)}
               {hasEarlyAdopterPricing(plan) && (
                 <span className="ml-1 text-muted-foreground line-through">
@@ -189,31 +195,22 @@ export default function UpgradePage() {
                 </span>
               )}
               {plan.period}
-            </CardTitle>
-            <CardDescription>
-              {plan.description}
-              {hasEarlyAdopterPricing(plan) && (
-                <span className="ml-2 text-success">
-                  Early adopter pricing - locked forever
-                </span>
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* AWS Costs Note */}
-            <div className="flex items-start gap-3 rounded-lg bg-muted/50 p-4">
-              <Zap className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-              <div>
-                <p className="font-medium text-sm">AWS costs are separate</p>
-                <p className="text-muted-foreground text-sm">
-                  You pay AWS directly for email sending ($0.10 per 1,000 emails
-                  on à la carte, or $0.16 on AWS&apos;s default Essentials plan)
-                  and infrastructure (~$2-5/mo for most apps).
-                </p>
-              </div>
+            </PanelTitle>
+          }
+        >
+          {/* AWS Costs Note */}
+          <div className="flex items-start gap-3 rounded-lg bg-muted/50 p-4">
+            <Zap className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <div>
+              <p className="font-medium text-sm">AWS costs are separate</p>
+              <p className="text-muted-foreground text-sm">
+                You pay AWS directly for email sending ($0.10 per 1,000 emails
+                on à la carte, or $0.16 on AWS&apos;s default Essentials plan)
+                and infrastructure (~$2-5/mo for most apps).
+              </p>
             </div>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-4 sm:flex-row sm:justify-between">
+          </div>
+          <div className="mt-4 flex flex-col gap-4 border-t pt-4 sm:flex-row sm:justify-between">
             <Button
               disabled={isFreeLoading || isLoading}
               onClick={handleContinueWithFree}
@@ -229,8 +226,8 @@ export default function UpgradePage() {
             >
               {isLoading ? "Starting checkout..." : `Subscribe to ${plan.name}`}
             </Button>
-          </CardFooter>
-        </Card>
+          </div>
+        </Panel>
 
         <p className="text-center text-muted-foreground text-xs">
           Cancel anytime. No long-term contracts.

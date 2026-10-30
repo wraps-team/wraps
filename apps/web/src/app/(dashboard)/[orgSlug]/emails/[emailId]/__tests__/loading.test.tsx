@@ -21,14 +21,14 @@ afterEach(() => {
 });
 
 describe("EmailDetailLoading", () => {
-  it("renders the detail page's two cards: the envelope hero and the timeline", () => {
+  it("renders the detail page's two panels: the envelope hero and the timeline", () => {
     const { container } = render(<EmailDetailLoading />);
 
-    expect(container.querySelectorAll('[data-slot="card"]')).toHaveLength(2);
-    // The timeline card leads with a header (title + description); the hero
-    // card does not. One header total is what page.tsx renders.
+    expect(container.querySelectorAll('[data-slot="panel"]')).toHaveLength(2);
+    // The timeline panel leads with a description; the hero panel does not.
+    // One panel header total is what page.tsx renders.
     expect(
-      container.querySelectorAll('[data-slot="card-header"]')
+      container.querySelectorAll('[data-slot="panel-header"]')
     ).toHaveLength(1);
   });
 

@@ -229,7 +229,7 @@ export function Meter({
     <div
       {...rest}
       className={cn(
-        "relative h-1.5 w-full overflow-hidden rounded-full bg-muted",
+        "relative h-1.5 w-full overflow-hidden bg-muted",
         rest.className
       )}
     >

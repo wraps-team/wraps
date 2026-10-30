@@ -1,12 +1,7 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   CheckCircle2Icon,
   GlobeIcon,
@@ -27,12 +22,11 @@ export function InfrastructureStatusCard({
   const { hasAwsAccount, hasPlatformConnection, awsRegion, verifiedDomains } =
     setupStatus;
 
+  // Read from the customer's AWS account and their deployed stack, so this is
+  // the dashed "own" panel.
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Infrastructure</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Panel label={<PanelTitle>Infrastructure</PanelTitle>} variant="own">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ServerIcon className="h-4 w-4 text-muted-foreground" />
@@ -88,7 +82,7 @@ export function InfrastructureStatusCard({
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

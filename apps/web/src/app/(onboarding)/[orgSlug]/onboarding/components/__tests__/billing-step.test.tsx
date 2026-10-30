@@ -93,22 +93,24 @@ vi.mock("@/components/plan-selector", () => ({
   ),
 }));
 
-vi.mock("@wraps/ui/components/ui/card", () => ({
-  Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardContent: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
+vi.mock("@wraps/ui/components/ui/panel", () => ({
+  Panel: ({
+    label,
+    description,
+    children,
+  }: {
+    label: React.ReactNode;
+    description?: React.ReactNode;
+    children: React.ReactNode;
+  }) => (
+    <section>
+      <div>{label}</div>
+      {description ? <p>{description}</p> : null}
+      {children}
+    </section>
   ),
-  CardDescription: ({ children }: { children: React.ReactNode }) => (
-    <p>{children}</p>
-  ),
-  CardFooter: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  CardHeader: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  CardTitle: ({ children }: { children: React.ReactNode }) => (
-    <h1>{children}</h1>
+  PanelTitle: ({ children }: { children: React.ReactNode }) => (
+    <h2>{children}</h2>
   ),
 }));
 

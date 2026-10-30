@@ -1,11 +1,5 @@
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { isSelfHosted } from "@/lib/plan-limits";
 import { IAMConfiguration } from "../components/iam-configuration";
 import { WebhookConfiguration } from "../components/webhook-configuration";
@@ -54,16 +48,19 @@ export default async function ConnectionPage({
   return (
     <div className="space-y-6">
       <div className="space-y-4" id="iam-role">
-        <Card>
-          <CardHeader>
-            <CardTitle>Role access</CardTitle>
-            <CardDescription>
+        {/* The role lives in the customer's AWS account: its status is read from there. */}
+        <Panel
+          description={
+            <>
               How Wraps reaches this AWS account, through the{" "}
               <code className="font-mono">wraps-console-access-role</code> IAM
               role.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
+            </>
+          }
+          label={<PanelTitle>Role access</PanelTitle>}
+          variant="own"
+        >
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={LEVEL_BADGE_VARIANT[roleStatus.level]}>
                 {roleStatus.label}
@@ -74,11 +71,11 @@ export default async function ConnectionPage({
                 </span>
               )}
             </div>
-            <code className="block break-all rounded-md border bg-muted px-3 py-2 font-mono text-sm">
+            <code className="block break-all border bg-muted px-3 py-2 font-mono text-sm">
               {account.roleArn}
             </code>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
         {permissions.canManage && (
           <IAMConfiguration

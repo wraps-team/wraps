@@ -2,13 +2,7 @@
 
 import { useForm } from "@tanstack/react-form";
 import { Alert, AlertDescription } from "@wraps/ui/components/ui/alert";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -137,128 +131,125 @@ export function AddDomainForm({ organizationId }: AddDomainFormProps) {
   }, [accounts, form]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Add a sending domain</CardTitle>
-        <CardDescription>
+    <Panel
+      description={
+        <>
           Creates the identity in SES with SES-managed Easy DKIM — no MAIL FROM
           subdomain is configured here. Run{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">
             wraps email domains add
           </code>{" "}
           from the CLI if you need one.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form
-          className="space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            form.handleSubmit();
+        </>
+      }
+      label={<PanelTitle>Add a sending domain</PanelTitle>}
+    >
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+      >
+        {accounts.length > 1 && (
+          <form.Field name="awsAccountId">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor={field.name}>AWS account</FieldLabel>
+                <Select
+                  name={field.name}
+                  onValueChange={(value) => field.handleChange(value)}
+                  value={field.state.value}
+                >
+                  <SelectTrigger id={field.name} onBlur={field.handleBlur}>
+                    <SelectValue placeholder="Select an AWS account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+          </form.Field>
+        )}
+
+        <form.Field
+          name="domain"
+          validators={{
+            onChange: ({ value }) => invalidDomainReason(value),
           }}
         >
-          {accounts.length > 1 && (
-            <form.Field name="awsAccountId">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor={field.name}>AWS account</FieldLabel>
-                  <Select
-                    name={field.name}
-                    onValueChange={(value) => field.handleChange(value)}
-                    value={field.state.value}
-                  >
-                    <SelectTrigger id={field.name} onBlur={field.handleBlur}>
-                      <SelectValue placeholder="Select an AWS account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
-            </form.Field>
-          )}
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid;
+            const errors = field.state.meta.errors.map((error) => ({
+              message: String(error),
+            }));
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel htmlFor={field.name}>Domain</FieldLabel>
+                <Input
+                  aria-invalid={isInvalid}
+                  id={field.name}
+                  name={field.name}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  placeholder="example.com"
+                  type="text"
+                  value={field.state.value}
+                />
+                {isInvalid && <FieldError errors={errors} />}
+              </Field>
+            );
+          }}
+        </form.Field>
 
-          <form.Field
-            name="domain"
-            validators={{
-              onChange: ({ value }) => invalidDomainReason(value),
-            }}
+        {resultMessage && (
+          <Alert
+            variant={resultMessage.kind === "error" ? "destructive" : "default"}
           >
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid;
-              const errors = field.state.meta.errors.map((error) => ({
-                message: String(error),
-              }));
-              return (
-                <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>Domain</FieldLabel>
-                  <Input
-                    aria-invalid={isInvalid}
-                    id={field.name}
-                    name={field.name}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    placeholder="example.com"
-                    type="text"
-                    value={field.state.value}
-                  />
-                  {isInvalid && <FieldError errors={errors} />}
-                </Field>
-              );
-            }}
-          </form.Field>
-
-          {resultMessage && (
-            <Alert
-              variant={
-                resultMessage.kind === "error" ? "destructive" : "default"
-              }
-            >
-              {resultMessage.kind === "error" ? (
-                <AlertCircleIcon className="size-4" />
-              ) : (
-                <CheckCircle2Icon className="size-4" />
-              )}
-              <AlertDescription>{resultMessage.text}</AlertDescription>
-            </Alert>
-          )}
-
-          <form.Subscribe
-            selector={(state) => [state.isSubmitting, state.canSubmit] as const}
-          >
-            {([isSubmitting, canSubmit]) => (
-              <Button
-                disabled={
-                  isSubmitting ||
-                  !canSubmit ||
-                  accountsLoading ||
-                  accounts.length === 0
-                }
-                type="submit"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2Icon className="mr-2 size-4 animate-spin" />
-                    Adding...
-                  </>
-                ) : (
-                  <>
-                    <PlusIcon className="mr-2 size-4" />
-                    Add domain
-                  </>
-                )}
-              </Button>
+            {resultMessage.kind === "error" ? (
+              <AlertCircleIcon className="size-4" />
+            ) : (
+              <CheckCircle2Icon className="size-4" />
             )}
-          </form.Subscribe>
-        </form>
-      </CardContent>
-    </Card>
+            <AlertDescription>{resultMessage.text}</AlertDescription>
+          </Alert>
+        )}
+
+        <form.Subscribe
+          selector={(state) => [state.isSubmitting, state.canSubmit] as const}
+        >
+          {([isSubmitting, canSubmit]) => (
+            <Button
+              disabled={
+                isSubmitting ||
+                !canSubmit ||
+                accountsLoading ||
+                accounts.length === 0
+              }
+              type="submit"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2Icon className="mr-2 size-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <PlusIcon className="mr-2 size-4" />
+                  Add domain
+                </>
+              )}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+    </Panel>
   );
 }

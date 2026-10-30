@@ -144,7 +144,7 @@ describe("EmailAnalytics", () => {
     ).toBeInTheDocument();
   });
 
-  it("puts the card in the heading outline", () => {
+  it("puts both panels in the heading outline", () => {
     queryResult.data = payload([
       { date: "2026-08-17", sent: 5, delivered: 5, opens: 1, clicks: 0 },
     ]);
@@ -152,7 +152,10 @@ describe("EmailAnalytics", () => {
     render(<EmailAnalytics orgSlug="acme" />);
 
     expect(
-      screen.getByRole("heading", { level: 2, name: "Email Activity" })
+      screen.getByRole("heading", { level: 2, name: /^Email activity · / })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Your SES account" })
     ).toBeInTheDocument();
   });
 

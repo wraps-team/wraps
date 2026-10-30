@@ -4,7 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { EmailType, Template } from "@wraps/db";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { ButtonGroup } from "@wraps/ui/components/ui/button-group";
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
 import { Checkbox } from "@wraps/ui/components/ui/checkbox";
 import {
   Dialog,
@@ -23,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@wraps/ui/components/ui/dropdown-menu";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -518,10 +518,9 @@ export function TemplatesList({ organizationId, orgSlug }: TemplatesListProps) {
 
   if (!templates || templates.length === 0) {
     return (
-      <Card className="py-12">
-        <CardContent className="text-center">
+      <Panel label={<PanelTitle>No templates yet</PanelTitle>}>
+        <div className="py-8 text-center">
           <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-          <h3 className="mb-2 font-semibold text-lg">No templates yet</h3>
           <p className="mb-4 text-muted-foreground">
             Create your first email template to get started.
           </p>
@@ -531,8 +530,8 @@ export function TemplatesList({ organizationId, orgSlug }: TemplatesListProps) {
               Create Template
             </Link>
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 

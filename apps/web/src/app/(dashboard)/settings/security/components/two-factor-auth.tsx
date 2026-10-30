@@ -11,13 +11,6 @@ import {
   AlertDialogTitle,
 } from "@wraps/ui/components/ui/alert-dialog";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -26,6 +19,7 @@ import {
   DialogTitle,
 } from "@wraps/ui/components/ui/dialog";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Check, Key, Shield } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
@@ -222,46 +216,47 @@ export function TwoFactorAuth() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Two-Factor Authentication
-              </CardTitle>
-              <CardDescription>
-                Add an extra layer of security to your account with TOTP
-                authentication using apps like Google Authenticator or Authy.
-              </CardDescription>
-            </div>
-            {isEnabled ? (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 rounded-full bg-success/15 px-3 py-1 text-success">
-                  <Check className="h-4 w-4" />
-                  <span className="text-sm">Enabled</span>
-                </div>
-                <Button
-                  className="cursor-pointer"
-                  onClick={() => promptForPassword("disable")}
-                  variant="outline"
-                >
-                  Disable
-                </Button>
+      <Panel
+        actions={
+          isEnabled ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 rounded-full bg-success/15 px-3 py-1 text-success">
+                <Check className="h-4 w-4" />
+                <span className="text-sm">Enabled</span>
               </div>
-            ) : (
               <Button
                 className="cursor-pointer"
-                loading={isLoading}
-                onClick={() => promptForPassword("enable")}
+                onClick={() => promptForPassword("disable")}
+                variant="outline"
               >
-                Enable 2FA
+                Disable
               </Button>
-            )}
-          </div>
-        </CardHeader>
+            </div>
+          ) : (
+            <Button
+              className="cursor-pointer"
+              loading={isLoading}
+              onClick={() => promptForPassword("enable")}
+            >
+              Enable 2FA
+            </Button>
+          )
+        }
+        description={
+          <>
+            Add an extra layer of security to your account with TOTP
+            authentication using apps like Google Authenticator or Authy.
+          </>
+        }
+        label={
+          <PanelTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Two-Factor Authentication
+          </PanelTitle>
+        }
+      >
         {isEnabled && (
-          <CardContent className="space-y-4">
+          <div className="space-y-4">
             <div className="rounded-lg border bg-muted/50 p-4">
               <div className="flex items-start gap-3">
                 <Key className="mt-0.5 h-5 w-5 text-muted-foreground" />
@@ -282,9 +277,9 @@ export function TwoFactorAuth() {
                 </div>
               </div>
             </div>
-          </CardContent>
+          </div>
         )}
-      </Card>
+      </Panel>
 
       {/* Setup 2FA Dialog */}
       <Dialog onOpenChange={setIsEnabling} open={isEnabling}>

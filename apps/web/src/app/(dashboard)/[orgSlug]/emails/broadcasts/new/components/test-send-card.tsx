@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { CheckCircle2, Send } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -67,16 +61,11 @@ export function TestSendCard({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Send a test first</CardTitle>
-        <CardDescription>
-          Sends one copy of this broadcast to a single address, rendered with a
-          real contact's data. Nothing is recorded — it does not appear in
-          broadcast history and does not affect any counts.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <Panel
+      description="Sends one copy of this broadcast to a single address, rendered with a real contact's data. Nothing is recorded — it does not appear in broadcast history and does not affect any counts."
+      label={<PanelTitle>Send a test first</PanelTitle>}
+    >
+      <div className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             aria-label="Test send recipient"
@@ -106,7 +95,7 @@ export function TestSendCard({
             correctly before sending to the full list.
           </p>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

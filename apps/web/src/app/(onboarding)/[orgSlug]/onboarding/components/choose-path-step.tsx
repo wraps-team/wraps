@@ -1,10 +1,4 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { CloudIcon, PencilRulerIcon } from "lucide-react";
 import posthog from "posthog-js";
 import { Button } from "@/components/ui/button";
@@ -40,50 +34,44 @@ export function ChoosePathStep({
   };
 
   return (
-    <Card>
-      <CardHeader className="space-y-2 text-center">
-        <CardTitle className="text-3xl">Welcome to Wraps!</CardTitle>
-        <CardDescription className="text-base">
-          How would you like to get started?
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="flex flex-col items-center space-y-3 p-6 text-center">
-            <CloudIcon className="h-10 w-10 text-primary" />
-            <h3 className="font-semibold text-lg">Connect AWS now</h3>
-            <p className="text-muted-foreground text-sm">
-              Set up your AWS infrastructure and start sending emails in
-              minutes. Best if you already have an AWS account.
-            </p>
-            <Button
-              className="mt-auto w-full"
-              onClick={() => handlePath("connect_aws")}
-              size="lg"
-            >
-              Set up infrastructure
-            </Button>
-          </Card>
-
-          <Card className="flex flex-col items-center space-y-3 p-6 text-center">
-            <PencilRulerIcon className="h-10 w-10 text-primary" />
-            <h3 className="font-semibold text-lg">Start building</h3>
-            <p className="text-muted-foreground text-sm">
-              Explore templates, contacts, and workflows first. You'll need to
-              connect AWS before you can send anything.
-            </p>
-            <Button
-              className="mt-auto w-full"
-              onClick={() => handlePath("start_building")}
-              size="lg"
-              variant="outline"
-            >
-              Explore Wraps!
-            </Button>
-          </Card>
+    <Panel
+      description="How would you like to get started?"
+      label={<PanelTitle>Welcome to Wraps!</PanelTitle>}
+    >
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="flex flex-col items-center space-y-3 border p-6 text-center">
+          <CloudIcon className="h-10 w-10 text-primary" />
+          <h3 className="font-semibold text-lg">Connect AWS now</h3>
+          <p className="text-muted-foreground text-sm">
+            Set up your AWS infrastructure and start sending emails in minutes.
+            Best if you already have an AWS account.
+          </p>
+          <Button
+            className="mt-auto w-full"
+            onClick={() => handlePath("connect_aws")}
+            size="lg"
+          >
+            Set up infrastructure
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="flex flex-col items-center space-y-3 border p-6 text-center">
+          <PencilRulerIcon className="h-10 w-10 text-primary" />
+          <h3 className="font-semibold text-lg">Start building</h3>
+          <p className="text-muted-foreground text-sm">
+            Explore templates, contacts, and workflows first. You'll need to
+            connect AWS before you can send anything.
+          </p>
+          <Button
+            className="mt-auto w-full"
+            onClick={() => handlePath("start_building")}
+            size="lg"
+            variant="outline"
+          >
+            Explore Wraps!
+          </Button>
+        </div>
+      </div>
+    </Panel>
   );
 }

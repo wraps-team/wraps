@@ -1,11 +1,6 @@
 import { MAX_WORKFLOW_RETRIES, type WorkflowStep } from "@wraps/db";
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { ArrowLeft, XCircle } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -167,29 +162,25 @@ export default async function ExecutionDetailPage({
       </div>
 
       {/* Step Trace */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Step Trace</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <StepTrace
-            stepEngagement={execution.stepEngagement}
-            stepExecutions={execution.stepExecutions}
-            stepNameMap={Object.fromEntries(stepNameMap)}
-          />
-        </CardContent>
-      </Card>
+      <Panel label={<PanelTitle>Step Trace</PanelTitle>}>
+        <StepTrace
+          stepEngagement={execution.stepEngagement}
+          stepExecutions={execution.stepExecutions}
+          stepNameMap={Object.fromEntries(stepNameMap)}
+        />
+      </Panel>
 
       {/* Error Details */}
       {execution.error && (
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
+        <Panel
+          label={
+            <PanelTitle className="flex items-center gap-2">
               <XCircle className="h-5 w-5 text-destructive" />
-              <span className="text-destructive">Error Details</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+              Error Details
+            </PanelTitle>
+          }
+        >
+          <div className="space-y-3">
             <p className="font-medium text-sm">
               {classifyWorkflowError(execution.error).remediation}
             </p>
@@ -199,50 +190,43 @@ export default async function ExecutionDetailPage({
               </summary>
               <p className="mt-2 font-mono text-xs">{execution.error}</p>
             </details>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       )}
 
       {/* Metadata */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 text-sm sm:grid-cols-2">
-            <div>
-              <div className="font-medium text-muted-foreground">Contact</div>
-              <div>{contactName}</div>
-            </div>
-            {execution.contact?.email && (
-              <div>
-                <div className="font-medium text-muted-foreground">Email</div>
-                <div>{execution.contact.email}</div>
-              </div>
-            )}
-            {execution.startedAt && (
-              <div>
-                <div className="font-medium text-muted-foreground">Started</div>
-                <div>{new Date(execution.startedAt).toLocaleString()}</div>
-              </div>
-            )}
-            {execution.completedAt && (
-              <div>
-                <div className="font-medium text-muted-foreground">
-                  Completed
-                </div>
-                <div>{new Date(execution.completedAt).toLocaleString()}</div>
-              </div>
-            )}
-            <div>
-              <div className="font-medium text-muted-foreground">
-                Execution ID
-              </div>
-              <div className="font-mono text-xs">{execution.id}</div>
-            </div>
+      <Panel label={<PanelTitle>Details</PanelTitle>}>
+        <div className="grid gap-4 text-sm sm:grid-cols-2">
+          <div>
+            <div className="font-medium text-muted-foreground">Contact</div>
+            <div>{contactName}</div>
           </div>
-        </CardContent>
-      </Card>
+          {execution.contact?.email && (
+            <div>
+              <div className="font-medium text-muted-foreground">Email</div>
+              <div>{execution.contact.email}</div>
+            </div>
+          )}
+          {execution.startedAt && (
+            <div>
+              <div className="font-medium text-muted-foreground">Started</div>
+              <div>{new Date(execution.startedAt).toLocaleString()}</div>
+            </div>
+          )}
+          {execution.completedAt && (
+            <div>
+              <div className="font-medium text-muted-foreground">Completed</div>
+              <div>{new Date(execution.completedAt).toLocaleString()}</div>
+            </div>
+          )}
+          <div>
+            <div className="font-medium text-muted-foreground">
+              Execution ID
+            </div>
+            <div className="font-mono text-xs">{execution.id}</div>
+          </div>
+        </div>
+      </Panel>
     </div>
   );
 }

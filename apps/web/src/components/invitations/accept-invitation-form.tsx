@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Separator } from "@wraps/ui/components/ui/separator";
 import { Building2, CheckCircle2, Mail, Shield, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -128,20 +121,16 @@ export function AcceptInvitationForm({
   };
 
   return (
-    <Card className="w-full max-w-lg shadow-xl">
-      <CardHeader className="space-y-4 text-center">
+    <Panel
+      className="w-full max-w-lg"
+      description={`${invitation.inviter.name} has invited you to join their organization`}
+      label={<PanelTitle>You're Invited!</PanelTitle>}
+    >
+      <div className="space-y-6">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand/10">
           <Mail className="h-8 w-8 text-brand-text" />
         </div>
-        <div>
-          <CardTitle className="text-2xl">You're Invited!</CardTitle>
-          <CardDescription className="mt-2">
-            {invitation.inviter.name} has invited you to join their organization
-          </CardDescription>
-        </div>
-      </CardHeader>
 
-      <CardContent className="space-y-6">
         {/* Organization Details */}
         <div className="space-y-4">
           <div className="flex items-start gap-3 rounded-lg border bg-muted/50 p-4">
@@ -211,9 +200,9 @@ export function AcceptInvitationForm({
             </p>
           </div>
         )}
-      </CardContent>
+      </div>
 
-      <CardFooter className="flex flex-col gap-3">
+      <div className="mt-4 flex flex-col gap-3 border-t pt-4">
         <Button
           className="w-full"
           disabled={
@@ -241,7 +230,7 @@ export function AcceptInvitationForm({
         >
           Decline Invitation
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </Panel>
   );
 }

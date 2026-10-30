@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Progress } from "@wraps/ui/components/ui/progress";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
@@ -54,18 +47,21 @@ export function UsageCard({
   className,
   action,
 }: UsageCardProps) {
+  const label = (
+    <PanelTitle className="flex items-center gap-2">
+      <Icon aria-hidden="true" className="size-3.5" />
+      {title}
+    </PanelTitle>
+  );
+
   if (isLoading) {
     return (
-      <Card className={className}>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Icon className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">{title}</CardTitle>
-          </div>
-          <CardDescription>Loading...</CardDescription>
-          {action && <CardAction className="self-center">{action}</CardAction>}
-        </CardHeader>
-      </Card>
+      <Panel
+        actions={action}
+        className={className}
+        description="Loading..."
+        label={label}
+      />
     );
   }
 
@@ -77,16 +73,13 @@ export function UsageCard({
   const displayPercent = isUnlimited ? 0 : Math.min(usage.percentUsed, 100);
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">{title}</CardTitle>
-        </div>
-        <CardDescription>{description}</CardDescription>
-        {action && <CardAction className="self-center">{action}</CardAction>}
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <Panel
+      actions={action}
+      className={className}
+      description={description}
+      label={label}
+    >
+      <div className="space-y-3">
         {isUnlimited ? (
           <p className="text-sm text-muted-foreground">Unlimited</p>
         ) : (
@@ -118,7 +111,7 @@ export function UsageCard({
             )}
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
