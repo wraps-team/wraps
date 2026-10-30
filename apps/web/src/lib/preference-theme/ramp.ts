@@ -35,16 +35,18 @@ const DEFAULT_RADIUS = "0.625rem";
  * always overwrites them (accent itself, and an auto-contrast foreground), so
  * their l/c here is never actually emitted.
  *
- * `destructive`/`success`/`warning` keep globals.css's own lightness+chroma —
+ * `destructive`/`success`/`warning` (and their `-foreground` pairs) keep the
+ * dashboard's own lightness+chroma from packages/ui/src/styles/theme.css —
  * FIXED_HUES below overrides their hue so they stay red/green/amber
  * regardless of the accent.
  *
- * That coupling is load-bearing and easy to break: when globals.css retuned
- * light-mode success/warning as text colours to clear WCAG AA (they measured
- * 2.37:1 and 3.75:1 as text on the tinted badge ground), these copies had to
- * move with them or a customer's preference centre would keep rendering the
- * failing pair while the dashboard rendered the passing one. `contrast.test.ts`
- * pins both sides now — the light values here are deliberately at the edge of
+ * That coupling is load-bearing and easy to break: the dashboard's status
+ * colours are tuned to WCAG AAA as text on their tinted badge ground, and a
+ * solid `bg-warning` chip is labelled with `--warning-foreground`, which must
+ * flip with `--warning`. These copies had to move with them or a customer's
+ * preference centre would keep rendering the failing pair while the dashboard
+ * rendered the passing one. `status-color-contrast.test.ts` pins the light
+ * values against theme.css now — the light values here are deliberately at the edge of
  * two opposing limits, so change them only with those numbers in hand.
  */
 export const NEUTRAL_RAMP: Record<
@@ -66,12 +68,12 @@ export const NEUTRAL_RAMP: Record<
     "muted-foreground": { l: 0.556, c: 0 },
     accent: { l: 0.97, c: 0.012 },
     "accent-foreground": { l: 0.205, c: 0 },
-    destructive: { l: 0.577, c: 0.245 },
+    destructive: { l: 0.413, c: 0.167 },
     "destructive-foreground": { l: 0.985, c: 0 },
-    success: { l: 0.5, c: 0.15 },
+    success: { l: 0.39, c: 0.122 },
     "success-foreground": { l: 0.985, c: 0 },
-    warning: { l: 0.52, c: 0.125 },
-    "warning-foreground": { l: 0.205, c: 0 },
+    warning: { l: 0.411, c: 0.101 },
+    "warning-foreground": { l: 0.985, c: 0 },
     border: { l: 0.922, c: 0.006 },
     input: { l: 0.922, c: 0.006 },
     ring: { l: 0.708, c: 0.006 },
@@ -91,12 +93,12 @@ export const NEUTRAL_RAMP: Record<
     "muted-foreground": { l: 0.708, c: 0 },
     accent: { l: 0.269, c: 0.012 },
     "accent-foreground": { l: 0.985, c: 0 },
-    destructive: { l: 0.704, c: 0.191 },
-    "destructive-foreground": { l: 0.985, c: 0 },
-    success: { l: 0.65, c: 0.2 },
-    "success-foreground": { l: 0.985, c: 0 },
-    warning: { l: 0.8, c: 0.18 },
-    "warning-foreground": { l: 0.205, c: 0 },
+    destructive: { l: 0.811, c: 0.105 },
+    "destructive-foreground": { l: 0.145, c: 0 },
+    success: { l: 0.775, c: 0.2 },
+    "success-foreground": { l: 0.145, c: 0 },
+    warning: { l: 0.807, c: 0.126 },
+    "warning-foreground": { l: 0.145, c: 0 },
     // globals.css uses translucent white (oklch(1 0 0 / 10%) / 15%) here;
     // alpha isn't modeled by this token grammar's emitted values, so we take
     // the pre-alpha L (1) and add the same tiny surface chroma as the other

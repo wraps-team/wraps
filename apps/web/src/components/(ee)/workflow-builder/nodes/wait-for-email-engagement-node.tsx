@@ -63,11 +63,11 @@ export function WaitForEmailEngagementNode({
       <div className="-bottom-5 absolute right-0 left-0 flex justify-between px-2">
         {/* Opened */}
         <div className="flex flex-col items-center">
-          <span className="mb-0.5 font-medium text-[7px] text-green-600 dark:text-green-400">
+          <span className="mb-0.5 font-medium text-[7px] text-success">
             Open
           </span>
           <Handle
-            className="!relative !transform-none !bg-green-500 !w-2 !h-2 !border-2 !border-background"
+            className="!relative !transform-none !bg-success !w-2 !h-2 !border-2 !border-background"
             id="opened"
             position={Position.Bottom}
             type="source"
@@ -76,11 +76,9 @@ export function WaitForEmailEngagementNode({
 
         {/* Clicked */}
         <div className="flex flex-col items-center">
-          <span className="mb-0.5 font-medium text-[7px] text-blue-600 dark:text-blue-400">
-            Click
-          </span>
+          <span className="mb-0.5 font-medium text-[7px] text-info">Click</span>
           <Handle
-            className="!relative !transform-none !bg-blue-500 !w-2 !h-2 !border-2 !border-background"
+            className="!relative !transform-none !bg-info !w-2 !h-2 !border-2 !border-background"
             id="clicked"
             position={Position.Bottom}
             type="source"
@@ -89,11 +87,11 @@ export function WaitForEmailEngagementNode({
 
         {/* Bounced */}
         <div className="flex flex-col items-center">
-          <span className="mb-0.5 font-medium text-[7px] text-red-600 dark:text-red-400">
+          <span className="mb-0.5 font-medium text-[7px] text-destructive">
             Bounce
           </span>
           <Handle
-            className="!relative !transform-none !bg-red-500 !w-2 !h-2 !border-2 !border-background"
+            className="!relative !transform-none !bg-destructive !w-2 !h-2 !border-2 !border-background"
             id="bounced"
             position={Position.Bottom}
             type="source"
@@ -102,11 +100,11 @@ export function WaitForEmailEngagementNode({
 
         {/* Timeout */}
         <div className="flex flex-col items-center">
-          <span className="mb-0.5 font-medium text-[7px] text-yellow-600 dark:text-yellow-400">
+          <span className="mb-0.5 font-medium text-[7px] text-warning">
             None
           </span>
           <Handle
-            className="!relative !transform-none !bg-yellow-500 !w-2 !h-2 !border-2 !border-background"
+            className="!relative !transform-none !bg-warning !w-2 !h-2 !border-2 !border-background"
             id="timeout"
             position={Position.Bottom}
             type="source"

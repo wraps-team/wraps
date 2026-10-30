@@ -181,7 +181,7 @@ export function EmailFields({ to, from, organizationId }: EmailFieldsProps) {
                     {isPending ? (
                       <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                     ) : newRecipientCount === 0 ? (
-                      <Check className="size-3.5 text-green-500" />
+                      <Check className="size-3.5 text-success" />
                     ) : (
                       <UserPlus className="size-3.5" />
                     )}

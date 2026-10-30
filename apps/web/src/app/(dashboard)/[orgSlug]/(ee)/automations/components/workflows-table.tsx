@@ -308,7 +308,7 @@ export function WorkflowsTable({
             <div className="text-sm">
               <span>{wf.totalExecutions.toLocaleString()} total</span>
               {wf.activeExecutions > 0 && (
-                <span className="ml-2 text-blue-600">
+                <span className="ml-2 text-info">
                   {wf.activeExecutions} active
                 </span>
               )}

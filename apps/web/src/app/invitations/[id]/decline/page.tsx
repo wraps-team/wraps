@@ -44,7 +44,7 @@ export default async function DeclineInvitationPage({
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+    <div className="flex min-h-dvh items-center justify-center bg-muted p-4">
       <DeclineInvitationForm invitation={invitation} invitationId={id} />
     </div>
   );

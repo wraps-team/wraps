@@ -14,7 +14,7 @@ export function SidebarNotification() {
   }
 
   return (
-    <Card className="mb-3 border-neutral-200 bg-neutral-50 py-0 dark:border-neutral-700 dark:bg-neutral-800">
+    <Card className="mb-3 border-border bg-muted py-0">
       <CardContent className="relative p-4">
         <Button
           className="absolute top-2 right-2 h-6 w-6"
@@ -27,7 +27,7 @@ export function SidebarNotification() {
         </Button>
 
         <div className="pr-6">
-          <h3 className="mt-1 mb-2 flex items-center gap-3 font-semibold text-neutral-900 dark:text-neutral-100">
+          <h3 className="mt-1 mb-2 flex items-center gap-3 font-semibold text-foreground">
             <Logo className="-mt-1 rounded-full" size={42} />
             <div>
               <a
@@ -41,7 +41,7 @@ export function SidebarNotification() {
               Updates
             </div>
           </h3>
-          <p className="text-muted-foreground text-sm leading-relaxed dark:text-neutral-400">
+          <p className="text-muted-foreground text-sm leading-relaxed">
             {/* Link to docs */}
             <a
               className="text-primary underline"

@@ -116,9 +116,10 @@ export default async function EmailsPage({
 
   return (
     <>
-      <EmailsHubHeader orgSlug={orgSlug} />
-
-      <div className="mt-4">
+      {/* One block so the tabs sit under the description, not a full section
+          gap away: the shell's gap-6 plus an mt-4 left 40px between them. */}
+      <div className="flex flex-col gap-3">
+        <EmailsHubHeader orgSlug={orgSlug} />
         <EmailsHubTabs days={days} orgSlug={orgSlug} tab={tab} />
       </div>
 

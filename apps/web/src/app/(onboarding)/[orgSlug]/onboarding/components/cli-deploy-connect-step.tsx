@@ -698,7 +698,7 @@ export function CliDeployConnectStep({
                       variant="ghost"
                     >
                       {copiedIndex === index ? (
-                        <CheckCircle2Icon className="size-4 text-green-500" />
+                        <CheckCircle2Icon className="size-4 text-success" />
                       ) : (
                         <CopyIcon className="size-4" />
                       )}
@@ -759,7 +759,7 @@ export function CliDeployConnectStep({
               ref={panelRef}
               tabIndex={-1}
             >
-              <div className="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-green-600 dark:text-green-400">
+              <div className="flex items-center gap-2 rounded-lg bg-success/10 p-3 text-success">
                 <CheckCircle2Icon className="h-5 w-5" />
                 <span className="font-medium text-sm">
                   CloudFormation deployment started

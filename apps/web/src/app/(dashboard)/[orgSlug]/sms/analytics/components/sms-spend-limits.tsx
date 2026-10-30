@@ -169,7 +169,7 @@ export function SMSSpendLimits({ orgSlug }: { orgSlug: string }) {
                 <div className="flex items-center justify-between text-muted-foreground text-xs">
                   <span>{percentage.toFixed(1)}% used</span>
                   {limit.overridden && (
-                    <span className="text-yellow-600">Custom limit set</span>
+                    <span className="text-warning">Custom limit set</span>
                   )}
                 </div>
               </div>

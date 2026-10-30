@@ -1265,7 +1265,7 @@ function SortableHeader({
             <ArrowDown className="h-4 w-4" />
           )
         ) : (
-          <ArrowUpDown className="h-4 w-4 text-muted-foreground/50" />
+          <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
         )}
       </Button>
     </TableHead>

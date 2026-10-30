@@ -110,9 +110,9 @@ export function PersonalInformation() {
         <CardContent className="space-y-4">
           {/* Form-level errors */}
           {accountFormErrors.length > 0 && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-4">
               {accountFormErrors.map((error) => (
-                <p className="text-red-600 text-sm" key={String(error)}>
+                <p className="text-destructive text-sm" key={String(error)}>
                   {String(error)}
                 </p>
               ))}
@@ -121,8 +121,8 @@ export function PersonalInformation() {
 
           {/* Success message */}
           {isAccountSuccess && (
-            <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-              <p className="text-green-600 text-sm">
+            <div className="rounded-lg border border-success/30 bg-success/15 p-4">
+              <p className="text-success text-sm">
                 {accountState &&
                 typeof accountState === "object" &&
                 "message" in accountState
@@ -137,8 +137,8 @@ export function PersonalInformation() {
             typeof accountState === "object" &&
             "error" in accountState &&
             accountState.error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                <p className="font-medium text-red-600 text-sm">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-4">
+                <p className="font-medium text-destructive text-sm">
                   {String(accountState.error)}
                 </p>
               </div>

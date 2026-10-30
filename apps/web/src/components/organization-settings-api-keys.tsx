@@ -494,7 +494,7 @@ export function OrganizationSettingsApiKeys({
                   variant="outline"
                 >
                   {copiedSecret ? (
-                    <Check className="h-4 w-4 text-green-600" />
+                    <Check className="h-4 w-4 text-success" />
                   ) : (
                     <Copy className="h-4 w-4" />
                   )}
@@ -758,13 +758,11 @@ const client = createPlatformClient({
 });`}
             </pre>
           </div>
-          <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+          <div className="flex items-start gap-3 rounded-lg border border-info/30 bg-info/15 p-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-info" />
             <div>
-              <h4 className="font-medium text-blue-900 dark:text-blue-100">
-                Security Best Practices
-              </h4>
-              <ul className="mt-1 list-inside list-disc text-blue-800 text-sm dark:text-blue-200">
+              <h4 className="font-medium text-info">Security Best Practices</h4>
+              <ul className="mt-1 list-inside list-disc text-info text-sm">
                 <li>Never commit API keys to version control</li>
                 <li>Use environment variables in production</li>
                 <li>Rotate keys regularly</li>

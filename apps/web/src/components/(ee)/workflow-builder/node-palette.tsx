@@ -32,7 +32,7 @@ export const paletteItems: NodePaletteItem[] = [
     label: "Trigger",
     description: "Start workflow",
     icon: <Zap className="h-4 w-4" />,
-    accentColor: "bg-yellow-500",
+    accentColor: "bg-yellow-700",
   },
   {
     type: "send_email",
@@ -46,7 +46,7 @@ export const paletteItems: NodePaletteItem[] = [
     label: "Send SMS",
     description: "Send a text message",
     icon: <MessageSquare className="h-4 w-4" />,
-    accentColor: "bg-green-500",
+    accentColor: "bg-green-700",
   },
   {
     type: "delay",
@@ -60,7 +60,7 @@ export const paletteItems: NodePaletteItem[] = [
     label: "Condition",
     description: "Branch Yes/No",
     icon: <GitBranch className="h-4 w-4" />,
-    accentColor: "bg-orange-500",
+    accentColor: "bg-orange-700",
   },
   {
     type: "update_contact",
@@ -75,7 +75,7 @@ export const paletteItems: NodePaletteItem[] = [
   //   label: "Webhook",
   //   description: "Call external API",
   //   icon: <Webhook className="h-4 w-4" />,
-  //   accentColor: "bg-cyan-500",
+  //   accentColor: "bg-cyan-700",
   // },
   // Slice 3 nodes
   {
@@ -83,7 +83,7 @@ export const paletteItems: NodePaletteItem[] = [
     label: "Wait for Event",
     description: "Wait until event occurs",
     icon: <Hourglass className="h-4 w-4" />,
-    accentColor: "bg-amber-500",
+    accentColor: "bg-amber-700",
   },
   {
     type: "wait_for_email_engagement",
@@ -97,14 +97,14 @@ export const paletteItems: NodePaletteItem[] = [
     label: "Topic",
     description: "Manage subscription",
     icon: <Bell className="h-4 w-4" />,
-    accentColor: "bg-emerald-500",
+    accentColor: "bg-emerald-700",
   },
   {
     type: "cascade",
     label: "Cascade",
     description: "Multi-channel sequence",
     icon: <Layers className="h-4 w-4" />,
-    accentColor: "bg-gradient-to-r from-blue-500 to-green-500",
+    accentColor: "bg-gradient-to-r from-blue-500 to-green-700",
   },
   {
     type: "exit",

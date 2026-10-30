@@ -237,7 +237,7 @@ export function TwoFactorAuth() {
             </div>
             {isEnabled ? (
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-green-700">
+                <div className="flex items-center gap-2 rounded-full bg-success/15 px-3 py-1 text-success">
                   <Check className="h-4 w-4" />
                   <span className="text-sm">Enabled</span>
                 </div>

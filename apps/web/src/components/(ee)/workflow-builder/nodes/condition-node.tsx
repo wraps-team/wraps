@@ -80,7 +80,7 @@ export function ConditionNode({ id, data, selected }: ConditionNodeProps) {
       >
         {/* Content rotated back */}
         <div className="-rotate-45 flex flex-col items-center px-1 text-center">
-          <div className="mb-0.5 flex h-6 w-6 items-center justify-center rounded bg-orange-500 text-white">
+          <div className="mb-0.5 flex h-6 w-6 items-center justify-center rounded bg-orange-700 text-white">
             <GitBranch className="h-3 w-3" />
           </div>
           <div className="max-w-[55px] truncate font-medium text-[10px] text-foreground">
@@ -94,11 +94,9 @@ export function ConditionNode({ id, data, selected }: ConditionNodeProps) {
 
       {/* Yes output - bottom left */}
       <div className="-bottom-5 absolute left-2 flex flex-col items-center">
-        <span className="mb-0.5 font-medium text-[8px] text-green-600 dark:text-green-400">
-          Yes
-        </span>
+        <span className="mb-0.5 font-medium text-[8px] text-success">Yes</span>
         <Handle
-          className="!relative !transform-none !bg-green-500 !w-2.5 !h-2.5 !border-2 !border-background"
+          className="!relative !transform-none !bg-success !w-2.5 !h-2.5 !border-2 !border-background"
           id="yes"
           position={Position.Bottom}
           type="source"
@@ -107,11 +105,11 @@ export function ConditionNode({ id, data, selected }: ConditionNodeProps) {
 
       {/* No output - bottom right */}
       <div className="-bottom-5 absolute right-2 flex flex-col items-center">
-        <span className="mb-0.5 font-medium text-[8px] text-red-600 dark:text-red-400">
+        <span className="mb-0.5 font-medium text-[8px] text-destructive">
           No
         </span>
         <Handle
-          className="!relative !transform-none !bg-red-500 !w-2.5 !h-2.5 !border-2 !border-background"
+          className="!relative !transform-none !bg-destructive !w-2.5 !h-2.5 !border-2 !border-background"
           id="no"
           position={Position.Bottom}
           type="source"

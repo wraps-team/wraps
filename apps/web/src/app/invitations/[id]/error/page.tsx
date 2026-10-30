@@ -21,7 +21,7 @@ export default async function InvitationErrorPage({
   const { message } = await searchParams;
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+    <div className="flex min-h-dvh items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
@@ -33,8 +33,8 @@ export default async function InvitationErrorPage({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <p className="text-amber-900 text-sm">
+          <div className="rounded-lg border border-warning/30 bg-warning/15 p-4">
+            <p className="text-warning text-sm">
               If you believe this is an error, please contact the person who
               invited you or reach out to support.
             </p>

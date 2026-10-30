@@ -39,7 +39,7 @@ export function SendSmsNode({ id, data, selected }: SendSmsNodeProps) {
 
   return (
     <BaseNode
-      accentColor="bg-green-500"
+      accentColor="bg-green-700"
       description={description}
       errorMessage={errorMessage}
       hasInput={true}

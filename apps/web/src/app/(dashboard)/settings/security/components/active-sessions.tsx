@@ -174,7 +174,7 @@ export function ActiveSessions() {
                             {browser && `, ${browser}`}
                           </p>
                           {isCurrent && (
-                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700 text-xs">
+                            <span className="rounded-full bg-success/15 px-2 py-0.5 text-success text-xs">
                               Current
                             </span>
                           )}

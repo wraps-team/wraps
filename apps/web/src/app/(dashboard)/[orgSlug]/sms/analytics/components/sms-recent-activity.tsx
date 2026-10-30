@@ -32,29 +32,23 @@ const getActivityIcon = (status: string) => {
   const statusLower = status.toLowerCase();
 
   if (statusLower === "delivered" || statusLower === "delivery") {
-    return (
-      <CheckCircle2 className="h-4 w-4 text-green-700 dark:text-green-400" />
-    );
+    return <CheckCircle2 className="h-4 w-4 text-success" />;
   }
   if (statusLower === "queued" || statusLower === "pending") {
     return <Clock className="h-4 w-4 text-muted-foreground" />;
   }
   if (statusLower === "sent") {
-    return (
-      <MessageSquare className="h-4 w-4 text-blue-700 dark:text-blue-400" />
-    );
+    return <MessageSquare className="h-4 w-4 text-info" />;
   }
   if (
     statusLower === "failed" ||
     statusLower === "failure" ||
     statusLower === "blocked"
   ) {
-    return <XCircle className="h-4 w-4 text-red-700 dark:text-red-400" />;
+    return <XCircle className="h-4 w-4 text-destructive" />;
   }
   if (statusLower === "invalid" || statusLower.includes("unreachable")) {
-    return (
-      <AlertTriangle className="h-4 w-4 text-orange-700 dark:text-orange-400" />
-    );
+    return <AlertTriangle className="h-4 w-4 text-warning" />;
   }
   return <Clock className="h-4 w-4 text-muted-foreground" />;
 };

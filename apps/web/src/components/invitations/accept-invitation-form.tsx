@@ -110,7 +110,7 @@ export function AcceptInvitationForm({
       case "owner":
         return "bg-purple-100 text-purple-700";
       case "admin":
-        return "bg-blue-100 text-blue-700";
+        return "bg-info/15 text-info";
       default:
         return "bg-muted text-foreground";
     }
@@ -131,7 +131,7 @@ export function AcceptInvitationForm({
     <Card className="w-full max-w-lg shadow-xl">
       <CardHeader className="space-y-4 text-center">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand/10">
-          <Mail className="h-8 w-8 text-brand" />
+          <Mail className="h-8 w-8 text-brand-text" />
         </div>
         <div>
           <CardTitle className="text-2xl">You're Invited!</CardTitle>
@@ -202,8 +202,8 @@ export function AcceptInvitationForm({
 
         {/* Email notice */}
         {session?.user && session.user.email !== invitation.email && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <p className="text-amber-900 text-sm">
+          <div className="rounded-lg border border-warning/30 bg-warning/15 p-4">
+            <p className="text-warning text-sm">
               <strong>Note:</strong> This invitation was sent to{" "}
               <strong>{invitation.email}</strong>, but you're signed in as{" "}
               <strong>{session.user.email}</strong>. Please sign in with the

@@ -19,10 +19,10 @@ export const WORKFLOW_STATUS_LABELS: Record<WorkflowStatus, string> = {
  * Workflow status colors for badges
  */
 export const WORKFLOW_STATUS_COLORS: Record<WorkflowStatus, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  enabled: "bg-green-100 text-green-700",
-  paused: "bg-yellow-100 text-yellow-700",
-  archived: "bg-gray-100 text-gray-500",
+  draft: "bg-muted text-foreground",
+  enabled: "bg-success/15 text-success",
+  paused: "bg-warning/15 text-warning",
+  archived: "bg-muted text-muted-foreground",
 };
 
 export const EXECUTION_STATUS_LABELS: Record<WorkflowExecutionStatus, string> =
@@ -38,13 +38,13 @@ export const EXECUTION_STATUS_LABELS: Record<WorkflowExecutionStatus, string> =
 
 export const EXECUTION_STATUS_COLORS: Record<WorkflowExecutionStatus, string> =
   {
-    pending: "bg-gray-100 text-gray-700",
-    active: "bg-blue-100 text-blue-700",
-    paused: "bg-yellow-100 text-yellow-700",
+    pending: "bg-muted text-foreground",
+    active: "bg-info/15 text-info",
+    paused: "bg-warning/15 text-warning",
     waiting: "bg-purple-100 text-purple-700",
-    completed: "bg-green-100 text-green-700",
-    failed: "bg-red-100 text-red-700",
-    cancelled: "bg-gray-100 text-gray-500",
+    completed: "bg-success/15 text-success",
+    failed: "bg-destructive/15 text-destructive",
+    cancelled: "bg-muted text-muted-foreground",
   };
 
 export const STEP_STATUS_LABELS: Record<WorkflowStepExecutionStatus, string> = {
@@ -56,11 +56,11 @@ export const STEP_STATUS_LABELS: Record<WorkflowStepExecutionStatus, string> = {
 };
 
 export const STEP_STATUS_COLORS: Record<WorkflowStepExecutionStatus, string> = {
-  pending: "bg-gray-100 text-gray-700",
-  executing: "bg-blue-100 text-blue-700",
-  completed: "bg-green-100 text-green-700",
-  failed: "bg-red-100 text-red-700",
-  skipped: "bg-gray-100 text-gray-500",
+  pending: "bg-muted text-foreground",
+  executing: "bg-info/15 text-info",
+  completed: "bg-success/15 text-success",
+  failed: "bg-destructive/15 text-destructive",
+  skipped: "bg-muted text-muted-foreground",
 };
 
 // Ordered error-message patterns mapped to a stable code and a user-facing

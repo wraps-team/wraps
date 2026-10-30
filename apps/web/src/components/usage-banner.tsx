@@ -18,22 +18,21 @@ type UsageBannerProps = {
 };
 
 const bgColors = {
-  warning:
-    "bg-amber-50 border-amber-200 dark:bg-amber-950/50 dark:border-amber-800",
-  critical: "bg-red-50 border-red-200 dark:bg-red-950/50 dark:border-red-800",
-  exceeded: "bg-red-100 border-red-300 dark:bg-red-950 dark:border-red-700",
+  warning: "bg-warning/15 border-warning/30",
+  critical: "bg-destructive/15 border-destructive/30",
+  exceeded: "bg-destructive/15 border-destructive/30",
 };
 
 const textColors = {
-  warning: "text-amber-800 dark:text-amber-200",
-  critical: "text-red-800 dark:text-red-200",
-  exceeded: "text-red-900 dark:text-red-100",
+  warning: "text-warning",
+  critical: "text-destructive",
+  exceeded: "text-destructive",
 };
 
 const iconColors = {
-  warning: "text-amber-600 dark:text-amber-400",
-  critical: "text-red-600 dark:text-red-400",
-  exceeded: "text-red-700 dark:text-red-300",
+  warning: "text-warning",
+  critical: "text-destructive",
+  exceeded: "text-destructive",
 };
 
 export function UsageBanner({ usage, upgradeHref }: UsageBannerProps) {

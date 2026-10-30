@@ -105,8 +105,8 @@ export function SuccessStep({
     return (
       <Card>
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 dark:bg-amber-500/15">
-            <AlertTriangleIcon className="h-10 w-10 text-amber-500 dark:text-amber-400" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-warning/10">
+            <AlertTriangleIcon className="h-10 w-10 text-warning" />
           </div>
           <CardTitle className="text-3xl">Setup Incomplete</CardTitle>
           <CardDescription className="text-base">
@@ -161,8 +161,8 @@ wraps platform connect`}</code>
   return (
     <Card>
       <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 dark:bg-green-500/15">
-          <CheckCircle2Icon className="h-10 w-10 text-green-500 dark:text-green-400" />
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
+          <CheckCircle2Icon className="h-10 w-10 text-success" />
         </div>
         <CardTitle className="text-3xl">You're All Set!</CardTitle>
         <CardDescription className="text-base">

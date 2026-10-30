@@ -43,7 +43,7 @@ export function TopicNode({ id, data, selected }: TopicNodeProps) {
 
   return (
     <BaseNode
-      accentColor="bg-emerald-500"
+      accentColor="bg-emerald-700"
       description={description}
       errorMessage={errorMessage}
       hasInput={true}

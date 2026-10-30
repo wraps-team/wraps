@@ -215,14 +215,14 @@ export function ChangePassword() {
                   <div
                     className={`rounded-lg border p-4 ${
                       isPasswordCompromised
-                        ? "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950"
+                        ? "border-warning/30 bg-warning/15"
                         : "border-destructive/30 bg-destructive/10"
                     }`}
                   >
                     <p
                       className={`font-medium text-sm ${
                         isPasswordCompromised
-                          ? "text-amber-700 dark:text-amber-300"
+                          ? "text-warning"
                           : "text-destructive"
                       }`}
                     >
@@ -230,7 +230,7 @@ export function ChangePassword() {
                       {String(passwordState.error)}
                     </p>
                     {isPasswordCompromised && (
-                      <p className="mt-2 text-orange-600 text-xs">
+                      <p className="mt-2 text-warning text-xs">
                         This password appears in a known data breach database.
                         Please choose a unique password you haven't used
                         elsewhere.

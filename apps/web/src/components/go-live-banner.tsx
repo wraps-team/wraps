@@ -128,14 +128,14 @@ export function GoLiveBanner({ orgSlug }: GoLiveBannerProps) {
 
   return (
     <div
-      className="-mt-4 md:-mt-6 flex items-center justify-between gap-4 border-b bg-blue-50 border-blue-200 dark:bg-blue-950/50 dark:border-blue-800 px-4 py-2"
+      className="-mt-4 md:-mt-6 flex items-center justify-between gap-4 border-b bg-info/15 border-info/30 px-4 py-2"
       role="status"
     >
-      <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
+      <div className="flex items-center gap-2 text-info">
         {step === "connect" ? (
-          <CloudUpload className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+          <CloudUpload className="h-4 w-4 shrink-0 text-info" />
         ) : (
-          <Lock className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+          <Lock className="h-4 w-4 shrink-0 text-info" />
         )}
         <p className="text-sm">
           {step === "connect"

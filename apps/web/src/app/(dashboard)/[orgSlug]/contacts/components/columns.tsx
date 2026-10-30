@@ -108,7 +108,7 @@ function SortableHeader({
       {direction === "asc" && <ArrowUp className="ml-2 h-4 w-4" />}
       {direction === "desc" && <ArrowDown className="ml-2 h-4 w-4" />}
       {direction === false && (
-        <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />
+        <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground" />
       )}
     </Button>
   );
@@ -149,7 +149,7 @@ export function createColumns(
                  * entries the way a plain Link push would.
                  */}
                 <Link
-                  className="rounded-sm font-medium outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  className="rounded-sm font-medium outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring"
                   href={detailHref}
                   onClick={(e) => e.stopPropagation()}
                   replace

@@ -97,7 +97,7 @@ export function MobileRescueGate({
         <CardContent className="space-y-4">
           {emailSent ? (
             <div className="flex flex-col items-center space-y-3 rounded-lg bg-muted/50 p-4 text-center">
-              <CheckCircleIcon className="h-8 w-8 text-green-600" />
+              <CheckCircleIcon className="h-8 w-8 text-success" />
               <p className="font-medium">Check your inbox!</p>
               <p className="text-muted-foreground text-sm">
                 We sent a link to <strong>{userEmail}</strong>. Open it on your

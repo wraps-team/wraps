@@ -81,7 +81,7 @@ export function InfrastructureStatusCard({
             <div className="space-y-1">
               {verifiedDomains.map((domain) => (
                 <div className="flex items-center gap-2 text-sm" key={domain}>
-                  <CheckCircle2Icon className="h-3.5 w-3.5 text-green-600" />
+                  <CheckCircle2Icon className="h-3.5 w-3.5 text-success" />
                   <span className="font-mono text-xs">{domain}</span>
                 </div>
               ))}

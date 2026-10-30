@@ -61,7 +61,7 @@ function ActivityCard({
             className={cn(
               "flex h-10 w-10 items-center justify-center rounded-lg",
               isComplete
-                ? "bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400"
+                ? "bg-success/15 text-success"
                 : "bg-primary/10 text-primary"
             )}
           >
@@ -125,9 +125,7 @@ export function ExploreFirstDashboard({
               <div
                 className={cn(
                   "h-2 w-2 rounded-full",
-                  activity.complete
-                    ? "bg-green-600 dark:bg-green-500"
-                    : "bg-muted-foreground/30"
+                  activity.complete ? "bg-success" : "bg-muted-foreground/30"
                 )}
               />
               <span

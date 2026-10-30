@@ -173,7 +173,7 @@ export function RecipientsPanel({
               <p className="font-medium text-destructive text-sm">
                 Couldn't load recipient outcomes.
               </p>
-              <p className="text-destructive/80 text-xs">{state.message}</p>
+              <p className="text-destructive text-xs">{state.message}</p>
             </div>
           </div>
         )}

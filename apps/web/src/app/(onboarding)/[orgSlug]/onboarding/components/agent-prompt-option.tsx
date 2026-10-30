@@ -76,7 +76,7 @@ export function AgentPromptOption({
       </div>
 
       {expanded && (
-        <pre className="overflow-x-auto whitespace-pre-wrap break-words border-t bg-muted/50 px-4 py-4 font-mono text-[13px] text-foreground/90 leading-relaxed">
+        <pre className="overflow-x-auto whitespace-pre-wrap break-words border-t bg-muted/50 px-4 py-4 font-mono text-[13px] text-foreground leading-relaxed">
           {prompt}
         </pre>
       )}

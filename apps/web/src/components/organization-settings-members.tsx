@@ -98,15 +98,15 @@ type BadgeVariant = ComponentProps<typeof Badge>["variant"];
 const roleConfig = {
   owner: {
     icon: Crown,
-    color: "text-yellow-600 dark:text-yellow-400",
-    bgColor: "bg-yellow-100 dark:bg-yellow-900",
+    color: "text-warning",
+    bgColor: "bg-warning/15",
     label: "Owner",
     variant: "warning" as BadgeVariant,
   },
   admin: {
     icon: Shield,
-    color: "text-blue-600 dark:text-blue-400",
-    bgColor: "bg-blue-100 dark:bg-blue-900",
+    color: "text-info",
+    bgColor: "bg-info/15",
     label: "Admin",
     variant: "info" as BadgeVariant,
   },
@@ -119,8 +119,8 @@ const roleConfig = {
   },
   marketing: {
     icon: Megaphone,
-    color: "text-orange-600 dark:text-orange-400",
-    bgColor: "bg-orange-100 dark:bg-orange-900",
+    color: "text-brand-text",
+    bgColor: "bg-brand/15",
     label: "Marketing",
     variant: "brand" as BadgeVariant,
   },
@@ -133,8 +133,8 @@ const roleConfig = {
   },
   billing: {
     icon: CreditCard,
-    color: "text-green-600 dark:text-green-400",
-    bgColor: "bg-green-100 dark:bg-green-900",
+    color: "text-success",
+    bgColor: "bg-success/15",
     label: "Billing",
     variant: "success" as BadgeVariant,
   },

@@ -23,7 +23,7 @@ export function TopPerformers({ orgSlug }: { orgSlug: string }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-green-500" />
+            <TrendingUp className="h-5 w-5 text-success" />
             Top Performing Emails
           </CardTitle>
         </CardHeader>
@@ -43,7 +43,7 @@ export function TopPerformers({ orgSlug }: { orgSlug: string }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-green-500" />
+            <TrendingUp className="h-5 w-5 text-success" />
             Top Performing Emails
           </CardTitle>
         </CardHeader>
@@ -62,7 +62,7 @@ export function TopPerformers({ orgSlug }: { orgSlug: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-green-500" />
+          <TrendingUp className="h-5 w-5 text-success" />
           Top Performing Emails
         </CardTitle>
       </CardHeader>
@@ -82,14 +82,14 @@ export function TopPerformers({ orgSlug }: { orgSlug: string }) {
             </div>
             <div className="flex items-center gap-3 text-muted-foreground text-xs">
               <div className="flex items-center gap-1">
-                <span className="font-medium text-green-600 dark:text-green-400">
+                <span className="font-medium text-success">
                   {email.openRate}%
                 </span>
                 <span>opens</span>
               </div>
               <div className="h-1 w-1 rounded-full bg-muted-foreground" />
               <div className="flex items-center gap-1">
-                <span className="font-medium text-blue-600 dark:text-blue-400">
+                <span className="font-medium text-info">
                   {email.clickRate}%
                 </span>
                 <span>clicks</span>

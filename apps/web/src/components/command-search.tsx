@@ -144,7 +144,7 @@ const CommandItem = forwardRef<
 >(({ className, shortcut, children, ...props }, ref) => (
   <CommandPrimitive.Item
     className={cn(
-      "relative flex h-12 cursor-pointer select-none items-center gap-2 rounded-lg px-4 text-sm text-foreground/80 outline-none transition-colors data-[disabled=true]:pointer-events-none data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground data-[disabled=true]:opacity-50 [&+[cmdk-item]]:mt-1",
+      "relative flex h-12 cursor-pointer select-none items-center gap-2 rounded-lg px-4 text-sm text-foreground outline-none transition-colors data-[disabled=true]:pointer-events-none data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground data-[disabled=true]:opacity-50 [&+[cmdk-item]]:mt-1",
       className
     )}
     ref={ref}
@@ -181,22 +181,22 @@ function getStatusStyle(status: string | null): string | null {
   }
   const s = status.toLowerCase();
   if (s === "draft") {
-    return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+    return "bg-warning/15 text-warning";
   }
   if (s === "published" || s === "enabled" || s === "completed") {
-    return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+    return "bg-success/15 text-success";
   }
   if (s === "archived" || s === "paused") {
-    return "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-muted-foreground";
+    return "bg-muted text-muted-foreground";
   }
   if (s === "scheduled") {
-    return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+    return "bg-info/15 text-info";
   }
   if (s === "default") {
     return "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400";
   }
   if (s === "failed") {
-    return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+    return "bg-destructive/15 text-destructive";
   }
   return null;
 }

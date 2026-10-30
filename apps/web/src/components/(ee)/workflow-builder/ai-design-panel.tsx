@@ -290,7 +290,7 @@ export function AIDesignPanel({ orgSlug, workflowId }: AIDesignPanelProps) {
 
       {/* Usage Warning Banner */}
       {aiUsage?.warning && (
-        <div className="flex items-center gap-2 border-b bg-amber-50 px-3 py-2 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+        <div className="flex items-center gap-2 border-b bg-warning/15 px-3 py-2 text-warning">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
           <p className="text-xs">{aiUsage.warning}</p>
         </div>
@@ -302,8 +302,8 @@ export function AIDesignPanel({ orgSlug, workflowId }: AIDesignPanelProps) {
         emptyState={
           aiUsage && aiUsage.remaining === 0 && messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950">
-                <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-warning/15">
+                <AlertTriangle className="h-6 w-6 text-warning" />
               </div>
               <h4 className="mb-1 font-medium text-sm">
                 Monthly Limit Reached

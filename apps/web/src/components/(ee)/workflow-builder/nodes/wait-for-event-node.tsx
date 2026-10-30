@@ -51,7 +51,7 @@ export function WaitForEventNode({
         )}
       >
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-amber-500 text-white">
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-amber-700 text-white">
             <Hourglass className="h-3 w-3" />
           </div>
           <div className="min-w-0 flex-1">
@@ -69,11 +69,11 @@ export function WaitForEventNode({
       <div className="-bottom-5 absolute right-0 left-0 flex justify-between px-3">
         {/* Event received - left */}
         <div className="flex flex-col items-center">
-          <span className="mb-0.5 font-medium text-[8px] text-green-600 dark:text-green-400">
+          <span className="mb-0.5 font-medium text-[8px] text-success">
             Event
           </span>
           <Handle
-            className="!relative !transform-none !bg-green-500 !w-2.5 !h-2.5 !border-2 !border-background"
+            className="!relative !transform-none !bg-success !w-2.5 !h-2.5 !border-2 !border-background"
             id="yes"
             position={Position.Bottom}
             type="source"
@@ -95,11 +95,11 @@ export function WaitForEventNode({
 
         {/* Timeout - right */}
         <div className="flex flex-col items-center">
-          <span className="mb-0.5 font-medium text-[8px] text-yellow-600 dark:text-yellow-400">
+          <span className="mb-0.5 font-medium text-[8px] text-warning">
             Timeout
           </span>
           <Handle
-            className="!relative !transform-none !bg-yellow-500 !w-2.5 !h-2.5 !border-2 !border-background"
+            className="!relative !transform-none !bg-warning !w-2.5 !h-2.5 !border-2 !border-background"
             id="timeout"
             position={Position.Bottom}
             type="source"

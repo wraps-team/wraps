@@ -319,7 +319,9 @@ export function InsightsSection({
         <TrendingDownIcon
           className={cn(
             "h-4 w-4",
-            anomaly.severity === "critical" ? "text-red-500" : "text-amber-500"
+            anomaly.severity === "critical"
+              ? "text-destructive"
+              : "text-warning"
           )}
         />
       );
@@ -330,7 +332,9 @@ export function InsightsSection({
         <TrendingDownIcon
           className={cn(
             "h-4 w-4",
-            anomaly.severity === "critical" ? "text-red-500" : "text-amber-500"
+            anomaly.severity === "critical"
+              ? "text-destructive"
+              : "text-warning"
           )}
         />
       );
@@ -341,7 +345,9 @@ export function InsightsSection({
         <TrendingUpIcon
           className={cn(
             "h-4 w-4",
-            anomaly.severity === "critical" ? "text-red-500" : "text-amber-500"
+            anomaly.severity === "critical"
+              ? "text-destructive"
+              : "text-warning"
           )}
         />
       );
@@ -383,7 +389,7 @@ export function InsightsSection({
         <AlertTriangleIcon
           className={cn(
             "h-4 w-4",
-            severity === "critical" ? "text-red-500" : "text-amber-500"
+            severity === "critical" ? "text-destructive" : "text-warning"
           )}
         />
       ),
@@ -417,7 +423,7 @@ export function InsightsSection({
           <BarChart3Icon
             className={cn(
               "h-4 w-4",
-              severity === "critical" ? "text-red-500" : "text-amber-500"
+              severity === "critical" ? "text-destructive" : "text-warning"
             )}
           />
         ),
@@ -444,7 +450,7 @@ export function InsightsSection({
       emailAnalytics.complaintRate > 0.3 ? "critical" : "warning";
     insights.push({
       id: "complaint-rate",
-      icon: <ShieldAlertIcon className="h-4 w-4 text-red-500" />,
+      icon: <ShieldAlertIcon className="h-4 w-4 text-destructive" />,
       title: `Complaint rate at ${emailAnalytics.complaintRate.toFixed(2)}%`,
       description:
         "AWS SES may suspend sending if this stays above 0.1%. Review your sending practices.",
@@ -533,9 +539,9 @@ export function InsightsSection({
             className={cn(
               "flex items-start gap-3 rounded-lg border p-3",
               insight.severity === "critical" &&
-                "border-red-500/20 bg-red-500/5",
+                "border-destructive/20 bg-destructive/5",
               insight.severity === "warning" &&
-                "border-amber-500/20 bg-amber-500/5",
+                "border-warning/20 bg-warning/5",
               insight.severity === "info" && "border-border"
             )}
             key={insight.id}

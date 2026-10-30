@@ -107,9 +107,9 @@ export function LoginAlerts() {
         <CardContent className="space-y-6">
           {/* Form-level errors */}
           {securityFormErrors.length > 0 && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-4">
               {securityFormErrors.map((error) => (
-                <p className="text-red-600 text-sm" key={String(error)}>
+                <p className="text-destructive text-sm" key={String(error)}>
                   {String(error)}
                 </p>
               ))}
@@ -118,8 +118,8 @@ export function LoginAlerts() {
 
           {/* Success message */}
           {isSecuritySuccess && (
-            <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-              <p className="text-green-600 text-sm">
+            <div className="rounded-lg border border-success/30 bg-success/15 p-4">
+              <p className="text-success text-sm">
                 {securityState &&
                 typeof securityState === "object" &&
                 "message" in securityState
@@ -134,8 +134,8 @@ export function LoginAlerts() {
             typeof securityState === "object" &&
             "error" in securityState &&
             securityState.error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                <p className="font-medium text-red-600 text-sm">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-4">
+                <p className="font-medium text-destructive text-sm">
                   {String(securityState.error)}
                 </p>
               </div>

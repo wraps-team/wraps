@@ -137,9 +137,9 @@ export function CascadeConfig({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {channel.type === "email" ? (
-                    <Mail className="h-3.5 w-3.5 text-blue-500" />
+                    <Mail className="h-3.5 w-3.5 text-info" />
                   ) : (
-                    <MessageSquare className="h-3.5 w-3.5 text-green-500" />
+                    <MessageSquare className="h-3.5 w-3.5 text-success" />
                   )}
                   <span className="font-medium text-xs">
                     Channel {index + 1}
@@ -367,8 +367,8 @@ export function CascadeConfig({
         <p className="font-medium text-xs">Output Paths:</p>
         <ul className="space-y-0.5 text-muted-foreground text-xs">
           <li>
-            <span className="font-medium text-green-600">Engaged</span> —
-            Contact engaged with a channel
+            <span className="font-medium text-success">Engaged</span> — Contact
+            engaged with a channel
           </li>
           <li>
             <span className="font-medium text-muted-foreground">Exhausted</span>{" "}

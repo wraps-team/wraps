@@ -90,13 +90,13 @@ export function DeclineInvitationForm({
         </div>
 
         {/* Warning */}
-        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+        <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/15 p-4">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
           <div className="flex-1 space-y-1">
-            <p className="font-medium text-amber-900 text-sm">
+            <p className="font-medium text-warning text-sm">
               This action cannot be undone
             </p>
-            <p className="text-amber-800 text-sm">
+            <p className="text-warning text-sm">
               If you decline this invitation, you'll need to request a new
               invitation from {invitation.inviter.name} if you change your mind.
             </p>

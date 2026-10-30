@@ -226,7 +226,7 @@ export function SMSRegistrations({ orgSlug }: { orgSlug: string }) {
                       Created {formatDate(reg.createdTimestamp)}
                     </p>
                     {reg.approvedVersionNumber && (
-                      <p className="mt-1 text-green-600 text-xs">
+                      <p className="mt-1 text-success text-xs">
                         Approved v{reg.approvedVersionNumber}
                       </p>
                     )}

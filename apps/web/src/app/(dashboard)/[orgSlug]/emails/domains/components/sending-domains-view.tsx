@@ -87,7 +87,7 @@ function CopyButton({ value }: { value: string }) {
       type="button"
     >
       {copied ? (
-        <CheckCircle2Icon className="h-3.5 w-3.5 text-green-500" />
+        <CheckCircle2Icon className="h-3.5 w-3.5 text-success" />
       ) : (
         <CopyIcon className="h-3.5 w-3.5" />
       )}
@@ -167,7 +167,7 @@ export function SendingDomainsView({
       <AddDomainForm organizationId={organizationId} />
 
       {unreachableAccountIds.length > 0 && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-600/30 bg-amber-600/10 p-3 text-amber-700 text-sm dark:text-amber-400">
+        <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-warning text-sm">
           <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             {unreachableAccountIds.length === 1

@@ -49,7 +49,7 @@ export function AccountTabs({ baseHref, canManage }: AccountTabsProps) {
           <Link
             aria-current={active ? "page" : undefined}
             className={cn(
-              "inline-flex h-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-transparent px-3 py-1 font-medium text-foreground text-sm transition-colors focus-visible:border-ring focus-visible:outline-1 focus-visible:outline-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:text-muted-foreground",
+              "inline-flex h-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-transparent px-3 py-1 font-medium text-foreground text-sm transition-colors focus-visible:border-ring focus-visible:outline-1 focus-visible:outline-ring focus-visible:ring-3 focus-visible:ring-ring dark:text-muted-foreground",
               active &&
                 "bg-background shadow-sm dark:border-input dark:bg-input/30 dark:text-foreground"
             )}

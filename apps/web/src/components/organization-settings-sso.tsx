@@ -245,15 +245,13 @@ export function OrganizationSettingsSso({
               <div className="flex items-center gap-2 text-sm">
                 {existingProvider.domainVerified ? (
                   <>
-                    <ShieldCheck className="h-4 w-4 text-green-600" />
-                    <span className="text-green-600">Active</span>
+                    <ShieldCheck className="h-4 w-4 text-success" />
+                    <span className="text-success">Active</span>
                   </>
                 ) : (
                   <>
-                    <ShieldOff className="h-4 w-4 text-yellow-600" />
-                    <span className="text-yellow-600">
-                      Pending verification
-                    </span>
+                    <ShieldOff className="h-4 w-4 text-warning" />
+                    <span className="text-warning">Pending verification</span>
                   </>
                 )}
               </div>
@@ -266,7 +264,7 @@ export function OrganizationSettingsSso({
               /* Active SSO */
               <div className="space-y-4">
                 <div className="rounded-lg bg-muted p-4 text-sm space-y-2">
-                  <p className="font-medium text-green-700 dark:text-green-400">
+                  <p className="font-medium text-success">
                     SSO is active for {existingProvider.domain}
                   </p>
                   <p className="text-muted-foreground">
@@ -345,7 +343,7 @@ export function OrganizationSettingsSso({
                           variant="ghost"
                         >
                           {copiedKey === "dns-hostname" ? (
-                            <Check className="h-4 w-4 text-green-600" />
+                            <Check className="h-4 w-4 text-success" />
                           ) : (
                             <Copy className="h-4 w-4" />
                           )}
@@ -374,7 +372,7 @@ export function OrganizationSettingsSso({
                           variant="ghost"
                         >
                           {copiedKey === "dns-token" ? (
-                            <Check className="h-4 w-4 text-green-600" />
+                            <Check className="h-4 w-4 text-success" />
                           ) : (
                             <Copy className="h-4 w-4" />
                           )}
@@ -582,7 +580,7 @@ export function OrganizationSettingsSso({
                       variant="ghost"
                     >
                       {copiedKey === "redirect-uri" ? (
-                        <Check className="h-4 w-4 text-green-600" />
+                        <Check className="h-4 w-4 text-success" />
                       ) : (
                         <Copy className="h-4 w-4" />
                       )}
@@ -664,7 +662,7 @@ export function OrganizationSettingsSso({
                   variant="ghost"
                 >
                   {copiedKey === "scim-base-url" ? (
-                    <Check className="h-4 w-4 text-green-600" />
+                    <Check className="h-4 w-4 text-success" />
                   ) : (
                     <Copy className="h-4 w-4" />
                   )}
@@ -675,7 +673,7 @@ export function OrganizationSettingsSso({
             {scimToken ? (
               <div className="space-y-2">
                 <p className="text-sm font-medium">SCIM Bearer Token</p>
-                <div className="flex items-center gap-2 rounded-lg border border-yellow-300 bg-yellow-50 p-3 font-mono text-sm dark:border-yellow-700 dark:bg-yellow-950">
+                <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/15 p-3 font-mono text-sm">
                   <span className="flex-1 break-all">{scimToken}</span>
                   <Button
                     aria-label="Copy SCIM bearer token"
@@ -684,7 +682,7 @@ export function OrganizationSettingsSso({
                     variant="ghost"
                   >
                     {copiedKey === "scim-token" ? (
-                      <Check className="h-4 w-4 text-green-600" />
+                      <Check className="h-4 w-4 text-success" />
                     ) : (
                       <Copy className="h-4 w-4" />
                     )}

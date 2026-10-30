@@ -38,12 +38,12 @@ type EnableReadinessDialogProps = {
 
 function getCheckIcon(check: ReadinessCheck) {
   if (check.status === "pass") {
-    return <CheckCircle2 className="h-4 w-4 shrink-0 text-chart-2" />;
+    return <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />;
   }
   if (check.severity === "critical") {
     return <XCircle className="h-4 w-4 shrink-0 text-destructive" />;
   }
-  return <AlertTriangle className="h-4 w-4 shrink-0 text-chart-4" />;
+  return <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />;
 }
 
 function ReadinessCheckRow({ check }: { check: ReadinessCheck }) {
