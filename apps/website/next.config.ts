@@ -58,6 +58,16 @@ const nextConfig = {
         ],
       },
       {
+        // Content-hashed by scripts/subset-fonts.py, so safe to cache for a year.
+        source: "/fonts/subset/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
         source: "/(.*)",
         headers: [
           {
