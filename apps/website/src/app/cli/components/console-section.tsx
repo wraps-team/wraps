@@ -21,22 +21,13 @@ export function CliConsoleSection() {
 
         {/* Console GIF */}
         <div className="group relative mx-auto max-w-4xl">
-          {/* Browser window */}
-          <div className="relative overflow-hidden rounded-2xl border border-border bg-card">
-            {/* Simple browser chrome */}
-            <div className="flex items-center gap-2 border-border border-b bg-muted/40 px-4 py-3">
-              <div className="flex gap-1.5">
-                <div className="size-3 rounded-full bg-muted-foreground/40" />
-                <div className="size-3 rounded-full bg-muted-foreground/40" />
-                <div className="size-3 rounded-full bg-muted-foreground/40" />
-              </div>
-              <span className="ml-2 font-mono text-muted-foreground text-xs">
-                localhost:5555
-              </span>
-            </div>
+          {/* No window frame: the recording sits on the page with a caption. */}
+          <div className="relative">
+            <p className="mb-2 font-mono text-muted-foreground text-xs">
+              localhost:5555
+            </p>
 
-            {/* Screenshot */}
-            <div className="relative aspect-video overflow-hidden bg-muted/20">
+            <div className="relative aspect-video overflow-hidden">
               <video
                 autoPlay
                 className="size-full object-cover object-top"

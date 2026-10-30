@@ -107,7 +107,7 @@ export function DashboardAutomationsSection() {
 
           {/* Screenshot - overflows right */}
           <div className="relative order-1 lg:-mr-32 xl:-mr-48 2xl:-mr-64 lg:order-2">
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
+            <div className="relative overflow-hidden">
               {/* Light mode image */}
               <img
                 alt="Workflow Builder - Light Mode"

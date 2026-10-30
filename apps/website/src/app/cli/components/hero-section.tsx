@@ -106,19 +106,11 @@ export function CliHeroSection() {
 
           {/* Right column - Terminal Demo */}
           <div className="relative">
-            {/* Terminal */}
-            <div className="relative overflow-hidden rounded-xl border border-border bg-card">
-              {/* Terminal header */}
-              <div className="flex items-center gap-2 border-border border-b bg-muted/40 px-4 py-3">
-                <div className="flex gap-1.5">
-                  <div className="size-3 rounded-full bg-muted-foreground/40" />
-                  <div className="size-3 rounded-full bg-muted-foreground/40" />
-                  <div className="size-3 rounded-full bg-muted-foreground/40" />
-                </div>
-                <span className="ml-2 font-mono text-muted-foreground text-xs">
-                  terminal — wraps email init
-                </span>
-              </div>
+            {/* No window frame: the recording sits on the page with a caption. */}
+            <div className="relative">
+              <p className="mb-2 font-mono text-muted-foreground text-xs">
+                terminal — wraps email init
+              </p>
               {/* Asciinema Player — recording canvas keeps its own dark surface */}
               <div className="bg-terminal">
                 <AsciinemaPlayer
