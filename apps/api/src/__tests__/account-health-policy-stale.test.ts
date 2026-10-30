@@ -257,7 +257,13 @@ describe("account-health console-policy-stale notification", () => {
     expect(payload.data).toMatchObject({
       awsAccountId: ACCOUNT_ROW.id,
       version: CURRENT_CONSOLE_POLICY_VERSION - 1,
+      currentVersion: CURRENT_CONSOLE_POLICY_VERSION,
     });
+    // The email names both versions, so the customer can tell which release
+    // they are behind without opening the dashboard.
+    expect(payload.body).toContain(
+      `policy v${CURRENT_CONSOLE_POLICY_VERSION - 1}; the current policy is v${CURRENT_CONSOLE_POLICY_VERSION}`
+    );
     expect(payload.href).toBe(
       `/acme/settings/aws-accounts/${ACCOUNT_ROW.id}/connection`
     );
@@ -332,11 +338,37 @@ describe("account-health console-policy-stale notification", () => {
     expect(mockNotifyOrg).not.toHaveBeenCalled();
   });
 
-  it("does not re-notify a still-behind account on every sweep", async () => {
-    // Probing hourly must not mean notifying hourly. The guard is
-    // notifyOnce's own 24h dedupe against the notification table, which is
-    // independent of the probe throttle — if the two are ever collapsed back
-    // into one window, this fails.
+  it("dedupes once per account per policy version, not per 24h", async () => {
+    // A behind role was emailed every day for as long as it stayed behind.
+    // The guard is now keyed on the policy version the role is behind, with
+    // no time window: one email per account per policy release.
+    ACCOUNT_ROW.consolePolicyVersion = CURRENT_CONSOLE_POLICY_VERSION - 1;
+    ACCOUNT_ROW.consolePolicyCheckedAt = new Date(Date.now() - 60_000);
+    mockProbeConsolePolicyVersion.mockResolvedValue({
+      version: CURRENT_CONSOLE_POLICY_VERSION - 1,
+      unreachable: false,
+    });
+
+    await invoke();
+
+    const staleCheck = mockHasRecentNotification.mock.calls.find(
+      (call) => call[0].type === "aws.role_policy_stale"
+    );
+    expect(staleCheck?.[0]).toMatchObject({
+      since: new Date(0),
+      dataEquals: {
+        key: "policyStaleKey",
+        value: `${ACCOUNT_ROW.id}:v${CURRENT_CONSOLE_POLICY_VERSION}`,
+      },
+    });
+    // The key is written onto the notification, or the next sweep cannot
+    // find it.
+    expect(mockNotifyOrg.mock.calls[0][0].data).toMatchObject({
+      policyStaleKey: `${ACCOUNT_ROW.id}:v${CURRENT_CONSOLE_POLICY_VERSION}`,
+    });
+  });
+
+  it("does not re-notify once this policy version has been notified", async () => {
     ACCOUNT_ROW.consolePolicyVersion = CURRENT_CONSOLE_POLICY_VERSION - 1;
     ACCOUNT_ROW.consolePolicyCheckedAt = new Date(Date.now() - 60_000);
     mockProbeConsolePolicyVersion.mockResolvedValue({

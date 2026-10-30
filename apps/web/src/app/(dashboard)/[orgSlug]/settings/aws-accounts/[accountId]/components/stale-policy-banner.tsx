@@ -52,9 +52,10 @@ export function StalePolicyBanner({
       <AlertDescription>
         <p>
           Wraps can still reach this account, but its wraps-console-access-role
-          is missing permissions added since it was created. Features that
-          depend on them may appear switched off even though they are deployed.
-          Open{" "}
+          is on policy {`v${account.consolePolicyVersion}`}; the current policy
+          is {`v${CURRENT_CONSOLE_POLICY_VERSION}`}, and the permissions added
+          since are missing. Features that depend on them may appear switched
+          off even though they are deployed. Open{" "}
           <a className="underline" href={href}>
             Connection → Role access
           </a>{" "}

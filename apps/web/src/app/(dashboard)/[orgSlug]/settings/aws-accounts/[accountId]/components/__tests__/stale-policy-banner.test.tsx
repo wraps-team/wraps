@@ -54,6 +54,12 @@ describe("StalePolicyBanner", () => {
     ).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Connection → Role access" });
     expect(link).toHaveAttribute("href", "#iam-role");
+    expect(
+      screen.getByText(
+        `is on policy v${CURRENT_CONSOLE_POLICY_VERSION - 1}; the current policy is v${CURRENT_CONSOLE_POLICY_VERSION}`,
+        { exact: false }
+      )
+    ).toBeInTheDocument();
   });
 
   it("renders when consolePolicyVersion is 0 (behind, not absent)", () => {

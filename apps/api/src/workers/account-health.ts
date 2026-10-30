@@ -30,6 +30,11 @@
  * email for a state they chose is noise. The episode starts at the last good
  * check (roleLastReachableAt only moves forward on success), so a role that
  * recovers and breaks again alerts again.
+ * `aws.role_policy_stale` is the other exception: it notifies once per
+ * account per policy version. A behind role still works, the dashboard
+ * banner keeps showing it, and a daily email about the same missing
+ * permissions is noise. A new policy version is new information, so
+ * shipping one notifies again.
  * Per-account errors are logged and skipped — one broken role must not
  * abort the sweep.
  *
@@ -150,13 +155,18 @@ async function notifyOnce(params: {
   data?: Record<string, unknown>;
   /** Dedupe window start; defaults to the last 24h. */
   since?: Date;
+  /** Payload key/value to dedupe on; defaults to this account's id. */
+  dedupeOn?: { key: string; value: string };
 }): Promise<boolean> {
   const since = params.since ?? new Date(Date.now() - DEDUPE_WINDOW_MS);
   const already = await hasRecentNotification({
     organizationId: params.account.organizationId,
     type: params.type,
     since,
-    dataEquals: { key: "awsAccountId", value: params.account.id },
+    dataEquals: params.dedupeOn ?? {
+      key: "awsAccountId",
+      value: params.account.id,
+    },
   });
   if (already) {
     return false;
@@ -178,7 +188,13 @@ async function notifyOnce(params: {
       title: params.title,
       body: params.body,
       href: params.href,
-      data: { awsAccountId: params.account.id, ...params.data },
+      data: {
+        awsAccountId: params.account.id,
+        ...params.data,
+        ...(params.dedupeOn && {
+          [params.dedupeOn.key]: params.dedupeOn.value,
+        }),
+      },
     });
   } catch (error) {
     captureException(error, {
@@ -491,14 +507,27 @@ async function checkAccount(account: AccountRow): Promise<void> {
         // that one is one sweep out of date. A behind-but-working role is
         // not an incident, so this carries no Sentry signal, unlike
         // aws.role_unreachable.
+        //
+        // Notified once per account per policy version, ever (see the header
+        // comment). The key names the version the role is behind, not the
+        // one it is on, so a partial repair (v4 -> v5 of 6) stays quiet and
+        // shipping v7 notifies again.
         if (result.version < CURRENT_CONSOLE_POLICY_VERSION) {
           await notifyOnce({
             account,
             type: "aws.role_policy_stale",
             title: "Your AWS role is behind the current Wraps policy",
-            body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) is missing permissions added since it was created. Wraps can still reach it, but features that depend on the newer permissions may appear switched off even though they are deployed. Open this account in Wraps and see Connection → Role access for the fastest fix.`,
+            body: `The wraps-console-access-role in AWS account ${account.accountId} (${account.region}) is on Wraps console policy v${result.version}; the current policy is v${CURRENT_CONSOLE_POLICY_VERSION}, and the permissions added since are missing. Wraps can still reach it, but features that depend on the newer permissions may appear switched off even though they are deployed. Open this account in Wraps and see Connection → Role access for the fastest fix.`,
             href: connectionHref,
-            data: { version: result.version },
+            data: {
+              version: result.version,
+              currentVersion: CURRENT_CONSOLE_POLICY_VERSION,
+            },
+            since: new Date(0),
+            dedupeOn: {
+              key: "policyStaleKey",
+              value: `${account.id}:v${CURRENT_CONSOLE_POLICY_VERSION}`,
+            },
           });
         }
       }
