@@ -33,7 +33,7 @@ export function BoxLabel({
 }) {
   return (
     <span
-      className={`absolute -top-2.5 left-3 bg-card px-2 font-mono text-2xs uppercase tracking-widest ${tone}`}
+      className={`absolute -top-2.5 left-3 bg-background px-2 font-mono text-2xs uppercase tracking-widest ${tone}`}
     >
       {children}
     </span>
@@ -58,7 +58,7 @@ export function FlowBox({
     <div
       className={`relative rounded-xl border px-3 pt-5 pb-3 sm:px-4 ${
         dashed
-          ? "border-brand/50 border-dashed bg-brand/5"
+          ? "border-brand/50 border-dashed bg-background bg-linear-to-b from-brand/5 to-brand/5"
           : "border-border bg-background"
       } ${className}`}
     >
@@ -68,7 +68,11 @@ export function FlowBox({
   );
 }
 
-/** The outer card every flow sits in. The animation is decorative; the figure caption carries the meaning. */
+/**
+ * The frame every flow sits in. No card around it: the labelled boxes sit
+ * straight on the page, the same way the dashboard's panels do. The animation
+ * is decorative; the figure caption carries the meaning.
+ */
 export function FlowCard({
   stage,
   cardRef,
@@ -81,7 +85,7 @@ export function FlowCard({
   return (
     <div
       aria-hidden="true"
-      className="rounded-2xl border border-border bg-card p-3 text-left shadow-sm sm:p-5"
+      className="text-left"
       data-stage={stage}
       ref={cardRef}
     >
