@@ -6,17 +6,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* League Gothic Condensed Font */
-@font-face {
-  font-family: "League Gothic Condensed";
-  src:
-    url("/fonts/LeagueGothic-Condensed.woff2") format("woff2"),
-    url("/fonts/LeagueGothic-Condensed.woff") format("woff");
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
-
 /* Shared tokens (colours, radius, fonts, chart series) live in
    packages/ui/src/styles/theme.css. Only marketing-site extras go here. */
 @theme inline {

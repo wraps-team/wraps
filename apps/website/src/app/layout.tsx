@@ -2,6 +2,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { preload } from "react-dom";
 import { AnalyticsProvider } from "@/components/analytics-provider";
 import { AttributionLinks } from "@/components/attribution-links";
 import { JsonLd } from "@/components/json-ld";
@@ -10,7 +11,8 @@ import { ThemeShortcut } from "@/components/theme-shortcut";
 import { WebMCP } from "@/components/webmcp";
 import { SidebarConfigProvider } from "@/contexts/sidebar-context";
 import { InViewProvider } from "@/hooks/use-shared-in-view";
-import { inter, jetbrainsMono, spaceGrotesk } from "@/lib/fonts";
+import { FONT_PRELOADS } from "@/lib/font-subset.generated";
+import "./font-subset.generated.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -133,12 +135,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Core subset per family. The extended files load only through unicode-range.
+  for (const href of FONT_PRELOADS) {
+    preload(href, { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
+  }
   return (
-    <html
-      className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased`}
-      lang="en"
-      suppressHydrationWarning
-    >
+    <html className="antialiased" lang="en" suppressHydrationWarning>
       <head>
         {/* Must block render to avoid a theme flash, so not next/script */}
         <script suppressHydrationWarning /* baseline:allow-no-sync-scripts */>
@@ -159,7 +161,7 @@ export default function RootLayout({
         <JsonLd data={organizationSchema} />
         <JsonLd data={websiteSchema} />
       </head>
-      <body className={inter.className}>
+      <body>
         <NuqsAdapter>
           <ThemeProvider defaultTheme="system" storageKey="wraps-ui-theme">
             <ThemeShortcut />
