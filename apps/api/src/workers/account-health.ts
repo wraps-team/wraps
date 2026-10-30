@@ -23,15 +23,21 @@
  *                             CURRENT_CONSOLE_POLICY_VERSION — permissions
  *                             added since the role was created are missing.
  *
- * Each alert is deduped per account per 24h via hasRecentNotification, so
- * an ongoing episode notifies once per day rather than once per hour.
- * `aws.role_unreachable` is the exception: it notifies once per episode. A
- * customer who removed the role on purpose will not repair it, and a daily
- * email for a state they chose is noise. The episode starts at the last good
- * check (roleLastReachableAt only moves forward on success), so a role that
- * recovers and breaks again alerts again.
- * `aws.role_policy_stale` is the other exception: it notifies once per
- * account per policy version. A behind role still works, the dashboard
+ * Each alert notifies once per episode: when the account goes into the
+ * condition, not on every sweep while it stays there. The SES alerts
+ * (sending paused, reputation, quota) tell an episode apart by comparing this
+ * sweep's reading against the previous sweep's, persisted in healthDetail; a
+ * condition the previous sweep already saw is ongoing and stays quiet. A
+ * repeated daily alert for one state was 71 inbox rows for one account, so
+ * the 24h dedupe via hasRecentNotification is now only a floor that stops a
+ * reading hovering at a threshold from alerting every hour.
+ * `aws.role_unreachable` has no healthDetail to compare against, so its
+ * episode starts at the last good check instead (roleLastReachableAt only
+ * moves forward on success): a role that recovers and breaks again alerts
+ * again. A customer who removed the role on purpose will not repair it, and a
+ * daily email for a state they chose is noise.
+ * `aws.role_policy_stale` treats each policy version as the event: it
+ * notifies once per account per version. A behind role still works, the dashboard
  * banner keeps showing it, and a daily email about the same missing
  * permissions is noise. A new policy version is new information, so
  * shipping one notifies again.
@@ -103,6 +109,7 @@ type AccountRow = {
   roleLastReachableAt: Date | null;
   consolePolicyVersion: number | null;
   consolePolicyCheckedAt: Date | null;
+  healthDetail: typeof awsAccount.$inferSelect.healthDetail;
 };
 
 async function getOrgSlug(organizationId: string): Promise<string | null> {
@@ -348,6 +355,42 @@ async function readVdmState(
   }
 }
 
+/**
+ * Which SES alert conditions the previous sweep already observed, read off
+ * the healthDetail it persisted. A condition seen last time is an ongoing
+ * episode the customer was already told about. No healthDetail (never swept,
+ * or the last verdict write never ran) reads as all clear, so the first
+ * sweep to see a problem reports it. The verdict write is skipped when the
+ * CloudWatch read throws, so this can be older than one sweep; the 24h
+ * dedupe still bounds what that costs.
+ */
+function previousConditions(detail: AccountRow["healthDetail"]): {
+  sendingPaused: boolean;
+  reputation: boolean;
+  quota: boolean;
+} {
+  if (!detail) {
+    return { sendingPaused: false, reputation: false, quota: false };
+  }
+  return {
+    // Truthiness, as in the live check below: a row written before
+    // enforcementStatus existed has no key at all, and reading that as
+    // "already paused" would silence the worst alert in this worker.
+    sendingPaused:
+      detail.sendingEnabled === false ||
+      (Boolean(detail.enforcementStatus) &&
+        detail.enforcementStatus !== "HEALTHY"),
+    reputation:
+      (detail.bounceRate !== null &&
+        detail.bounceRate >= SES_THRESHOLDS.bounce.review) ||
+      (detail.complaintRate !== null &&
+        detail.complaintRate >= SES_THRESHOLDS.complaint.review),
+    quota:
+      detail.quotaUsedRatio !== null &&
+      detail.quotaUsedRatio >= SES_THRESHOLDS.quotaWarnRatio,
+  };
+}
+
 async function checkAccount(account: AccountRow): Promise<void> {
   const orgSlug = await getOrgSlug(account.organizationId);
   if (!orgSlug) {
@@ -540,11 +583,14 @@ async function checkAccount(account: AccountRow): Promise<void> {
     });
   }
 
+  const previously = previousConditions(account.healthDetail);
+
   // 1. Sending paused / enforcement problems — the catastrophic one.
   const enforcement = info.EnforcementStatus;
   if (
-    info.SendingEnabled === false ||
-    (enforcement && enforcement !== "HEALTHY")
+    !previously.sendingPaused &&
+    (info.SendingEnabled === false ||
+      (enforcement && enforcement !== "HEALTHY"))
   ) {
     await notifyOnce({
       account,
@@ -593,7 +639,11 @@ async function checkAccount(account: AccountRow): Promise<void> {
   // 3. Daily quota approaching.
   const max24h = info.SendQuota?.Max24HourSend ?? 0;
   const sent24h = info.SendQuota?.SentLast24Hours ?? 0;
-  if (max24h > 0 && sent24h / max24h >= SES_THRESHOLDS.quotaWarnRatio) {
+  if (
+    !previously.quota &&
+    max24h > 0 &&
+    sent24h / max24h >= SES_THRESHOLDS.quotaWarnRatio
+  ) {
     const pct = Math.round((sent24h / max24h) * 100);
     await notifyOnce({
       account,
@@ -625,7 +675,7 @@ async function checkAccount(account: AccountRow): Promise<void> {
     bounceRate !== null && bounceRate >= SES_THRESHOLDS.bounce.review;
   const complaintHigh =
     complaintRate !== null && complaintRate >= SES_THRESHOLDS.complaint.review;
-  if (bounceHigh || complaintHigh) {
+  if (!previously.reputation && (bounceHigh || complaintHigh)) {
     const parts: string[] = [];
     if (bounceHigh) {
       parts.push(
@@ -723,6 +773,7 @@ export const handler: Handler = wrapHandler(async () =>
             roleLastReachableAt: awsAccount.roleLastReachableAt,
             consolePolicyVersion: awsAccount.consolePolicyVersion,
             consolePolicyCheckedAt: awsAccount.consolePolicyCheckedAt,
+            healthDetail: awsAccount.healthDetail,
           })
           .from(awsAccount)
           .where(isNotNull(awsAccount.webhookSecret));
