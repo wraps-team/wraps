@@ -6,7 +6,7 @@
 // <lastmod>, which cannot be derived at build time: see the script header.
 
 export const PAGE_DATES: Record<string, string> = {
-  "/": "2026-10-30T14:29:19-06:00",
+  "/": "2026-10-30T14:31:42-06:00",
   "/about": "2026-10-30T11:20:41-06:00",
   "/agents": "2026-10-30T11:20:41-06:00",
   "/alternatives": "2026-10-30T11:20:41-06:00",
@@ -50,8 +50,8 @@ export const PAGE_DATES: Record<string, string> = {
   "/blog/yc-w26-email-security-audit": "2026-10-30T11:20:41-06:00",
   "/blog/your-dmarc-policy-is-useless": "2026-10-30T11:20:41-06:00",
   "/byoc": "2026-10-30T11:20:41-06:00",
-  "/changelog": "2026-10-30T11:20:41-06:00",
-  "/cli": "2026-10-30T14:29:19-06:00",
+  "/changelog": "2026-10-30T16:12:21-06:00",
+  "/cli": "2026-10-30T14:31:42-06:00",
   "/compare": "2026-10-30T11:20:41-06:00",
   "/compare/amazon-ses-vs-wraps": "2026-10-30T11:20:41-06:00",
   "/compare/customer-io-vs-wraps": "2026-10-30T11:20:41-06:00",
@@ -175,7 +175,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/migrate/postmark": "2026-10-30T11:20:41-06:00",
   "/migrate/resend": "2026-10-30T11:20:41-06:00",
   "/migrate/sendgrid": "2026-10-30T11:20:41-06:00",
-  "/platform": "2026-10-30T14:29:19-06:00",
+  "/platform": "2026-10-30T14:31:42-06:00",
   "/privacy": "2026-08-28T11:14:02-06:00",
   "/sdk": "2026-10-30T11:20:41-06:00",
   "/security": "2026-10-30T11:20:41-06:00",
