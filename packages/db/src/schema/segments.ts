@@ -80,7 +80,9 @@ export const segment = pgTable(
     lastComputedAt: timestamp("last_computed_at"),
 
     // Audit
-    createdBy: text("created_by").references(() => user.id),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

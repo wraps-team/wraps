@@ -70,6 +70,8 @@ export function DeleteAccount() {
                 <AlertDialogDescription>
                   This action cannot be undone. This will permanently delete
                   your account and remove all associated data from our servers.
+                  Organizations where you are the only member are deleted too,
+                  and their paid subscriptions are canceled immediately.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

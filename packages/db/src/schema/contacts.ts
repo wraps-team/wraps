@@ -181,7 +181,9 @@ export const contact = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
 
     // Audit
-    createdBy: text("created_by").references(() => user.id),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
 
     // ═══════════════════════════════════════════════════════════════════════
     // DEPRECATED FIELDS (kept for backwards compatibility)
@@ -273,7 +275,9 @@ export const topic = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
 
     // Audit
-    createdBy: text("created_by").references(() => user.id),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => ({
     orgIdx: index("topic_org_idx").on(table.organizationId),

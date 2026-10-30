@@ -277,7 +277,8 @@ export function OrganizationSettingsGeneral({
                     <AlertDialogDescription>
                       This action cannot be undone. This will permanently delete
                       the organization, all members, templates, contacts,
-                      workflows, and associated data.
+                      workflows, and associated data. Any paid subscription is
+                      canceled immediately.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
