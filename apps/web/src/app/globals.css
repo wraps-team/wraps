@@ -1,56 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@wraps/ui/styles/theme.css";
 
 @source "../../../../packages/ui/src";
 @source "../../node_modules/@byo-oss/notifications/dist";
 
 @custom-variant dark (&:is(.dark *));
 
+/* Shared tokens (colours, radius, fonts, chart series) live in
+   packages/ui/src/styles/theme.css. Only dashboard-specific extras go here. */
 @theme inline {
-  --font-sans: var(--font-inter);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
-  --color-brand: var(--brand);
-  --color-brand-foreground: var(--brand-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
   --animate-rainbow: rainbow var(--speed, 2s) infinite linear;
   --color-color-5: var(--color-5);
   --color-color-4: var(--color-4);
@@ -65,169 +24,19 @@
       background-position: 200%;
     }
   }
-  --font-heading: var(--font-geist);
-  --font-body: var(--font-geist);
-  --font-mono: var(--font-geist-mono);
-  --font-geist: var(--font-geist);
-  --font-geist-mono: var(--font-geist-mono);
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  /*
-   * Semantic status colours, tuned as TEXT rather than as fill.
-   *
-   * That is how they are actually used: `text-success` / `text-warning` carry
-   * the list-health figures and the status badges, while only a handful of
-   * call sites use a solid `bg-*`. The original values were picked as fills
-   * and then reused as text, and on this near-white ground they failed WCAG
-   * AA badly - warning measured 2.37:1 and success 3.75:1 against --card,
-   * where 1.4.3 requires 4.5:1.
-   *
-   * Text on white needs roughly L <= 0.55 at this chroma. The binding ground
-   * is not the card but the tinted badge (`bg-warning/15` composited over the
-   * card), which is always worse than the card behind it; these clear 4.5:1
-   * there - success 4.54:1, warning 4.64:1, info 4.62:1 - and land at
-   * 5.6-5.8:1 against plain --card / --background.
-   *
-   * --warning is the tight one, pinned in a narrow band from both sides:
-   * lighter than L 0.52 and the badge text fails, darker and the near-black
-   * checkmark on a solid `bg-warning` drops under the 3:1 that 1.4.11 asks of
-   * non-text. Its chroma stops at 0.125 because 0.13 at this lightness falls
-   * outside sRGB and the browser silently clips it.
-   *
-   * --warning-foreground stays near-black deliberately: lib/preference-theme/
-   * ramp.ts hardcodes the same pair for customer-authored preference-centre
-   * themes, so flipping one without the other would split the two.
-   *
-   * The dark theme is a separate and already-passing set - do not copy these
-   * values down to it.
-   */
-  --success: oklch(0.5 0.15 145);
-  --success-foreground: oklch(0.985 0 0);
-  --warning: oklch(0.52 0.125 55);
-  --warning-foreground: oklch(0.205 0 0);
-  --info: oklch(0.51 0.14 250);
-  --info-foreground: oklch(0.985 0 0);
-  --brand: oklch(0.705 0.213 47.604);
-  --brand-foreground: oklch(0.985 0 0);
   --color-1: oklch(66.2% 0.225 25.9);
   --color-2: oklch(60.4% 0.26 302);
   --color-3: oklch(69.6% 0.165 251);
   --color-4: oklch(80.2% 0.134 225);
   --color-5: oklch(90.7% 0.231 133);
-
-  /*
-   * Chart series palette.
-   *
-   * Hue is fixed per series and only lightness moves between themes, so a line
-   * keeps its identity when the theme flips and when the reader moves between
-   * pages. Before this existed every chart hand-wrote its own oklch() pair and
-   * they drifted: "sent" was blue at 250 on one page and green at 160 on the
-   * next, and two charts still carried hsl() literals - one of them
-   * `hsl(var(--primary))`, which is invalid CSS because --primary is oklch.
-   *
-   * Named by role rather than by metric so a new chart has somewhere to land:
-   * attention covers opens and suppression, secondary covers inbound and the
-   * second channel in a two-channel chart.
-   */
-  --series-volume: oklch(0.5 0.15 250);
-  --series-success: oklch(0.48 0.15 160);
-  --series-attention: oklch(0.55 0.15 80);
-  --series-engagement: oklch(0.48 0.2 320);
-  --series-failure: oklch(0.52 0.19 25);
-  --series-secondary: oklch(0.5 0.11 200);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-  --success: oklch(0.65 0.2 145);
-  --success-foreground: oklch(0.985 0 0);
-  --warning: oklch(0.8 0.18 55);
-  --warning-foreground: oklch(0.205 0 0);
-  --info: oklch(0.68 0.15 250);
-  --info-foreground: oklch(0.985 0 0);
-  --brand: oklch(0.75 0.183 55.934);
-  --brand-foreground: oklch(0.985 0 0);
-  --color-1: oklch(66.2% 0.225 25.9);
-  --color-2: oklch(60.4% 0.26 302);
-  --color-3: oklch(69.6% 0.165 251);
-  --color-4: oklch(80.2% 0.134 225);
-  --color-5: oklch(90.7% 0.231 133);
-
-  /* Same hues as :root, lifted for a dark surface. */
-  --series-volume: oklch(0.7 0.13 250);
-  --series-success: oklch(0.68 0.14 160);
-  --series-attention: oklch(0.75 0.14 80);
-  --series-engagement: oklch(0.72 0.16 320);
-  --series-failure: oklch(0.7 0.17 25);
-  --series-secondary: oklch(0.72 0.1 200);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;
@@ -307,9 +116,6 @@
   pre {
     font-family: var(--font-mono);
   }
-  html {
-    @apply font-geist font-geist-mono;
-  }
 }
 
 /* Ensure consistent font rendering across different DPI levels */
@@ -323,20 +129,6 @@
 [data-sidebar-none-mode] [data-slot="sidebar"] {
   height: 100vh !important;
   min-height: 100vh !important;
-}
-
-/* Fix for right-side inset variant support */
-@media (min-width: 768px) {
-  /* Right sidebar inset variant - margin adjustments */
-  [data-side="right"][data-variant="inset"] ~ [data-slot="sidebar-inset"] {
-    margin-right: 0 !important;
-  }
-
-  /* Right sidebar inset variant - collapsed state margin */
-  [data-side="right"][data-variant="inset"][data-state="collapsed"]
-    ~ [data-slot="sidebar-inset"] {
-    margin-right: 0.5rem !important;
-  }
 }
 
 /* Smooth scrolling for the entire page */
