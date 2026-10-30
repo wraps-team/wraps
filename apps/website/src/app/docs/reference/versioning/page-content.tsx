@@ -175,7 +175,7 @@ export default function PageContent() {
           </code>{" "}
           and described by the{" "}
           <a
-            className="text-brand underline underline-offset-4"
+            className="text-brand-text underline underline-offset-4"
             href="https://api.wraps.dev/swagger/json"
             rel="noopener noreferrer"
             target="_blank"
@@ -389,7 +389,7 @@ export default function PageContent() {
         <p className="text-muted-foreground">
           Deprecations are announced in the{" "}
           <Link
-            className="text-brand underline underline-offset-4"
+            className="text-brand-text underline underline-offset-4"
             href="/changelog"
           >
             changelog

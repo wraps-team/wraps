@@ -730,7 +730,7 @@ export default function CustomerIoVsWrapsPage() {
                             </div>
                           </td>
                           <td className="p-4">
-                            <div className="font-medium text-brand">
+                            <div className="font-medium text-brand-text">
                               ${(cioLow - wrapsNum).toLocaleString("en-US")}/mo
                             </div>
                             <div className="font-mono text-2xs text-muted-foreground uppercase tracking-widest">

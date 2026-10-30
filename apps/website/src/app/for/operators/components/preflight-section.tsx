@@ -63,7 +63,7 @@ export function OperatorsPreflightSection() {
             <Card className="border-border/70 bg-card/50" key={step}>
               <CardContent className="p-5">
                 <div className="mb-3 flex items-center gap-2.5">
-                  <Icon className="size-4 text-brand" />
+                  <Icon className="size-4 text-brand-text" />
                   <span className="font-mono text-2xs text-muted-foreground tracking-eyebrow">
                     {step}
                   </span>

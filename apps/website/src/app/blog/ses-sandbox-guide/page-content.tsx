@@ -319,7 +319,7 @@ const ChecklistGroup = ({
               <div
                 className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 transition-colors ${
                   checkedItems.includes(item.id)
-                    ? "border-success bg-success text-white"
+                    ? "border-success bg-success text-success-foreground"
                     : "border-muted-foreground"
                 }`}
               >
@@ -1093,7 +1093,7 @@ export default function SandboxGuideContent() {
 
           <div className="relative space-y-6 border-l-2 border-muted pl-8">
             <div className="relative">
-              <div className="absolute -left-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-primary bg-primary text-white">
+              <div className="absolute -left-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-primary bg-primary text-primary-foreground">
                 <Clock className="h-3 w-3" />
               </div>
               <h4 className="font-semibold">0-24 Hours: Initial Review</h4>

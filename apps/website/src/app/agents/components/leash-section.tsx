@@ -64,7 +64,7 @@ export function AgentsLeashSection() {
               <Card key={check.step}>
                 <CardContent className="p-6">
                   <div className="flex items-start gap-4">
-                    <Icon className="mt-0.5 size-5 shrink-0 text-brand" />
+                    <Icon className="mt-0.5 size-5 shrink-0 text-brand-text" />
                     <div>
                       <div className="flex flex-wrap items-baseline gap-x-2">
                         <span className="font-mono text-muted-foreground text-xs">
@@ -91,7 +91,7 @@ export function AgentsLeashSection() {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-border bg-card p-5">
             <div className="flex items-start gap-3">
-              <Inbox className="mt-0.5 size-4 shrink-0 text-brand" />
+              <Inbox className="mt-0.5 size-4 shrink-0 text-brand-text" />
               <div>
                 <p className="font-medium">
                   Flagged sends wait in an approval queue.
@@ -108,7 +108,7 @@ export function AgentsLeashSection() {
 
           <div className="rounded-lg border border-border bg-card p-5">
             <div className="flex items-start gap-3">
-              <Fingerprint className="mt-0.5 size-4 shrink-0 text-brand" />
+              <Fingerprint className="mt-0.5 size-4 shrink-0 text-brand-text" />
               <div>
                 <p className="font-medium">
                   An agent can't lie about which agent it is.

@@ -207,14 +207,14 @@ export default function BounceRateCalculatorPageContent() {
                 it does not publish and counts only hard bounces to unverified
                 domains, so your SES number can differ. See{" "}
                 <Link
-                  className="text-brand underline underline-offset-2"
+                  className="text-brand-text underline underline-offset-2"
                   href="/ses/bounce-rate"
                 >
                   how SES counts bounces
                 </Link>{" "}
                 and{" "}
                 <Link
-                  className="text-brand underline underline-offset-2"
+                  className="text-brand-text underline underline-offset-2"
                   href="/ses/complaint-rate"
                 >
                   complaints

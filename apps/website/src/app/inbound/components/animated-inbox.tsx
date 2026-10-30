@@ -84,7 +84,7 @@ export function AnimatedInbox() {
       {/* Inbox header */}
       <div className="flex items-center justify-between border-border border-b bg-muted/30 px-4 py-3">
         <div className="flex items-center gap-3">
-          <Inbox aria-hidden="true" className="size-3.5 text-brand" />
+          <Inbox aria-hidden="true" className="size-3.5 text-brand-text" />
           <span className="font-mono text-muted-foreground text-xs">
             inbox@yourapp.com
           </span>

@@ -70,7 +70,7 @@ export function DashboardPricingSection() {
                 >
                   <div
                     className={`mb-1 font-semibold ${
-                      tier.highlight ? "text-brand" : "text-foreground"
+                      tier.highlight ? "text-brand-text" : "text-foreground"
                     }`}
                   >
                     {tier.name}
@@ -117,7 +117,7 @@ export function DashboardPricingSection() {
                       <Check
                         className={`mt-0.5 size-4 shrink-0 ${
                           tier.highlight
-                            ? "text-brand"
+                            ? "text-brand-text"
                             : "text-muted-foreground"
                         }`}
                       />
@@ -133,7 +133,7 @@ export function DashboardPricingSection() {
                         <Check
                           className={`mt-0.5 size-4 shrink-0 ${
                             tier.highlight
-                              ? "text-brand"
+                              ? "text-brand-text"
                               : "text-muted-foreground"
                           }`}
                         />

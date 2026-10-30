@@ -71,7 +71,7 @@ export default function AboutPage() {
           </div>
 
           <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
-            About <span className="text-brand">Wraps</span>
+            About <span className="text-brand-text">Wraps</span>
           </h1>
 
           <p className="text-lg text-muted-foreground">

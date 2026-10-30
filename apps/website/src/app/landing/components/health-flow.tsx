@@ -70,7 +70,7 @@ export function HealthFlow() {
         <div className="space-y-1 font-mono text-xs">
           <Reveal at={2} stage={stage}>
             <p className="text-foreground">
-              <span className="text-brand">$</span> wraps email check
+              <span className="text-brand-text">$</span> wraps email check
               example.com
             </p>
           </Reveal>

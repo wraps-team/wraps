@@ -1466,7 +1466,7 @@ export default function PulumiReferencePageContent() {
             ) of every raw SES event, so a broken pipeline can be repaired and
             replayed instead of losing events, plus a CloudWatch alarm on
             EventBridge delivery failures. This library creates neither. The{" "}
-            <Link className="text-brand underline" href="/byoc">
+            <Link className="text-brand-text underline" href="/byoc">
               BYOC page
             </Link>{" "}
             describes the event pipeline&apos;s replay path. That description is

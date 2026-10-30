@@ -225,7 +225,7 @@ export function AutomationsCodePanel() {
       <FadeIn className="text-center" delay={0.1}>
         <div className="inline-flex items-center gap-2 rounded-full border bg-muted/50 px-4 py-2">
           <code className="text-sm">
-            <span className="text-brand">wraps email workflows push</span>
+            <span className="text-brand-text">wraps email workflows push</span>
           </code>
           <span className="text-muted-foreground text-xs">
             → deploys to Wraps platform
@@ -244,7 +244,7 @@ export function AutomationsCodePanel() {
                 key={feature.title}
               >
                 <div className="mb-3 flex size-12 items-center justify-center rounded-full bg-brand/10">
-                  <Icon className="size-6 text-brand" />
+                  <Icon className="size-6 text-brand-text" />
                 </div>
                 <h4 className="mb-1 font-semibold text-sm">{feature.title}</h4>
                 <p className="text-muted-foreground text-xs leading-relaxed">

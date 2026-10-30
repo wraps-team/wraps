@@ -84,7 +84,7 @@ export function McpToolsSection() {
                 <p className="mb-3 text-muted-foreground text-sm">
                   {tool.description}
                 </p>
-                <p className="font-mono text-muted-foreground/80 text-xs">
+                <p className="font-mono text-muted-foreground text-xs">
                   {tool.prompt}
                 </p>
               </CardContent>

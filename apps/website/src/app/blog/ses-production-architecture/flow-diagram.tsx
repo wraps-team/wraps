@@ -100,7 +100,7 @@ const SESNode = ({ data }: { data: NodeData }) => (
 const SNSNode = ({ data }: { data: NodeData }) => (
   <>
     <Handle
-      className="!bg-pink-500 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-destructive !w-3 !h-3 !border-2 !border-background"
       position={Position.Left}
       type="target"
     />
@@ -111,7 +111,7 @@ const SNSNode = ({ data }: { data: NodeData }) => (
       sublabel={data.sublabel}
     />
     <Handle
-      className="!bg-pink-500 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-destructive !w-3 !h-3 !border-2 !border-background"
       position={Position.Right}
       type="source"
     />
@@ -121,7 +121,7 @@ const SNSNode = ({ data }: { data: NodeData }) => (
 const SQSNode = ({ data }: { data: NodeData }) => (
   <>
     <Handle
-      className="!bg-purple-500 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-info !w-3 !h-3 !border-2 !border-background"
       position={Position.Left}
       type="target"
     />
@@ -132,7 +132,7 @@ const SQSNode = ({ data }: { data: NodeData }) => (
       sublabel={data.sublabel}
     />
     <Handle
-      className="!bg-purple-500 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-info !w-3 !h-3 !border-2 !border-background"
       position={Position.Right}
       type="source"
     />
@@ -205,7 +205,7 @@ const CloudWatchNode = ({ data }: { data: NodeData }) => (
 const EventBridgeNode = ({ data }: { data: NodeData }) => (
   <>
     <Handle
-      className="!bg-pink-500 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-destructive !w-3 !h-3 !border-2 !border-background"
       position={Position.Left}
       type="target"
     />
@@ -216,7 +216,7 @@ const EventBridgeNode = ({ data }: { data: NodeData }) => (
       sublabel={data.sublabel}
     />
     <Handle
-      className="!bg-pink-500 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-destructive !w-3 !h-3 !border-2 !border-background"
       position={Position.Right}
       type="source"
     />
@@ -226,7 +226,7 @@ const EventBridgeNode = ({ data }: { data: NodeData }) => (
 const AppNode = ({ data }: { data: NodeData }) => (
   <>
     <Handle
-      className="!bg-cyan-500 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-info !w-3 !h-3 !border-2 !border-background"
       position={Position.Left}
       type="target"
     />
@@ -237,7 +237,7 @@ const AppNode = ({ data }: { data: NodeData }) => (
       sublabel={data.sublabel}
     />
     <Handle
-      className="!bg-cyan-500 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-info !w-3 !h-3 !border-2 !border-background"
       position={Position.Right}
       type="source"
     />
@@ -247,13 +247,13 @@ const AppNode = ({ data }: { data: NodeData }) => (
 const ConfigSetNode = ({ data }: { data: NodeData }) => (
   <>
     <Handle
-      className="!bg-indigo-500 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-info !w-3 !h-3 !border-2 !border-background"
       id="top"
       position={Position.Top}
       type="target"
     />
     <Handle
-      className="!bg-indigo-500 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-info !w-3 !h-3 !border-2 !border-background"
       id="left"
       position={Position.Left}
       type="target"
@@ -265,13 +265,13 @@ const ConfigSetNode = ({ data }: { data: NodeData }) => (
       sublabel={data.sublabel}
     />
     <Handle
-      className="!bg-indigo-500 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-info !w-3 !h-3 !border-2 !border-background"
       id="bottom"
       position={Position.Bottom}
       type="source"
     />
     <Handle
-      className="!bg-indigo-500 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-info !w-3 !h-3 !border-2 !border-background"
       id="right"
       position={Position.Right}
       type="source"
@@ -317,7 +317,7 @@ const IPPoolNode = ({ data }: { data: NodeData }) => (
 const ISPNode = ({ data }: { data: NodeData }) => (
   <>
     <Handle
-      className="!bg-slate-400 !w-3 !h-3 !border-2 !border-background"
+      className="!bg-muted-foreground !w-3 !h-3 !border-2 !border-background"
       position={Position.Left}
       type="target"
     />

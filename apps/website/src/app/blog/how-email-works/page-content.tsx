@@ -688,7 +688,7 @@ export const SmtpTerminal = () => {
 
       {/* Terminal body */}
       <div
-        className="h-80 overflow-y-auto bg-terminal p-4 font-mono text-sm"
+        className="dark h-80 overflow-y-auto bg-terminal p-4 font-mono text-sm"
         ref={scrollRef}
       >
         <AnimatePresence initial={false}>
@@ -731,7 +731,7 @@ export const SmtpTerminal = () => {
 
       {/* Input */}
       <form
-        className="flex items-center border-t bg-terminal px-4 py-2"
+        className="dark flex items-center border-t bg-terminal px-4 py-2"
         onSubmit={handleSubmit}
       >
         <span className="mr-2 font-mono text-info text-sm">{">"}</span>
@@ -860,7 +860,7 @@ export const MxLookup = () => {
                     key={i}
                     transition={{ delay: i * 0.1, duration: 0.2 }}
                   >
-                    <span className="text-brand">{record.priority}</span>
+                    <span className="text-brand-text">{record.priority}</span>
                     <span className="text-foreground">{record.exchange}</span>
                   </motion.div>
                 ))}
@@ -974,7 +974,9 @@ export const AuthVisualizer = () => {
       <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
         <span className="rounded bg-info/20 px-2 py-0.5 text-info">SPF</span>
         <ArrowRight className="h-3 w-3" />
-        <span className="rounded bg-brand/20 px-2 py-0.5 text-brand">DKIM</span>
+        <span className="rounded bg-brand/20 px-2 py-0.5 text-brand-text">
+          DKIM
+        </span>
         <ArrowRight className="h-3 w-3" />
         <span className="rounded bg-success/20 px-2 py-0.5 text-success">
           DMARC
@@ -1086,12 +1088,12 @@ export const RelayMap = () => {
           >
             {/* Node */}
             {prefersReduced ? (
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand font-bold text-white">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground">
                 {i + 1}
               </div>
             ) : (
               <motion.div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand font-bold text-white"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground"
                 initial={{ scale: 0, opacity: 0 }}
                 transition={{
                   delay: i * 0.2,
@@ -1248,7 +1250,7 @@ export const HeaderChain = () => {
                     expandedHeaders.has(i) ? "rotate-90" : ""
                   }`}
                 />
-                <span className="text-xs font-medium text-brand">
+                <span className="text-xs font-medium text-brand-text">
                   {h.chapter}
                 </span>
                 {viewMode === "parsed" && (

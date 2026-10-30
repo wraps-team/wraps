@@ -55,7 +55,7 @@ export function CliCommandsSection() {
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         {/* Simple inline label */}
         <p className="mb-8 text-center font-mono text-muted-foreground text-sm">
-          <span className="text-brand">$</span> wraps --help
+          <span className="text-brand-text">$</span> wraps --help
         </p>
 
         {/* Commands grid */}
@@ -81,7 +81,7 @@ export function CliCommandsSection() {
                     className="flex items-baseline gap-3 rounded px-2 py-1.5 transition-colors hover:bg-muted/60"
                     key={cmd.command}
                   >
-                    <code className="shrink-0 font-mono text-brand text-xs">
+                    <code className="shrink-0 font-mono text-brand-text text-xs">
                       {cmd.command}
                     </code>
                     <span className="font-mono text-2xs text-muted-foreground">

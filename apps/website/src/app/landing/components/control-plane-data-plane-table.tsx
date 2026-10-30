@@ -73,7 +73,7 @@ export function ControlPlaneDataPlaneTable({
               <li className="flex items-start gap-3" key={item}>
                 <Check
                   aria-hidden="true"
-                  className="mt-0.5 size-4 shrink-0 text-brand"
+                  className="mt-0.5 size-4 shrink-0 text-brand-text"
                 />
                 <span className="text-foreground text-sm">{item}</span>
               </li>

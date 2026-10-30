@@ -67,7 +67,7 @@ export function SdkTabs({ examples }: { examples: CodeExamples }) {
             className={cn(
               "cursor-pointer rounded-lg px-4 py-2 font-mono text-xs uppercase tracking-widest transition-all",
               activeExample === key
-                ? "bg-brand text-white"
+                ? "bg-primary text-primary-foreground"
                 : "border border-border bg-card text-muted-foreground hover:text-foreground"
             )}
             key={key}

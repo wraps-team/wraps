@@ -45,7 +45,9 @@ export function SmsTeaserSection() {
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-10 text-center">
-          <p className="mb-2 font-medium text-brand text-sm">Platform Vision</p>
+          <p className="mb-2 font-medium text-brand-text text-sm">
+            Platform Vision
+          </p>
           <h2 className="mb-3 font-bold text-2xl tracking-tight sm:text-3xl">
             Start with Email. Expand When Ready.
           </h2>
@@ -81,7 +83,7 @@ export function SmsTeaserSection() {
                 >
                   <Icon
                     className={`size-40 ${
-                      isAvailable ? "text-brand" : "text-foreground"
+                      isAvailable ? "text-brand-text" : "text-foreground"
                     }`}
                   />
                 </div>
@@ -92,7 +94,7 @@ export function SmsTeaserSection() {
                     <div
                       className={`flex size-11 items-center justify-center rounded-xl ${
                         isAvailable
-                          ? "bg-brand text-white"
+                          ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground"
                       }`}
                     >
@@ -104,7 +106,7 @@ export function SmsTeaserSection() {
                         Available
                       </span>
                     ) : (
-                      <span className="rounded-full bg-brand/10 px-2 py-1 text-3xs font-medium text-brand">
+                      <span className="rounded-full bg-brand/10 px-2 py-1 text-3xs font-medium text-brand-text">
                         Coming Soon
                       </span>
                     )}
@@ -152,7 +154,9 @@ export function SmsTeaserSection() {
                       >
                         <Check
                           className={`size-3.5 ${
-                            isAvailable ? "text-brand" : "text-muted-foreground"
+                            isAvailable
+                              ? "text-brand-text"
+                              : "text-muted-foreground"
                           }`}
                         />
                         {feature}

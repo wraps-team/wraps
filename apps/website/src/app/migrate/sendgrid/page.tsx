@@ -349,7 +349,7 @@ export default function MigrateFromSendGridPage() {
                   <li className="flex gap-2.5" key={item}>
                     <X
                       aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-muted-foreground/70"
+                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
                     />
                     {item}
                   </li>
@@ -442,7 +442,7 @@ export default function MigrateFromSendGridPage() {
                   <li className="flex gap-2.5" key={item}>
                     <X
                       aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-muted-foreground/70"
+                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
                     />
                     {item}
                   </li>
@@ -536,7 +536,7 @@ export default function MigrateFromSendGridPage() {
                     <li className="flex gap-2.5" key={item}>
                       <X
                         aria-hidden="true"
-                        className="mt-0.5 size-4 shrink-0 text-muted-foreground/70"
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
                       />
                       {item}
                     </li>

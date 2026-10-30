@@ -377,7 +377,7 @@ function BuildMode() {
               and let DKIM leave Pending first. An account with one verified
               address gives the reviewer nothing to check —{" "}
               <Link
-                className="text-brand underline underline-offset-2"
+                className="text-brand-text underline underline-offset-2"
                 href="/docs/guides/domain-verification"
               >
                 domain verification guide

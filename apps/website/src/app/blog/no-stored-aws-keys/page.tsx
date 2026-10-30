@@ -72,14 +72,14 @@ export default function Page() {
           <div className="absolute inset-0 bg-radial-top from-brand/20 via-transparent to-transparent" />
 
           <div className="relative mx-auto max-w-4xl px-6 pt-20 pb-16">
-            <div className="mb-4 flex items-center gap-2 font-medium text-brand text-sm">
+            <div className="mb-4 flex items-center gap-2 font-medium text-brand-text text-sm">
               <ShieldCheck size={16} />
               <span>Security</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">6 min read</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">Wraps Team</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">October 23, 2026</span>
             </div>
 
@@ -98,19 +98,19 @@ export default function Page() {
 
             <div className="mt-8 flex flex-wrap gap-4">
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <KeyRound className="text-brand" size={16} />
+                <KeyRound className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   OIDC on Vercel
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Timer className="text-brand" size={16} />
+                <Timer className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   One-hour role sessions
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <ShieldCheck className="text-brand" size={16} />
+                <ShieldCheck className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Revoke from your side
                 </span>
@@ -556,11 +556,11 @@ const ses = new SESv2Client({
                 your AWS account, with OIDC if you're on Vercel.
               </p>
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand">
+                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand-text">
                   npx @wraps.dev/cli email init
                 </div>
                 <a
-                  className="flex items-center gap-2 rounded-xl bg-brand px-6 py-3 font-semibold text-white transition-colors hover:bg-brand"
+                  className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                   href="/docs/guides/vercel-setup"
                 >
                   Read the Guide

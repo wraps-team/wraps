@@ -71,7 +71,7 @@ export function TrustedBySection() {
 
       {/* <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
         <FadeIn className="mb-8 text-center sm:mb-10">
-          <p className="mb-2 font-medium text-brand text-sm">Built On</p>
+          <p className="mb-2 font-medium text-brand-text text-sm">Built On</p>
           <h2 className="font-bold text-xl text-foreground sm:text-2xl">
             Battle-tested infrastructure
           </h2>

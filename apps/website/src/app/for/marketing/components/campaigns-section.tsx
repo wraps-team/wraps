@@ -49,7 +49,7 @@ export function MarketingCampaignsSection() {
           {capabilities.map(({ icon: Icon, title, description }) => (
             <Card className="border-border/70 bg-card/50" key={title}>
               <CardContent className="p-5">
-                <Icon className="mb-3 size-4 text-brand" />
+                <Icon className="mb-3 size-4 text-brand-text" />
                 <h3 className="mb-2 font-medium text-base tracking-tight">
                   {title}
                 </h3>

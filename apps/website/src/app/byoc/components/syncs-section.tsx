@@ -117,7 +117,7 @@ export function SyncsSection() {
           <p className="text-muted-foreground text-sm">
             Read the generator on{" "}
             <a
-              className="text-brand underline underline-offset-2 hover:text-brand"
+              className="text-brand-text underline underline-offset-2 hover:text-brand-text"
               href="https://github.com/wraps-team/wraps/blob/main/packages/cli/src/commands/platform/update-role.ts"
               rel="noopener noreferrer"
               target="_blank"

@@ -69,12 +69,12 @@ export default function Page() {
           <div className="absolute inset-0 bg-radial-top from-brand/20 via-transparent to-transparent" />
 
           <div className="relative mx-auto max-w-4xl px-6 pt-20 pb-16">
-            <div className="mb-4 flex items-center gap-2 font-medium text-brand text-sm">
+            <div className="mb-4 flex items-center gap-2 font-medium text-brand-text text-sm">
               <Building2 size={16} />
               <span>Product</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">7 min read</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">Wraps Team</span>
             </div>
 
@@ -100,7 +100,7 @@ export default function Page() {
                 "1-year history",
               ].map((tag) => (
                 <span
-                  className="rounded-full border bg-muted/30 px-3 py-1 text-foreground/70 text-sm"
+                  className="rounded-full border bg-muted/30 px-3 py-1 text-muted-foreground text-sm"
                   key={tag}
                 >
                   {tag}

@@ -153,7 +153,7 @@ export default function InboundPage() {
                   </div>
 
                   <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
-                    <span className="text-brand">Every inbox.</span>
+                    <span className="text-brand-text">Every inbox.</span>
                     <br />
                     Your infrastructure.
                   </h1>
@@ -365,7 +365,7 @@ export default function InboundPage() {
               <div className="overflow-hidden rounded-lg border border-border bg-card">
                 <div className="flex items-center justify-between border-border border-b bg-muted/30 px-6 py-4">
                   <div className="flex items-center gap-2">
-                    <Lock className="size-4 text-brand" />
+                    <Lock className="size-4 text-brand-text" />
                     <span className="font-medium text-sm">
                       Your AWS Account
                     </span>
@@ -383,7 +383,7 @@ export default function InboundPage() {
                         <div className="flex items-center" key={node.id}>
                           <div className="flex flex-col items-center rounded-lg border border-border bg-background p-4">
                             <div className="mb-2 flex size-12 items-center justify-center rounded-lg bg-muted">
-                              <Icon className="size-6 text-brand" />
+                              <Icon className="size-6 text-brand-text" />
                             </div>
                             <span className="font-medium text-sm">
                               {node.label}
@@ -394,7 +394,7 @@ export default function InboundPage() {
                           </div>
 
                           {index < architectureNodesData.length - 1 && (
-                            <ArrowRight className="mx-1 size-5 shrink-0 text-muted-foreground/50 sm:mx-2" />
+                            <ArrowRight className="mx-1 size-5 shrink-0 text-muted-foreground sm:mx-2" />
                           )}
                         </div>
                       );
@@ -454,7 +454,7 @@ export default function InboundPage() {
                   <div className="flex items-center gap-3 border-border border-b bg-muted/30 px-4 py-3">
                     <Terminal
                       aria-hidden="true"
-                      className="size-3.5 text-brand"
+                      className="size-3.5 text-brand-text"
                     />
                     <span className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
                       CLI

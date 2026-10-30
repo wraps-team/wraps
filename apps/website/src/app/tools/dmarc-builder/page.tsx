@@ -122,7 +122,7 @@ const faqSchema = {
   })),
 };
 
-const linkClass = "text-brand underline underline-offset-2";
+const linkClass = "text-brand-text underline underline-offset-2";
 
 export default function DmarcBuilderPage() {
   return (
@@ -140,7 +140,7 @@ export default function DmarcBuilderPage() {
                 <span>wraps · free tool</span>
               </div>
               <h1 className="mb-4 text-pretty font-heading font-semibold text-3xl tracking-tight sm:text-5xl">
-                DMARC Record <span className="text-brand">Generator</span>
+                DMARC Record <span className="text-brand-text">Generator</span>
               </h1>
               <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
                 Answer a few questions, copy the TXT value, and see which

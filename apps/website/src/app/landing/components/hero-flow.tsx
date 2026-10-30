@@ -63,11 +63,12 @@ export function HeroFlow() {
     >
       {/* The customer's AWS account */}
       <div className="relative rounded-xl border border-brand/50 border-dashed bg-brand/5 px-3 pt-5 pb-3 sm:px-4">
-        <BoxLabel tone="text-brand">Your AWS account</BoxLabel>
+        <BoxLabel tone="text-brand-text">Your AWS account</BoxLabel>
 
         <Reveal at={1} stage={stage}>
           <p className="font-mono text-foreground text-xs sm:text-sm">
-            <span className="text-brand">$</span> npx @wraps.dev/cli email init
+            <span className="text-brand-text">$</span> npx @wraps.dev/cli email
+            init
           </p>
         </Reveal>
 

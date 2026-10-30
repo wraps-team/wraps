@@ -25,7 +25,7 @@ export function ContactPriceCurve() {
             <th className="px-4 py-2.5 font-normal">Contacts</th>
             <th className="px-3 py-2.5 font-normal">Customer.io</th>
             <th className="px-3 py-2.5 font-normal">Klaviyo</th>
-            <th className="px-4 py-2.5 text-right font-normal text-brand">
+            <th className="px-4 py-2.5 text-right font-normal text-brand-text">
               Wraps
             </th>
           </tr>

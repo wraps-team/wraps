@@ -19,7 +19,7 @@ export function OperatorsHeroSection() {
 
             <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
               Your name is on the send.{" "}
-              <span className="text-brand">So is the paper trail.</span>
+              <span className="text-brand-text">So is the paper trail.</span>
             </h1>
 
             <p className="mb-6 max-w-md text-muted-foreground">

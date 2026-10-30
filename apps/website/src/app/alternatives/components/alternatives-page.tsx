@@ -87,7 +87,7 @@ export function AlternativesPageLayout({ page }: { page: AlternativesPage }) {
                   <li className="p-4 sm:p-5" key={rule.condition}>
                     <p className="font-medium">{rule.condition}</p>
                     <p className="mt-1 flex items-start gap-2 text-muted-foreground text-sm">
-                      <CornerDownRight className="mt-0.5 size-3.5 shrink-0 text-brand" />
+                      <CornerDownRight className="mt-0.5 size-3.5 shrink-0 text-brand-text" />
                       {rule.pick}
                     </p>
                   </li>

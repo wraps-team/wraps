@@ -841,8 +841,9 @@ export default function SesBounceHandlingHandRolledVsWrapsPage() {
 
             <p className="mt-4 text-muted-foreground text-xs">
               <Check className="mb-0.5 inline size-3 text-success" /> = built-in
-              or included, <Minus className="mb-0.5 inline size-3 text-brand" />{" "}
-              = possible but requires manual setup,{" "}
+              or included,{" "}
+              <Minus className="mb-0.5 inline size-3 text-brand-text" /> =
+              possible but requires manual setup,{" "}
               <X className="mb-0.5 inline size-3 text-destructive" /> = not
               available
             </p>
@@ -864,7 +865,7 @@ export default function SesBounceHandlingHandRolledVsWrapsPage() {
                 <ul className="space-y-3">
                   {stillYourJob.map((item) => (
                     <li className="flex items-start gap-3" key={item}>
-                      <Minus className="mt-0.5 size-5 shrink-0 text-brand" />
+                      <Minus className="mt-0.5 size-5 shrink-0 text-brand-text" />
                       <span className="text-muted-foreground">{item}</span>
                     </li>
                   ))}

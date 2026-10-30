@@ -92,7 +92,7 @@ export function DashboardEventsSection() {
                   <Icon
                     aria-hidden="true"
                     className={`size-5 ${
-                      type.counted ? "text-brand" : "text-muted-foreground"
+                      type.counted ? "text-brand-text" : "text-muted-foreground"
                     }`}
                   />
                   <h3 className="font-semibold text-lg">{type.title}</h3>

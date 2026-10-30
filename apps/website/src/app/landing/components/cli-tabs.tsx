@@ -130,7 +130,9 @@ function DeployContent() {
         <div className="flex items-center gap-3">
           <IconBox highlighted icon={Terminal} />
           <div>
-            <h3 className="font-semibold text-brand">Deploy Infrastructure</h3>
+            <h3 className="font-semibold text-brand-text">
+              Deploy Infrastructure
+            </h3>
             <p className="text-muted-foreground text-sm">
               One command deploys everything to AWS
             </p>
@@ -175,7 +177,7 @@ function DeployContent() {
             "Vercel OIDC support",
           ].map((item) => (
             <div className="flex items-center gap-2" key={item}>
-              <Check className="size-4 text-brand" />
+              <Check className="size-4 text-brand-text" />
               <span className="text-sm">{item}</span>
             </div>
           ))}
@@ -200,7 +202,9 @@ function SendContent() {
         <div className="flex items-center gap-3">
           <IconBox highlighted icon={Code2} />
           <div>
-            <h3 className="font-semibold text-brand">Install SDK & Send</h3>
+            <h3 className="font-semibold text-brand-text">
+              Install SDK & Send
+            </h3>
             <p className="text-muted-foreground text-sm">
               Add the package and start sending
             </p>
@@ -279,7 +283,7 @@ function ReceiveContent() {
         <div className="flex items-center gap-3">
           <IconBox highlighted icon={Inbox} />
           <div>
-            <h3 className="font-semibold text-brand">Receive Emails</h3>
+            <h3 className="font-semibold text-brand-text">Receive Emails</h3>
             <p className="text-muted-foreground text-sm">
               Deploy inbound infrastructure to your AWS
             </p>
@@ -362,7 +366,7 @@ function ReceiveContent() {
             "Reply with threading",
           ].map((item) => (
             <div className="flex items-center gap-2" key={item}>
-              <Check className="size-4 text-brand" />
+              <Check className="size-4 text-brand-text" />
               <span className="text-sm">{item}</span>
             </div>
           ))}
@@ -392,7 +396,7 @@ function _ConsoleContent() {
                 </span>
               </div>
             </div>
-            <span className="hidden rounded bg-brand/10 px-2 py-0.5 font-medium text-brand text-xs sm:inline">
+            <span className="hidden rounded bg-brand/10 px-2 py-0.5 font-medium text-brand-text text-xs sm:inline">
               Local Mode
             </span>
           </div>
@@ -425,7 +429,7 @@ function _ConsoleContent() {
               key={feature.title}
             >
               <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-brand/10">
-                <Icon className="size-5 text-brand" />
+                <Icon className="size-5 text-brand-text" />
               </div>
               <h4 className="mb-1 font-semibold text-sm">{feature.title}</h4>
               <p className="text-muted-foreground text-xs leading-relaxed">
@@ -464,7 +468,7 @@ function GlowingTabBar({ activeIndex, onTabClick }: GlowingTabProps) {
                 className={cn(
                   "group relative flex items-center gap-2 overflow-hidden rounded-full px-5 py-2.5 font-medium text-sm transition-all duration-300",
                   isActive
-                    ? "bg-brand text-white shadow-lg shadow-brand/30 scale-105"
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-brand/30 scale-105"
                     : "text-muted-foreground hover:bg-brand/10 hover:text-foreground dark:hover:bg-brand/20"
                 )}
                 key={tab.key}
@@ -479,7 +483,7 @@ function GlowingTabBar({ activeIndex, onTabClick }: GlowingTabProps) {
                     "relative size-4 transition-transform duration-300",
                     isActive
                       ? "scale-110"
-                      : "group-hover:scale-110 group-hover:text-brand"
+                      : "group-hover:scale-110 group-hover:text-brand-text"
                   )}
                 />
                 <span className="relative hidden sm:inline">{tab.label}</span>

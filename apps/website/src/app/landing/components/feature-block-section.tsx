@@ -116,7 +116,7 @@ export function FeatureBlockSection() {
                 <li className="flex items-start gap-3.5" key={check.title}>
                   <Icon
                     aria-hidden="true"
-                    className="mt-0.5 size-5 shrink-0 text-brand"
+                    className="mt-0.5 size-5 shrink-0 text-brand-text"
                   />
                   <div>
                     <h3 className="mb-1 font-semibold text-base text-foreground">

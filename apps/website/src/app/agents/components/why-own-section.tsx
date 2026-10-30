@@ -47,7 +47,7 @@ export function AgentsWhyOwnSection() {
               >
                 <CardContent className="p-6">
                   <div className="flex items-start gap-3">
-                    <Icon className="h-6 w-6 shrink-0 text-brand" />
+                    <Icon className="h-6 w-6 shrink-0 text-brand-text" />
                     <div>
                       <h3 className="font-medium">{reason.title}</h3>
                       <p className="mt-1 text-muted-foreground text-sm">

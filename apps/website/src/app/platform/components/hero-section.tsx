@@ -20,7 +20,7 @@ export function DashboardHeroSection() {
           {/* Main Headline */}
           <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
             Stop overpaying to send{" "}
-            <span className="text-brand">newsletters and campaigns.</span>
+            <span className="text-brand-text">newsletters and campaigns.</span>
           </h1>
 
           {/* Subheading */}

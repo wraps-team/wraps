@@ -17,7 +17,8 @@ export function ByocHeroSection() {
           </div>
 
           <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
-            BYOC sending <span className="text-brand">infrastructure.</span>
+            BYOC sending{" "}
+            <span className="text-brand-text">infrastructure.</span>
           </h1>
 
           <p className="mb-8 max-w-xl text-lg text-muted-foreground">

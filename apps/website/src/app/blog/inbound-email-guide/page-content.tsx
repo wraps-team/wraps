@@ -97,15 +97,15 @@ export function InboundArchitectureDiagram() {
 
   const colorClasses = {
     gray: {
-      bg: "bg-gray-500/10 dark:bg-gray-500/20",
-      border: "border-gray-500/50",
-      text: "text-gray-600 dark:text-gray-400",
-      glow: "shadow-gray-500/25",
+      bg: "bg-muted-foreground/10 dark:bg-muted-foreground/20",
+      border: "border-muted-foreground/50",
+      text: "text-muted-foreground",
+      glow: "shadow-muted-foreground/25",
     },
     orange: {
       bg: "bg-brand/10",
       border: "border-brand/50",
-      text: "text-brand",
+      text: "text-brand-text",
       glow: "shadow-brand/25",
     },
     green: {
@@ -121,16 +121,16 @@ export function InboundArchitectureDiagram() {
       glow: "shadow-warning/25",
     },
     purple: {
-      bg: "bg-purple-500/10 dark:bg-purple-500/20",
-      border: "border-purple-500/50",
-      text: "text-purple-600 dark:text-purple-400",
-      glow: "shadow-purple-500/25",
+      bg: "bg-info/10 dark:bg-info/20",
+      border: "border-info/50",
+      text: "text-info",
+      glow: "shadow-info/25",
     },
     cyan: {
-      bg: "bg-cyan-500/10 dark:bg-cyan-500/20",
-      border: "border-cyan-500/50",
-      text: "text-cyan-600 dark:text-cyan-400",
-      glow: "shadow-cyan-500/25",
+      bg: "bg-info/10 dark:bg-info/20",
+      border: "border-info/50",
+      text: "text-info",
+      glow: "shadow-info/25",
     },
   };
 
@@ -203,9 +203,7 @@ export function InboundArchitectureDiagram() {
                 <div className="flex items-center">
                   <ArrowRight
                     className={`transition-colors duration-300 ${
-                      index < activeStep
-                        ? "text-cyan-600 dark:text-cyan-500"
-                        : "text-muted-foreground/50"
+                      index < activeStep ? "text-info" : "text-muted-foreground"
                     }`}
                     size={16}
                   />
@@ -239,7 +237,7 @@ export function UseCasesGrid() {
       title: "Order Processing",
       description:
         "Parse confirmations, extract tracking numbers, update databases automatically.",
-      color: "text-brand",
+      color: "text-brand-text",
       bgColor: "bg-brand/10",
     },
     {
@@ -261,7 +259,7 @@ export function UseCasesGrid() {
       icon: Users,
       title: "Lead Capture",
       description: "Extract contact info from inquiries, sync to CRM.",
-      color: "text-brand",
+      color: "text-brand-text",
       bgColor: "bg-brand/10",
     },
     {
@@ -412,7 +410,7 @@ export function CLIDemo() {
         ✓ Inbound infrastructure deployed!
       </AnimatedSpan>
 
-      <AnimatedSpan className="text-brand" delay={7500}>
+      <AnimatedSpan className="text-brand-text" delay={7500}>
         MX Record: 10 inbound-smtp.us-east-1.amazonaws.com
       </AnimatedSpan>
 

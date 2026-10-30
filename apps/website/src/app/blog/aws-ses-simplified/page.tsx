@@ -208,9 +208,9 @@ export default function Page() {
             <div className="mb-4 flex items-center gap-2 font-medium text-success text-sm">
               <Terminal size={16} />
               <span>Engineering</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">10 min read</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">Wraps Team</span>
             </div>
 
@@ -1074,7 +1074,7 @@ wraps email destroy`}
                   npx @wraps.dev/cli email init
                 </div>
                 <a
-                  className="flex items-center gap-2 rounded-xl bg-success px-6 py-3 font-semibold text-white transition-colors hover:bg-success"
+                  className="flex items-center gap-2 rounded-xl bg-success px-6 py-3 font-semibold text-success-foreground transition-colors hover:bg-success"
                   href="/cli"
                 >
                   Explore the CLI

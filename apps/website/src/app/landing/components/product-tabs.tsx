@@ -94,7 +94,7 @@ function TemplatesContent() {
               className="flex items-center gap-2 rounded-full border bg-background px-4 py-2 transition-colors hover:border-brand/50"
               key={feature.title}
             >
-              <feature.icon className="size-4 text-brand" />
+              <feature.icon className="size-4 text-brand-text" />
               <span className="font-medium text-sm">{feature.title}</span>
               {feature.badge && <Badge variant="brand">{feature.badge}</Badge>}
             </div>
@@ -137,7 +137,7 @@ function BroadcastsContent() {
               className="flex items-center gap-2 rounded-full border bg-background px-4 py-2 transition-colors hover:border-brand/50"
               key={feature.title}
             >
-              <feature.icon className="size-4 text-brand" />
+              <feature.icon className="size-4 text-brand-text" />
               <span className="font-medium text-sm">{feature.title}</span>
               {feature.badge && <Badge variant="brand">{feature.badge}</Badge>}
             </div>
@@ -180,7 +180,7 @@ function AutomationsContent() {
               className="flex items-center gap-2 rounded-full border bg-background px-4 py-2 transition-colors hover:border-brand/50"
               key={feature.title}
             >
-              <feature.icon className="size-4 text-brand" />
+              <feature.icon className="size-4 text-brand-text" />
               <span className="font-medium text-sm">{feature.title}</span>
               {feature.badge && <Badge variant="brand">{feature.badge}</Badge>}
             </div>
@@ -236,10 +236,10 @@ function EventWorkflowCard({
     <div className="overflow-hidden rounded-2xl border bg-background">
       <div className="flex items-center gap-3 border-b bg-brand/5 px-4 py-3">
         <div className="flex size-8 items-center justify-center rounded-full bg-brand">
-          <Zap className="size-4 text-white" />
+          <Zap className="size-4 text-brand-foreground" />
         </div>
         <div>
-          <code className="font-mono font-semibold text-brand text-sm">
+          <code className="font-mono font-semibold text-brand-text text-sm">
             {example.event}
           </code>
           <p className="text-muted-foreground text-xs">triggers</p>
@@ -267,7 +267,7 @@ function EventWorkflowCard({
 
 function EventCodeExample() {
   return (
-    <div className="mx-auto max-w-2xl overflow-hidden rounded-2xl border bg-terminal">
+    <div className="dark mx-auto max-w-2xl overflow-hidden rounded-2xl border bg-terminal">
       <div className="flex items-center gap-2 border-b border-terminal-border bg-terminal-border/50 px-4 py-2">
         <div className="flex gap-1.5">
           <div className="size-3 rounded-full bg-destructive/80" />
@@ -344,7 +344,7 @@ function EventsContent() {
               className="flex items-center gap-2 rounded-full border bg-background px-4 py-2 transition-colors hover:border-brand/50"
               key={feature.title}
             >
-              <feature.icon className="size-4 text-brand" />
+              <feature.icon className="size-4 text-brand-text" />
               <span className="font-medium text-sm">{feature.title}</span>
               {feature.badge && (
                 <Badge variant={feature.badge === "Free" ? "success" : "brand"}>
@@ -385,7 +385,7 @@ function GlowingTabBar({ activeIndex, onTabClick }: GlowingTabProps) {
                 className={cn(
                   "group relative flex items-center gap-2 overflow-hidden rounded-full px-5 py-2.5 font-medium text-sm transition-all duration-300",
                   isActive
-                    ? "bg-brand text-white shadow-lg shadow-brand/30 scale-105"
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-brand/30 scale-105"
                     : "text-muted-foreground hover:bg-brand/10 hover:text-foreground dark:hover:bg-brand/20"
                 )}
                 key={tab.key}
@@ -400,7 +400,7 @@ function GlowingTabBar({ activeIndex, onTabClick }: GlowingTabProps) {
                     "relative size-4 transition-transform duration-300",
                     isActive
                       ? "scale-110"
-                      : "group-hover:scale-110 group-hover:text-brand"
+                      : "group-hover:scale-110 group-hover:text-brand-text"
                   )}
                 />
                 <span className="relative hidden sm:inline">{tab.label}</span>

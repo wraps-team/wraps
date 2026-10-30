@@ -784,7 +784,7 @@ export default function Page() {
                 deploy. One command, production-ready authentication.
               </p>
               <a
-                className="inline-flex items-center gap-1 font-medium text-brand text-sm hover:text-brand"
+                className="inline-flex items-center gap-1 font-medium text-brand-text text-sm hover:text-brand-text"
                 href="/docs/quickstart"
               >
                 Deploy in 2 minutes &rarr;
@@ -837,7 +837,7 @@ export default function Page() {
 
             <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <a
-                className="inline-flex items-center justify-center rounded-lg bg-brand px-6 py-2.5 font-medium text-white transition-colors hover:bg-brand/90"
+                className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-2.5 font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 href="/docs/quickstart"
               >
                 Free CLI Quickstart
@@ -915,7 +915,7 @@ export default function Page() {
               </p>
               <div className="mt-4 flex flex-col justify-center gap-3 sm:flex-row">
                 <a
-                  className="inline-flex items-center justify-center rounded-lg bg-brand px-5 py-2 font-medium text-sm text-white transition-colors hover:bg-brand/90"
+                  className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2 font-medium text-sm text-primary-foreground transition-colors hover:bg-primary/90"
                   href="/docs/quickstart"
                 >
                   Get Started Free &rarr;

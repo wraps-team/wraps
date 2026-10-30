@@ -65,7 +65,7 @@ export default function ApproachesPage() {
                   key={approach.id}
                 >
                   <div className="mb-4 flex items-baseline gap-3">
-                    <span className="font-mono text-brand text-xs">
+                    <span className="font-mono text-brand-text text-xs">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <div>

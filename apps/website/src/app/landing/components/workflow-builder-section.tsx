@@ -287,11 +287,11 @@ const typeColors: Record<StepType, string> = {
 };
 
 const typeBgColors: Record<StepType, string> = {
-  trigger: "bg-warning",
-  wait: "bg-success",
-  wait_event: "bg-warning",
-  condition: "bg-brand",
-  action: "bg-info",
+  trigger: "bg-warning text-warning-foreground",
+  wait: "bg-success text-success-foreground",
+  wait_event: "bg-warning text-warning-foreground",
+  condition: "bg-brand text-brand-foreground",
+  action: "bg-info text-info-foreground",
 };
 
 function WorkflowNode({
@@ -327,7 +327,7 @@ function WorkflowNode({
           typeBgColors[step.type]
         )}
       >
-        <Icon className={cn("text-white", compact ? "size-4" : "size-5")} />
+        <Icon className={cn(compact ? "size-4" : "size-5")} />
       </div>
       <div className="min-w-0 flex-1 text-left">
         <p className={cn("font-semibold", compact ? "text-xs" : "text-sm")}>
@@ -374,8 +374,8 @@ function BranchActionNode({
       onClick={onClick}
       type="button"
     >
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-info">
-        <Icon className="size-5 text-white" />
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-info text-info-foreground">
+        <Icon className="size-5" />
       </div>
       <div className="min-w-0 flex-1 text-left">
         <p className="font-semibold text-sm">{label}</p>
@@ -422,8 +422,8 @@ function ConditionBranch({
           )}
         >
           <div className="-rotate-45 flex flex-col items-center gap-1">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-brand">
-              <Icon className="size-4 text-white" />
+            <div className="flex size-8 items-center justify-center rounded-lg bg-brand text-brand-foreground">
+              <Icon className="size-4" />
             </div>
             <p className="max-w-[60px] truncate text-center font-medium text-xs">
               {step.label.length > 12
@@ -448,7 +448,7 @@ function ConditionBranch({
           >
             {/* Center vertical line from diamond */}
             <line
-              className="text-muted-foreground/50"
+              className="text-muted-foreground"
               stroke="currentColor"
               strokeWidth="2"
               x1="200"
@@ -617,19 +617,19 @@ function WorkflowDetails({
   const getIconBg = () => {
     switch (badgeType) {
       case "trigger":
-        return "bg-success";
+        return "bg-success text-success-foreground";
       case "wait":
-        return "bg-info";
+        return "bg-info text-info-foreground";
       case "wait_event":
-        return "bg-warning";
+        return "bg-warning text-warning-foreground";
       case "condition":
-        return "bg-muted-foreground";
+        return "bg-muted-foreground text-background";
       case "yes":
-        return "bg-success";
+        return "bg-success text-success-foreground";
       case "no":
-        return "bg-destructive";
+        return "bg-destructive text-destructive-foreground";
       default:
-        return "bg-brand";
+        return "bg-brand text-brand-foreground";
     }
   };
 
@@ -642,7 +642,7 @@ function WorkflowDetails({
             getIconBg()
           )}
         >
-          <Icon className="size-6 text-white" />
+          <Icon className="size-6" />
         </div>
         <div>
           <Badge className="mb-1" variant={getBadgeVariant()}>
@@ -721,7 +721,7 @@ function WorkflowTemplateCard({
         <Sparkles
           className={cn(
             "size-4",
-            isActive ? "text-brand" : "text-muted-foreground"
+            isActive ? "text-brand-text" : "text-muted-foreground"
           )}
         />
         <span className="font-semibold">{template.name}</span>
@@ -827,7 +827,7 @@ export function InteractiveWorkflowBuilder() {
           />
         ))}
       </div>
-      <div className="flex items-center justify-center gap-4 text-muted-foreground/60 text-xs">
+      <div className="flex items-center justify-center gap-4 text-muted-foreground text-xs">
         <span className="flex items-center gap-1">
           <Mail className="size-3" /> Emails
         </span>

@@ -82,7 +82,7 @@ export function UseCasesCarousel({ useCases }: { useCases: UseCase[] }) {
               <div className="border-border border-b p-6">
                 <div className="mb-4 flex items-center gap-3">
                   <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-                    <Icon className="size-5 text-brand" />
+                    <Icon className="size-5 text-brand-text" />
                   </div>
                   <h3 className="font-heading font-semibold text-lg tracking-tight">
                     {useCase.title}

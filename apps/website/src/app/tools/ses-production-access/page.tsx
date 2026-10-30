@@ -149,7 +149,7 @@ export default function SESProductionAccessPage() {
               </div>
               <h1 className="mb-4 text-pretty font-heading font-semibold text-3xl tracking-tight sm:text-5xl">
                 SES production access,{" "}
-                <span className="text-brand">written out</span>
+                <span className="text-brand-text">written out</span>
               </h1>
               <p className="max-w-3xl text-balance text-base text-muted-foreground sm:text-lg">
                 AWS asks for an email type, a website and a contact address,
@@ -205,7 +205,7 @@ export default function SESProductionAccessPage() {
                 help your case — the reviewer checks. The full walkthrough,
                 including how to read the review status from the CLI, is in the{" "}
                 <Link
-                  className="text-brand underline underline-offset-2"
+                  className="text-brand-text underline underline-offset-2"
                   href="/docs/guides/production-access"
                 >
                   production access guide
@@ -255,7 +255,7 @@ export default function SESProductionAccessPage() {
             <p className="mt-16 text-muted-foreground">
               Not submitted yet? Work through the{" "}
               <Link
-                className="text-brand underline underline-offset-2"
+                className="text-brand-text underline underline-offset-2"
                 href="/blog/ses-sandbox-guide#pre-request-checklist"
               >
                 16-point pre-request checklist
@@ -289,7 +289,7 @@ export default function SESProductionAccessPage() {
                 <CardHeader>
                   <CardTitle className="font-heading text-base tracking-tight">
                     <Link
-                      className="text-brand underline underline-offset-2"
+                      className="text-brand-text underline underline-offset-2"
                       href="/blog/ses-sandbox-guide"
                     >
                       Getting out of the sandbox
@@ -305,7 +305,7 @@ export default function SESProductionAccessPage() {
                 <CardHeader>
                   <CardTitle className="font-heading text-base tracking-tight">
                     <Link
-                      className="text-brand underline underline-offset-2"
+                      className="text-brand-text underline underline-offset-2"
                       href="/ses/limits"
                     >
                       Sending limits
@@ -321,7 +321,7 @@ export default function SESProductionAccessPage() {
                 <CardHeader>
                   <CardTitle className="font-heading text-base tracking-tight">
                     <Link
-                      className="text-brand underline underline-offset-2"
+                      className="text-brand-text underline underline-offset-2"
                       href="/tools/ses-calculator"
                     >
                       SES cost calculator

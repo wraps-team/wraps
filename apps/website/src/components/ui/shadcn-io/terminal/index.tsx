@@ -107,9 +107,9 @@ export const Terminal = ({ children, className }: TerminalProps) => (
   >
     <div className="flex flex-col gap-y-2 border-border border-b p-4">
       <div className="flex flex-row gap-x-2">
-        <div className="h-2 w-2 rounded-full bg-red-500" />
-        <div className="h-2 w-2 rounded-full bg-yellow-500" />
-        <div className="h-2 w-2 rounded-full bg-green-500" />
+        <div className="h-2 w-2 rounded-full bg-destructive" />
+        <div className="h-2 w-2 rounded-full bg-warning" />
+        <div className="h-2 w-2 rounded-full bg-success" />
       </div>
     </div>
     <pre className="p-4">

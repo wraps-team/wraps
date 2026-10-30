@@ -43,7 +43,7 @@ export function PricingSection() {
                 }`}
                 key={tier.id}
               >
-                <div className="mb-2.5 min-h-4 font-mono text-2xs text-brand uppercase tracking-widest">
+                <div className="mb-2.5 min-h-4 font-mono text-2xs text-brand-text uppercase tracking-widest">
                   {label}
                 </div>
                 <h3 className="mb-1 font-semibold text-lg text-foreground">
@@ -66,7 +66,7 @@ export function PricingSection() {
                     >
                       <Check
                         aria-hidden="true"
-                        className="mt-0.5 size-[15px] shrink-0 text-brand"
+                        className="mt-0.5 size-[15px] shrink-0 text-brand-text"
                       />
                       {feature}
                     </li>
@@ -94,7 +94,7 @@ export function PricingSection() {
         <p className="mt-6 text-center text-muted-foreground text-sm">
           {PRICING_COPY.enterpriseNote.split("Contact us")[0]}
           <a
-            className="text-brand hover:underline"
+            className="text-brand-text hover:underline"
             href="mailto:support@wraps.dev"
           >
             Contact us for Enterprise

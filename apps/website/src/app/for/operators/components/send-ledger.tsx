@@ -59,7 +59,7 @@ export function SendLedger() {
             className="flex items-baseline gap-3 px-4 py-2.5 font-mono text-xs"
             key={`${event.at}-${event.type}`}
           >
-            <span className="shrink-0 text-muted-foreground/70 tabular-nums">
+            <span className="shrink-0 text-muted-foreground tabular-nums">
               {event.at}
             </span>
             <span className={`w-20 shrink-0 font-medium ${event.tone}`}>

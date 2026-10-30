@@ -102,7 +102,7 @@ export function AgentsPromptSection() {
                 >
                   <Icon
                     className={`mt-0.5 size-4 shrink-0 ${
-                      isActive ? "text-brand" : "text-muted-foreground"
+                      isActive ? "text-brand-text" : "text-muted-foreground"
                     }`}
                   />
                   <span>

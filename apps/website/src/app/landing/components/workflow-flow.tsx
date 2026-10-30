@@ -46,7 +46,7 @@ const SPINE: Node[] = [
   },
   {
     icon: Mail,
-    tone: "bg-brand/10 text-brand",
+    tone: "bg-brand/10 text-brand-text",
     title: "Send welcome email",
     detail: "Template: Welcome",
     at: 2,
@@ -69,7 +69,7 @@ const SPINE: Node[] = [
 
 const YES: Node = {
   icon: Mail,
-  tone: "bg-brand/10 text-brand",
+  tone: "bg-brand/10 text-brand-text",
   title: "Send getting-started tips",
   detail: "Email",
   at: 5,

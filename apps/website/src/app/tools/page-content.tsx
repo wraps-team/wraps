@@ -198,8 +198,8 @@ function GradeDisplay({ grade, score }: { grade: string; score: number }) {
     B: "text-success border-success",
     "B-": "text-warning border-warning",
     "C+": "text-warning border-warning",
-    C: "text-brand border-brand",
-    "C-": "text-brand border-brand",
+    C: "text-brand-text border-brand",
+    "C-": "text-brand-text border-brand",
     D: "text-destructive border-destructive",
     F: "text-destructive border-destructive",
   };
@@ -1092,7 +1092,7 @@ export default function ToolsPageContent({
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-1">
-                          <Sparkles className="h-3.5 w-3.5 text-brand" />
+                          <Sparkles className="h-3.5 w-3.5 text-brand-text" />
                           Bonus Points
                         </span>
                         <span className="text-muted-foreground">
@@ -1225,7 +1225,7 @@ export default function ToolsPageContent({
             <Card className="border-border bg-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-brand" />
+                  <Sparkles className="h-5 w-5 text-brand-text" />
                   Bonus Points Earned ({result.bonuses.length})
                 </CardTitle>
               </CardHeader>
