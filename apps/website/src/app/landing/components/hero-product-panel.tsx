@@ -7,12 +7,12 @@ import { HeroFlow } from "./hero-flow";
 export function HeroProductPanel() {
   return (
     <figure className="hero-rise relative m-0 mx-auto w-full max-w-2xl">
-      {/* Warm light behind the card; the one place the hero uses the brand colour as atmosphere. */}
+      {/* Warm light behind the figure; the one place the hero uses the brand colour as atmosphere. */}
       <div
         aria-hidden="true"
         className="-top-4 absolute inset-x-12 h-40 rounded-full bg-brand/15 blur-3xl"
       />
-      <div className="relative rounded-2xl shadow-xl">
+      <div className="relative">
         <HeroFlow />
       </div>
       <figcaption className="sr-only">

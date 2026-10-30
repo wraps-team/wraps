@@ -56,13 +56,9 @@ export function HeroFlow() {
   const { stage } = useStageLoop({ ...HERO_FLOW, trigger: "mount" });
 
   return (
-    <div
-      aria-hidden="true"
-      className="rounded-2xl border border-border bg-card p-3 text-left sm:p-5"
-      data-stage={stage}
-    >
+    <div aria-hidden="true" className="text-left" data-stage={stage}>
       {/* The customer's AWS account */}
-      <div className="relative rounded-xl border border-brand/50 border-dashed bg-brand/5 px-3 pt-5 pb-3 sm:px-4">
+      <div className="relative rounded-xl border border-brand/50 border-dashed bg-background bg-linear-to-b from-brand/5 to-brand/5 px-3 pt-5 pb-3 sm:px-4">
         <BoxLabel tone="text-brand-text">Your AWS account</BoxLabel>
 
         <Reveal at={1} stage={stage}>
