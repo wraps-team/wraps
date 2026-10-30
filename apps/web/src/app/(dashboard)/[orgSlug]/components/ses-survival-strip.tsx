@@ -295,10 +295,10 @@ export function SesSurvivalStrip({ orgSlug }: { orgSlug: string }) {
   // panel is the dashed "own" one.
   return (
     <Panel
-      actions={
+      label={<PanelTitle>Account survival</PanelTitle>}
+      meta={
         <span className="text-muted-foreground text-xs">{checkedLine}</span>
       }
-      label={<PanelTitle>Account survival</PanelTitle>}
       variant="own"
     >
       <div className="space-y-6">

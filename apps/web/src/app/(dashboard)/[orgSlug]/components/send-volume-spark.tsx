@@ -79,29 +79,31 @@ export function SendVolumeSpark({
 
   return (
     <Panel
-      actions={
-        <div className="flex items-center gap-3">
-          {showEmail && (
-            <Link
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              href={hubHref(orgSlug)}
-            >
-              Email activity
-              <ArrowRightIcon className="h-3 w-3" />
-            </Link>
-          )}
-          {showSMS && (
-            <Link
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              href={`/${orgSlug}/sms/analytics`}
-            >
-              SMS analytics
-              <ArrowRightIcon className="h-3 w-3" />
-            </Link>
-          )}
-        </div>
-      }
       label={<PanelTitle>Send Volume</PanelTitle>}
+      meta={
+        (showEmail || showSMS) && (
+          <>
+            {showEmail && (
+              <Link
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                href={hubHref(orgSlug)}
+              >
+                Email activity
+                <ArrowRightIcon className="h-3 w-3" />
+              </Link>
+            )}
+            {showSMS && (
+              <Link
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                href={`/${orgSlug}/sms/analytics`}
+              >
+                SMS analytics
+                <ArrowRightIcon className="h-3 w-3" />
+              </Link>
+            )}
+          </>
+        )
+      }
     >
       {!isLoading && (
         <div className="mb-3 space-y-1">

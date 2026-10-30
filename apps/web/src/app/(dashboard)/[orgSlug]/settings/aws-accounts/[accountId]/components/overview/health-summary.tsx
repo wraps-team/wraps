@@ -41,14 +41,14 @@ export function HealthSummary({
   return (
     // Read from the hourly sweep of the customer's SES account.
     <Panel
-      actions={
+      label={<PanelTitle>Sending health · {region}</PanelTitle>}
+      meta={
         healthCheckedAt && (
           <span className="text-muted-foreground text-xs">
             checked {formatRelativeTime(new Date(healthCheckedAt))}
           </span>
         )
       }
-      label={<PanelTitle>Sending health · {region}</PanelTitle>}
       variant="own"
     >
       <div className="space-y-4">

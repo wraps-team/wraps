@@ -39,10 +39,20 @@ const panelLabelVariants = cva(
   }
 );
 
+/**
+ * The label's mirror at the right of the top border: a status line or a link or
+ * two, short enough to sit on the line. Buttons and anything wider belong in
+ * `actions`, which takes a row inside the panel.
+ */
+const panelMetaClassName =
+  "absolute -top-2.5 right-3 flex items-center gap-3 bg-background px-2 leading-5";
+
 type PanelProps = Omit<React.ComponentProps<"section">, "title"> &
   VariantProps<typeof panelVariants> & {
     /** Rendered in the top border. Usually a `<PanelTitle>`, plus an optional info trigger. */
     label: React.ReactNode;
+    /** Rendered in the top border, right side. See `panelMetaClassName`. */
+    meta?: React.ReactNode;
     /** Muted line at the top of the panel, where a card's description went. */
     description?: React.ReactNode;
     /** Controls at the top right of the panel, where a card's header actions went. */
@@ -53,6 +63,7 @@ function Panel({
   className,
   variant,
   label,
+  meta,
   description,
   actions,
   children,
@@ -68,6 +79,11 @@ function Panel({
       <div className={panelLabelVariants({ variant })} data-slot="panel-label">
         {label}
       </div>
+      {meta ? (
+        <div className={panelMetaClassName} data-slot="panel-meta">
+          {meta}
+        </div>
+      ) : null}
       {description || actions ? (
         <div
           className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2"
