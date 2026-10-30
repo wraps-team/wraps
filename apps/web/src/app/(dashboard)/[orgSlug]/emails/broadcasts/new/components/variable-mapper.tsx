@@ -6,17 +6,12 @@ import {
   AlertTitle,
 } from "@wraps/ui/components/ui/alert";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@wraps/ui/components/ui/collapsible";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   RadioGroup,
   RadioGroupItem,
@@ -176,16 +171,16 @@ export function VariableMapper({
 
   if (loading) {
     return (
-      <Card className="mt-4">
-        <CardHeader className="py-3">
-          <CardTitle className="text-base">Template Variables</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <Panel
+        className="mt-4"
+        label={<PanelTitle>Template Variables</PanelTitle>}
+      >
+        <div className="space-y-2">
           <Skeleton className="h-4 w-3/4" />
           <Skeleton className="h-4 w-1/2" />
           <Skeleton className="h-4 w-2/3" />
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
@@ -205,34 +200,39 @@ export function VariableMapper({
   }
 
   return (
-    <Card className="mt-4">
-      <Collapsible onOpenChange={setIsExpanded} open={isExpanded}>
-        <CardHeader className="py-3">
-          <CollapsibleTrigger className="flex w-full items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-base">Template Variables</CardTitle>
-              {unmappedCount > 0 && (
-                <span className="rounded-full bg-warning/15 px-2 py-0.5 font-medium text-xs text-warning">
-                  {unmappedCount} needs mapping
-                </span>
-              )}
-              {unmappedCount === 0 && customVariables.length > 0 && (
-                <span className="rounded-full bg-success/15 px-2 py-0.5 font-medium text-success text-xs">
-                  All mapped
-                </span>
-              )}
-            </div>
-            <ChevronDown
-              className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform",
-                isExpanded && "rotate-180"
-              )}
-            />
-          </CollapsibleTrigger>
-        </CardHeader>
-
+    <Collapsible onOpenChange={setIsExpanded} open={isExpanded}>
+      <Panel
+        className="mt-4"
+        label={
+          <div className="flex items-center gap-2">
+            {/* The title is the disclosure: the heading wraps the trigger, the
+                way the WAI-ARIA accordion pattern does. */}
+            <PanelTitle>
+              <CollapsibleTrigger className="flex items-center gap-2 text-left">
+                Template Variables
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 text-muted-foreground transition-transform",
+                    isExpanded && "rotate-180"
+                  )}
+                />
+              </CollapsibleTrigger>
+            </PanelTitle>
+            {unmappedCount > 0 && (
+              <span className="rounded-full bg-warning/15 px-2 py-0.5 font-medium text-xs text-warning">
+                {unmappedCount} needs mapping
+              </span>
+            )}
+            {unmappedCount === 0 && customVariables.length > 0 && (
+              <span className="rounded-full bg-success/15 px-2 py-0.5 font-medium text-success text-xs">
+                All mapped
+              </span>
+            )}
+          </div>
+        }
+      >
         <CollapsibleContent>
-          <CardContent className="space-y-4">
+          <div className="space-y-4">
             {/* Filled from the wizard's own fields — not asked for twice */}
             {formManagedVariables.length > 0 && (
               <div>
@@ -259,7 +259,7 @@ export function VariableMapper({
                   ))}
                 </div>
                 <p className="mt-1 text-muted-foreground text-xs">
-                  Edit these in the Subject &amp; Preview card above.
+                  Edit these in the Subject &amp; Preview panel above.
                 </p>
               </div>
             )}
@@ -304,10 +304,10 @@ export function VariableMapper({
                 </div>
               </div>
             )}
-          </CardContent>
+          </div>
         </CollapsibleContent>
-      </Collapsible>
-    </Card>
+      </Panel>
+    </Collapsible>
   );
 }
 
@@ -336,7 +336,7 @@ function VariableMapperRow({
   return (
     <div
       className={cn(
-        "rounded-lg border p-3",
+        "border p-4",
         hasError ? "border-warning/30 bg-warning/10" : "border-border"
       )}
     >

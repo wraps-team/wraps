@@ -3,13 +3,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -17,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@wraps/ui/components/ui/dialog";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   CheckCircle2Icon,
   CreditCardIcon,
@@ -183,39 +177,39 @@ export function OrganizationSettingsBilling({
 
   return (
     <div className="space-y-6">
-      {/* Current Plan Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Current Plan
-                {isAnnual && <Badge variant="success">Annual</Badge>}
-                {isTrialing && <Badge variant="secondary">Trial</Badge>}
-                {isCancelled && <Badge variant="destructive">Cancelling</Badge>}
-              </CardTitle>
-              <CardDescription>
-                {isTrialing && trialEndsAt
-                  ? `Your trial ends on ${trialEndsAt.toLocaleDateString()}`
-                  : isCancelled && periodEndsAt
-                    ? `Access ends on ${periodEndsAt.toLocaleDateString()}`
-                    : "You're currently on this plan"}
-              </CardDescription>
-            </div>
-            {activeSubscription && canManageBilling && (
-              <Button
-                loading={billingPortalMutation.isPending}
-                onClick={() => billingPortalMutation.mutate()}
-                variant="outline"
-              >
-                <CreditCardIcon className="mr-2 size-4" />
-                Manage Billing
-                <ExternalLinkIcon className="ml-2 size-4" />
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* Current Plan Panel */}
+      <Panel
+        actions={
+          activeSubscription &&
+          canManageBilling && (
+            <Button
+              loading={billingPortalMutation.isPending}
+              onClick={() => billingPortalMutation.mutate()}
+              variant="outline"
+            >
+              <CreditCardIcon className="mr-2 size-4" />
+              Manage Billing
+              <ExternalLinkIcon className="ml-2 size-4" />
+            </Button>
+          )
+        }
+        description={
+          isTrialing && trialEndsAt
+            ? `Your trial ends on ${trialEndsAt.toLocaleDateString()}`
+            : isCancelled && periodEndsAt
+              ? `Access ends on ${periodEndsAt.toLocaleDateString()}`
+              : "You're currently on this plan"
+        }
+        label={
+          <PanelTitle className="flex items-center gap-2">
+            Current Plan
+            {isAnnual && <Badge variant="success">Annual</Badge>}
+            {isTrialing && <Badge variant="secondary">Trial</Badge>}
+            {isCancelled && <Badge variant="destructive">Cancelling</Badge>}
+          </PanelTitle>
+        }
+      >
+        <div className="space-y-4">
           <div className="flex items-baseline gap-2">
             <span className="font-bold text-4xl">{planConfig.name}</span>
             {planConfig.price !== null && planConfig.price > 0 && (
@@ -240,7 +234,7 @@ export function OrganizationSettingsBilling({
           </ul>
 
           {isCancelled && periodEndsAt && (
-            <div className="flex items-center justify-between rounded-lg border border-warning/20 bg-warning/10 p-4">
+            <div className="flex items-center justify-between border border-warning/20 bg-warning/10 p-4">
               <p className="text-sm text-warning">
                 Your subscription will end on{" "}
                 {periodEndsAt.toLocaleDateString()}
@@ -256,22 +250,19 @@ export function OrganizationSettingsBilling({
               </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Event Usage */}
       {organization.slug && <EventUsageCard orgSlug={organization.slug} />}
 
       {/* Upgrade Options */}
       {!(isCancelled || isTopPlan(currentPlan)) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Upgrade Your Plan</CardTitle>
-            <CardDescription>
-              Unlock more features and increase your limits
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <Panel
+          description="Unlock more features and increase your limits"
+          label={<PanelTitle>Upgrade Your Plan</PanelTitle>}
+        >
+          <div className="space-y-6">
             {/* Billing Interval Toggle */}
             <BillingToggle
               onChange={setUpgradeBillingInterval}
@@ -287,7 +278,7 @@ export function OrganizationSettingsBilling({
                     PUBLIC_PLAN_IDS.indexOf(toPublicPlanId(currentPlan))
                 )
                 .map(({ id, plan }, index) => (
-                  <div className="space-y-4 rounded-lg border p-6" key={id}>
+                  <div className="space-y-4 border p-6" key={id}>
                     <div>
                       <h3 className="font-semibold text-lg">{plan.name}</h3>
                       <div className="mt-2 flex items-baseline gap-1">
@@ -352,22 +343,21 @@ export function OrganizationSettingsBilling({
                 Only organization owners and admins can manage billing
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       )}
 
       {/* AWS Infrastructure Costs */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
+      <Panel
+        description="Separate from your Wraps subscription"
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <ZapIcon className="size-5 text-primary" />
-            <CardTitle>AWS Infrastructure Costs</CardTitle>
-          </div>
-          <CardDescription>
-            Separate from your Wraps subscription
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 text-muted-foreground text-sm">
+            AWS Infrastructure Costs
+          </PanelTitle>
+        }
+      >
+        <div className="space-y-2 text-muted-foreground text-sm">
           <p>
             <strong className="text-foreground">Email Sending:</strong> $0.10
             per 1,000 emails à la carte, or $0.16 on AWS&apos;s default
@@ -381,8 +371,8 @@ export function OrganizationSettingsBilling({
             New AWS accounts get $200 in AWS Free Tier credits, valid for 6
             months.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Cancel Subscription */}
       {activeSubscription && !isCancelled && (

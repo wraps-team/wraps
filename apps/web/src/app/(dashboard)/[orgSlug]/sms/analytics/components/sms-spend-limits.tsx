@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Progress } from "@wraps/ui/components/ui/progress";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { AlertCircle, DollarSign } from "lucide-react";
@@ -44,54 +38,60 @@ export function SMSSpendLimits({ orgSlug }: { orgSlug: string }) {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel
+        description="Monthly spend limits and usage"
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
             Spend Limits
-          </CardTitle>
-          <CardDescription>Monthly spend limits and usage</CardDescription>
-        </CardHeader>
-        <CardContent>
+          </PanelTitle>
+        }
+        variant="own"
+      >
+        <div>
           <div className="space-y-4">
             <Skeleton className="h-16 w-full" />
             <Skeleton className="h-16 w-full" />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   if (error) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
             Spend Limits
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+          </PanelTitle>
+        }
+        variant="own"
+      >
+        <div>
           <div className="flex items-center gap-2 text-destructive">
             <AlertCircle className="h-4 w-4" />
             <p className="text-sm">Failed to load spend limits</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   if (!data?.spendLimits || data.spendLimits.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel
+        description="Monthly spend limits and usage"
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
             Spend Limits
-          </CardTitle>
-          <CardDescription>Monthly spend limits and usage</CardDescription>
-        </CardHeader>
-        <CardContent>
+          </PanelTitle>
+        }
+        variant="own"
+      >
+        <div>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <DollarSign className="mb-4 h-12 w-12 text-muted-foreground/50" />
             <h3 className="font-medium text-lg">No Spend Limits Set</h3>
@@ -99,8 +99,8 @@ export function SMSSpendLimits({ orgSlug }: { orgSlug: string }) {
               Configure spend limits in AWS SMS Voice console
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
@@ -112,35 +112,39 @@ export function SMSSpendLimits({ orgSlug }: { orgSlug: string }) {
 
   if (relevantLimits.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel
+        description="Monthly spend limits and usage"
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
             Spend Limits
-          </CardTitle>
-          <CardDescription>Monthly spend limits and usage</CardDescription>
-        </CardHeader>
-        <CardContent>
+          </PanelTitle>
+        }
+        variant="own"
+      >
+        <div>
           <div className="py-4 text-center">
             <p className="text-muted-foreground text-sm">
               Default AWS spend limits apply
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <Panel
+      description="Monthly spend limits and usage"
+      label={
+        <PanelTitle className="flex items-center gap-2">
           <DollarSign className="h-5 w-5" />
           Spend Limits
-        </CardTitle>
-        <CardDescription>Monthly spend limits and usage</CardDescription>
-      </CardHeader>
-      <CardContent>
+        </PanelTitle>
+      }
+      variant="own"
+    >
+      <div>
         <div className="space-y-6">
           {relevantLimits.map((limit) => {
             // Find the corresponding current spend
@@ -176,7 +180,7 @@ export function SMSSpendLimits({ orgSlug }: { orgSlug: string }) {
             );
           })}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

@@ -11,14 +11,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@wraps/ui/components/ui/alert-dialog";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -63,19 +56,14 @@ export default function OnboardingPage() {
 
   return (
     <div className="flex min-h-dvh items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Create Your Organization</CardTitle>
-          <CardDescription>
-            Let's set up your workspace to get started with Wraps
-          </CardDescription>
-        </CardHeader>
+      <Panel
+        className="w-full max-w-md"
+        description="Let's set up your workspace to get started with Wraps"
+        label={<PanelTitle>Create Your Organization</PanelTitle>}
+      >
+        <CreateOrganizationForm onSuccess={handleSuccess} />
 
-        <CardContent>
-          <CreateOrganizationForm onSuccess={handleSuccess} />
-        </CardContent>
-
-        <CardFooter className="flex flex-col items-center gap-3 pt-6">
+        <div className="mt-4 flex flex-col items-center gap-3 border-t pt-4">
           <Button
             onClick={async () => {
               await authClient.signOut();
@@ -135,8 +123,8 @@ export default function OnboardingPage() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </CardFooter>
-      </Card>
+        </div>
+      </Panel>
     </div>
   );
 }

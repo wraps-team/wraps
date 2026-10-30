@@ -1,11 +1,5 @@
 import { db } from "@wraps/db";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { QuotaReserve } from "../components/quota-reserve";
 import { RemoveAccountCard } from "../components/remove-account-card";
 import { RenameAccountForm } from "../components/rename-account-form";
@@ -70,14 +64,11 @@ export default async function SettingsPage({
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>General</CardTitle>
-          <CardDescription>
-            Give this account a name you will recognise in lists and alerts.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Panel
+        description="Give this account a name you will recognise in lists and alerts."
+        label={<PanelTitle>General</PanelTitle>}
+      >
+        <div className="space-y-4">
           <RenameAccountForm
             awsAccountId={account.id}
             initialName={account.name}
@@ -88,8 +79,8 @@ export default async function SettingsPage({
             {creator ? ` by ${creator.user.name}` : ""}
             {setupLabel ? ` · connected via ${setupLabel}` : ""}
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       <QuotaReserve account={clientAccount} region={region} />
 

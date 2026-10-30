@@ -1,13 +1,7 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import Link from "next/link";
 import type {
   SesHealthAccount,
@@ -81,9 +75,9 @@ export function RateMeter({
       >
         {formatRate(value, digits)}
       </p>
-      <div className="relative h-1.5 w-full rounded-full bg-muted">
+      <div className="relative h-1.5 w-full bg-muted">
         <div
-          className={cn("h-full rounded-full", LEVEL_FILL[level])}
+          className={cn("h-full", LEVEL_FILL[level])}
           style={{ width: `${valuePct}%` }}
         />
         <span
@@ -141,12 +135,9 @@ export function QuotaMeter({ detail }: { detail: SesHealthDetail }) {
       {isUnlimited ? (
         <div className="h-1.5" />
       ) : (
-        <div className="relative h-1.5 w-full rounded-full bg-muted">
+        <div className="relative h-1.5 w-full bg-muted">
           <div
-            className={cn(
-              "h-full rounded-full",
-              isHigh ? "bg-warning" : "bg-foreground"
-            )}
+            className={cn("h-full", isHigh ? "bg-warning" : "bg-foreground")}
             style={{ width: `${Math.min(100, ratio * 100)}%` }}
           />
           <span
@@ -300,26 +291,26 @@ export function SesSurvivalStrip({ orgSlug }: { orgSlug: string }) {
       ? "Never checked"
       : `Checked ${formatRelativeTime(new Date(data.checkedAt))}`;
 
+  // SES account survival is read live from the customer's AWS account, so the
+  // panel is the dashed "own" one.
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Account survival</CardTitle>
-        <CardAction className="self-center">
-          <span className="text-muted-foreground text-xs">{checkedLine}</span>
-        </CardAction>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          {data.accounts.map((account) => (
-            <AccountBlock
-              account={account}
-              key={account.id}
-              orgSlug={orgSlug}
-              showName={data.accounts.length > 1}
-            />
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+    <Panel
+      actions={
+        <span className="text-muted-foreground text-xs">{checkedLine}</span>
+      }
+      label={<PanelTitle>Account survival</PanelTitle>}
+      variant="own"
+    >
+      <div className="space-y-6">
+        {data.accounts.map((account) => (
+          <AccountBlock
+            account={account}
+            key={account.id}
+            orgSlug={orgSlug}
+            showName={data.accounts.length > 1}
+          />
+        ))}
+      </div>
+    </Panel>
   );
 }

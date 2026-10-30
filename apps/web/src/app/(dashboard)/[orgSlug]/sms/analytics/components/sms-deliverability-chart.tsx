@@ -2,14 +2,6 @@
 
 import { ButtonGroup } from "@wraps/ui/components/ui/button-group";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   type ChartConfig,
   ChartContainer,
   ChartLegend,
@@ -17,6 +9,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -63,16 +56,9 @@ export function SMSDeliverabilityChart({ orgSlug }: { orgSlug: string }) {
   const chartData = volumeData || [];
 
   return (
-    <Card className="@container/card">
-      <CardHeader>
-        <CardTitle>Deliverability</CardTitle>
-        <CardDescription>
-          <span className="@[540px]/card:block hidden">
-            Delivered vs failed messages over time
-          </span>
-          <span className="@[540px]/card:hidden">Delivery status</span>
-        </CardDescription>
-        <CardAction className="self-center">
+    <Panel
+      actions={
+        <>
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "90d"}
@@ -113,9 +99,20 @@ export function SMSDeliverabilityChart({ orgSlug }: { orgSlug: string }) {
               <SelectItem value="7d">7 days</SelectItem>
             </SelectContent>
           </Select>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+        </>
+      }
+      className="@container/card"
+      description={
+        <>
+          <span className="@[540px]/card:block hidden">
+            Delivered vs failed messages over time
+          </span>
+          <span className="@[540px]/card:hidden">Delivery status</span>
+        </>
+      }
+      label={<PanelTitle>Deliverability</PanelTitle>}
+    >
+      <div>
         {isLoading ? (
           <Skeleton className="h-[300px] w-full" />
         ) : error ? (
@@ -206,7 +203,7 @@ export function SMSDeliverabilityChart({ orgSlug }: { orgSlug: string }) {
             </AreaChart>
           </ChartContainer>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

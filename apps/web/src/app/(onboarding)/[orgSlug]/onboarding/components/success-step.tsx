@@ -5,14 +5,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@wraps/ui/components/ui/alert";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   AlertTriangleIcon,
   BookOpenIcon,
@@ -103,18 +96,16 @@ export function SuccessStep({
 
   if (!isConnected) {
     return (
-      <Card>
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-warning/10">
+      <Panel
+        description="Your AWS infrastructure is not connected yet."
+        label={<PanelTitle>Setup Incomplete</PanelTitle>}
+        variant="own"
+      >
+        <div className="space-y-6">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-warning/10">
             <AlertTriangleIcon className="h-10 w-10 text-warning" />
           </div>
-          <CardTitle className="text-3xl">Setup Incomplete</CardTitle>
-          <CardDescription className="text-base">
-            Your AWS infrastructure is not connected yet.
-          </CardDescription>
-        </CardHeader>
 
-        <CardContent className="space-y-6">
           <Alert variant="destructive">
             <AlertTriangleIcon className="h-4 w-4" />
             <AlertTitle>Infrastructure required</AlertTitle>
@@ -144,34 +135,36 @@ wraps platform connect`}</code>
           </div>
 
           <NeedHelpBlock />
-        </CardContent>
+        </div>
 
-        <CardFooter className="flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between border-t pt-4">
           <Button onClick={handleGoBack} size="lg" variant="outline">
             Go back and connect
           </Button>
           <Button onClick={handleComplete} variant="ghost">
             Continue to dashboard anyway
           </Button>
-        </CardFooter>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
-          <CheckCircle2Icon className="h-10 w-10 text-success" />
-        </div>
-        <CardTitle className="text-3xl">You're All Set!</CardTitle>
-        <CardDescription className="text-base">
+    <Panel
+      description={
+        <>
           Your email infrastructure is deployed and connected. Here's what to do
           next.
-        </CardDescription>
-      </CardHeader>
+        </>
+      }
+      label={<PanelTitle>You're All Set!</PanelTitle>}
+      variant="own"
+    >
+      <div className="space-y-6">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
+          <CheckCircle2Icon className="h-10 w-10 text-success" />
+        </div>
 
-      <CardContent className="space-y-6">
         {/* Next Steps */}
         <div className="space-y-4">
           <h3 className="font-semibold">Next Steps</h3>
@@ -264,13 +257,13 @@ await wraps.send({
         </div>
 
         <NeedHelpBlock />
-      </CardContent>
+      </div>
 
-      <CardFooter className="flex justify-center">
+      <div className="mt-4 flex justify-center border-t pt-4">
         <Button className="w-full sm:w-auto" onClick={handleComplete} size="lg">
           Continue to Dashboard
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </Panel>
   );
 }

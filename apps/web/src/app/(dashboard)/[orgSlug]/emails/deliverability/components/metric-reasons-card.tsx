@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import * as React from "react";
 import {
@@ -202,37 +202,32 @@ export function MetricReasonsCard({
           </p>
         ) : null}
 
-        <div className="flex flex-col gap-3">
-          <p className="text-muted-foreground text-xs uppercase tracking-wide">
-            Top reasons
-          </p>
-          <ul className="flex flex-col gap-3">
-            {rows.map((row) => (
-              <li className="flex flex-col gap-1.5" key={row.key}>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate">{row.label}</span>
-                    {row.kind === "hard" ? (
-                      <Badge variant="destructive">hard</Badge>
-                    ) : null}
-                    {row.kind === "soft" ? (
-                      <Badge variant="warning">soft</Badge>
-                    ) : null}
-                  </span>
-                  <span className="shrink-0 tabular-nums">
-                    {row.count.toLocaleString("en-US")}
-                  </span>
-                </div>
-                <Meter
-                  aria-hidden="true"
-                  className="h-1"
-                  fillClass={barFill(row, metric)}
-                  fillPct={(row.count / max) * 100}
-                />
-              </li>
-            ))}
-          </ul>
-        </div>
+        <ul className="flex flex-col gap-3">
+          {rows.map((row) => (
+            <li className="flex flex-col gap-1.5" key={row.key}>
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate">{row.label}</span>
+                  {row.kind === "hard" ? (
+                    <Badge variant="destructive">hard</Badge>
+                  ) : null}
+                  {row.kind === "soft" ? (
+                    <Badge variant="warning">soft</Badge>
+                  ) : null}
+                </span>
+                <span className="shrink-0 tabular-nums">
+                  {row.count.toLocaleString("en-US")}
+                </span>
+              </div>
+              <Meter
+                aria-hidden="true"
+                className="h-1"
+                fillClass={barFill(row, metric)}
+                fillPct={(row.count / max) * 100}
+              />
+            </li>
+          ))}
+        </ul>
       </>
     );
   }
@@ -243,14 +238,17 @@ export function MetricReasonsCard({
         <h2 className="font-semibold text-lg">{copy.title}</h2>
         <p className="text-muted-foreground text-sm">{copy.subtitle}</p>
       </div>
-      <Card className="@container/card">
-        <CardContent className="space-y-5">
+      <Panel
+        className="@container/card"
+        label={<PanelTitle level={3}>Top reasons</PanelTitle>}
+      >
+        <div className="space-y-5">
           {body}
           <p className="border-t pt-4 text-muted-foreground text-xs">
             {copy.footnote}
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     </section>
   );
 }

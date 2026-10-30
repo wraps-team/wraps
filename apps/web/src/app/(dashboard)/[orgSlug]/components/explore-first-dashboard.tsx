@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   CheckCircle2Icon,
   CloudIcon,
@@ -35,9 +29,12 @@ type ActivityCardProps = {
   ctaLabel: string;
   ctaHref: string;
   isComplete: boolean;
-  highlight?: boolean;
 };
 
+/**
+ * One setup step as a panel. The icon sits top right; a completed step swaps
+ * it for a tick in the success colour.
+ */
 function ActivityCard({
   icon,
   title,
@@ -45,36 +42,28 @@ function ActivityCard({
   ctaLabel,
   ctaHref,
   isComplete,
-  highlight,
 }: ActivityCardProps) {
   return (
-    <Card
-      className={cn(
-        "transition-colors",
-        highlight && !isComplete && "border-primary/30 bg-primary/5",
-        !isComplete && "hover:border-primary/20"
-      )}
-    >
-      <CardContent>
-        <div className="flex items-start justify-between mb-3">
-          <div
-            className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-lg",
-              isComplete
-                ? "bg-success/15 text-success"
-                : "bg-primary/10 text-primary"
-            )}
-          >
-            {isComplete ? <CheckCircle2Icon className="h-5 w-5" /> : icon}
-          </div>
+    <Panel
+      actions={
+        <div
+          className={cn(
+            "flex h-10 w-10 items-center justify-center",
+            isComplete
+              ? "bg-success/15 text-success"
+              : "bg-primary/10 text-primary"
+          )}
+        >
+          {isComplete ? <CheckCircle2Icon className="h-5 w-5" /> : icon}
         </div>
-        <h3 className="font-semibold text-sm mb-1">{title}</h3>
-        <p className="text-muted-foreground text-xs mb-3">{description}</p>
-        <Button asChild size="sm" variant={isComplete ? "outline" : "default"}>
-          <Link href={ctaHref}>{isComplete ? "View" : ctaLabel}</Link>
-        </Button>
-      </CardContent>
-    </Card>
+      }
+      description={description}
+      label={<PanelTitle level={3}>{title}</PanelTitle>}
+    >
+      <Button asChild size="sm" variant={isComplete ? "outline" : "default"}>
+        <Link href={ctaHref}>{isComplete ? "View" : ctaLabel}</Link>
+      </Button>
+    </Panel>
   );
 }
 
@@ -148,22 +137,14 @@ export function ExploreFirstDashboard({
 
       {/* Main Content */}
       <div className="@container/main px-4 lg:px-6">
-        {/* Connect AWS Card - primary CTA */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-              <CloudIcon className="h-5 w-5" />
-            </div>
-            <CardTitle className="text-lg">
-              Connect AWS to start sending
-            </CardTitle>
-            <CardDescription>
-              You can explore templates and contacts now, but sending requires
-              your AWS account. Connect it to send your first email — your
-              infrastructure, your data, AWS pricing.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {/* Connect AWS panel - primary CTA */}
+        <Panel
+          actions={<CloudIcon aria-hidden="true" className="size-5" />}
+          className="mb-6"
+          description="You can explore templates and contacts now, but sending requires your AWS account. Connect it to send your first email — your infrastructure, your data, AWS pricing."
+          label={<PanelTitle>Connect AWS to start sending</PanelTitle>}
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Button asChild className="w-full sm:w-auto">
               <Link href={`/${orgSlug}/setup`}>Connect AWS</Link>
             </Button>
@@ -176,8 +157,8 @@ export function ExploreFirstDashboard({
                 Learn more
               </a>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column - Activity Cards */}
@@ -211,7 +192,6 @@ export function ExploreFirstDashboard({
                 ctaHref={`/${orgSlug}/settings/members`}
                 ctaLabel="Invite Members"
                 description="Collaborate on templates and broadcasts."
-                highlight={memberCount === 1}
                 icon={<UserPlusIcon className="h-5 w-5" />}
                 isComplete={memberCount > 1}
                 title="Invite Your Team"

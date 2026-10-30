@@ -5,19 +5,13 @@ import { initialFormState, useTransform } from "@tanstack/react-form-nextjs";
 import { useStore } from "@tanstack/react-store";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@wraps/ui/components/ui/dialog";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Separator } from "@wraps/ui/components/ui/separator";
 import { CheckCircle2, Key, Mail, XCircle } from "lucide-react";
 import { useActionState, useEffect, useState } from "react";
@@ -108,14 +102,11 @@ export function ChangePassword() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Password & Email</CardTitle>
-        <CardDescription>
-          Manage your password and email verification status.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Panel
+      description={<>Manage your password and email verification status.</>}
+      label={<PanelTitle>Password & Email</PanelTitle>}
+    >
+      <div className="space-y-4">
         {/* Email Verification Status */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
@@ -391,7 +382,7 @@ export function ChangePassword() {
             </form>
           </DialogContent>
         </Dialog>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

@@ -2,7 +2,7 @@ import { db } from "@wraps/db";
 import { awsAccount } from "@wraps/db/schema/app";
 import { messageSend } from "@wraps/db/schema/batch";
 import { Badge } from "@wraps/ui/components/ui/badge";
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { and, eq, or } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -453,40 +453,42 @@ export default async function EmailDetailPage({
 
       {/* Page Content */}
       <div className="space-y-6 px-4 lg:px-6">
-        {/* Email Envelope Hero - Compact */}
-        <Card>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Subject Line & Status */}
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <h1 className="mb-2 font-bold text-2xl">{email.subject}</h1>
-                  <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
-                    <span>{formatFullTimestamp(email.sentAt)}</span>
-                    <span>•</span>
-                    <div className="flex min-w-0 max-w-full flex-row items-center gap-1">
-                      <code className="min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                        {email.messageId}
-                      </code>
-                      <CopyButton text={email.messageId} />
-                    </div>
+        {/*
+          Email Envelope Hero - Compact. The envelope is the Wraps-stored send
+          record (Postgres), so it is a default panel; the events below it are
+          the ones read from the customer's AWS account.
+        */}
+        <Panel label={<PanelTitle>Message</PanelTitle>}>
+          <div className="space-y-4">
+            {/* Subject Line & Status */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <h1 className="mb-2 font-bold text-2xl">{email.subject}</h1>
+                <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
+                  <span>{formatFullTimestamp(email.sentAt)}</span>
+                  <span>•</span>
+                  <div className="flex min-w-0 max-w-full flex-row items-center gap-1">
+                    <code className="min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                      {email.messageId}
+                    </code>
+                    <CopyButton text={email.messageId} />
                   </div>
                 </div>
-                <Badge variant={statusConfig.variant}>
-                  <StatusIcon className="mr-1 h-3 w-3" />
-                  {statusConfig.label}
-                </Badge>
               </div>
-
-              {/* To/From - Compact Grid */}
-              <EmailFields
-                from={email.from}
-                organizationId={orgWithMembership.id}
-                to={email.to}
-              />
+              <Badge variant={statusConfig.variant}>
+                <StatusIcon className="mr-1 h-3 w-3" />
+                {statusConfig.label}
+              </Badge>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* To/From - Compact Grid */}
+            <EmailFields
+              from={email.from}
+              organizationId={orgWithMembership.id}
+              to={email.to}
+            />
+          </div>
+        </Panel>
 
         {/* Event Timeline - Collapsible */}
         <EventTimeline eventCount={email.events.length}>

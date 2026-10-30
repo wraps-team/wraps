@@ -1,13 +1,7 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -271,15 +265,13 @@ export default function BrandKitEditPage() {
           <Skeleton className="mb-2 h-8 w-48" />
           <Skeleton className="h-5 w-72" />
         </div>
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-6">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          </CardContent>
-        </Card>
+        <Panel label={<Skeleton className="h-5 w-32" />}>
+          <div className="space-y-6">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </Panel>
       </div>
     );
   }
@@ -325,17 +317,16 @@ export default function BrandKitEditPage() {
         <div className="space-y-6 lg:col-span-2">
           {/* Extract from Domain - Only show when creating new */}
           {isNew && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+            <Panel
+              description="Extract brand colors and fonts automatically."
+              label={
+                <PanelTitle className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
                   Quick Start
-                </CardTitle>
-                <CardDescription>
-                  Extract brand colors and fonts automatically.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
+                </PanelTitle>
+              }
+            >
+              <div className="space-y-3">
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <Globe className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -422,16 +413,13 @@ export default function BrandKitEditPage() {
                     </div>
                   </>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           )}
 
           {/* Basic Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Basic Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Panel label={<PanelTitle>Basic Information</PanelTitle>}>
+            <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="name">Name</Label>
@@ -456,233 +444,214 @@ export default function BrandKitEditPage() {
                   />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
           {/* Colors */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Colors</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="primaryColor">Primary Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      className="h-10 w-14 p-1"
-                      id="primaryColor"
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          primaryColor: e.target.value,
-                        })
-                      }
-                      type="color"
-                      value={formData.primaryColor}
-                    />
-                    <Input
-                      className="flex-1"
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          primaryColor: e.target.value,
-                        })
-                      }
-                      placeholder="#5046e5"
-                      value={formData.primaryColor}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="secondaryColor">Secondary Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      className="h-10 w-14 p-1"
-                      id="secondaryColor"
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          secondaryColor: e.target.value,
-                        })
-                      }
-                      type="color"
-                      value={formData.secondaryColor}
-                    />
-                    <Input
-                      className="flex-1"
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          secondaryColor: e.target.value,
-                        })
-                      }
-                      placeholder="#6366f1"
-                      value={formData.secondaryColor}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="backgroundColor">Background Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      className="h-10 w-14 p-1"
-                      id="backgroundColor"
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          backgroundColor: e.target.value,
-                        })
-                      }
-                      type="color"
-                      value={formData.backgroundColor}
-                    />
-                    <Input
-                      className="flex-1"
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          backgroundColor: e.target.value,
-                        })
-                      }
-                      placeholder="#ffffff"
-                      value={formData.backgroundColor}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="textColor">Text Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      className="h-10 w-14 p-1"
-                      id="textColor"
-                      onChange={(e) =>
-                        setFormData({ ...formData, textColor: e.target.value })
-                      }
-                      type="color"
-                      value={formData.textColor}
-                    />
-                    <Input
-                      className="flex-1"
-                      onChange={(e) =>
-                        setFormData({ ...formData, textColor: e.target.value })
-                      }
-                      placeholder="#1f2937"
-                      value={formData.textColor}
-                    />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Typography */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Typography</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="fontFamily">Body Font</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, fontFamily: value })
-                    }
-                    value={formData.fontFamily}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select font" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FONT_OPTIONS.map((font) => (
-                        <SelectItem key={font.value} value={font.value}>
-                          {font.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="headingFontFamily">Heading Font</Label>
-                  <Select
-                    onValueChange={(value) =>
+          <Panel label={<PanelTitle>Colors</PanelTitle>}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="primaryColor">Primary Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    className="h-10 w-14 p-1"
+                    id="primaryColor"
+                    onChange={(e) =>
                       setFormData({
                         ...formData,
-                        headingFontFamily: value === "same" ? "" : value,
+                        primaryColor: e.target.value,
                       })
                     }
-                    value={formData.headingFontFamily || "same"}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select font" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="same">Same as body</SelectItem>
-                      {FONT_OPTIONS.map((font) => (
-                        <SelectItem key={font.value} value={font.value}>
-                          {font.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Button Styles */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Button Styles</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="buttonStyle">Button Style</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, buttonStyle: value })
-                    }
-                    value={formData.buttonStyle}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select style" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {BUTTON_STYLE_OPTIONS.map((style) => (
-                        <SelectItem key={style.value} value={style.value}>
-                          {style.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="buttonRadius">Button Radius</Label>
+                    type="color"
+                    value={formData.primaryColor}
+                  />
                   <Input
-                    id="buttonRadius"
+                    className="flex-1"
                     onChange={(e) =>
-                      setFormData({ ...formData, buttonRadius: e.target.value })
+                      setFormData({
+                        ...formData,
+                        primaryColor: e.target.value,
+                      })
                     }
-                    placeholder="4px"
-                    value={formData.buttonRadius}
+                    placeholder="#5046e5"
+                    value={formData.primaryColor}
                   />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="space-y-2">
+                <Label htmlFor="secondaryColor">Secondary Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    className="h-10 w-14 p-1"
+                    id="secondaryColor"
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        secondaryColor: e.target.value,
+                      })
+                    }
+                    type="color"
+                    value={formData.secondaryColor}
+                  />
+                  <Input
+                    className="flex-1"
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        secondaryColor: e.target.value,
+                      })
+                    }
+                    placeholder="#6366f1"
+                    value={formData.secondaryColor}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="backgroundColor">Background Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    className="h-10 w-14 p-1"
+                    id="backgroundColor"
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        backgroundColor: e.target.value,
+                      })
+                    }
+                    type="color"
+                    value={formData.backgroundColor}
+                  />
+                  <Input
+                    className="flex-1"
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        backgroundColor: e.target.value,
+                      })
+                    }
+                    placeholder="#ffffff"
+                    value={formData.backgroundColor}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="textColor">Text Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    className="h-10 w-14 p-1"
+                    id="textColor"
+                    onChange={(e) =>
+                      setFormData({ ...formData, textColor: e.target.value })
+                    }
+                    type="color"
+                    value={formData.textColor}
+                  />
+                  <Input
+                    className="flex-1"
+                    onChange={(e) =>
+                      setFormData({ ...formData, textColor: e.target.value })
+                    }
+                    placeholder="#1f2937"
+                    value={formData.textColor}
+                  />
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          {/* Typography */}
+          <Panel label={<PanelTitle>Typography</PanelTitle>}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="fontFamily">Body Font</Label>
+                <Select
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, fontFamily: value })
+                  }
+                  value={formData.fontFamily}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select font" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_OPTIONS.map((font) => (
+                      <SelectItem key={font.value} value={font.value}>
+                        {font.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="headingFontFamily">Heading Font</Label>
+                <Select
+                  onValueChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      headingFontFamily: value === "same" ? "" : value,
+                    })
+                  }
+                  value={formData.headingFontFamily || "same"}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select font" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="same">Same as body</SelectItem>
+                    {FONT_OPTIONS.map((font) => (
+                      <SelectItem key={font.value} value={font.value}>
+                        {font.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </Panel>
+
+          {/* Button Styles */}
+          <Panel label={<PanelTitle>Button Styles</PanelTitle>}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="buttonStyle">Button Style</Label>
+                <Select
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, buttonStyle: value })
+                  }
+                  value={formData.buttonStyle}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BUTTON_STYLE_OPTIONS.map((style) => (
+                      <SelectItem key={style.value} value={style.value}>
+                        {style.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="buttonRadius">Button Radius</Label>
+                <Input
+                  id="buttonRadius"
+                  onChange={(e) =>
+                    setFormData({ ...formData, buttonRadius: e.target.value })
+                  }
+                  placeholder="4px"
+                  value={formData.buttonRadius}
+                />
+              </div>
+            </div>
+          </Panel>
 
           {/* Company Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Company Information</CardTitle>
-              <CardDescription>
-                This information will appear in email footers for CAN-SPAM
-                compliance.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Panel
+            description="This information will appear in email footers for CAN-SPAM compliance."
+            label={<PanelTitle>Company Information</PanelTitle>}
+          >
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="companyName">Company Name</Label>
                 <Input
@@ -706,107 +675,105 @@ export default function BrandKitEditPage() {
                   value={formData.companyAddress}
                 />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
 
         {/* Preview sidebar */}
         <div className="lg:col-span-1">
-          <Card className="sticky top-20">
-            <CardHeader>
-              <CardTitle className="text-base">Preview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Color palette */}
-              <div className="mb-4">
-                <p className="mb-2 text-muted-foreground text-xs">
-                  Color Palette
-                </p>
-                <div className="flex gap-1">
-                  <div
-                    className="h-12 flex-1 rounded-l-md border"
-                    style={{ backgroundColor: formData.primaryColor }}
-                  />
-                  <div
-                    className="h-12 flex-1 border-y"
-                    style={{ backgroundColor: formData.secondaryColor }}
-                  />
-                  <div
-                    className="h-12 flex-1 border-y"
-                    style={{ backgroundColor: formData.backgroundColor }}
-                  />
-                  <div
-                    className="h-12 flex-1 rounded-r-md border"
-                    style={{ backgroundColor: formData.textColor }}
-                  />
-                </div>
-              </div>
-
-              {/* Logo preview */}
-              {formData.logoUrl && (
-                <div className="mb-4">
-                  <p className="mb-2 text-muted-foreground text-xs">Logo</p>
-                  <div className="flex h-16 items-center justify-center rounded border bg-muted/30 p-2">
-                    <img
-                      alt="Logo preview"
-                      className="max-h-full max-w-full object-contain"
-                      src={formData.logoUrl}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Typography preview */}
-              <div className="mb-4">
-                <p className="mb-2 text-muted-foreground text-xs">Typography</p>
+          <Panel
+            className="sticky top-20"
+            label={<PanelTitle>Preview</PanelTitle>}
+          >
+            {/* Color palette */}
+            <div className="mb-4">
+              <p className="mb-2 text-muted-foreground text-xs">
+                Color Palette
+              </p>
+              <div className="flex gap-1">
                 <div
-                  className="rounded border p-3"
-                  style={{
-                    backgroundColor: formData.backgroundColor,
-                    color: formData.textColor,
-                  }}
-                >
-                  <h3
-                    className="mb-1 font-semibold"
-                    style={{
-                      fontFamily:
-                        formData.headingFontFamily || formData.fontFamily,
-                    }}
-                  >
-                    Heading Text
-                  </h3>
-                  <p
-                    className="text-sm"
-                    style={{ fontFamily: formData.fontFamily }}
-                  >
-                    Body text preview with your selected font.
-                  </p>
+                  className="h-12 flex-1 rounded-l-md border"
+                  style={{ backgroundColor: formData.primaryColor }}
+                />
+                <div
+                  className="h-12 flex-1 border-y"
+                  style={{ backgroundColor: formData.secondaryColor }}
+                />
+                <div
+                  className="h-12 flex-1 border-y"
+                  style={{ backgroundColor: formData.backgroundColor }}
+                />
+                <div
+                  className="h-12 flex-1 rounded-r-md border"
+                  style={{ backgroundColor: formData.textColor }}
+                />
+              </div>
+            </div>
+
+            {/* Logo preview */}
+            {formData.logoUrl && (
+              <div className="mb-4">
+                <p className="mb-2 text-muted-foreground text-xs">Logo</p>
+                <div className="flex h-16 items-center justify-center rounded border bg-muted/30 p-2">
+                  <img
+                    alt="Logo preview"
+                    className="max-h-full max-w-full object-contain"
+                    src={formData.logoUrl}
+                  />
                 </div>
               </div>
+            )}
 
-              {/* Button preview */}
-              <div>
-                <p className="mb-2 text-muted-foreground text-xs">Button</p>
-                {/* White label on the kit's own primary color, as the email renders it */}
-                <button
-                  className="w-full px-4 py-2 font-medium text-white" // baseline:allow-ratchet-white-black-web baseline:allow-ratchet-theme-tokens-web baseline:allow-ratchet-dark-mode-web
+            {/* Typography preview */}
+            <div className="mb-4">
+              <p className="mb-2 text-muted-foreground text-xs">Typography</p>
+              <div
+                className="rounded border p-3"
+                style={{
+                  backgroundColor: formData.backgroundColor,
+                  color: formData.textColor,
+                }}
+              >
+                <h3
+                  className="mb-1 font-semibold"
                   style={{
-                    backgroundColor: formData.primaryColor,
-                    borderRadius:
-                      formData.buttonStyle === "pill"
-                        ? "9999px"
-                        : formData.buttonStyle === "square"
-                          ? "0"
-                          : formData.buttonRadius,
-                    fontFamily: formData.fontFamily,
+                    fontFamily:
+                      formData.headingFontFamily || formData.fontFamily,
                   }}
-                  type="button"
                 >
-                  Button Preview
-                </button>
+                  Heading Text
+                </h3>
+                <p
+                  className="text-sm"
+                  style={{ fontFamily: formData.fontFamily }}
+                >
+                  Body text preview with your selected font.
+                </p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+
+            {/* Button preview */}
+            <div>
+              <p className="mb-2 text-muted-foreground text-xs">Button</p>
+              {/* White label on the kit's own primary color, as the email renders it */}
+              <button
+                className="w-full px-4 py-2 font-medium text-white" // baseline:allow-ratchet-white-black-web baseline:allow-ratchet-theme-tokens-web baseline:allow-ratchet-dark-mode-web
+                style={{
+                  backgroundColor: formData.primaryColor,
+                  borderRadius:
+                    formData.buttonStyle === "pill"
+                      ? "9999px"
+                      : formData.buttonStyle === "square"
+                        ? "0"
+                        : formData.buttonRadius,
+                  fontFamily: formData.fontFamily,
+                }}
+                type="button"
+              >
+                Button Preview
+              </button>
+            </div>
+          </Panel>
         </div>
       </div>
     </div>

@@ -2,19 +2,12 @@
 
 import { ButtonGroup } from "@wraps/ui/components/ui/button-group";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -176,17 +169,12 @@ export function InboundAnalytics({
     router.refresh();
   }
 
+  // Received by SES and parsed into the customer's S3 bucket, so the panel
+  // carries the `own` border.
   return (
-    <Card className="@container/card">
-      <CardHeader>
-        <CardTitle>Inbound Activity</CardTitle>
-        <CardDescription>
-          <span className="@[540px]/card:block hidden">
-            Emails received through your inbound infrastructure
-          </span>
-          <span className="@[540px]/card:hidden">Received emails</span>
-        </CardDescription>
-        <CardAction className="self-center">
+    <Panel
+      actions={
+        <>
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "30d"}
@@ -223,196 +211,205 @@ export function InboundAnalytics({
             className="@[767px]/card:hidden"
             onRefresh={handleRefresh}
           />
-        </CardAction>
-      </CardHeader>
-      <CardContent className="px-2 pt-2 sm:px-6 sm:pt-3">
-        <div className="grid grid-cols-1 gap-6 @[540px]/card:grid-cols-[1fr_auto] @[800px]/card:grid-cols-[1fr_auto_120px]">
-          {/* Received Over Time */}
+        </>
+      }
+      className="@container/card"
+      description={
+        <>
+          <span className="@[540px]/card:block hidden">
+            Emails received through your inbound infrastructure
+          </span>
+          <span className="@[540px]/card:hidden">Received emails</span>
+        </>
+      }
+      label={<PanelTitle>Inbound Activity</PanelTitle>}
+    >
+      <div className="grid grid-cols-1 gap-6 @[540px]/card:grid-cols-[1fr_auto] @[800px]/card:grid-cols-[1fr_auto_120px]">
+        {/* Received Over Time */}
+        <div className="min-w-0">
+          <div className="mb-2 font-medium text-muted-foreground text-sm">
+            Received Over Time
+          </div>
+          {analytics.dailyData.every((d) => d.count === 0) ? (
+            <div className="flex h-[200px] items-center justify-center text-muted-foreground text-sm">
+              No emails received in this period
+            </div>
+          ) : (
+            <ChartContainer
+              className="aspect-auto h-[200px] w-full"
+              config={areaChartConfig}
+            >
+              <AreaChart accessibilityLayer data={analytics.dailyData}>
+                <defs>
+                  <linearGradient id="fillInbound" x1="0" x2="0" y1="0" y2="1">
+                    <stop
+                      offset="5%"
+                      stopColor="var(--color-count)"
+                      stopOpacity={0.4}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor="var(--color-count)"
+                      stopOpacity={0.05}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  axisLine={false}
+                  dataKey="date"
+                  minTickGap={32}
+                  tickFormatter={(value) => {
+                    const date = new Date(`${value}T00:00:00`);
+                    return date.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    });
+                  }}
+                  tickLine={false}
+                  tickMargin={8}
+                />
+                <YAxis
+                  {...countYAxisProps(
+                    Math.max(...analytics.dailyData.map((d) => d.count || 0))
+                  )}
+                  width={40}
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      indicator="line"
+                      labelFormatter={(value) => {
+                        const date = new Date(`${value}T00:00:00`);
+                        return date.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        });
+                      }}
+                    />
+                  }
+                />
+                <Area
+                  dataKey="count"
+                  fill="url(#fillInbound)"
+                  stroke="var(--color-count)"
+                  strokeWidth={2}
+                  type="monotone"
+                />
+              </AreaChart>
+            </ChartContainer>
+          )}
+        </div>
+
+        {/* Top Recipients Donut */}
+        {analytics.topRecipients.length > 0 ? (
           <div className="min-w-0">
             <div className="mb-2 font-medium text-muted-foreground text-sm">
-              Received Over Time
+              Top Recipients
             </div>
-            {analytics.dailyData.every((d) => d.count === 0) ? (
-              <div className="flex h-[200px] items-center justify-center text-muted-foreground text-sm">
-                No emails received in this period
-              </div>
-            ) : (
+            <div className="flex items-center gap-3">
               <ChartContainer
-                className="aspect-auto h-[200px] w-full"
-                config={areaChartConfig}
+                className="aspect-square h-[160px] shrink-0"
+                config={pieChartConfig}
               >
-                <AreaChart accessibilityLayer data={analytics.dailyData}>
-                  <defs>
-                    <linearGradient
-                      id="fillInbound"
-                      x1="0"
-                      x2="0"
-                      y1="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="5%"
-                        stopColor="var(--color-count)"
-                        stopOpacity={0.4}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor="var(--color-count)"
-                        stopOpacity={0.05}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis
-                    axisLine={false}
-                    dataKey="date"
-                    minTickGap={32}
-                    tickFormatter={(value) => {
-                      const date = new Date(`${value}T00:00:00`);
-                      return date.toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      });
-                    }}
-                    tickLine={false}
-                    tickMargin={8}
-                  />
-                  <YAxis
-                    {...countYAxisProps(
-                      Math.max(...analytics.dailyData.map((d) => d.count || 0))
-                    )}
-                    width={40}
-                  />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        indicator="line"
-                        labelFormatter={(value) => {
-                          const date = new Date(`${value}T00:00:00`);
-                          return date.toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          });
-                        }}
-                      />
-                    }
-                  />
-                  <Area
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                  <Pie
+                    data={analytics.topRecipients}
                     dataKey="count"
-                    fill="url(#fillInbound)"
-                    stroke="var(--color-count)"
-                    strokeWidth={2}
-                    type="monotone"
-                  />
-                </AreaChart>
-              </ChartContainer>
-            )}
-          </div>
-
-          {/* Top Recipients Donut */}
-          {analytics.topRecipients.length > 0 ? (
-            <div className="min-w-0">
-              <div className="mb-2 font-medium text-muted-foreground text-sm">
-                Top Recipients
-              </div>
-              <div className="flex items-center gap-3">
-                <ChartContainer
-                  className="aspect-square h-[160px] shrink-0"
-                  config={pieChartConfig}
-                >
-                  <PieChart>
-                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Pie
-                      data={analytics.topRecipients}
-                      dataKey="count"
-                      innerRadius={40}
-                      nameKey="address"
-                      outerRadius={65}
-                      paddingAngle={2}
-                      strokeWidth={0}
-                    >
-                      {analytics.topRecipients.map((_entry, index) => (
-                        <Cell
-                          fill={pieColors[index % pieColors.length]}
-                          key={`cell-${index}`}
-                        />
-                      ))}
-                      <Label
-                        content={({ viewBox }) => {
-                          if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                            return (
-                              <text
-                                dominantBaseline="middle"
-                                textAnchor="middle"
+                    innerRadius={40}
+                    nameKey="address"
+                    outerRadius={65}
+                    paddingAngle={2}
+                    strokeWidth={0}
+                  >
+                    {analytics.topRecipients.map((_entry, index) => (
+                      <Cell
+                        fill={pieColors[index % pieColors.length]}
+                        key={`cell-${index}`}
+                      />
+                    ))}
+                    <Label
+                      content={({ viewBox }) => {
+                        if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                          return (
+                            <text
+                              dominantBaseline="middle"
+                              textAnchor="middle"
+                              x={viewBox.cx}
+                              y={viewBox.cy}
+                            >
+                              <tspan
+                                className="fill-foreground font-semibold text-base"
                                 x={viewBox.cx}
                                 y={viewBox.cy}
                               >
-                                <tspan
-                                  className="fill-foreground font-semibold text-base"
-                                  x={viewBox.cx}
-                                  y={viewBox.cy}
-                                >
-                                  {recipientsTotal.toLocaleString()}
-                                </tspan>
-                              </text>
-                            );
-                          }
-                        }}
-                      />
-                    </Pie>
-                  </PieChart>
-                </ChartContainer>
-                <div className="flex flex-col gap-1">
-                  {analytics.topRecipients.map((recipient, index) => (
+                                {recipientsTotal.toLocaleString()}
+                              </tspan>
+                            </text>
+                          );
+                        }
+                      }}
+                    />
+                  </Pie>
+                </PieChart>
+              </ChartContainer>
+              <div className="flex flex-col gap-1">
+                {analytics.topRecipients.map((recipient, index) => (
+                  <div
+                    className="flex items-center gap-2 text-xs"
+                    key={recipient.address}
+                  >
                     <div
-                      className="flex items-center gap-2 text-xs"
-                      key={recipient.address}
-                    >
-                      <div
-                        className="size-2 shrink-0 rounded-full"
-                        style={{
-                          backgroundColor: pieColors[index % pieColors.length],
-                        }}
-                      />
-                      <span className="truncate text-muted-foreground">
-                        {recipient.address}
-                      </span>
-                      <span className="ml-auto shrink-0 font-medium tabular-nums">
-                        {recipient.count.toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                      className="size-2 shrink-0 rounded-full"
+                      style={{
+                        backgroundColor: pieColors[index % pieColors.length],
+                      }}
+                    />
+                    <span className="truncate text-muted-foreground">
+                      {recipient.address}
+                    </span>
+                    <span className="ml-auto shrink-0 font-medium tabular-nums">
+                      {recipient.count.toLocaleString()}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-          ) : (
-            <div />
-          )}
+          </div>
+        ) : (
+          <div />
+        )}
 
-          {/* Stats */}
-          <div className="flex flex-col gap-2">
-            <div className="rounded-lg border bg-card p-2.5 text-center">
-              <div className="font-semibold text-xl tabular-nums">
-                {analytics.totalReceived.toLocaleString()}
-              </div>
-              <div className="text-muted-foreground text-xs">Received</div>
+        {/* Stats: one ruled column, not three boxed cards */}
+        <div className="flex flex-col">
+          <div className="py-2.5 text-center first:pt-0">
+            <div className="font-heading font-semibold text-2xl tabular-nums">
+              {analytics.totalReceived.toLocaleString()}
             </div>
-            <div className="rounded-lg border bg-card p-2.5 text-center">
-              <div className="font-semibold text-xl tabular-nums">
-                {analytics.cleanCount.toLocaleString()}
-              </div>
-              <div className="text-muted-foreground text-xs">Clean</div>
+            <div className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
+              Received
             </div>
-            <div className="rounded-lg border bg-card p-2.5 text-center">
-              <div className="font-semibold text-xl tabular-nums">
-                {analytics.spamCount}
-              </div>
-              <div className="text-muted-foreground text-xs">Spam</div>
+          </div>
+          <div className="border-t py-2.5 text-center">
+            <div className="font-heading font-semibold text-2xl tabular-nums">
+              {analytics.cleanCount.toLocaleString()}
+            </div>
+            <div className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
+              Clean
+            </div>
+          </div>
+          <div className="border-t py-2.5 text-center">
+            <div className="font-heading font-semibold text-2xl tabular-nums">
+              {analytics.spamCount}
+            </div>
+            <div className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
+              Spam
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -160,69 +155,63 @@ export function EmailPreviewCarousel({
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
+      <Panel
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <Mail className="h-4 w-4" />
             Email Preview
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-[300px] w-full" />
-        </CardContent>
-      </Card>
+          </PanelTitle>
+        }
+      >
+        <Skeleton className="h-[300px] w-full" />
+      </Panel>
     );
   }
 
   if (contacts.length === 0) {
     return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
+      <Panel
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <Mail className="h-4 w-4" />
             Email Preview
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            No contacts found to preview.
-          </p>
-        </CardContent>
-      </Card>
+          </PanelTitle>
+        }
+      >
+        <p className="text-muted-foreground text-sm">
+          No contacts found to preview.
+        </p>
+      </Panel>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Mail className="h-4 w-4" />
-            Email Preview ({currentIndex + 1} of {contacts.length})
-          </CardTitle>
-          <div className="flex items-center gap-1">
-            <Button
-              aria-label="Previous"
-              disabled={contacts.length <= 1}
-              onClick={handlePrev}
-              size="icon"
-              variant="ghost"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              aria-label="Next"
-              disabled={contacts.length <= 1}
-              onClick={handleNext}
-              size="icon"
-              variant="ghost"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+    <Panel
+      actions={
+        <div className="flex items-center gap-1">
+          <Button
+            aria-label="Previous"
+            disabled={contacts.length <= 1}
+            onClick={handlePrev}
+            size="icon"
+            variant="ghost"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            aria-label="Next"
+            disabled={contacts.length <= 1}
+            onClick={handleNext}
+            size="icon"
+            variant="ghost"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
-        {currentContact && (
-          <p className="text-muted-foreground text-sm">
+      }
+      description={
+        currentContact && (
+          <p>
             Previewing as:{" "}
             <span className="font-medium text-foreground">
               {[currentContact.firstName, currentContact.lastName]
@@ -233,22 +222,27 @@ export function EmailPreviewCarousel({
               &lt;{currentContact.email}&gt;
             </span>
           </p>
-        )}
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-hidden rounded-lg border bg-card">
-          {/* Fully sandboxed: this preview renders real contact data, and the
+        )
+      }
+      label={
+        <PanelTitle className="flex items-center gap-2">
+          <Mail className="h-4 w-4" />
+          Email Preview ({currentIndex + 1} of {contacts.length})
+        </PanelTitle>
+      }
+    >
+      <div className="overflow-hidden border bg-card">
+        {/* Fully sandboxed: this preview renders real contact data, and the
               renderer substitutes values verbatim to match SES, so the markup
               is not trusted. Nothing here reads contentWindow, so the frame
               has no reason to hold the app's origin. */}
-          <iframe
-            className="h-[400px] w-full border-0"
-            sandbox=""
-            srcDoc={htmlContent}
-            title="Email Preview"
-          />
-        </div>
-      </CardContent>
-    </Card>
+        <iframe
+          className="h-[400px] w-full border-0"
+          sandbox=""
+          srcDoc={htmlContent}
+          title="Email Preview"
+        />
+      </div>
+    </Panel>
   );
 }

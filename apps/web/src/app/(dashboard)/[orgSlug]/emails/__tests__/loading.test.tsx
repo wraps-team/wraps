@@ -5,7 +5,7 @@
  * message list's shape, so the template editor, the setup wizard and the brand
  * kit pages all promised a chart and a table while they loaded. These tests
  * pin the replacement to a neutral page shell and pin the negatives: no table,
- * no card, no toolbar-and-pagination pair.
+ * no panel, no toolbar-and-pagination pair.
  *
  * Every negative assertion below is paired with a render that the same
  * selector *does* match, so "no table" can never quietly become "the selector
@@ -16,7 +16,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render } from "@testing-library/react";
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
+import { Panel } from "@wraps/ui/components/ui/panel";
 import { afterEach, describe, expect, it } from "vitest";
 import { EmailsTableSkeleton } from "../components/emails-table-skeleton";
 import EmailsSegmentLoading from "../loading";
@@ -48,18 +48,18 @@ describe("EmailsSegmentLoading", () => {
     expect(list.container.querySelectorAll("tr").length).toBeGreaterThan(0);
   });
 
-  it("renders no card, so it cannot read as a chart or metrics panel", () => {
+  it("renders no panel, so it cannot read as a chart or metrics panel", () => {
     const generic = render(<EmailsSegmentLoading />);
-    expect(generic.container.querySelector('[data-slot="card"]')).toBeNull();
+    expect(generic.container.querySelector('[data-slot="panel"]')).toBeNull();
     cleanup();
 
-    // Teeth: the selector matches a real Card.
-    const card = render(
-      <Card>
-        <CardContent>content</CardContent>
-      </Card>
+    // Teeth: the selector matches a real Panel.
+    const panel = render(
+      <Panel label="Teeth">
+        <p>content</p>
+      </Panel>
     );
-    expect(card.container.querySelector('[data-slot="card"]')).not.toBeNull();
+    expect(panel.container.querySelector('[data-slot="panel"]')).not.toBeNull();
   });
 
   it("renders no filter bar or pagination row", () => {

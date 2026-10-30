@@ -1,14 +1,8 @@
 "use client";
 
 import { Alert, AlertDescription } from "@wraps/ui/components/ui/alert";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { AlertCircle, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { saveDailyQuotaReserveAction } from "@/actions/aws-accounts";
@@ -59,20 +53,20 @@ export function QuotaReserve({ account, region }: QuotaReserveProps) {
   };
 
   return (
-    <Card id="quota-reserve">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    // The SES sending quota is read from the customer's AWS account; only the
+    // reserve figure itself is stored by Wraps.
+    <Panel
+      description="Broadcasts will never use this many emails of your daily SES quota, keeping them available for transactional sending. A broadcast that runs out of headroom pauses and resumes on its own as quota frees up. Only an audience too large to ever fit in a day is blocked outright."
+      id="quota-reserve"
+      label={
+        <PanelTitle className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5" />
           Daily quota reserve · {region}
-        </CardTitle>
-        <CardDescription>
-          Broadcasts will never use this many emails of your daily SES quota,
-          keeping them available for transactional sending. A broadcast that
-          runs out of headroom pauses and resumes on its own as quota frees up.
-          Only an audience too large to ever fit in a day is blocked outright.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        </PanelTitle>
+      }
+      variant="own"
+    >
+      <div className="space-y-4">
         {success && (
           <Alert>
             <CheckCircle2 className="h-4 w-4 text-success" />
@@ -114,7 +108,7 @@ export function QuotaReserve({ account, region }: QuotaReserveProps) {
           )}
           Save
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

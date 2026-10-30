@@ -2,19 +2,12 @@
 
 import { ButtonGroup } from "@wraps/ui/components/ui/button-group";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -116,16 +109,9 @@ export function EventAnalytics({ organizationId }: EventAnalyticsProps) {
   const topEventsTotal = topEventsData.reduce((sum, e) => sum + e.count, 0);
 
   return (
-    <Card className="@container/card">
-      <CardHeader>
-        <CardTitle>Event Activity</CardTitle>
-        <CardDescription>
-          <span className="@[540px]/card:block hidden">
-            Custom events tracked from your application
-          </span>
-          <span className="@[540px]/card:hidden">Event tracking</span>
-        </CardDescription>
-        <CardAction className="self-center">
+    <Panel
+      actions={
+        <>
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "30d"}
@@ -162,9 +148,20 @@ export function EventAnalytics({ organizationId }: EventAnalyticsProps) {
             className="@[767px]/card:hidden"
             onRefresh={handleRefresh}
           />
-        </CardAction>
-      </CardHeader>
-      <CardContent className="px-2 pt-2 sm:px-6 sm:pt-3">
+        </>
+      }
+      className="@container/card"
+      description={
+        <>
+          <span className="@[540px]/card:block hidden">
+            Custom events tracked from your application
+          </span>
+          <span className="@[540px]/card:hidden">Event tracking</span>
+        </>
+      }
+      label={<PanelTitle>Event Activity</PanelTitle>}
+    >
+      <div>
         {isLoading ? (
           <div className="grid grid-cols-1 gap-6 @[540px]/card:grid-cols-[1fr_auto] @[800px]/card:grid-cols-[1fr_auto_120px]">
             <Skeleton className="h-[200px] w-full" />
@@ -367,7 +364,7 @@ export function EventAnalytics({ organizationId }: EventAnalyticsProps) {
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

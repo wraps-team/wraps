@@ -4,14 +4,7 @@ import {
   SES_PLAN_RATES,
 } from "@wraps/core/ses-plans";
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import type { ClientAccount } from "../lib/client-account";
 
 type VdmStatusCardProps = {
@@ -64,17 +57,18 @@ export function VdmStatusCard({ account, iamRoleHref }: VdmStatusCardProps) {
   const recommendations = vdm.recommendations;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Virtual Deliverability Manager</CardTitle>
-        <CardDescription>{description}</CardDescription>
-        <CardAction>
-          <Badge variant={badgeVariant}>{vdm.enabled ? "On" : "Off"}</Badge>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    // VDM state and recommendations are read from the customer's SES account.
+    <Panel
+      actions={
+        <Badge variant={badgeVariant}>{vdm.enabled ? "On" : "Off"}</Badge>
+      }
+      description={description}
+      label={<PanelTitle>Virtual Deliverability Manager</PanelTitle>}
+      variant="own"
+    >
+      <div className="space-y-4">
         {showEnableCommand && (
-          <code className="block rounded bg-muted px-2 py-1 font-mono text-xs">
+          <code className="block bg-muted px-2 py-1 font-mono text-xs">
             wraps email vdm --enable --region {account.region}
           </code>
         )}
@@ -122,7 +116,7 @@ export function VdmStatusCard({ account, iamRoleHref }: VdmStatusCardProps) {
             VDM recommendations couldn&apos;t be read on the last check.
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

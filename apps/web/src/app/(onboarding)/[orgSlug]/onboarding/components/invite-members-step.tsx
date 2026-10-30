@@ -1,10 +1,4 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -90,16 +84,11 @@ export function InviteMembersStep({
   };
 
   return (
-    <Card>
-      <CardHeader className="space-y-2 text-center">
-        <CardTitle className="text-3xl">Invite your team</CardTitle>
-        <CardDescription className="text-base">
-          Optional — invite teammates now or skip and add them anytime from
-          Settings. They'll get access as soon as your setup is done.
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="space-y-6">
+    <Panel
+      description="Optional — invite teammates now or skip and add them anytime from Settings. They'll get access as soon as your setup is done."
+      label={<PanelTitle>Invite your team</PanelTitle>}
+    >
+      <div className="space-y-6">
         <form className="flex gap-3" onSubmit={handleInvite}>
           <Input
             className="flex-1"
@@ -167,7 +156,7 @@ export function InviteMembersStep({
             </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

@@ -1,10 +1,5 @@
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import Link from "next/link";
 import { formatRelativeTime } from "@/lib/utils";
 import { LEVEL_BADGE_VARIANT, type RoleStatus } from "../../lib/role-status";
@@ -81,47 +76,42 @@ export function StatusList({
     .join(" + ");
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Status</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ul className="divide-y">
-          <Row
-            badge={
-              <Badge variant={LEVEL_BADGE_VARIANT[roleStatus.level]}>
-                {roleStatus.label}
-              </Badge>
-            }
-            detail={roleStatus.detail || null}
-            href={`${base}/connection`}
-            label="Role access"
-            linkText="Connection →"
-          />
-          <Row
-            badge={<Badge variant={streaming.variant}>{streaming.label}</Badge>}
-            detail={streaming.detail}
-            href={`${base}/connection`}
-            label={`Event streaming · ${region}`}
-            linkText="Connection →"
-          />
-          <Row
-            badge={
-              <Badge variant="secondary">
-                {services || "Nothing detected"}
-              </Badge>
-            }
-            detail={
-              scannedAt
-                ? `scanned ${formatRelativeTime(new Date(scannedAt))}`
-                : "not scanned yet"
-            }
-            href={`${base}/services`}
-            label={`Infrastructure · ${region}`}
-            linkText="Services →"
-          />
-        </ul>
-      </CardContent>
-    </Card>
+    // Role, streaming and infrastructure state are all read from the
+    // customer's AWS account.
+    <Panel label={<PanelTitle>Status</PanelTitle>} variant="own">
+      <ul className="divide-y">
+        <Row
+          badge={
+            <Badge variant={LEVEL_BADGE_VARIANT[roleStatus.level]}>
+              {roleStatus.label}
+            </Badge>
+          }
+          detail={roleStatus.detail || null}
+          href={`${base}/connection`}
+          label="Role access"
+          linkText="Connection →"
+        />
+        <Row
+          badge={<Badge variant={streaming.variant}>{streaming.label}</Badge>}
+          detail={streaming.detail}
+          href={`${base}/connection`}
+          label={`Event streaming · ${region}`}
+          linkText="Connection →"
+        />
+        <Row
+          badge={
+            <Badge variant="secondary">{services || "Nothing detected"}</Badge>
+          }
+          detail={
+            scannedAt
+              ? `scanned ${formatRelativeTime(new Date(scannedAt))}`
+              : "not scanned yet"
+          }
+          href={`${base}/services`}
+          label={`Infrastructure · ${region}`}
+          linkText="Services →"
+        />
+      </ul>
+    </Panel>
   );
 }

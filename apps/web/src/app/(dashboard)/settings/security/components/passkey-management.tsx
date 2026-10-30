@@ -11,13 +11,6 @@ import {
   AlertDialogTitle,
 } from "@wraps/ui/components/ui/alert-dialog";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -26,6 +19,7 @@ import {
   DialogTitle,
 } from "@wraps/ui/components/ui/dialog";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Edit2,
   Fingerprint,
@@ -131,30 +125,31 @@ export function PasskeyManagement() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Fingerprint className="h-5 w-5" />
-                Passkeys
-              </CardTitle>
-              <CardDescription>
-                Passkeys provide a secure, passwordless way to sign in using
-                biometrics or your device's security features.
-              </CardDescription>
-            </div>
-            <Button
-              className="cursor-pointer"
-              onClick={() => setIsAddingPasskey(true)}
-              size="sm"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Passkey
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
+      <Panel
+        actions={
+          <Button
+            className="cursor-pointer"
+            onClick={() => setIsAddingPasskey(true)}
+            size="sm"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Passkey
+          </Button>
+        }
+        description={
+          <>
+            Passkeys provide a secure, passwordless way to sign in using
+            biometrics or your device's security features.
+          </>
+        }
+        label={
+          <PanelTitle className="flex items-center gap-2">
+            <Fingerprint className="h-5 w-5" />
+            Passkeys
+          </PanelTitle>
+        }
+      >
+        <div>
           {isPending ? (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -228,8 +223,8 @@ export function PasskeyManagement() {
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Add Passkey Dialog */}
       <Dialog onOpenChange={setIsAddingPasskey} open={isAddingPasskey}>

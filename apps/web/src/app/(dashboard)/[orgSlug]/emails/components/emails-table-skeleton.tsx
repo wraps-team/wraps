@@ -1,3 +1,4 @@
+import { Panel } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import {
   Table,
@@ -42,27 +43,36 @@ export function EmailsTableSkeletonRows({
  */
 export function EmailsTableSkeleton() {
   return (
-    <div className="w-full space-y-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Skeleton className="h-9 w-full max-w-sm" />
-        <div className="flex flex-wrap items-center gap-2">
-          <Skeleton className="h-9 w-[150px]" />
-          <Skeleton className="h-9 w-[140px]" />
-          <Skeleton className="h-9 w-9" />
+    <Panel
+      className="w-full"
+      label={
+        <span className="font-mono text-2xs leading-5 tracking-eyebrow">
+          Messages
+        </span>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <Skeleton className="h-9 w-full max-w-sm" />
+          <div className="flex flex-wrap items-center gap-2">
+            <Skeleton className="h-9 w-[150px]" />
+            <Skeleton className="h-9 w-[140px]" />
+            <Skeleton className="h-9 w-9" />
+          </div>
+        </div>
+        <div className="-mx-4">
+          <Table>
+            <TableBody>
+              <EmailsTableSkeletonRows />
+            </TableBody>
+          </Table>
+        </div>
+        <div className="flex items-center justify-between py-4">
+          <Skeleton className="h-9 w-28" />
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-9 w-48" />
         </div>
       </div>
-      <div className="rounded-md border">
-        <Table>
-          <TableBody>
-            <EmailsTableSkeletonRows />
-          </TableBody>
-        </Table>
-      </div>
-      <div className="flex items-center justify-between py-4">
-        <Skeleton className="h-9 w-28" />
-        <Skeleton className="h-4 w-40" />
-        <Skeleton className="h-9 w-48" />
-      </div>
-    </div>
+    </Panel>
   );
 }

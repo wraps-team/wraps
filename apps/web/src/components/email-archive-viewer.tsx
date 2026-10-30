@@ -2,13 +2,7 @@
 
 import { Alert, AlertDescription } from "@wraps/ui/components/ui/alert";
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import {
   Tabs,
@@ -51,28 +45,23 @@ export function EmailArchiveViewer({
   // Not enabled - show premium upgrade message
   if (!archivingEnabled) {
     return (
-      <Card className="border-dashed">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Lock className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Email Archive
-                <Badge className="gap-1" variant="secondary">
-                  <Sparkles className="h-3 w-3" />
-                  Premium
-                </Badge>
-              </CardTitle>
-              <CardDescription>
-                Full email content with HTML rendering and attachments
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-lg border bg-muted/50 p-4">
+      // The upgrade prompt is Wraps' own offer, not data from the account, so it
+      // keeps the plain panel.
+      <Panel
+        actions={<Lock className="h-5 w-5 text-primary" />}
+        description="Full email content with HTML rendering and attachments"
+        label={
+          <PanelTitle className="flex items-center gap-2">
+            Email Archive
+            <Badge className="gap-1" variant="secondary">
+              <Sparkles className="h-3 w-3" />
+              Premium
+            </Badge>
+          </PanelTitle>
+        }
+      >
+        <div className="space-y-4">
+          <div className="border bg-muted/50 p-4">
             <div className="mb-4 flex items-start gap-3">
               <Mail className="mt-0.5 h-5 w-5 text-muted-foreground" />
               <div className="space-y-1">
@@ -111,77 +100,60 @@ export function EmailArchiveViewer({
               in your CLI.
             </AlertDescription>
           </Alert>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   // Loading state - premium shimmer
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Mail className="h-5 w-5 animate-pulse text-primary" />
-            </div>
-            <div>
-              <CardTitle>Email Archive</CardTitle>
-              <CardDescription>
-                Loading archived email content from AWS SES Mail Manager...
-              </CardDescription>
-            </div>
+      <Panel
+        actions={<Mail className="h-5 w-5 animate-pulse text-primary" />}
+        description="Loading archived email content from AWS SES Mail Manager..."
+        label={<PanelTitle>Email Archive</PanelTitle>}
+      >
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-[400px] w-full" />
+          <div className="flex gap-2">
+            <Skeleton className="h-20 flex-1" />
+            <Skeleton className="h-20 flex-1" />
+            <Skeleton className="h-20 flex-1" />
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-[400px] w-full" />
-            <div className="flex gap-2">
-              <Skeleton className="h-20 flex-1" />
-              <Skeleton className="h-20 flex-1" />
-              <Skeleton className="h-20 flex-1" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   // Error state
   if (error) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Email Archive</CardTitle>
-          <CardDescription>Failed to load archived email</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+      <Panel
+        description="Failed to load archived email"
+        label={<PanelTitle>Email Archive</PanelTitle>}
+      >
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </Panel>
     );
   }
 
   // Email not found in archive (sent before archiving was enabled)
   if (!archivedEmail) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Email Archive</CardTitle>
-          <CardDescription>Email content not available</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert>
-            <AlertDescription>
-              This email was not archived. It may have been sent before email
-              archiving was enabled for this AWS account.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+      <Panel
+        description="Email content not available"
+        label={<PanelTitle>Email Archive</PanelTitle>}
+      >
+        <Alert>
+          <AlertDescription>
+            This email was not archived. It may have been sent before email
+            archiving was enabled for this AWS account.
+          </AlertDescription>
+        </Alert>
+      </Panel>
     );
   }
 
@@ -199,200 +171,192 @@ export function EmailArchiveViewer({
   };
 
   return (
-    <Card className="border-2">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/5">
-              <Mail className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Email Archive
-                <Badge className="gap-1" variant="outline">
-                  <CheckCircle2 className="h-3 w-3 text-success" />
-                  Archived
-                </Badge>
-              </CardTitle>
-              <CardDescription>
-                Full email content stored securely in AWS SES Mail Manager
-              </CardDescription>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {archivedEmail.attachments.length > 0 && (
-              <Badge className="gap-1" variant="secondary">
-                <Download className="h-3 w-3" />
-                {archivedEmail.attachments.length} attachment
-                {archivedEmail.attachments.length > 1 ? "s" : ""}
-              </Badge>
-            )}
-            {archivedEmail.html && (
-              <Button
-                className="gap-2"
-                onClick={downloadHTML}
-                size="sm"
-                variant="outline"
-              >
-                <Download className="h-4 w-4" />
-                Download HTML
-              </Button>
-            )}
-          </div>
+    // A plain panel: an archived message is history, and the dashed "own"
+    // border is reserved for live account state.
+    <Panel
+      actions={
+        <div className="flex items-center gap-2">
+          {archivedEmail.attachments.length > 0 && (
+            <Badge className="gap-1" variant="secondary">
+              <Download className="h-3 w-3" />
+              {archivedEmail.attachments.length} attachment
+              {archivedEmail.attachments.length > 1 ? "s" : ""}
+            </Badge>
+          )}
+          {archivedEmail.html && (
+            <Button
+              className="gap-2"
+              onClick={downloadHTML}
+              size="sm"
+              variant="outline"
+            >
+              <Download className="h-4 w-4" />
+              Download HTML
+            </Button>
+          )}
         </div>
-      </CardHeader>
-      <CardContent>
-        <Tabs className="w-full" defaultValue="rendered">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger className="gap-2" value="rendered">
-              <Globe className="h-4 w-4" />
-              Rendered Email
-            </TabsTrigger>
-            <TabsTrigger className="gap-2" value="text">
-              <FileText className="h-4 w-4" />
-              Plain Text
-            </TabsTrigger>
-            <TabsTrigger className="gap-2" value="html">
-              <Code2 className="h-4 w-4" />
-              HTML Source
-            </TabsTrigger>
-          </TabsList>
+      }
+      description="Full email content stored securely in AWS SES Mail Manager"
+      label={
+        <PanelTitle className="flex items-center gap-2">
+          Email Archive
+          <Badge className="gap-1" variant="outline">
+            <CheckCircle2 className="h-3 w-3 text-success" />
+            Archived
+          </Badge>
+        </PanelTitle>
+      }
+    >
+      <Tabs className="w-full" defaultValue="rendered">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger className="gap-2" value="rendered">
+            <Globe className="h-4 w-4" />
+            Rendered Email
+          </TabsTrigger>
+          <TabsTrigger className="gap-2" value="text">
+            <FileText className="h-4 w-4" />
+            Plain Text
+          </TabsTrigger>
+          <TabsTrigger className="gap-2" value="html">
+            <Code2 className="h-4 w-4" />
+            HTML Source
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Rendered Email Tab */}
-          <TabsContent className="space-y-4" value="rendered">
-            {archivedEmail.html ? (
-              <div className="rounded-md border">
-                {/* Fully sandboxed: this is the org's own archived sent mail, but
+        {/* Rendered Email Tab */}
+        <TabsContent className="space-y-4" value="rendered">
+          {archivedEmail.html ? (
+            <div className="border">
+              {/* Fully sandboxed: this is the org's own archived sent mail, but
                     nothing here reads contentWindow, so the frame has no reason
                     to hold the app's origin. no-referrer keeps remote images from
                     leaking the dashboard URL to whatever host serves them. */}
-                <iframe
-                  className="h-[600px] w-full rounded-md"
-                  referrerPolicy="no-referrer"
-                  sandbox=""
-                  srcDoc={archivedEmail.html}
-                  title="Email preview"
-                />
-              </div>
-            ) : (
-              <Alert>
-                <AlertDescription>
-                  No HTML content available for this email. View the plain text
-                  tab instead.
-                </AlertDescription>
-              </Alert>
-            )}
+              <iframe
+                className="h-[600px] w-full"
+                referrerPolicy="no-referrer"
+                sandbox=""
+                srcDoc={archivedEmail.html}
+                title="Email preview"
+              />
+            </div>
+          ) : (
+            <Alert>
+              <AlertDescription>
+                No HTML content available for this email. View the plain text
+                tab instead.
+              </AlertDescription>
+            </Alert>
+          )}
 
-            {archivedEmail.attachments.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Download className="h-4 w-4 text-muted-foreground" />
-                  <div className="font-medium text-sm">
-                    Attachments ({archivedEmail.attachments.length})
+          {archivedEmail.attachments.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Download className="h-4 w-4 text-muted-foreground" />
+                <div className="font-medium text-sm">
+                  Attachments ({archivedEmail.attachments.length})
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {archivedEmail.attachments.map((attachment, index) => (
+                  <div
+                    className="group relative flex items-center justify-between border bg-gradient-to-br from-background to-muted/20 p-4 transition-all hover:border-primary/50 hover:shadow-md"
+                    key={attachment.filename || `attachment-${index}`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center bg-primary/10">
+                          <FileText className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="font-medium font-mono text-sm">
+                          {attachment.filename || `Attachment ${index + 1}`}
+                        </div>
+                      </div>
+                      <div className="ml-10 text-muted-foreground text-xs">
+                        {attachment.contentType} •{" "}
+                        {(attachment.size / 1024).toFixed(2)} KB
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {archivedEmail.attachments.map((attachment, index) => (
-                    <div
-                      className="group relative flex items-center justify-between rounded-lg border bg-gradient-to-br from-background to-muted/20 p-4 transition-all hover:border-primary/50 hover:shadow-md"
-                      key={attachment.filename || `attachment-${index}`}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                            <FileText className="h-4 w-4 text-primary" />
-                          </div>
-                          <div className="font-medium font-mono text-sm">
-                            {attachment.filename || `Attachment ${index + 1}`}
-                          </div>
-                        </div>
-                        <div className="ml-10 text-muted-foreground text-xs">
-                          {attachment.contentType} •{" "}
-                          {(attachment.size / 1024).toFixed(2)} KB
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Plain Text Tab */}
-          <TabsContent className="space-y-4" value="text">
-            {archivedEmail.text ? (
-              <div className="rounded-md border bg-muted p-4">
-                <pre className="whitespace-pre-wrap font-mono text-sm">
-                  {archivedEmail.text}
-                </pre>
-              </div>
-            ) : (
-              <Alert>
-                <AlertDescription>
-                  No plain text content available for this email.
-                </AlertDescription>
-              </Alert>
-            )}
-          </TabsContent>
-
-          {/* HTML Source Tab */}
-          <TabsContent className="space-y-4" value="html">
-            {archivedEmail.html ? (
-              <div className="rounded-md border bg-muted p-4">
-                <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-xs">
-                  {archivedEmail.html}
-                </pre>
-              </div>
-            ) : (
-              <Alert>
-                <AlertDescription>
-                  No HTML content available for this email.
-                </AlertDescription>
-              </Alert>
-            )}
-          </TabsContent>
-        </Tabs>
-
-        {/* Email Headers */}
-        {archivedEmail.headers &&
-          Object.keys(archivedEmail.headers).length > 0 && (
-            <div className="mt-6 space-y-3 rounded-md border p-4">
-              <div className="font-medium text-sm">Email Headers</div>
-              <div className="space-y-2">
-                {Object.entries(archivedEmail.headers)
-                  .filter(([key]) =>
-                    [
-                      "from",
-                      "to",
-                      "subject",
-                      "date",
-                      "message-id",
-                      "reply-to",
-                      "cc",
-                      "bcc",
-                      "x-ses-configuration-set",
-                      "x-ses-message-id",
-                      "mime-version",
-                      "content-type",
-                    ].includes(key.toLowerCase())
-                  )
-                  .map(([key, value]) => (
-                    <div
-                      className="grid gap-2 border-b pb-2 last:border-b-0 md:grid-cols-4"
-                      key={key}
-                    >
-                      <div className="font-medium text-muted-foreground text-xs uppercase">
-                        {key}
-                      </div>
-                      <div className="break-all font-mono text-sm md:col-span-3">
-                        {Array.isArray(value) ? value.join(", ") : value}
-                      </div>
-                    </div>
-                  ))}
+                ))}
               </div>
             </div>
           )}
-      </CardContent>
-    </Card>
+        </TabsContent>
+
+        {/* Plain Text Tab */}
+        <TabsContent className="space-y-4" value="text">
+          {archivedEmail.text ? (
+            <div className="border bg-muted p-4">
+              <pre className="whitespace-pre-wrap font-mono text-sm">
+                {archivedEmail.text}
+              </pre>
+            </div>
+          ) : (
+            <Alert>
+              <AlertDescription>
+                No plain text content available for this email.
+              </AlertDescription>
+            </Alert>
+          )}
+        </TabsContent>
+
+        {/* HTML Source Tab */}
+        <TabsContent className="space-y-4" value="html">
+          {archivedEmail.html ? (
+            <div className="border bg-muted p-4">
+              <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-xs">
+                {archivedEmail.html}
+              </pre>
+            </div>
+          ) : (
+            <Alert>
+              <AlertDescription>
+                No HTML content available for this email.
+              </AlertDescription>
+            </Alert>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Email Headers */}
+      {archivedEmail.headers &&
+        Object.keys(archivedEmail.headers).length > 0 && (
+          <div className="mt-6 space-y-3 border p-4">
+            <div className="font-medium text-sm">Email Headers</div>
+            <div className="space-y-2">
+              {Object.entries(archivedEmail.headers)
+                .filter(([key]) =>
+                  [
+                    "from",
+                    "to",
+                    "subject",
+                    "date",
+                    "message-id",
+                    "reply-to",
+                    "cc",
+                    "bcc",
+                    "x-ses-configuration-set",
+                    "x-ses-message-id",
+                    "mime-version",
+                    "content-type",
+                  ].includes(key.toLowerCase())
+                )
+                .map(([key, value]) => (
+                  <div
+                    className="grid gap-2 border-b pb-2 last:border-b-0 md:grid-cols-4"
+                    key={key}
+                  >
+                    <div className="font-medium text-muted-foreground text-xs uppercase">
+                      {key}
+                    </div>
+                    <div className="break-all font-mono text-sm md:col-span-3">
+                      {Array.isArray(value) ? value.join(", ") : value}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+    </Panel>
   );
 }

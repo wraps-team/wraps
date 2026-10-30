@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Check,
   Copy,
@@ -231,409 +225,388 @@ export function OrganizationSettingsSso({
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Single Sign-On</CardTitle>
-              <CardDescription>
-                Configure OIDC-based SSO for your organization. Members can sign
-                in via your identity provider (Okta, Azure AD, etc.).
-              </CardDescription>
+      <Panel
+        actions={
+          existingProvider && (
+            <div className="flex items-center gap-2 text-sm">
+              {existingProvider.domainVerified ? (
+                <>
+                  <ShieldCheck className="h-4 w-4 text-success" />
+                  <span className="text-success">Active</span>
+                </>
+              ) : (
+                <>
+                  <ShieldOff className="h-4 w-4 text-warning" />
+                  <span className="text-warning">Pending verification</span>
+                </>
+              )}
             </div>
-            {existingProvider && (
-              <div className="flex items-center gap-2 text-sm">
-                {existingProvider.domainVerified ? (
-                  <>
-                    <ShieldCheck className="h-4 w-4 text-success" />
-                    <span className="text-success">Active</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldOff className="h-4 w-4 text-warning" />
-                    <span className="text-warning">Pending verification</span>
-                  </>
-                )}
+          )
+        }
+        description="Configure OIDC-based SSO for your organization. Members can sign in via your identity provider (Okta, Azure AD, etc.)."
+        label={<PanelTitle>Single Sign-On</PanelTitle>}
+      >
+        {existingProvider ? (
+          existingProvider.domainVerified ? (
+            /* Active SSO */
+            <div className="space-y-4">
+              <div className="bg-muted p-4 text-sm space-y-2">
+                <p className="font-medium text-success">
+                  SSO is active for {existingProvider.domain}
+                </p>
+                <p className="text-muted-foreground">
+                  Issuer: {existingProvider.issuer}
+                </p>
               </div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {existingProvider ? (
-            existingProvider.domainVerified ? (
-              /* Active SSO */
-              <div className="space-y-4">
-                <div className="rounded-lg bg-muted p-4 text-sm space-y-2">
-                  <p className="font-medium text-success">
-                    SSO is active for {existingProvider.domain}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Issuer: {existingProvider.issuer}
-                  </p>
+              <div className="border bg-muted/40 p-4 text-sm space-y-1">
+                <p className="font-medium">How your team signs in</p>
+                <ol className="space-y-1 text-muted-foreground list-decimal list-inside">
+                  <li>
+                    Go to <strong>{APP_HOST}</strong>
+                  </li>
+                  <li>
+                    Enter their <strong>@{existingProvider.domain}</strong>{" "}
+                    email address
+                  </li>
+                  <li>
+                    Click <strong>Sign in with SSO</strong>
+                  </li>
+                </ol>
+              </div>
+              {canEdit && (
+                <Button
+                  disabled={isPending}
+                  onClick={handleDelete}
+                  variant="outline"
+                >
+                  Remove SSO Provider
+                </Button>
+              )}
+            </div>
+          ) : (
+            /* Domain verification */
+            <div className="space-y-4">
+              <div className="border bg-muted/40 p-4 text-sm space-y-3">
+                <p className="font-medium">
+                  Step 2 of 2 — Verify domain ownership
+                </p>
+                <p className="text-muted-foreground">
+                  Add a DNS TXT record to prove you own{" "}
+                  <strong>{existingProvider.domain}</strong>. SSO activates
+                  automatically once verified.
+                </p>
+                <ol className="space-y-1 text-muted-foreground list-decimal list-inside">
+                  <li>
+                    Click <strong>Get Verification Token</strong> below
+                  </li>
+                  <li>Add the TXT record to your DNS provider</li>
+                  <li>
+                    Click <strong>Verify Domain</strong> — DNS can take a few
+                    minutes to propagate
+                  </li>
+                </ol>
+              </div>
+
+              {verificationToken && (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Record type</p>
+                    <div className="border bg-muted/50 px-3 py-2 font-mono text-sm">
+                      TXT
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Hostname / Name</p>
+                    <div className="flex items-center gap-2 border bg-muted/50 p-3 font-mono text-sm">
+                      <span className="flex-1 break-all">{dnsTxtHostname}</span>
+                      <Button
+                        aria-label="Copy DNS hostname"
+                        onClick={() =>
+                          handleCopy(dnsTxtHostname ?? "", "dns-hostname")
+                        }
+                        size="icon"
+                        variant="ghost"
+                      >
+                        {copiedKey === "dns-hostname" ? (
+                          <Check className="h-4 w-4 text-success" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      Some DNS providers auto-append your domain — enter only
+                      the part shown above.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Value</p>
+                    <div className="flex items-center gap-2 border bg-muted/50 p-3 font-mono text-sm">
+                      <span className="flex-1 break-all">
+                        {dnsTxtHostname}={verificationToken}
+                      </span>
+                      <Button
+                        aria-label="Copy DNS TXT value"
+                        onClick={() =>
+                          handleCopy(
+                            `${dnsTxtHostname}=${verificationToken}`,
+                            "dns-token"
+                          )
+                        }
+                        size="icon"
+                        variant="ghost"
+                      >
+                        {copiedKey === "dns-token" ? (
+                          <Check className="h-4 w-4 text-success" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  {verificationExpiresAt && (
+                    <p className="text-muted-foreground text-xs">
+                      Token expires{" "}
+                      {new Date(verificationExpiresAt).toLocaleDateString(
+                        "en-US",
+                        {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        }
+                      )}
+                    </p>
+                  )}
                 </div>
-                <div className="rounded-lg border bg-muted/40 p-4 text-sm space-y-1">
-                  <p className="font-medium">How your team signs in</p>
-                  <ol className="space-y-1 text-muted-foreground list-decimal list-inside">
-                    <li>
-                      Go to <strong>{APP_HOST}</strong>
-                    </li>
-                    <li>
-                      Enter their <strong>@{existingProvider.domain}</strong>{" "}
-                      email address
-                    </li>
-                    <li>
-                      Click <strong>Sign in with SSO</strong>
-                    </li>
-                  </ol>
-                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {canEdit && (
+                  <Button
+                    disabled={isPending}
+                    onClick={handleRequestVerification}
+                    variant="outline"
+                  >
+                    {isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    {verificationToken
+                      ? "Regenerate Token"
+                      : "Get Verification Token"}
+                  </Button>
+                )}
+                {canEdit && (
+                  <Button
+                    disabled={isPending || !verificationToken}
+                    onClick={handleVerify}
+                  >
+                    {isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Verify Domain
+                  </Button>
+                )}
                 {canEdit && (
                   <Button
                     disabled={isPending}
                     onClick={handleDelete}
-                    variant="outline"
+                    variant="ghost-destructive"
                   >
-                    Remove SSO Provider
+                    Remove Provider
                   </Button>
                 )}
               </div>
-            ) : (
-              /* Domain verification */
-              <div className="space-y-4">
-                <div className="rounded-lg border bg-muted/40 p-4 text-sm space-y-3">
-                  <p className="font-medium">
-                    Step 2 of 2 — Verify domain ownership
-                  </p>
-                  <p className="text-muted-foreground">
-                    Add a DNS TXT record to prove you own{" "}
-                    <strong>{existingProvider.domain}</strong>. SSO activates
-                    automatically once verified.
-                  </p>
-                  <ol className="space-y-1 text-muted-foreground list-decimal list-inside">
-                    <li>
-                      Click <strong>Get Verification Token</strong> below
-                    </li>
-                    <li>Add the TXT record to your DNS provider</li>
-                    <li>
-                      Click <strong>Verify Domain</strong> — DNS can take a few
-                      minutes to propagate
-                    </li>
-                  </ol>
-                </div>
-
-                {verificationToken && (
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Record type</p>
-                      <div className="rounded-lg border bg-muted/50 px-3 py-2 font-mono text-sm">
-                        TXT
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Hostname / Name</p>
-                      <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3 font-mono text-sm">
-                        <span className="flex-1 break-all">
-                          {dnsTxtHostname}
-                        </span>
-                        <Button
-                          aria-label="Copy DNS hostname"
-                          onClick={() =>
-                            handleCopy(dnsTxtHostname ?? "", "dns-hostname")
-                          }
-                          size="icon"
-                          variant="ghost"
-                        >
-                          {copiedKey === "dns-hostname" ? (
-                            <Check className="h-4 w-4 text-success" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                      <p className="text-muted-foreground text-xs">
-                        Some DNS providers auto-append your domain — enter only
-                        the part shown above.
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Value</p>
-                      <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3 font-mono text-sm">
-                        <span className="flex-1 break-all">
-                          {dnsTxtHostname}={verificationToken}
-                        </span>
-                        <Button
-                          aria-label="Copy DNS TXT value"
-                          onClick={() =>
-                            handleCopy(
-                              `${dnsTxtHostname}=${verificationToken}`,
-                              "dns-token"
-                            )
-                          }
-                          size="icon"
-                          variant="ghost"
-                        >
-                          {copiedKey === "dns-token" ? (
-                            <Check className="h-4 w-4 text-success" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                    {verificationExpiresAt && (
-                      <p className="text-muted-foreground text-xs">
-                        Token expires{" "}
-                        {new Date(verificationExpiresAt).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          }
-                        )}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-2">
-                  {canEdit && (
-                    <Button
-                      disabled={isPending}
-                      onClick={handleRequestVerification}
-                      variant="outline"
-                    >
-                      {isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : null}
-                      {verificationToken
-                        ? "Regenerate Token"
-                        : "Get Verification Token"}
-                    </Button>
-                  )}
-                  {canEdit && (
-                    <Button
-                      disabled={isPending || !verificationToken}
-                      onClick={handleVerify}
-                    >
-                      {isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : null}
-                      Verify Domain
-                    </Button>
-                  )}
-                  {canEdit && (
-                    <Button
-                      disabled={isPending}
-                      onClick={handleDelete}
-                      variant="ghost-destructive"
-                    >
-                      Remove Provider
-                    </Button>
-                  )}
-                </div>
-
-                {canEdit && (
-                  <div className="border-t pt-4 space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      Already use Wraps email for{" "}
-                      <strong>{existingProvider.domain}</strong>? Skip the TXT
-                      record — verify via your connected AWS account instead.
-                    </p>
-                    <Button
-                      disabled={isPending}
-                      onClick={handleVerifyViaSES}
-                      variant="outline"
-                    >
-                      {isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : null}
-                      Verify via AWS SES
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )
-          ) : (
-            /* Setup form */
-            <div className="space-y-6">
-              {/* IdP setup guide */}
-              <div className="rounded-lg border bg-muted/40 p-4 text-sm space-y-3">
-                <p className="font-medium">
-                  Step 1 of 2 — Configure your identity provider
-                </p>
-                <p className="text-muted-foreground">
-                  Create a new OIDC app in your IdP (Okta, Azure AD, Google
-                  Workspace, etc.) with these settings before filling in the
-                  form below.
-                </p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <p className="font-medium text-foreground">
-                      Application type
-                    </p>
-                    <p className="text-muted-foreground">Web Application</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-medium text-foreground">Grant type</p>
-                    <p className="text-muted-foreground">Authorization Code</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-medium text-foreground">
-                      Required scopes
-                    </p>
-                    <p className="text-muted-foreground font-mono">
-                      openid, email, profile
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-medium text-foreground">
-                      Sign-in redirect URI
-                    </p>
-                    <p className="text-muted-foreground">See field below ↓</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Form fields */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium" htmlFor="sso-domain">
-                    Domain
-                  </label>
-                  <Input
-                    disabled={!canEdit || isPending}
-                    id="sso-domain"
-                    onChange={(e) => setDomain(e.target.value)}
-                    placeholder="company.com"
-                    value={domain}
-                  />
-                  <p className="text-muted-foreground text-xs">
-                    The email domain your team uses
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium" htmlFor="sso-issuer">
-                    Issuer URL
-                  </label>
-                  <Input
-                    disabled={!canEdit || isPending}
-                    id="sso-issuer"
-                    onChange={(e) => setIssuer(e.target.value)}
-                    placeholder="https://your-org.okta.com/oauth2/default"
-                    value={issuer}
-                  />
-                  <p className="text-muted-foreground text-xs">
-                    Okta: Settings → Authorization Servers → Issuer URI (usually
-                    ends in <code>/oauth2/default</code>). Azure AD: the tenant
-                    issuer from App registrations.
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <label
-                    className="text-sm font-medium"
-                    htmlFor="sso-client-id"
-                  >
-                    Client ID
-                  </label>
-                  <Input
-                    disabled={!canEdit || isPending}
-                    id="sso-client-id"
-                    onChange={(e) => setClientId(e.target.value)}
-                    placeholder="0oa..."
-                    value={clientId}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label
-                    className="text-sm font-medium"
-                    htmlFor="sso-client-secret"
-                  >
-                    Client Secret
-                  </label>
-                  <Input
-                    disabled={!canEdit || isPending}
-                    id="sso-client-secret"
-                    onChange={(e) => setClientSecret(e.target.value)}
-                    placeholder="••••••••"
-                    type="password"
-                    value={clientSecret}
-                  />
-                </div>
-              </div>
-
-              {/* Redirect URI */}
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Sign-in Redirect URI</p>
-                <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3 font-mono text-sm">
-                  <span
-                    className={`flex-1 break-all ${domain ? "" : "text-muted-foreground"}`}
-                  >
-                    {redirectUri ??
-                      `${APP_URL}/api/auth/sso/callback/your-domain.com`}
-                  </span>
-                  {redirectUri && (
-                    <Button
-                      aria-label="Copy sign-in redirect URI"
-                      onClick={() => handleCopy(redirectUri, "redirect-uri")}
-                      size="icon"
-                      type="button"
-                      variant="ghost"
-                    >
-                      {copiedKey === "redirect-uri" ? (
-                        <Check className="h-4 w-4 text-success" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  )}
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  Add this as the sign-in redirect URI in your identity
-                  provider. Updates as you type your domain above.
-                </p>
-              </div>
 
               {canEdit && (
-                <Button
-                  disabled={
-                    isPending ||
-                    !domain ||
-                    !issuer ||
-                    !clientId ||
-                    !clientSecret
-                  }
-                  onClick={handleSave}
-                >
-                  {isPending ? (
-                    <>
+                <div className="border-t pt-4 space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Already use Wraps email for{" "}
+                    <strong>{existingProvider.domain}</strong>? Skip the TXT
+                    record — verify via your connected AWS account instead.
+                  </p>
+                  <Button
+                    disabled={isPending}
+                    onClick={handleVerifyViaSES}
+                    variant="outline"
+                  >
+                    {isPending ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Save and continue"
-                  )}
-                </Button>
+                    ) : null}
+                    Verify via AWS SES
+                  </Button>
+                </div>
               )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          )
+        ) : (
+          /* Setup form */
+          <div className="space-y-6">
+            {/* IdP setup guide */}
+            <div className="border bg-muted/40 p-4 text-sm space-y-3">
+              <p className="font-medium">
+                Step 1 of 2 — Configure your identity provider
+              </p>
+              <p className="text-muted-foreground">
+                Create a new OIDC app in your IdP (Okta, Azure AD, Google
+                Workspace, etc.) with these settings before filling in the form
+                below.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">
+                    Application type
+                  </p>
+                  <p className="text-muted-foreground">Web Application</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">Grant type</p>
+                  <p className="text-muted-foreground">Authorization Code</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">Required scopes</p>
+                  <p className="text-muted-foreground font-mono">
+                    openid, email, profile
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">
+                    Sign-in redirect URI
+                  </p>
+                  <p className="text-muted-foreground">See field below ↓</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Form fields */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-sm font-medium" htmlFor="sso-domain">
+                  Domain
+                </label>
+                <Input
+                  disabled={!canEdit || isPending}
+                  id="sso-domain"
+                  onChange={(e) => setDomain(e.target.value)}
+                  placeholder="company.com"
+                  value={domain}
+                />
+                <p className="text-muted-foreground text-xs">
+                  The email domain your team uses
+                </p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium" htmlFor="sso-issuer">
+                  Issuer URL
+                </label>
+                <Input
+                  disabled={!canEdit || isPending}
+                  id="sso-issuer"
+                  onChange={(e) => setIssuer(e.target.value)}
+                  placeholder="https://your-org.okta.com/oauth2/default"
+                  value={issuer}
+                />
+                <p className="text-muted-foreground text-xs">
+                  Okta: Settings → Authorization Servers → Issuer URI (usually
+                  ends in <code>/oauth2/default</code>). Azure AD: the tenant
+                  issuer from App registrations.
+                </p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium" htmlFor="sso-client-id">
+                  Client ID
+                </label>
+                <Input
+                  disabled={!canEdit || isPending}
+                  id="sso-client-id"
+                  onChange={(e) => setClientId(e.target.value)}
+                  placeholder="0oa..."
+                  value={clientId}
+                />
+              </div>
+              <div className="space-y-1">
+                <label
+                  className="text-sm font-medium"
+                  htmlFor="sso-client-secret"
+                >
+                  Client Secret
+                </label>
+                <Input
+                  disabled={!canEdit || isPending}
+                  id="sso-client-secret"
+                  onChange={(e) => setClientSecret(e.target.value)}
+                  placeholder="••••••••"
+                  type="password"
+                  value={clientSecret}
+                />
+              </div>
+            </div>
+
+            {/* Redirect URI */}
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Sign-in Redirect URI</p>
+              <div className="flex items-center gap-2 border bg-muted/50 p-3 font-mono text-sm">
+                <span
+                  className={`flex-1 break-all ${domain ? "" : "text-muted-foreground"}`}
+                >
+                  {redirectUri ??
+                    `${APP_URL}/api/auth/sso/callback/your-domain.com`}
+                </span>
+                {redirectUri && (
+                  <Button
+                    aria-label="Copy sign-in redirect URI"
+                    onClick={() => handleCopy(redirectUri, "redirect-uri")}
+                    size="icon"
+                    type="button"
+                    variant="ghost"
+                  >
+                    {copiedKey === "redirect-uri" ? (
+                      <Check className="h-4 w-4 text-success" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Add this as the sign-in redirect URI in your identity provider.
+                Updates as you type your domain above.
+              </p>
+            </div>
+
+            {canEdit && (
+              <Button
+                disabled={
+                  isPending || !domain || !issuer || !clientId || !clientSecret
+                }
+                onClick={handleSave}
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save and continue"
+                )}
+              </Button>
+            )}
+          </div>
+        )}
+      </Panel>
 
       {/* SCIM Provisioning — only shown when SSO is active */}
       {existingProvider?.domainVerified && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Panel
+          description="Automatically sync users and groups from your identity provider via the SCIM 2.0 protocol."
+          label={
+            <PanelTitle className="flex items-center gap-2">
               <KeyRound className="h-5 w-5" />
               SCIM Provisioning
-            </CardTitle>
-            <CardDescription>
-              Automatically sync users and groups from your identity provider
-              via the SCIM 2.0 protocol.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg border bg-muted/40 p-4 text-sm space-y-2">
+            </PanelTitle>
+          }
+        >
+          <div className="space-y-4">
+            <div className="border bg-muted/40 p-4 text-sm space-y-2">
               <p className="font-medium">Setup instructions</p>
               <ol className="space-y-1 text-muted-foreground list-decimal list-inside">
                 <li>In your IdP, enable SCIM provisioning on this app</li>
@@ -653,7 +626,7 @@ export function OrganizationSettingsSso({
 
             <div className="space-y-1">
               <p className="text-sm font-medium">SCIM Base URL</p>
-              <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3 font-mono text-sm">
+              <div className="flex items-center gap-2 border bg-muted/50 p-3 font-mono text-sm">
                 <span className="flex-1 break-all">{scimBaseUrl}</span>
                 <Button
                   aria-label="Copy SCIM base URL"
@@ -673,7 +646,7 @@ export function OrganizationSettingsSso({
             {scimToken ? (
               <div className="space-y-2">
                 <p className="text-sm font-medium">SCIM Bearer Token</p>
-                <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/15 p-3 font-mono text-sm">
+                <div className="flex items-center gap-2 border border-warning/30 bg-warning/15 p-3 font-mono text-sm">
                   <span className="flex-1 break-all">{scimToken}</span>
                   <Button
                     aria-label="Copy SCIM bearer token"
@@ -717,8 +690,8 @@ export function OrganizationSettingsSso({
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       )}
     </div>
   );

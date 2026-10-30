@@ -1,17 +1,12 @@
 "use client";
 
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { ArrowRightIcon, MailIcon, MessageSquareIcon } from "lucide-react";
 import Link from "next/link";
@@ -83,159 +78,156 @@ export function SendVolumeSpark({
   const showBothChannels = showEmail && showSMS;
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">Send Volume</CardTitle>
-          <div className="flex items-center gap-3">
-            {showEmail && (
-              <Link
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                href={hubHref(orgSlug)}
+    <Panel
+      actions={
+        <div className="flex items-center gap-3">
+          {showEmail && (
+            <Link
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              href={hubHref(orgSlug)}
+            >
+              Email activity
+              <ArrowRightIcon className="h-3 w-3" />
+            </Link>
+          )}
+          {showSMS && (
+            <Link
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              href={`/${orgSlug}/sms/analytics`}
+            >
+              SMS analytics
+              <ArrowRightIcon className="h-3 w-3" />
+            </Link>
+          )}
+        </div>
+      }
+      label={<PanelTitle>Send Volume</PanelTitle>}
+    >
+      {!isLoading && (
+        <div className="mb-3 space-y-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold tracking-tight">
+              {totalSent.toLocaleString()}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              last {days} days
+            </span>
+            {trend !== 0 && (
+              <span
+                className={
+                  trend > 0
+                    ? "text-xs text-success"
+                    : "text-xs text-destructive"
+                }
               >
-                Email activity
-                <ArrowRightIcon className="h-3 w-3" />
-              </Link>
+                {trend > 0 ? "+" : ""}
+                {trend}%
+              </span>
+            )}
+          </div>
+          {showBothChannels && (
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: SERIES_COLOR.volume }}
+                />
+                <MailIcon className="h-3 w-3" />
+                {emailTotal.toLocaleString()}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: SERIES_COLOR.secondary }}
+                />
+                <MessageSquareIcon className="h-3 w-3" />
+                {smsTotal.toLocaleString()}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+      {isLoading ? (
+        <Skeleton className="h-[80px] w-full" />
+      ) : chartData.length === 0 ? (
+        <div className="flex h-[80px] items-center justify-center text-muted-foreground text-xs">
+          No send data yet
+        </div>
+      ) : (
+        <ChartContainer
+          className="aspect-auto h-[80px] w-full"
+          config={chartConfig}
+        >
+          <AreaChart accessibilityLayer data={chartData}>
+            <defs>
+              <linearGradient id="emailFill" x1="0" x2="0" y1="0" y2="1">
+                <stop
+                  offset="5%"
+                  stopColor="var(--color-email)"
+                  stopOpacity={0.3}
+                />
+                <stop
+                  offset="95%"
+                  stopColor="var(--color-email)"
+                  stopOpacity={0.05}
+                />
+              </linearGradient>
+              <linearGradient id="smsFill" x1="0" x2="0" y1="0" y2="1">
+                <stop
+                  offset="5%"
+                  stopColor="var(--color-sms)"
+                  stopOpacity={0.3}
+                />
+                <stop
+                  offset="95%"
+                  stopColor="var(--color-sms)"
+                  stopOpacity={0.05}
+                />
+              </linearGradient>
+            </defs>
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  hideLabel={false}
+                  indicator="line"
+                  labelFormatter={(_value, payload) => {
+                    const date = payload?.[0]?.payload?.date;
+                    if (!date) return "";
+                    return new Date(`${date}T00:00:00`).toLocaleDateString(
+                      "en-US",
+                      {
+                        month: "short",
+                        day: "numeric",
+                      }
+                    );
+                  }}
+                />
+              }
+            />
+            {showEmail && (
+              <Area
+                dataKey="email"
+                fill="url(#emailFill)"
+                stackId="volume"
+                stroke="var(--color-email)"
+                strokeWidth={1.5}
+                type="monotone"
+              />
             )}
             {showSMS && (
-              <Link
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                href={`/${orgSlug}/sms/analytics`}
-              >
-                SMS analytics
-                <ArrowRightIcon className="h-3 w-3" />
-              </Link>
-            )}
-          </div>
-        </div>
-        {!isLoading && (
-          <div className="space-y-1">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight">
-                {totalSent.toLocaleString()}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                last {days} days
-              </span>
-              {trend !== 0 && (
-                <span
-                  className={
-                    trend > 0
-                      ? "text-xs text-success"
-                      : "text-xs text-destructive"
-                  }
-                >
-                  {trend > 0 ? "+" : ""}
-                  {trend}%
-                </span>
-              )}
-            </div>
-            {showBothChannels && (
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: SERIES_COLOR.volume }}
-                  />
-                  <MailIcon className="h-3 w-3" />
-                  {emailTotal.toLocaleString()}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: SERIES_COLOR.secondary }}
-                  />
-                  <MessageSquareIcon className="h-3 w-3" />
-                  {smsTotal.toLocaleString()}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-      </CardHeader>
-      <CardContent className="px-2 pb-4">
-        {isLoading ? (
-          <Skeleton className="h-[80px] w-full" />
-        ) : chartData.length === 0 ? (
-          <div className="flex h-[80px] items-center justify-center text-muted-foreground text-xs">
-            No send data yet
-          </div>
-        ) : (
-          <ChartContainer
-            className="aspect-auto h-[80px] w-full"
-            config={chartConfig}
-          >
-            <AreaChart accessibilityLayer data={chartData}>
-              <defs>
-                <linearGradient id="emailFill" x1="0" x2="0" y1="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor="var(--color-email)"
-                    stopOpacity={0.3}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="var(--color-email)"
-                    stopOpacity={0.05}
-                  />
-                </linearGradient>
-                <linearGradient id="smsFill" x1="0" x2="0" y1="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor="var(--color-sms)"
-                    stopOpacity={0.3}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="var(--color-sms)"
-                    stopOpacity={0.05}
-                  />
-                </linearGradient>
-              </defs>
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    hideLabel={false}
-                    indicator="line"
-                    labelFormatter={(_value, payload) => {
-                      const date = payload?.[0]?.payload?.date;
-                      if (!date) return "";
-                      return new Date(`${date}T00:00:00`).toLocaleDateString(
-                        "en-US",
-                        {
-                          month: "short",
-                          day: "numeric",
-                        }
-                      );
-                    }}
-                  />
-                }
+              <Area
+                dataKey="sms"
+                fill="url(#smsFill)"
+                stackId="volume"
+                stroke="var(--color-sms)"
+                strokeWidth={1.5}
+                type="monotone"
               />
-              {showEmail && (
-                <Area
-                  dataKey="email"
-                  fill="url(#emailFill)"
-                  stackId="volume"
-                  stroke="var(--color-email)"
-                  strokeWidth={1.5}
-                  type="monotone"
-                />
-              )}
-              {showSMS && (
-                <Area
-                  dataKey="sms"
-                  fill="url(#smsFill)"
-                  stackId="volume"
-                  stroke="var(--color-sms)"
-                  strokeWidth={1.5}
-                  type="monotone"
-                />
-              )}
-            </AreaChart>
-          </ChartContainer>
-        )}
-      </CardContent>
-    </Card>
+            )}
+          </AreaChart>
+        </ChartContainer>
+      )}
+    </Panel>
   );
 }
 

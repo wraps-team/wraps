@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { CheckCircleIcon, MailIcon, MonitorIcon } from "lucide-react";
 import posthog from "posthog-js";
 import { useEffect, useState } from "react";
@@ -74,15 +68,10 @@ export function MobileRescueGate({
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="max-w-md">
-        <CardHeader className="space-y-2 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <MonitorIcon className="h-8 w-8 text-primary" />
-          </div>
-          <CardTitle className="text-2xl">
-            You'll need a desktop to get started
-          </CardTitle>
-          <CardDescription className="text-base">
+      <Panel
+        className="max-w-md"
+        description={
+          <>
             Wraps requires a desktop to set up your AWS sending infrastructure.
             {orgName && (
               <>
@@ -91,10 +80,15 @@ export function MobileRescueGate({
                 waiting.
               </>
             )}
-          </CardDescription>
-        </CardHeader>
+          </>
+        }
+        label={<PanelTitle>You'll need a desktop to get started</PanelTitle>}
+      >
+        <div className="space-y-4">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+            <MonitorIcon className="h-8 w-8 text-primary" />
+          </div>
 
-        <CardContent className="space-y-4">
           {emailSent ? (
             <div className="flex flex-col items-center space-y-3 rounded-lg bg-muted/50 p-4 text-center">
               <CheckCircleIcon className="h-8 w-8 text-success" />
@@ -119,8 +113,8 @@ export function MobileRescueGate({
           <Button className="w-full" onClick={handleBypass} variant="ghost">
             I'm on desktop anyway
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     </div>
   );
 }

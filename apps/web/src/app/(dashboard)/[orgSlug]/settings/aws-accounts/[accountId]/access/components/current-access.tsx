@@ -1,13 +1,7 @@
 "use client";
 
 import type { awsAccountPermission, member, user } from "@wraps/db";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import type { InferSelectModel } from "drizzle-orm";
 import { PermissionsList } from "@/components/permissions-list";
 
@@ -36,27 +30,24 @@ export function CurrentAccess({
   const hasAnyAccess = owners.length > 0 || permissions.length > 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Current Access</CardTitle>
-        <CardDescription>
-          Manage who has access to this AWS account and their permission levels.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {hasAnyAccess ? (
-          <PermissionsList
-            awsAccountId={awsAccountId}
-            organizationId={organizationId}
-            owners={owners}
-            permissions={permissions}
-          />
-        ) : (
-          <div className="rounded-lg border border-dashed p-12 text-center">
-            <p className="text-muted-foreground">No access configured</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    // Who has access is Wraps' own record (members and grants), not data
+    // read from the customer's AWS account, so this panel stays default.
+    <Panel
+      description="Manage who has access to this AWS account and their permission levels."
+      label={<PanelTitle>Current Access</PanelTitle>}
+    >
+      {hasAnyAccess ? (
+        <PermissionsList
+          awsAccountId={awsAccountId}
+          organizationId={organizationId}
+          owners={owners}
+          permissions={permissions}
+        />
+      ) : (
+        <div className="border p-12 text-center">
+          <p className="text-muted-foreground">No access configured</p>
+        </div>
+      )}
+    </Panel>
   );
 }

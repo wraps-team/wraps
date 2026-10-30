@@ -3,14 +3,8 @@
 import { mergeForm, useForm } from "@tanstack/react-form";
 import { initialFormState, useTransform } from "@tanstack/react-form-nextjs";
 import { useStore } from "@tanstack/react-store";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Switch } from "@wraps/ui/components/ui/switch";
 import { Smartphone } from "lucide-react";
 import { useActionState, useEffect, useState } from "react";
@@ -78,12 +72,10 @@ export function LoginAlerts() {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Security Settings</CardTitle>
-          <CardDescription>Loading...</CardDescription>
-        </CardHeader>
-      </Card>
+      <Panel
+        description={<>Loading...</>}
+        label={<PanelTitle>Security Settings</PanelTitle>}
+      />
     );
   }
 
@@ -93,18 +85,21 @@ export function LoginAlerts() {
       className="space-y-6"
       onSubmit={() => securityForm.handleSubmit()}
     >
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Smartphone className="size-5" />
-            Security Settings
-          </CardTitle>
-          <CardDescription>
+      <Panel
+        description={
+          <>
             Configure SMS login alerts to get notified when someone logs into
             your account from a new device or location.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+          </>
+        }
+        label={
+          <PanelTitle className="flex items-center gap-2">
+            <Smartphone className="size-5" />
+            Security Settings
+          </PanelTitle>
+        }
+      >
+        <div className="space-y-6">
           {/* Form-level errors */}
           {securityFormErrors.length > 0 && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-4">
@@ -204,8 +199,8 @@ export function LoginAlerts() {
               </div>
             )}
           </securityForm.Field>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       <securityForm.Subscribe selector={(formState) => [formState.canSubmit]}>
         {([canSubmit]) => (

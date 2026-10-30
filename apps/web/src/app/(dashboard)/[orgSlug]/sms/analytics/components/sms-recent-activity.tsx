@@ -1,12 +1,7 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import {
   AlertTriangle,
@@ -112,49 +107,52 @@ export function SMSRecentActivity({ orgSlug }: { orgSlug: string }) {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
             Recent Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </PanelTitle>
+        }
+      >
+        <div className="space-y-4">
           {[1, 2, 3, 4, 5].map((i) => (
             <Skeleton className="h-16 w-full" key={i} />
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   if (error || !activities || activities.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
             Recent Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+          </PanelTitle>
+        }
+      >
+        <div>
           <p className="text-center text-muted-foreground text-sm">
             {error ? "Failed to load recent activity" : "No recent activity"}
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <Panel
+      label={
+        <PanelTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5" />
           Recent Activity
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+        </PanelTitle>
+      }
+    >
+      <div>
         <ItemGroup>
           {activities.map((activity, index) => {
             const messageId = activity.id.split("-").slice(0, -1).join("-");
@@ -189,7 +187,7 @@ export function SMSRecentActivity({ orgSlug }: { orgSlug: string }) {
             );
           })}
         </ItemGroup>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

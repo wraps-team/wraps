@@ -11,13 +11,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@wraps/ui/components/ui/alert-dialog";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Separator } from "@wraps/ui/components/ui/separator";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -44,12 +38,11 @@ export function DeleteAccount() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Danger Zone</CardTitle>
-        <CardDescription>Irreversible and destructive actions.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Panel
+      description={<>Irreversible and destructive actions.</>}
+      label={<PanelTitle>Danger Zone</PanelTitle>}
+    >
+      <div className="space-y-4">
         <Separator />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -89,7 +82,7 @@ export function DeleteAccount() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

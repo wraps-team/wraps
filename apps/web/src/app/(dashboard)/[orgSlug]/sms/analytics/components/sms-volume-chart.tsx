@@ -2,19 +2,12 @@
 
 import { ButtonGroup } from "@wraps/ui/components/ui/button-group";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -59,16 +52,9 @@ export function SMSVolumeChart({ orgSlug }: { orgSlug: string }) {
   const maxValue = Math.max(...chartData.map((d) => d.sent || 0));
 
   return (
-    <Card className="@container/card">
-      <CardHeader>
-        <CardTitle>SMS Volume</CardTitle>
-        <CardDescription>
-          <span className="@[540px]/card:block hidden">
-            Daily SMS sending volume over time
-          </span>
-          <span className="@[540px]/card:hidden">Daily volume</span>
-        </CardDescription>
-        <CardAction className="self-center">
+    <Panel
+      actions={
+        <>
           <ButtonGroup className="@[767px]/card:flex hidden">
             <Button
               aria-pressed={timeRange === "90d"}
@@ -109,9 +95,20 @@ export function SMSVolumeChart({ orgSlug }: { orgSlug: string }) {
               <SelectItem value="7d">7 days</SelectItem>
             </SelectContent>
           </Select>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+        </>
+      }
+      className="@container/card"
+      description={
+        <>
+          <span className="@[540px]/card:block hidden">
+            Daily SMS sending volume over time
+          </span>
+          <span className="@[540px]/card:hidden">Daily volume</span>
+        </>
+      }
+      label={<PanelTitle>SMS Volume</PanelTitle>}
+    >
+      <div>
         {isLoading ? (
           <Skeleton className="h-[300px] w-full" />
         ) : error ? (
@@ -182,7 +179,7 @@ export function SMSVolumeChart({ orgSlug }: { orgSlug: string }) {
             </AreaChart>
           </ChartContainer>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

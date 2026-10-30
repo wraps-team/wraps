@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { AlertCircle, Building2, Mail, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import posthog from "posthog-js";
@@ -52,20 +45,16 @@ export function DeclineInvitationForm({
   };
 
   return (
-    <Card className="w-full max-w-lg shadow-xl">
-      <CardHeader className="space-y-4 text-center">
+    <Panel
+      className="w-full max-w-lg"
+      description="Are you sure you want to decline this invitation?"
+      label={<PanelTitle>Decline Invitation</PanelTitle>}
+    >
+      <div className="space-y-6">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted">
           <X className="h-8 w-8 text-muted-foreground" />
         </div>
-        <div>
-          <CardTitle className="text-2xl">Decline Invitation</CardTitle>
-          <CardDescription className="mt-2">
-            Are you sure you want to decline this invitation?
-          </CardDescription>
-        </div>
-      </CardHeader>
 
-      <CardContent className="space-y-6">
         {/* Organization Details */}
         <div className="space-y-4">
           <div className="flex items-start gap-3 rounded-lg border bg-muted/50 p-4">
@@ -102,9 +91,9 @@ export function DeclineInvitationForm({
             </p>
           </div>
         </div>
-      </CardContent>
+      </div>
 
-      <CardFooter className="flex flex-col gap-3">
+      <div className="mt-4 flex flex-col gap-3 border-t pt-4">
         <Button
           className="w-full"
           disabled={isDeclining}
@@ -123,7 +112,7 @@ export function DeclineInvitationForm({
         >
           Go Back to Accept
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </Panel>
   );
 }

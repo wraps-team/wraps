@@ -1,13 +1,7 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   AccountFlags,
   QuotaMeter,
@@ -45,18 +39,19 @@ export function HealthSummary({
   const unmeasured = status.level === "unknown" && healthDetail === null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Sending health · {region}</CardTitle>
-        {healthCheckedAt && (
-          <CardAction>
-            <span className="text-muted-foreground text-xs">
-              checked {formatRelativeTime(new Date(healthCheckedAt))}
-            </span>
-          </CardAction>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4">
+    // Read from the hourly sweep of the customer's SES account.
+    <Panel
+      actions={
+        healthCheckedAt && (
+          <span className="text-muted-foreground text-xs">
+            checked {formatRelativeTime(new Date(healthCheckedAt))}
+          </span>
+        )
+      }
+      label={<PanelTitle>Sending health · {region}</PanelTitle>}
+      variant="own"
+    >
+      <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={LEVEL_BADGE_VARIANT[status.level]}>
             {status.label}
@@ -112,7 +107,7 @@ export function HealthSummary({
             ))}
           </ul>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

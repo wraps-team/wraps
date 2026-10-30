@@ -3,13 +3,7 @@
 import { mergeForm, useForm } from "@tanstack/react-form";
 import { initialFormState, useTransform } from "@tanstack/react-form-nextjs";
 import { useStore } from "@tanstack/react-store";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { useActionState, useCallback, useEffect, useRef } from "react";
 import { z } from "zod";
 import { updateAccountAction } from "@/actions/account";
@@ -99,15 +93,16 @@ export function PersonalInformation() {
       className="space-y-6"
       onSubmit={() => accountForm.handleSubmit()}
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          <CardDescription>
+      <Panel
+        description={
+          <>
             Update your personal information that will be displayed on your
             profile.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </>
+        }
+        label={<PanelTitle>Personal Information</PanelTitle>}
+      >
+        <div className="space-y-4">
           {/* Form-level errors */}
           {accountFormErrors.length > 0 && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-4">
@@ -251,8 +246,8 @@ export function PersonalInformation() {
               );
             }}
           </accountForm.Field>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       <accountForm.Subscribe selector={(formState) => [formState.canSubmit]}>
         {([canSubmit]) => (

@@ -3,18 +3,12 @@
 import { Alert, AlertDescription } from "@wraps/ui/components/ui/alert";
 import { Badge } from "@wraps/ui/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@wraps/ui/components/ui/collapsible";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Separator } from "@wraps/ui/components/ui/separator";
 import {
   AlertCircle,
@@ -112,18 +106,18 @@ export function WebhookConfiguration({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    // The SES event destination lives in the customer's AWS account.
+    <Panel
+      description="Delivery, bounce, complaint, open and click events from SES. They power the email timeline, analytics and suppression handling."
+      label={
+        <PanelTitle className="flex items-center gap-2">
           <Link2 className="h-5 w-5" />
           Event streaming · {region}
-        </CardTitle>
-        <CardDescription>
-          Delivery, bounce, complaint, open and click events from SES. They
-          power the email timeline, analytics and suppression handling.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        </PanelTitle>
+      }
+      variant="own"
+    >
+      <div className="space-y-4">
         {/* Streaming status */}
         <div className="flex items-center gap-2">
           <Badge variant={status.variant}>{status.label}</Badge>
@@ -182,14 +176,14 @@ export function WebhookConfiguration({
         {canManage && !isConnected && (
           <div className="space-y-4">
             {/* CLI Command - Primary CTA */}
-            <div className="rounded-lg border bg-muted/50 p-4">
+            <div className="border bg-muted/50 p-4">
               <div className="mb-2 flex items-center gap-2">
                 <Terminal className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium text-sm">
                   Connect via the Wraps CLI
                 </span>
               </div>
-              <code className="block rounded-md border bg-background px-3 py-2 font-mono text-sm">
+              <code className="block border bg-background px-3 py-2 font-mono text-sm">
                 wraps platform connect
               </code>
               <p className="mt-2 text-muted-foreground text-xs">
@@ -240,7 +234,7 @@ export function WebhookConfiguration({
             </Collapsible>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

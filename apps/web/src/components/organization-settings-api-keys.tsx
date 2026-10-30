@@ -6,13 +6,6 @@ import {
   AlertTitle,
 } from "@wraps/ui/components/ui/alert";
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
 import { Checkbox } from "@wraps/ui/components/ui/checkbox";
 import {
   Dialog,
@@ -30,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@wraps/ui/components/ui/dropdown-menu";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -578,179 +572,169 @@ export function OrganizationSettingsApiKeys({
         </DialogContent>
       </Dialog>
 
-      {/* API Keys Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>API Keys</CardTitle>
-              <CardDescription>
-                Manage API keys for programmatic access to the Wraps API.
-              </CardDescription>
-            </div>
+      {/* API Keys Panel */}
+      <Panel
+        actions={
+          canEdit && (
+            <Button onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create API Key
+            </Button>
+          )
+        }
+        description="Manage API keys for programmatic access to the Wraps API."
+        label={<PanelTitle>API Keys</PanelTitle>}
+      >
+        {apiKeys.length === 0 ? (
+          <div className="py-8 text-center">
+            <Key className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 font-semibold text-lg">No API Keys</h3>
+            <p className="mt-1 text-muted-foreground text-sm">
+              Create an API key to start using the Wraps API.
+            </p>
             {canEdit && (
-              <Button onClick={() => setCreateDialogOpen(true)}>
+              <Button
+                className="mt-4"
+                onClick={() => setCreateDialogOpen(true)}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Create API Key
               </Button>
             )}
           </div>
-        </CardHeader>
-        <CardContent>
-          {apiKeys.length === 0 ? (
-            <div className="py-8 text-center">
-              <Key className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 font-semibold text-lg">No API Keys</h3>
-              <p className="mt-1 text-muted-foreground text-sm">
-                Create an API key to start using the Wraps API.
-              </p>
-              {canEdit && (
-                <Button
-                  className="mt-4"
-                  onClick={() => setCreateDialogOpen(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create API Key
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {apiKeys.map((key) => (
-                <div
-                  className="flex items-center justify-between rounded-lg border p-4"
-                  key={key.id}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                      <Key className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">{key.name}</h4>
-                        <Badge variant="secondary">
-                          {key.prefix.includes("live") ? "Live" : "Test"}
-                        </Badge>
-                        {key.expiresAt &&
-                          new Date(key.expiresAt) < new Date() && (
-                            <Badge variant="destructive">Expired</Badge>
-                          )}
-                      </div>
-                      <p className="font-mono text-muted-foreground text-sm">
-                        {key.prefix}
-                      </p>
-                      <p className="text-muted-foreground text-xs">
-                        Created{" "}
-                        {new Date(key.createdAt).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                        {key.lastUsedAt && (
-                          <>
-                            {" "}
-                            &middot; Last used{" "}
-                            {new Date(key.lastUsedAt).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              }
-                            )}
-                          </>
-                        )}
-                      </p>
-                    </div>
+        ) : (
+          <div className="space-y-4">
+            {apiKeys.map((key) => (
+              <div
+                className="flex items-center justify-between border p-4"
+                key={key.id}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center bg-muted">
+                    <Key className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    {sparkData.length > 0 && (
-                      <div className="hidden h-10 w-24 md:block">
-                        <AreaChart data={sparkData} height={40} width={96}>
-                          <defs>
-                            <linearGradient
-                              id={`spark-${key.id}`}
-                              x1="0"
-                              x2="0"
-                              y1="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="5%"
-                                stopColor="currentColor"
-                                stopOpacity={0.15}
-                              />
-                              <stop
-                                offset="95%"
-                                stopColor="currentColor"
-                                stopOpacity={0}
-                              />
-                            </linearGradient>
-                          </defs>
-                          <Area
-                            dataKey="v"
-                            fill={`url(#spark-${key.id})`}
-                            isAnimationActive={false}
-                            stroke="currentColor"
-                            strokeOpacity={0.3}
-                            strokeWidth={1.5}
-                            type="monotone"
-                          />
-                        </AreaChart>
-                      </div>
-                    )}
-                    {canEdit && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            aria-label="More actions"
-                            size="icon"
-                            variant="ghost"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(key)}>
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteApiKey(key.id)}
-                            variant="destructive"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold">{key.name}</h4>
+                      <Badge variant="secondary">
+                        {key.prefix.includes("live") ? "Live" : "Test"}
+                      </Badge>
+                      {key.expiresAt &&
+                        new Date(key.expiresAt) < new Date() && (
+                          <Badge variant="destructive">Expired</Badge>
+                        )}
+                    </div>
+                    <p className="font-mono text-muted-foreground text-sm">
+                      {key.prefix}
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Created{" "}
+                      {new Date(key.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                      {key.lastUsedAt && (
+                        <>
+                          {" "}
+                          &middot; Last used{" "}
+                          {new Date(key.lastUsedAt).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            }
+                          )}
+                        </>
+                      )}
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <div className="flex items-center gap-2">
+                  {sparkData.length > 0 && (
+                    <div className="hidden h-10 w-24 md:block">
+                      <AreaChart data={sparkData} height={40} width={96}>
+                        <defs>
+                          <linearGradient
+                            id={`spark-${key.id}`}
+                            x1="0"
+                            x2="0"
+                            y1="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="currentColor"
+                              stopOpacity={0.15}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="currentColor"
+                              stopOpacity={0}
+                            />
+                          </linearGradient>
+                        </defs>
+                        <Area
+                          dataKey="v"
+                          fill={`url(#spark-${key.id})`}
+                          isAnimationActive={false}
+                          stroke="currentColor"
+                          strokeOpacity={0.3}
+                          strokeWidth={1.5}
+                          type="monotone"
+                        />
+                      </AreaChart>
+                    </div>
+                  )}
+                  {canEdit && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          aria-label="More actions"
+                          size="icon"
+                          variant="ghost"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEditDialog(key)}>
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteApiKey(key.id)}
+                          variant="destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
 
-      {/* Usage Guide Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Using API Keys</CardTitle>
-          <CardDescription>
-            How to authenticate with the Wraps API.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* Usage Guide Panel */}
+      <Panel
+        description="How to authenticate with the Wraps API."
+        label={<PanelTitle>Using API Keys</PanelTitle>}
+      >
+        <div className="space-y-4">
           <div>
             <h4 className="mb-2 font-medium">HTTP Header</h4>
-            <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-sm">
+            <pre className="overflow-x-auto bg-muted p-3 font-mono text-sm">
               Authorization: Bearer wraps_live_xxxx...
             </pre>
           </div>
           <div>
             <h4 className="mb-2 font-medium">SDK Usage</h4>
-            <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-sm">
+            <pre className="overflow-x-auto bg-muted p-3 font-mono text-sm">
               {`import { createPlatformClient } from '@wraps.dev/client';
 
 const client = createPlatformClient({
@@ -758,7 +742,7 @@ const client = createPlatformClient({
 });`}
             </pre>
           </div>
-          <div className="flex items-start gap-3 rounded-lg border border-info/30 bg-info/15 p-3">
+          <div className="flex items-start gap-3 border border-info/30 bg-info/15 p-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-info" />
             <div>
               <h4 className="font-medium text-info">Security Best Practices</h4>
@@ -770,8 +754,8 @@ const client = createPlatformClient({
               </ul>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     </div>
   );
 }

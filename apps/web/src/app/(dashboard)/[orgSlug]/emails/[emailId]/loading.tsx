@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader } from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 
 /**
@@ -14,7 +14,8 @@ import { Skeleton } from "@wraps/ui/components/ui/skeleton";
  *
  * The shape below mirrors `page.tsx` exactly — back link, envelope hero
  * (subject, sent-at, message id, status badge, To/From pair), then the event
- * timeline card — so nothing shifts when the real content swaps in.
+ * timeline panel — so nothing shifts when the real content swaps in. The
+ * timeline panel is the `own` one, as it is on the page.
  */
 
 /** Placeholder rows in the timeline card. A typical message has send +
@@ -51,49 +52,44 @@ export default function EmailDetailLoading() {
 
       <div className="space-y-6 px-4 lg:px-6">
         {/* Envelope hero */}
-        <Card>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  {/* Subject (text-2xl) */}
-                  <Skeleton className="mb-2 h-8 w-full max-w-md" />
-                  {/* Sent-at • message id */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Skeleton className="h-4 w-44" />
-                    <Skeleton className="h-4 w-56 max-w-full" />
-                  </div>
+        <Panel label={<PanelTitle>Message</PanelTitle>}>
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                {/* Subject (text-2xl) */}
+                <Skeleton className="mb-2 h-8 w-full max-w-md" />
+                {/* Sent-at • message id */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Skeleton className="h-4 w-44" />
+                  <Skeleton className="h-4 w-56 max-w-full" />
                 </div>
-                {/* Status badge */}
-                <Skeleton className="h-6 w-24 shrink-0" />
               </div>
-
-              {/* To / From */}
-              <div className="grid gap-3 md:grid-cols-2">
-                <Skeleton className="h-9 w-full" />
-                <Skeleton className="h-9 w-full" />
-              </div>
+              {/* Status badge */}
+              <Skeleton className="h-6 w-24 shrink-0" />
             </div>
-          </CardContent>
-        </Card>
+
+            {/* To / From */}
+            <div className="grid gap-3 md:grid-cols-2">
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-9 w-full" />
+            </div>
+          </div>
+        </Panel>
 
         {/* Event timeline */}
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-4 w-full max-w-xs" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {Array.from({ length: TIMELINE_ROW_COUNT }).map((_, index) => (
-                <TimelineRowSkeleton
-                  isLast={index === TIMELINE_ROW_COUNT - 1}
-                  key={`timeline-skeleton-${index}`}
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <Panel
+          description={<Skeleton className="h-4 w-full max-w-xs" />}
+          label={<Skeleton className="h-3 w-40" />}
+        >
+          <div className="space-y-2">
+            {Array.from({ length: TIMELINE_ROW_COUNT }).map((_, index) => (
+              <TimelineRowSkeleton
+                isLast={index === TIMELINE_ROW_COUNT - 1}
+                key={`timeline-skeleton-${index}`}
+              />
+            ))}
+          </div>
+        </Panel>
       </div>
     </>
   );

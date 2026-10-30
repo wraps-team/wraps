@@ -1,11 +1,15 @@
 "use client";
 
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { X } from "lucide-react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "./logo";
 
+/**
+ * A compact default panel in the sidebar. The close control sits in the
+ * panel's actions slot, top right, where the card's close button was.
+ */
 export function SidebarNotification() {
   const [isVisible, setIsVisible] = React.useState(true);
 
@@ -14,10 +18,10 @@ export function SidebarNotification() {
   }
 
   return (
-    <Card className="mb-3 border-border bg-muted py-0">
-      <CardContent className="relative p-4">
+    <Panel
+      actions={
         <Button
-          className="absolute top-2 right-2 h-6 w-6"
+          className="h-6 w-6"
           onClick={() => setIsVisible(false)}
           size="sm"
           variant="ghost"
@@ -25,36 +29,37 @@ export function SidebarNotification() {
           <X className="h-3 w-3" />
           <span className="sr-only">Close notification</span>
         </Button>
-
-        <div className="pr-6">
-          <h3 className="mt-1 mb-2 flex items-center gap-3 font-semibold text-foreground">
-            <Logo className="-mt-1 rounded-full" size={42} />
-            <div>
-              <a
-                className="text-primary hover:underline"
-                href="https://wraps.dev"
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                Wraps
-              </a>{" "}
-              Updates
-            </div>
-          </h3>
-          <p className="text-muted-foreground text-sm leading-relaxed">
-            {/* Link to docs */}
-            <a
-              className="text-primary underline"
-              href="https://wraps.dev/docs"
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              Docs
-            </a>{" "}
-            to get started.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+      }
+      className="mb-3"
+      label={
+        <PanelTitle level={3}>
+          <a
+            className="text-primary hover:underline"
+            href="https://wraps.dev"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Wraps
+          </a>{" "}
+          Updates
+        </PanelTitle>
+      }
+    >
+      <div className="flex items-start gap-3">
+        <Logo className="mt-0.5" size={24} />
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          {/* Link to docs */}
+          <a
+            className="text-primary underline"
+            href="https://wraps.dev/docs"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Docs
+          </a>{" "}
+          to get started.
+        </p>
+      </div>
+    </Panel>
   );
 }

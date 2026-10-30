@@ -1,17 +1,11 @@
 "use client";
 
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@wraps/ui/components/ui/collapsible";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { ChevronDown, Copy, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -55,20 +49,21 @@ export function IAMConfiguration({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Repair role access</CardTitle>
-        <CardDescription>
-          {selfHosted
-            ? "Your External ID for secure role assumption. Keep this secret and use it when updating your CloudFormation stack."
-            : "If Wraps can no longer reach this account, its role needs its trust policy and permissions rewritten. Any of the routes below does that."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    // The role and its External ID live in the customer's AWS account.
+    <Panel
+      description={
+        selfHosted
+          ? "Your External ID for secure role assumption. Keep this secret and use it when updating your CloudFormation stack."
+          : "If Wraps can no longer reach this account, its role needs its trust policy and permissions rewritten. Any of the routes below does that."
+      }
+      label={<PanelTitle>Repair role access</PanelTitle>}
+      variant="own"
+    >
+      <div className="space-y-4">
         <div>
           <h4 className="mb-2 font-medium text-sm">External ID</h4>
           <div className="flex items-center gap-2">
-            <code className="min-w-0 flex-1 break-all rounded-md border bg-muted px-3 py-2 font-mono text-sm">
+            <code className="min-w-0 flex-1 break-all border bg-muted px-3 py-2 font-mono text-sm">
               {account.externalId}
             </code>
             <Button
@@ -168,7 +163,7 @@ export function IAMConfiguration({
                 <div>
                   <h4 className="mb-2 font-medium text-sm">Template URL</h4>
                   <div className="flex items-center gap-2">
-                    <code className="min-w-0 flex-1 break-all rounded-md border bg-muted px-3 py-2 font-mono text-sm">
+                    <code className="min-w-0 flex-1 break-all border bg-muted px-3 py-2 font-mono text-sm">
                       {repair.templateUrl}
                     </code>
                     <Button
@@ -219,7 +214,7 @@ export function IAMConfiguration({
             </CollapsibleContent>
           </Collapsible>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

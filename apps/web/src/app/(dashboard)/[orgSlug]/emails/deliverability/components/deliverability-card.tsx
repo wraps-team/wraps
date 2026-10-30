@@ -1,13 +1,13 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
 import {
   type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Popover,
   PopoverContent,
@@ -181,7 +181,7 @@ function ChartBox({
 }) {
   return (
     <div
-      className={`flex items-center justify-center rounded-md text-center text-muted-foreground text-sm ${CHART_HEIGHT} ${dashed ? "border border-dashed" : ""}`}
+      className={`flex items-center justify-center text-center text-muted-foreground text-sm ${CHART_HEIGHT} ${dashed ? "border border-dashed" : ""}`}
     >
       {children}
     </div>
@@ -480,8 +480,12 @@ export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
   })();
 
   return (
-    <Card className="@container/card">
-      <CardContent className="space-y-5">
+    <Panel
+      className="@container/card"
+      label={<PanelTitle level={3}>Rates · {rangeLabel}</PanelTitle>}
+      variant="own"
+    >
+      <div className="space-y-5">
         {railError ? (
           <p className="text-muted-foreground text-sm">
             Failed to load deliverability data
@@ -606,8 +610,8 @@ export function DeliverabilityCard({ orgSlug }: { orgSlug: string }) {
           orgSlug={orgSlug}
           state={listState}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
@@ -657,12 +661,12 @@ export function DeliverabilityBody({ orgSlug }: { orgSlug: string }) {
           )}
         </div>
       ) : (
-        <Card className="@container/card">
-          <CardContent className="space-y-2">
-            <h3 className="font-semibold text-sm">Breakdown</h3>
-            <p className="text-muted-foreground text-sm">{note}</p>
-          </CardContent>
-        </Card>
+        <Panel
+          className="@container/card"
+          label={<PanelTitle level={3}>Breakdown</PanelTitle>}
+        >
+          <p className="text-muted-foreground text-sm">{note}</p>
+        </Panel>
       )}
     </>
   );

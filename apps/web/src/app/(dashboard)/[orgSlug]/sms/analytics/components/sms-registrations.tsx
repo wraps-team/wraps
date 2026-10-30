@@ -1,13 +1,7 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import {
   AlertCircle,
@@ -117,57 +111,59 @@ export function SMSRegistrations({ orgSlug }: { orgSlug: string }) {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel
+        description="Toll-free and 10DLC registration status"
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <FileCheck className="h-5 w-5" />
             Registrations
-          </CardTitle>
-          <CardDescription>
-            Toll-free and 10DLC registration status
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </PanelTitle>
+        }
+        variant="own"
+      >
+        <div>
           <div className="space-y-4">
             <Skeleton className="h-24 w-full" />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   if (error) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <FileCheck className="h-5 w-5" />
             Registrations
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+          </PanelTitle>
+        }
+        variant="own"
+      >
+        <div>
           <div className="flex items-center gap-2 text-destructive">
             <AlertCircle className="h-4 w-4" />
             <p className="text-sm">Failed to load registration status</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   if (!data?.registrations || data.registrations.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel
+        description="Toll-free and 10DLC registration status"
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <FileCheck className="h-5 w-5" />
             Registrations
-          </CardTitle>
-          <CardDescription>
-            Toll-free and 10DLC registration status
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </PanelTitle>
+        }
+        variant="own"
+      >
+        <div>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <FileCheck className="mb-4 h-12 w-12 text-muted-foreground/50" />
             <h3 className="font-medium text-lg">No Registrations</h3>
@@ -180,23 +176,23 @@ export function SMSRegistrations({ orgSlug }: { orgSlug: string }) {
               to start
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <Panel
+      description="Toll-free and 10DLC registration status"
+      label={
+        <PanelTitle className="flex items-center gap-2">
           <FileCheck className="h-5 w-5" />
           Registrations
-        </CardTitle>
-        <CardDescription>
-          Toll-free and 10DLC registration status
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </PanelTitle>
+      }
+      variant="own"
+    >
+      <div>
         <div className="space-y-4">
           {data.registrations.map((reg) => {
             const statusInfo = getRegistrationStatusInfo(
@@ -236,7 +232,7 @@ export function SMSRegistrations({ orgSlug }: { orgSlug: string }) {
             );
           })}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

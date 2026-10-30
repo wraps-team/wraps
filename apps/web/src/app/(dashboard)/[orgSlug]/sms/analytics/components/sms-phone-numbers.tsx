@@ -1,13 +1,7 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { AlertCircle, MessageSquareMore, Phone } from "lucide-react";
 import type { ComponentProps } from "react";
@@ -58,54 +52,60 @@ export function SMSPhoneNumbers({ orgSlug }: { orgSlug: string }) {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel
+        description="Your provisioned SMS phone numbers"
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <Phone className="h-5 w-5" />
             Phone Numbers
-          </CardTitle>
-          <CardDescription>Your provisioned SMS phone numbers</CardDescription>
-        </CardHeader>
-        <CardContent>
+          </PanelTitle>
+        }
+        variant="own"
+      >
+        <div>
           <div className="space-y-4">
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-20 w-full" />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   if (error) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <Phone className="h-5 w-5" />
             Phone Numbers
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+          </PanelTitle>
+        }
+        variant="own"
+      >
+        <div>
           <div className="flex items-center gap-2 text-destructive">
             <AlertCircle className="h-4 w-4" />
             <p className="text-sm">Failed to load phone numbers</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   if (!data?.hasSMSInfrastructure || data.phoneNumbers.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel
+        description="Your provisioned SMS phone numbers"
+        label={
+          <PanelTitle className="flex items-center gap-2">
             <Phone className="h-5 w-5" />
             Phone Numbers
-          </CardTitle>
-          <CardDescription>Your provisioned SMS phone numbers</CardDescription>
-        </CardHeader>
-        <CardContent>
+          </PanelTitle>
+        }
+        variant="own"
+      >
+        <div>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Phone className="mb-4 h-12 w-12 text-muted-foreground/50" />
             <h3 className="font-medium text-lg">No Phone Numbers</h3>
@@ -114,21 +114,23 @@ export function SMSPhoneNumbers({ orgSlug }: { orgSlug: string }) {
               to provision a phone number
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <Panel
+      description="Your provisioned SMS phone numbers"
+      label={
+        <PanelTitle className="flex items-center gap-2">
           <Phone className="h-5 w-5" />
           Phone Numbers
-        </CardTitle>
-        <CardDescription>Your provisioned SMS phone numbers</CardDescription>
-      </CardHeader>
-      <CardContent>
+        </PanelTitle>
+      }
+      variant="own"
+    >
+      <div>
         <div className="space-y-4">
           {data.phoneNumbers.map((phone) => {
             const typeInfo = getNumberTypeBadge(phone.numberType);
@@ -166,7 +168,7 @@ export function SMSPhoneNumbers({ orgSlug }: { orgSlug: string }) {
             );
           })}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

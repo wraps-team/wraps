@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { UserPlus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -59,23 +53,24 @@ export function MembersPageContent({
   return (
     <div className="space-y-6">
       {/* Members Section */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <div>
-            <CardTitle>Members</CardTitle>
-            <CardDescription>
-              {members.length} {members.length === 1 ? "member" : "members"} in
-              this organization
-            </CardDescription>
-          </div>
-          {canManageMembers && (
+      <Panel
+        actions={
+          canManageMembers && (
             <Button onClick={() => setIsInviteDialogOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
               Invite Member
             </Button>
-          )}
-        </CardHeader>
-        <CardContent>
+          )
+        }
+        description={
+          <>
+            {members.length} {members.length === 1 ? "member" : "members"} in
+            this organization
+          </>
+        }
+        label={<PanelTitle>Members</PanelTitle>}
+      >
+        <div className="-mx-4">
           <MembersTable
             members={members}
             onMemberUpdated={fetchMembers}
@@ -83,27 +78,28 @@ export function MembersPageContent({
             organizationSlug={organizationSlug}
             userRole={userRole}
           />
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Pending Invitations Section */}
       {canManageMembers && invitations.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Pending Invitations</CardTitle>
-            <CardDescription>
+        <Panel
+          description={
+            <>
               {invitations.length}{" "}
               {invitations.length === 1 ? "invitation" : "invitations"} pending
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </>
+          }
+          label={<PanelTitle>Pending Invitations</PanelTitle>}
+        >
+          <div className="-mx-4">
             <InvitationsTable
               invitations={invitations}
               onInvitationCancelled={fetchMembers}
               organizationId={organizationId}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       )}
 
       {/* Invite Member Dialog */}

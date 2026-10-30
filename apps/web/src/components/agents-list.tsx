@@ -11,13 +11,7 @@ import {
   AlertDialogTitle,
 } from "@wraps/ui/components/ui/alert-dialog";
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Table,
   TableBody,
@@ -129,102 +123,94 @@ export function AgentsList({
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <CardTitle>Agents</CardTitle>
-              <CardDescription>
-                Each agent sends through a customer-side enforcer that checks
-                its policy and kill switch on every send.
-              </CardDescription>
-            </div>
-            <Button asChild variant="outline">
-              <Link href={`/${orgSlug}/automations/agents/approvals`}>
-                Approval queue
-              </Link>
-            </Button>
+      <Panel
+        actions={
+          <Button asChild variant="outline">
+            <Link href={`/${orgSlug}/automations/agents/approvals`}>
+              Approval queue
+            </Link>
+          </Button>
+        }
+        description="Each agent sends through a customer-side enforcer that checks its policy and kill switch on every send."
+        label={<PanelTitle>Agents</PanelTitle>}
+      >
+        {agents.length === 0 ? (
+          <div className="py-8 text-center">
+            <Bot className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 font-semibold text-lg text-foreground">
+              No agents yet
+            </h3>
+            <p className="mt-1 text-muted-foreground text-sm">
+              Create one with{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                wraps email agent create
+              </code>
+              .
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          {agents.length === 0 ? (
-            <div className="py-8 text-center">
-              <Bot className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 font-semibold text-lg text-foreground">
-                No agents yet
-              </h3>
-              <p className="mt-1 text-muted-foreground text-sm">
-                Create one with{" "}
-                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-                  wraps email agent create
-                </code>
-                .
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Agent</TableHead>
-                    <TableHead>Address</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Policy</TableHead>
+        ) : (
+          <div className="-mx-4 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Agent</TableHead>
+                  <TableHead>Address</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Policy</TableHead>
+                  {canManage && (
+                    <TableHead className="text-right">Actions</TableHead>
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {agents.map((agent) => (
+                  <TableRow key={agent.id}>
+                    <TableCell className="font-medium text-foreground">
+                      {agent.name}
+                    </TableCell>
+                    <TableCell className="font-mono text-muted-foreground text-sm">
+                      {agent.emailAddress}
+                    </TableCell>
+                    <TableCell>
+                      {agent.status === "ACTIVE" ? (
+                        <Badge variant="secondary">
+                          <ShieldCheck className="mr-1 h-3 w-3" />
+                          Active
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive">
+                          <ShieldAlert className="mr-1 h-3 w-3" />
+                          Killed
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {policySummary(agent)}
+                    </TableCell>
                     {canManage && (
-                      <TableHead className="text-right">Actions</TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {agents.map((agent) => (
-                    <TableRow key={agent.id}>
-                      <TableCell className="font-medium text-foreground">
-                        {agent.name}
-                      </TableCell>
-                      <TableCell className="font-mono text-muted-foreground text-sm">
-                        {agent.emailAddress}
-                      </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         {agent.status === "ACTIVE" ? (
-                          <Badge variant="secondary">
-                            <ShieldCheck className="mr-1 h-3 w-3" />
-                            Active
-                          </Badge>
+                          <Button
+                            onClick={() => setKillTarget(agent)}
+                            size="sm"
+                            variant="destructive"
+                          >
+                            Kill switch
+                          </Button>
                         ) : (
-                          <Badge variant="destructive">
-                            <ShieldAlert className="mr-1 h-3 w-3" />
-                            Killed
-                          </Badge>
+                          <span className="text-muted-foreground text-sm">
+                            —
+                          </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {policySummary(agent)}
-                      </TableCell>
-                      {canManage && (
-                        <TableCell className="text-right">
-                          {agent.status === "ACTIVE" ? (
-                            <Button
-                              onClick={() => setKillTarget(agent)}
-                              size="sm"
-                              variant="destructive"
-                            >
-                              Kill switch
-                            </Button>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">
-                              —
-                            </span>
-                          )}
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </Panel>
 
       <AlertDialog
         onOpenChange={(open) => {

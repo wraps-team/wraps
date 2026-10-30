@@ -13,14 +13,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@wraps/ui/components/ui/alert-dialog";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Separator } from "@wraps/ui/components/ui/separator";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -160,14 +154,11 @@ export function OrganizationSettingsGeneral({
           form.handleSubmit();
         }}
       >
-        <Card>
-          <CardHeader>
-            <CardTitle>General Information</CardTitle>
-            <CardDescription>
-              Update your organization's basic information.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Panel
+          description="Update your organization's basic information."
+          label={<PanelTitle>General Information</PanelTitle>}
+        >
+          <div className="space-y-4">
             <form.Field name="name">
               {(field) => (
                 <div className="space-y-2">
@@ -239,17 +230,14 @@ export function OrganizationSettingsGeneral({
                 </div>
               )}
             </form.Field>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Danger Zone</CardTitle>
-            <CardDescription>
-              Irreversible and destructive actions.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Panel
+          description="Irreversible and destructive actions."
+          label={<PanelTitle>Danger Zone</PanelTitle>}
+        >
+          <div className="space-y-4">
             <Separator />
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -296,8 +284,8 @@ export function OrganizationSettingsGeneral({
                 </AlertDialogContent>
               </AlertDialog>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
         {canEdit && (
           <div className="flex space-x-2">

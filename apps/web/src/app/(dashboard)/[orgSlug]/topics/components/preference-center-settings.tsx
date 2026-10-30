@@ -12,13 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@wraps/ui/components/ui/alert-dialog";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Textarea } from "@wraps/ui/components/ui/textarea";
 import {
   ToggleGroup,
@@ -287,15 +281,16 @@ export function PreferenceCenterSettings({
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Preference Center Settings</CardTitle>
-          <CardDescription>
+      <Panel
+        description={
+          <>
             Customize the appearance and content of your subscriber preference
             center. This is where contacts can manage their topic subscriptions.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </>
+        }
+        label={<PanelTitle>Preference Center Settings</PanelTitle>}
+      >
+        <div>
           <form
             className="space-y-6"
             onSubmit={(e) => {
@@ -408,8 +403,8 @@ export function PreferenceCenterSettings({
               </FieldContent>
             </Field>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       <Toolbar
         draft={draft}

@@ -1,15 +1,9 @@
 "use client";
 
 import { useForm } from "@tanstack/react-form";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
 import { Checkbox } from "@wraps/ui/components/ui/checkbox";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -117,14 +111,13 @@ export default function NotificationSettings() {
         }}
       >
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Email Notifications</CardTitle>
-              <CardDescription>
-                Choose what email notifications you want to receive.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+          <Panel
+            description={
+              <>Choose what email notifications you want to receive.</>
+            }
+            label={<PanelTitle>Email Notifications</PanelTitle>}
+          >
+            <div className="space-y-6">
               <div className="space-y-4">
                 <form.Field name="emailSecurity">
                   {(field) => (
@@ -185,17 +178,14 @@ export default function NotificationSettings() {
                   )}
                 </form.Field>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Push Notifications</CardTitle>
-              <CardDescription>
-                Configure browser and mobile push notifications.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+          <Panel
+            description={<>Configure browser and mobile push notifications.</>}
+            label={<PanelTitle>Push Notifications</PanelTitle>}
+          >
+            <div className="space-y-6">
               <div className="space-y-4">
                 <form.Field name="pushMessages">
                   {(field) => (
@@ -255,17 +245,14 @@ export default function NotificationSettings() {
                   )}
                 </form.Field>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Notification Frequency</CardTitle>
-            <CardDescription>
-              Control how often you receive notifications.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Panel
+          description={<>Control how often you receive notifications.</>}
+          label={<PanelTitle>Notification Frequency</PanelTitle>}
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <form.Field name="emailFrequency">
               {(field) => (
                 <div className="space-y-2">
@@ -337,13 +324,12 @@ export default function NotificationSettings() {
                 </form.Field>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Notification Preferences</CardTitle>
-            <CardDescription>
+        <Panel
+          description={
+            <>
               We need permission from your browser to show notifications.{" "}
               <Button
                 className="h-auto"
@@ -352,9 +338,11 @@ export default function NotificationSettings() {
               >
                 Request Permission
               </Button>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </>
+          }
+          label={<PanelTitle>Notification Preferences</PanelTitle>}
+        >
+          <div>
             <div className="space-y-6">
               <Table>
                 <TableHeader>
@@ -583,18 +571,19 @@ export default function NotificationSettings() {
                 </form.Field>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Notification Channels</CardTitle>
-            <CardDescription>
+        <Panel
+          description={
+            <>
               Choose your preferred notification channels for different types of
               alerts.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </>
+          }
+          label={<PanelTitle>Notification Channels</PanelTitle>}
+        >
+          <div>
             <div className="space-y-4">
               <form.Field name="channelEmail">
                 {(field) => (
@@ -680,8 +669,8 @@ export default function NotificationSettings() {
                 )}
               </form.Field>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
         <div className="flex space-x-2">
           <form.Subscribe

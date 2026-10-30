@@ -1,12 +1,7 @@
 "use client";
 
 import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Table,
   TableBody,
@@ -134,9 +129,8 @@ export function RecipientsPanel({
   const total = state.kind === "ready" ? state.total : 0;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle className="text-lg">Recipients</CardTitle>
+    <Panel
+      actions={
         <Button
           disabled={isExporting || state.kind !== "ready" || total === 0}
           onClick={handleExport}
@@ -150,8 +144,10 @@ export function RecipientsPanel({
           )}
           Export CSV
         </Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      }
+      label={<PanelTitle>Recipients</PanelTitle>}
+    >
+      <div className="space-y-4">
         <Tabs onValueChange={handleFilterChange} value={statusFilter}>
           <TabsList>
             <TabsTrigger value="failed">Failed</TabsTrigger>
@@ -187,7 +183,7 @@ export function RecipientsPanel({
         )}
 
         {state.kind === "ready" && rows.length > 0 && (
-          <div className="overflow-x-auto rounded-md border">
+          <div className="-mx-4 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -250,7 +246,7 @@ export function RecipientsPanel({
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

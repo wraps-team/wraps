@@ -2,14 +2,8 @@
 
 import { useForm } from "@tanstack/react-form";
 import { Alert, AlertDescription } from "@wraps/ui/components/ui/alert";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -258,16 +252,11 @@ export function SenderDefaultsForm({
         }}
       >
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Default AWS Account</CardTitle>
-              <CardDescription>
-                Select the default AWS account to use for sending emails and
-                SMS. New workflows and broadcasts will use this account unless
-                otherwise specified.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Panel
+            description="Select the default AWS account to use for sending emails and SMS. New workflows and broadcasts will use this account unless otherwise specified."
+            label={<PanelTitle>Default AWS Account</PanelTitle>}
+          >
+            <div className="space-y-4">
               {awsAccounts.length > 0 ? (
                 <form.Field name="awsAccountId">
                   {(field) => (
@@ -296,7 +285,7 @@ export function SenderDefaultsForm({
                   )}
                 </form.Field>
               ) : (
-                <div className="rounded-lg border border-dashed p-6 text-center">
+                <div className="border p-6 text-center">
                   <p className="mb-2 text-muted-foreground">
                     No AWS accounts connected
                   </p>
@@ -307,18 +296,14 @@ export function SenderDefaultsForm({
                   </Button>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Email Defaults</CardTitle>
-              <CardDescription>
-                Set default sender information for emails. These values will be
-                used when creating new workflows and broadcasts.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Panel
+            description="Set default sender information for emails. These values will be used when creating new workflows and broadcasts."
+            label={<PanelTitle>Email Defaults</PanelTitle>}
+          >
+            <div className="space-y-4">
               {/* From Name */}
               <form.Field name="fromName">
                 {(field) => (
@@ -404,7 +389,7 @@ export function SenderDefaultsForm({
                       </form.Field>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-dashed p-3 text-center">
+                    <div className="border p-3 text-center">
                       <p className="text-muted-foreground text-xs">
                         {domainsLoading
                           ? "Loading domains..."
@@ -439,19 +424,16 @@ export function SenderDefaultsForm({
                   </div>
                 )}
               </form.Field>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
           {/* SMS Defaults - Only show if SMS is available */}
           {awsAccounts.some((a) => a.smsEnabled) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>SMS Defaults</CardTitle>
-                <CardDescription>
-                  Set default sender information for SMS messages.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <Panel
+              description="Set default sender information for SMS messages."
+              label={<PanelTitle>SMS Defaults</PanelTitle>}
+            >
+              <div className="space-y-4">
                 {currentAwsAccountId ? (
                   smsEnabled ? (
                     phoneNumbers.length > 0 ? (
@@ -505,7 +487,7 @@ export function SenderDefaultsForm({
                         )}
                       </form.Field>
                     ) : (
-                      <div className="rounded-lg border border-dashed p-3 text-center">
+                      <div className="border p-3 text-center">
                         <p className="text-muted-foreground text-xs">
                           {phoneNumbersLoading
                             ? "Loading phone numbers..."
@@ -523,8 +505,8 @@ export function SenderDefaultsForm({
                     Select an AWS account first
                   </p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           )}
 
           {canEdit && (

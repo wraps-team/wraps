@@ -3,13 +3,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Calendar } from "@wraps/ui/components/ui/calendar";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -22,6 +15,7 @@ import {
   DialogTitle,
 } from "@wraps/ui/components/ui/dialog";
 import { Label } from "@wraps/ui/components/ui/label";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Popover,
   PopoverContent,
@@ -1067,12 +1061,11 @@ function SetupStep({
   const domainOptions = verifiedDomains.filter((d) => d.type === "DOMAIN");
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Broadcast Details</CardTitle>
-          <CardDescription>Basic information about your email</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Panel
+        description="Basic information about your email"
+        label={<PanelTitle>Broadcast Details</PanelTitle>}
+      >
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Broadcast Name</Label>
             <Input
@@ -1085,15 +1078,14 @@ function SetupStep({
               Internal name to identify this broadcast
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Sender Information</CardTitle>
-          <CardDescription>Configure who this email is from</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Panel
+        description="Configure who this email is from"
+        label={<PanelTitle>Sender Information</PanelTitle>}
+      >
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="fromName">From Name</Label>
             <Input
@@ -1149,7 +1141,7 @@ function SetupStep({
                 </Select>
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed p-4 text-center">
+              <div className="border border-dashed p-4 text-center">
                 <p className="text-muted-foreground text-sm">
                   {domainsLoading
                     ? "Loading domains..."
@@ -1182,45 +1174,40 @@ function SetupStep({
               Where replies will be sent (defaults to From Email)
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>AWS Account</CardTitle>
-          <CardDescription>
-            Select which AWS account to send from
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {awsAccounts.length > 0 ? (
-            <Select
-              onValueChange={(value) => onChange({ awsAccountId: value })}
-              value={data.awsAccountId || ""}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select AWS account" />
-              </SelectTrigger>
-              <SelectContent>
-                {awsAccounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.name} ({account.region})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="text-center text-muted-foreground text-sm">
-              <p>No AWS accounts connected.</p>
-              <Button asChild className="mt-2" size="sm" variant="outline">
-                <Link href={`/${orgSlug}/settings/aws-accounts`}>
-                  Connect AWS Account
-                </Link>
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Panel
+        description="Select which AWS account to send from"
+        label={<PanelTitle>AWS Account</PanelTitle>}
+      >
+        {awsAccounts.length > 0 ? (
+          <Select
+            onValueChange={(value) => onChange({ awsAccountId: value })}
+            value={data.awsAccountId || ""}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select AWS account" />
+            </SelectTrigger>
+            <SelectContent>
+              {awsAccounts.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name} ({account.region})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <div className="text-center text-muted-foreground text-sm">
+            <p>No AWS accounts connected.</p>
+            <Button asChild className="mt-2" size="sm" variant="outline">
+              <Link href={`/${orgSlug}/settings/aws-accounts`}>
+                Connect AWS Account
+              </Link>
+            </Button>
+          </div>
+        )}
+      </Panel>
     </div>
   );
 }
@@ -1241,16 +1228,13 @@ function ContentStep({
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Email Content</CardTitle>
-          <CardDescription>
-            Choose how to build your email content
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Panel
+        description="Choose how to build your email content"
+        label={<PanelTitle>Email Content</PanelTitle>}
+      >
+        <div className="space-y-4">
           {/* Use Template - Primary Option */}
-          <div className="rounded-lg border p-4">
+          <div className="border p-4">
             <RadioGroup
               onValueChange={(v) => {
                 if (v === "template") {
@@ -1327,7 +1311,7 @@ function ContentStep({
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="pt-2">
-              <div className="rounded-lg border p-4">
+              <div className="border p-4">
                 <RadioGroup
                   onValueChange={(v) => {
                     onChange({
@@ -1379,18 +1363,15 @@ function ContentStep({
               </div>
             </CollapsibleContent>
           </Collapsible>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Subject & Preview Text */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Subject & Preview</CardTitle>
-          <CardDescription>
-            The subject line and preview text for this broadcast
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Panel
+        description="The subject line and preview text for this broadcast"
+        label={<PanelTitle>Subject & Preview</PanelTitle>}
+      >
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="subject">Subject Line *</Label>
             <Input
@@ -1415,8 +1396,8 @@ function ContentStep({
               Appears after the subject in most email clients
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Variable Mapping - shown when a template is selected */}
       {data.contentType === "template" && data.templateId && (
@@ -1615,59 +1596,54 @@ function RecipientPreviewCard({
   return (
     <>
       {/* Recipient Count & Sample Preview */}
-      <Card className="bg-muted/50">
-        <CardContent>
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-              <Users className="h-6 w-6 text-primary" />
+      <Panel label={<PanelTitle>Estimated Recipients</PanelTitle>}>
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+            <Users className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold text-2xl">
+              {loadingCount
+                ? "..."
+                : countError || recipientCount === null
+                  ? "Unknown"
+                  : recipientCount.toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        {/* Sample Contacts Preview */}
+        {sampleContacts.length > 0 && (
+          <div className="mt-4 border-t pt-4">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="font-medium text-muted-foreground text-sm">
+                {recipientCount === null
+                  ? `Preview (${sampleContacts.length})`
+                  : `Preview (${sampleContacts.length} of ${recipientCount.toLocaleString()})`}
+              </p>
+              {hasMoreThanPreview && (
+                <Button
+                  className="h-auto"
+                  onClick={() => setShowAllRecipients(true)}
+                  type="button"
+                  variant="link"
+                >
+                  View all recipients
+                </Button>
+              )}
             </div>
-            <div>
-              <p className="text-muted-foreground text-sm">
-                Estimated Recipients
-              </p>
-              <p className="font-semibold text-2xl">
-                {loadingCount
-                  ? "..."
-                  : countError || recipientCount === null
-                    ? "Unknown"
-                    : recipientCount.toLocaleString()}
-              </p>
+            <div className="space-y-1">
+              {loadingSamples ? (
+                <p className="text-muted-foreground text-sm">Loading...</p>
+              ) : (
+                sampleContacts.map((contact) => (
+                  <ContactRow contact={contact} key={contact.id} />
+                ))
+              )}
             </div>
           </div>
-
-          {/* Sample Contacts Preview */}
-          {sampleContacts.length > 0 && (
-            <div className="mt-4 border-t pt-4">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="font-medium text-muted-foreground text-sm">
-                  {recipientCount === null
-                    ? `Preview (${sampleContacts.length})`
-                    : `Preview (${sampleContacts.length} of ${recipientCount.toLocaleString()})`}
-                </p>
-                {hasMoreThanPreview && (
-                  <Button
-                    className="h-auto"
-                    onClick={() => setShowAllRecipients(true)}
-                    type="button"
-                    variant="link"
-                  >
-                    View all recipients
-                  </Button>
-                )}
-              </div>
-              <div className="space-y-1">
-                {loadingSamples ? (
-                  <p className="text-muted-foreground text-sm">Loading...</p>
-                ) : (
-                  sampleContacts.map((contact) => (
-                    <ContactRow contact={contact} key={contact.id} />
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </Panel>
 
       {/* Leaving the wizard to inspect the audience used to discard the whole
           draft, so the full list opens here instead of on the contacts page. */}
@@ -1711,140 +1687,135 @@ function AudienceStep({
 }) {
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Audience</CardTitle>
-          <CardDescription>
-            Choose who will receive this broadcast
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RadioGroup
-            onValueChange={(v) => onChange({ audienceType: v as AudienceType })}
-            value={data.audienceType}
-          >
-            {/* All Contacts */}
-            <div className="flex items-start space-x-3 rounded-lg border p-4">
-              <RadioGroupItem id="all" value="all" />
-              <div className="flex-1">
+      <Panel
+        description="Choose who will receive this broadcast"
+        label={<PanelTitle>Select Audience</PanelTitle>}
+      >
+        <RadioGroup
+          onValueChange={(v) => onChange({ audienceType: v as AudienceType })}
+          value={data.audienceType}
+        >
+          {/* All Contacts */}
+          <div className="flex items-start space-x-3 border p-4">
+            <RadioGroupItem id="all" value="all" />
+            <div className="flex-1">
+              <label
+                className="cursor-pointer font-medium text-sm"
+                htmlFor="all"
+              >
+                All Contacts
+              </label>
+              <p className="mt-1 text-muted-foreground text-xs">
+                Send to all active contacts in your database
+              </p>
+            </div>
+          </div>
+
+          {/* Topic Subscribers */}
+          <div className="flex items-start space-x-3 border p-4">
+            <RadioGroupItem
+              disabled={!topicsEnabled}
+              id="topic"
+              value="topic"
+            />
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-2">
                 <label
-                  className="cursor-pointer font-medium text-sm"
-                  htmlFor="all"
+                  className={`cursor-pointer font-medium text-sm ${topicsEnabled ? "" : "text-muted-foreground"}`}
+                  htmlFor="topic"
                 >
-                  All Contacts
+                  <Tag className="mr-1 inline h-4 w-4" />
+                  Topic Subscribers
                 </label>
-                <p className="mt-1 text-muted-foreground text-xs">
-                  Send to all active contacts in your database
-                </p>
-              </div>
-            </div>
-
-            {/* Topic Subscribers */}
-            <div className="flex items-start space-x-3 rounded-lg border p-4">
-              <RadioGroupItem
-                disabled={!topicsEnabled}
-                id="topic"
-                value="topic"
-              />
-              <div className="flex-1 space-y-3">
-                <div className="flex items-center gap-2">
-                  <label
-                    className={`cursor-pointer font-medium text-sm ${topicsEnabled ? "" : "text-muted-foreground"}`}
-                    htmlFor="topic"
-                  >
-                    <Tag className="mr-1 inline h-4 w-4" />
-                    Topic Subscribers
-                  </label>
-                  {!topicsEnabled && (
-                    <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                      <Lock className="h-3 w-3" />
-                      <Link
-                        className="text-primary hover:underline"
-                        href={`/${orgSlug}/settings/billing`}
-                      >
-                        {requiredPlanName("topics")}
-                      </Link>
-                    </span>
-                  )}
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  Send to contacts subscribed to a specific topic
-                </p>
-                {data.audienceType === "topic" && topicsEnabled && (
-                  <Select
-                    onValueChange={(v) => onChange({ topicId: v })}
-                    value={data.topicId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a topic" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {topics.map((topic) => (
-                        <SelectItem key={topic.id} value={topic.id}>
-                          {topic.name} ({topic.subscriberCount.toLocaleString()}{" "}
-                          can be emailed)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                {!topicsEnabled && (
+                  <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                    <Lock className="h-3 w-3" />
+                    <Link
+                      className="text-primary hover:underline"
+                      href={`/${orgSlug}/settings/billing`}
+                    >
+                      {requiredPlanName("topics")}
+                    </Link>
+                  </span>
                 )}
               </div>
+              <p className="text-muted-foreground text-xs">
+                Send to contacts subscribed to a specific topic
+              </p>
+              {data.audienceType === "topic" && topicsEnabled && (
+                <Select
+                  onValueChange={(v) => onChange({ topicId: v })}
+                  value={data.topicId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a topic" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {topics.map((topic) => (
+                      <SelectItem key={topic.id} value={topic.id}>
+                        {topic.name} ({topic.subscriberCount.toLocaleString()}{" "}
+                        can be emailed)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
+          </div>
 
-            {/* Segment */}
-            <div className="flex items-start space-x-3 rounded-lg border p-4">
-              <RadioGroupItem
-                disabled={!segmentsEnabled}
-                id="segment"
-                value="segment"
-              />
-              <div className="flex-1 space-y-3">
-                <div className="flex items-center gap-2">
-                  <label
-                    className={`cursor-pointer font-medium text-sm ${segmentsEnabled ? "" : "text-muted-foreground"}`}
-                    htmlFor="segment"
-                  >
-                    <Filter className="mr-1 inline h-4 w-4" />
-                    Segment
-                  </label>
-                  {!segmentsEnabled && (
-                    <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                      <Lock className="h-3 w-3" />
-                      <Link
-                        className="text-primary hover:underline"
-                        href={`/${orgSlug}/settings/billing`}
-                      >
-                        {requiredPlanName("segments")}
-                      </Link>
-                    </span>
-                  )}
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  Send to contacts matching specific criteria
-                </p>
-                {data.audienceType === "segment" && segmentsEnabled && (
-                  <Select
-                    onValueChange={(v) => onChange({ segmentId: v })}
-                    value={data.segmentId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a segment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {segments.map((segment) => (
-                        <SelectItem key={segment.id} value={segment.id}>
-                          {segment.name} ({segment.memberCount.toLocaleString()}{" "}
-                          can be emailed)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          {/* Segment */}
+          <div className="flex items-start space-x-3 border p-4">
+            <RadioGroupItem
+              disabled={!segmentsEnabled}
+              id="segment"
+              value="segment"
+            />
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-2">
+                <label
+                  className={`cursor-pointer font-medium text-sm ${segmentsEnabled ? "" : "text-muted-foreground"}`}
+                  htmlFor="segment"
+                >
+                  <Filter className="mr-1 inline h-4 w-4" />
+                  Segment
+                </label>
+                {!segmentsEnabled && (
+                  <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                    <Lock className="h-3 w-3" />
+                    <Link
+                      className="text-primary hover:underline"
+                      href={`/${orgSlug}/settings/billing`}
+                    >
+                      {requiredPlanName("segments")}
+                    </Link>
+                  </span>
                 )}
               </div>
+              <p className="text-muted-foreground text-xs">
+                Send to contacts matching specific criteria
+              </p>
+              {data.audienceType === "segment" && segmentsEnabled && (
+                <Select
+                  onValueChange={(v) => onChange({ segmentId: v })}
+                  value={data.segmentId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a segment" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {segments.map((segment) => (
+                      <SelectItem key={segment.id} value={segment.id}>
+                        {segment.name} ({segment.memberCount.toLocaleString()}{" "}
+                        can be emailed)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
-          </RadioGroup>
-        </CardContent>
-      </Card>
+          </div>
+        </RadioGroup>
+      </Panel>
 
       <RecipientPreviewCard
         countError={countError}
@@ -2149,12 +2120,11 @@ function ReviewStep({
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Review Broadcast</CardTitle>
-          <CardDescription>Review all details before sending</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Panel
+        description="Review all details before sending"
+        label={<PanelTitle>Review Broadcast</PanelTitle>}
+      >
+        <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label className="text-muted-foreground">Broadcast Name</Label>
@@ -2184,8 +2154,8 @@ function ReviewStep({
               <p>{data.previewText}</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Email Preview Carousel - only show for template content */}
       {data.contentType === "template" && data.templateId && (
@@ -2197,29 +2167,24 @@ function ReviewStep({
         />
       )}
 
-      <Card className="bg-muted/50">
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                <Users className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-muted-foreground text-sm">
-                  {getAudienceLabel()}
-                </p>
-                <p className="font-semibold text-2xl">
-                  {loadingCount
-                    ? "..."
-                    : countError || recipientCount === null
-                      ? "Recipient count unavailable"
-                      : `${recipientCount.toLocaleString()} recipients`}
-                </p>
-              </div>
+      <Panel label={<PanelTitle>{getAudienceLabel()}</PanelTitle>}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+              <Users className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold text-2xl">
+                {loadingCount
+                  ? "..."
+                  : countError || recipientCount === null
+                    ? "Recipient count unavailable"
+                    : `${recipientCount.toLocaleString()} recipients`}
+              </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Test send — the flow had none, so the only way to try a broadcast was
           to send a real one. See finding H5. */}
@@ -2249,7 +2214,7 @@ function ReviewStep({
         }}
       />
 
-      {/* Scheduling Card */}
+      {/* Scheduling panel */}
       <SchedulingCard
         allowSendNow={!isEditingScheduled}
         data={data}
@@ -2453,7 +2418,7 @@ function ReviewStep({
   );
 }
 
-// Scheduling Card Component - isolated to prevent NL input keystrokes from
+// Scheduling Panel Component - isolated to prevent NL input keystrokes from
 // re-rendering the rest of ReviewStep (notably EmailPreviewCarousel)
 function SchedulingCard({
   allowSendNow,
@@ -2530,157 +2495,154 @@ function SchedulingCard({
   const scheduledDateTime = getScheduledDateTime();
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>When to Send</CardTitle>
-        <CardDescription>
-          {allowSendNow
-            ? "Send now or schedule for later"
-            : "Move the send time. To send now, cancel this broadcast and send a copy."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <RadioGroup
-          onValueChange={(v) => onChange({ scheduleType: v as ScheduleType })}
-          value={data.scheduleType}
-        >
-          {/* Send Now */}
-          {allowSendNow && (
-            <div className="flex items-start space-x-3 rounded-lg border p-4">
-              <RadioGroupItem id="now" value="now" />
-              <div className="flex-1">
-                <label
-                  className="cursor-pointer font-medium text-sm"
-                  htmlFor="now"
-                >
-                  <Send className="mr-1 inline h-4 w-4" />
-                  Send immediately
-                </label>
-                <p className="mt-1 text-muted-foreground text-xs">
-                  Start sending to recipients right away
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Schedule for Later */}
-          <div
-            className={cn(
-              "flex items-start space-x-3 rounded-lg border p-4",
-              !schedulingEnabled && "cursor-not-allowed opacity-60"
-            )}
-          >
-            <RadioGroupItem
-              disabled={!schedulingEnabled}
-              id="later"
-              value="later"
-            />
-            <div className="flex-1 space-y-3">
-              <div>
-                <label
-                  className={cn(
-                    "font-medium text-sm",
-                    schedulingEnabled ? "cursor-pointer" : "cursor-not-allowed"
-                  )}
-                  htmlFor="later"
-                >
-                  {schedulingEnabled ? (
-                    <Clock className="mr-1 inline h-4 w-4" />
-                  ) : (
-                    <Lock className="mr-1 inline h-4 w-4" />
-                  )}
-                  Schedule for later
-                  {!schedulingEnabled && (
-                    <span className="ml-2 text-muted-foreground text-xs">
-                      ({requiredPlanName("campaigns")} plan)
-                    </span>
-                  )}
-                </label>
-                <p className="mt-1 text-muted-foreground text-xs">
-                  {schedulingEnabled
-                    ? "Choose a specific date and time to send"
-                    : `Upgrade to ${requiredPlanName("campaigns")} to schedule broadcasts for later`}
-                </p>
-              </div>
-              {data.scheduleType === "later" && (
-                <div className="space-y-3">
-                  {/* Natural language date input */}
-                  <div className="space-y-1.5">
-                    <Input
-                      onChange={(e) => setNlText(e.target.value)}
-                      placeholder='Type a date, e.g. "next Wednesday at 9am"'
-                      value={nlText}
-                    />
-                    {formattedPreview && (
-                      <p className="flex items-center gap-1.5 text-sm text-success">
-                        <Check className="h-3.5 w-3.5" />
-                        {formattedPreview}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Date & time pickers as fallback */}
-                  <div className="space-y-1.5">
-                    <p className="text-muted-foreground text-xs">
-                      Or pick a date and time:
-                    </p>
-                    <div className="flex flex-wrap gap-3">
-                      {/* Date Picker */}
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            className="w-[180px] justify-start text-left"
-                            variant="outline"
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {data.scheduledDate ? (
-                              format(data.scheduledDate, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="w-auto p-0">
-                          <Calendar
-                            disabled={(date) => date < new Date()}
-                            mode="single"
-                            onSelect={handlePickerDateChange}
-                            selected={data.scheduledDate}
-                          />
-                        </PopoverContent>
-                      </Popover>
-
-                      {/* Time Picker */}
-                      <Select
-                        onValueChange={handlePickerTimeChange}
-                        value={data.scheduledTime}
-                      >
-                        <SelectTrigger className="w-[160px]">
-                          <Clock className="mr-2 h-4 w-4" />
-                          <SelectValue placeholder="Time" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {timeOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {data.scheduleType === "later" && scheduledDateTime && (
-                <p className="text-muted-foreground text-xs">
-                  Scheduled for {format(scheduledDateTime, "PPPP 'at' p")} (
-                  {localTimeZoneLabel()})
-                </p>
-              )}
+    <Panel
+      description={
+        allowSendNow
+          ? "Send now or schedule for later"
+          : "Move the send time. To send now, cancel this broadcast and send a copy."
+      }
+      label={<PanelTitle>When to Send</PanelTitle>}
+    >
+      <RadioGroup
+        onValueChange={(v) => onChange({ scheduleType: v as ScheduleType })}
+        value={data.scheduleType}
+      >
+        {/* Send Now */}
+        {allowSendNow && (
+          <div className="flex items-start space-x-3 border p-4">
+            <RadioGroupItem id="now" value="now" />
+            <div className="flex-1">
+              <label
+                className="cursor-pointer font-medium text-sm"
+                htmlFor="now"
+              >
+                <Send className="mr-1 inline h-4 w-4" />
+                Send immediately
+              </label>
+              <p className="mt-1 text-muted-foreground text-xs">
+                Start sending to recipients right away
+              </p>
             </div>
           </div>
-        </RadioGroup>
-      </CardContent>
-    </Card>
+        )}
+
+        {/* Schedule for Later */}
+        <div
+          className={cn(
+            "flex items-start space-x-3 border p-4",
+            !schedulingEnabled && "cursor-not-allowed opacity-60"
+          )}
+        >
+          <RadioGroupItem
+            disabled={!schedulingEnabled}
+            id="later"
+            value="later"
+          />
+          <div className="flex-1 space-y-3">
+            <div>
+              <label
+                className={cn(
+                  "font-medium text-sm",
+                  schedulingEnabled ? "cursor-pointer" : "cursor-not-allowed"
+                )}
+                htmlFor="later"
+              >
+                {schedulingEnabled ? (
+                  <Clock className="mr-1 inline h-4 w-4" />
+                ) : (
+                  <Lock className="mr-1 inline h-4 w-4" />
+                )}
+                Schedule for later
+                {!schedulingEnabled && (
+                  <span className="ml-2 text-muted-foreground text-xs">
+                    ({requiredPlanName("campaigns")} plan)
+                  </span>
+                )}
+              </label>
+              <p className="mt-1 text-muted-foreground text-xs">
+                {schedulingEnabled
+                  ? "Choose a specific date and time to send"
+                  : `Upgrade to ${requiredPlanName("campaigns")} to schedule broadcasts for later`}
+              </p>
+            </div>
+            {data.scheduleType === "later" && (
+              <div className="space-y-3">
+                {/* Natural language date input */}
+                <div className="space-y-1.5">
+                  <Input
+                    onChange={(e) => setNlText(e.target.value)}
+                    placeholder='Type a date, e.g. "next Wednesday at 9am"'
+                    value={nlText}
+                  />
+                  {formattedPreview && (
+                    <p className="flex items-center gap-1.5 text-sm text-success">
+                      <Check className="h-3.5 w-3.5" />
+                      {formattedPreview}
+                    </p>
+                  )}
+                </div>
+
+                {/* Date & time pickers as fallback */}
+                <div className="space-y-1.5">
+                  <p className="text-muted-foreground text-xs">
+                    Or pick a date and time:
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    {/* Date Picker */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          className="w-[180px] justify-start text-left"
+                          variant="outline"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {data.scheduledDate ? (
+                            format(data.scheduledDate, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-auto p-0">
+                        <Calendar
+                          disabled={(date) => date < new Date()}
+                          mode="single"
+                          onSelect={handlePickerDateChange}
+                          selected={data.scheduledDate}
+                        />
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* Time Picker */}
+                    <Select
+                      onValueChange={handlePickerTimeChange}
+                      value={data.scheduledTime}
+                    >
+                      <SelectTrigger className="w-[160px]">
+                        <Clock className="mr-2 h-4 w-4" />
+                        <SelectValue placeholder="Time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
+            {data.scheduleType === "later" && scheduledDateTime && (
+              <p className="text-muted-foreground text-xs">
+                Scheduled for {format(scheduledDateTime, "PPPP 'at' p")} (
+                {localTimeZoneLabel()})
+              </p>
+            )}
+          </div>
+        </div>
+      </RadioGroup>
+    </Panel>
   );
 }

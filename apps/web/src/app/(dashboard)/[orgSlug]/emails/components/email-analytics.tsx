@@ -1,17 +1,12 @@
 "use client";
 
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@wraps/ui/components/ui/card";
-import {
   type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@wraps/ui/components/ui/chart";
+import { Panel, PanelSource, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { CircleAlert, Loader2, RotateCw } from "lucide-react";
 import { useMemo } from "react";
@@ -19,7 +14,6 @@ import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useHubDays } from "@/hooks/use-hub-days";
 import {
-  type ReputationLabel,
   reputationPartialLabel,
   reputationScopeLabel,
 } from "@/lib/analytics-scope";
@@ -30,7 +24,7 @@ import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { useEmailChartData } from "../analytics/hooks/use-analytics";
 import { captureEmailsErrorRetried } from "../lib/analytics";
-import { Figure, ReputationScope, UpdatedAgo } from "./summary-rail";
+import { ReputationScope, UpdatedAgo } from "./summary-rail";
 
 /**
  * The four series, each owning its colour AND a stroke treatment.
@@ -142,91 +136,93 @@ const chartConfig: ChartConfig = {
  */
 const PLOT_HEIGHT = "h-[260px] @[540px]/card:h-[320px]";
 
-type SummaryProps = {
-  overview:
-    | {
-        totalSent: number;
-        totalDelivered: number;
-        deliveryRate: number;
-        bounceRate: number;
-        complaintRate: number;
-      }
-    | undefined;
-  generatedAt: number | undefined;
-  reputation: ReputationLabel | null;
-  reputationPartial: string | null;
-};
+type AccountOverview =
+  | {
+      totalSent: number;
+      totalDelivered: number;
+      deliveryRate: number;
+      bounceRate: number;
+      complaintRate: number;
+    }
+  | undefined;
+
+function Stat({
+  label,
+  value,
+  aside,
+  className,
+}: {
+  label: string;
+  value: string;
+  aside?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("py-3", className)}>
+      <div className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
+        {label}
+      </div>
+      <div className="mt-1.5 flex items-baseline gap-1.5">
+        <span className="font-heading font-semibold text-2xl leading-none tabular-nums">
+          {value}
+        </span>
+        {aside ? (
+          <span className="text-muted-foreground text-sm">{aside}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 /**
- * The card's numbers, as one horizontal rail above the plot.
- *
- * They were a 200px column beside the chart, in three bordered tiles nested
- * inside the card - and the counts and the reputation rates were distinguished
- * only by a border alpha, which is too weak a signal to read as deliberate for
- * a distinction that actually matters: the counts are scoped to the selected
- * window, the rates are an all-time figure for the whole AWS account. Here the
- * split is carried by a rule and by type size, and nothing is boxed.
+ * The account's figures as a 2x2 ruled grid. Two populations, split by the
+ * rule between the rows: the top row counts the selected window, the bottom
+ * row is the account's all-time reputation, which the source line's scope
+ * popover explains. A reader who assumes the bounce rate is window-scoped will
+ * misread it, so the split is carried by the rule and by the window in the top
+ * labels.
  */
-function ActivitySummary({
+function AccountFigures({
   overview,
-  generatedAt,
-  reputation,
+  rangeShort,
   reputationPartial,
-}: SummaryProps) {
+}: {
+  overview: AccountOverview;
+  rangeShort: string;
+  reputationPartial: string | null;
+}) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b pb-5">
-      <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
-        <Figure
-          label="Sent"
+    <div>
+      <div className="grid grid-cols-2">
+        <Stat
+          label={`Sent · ${rangeShort}`}
           value={(overview?.totalSent ?? 0).toLocaleString()}
         />
-        <Figure
+        <Stat
           aside={`${(overview?.deliveryRate ?? 0).toFixed(1)}%`}
-          label="Delivered"
+          className="border-l pl-4"
+          label={`Delivered · ${rangeShort}`}
           value={(overview?.totalDelivered ?? 0).toLocaleString()}
         />
-
-        {/* A different population starts here. */}
-        <div
-          aria-hidden="true"
-          className="@[540px]/card:block hidden h-10 w-px bg-border"
+        <Stat
+          className="border-t"
+          label="Bounce rate"
+          value={`${(overview?.bounceRate ?? 0).toFixed(2)}%`}
         />
-
-        <div>
-          <div className="flex items-center gap-1 text-muted-foreground text-xs">
-            {reputation?.title ?? "Account reputation"}
-            {reputation ? <ReputationScope reputation={reputation} /> : null}
-          </div>
-          <div className="mt-1.5 flex items-baseline gap-4 text-sm leading-none">
-            <span className="font-medium tabular-nums">
-              {(overview?.bounceRate ?? 0).toFixed(2)}%{" "}
-              <span className="font-normal text-muted-foreground">bounces</span>
-            </span>
-            <span className="font-medium tabular-nums">
-              {(overview?.complaintRate ?? 0).toFixed(3)}%{" "}
-              <span className="font-normal text-muted-foreground">
-                complaints
-              </span>
-            </span>
-          </div>
-          {/*
-            Stays on the surface rather than going into the popover: a rate
-            computed from an incomplete set of AWS accounts is a caveat about
-            the number itself, not background reading.
-          */}
-          {reputationPartial ? (
-            <p className="mt-1.5 text-destructive text-xs">
-              {reputationPartial}
-            </p>
-          ) : null}
-        </div>
+        <Stat
+          className="border-t border-l pl-4"
+          label="Complaint rate"
+          value={`${(overview?.complaintRate ?? 0).toFixed(3)}%`}
+        />
       </div>
-
-      {generatedAt === undefined ? null : (
-        <p className="text-muted-foreground text-xs">
-          <UpdatedAgo generatedAt={generatedAt} />
-        </p>
-      )}
+      {/*
+        Stays on the surface rather than going into the popover: a rate
+        computed from an incomplete set of AWS accounts is a caveat about the
+        number itself, not background reading.
+      */}
+      {reputationPartial ? (
+        <p className="mt-2 text-destructive text-xs">{reputationPartial}</p>
+      ) : null}
     </div>
   );
 }
@@ -352,38 +348,20 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
   } sent, ${overview?.totalDelivered ?? 0} delivered.`;
 
   return (
-    <Card className="@container/card">
-      <CardHeader>
-        {/*
-          A real <h2>. The card is a section of the page, not a container, and
-          `role="heading" aria-level={2}` on a <div> bought the same outline
-          entry with none of the semantics.
-
-          No CardDescription: it carried EMAIL_COVERAGE_EXPLAINER, the same 200
-          characters the Messages table prints a few hundred pixels below - and
-          it opens "This list shows every message...", on a card that holds no
-          list.
-        */}
-        <CardTitle asChild>
-          <h2>Email Activity</h2>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <div className="grid gap-6 lg:grid-cols-5">
+      {/*
+        Two labelled panels, no card around them. The chart is something Wraps
+        computes from the customer's events, so it gets the plain border; the
+        account figures are read from their SES account, so they get the dashed
+        "your account" one.
+      */}
+      <Panel
+        className="@container/card lg:col-span-3"
+        label={<PanelTitle>Email activity · {range.short}</PanelTitle>}
+      >
         {isLoading && (
-          // Mirrors the loaded card block for block. The old skeleton modelled
-          // a 216px sidebar against a 452px real one, so the card grew by more
-          // than 200px the moment data landed and shoved the Messages table
-          // down the page.
           <div>
-            <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b pb-5">
-              <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
-                <Skeleton className="h-11 w-20" />
-                <Skeleton className="h-11 w-28" />
-                <Skeleton className="h-11 w-56" />
-              </div>
-              <Skeleton className="h-4 w-32" />
-            </div>
-            <Skeleton className={cn("mt-6 w-full", PLOT_HEIGHT)} />
+            <Skeleton className={cn("w-full", PLOT_HEIGHT)} />
             <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
               <Skeleton className="h-4 w-16" />
               <Skeleton className="h-4 w-20" />
@@ -404,155 +382,184 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
         )}
 
         {!(isLoading || isError) && (
-          <div>
-            <ActivitySummary
-              generatedAt={meta?.generatedAt}
-              overview={overview}
-              reputation={reputation}
-              reputationPartial={reputationPartial}
-            />
-
-            <div className="mt-6 min-w-0">
-              {hasActivity ? (
-                <>
-                  {/*
+          <div className="min-w-0">
+            {hasActivity ? (
+              <>
+                {/*
                     role="figure", not "img": accessibilityLayer puts a
                     focusable role="application" surface inside, and role="img"
                     makes its subtree presentational - which would hide the
                     keyboard path we just added.
                   */}
-                  <ChartContainer
-                    aria-label={chartSummary}
-                    className={cn("aspect-auto w-full", PLOT_HEIGHT)}
-                    config={chartConfig}
-                    role="figure"
-                  >
-                    {/* accessibilityLayer makes the plot tabbable and
+                <ChartContainer
+                  aria-label={chartSummary}
+                  className={cn("aspect-auto w-full", PLOT_HEIGHT)}
+                  config={chartConfig}
+                  role="figure"
+                >
+                  {/* accessibilityLayer makes the plot tabbable and
                         arrow-navigable; without it every number here was
                         mouse-hover only. */}
-                    <AreaChart accessibilityLayer data={chartData}>
-                      <defs>
-                        <linearGradient
-                          id="fillSent"
-                          x1="0"
-                          x2="0"
-                          y1="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="5%"
-                            stopColor="var(--color-sent)"
-                            stopOpacity={0.3}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="var(--color-sent)"
-                            stopOpacity={0.05}
-                          />
-                        </linearGradient>
-                        <linearGradient
-                          id="fillDelivered"
-                          x1="0"
-                          x2="0"
-                          y1="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="5%"
-                            stopColor="var(--color-delivered)"
-                            stopOpacity={0.3}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="var(--color-delivered)"
-                            stopOpacity={0.05}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis
-                        axisLine={false}
-                        dataKey="date"
-                        minTickGap={32}
-                        tickFormatter={(value) => {
-                          const date = new Date(value);
-                          return date.toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          });
-                        }}
-                        tickLine={false}
-                        tickMargin={8}
-                      />
-                      <YAxis {...countYAxisProps(maxValue)} />
-                      <ChartTooltip
-                        content={
-                          <ChartTooltipContent
-                            labelFormatter={(value) =>
-                              new Date(value).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })
-                            }
-                          />
-                        }
-                      />
-                      {/* isAnimationActive is JS-driven, so the reduced-motion
+                  <AreaChart accessibilityLayer data={chartData}>
+                    <defs>
+                      <linearGradient id="fillSent" x1="0" x2="0" y1="0" y2="1">
+                        <stop
+                          offset="5%"
+                          stopColor="var(--color-sent)"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="var(--color-sent)"
+                          stopOpacity={0.05}
+                        />
+                      </linearGradient>
+                      <linearGradient
+                        id="fillDelivered"
+                        x1="0"
+                        x2="0"
+                        y1="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="var(--color-delivered)"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="var(--color-delivered)"
+                          stopOpacity={0.05}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      axisLine={false}
+                      dataKey="date"
+                      minTickGap={32}
+                      tickFormatter={(value) => {
+                        const date = new Date(value);
+                        return date.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        });
+                      }}
+                      tickLine={false}
+                      tickMargin={8}
+                    />
+                    <YAxis {...countYAxisProps(maxValue)} />
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          labelFormatter={(value) =>
+                            new Date(value).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          }
+                        />
+                      }
+                    />
+                    {/* isAnimationActive is JS-driven, so the reduced-motion
                           rules in globals.css cannot reach it. */}
-                      <Area
-                        dataKey="sent"
-                        fill="url(#fillSent)"
-                        isAnimationActive={!reducedMotion}
-                        stroke="var(--color-sent)"
-                        strokeWidth={SERIES.sent.width}
-                        type="monotone"
-                      />
-                      <Area
-                        dataKey="delivered"
-                        fill="url(#fillDelivered)"
-                        isAnimationActive={!reducedMotion}
-                        stroke="var(--color-delivered)"
-                        strokeDasharray={SERIES.delivered.dash}
-                        strokeWidth={SERIES.delivered.width}
-                        type="monotone"
-                      />
-                      <Area
-                        dataKey="opened"
-                        fill="transparent"
-                        isAnimationActive={!reducedMotion}
-                        stroke="var(--color-opened)"
-                        strokeDasharray={SERIES.opened.dash}
-                        strokeWidth={SERIES.opened.width}
-                        type="monotone"
-                      />
-                      <Area
-                        dataKey="clicked"
-                        fill="transparent"
-                        isAnimationActive={!reducedMotion}
-                        stroke="var(--color-clicked)"
-                        strokeDasharray={SERIES.clicked.dash}
-                        strokeWidth={SERIES.clicked.width}
-                        type="monotone"
-                      />
-                    </AreaChart>
-                  </ChartContainer>
-                  <ChartLegend />
-                </>
-              ) : (
-                <div
-                  className={cn(
-                    "flex items-center justify-center text-muted-foreground text-sm",
-                    PLOT_HEIGHT
-                  )}
-                >
-                  No email activity in this period
-                </div>
-              )}
-            </div>
+                    <Area
+                      dataKey="sent"
+                      fill="url(#fillSent)"
+                      isAnimationActive={!reducedMotion}
+                      stroke="var(--color-sent)"
+                      strokeWidth={SERIES.sent.width}
+                      type="monotone"
+                    />
+                    <Area
+                      dataKey="delivered"
+                      fill="url(#fillDelivered)"
+                      isAnimationActive={!reducedMotion}
+                      stroke="var(--color-delivered)"
+                      strokeDasharray={SERIES.delivered.dash}
+                      strokeWidth={SERIES.delivered.width}
+                      type="monotone"
+                    />
+                    <Area
+                      dataKey="opened"
+                      fill="transparent"
+                      isAnimationActive={!reducedMotion}
+                      stroke="var(--color-opened)"
+                      strokeDasharray={SERIES.opened.dash}
+                      strokeWidth={SERIES.opened.width}
+                      type="monotone"
+                    />
+                    <Area
+                      dataKey="clicked"
+                      fill="transparent"
+                      isAnimationActive={!reducedMotion}
+                      stroke="var(--color-clicked)"
+                      strokeDasharray={SERIES.clicked.dash}
+                      strokeWidth={SERIES.clicked.width}
+                      type="monotone"
+                    />
+                  </AreaChart>
+                </ChartContainer>
+                <ChartLegend />
+              </>
+            ) : (
+              <div
+                className={cn(
+                  "flex items-center justify-center text-muted-foreground text-sm",
+                  PLOT_HEIGHT
+                )}
+              >
+                No email activity in this period
+              </div>
+            )}
           </div>
         )}
-      </CardContent>
-    </Card>
+
+        <PanelSource>
+          <span>Computed by Wraps from your events</span>
+          <span>{range.long}</span>
+        </PanelSource>
+      </Panel>
+
+      <Panel
+        className="lg:col-span-2"
+        label={<PanelTitle>Your SES account</PanelTitle>}
+        variant="own"
+      >
+        {isLoading && (
+          <div className="grid grid-cols-2 gap-4 py-3">
+            <Skeleton className="h-11" />
+            <Skeleton className="h-11" />
+            <Skeleton className="h-11" />
+            <Skeleton className="h-11" />
+          </div>
+        )}
+
+        {!isLoading && isError && (
+          <p className="py-3 text-muted-foreground text-sm">
+            These figures did not load. Retry from the activity panel.
+          </p>
+        )}
+
+        {!(isLoading || isError) && (
+          <AccountFigures
+            overview={overview}
+            rangeShort={range.short}
+            reputationPartial={reputationPartial}
+          />
+        )}
+
+        <PanelSource>
+          <span className="flex items-center gap-1">
+            {reputation?.title ?? "Account reputation"}
+            {reputation ? <ReputationScope reputation={reputation} /> : null}
+          </span>
+          {meta?.generatedAt === undefined ? null : (
+            <UpdatedAgo generatedAt={meta.generatedAt} />
+          )}
+        </PanelSource>
+      </Panel>
+    </div>
   );
 }
