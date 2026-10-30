@@ -69,10 +69,10 @@ describe("WORKFLOW_STATUS_LABELS", () => {
 
 describe("WORKFLOW_STATUS_COLORS", () => {
   it("should have colors for all statuses", () => {
-    expect(WORKFLOW_STATUS_COLORS.draft).toContain("gray");
-    expect(WORKFLOW_STATUS_COLORS.enabled).toContain("green");
-    expect(WORKFLOW_STATUS_COLORS.paused).toContain("yellow");
-    expect(WORKFLOW_STATUS_COLORS.archived).toContain("gray");
+    expect(WORKFLOW_STATUS_COLORS.draft).toContain("text-foreground");
+    expect(WORKFLOW_STATUS_COLORS.enabled).toContain("text-success");
+    expect(WORKFLOW_STATUS_COLORS.paused).toContain("text-warning");
+    expect(WORKFLOW_STATUS_COLORS.archived).toContain("text-muted-foreground");
   });
 });
 
